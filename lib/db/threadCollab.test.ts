@@ -77,14 +77,16 @@ test("independent SQLite writers racing their first mutation keep exact counts",
   const dbPath = f.db.prepare("PRAGMA database_list").get().file as string;
   const storagePath = new URL("./threadCollab.ts", import.meta.url).pathname;
   const retryPath = new URL("../dbWriteRetry.ts", import.meta.url).pathname;
+  const connectionPath = new URL("./connection.ts", import.meta.url).pathname;
   // Separate Bun processes exercise real SQLite writer contention rather than
   // merely interleaving Promise callbacks on one shared connection.
   const script = `
     import { Database } from 'bun:sqlite';
     import { addThreadComment } from ${JSON.stringify(storagePath)};
     import { withDbWriteRetry } from ${JSON.stringify(retryPath)};
+    import { configureAccountDb } from ${JSON.stringify(connectionPath)};
     const db = new Database(process.env.COLLAB_TEST_DB);
-    db.exec('PRAGMA busy_timeout=0');
+    configureAccountDb(db, 0);
     const start = new Promise(resolve => process.stdin.once('end', resolve));
     process.stdin.resume();
     console.log('ready');

@@ -469,7 +469,7 @@ All message lookups, joins and mutations include the account. The durable keys a
   `(accountId, messageId, eventUid)`. Each has an account-scoped message foreign
   key with `ON DELETE CASCADE`. Attachment metadata, ids and removal additionally
   check the owning message before preview, bytes, ETag/304, or cache handling.
-- `message_fts` stores `accountId` and the local row id (both unindexed). Search
+- `message_fts_v2` stores `accountId` and the local row id (both unindexed). Search
   matches the pair; sync/deletion replaces only that account's FTS entries.
 - `thread_topics`: `(accountId, threadId, topicId)`. Topic filters and remaps
   include accountId. Collaboration state already uses `(accountId, threadId)`;
@@ -487,9 +487,37 @@ and child ownership from the legacy globally unique message id, preserves indexe
 and triggers, rebuilds FTS from surviving messages, then checks foreign keys
 before commit. SQLite foreign-key enforcement is disabled only around the atomic
 rebuild and restored even on failure; failures roll back all table swaps. Repeated
-opens do not rebuild or acquire a writer lock for the key check. Stop all app and
-worker processes before upgrading; mixed old/new writers are unsupported. Keep a
-backup of each physical shard and the account-scoped files together.
+opens do not rebuild or acquire a writer lock for the key/format check.
+
+Shard `PRAGMA user_version = 2` is installed in that same transaction, together
+with database-enforced legacy-writer rejection. Every ordinary table containing
+`accountId` has BEFORE INSERT/UPDATE/DELETE triggers requiring the connection-local
+`noctua_writer_v2()` SQL function. `configureAccountDb` registers it immediately
+on open, before schema/data writes, including the separate membership-cleanup
+handle; sync workers, recompute CLIs, watcher ingestion and maintenance scripts
+use the common account connection API. Schema initialization also registers it
+for explicit migration handles. Connections refuse a `user_version` newer than
+the binary supports before configuration/schema writes.
+
+SQLite forbids persistent triggers referencing TEMP tables, and forbids triggers
+on virtual tables and FTS shadow tables. Therefore the guard uses a SQL function
+instead of a TEMP marker, and FTS is physically renamed to `message_fts_v2`.
+The legacy `message_fts` name becomes a read-only view. Legacy ordinary-table
+mutations fail at statement preparation with `no such function:
+noctua_writer_v2`; legacy FTS mutations fail with `cannot modify message_fts
+because it is a view`. This also invalidates statements prepared before the
+migration. Legacy reads may work or fail; an old binary cannot safely resume
+writing this format. Direct shard writers must use `configureAccountDb` and
+the current FTS table name; the marker is a format compatibility boundary, not
+protection against an operator deliberately changing the schema.
+
+Stop all app, watcher, sync and recompute worker processes before upgrading.
+Back up the master DB, each actual physical shard (including WAL state using
+SQLite backup or a clean shutdown), and account-scoped files together. Run the
+collision inventory below before migrating, start only the new binary to migrate
+each shard at first open, then resync all accounts that used a legacy shared file.
+To roll back to an old binary, stop the new processes and restore the coordinated
+pre-upgrade backup; never remove the guards or lower `user_version` in place.
 
 Before opening an existing shared shard with the new version, run this read-only
 inventory once for each actual file (paths are deduplicated by realpath):

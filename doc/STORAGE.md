@@ -34,13 +34,50 @@ Depending on `IMAP_CREDENTIALS_STORAGE`, encrypted IMAP/SMTP passwords may also 
 ### `db/accounts/<accountId>.db` (account shard DB, important)
 
 Contains per-account operational and user-facing mail state:
-- `folders`, `messages`, `threads`, `mailbox_state`, `message_fts`
+- `folders`, `messages`, `threads`, `mailbox_state`, `message_fts_v2`
 - attachment metadata (`attachments`)
 - reminder definitions (`calendar_reminders`)
 - categorization state and learning:
   - message category fields (`messages.category`, `messages.categoryScore`, `messages.categorySignals`)
   - learned model (`category_model_state`)
   - feedback/training history (`category_feedback_events`)
+
+Several accounts may map to one physical shard via `accounts.dbPath`. Message
+and thread identities include `accountId`; attachments, translations and calendar
+message links use the same composite ownership. Source and attachment cache paths
+remain account scoped. Format 2 (`PRAGMA user_version = 2`) is migrated at first
+open in one immediate transaction with the composite-key/FTS rebuild and writer
+guards. It preserves surviving data, indexes and custom triggers, checks foreign
+keys, and rolls back on failure. Repeated initialization is idempotent.
+
+BEFORE INSERT/UPDATE/DELETE triggers on every ordinary account-scoped table
+require `noctua_writer_v2()`, registered per connection by `configureAccountDb`
+before writes (also by explicit schema initialization). A legacy connection fails
+at statement preparation with `no such function: noctua_writer_v2`. SQLite does
+not allow persistent triggers to refer to TEMP tables or triggers on virtual/FTS
+shadow tables. Accordingly, the physical FTS table is `message_fts_v2`, and the
+old `message_fts` name is reserved as a read-only view: legacy FTS mutations fail
+with `cannot modify message_fts because it is a view`. Old reads may work or fail.
+The current binary rejects shard versions newer than its supported format before
+configuration/schema writes. Raw maintenance writers must use the common shard
+connection configuration and the current FTS name.
+
+Upgrade procedure:
+
+1. Stop old app instances, watchers, sync and recompute workers.
+2. Back up the master DB, every actual shard path once, and account-scoped files
+   together. Use SQLite backup or a clean shutdown so WAL data is included.
+3. Run `bun scripts/checkShardMessageCollisions.ts /absolute/path/to/shard.db`
+   read-only before migration. Save the collision inventory and account mappings;
+   a zero collision count cannot reveal rows already overwritten by legacy sync.
+4. Start only the current binary; opening each shard migrates it automatically.
+5. Resync every account that used a legacy shared shard, including accounts with
+   zero surviving collisions. Migration cannot recover previously lost rows.
+
+For downgrade, stop the current processes and restore the coordinated pre-upgrade
+backup before starting an old binary. Do not drop guards or lower the version to
+permit mixed writers. See [Team Inbox §3.2](TEAM-INBOX.md#32-account-shard-db-dbaccountsaccountiddb)
+for the shard key and migration contract.
 
 ### `sources/...` and `attachments/...` (cache, rebuildable)
 

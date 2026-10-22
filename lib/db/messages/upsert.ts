@@ -30,6 +30,7 @@
  *     learning state refreshed. `replaceExisting` + account-scoped
  *     writes escalate to a full-account recompute.
  */
+import { SHARD_FTS_TABLE } from "../shardFormat";
 import type { Message } from "../../data";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
@@ -155,10 +156,10 @@ export async function upsertMessages(
     );
     const deleteFtsByScope = folderId
       ? db.prepare(
-          `DELETE FROM message_fts WHERE EXISTS (SELECT 1 FROM messages m WHERE m.accountId = message_fts.accountId AND m.id = message_fts.messageId AND m.accountId = ? AND m.folderId = ?)`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE EXISTS (SELECT 1 FROM messages m WHERE m.accountId = ${SHARD_FTS_TABLE}.accountId AND m.id = ${SHARD_FTS_TABLE}.messageId AND m.accountId = ? AND m.folderId = ?)`
         )
       : db.prepare(
-          `DELETE FROM message_fts WHERE accountId = ?`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ?`
         );
     const insertAttachment = db.prepare(
       `INSERT INTO attachments (accountId, id, messageId, filename, contentType, size, inline, cid, url)
@@ -239,10 +240,10 @@ export async function upsertMessages(
         pendingMoveStartedAt=NULL
     `);
     const insertFts = db.prepare(`
-      INSERT INTO message_fts (accountId, messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
+      INSERT INTO ${SHARD_FTS_TABLE} (accountId, messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const deleteFts = db.prepare(`DELETE FROM message_fts WHERE accountId = ? AND messageId = ?`);
+    const deleteFts = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`);
     const deleteMessages = db.prepare(deleteSql);
     const existingScopeThreadIds =
       replaceExisting && folderId
