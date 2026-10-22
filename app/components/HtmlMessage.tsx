@@ -438,7 +438,7 @@ function HtmlMessage({
   fontScale = 1,
   zoom = 1,
   accountId,
-  sender,
+  senderKey,
   messageId,
   sanitizeHtml = sanitizeHtmlForDisplay
 }: {
@@ -447,7 +447,7 @@ function HtmlMessage({
   fontScale?: number;
   zoom?: number;
   accountId?: string;
-  sender?: string;
+  senderKey?: string | null;
   messageId?: string;
   /** Display sanitizer. Dark mode and font scale do not change its output. */
   sanitizeHtml?: (input: string, mode?: RemoteContentMode) => string;
@@ -460,7 +460,7 @@ function HtmlMessage({
   const setLinkPreviewUrl = useMessageLinkPreview();
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
-  const remote = useRemoteContent(accountId, sender, messageId ?? html);
+  const remote = useRemoteContent(accountId, senderKey, messageId ?? html);
   const remoteContent = remote.allowed ? "allow" : "block";
   // Theme and zoom only change the wrapper, not the sanitized message.
   const blockedHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
@@ -724,7 +724,8 @@ function HtmlMessage({
         <div role="status" className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
           <span>Remote content blocked</span>
           <Button variant="outline" size="sm" onClick={remote.loadOnce}>Load once</Button>
-          {remote.canAlwaysAllow && <Button variant="ghost" size="sm" disabled={remote.saving} onClick={() => void remote.alwaysAllow()}>Always load from this sender</Button>}
+          <Button variant="ghost" size="sm" disabled={!remote.canAlwaysAllow || remote.saving} onClick={() => void remote.alwaysAllow()}>Always load from this sender</Button>
+          {!remote.canAlwaysAllow && <span>Sender unknown until the original message is available or resynced.</span>}
           {remote.error && <span role="alert">{remote.error}</span>}
         </div>
       )}

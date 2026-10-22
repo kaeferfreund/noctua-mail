@@ -7,6 +7,7 @@
  * reconciliation path relies on.
  */
 import type { Message } from "../../data";
+import { backfillMessageSenderKey } from "./senderKey";
 import { getAccountDb } from "../connection";
 import { buildMessageRowIdLookupCandidates } from "../../messageIds";
 import {
@@ -46,6 +47,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     }
   }
   if (!row) return null;
+  await backfillMessageSenderKey(db, row);
   const attachments = db
     .prepare(`SELECT * FROM attachments WHERE messageId = ?`)
     .all(row.id) as any[];
@@ -68,6 +70,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     xForwardedMessageId: row.xForwardedMessageId ?? undefined,
     subject: row.subject,
     from: row.fromAddr,
+    senderKey: row.senderKey ?? null,
     replyTo: row.replyToAddr ?? undefined,
     to: row.toAddr,
     cc: row.ccAddr ?? undefined,

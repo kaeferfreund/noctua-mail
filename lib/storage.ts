@@ -243,9 +243,9 @@ export async function listMessageSourceSizes(accountId: string) {
   return sizes;
 }
 
-export async function getMessageSource(accountId: string, messageId: string) {
+export async function getMessageSource(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
-  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
   for (const candidateId of candidates) {
     try {
       return await fs.readFile(sourceFilePath(accountId, candidateId), "utf-8");

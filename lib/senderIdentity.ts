@@ -82,8 +82,9 @@ export function extractDisplayName(value?: string | null) {
   return stripWrappingQuotes(rawName);
 }
 
-const DOT_ATOM_LOCAL = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/i;
-const QUOTED_LOCAL = /^"(?:[\x20\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*"$/;
+// RFC 6531 extends atext and qtext with UTF-8; only the domain is punycoded.
+const DOT_ATOM_LOCAL = /^[a-z0-9!#$%&'*+/=?^_`{|}~\x80-\u{10ffff}-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~\x80-\u{10ffff}-]+)*$/iu;
+const QUOTED_LOCAL = /^"(?:[\x20\x21\x23-\x5b\x5d-\x7e\x80-\u{10ffff}]|\\[\x20-\x7e\x80-\u{10ffff}])*"$/u;
 
 function formatMailboxLocalPart(local: string) {
   return DOT_ATOM_LOCAL.test(local) ? local : `"${local.replace(/["\\]/g, "\\$&")}"`;
@@ -202,7 +203,7 @@ export function extractUnambiguousPrimaryEmail(value?: string | null) {
 
 /**
  * Splits an RFC 5322 address-list string on commas while respecting quoted
- * display names like `"Doe, John" <john@doe.com>` and angle-bracketed addrs.
+ * display names, angle-bracketed addresses and nested comments with escapes.
  */
 export function splitAddressList(value: string | null | undefined): string[] {
   const text = (value ?? "").trim();
@@ -211,21 +212,24 @@ export function splitAddressList(value: string | null | undefined): string[] {
   let buf = "";
   let inQuotes = false;
   let inAngles = false;
+  let comments = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (inQuotes && ch === "\\" && i + 1 < text.length) {
+    if ((inQuotes || comments > 0) && ch === "\\" && i + 1 < text.length) {
       buf += ch + text[i + 1];
       i += 1;
       continue;
     }
-    if (ch === '"') {
+    if (!inQuotes && ch === "(") comments++;
+    else if (comments > 0 && ch === ")") comments--;
+    else if (comments === 0 && ch === '"') {
       inQuotes = !inQuotes;
       buf += ch;
       continue;
     }
-    if (ch === "<" && !inQuotes) inAngles = true;
-    else if (ch === ">" && !inQuotes) inAngles = false;
-    if (ch === "," && !inQuotes && !inAngles) {
+    if (ch === "<" && !inQuotes && comments === 0) inAngles = true;
+    else if (ch === ">" && !inQuotes && comments === 0) inAngles = false;
+    if (ch === "," && !inQuotes && !inAngles && comments === 0) {
       const trimmed = buf.trim();
       if (trimmed) parts.push(trimmed);
       buf = "";

@@ -1,6 +1,7 @@
 import { ingestedSenderCases, ingestSenderPermissionMessage } from "../testFixtures/ingestedSenders";
-import { remoteContentSenderKey, senderAllowsRemoteContent } from "../html/remoteContent";
-import { extractPrimaryEmail, canonicalizeMailboxAddress } from "../senderIdentity";
+import { senderPermissionCases } from "../testFixtures/senderPermissions";
+import { senderAllowsRemoteContent } from "../html/remoteContent";
+import { extractUnambiguousPrimaryEmail, extractPrimaryEmail, canonicalizeMailboxAddress } from "../senderIdentity";
 import { resolveMessageAddresses, formatEnvelopeAddresses, formatHeaderAddresses, parseHeaderMap } from "./imap/parser";
 import { describe, expect, it } from "bun:test";
 import { createRequire } from "module";
@@ -138,13 +139,38 @@ describe("extractMessageStructureMetadata", () => {
 });
 
 describe("RFC 5322 ingestion-to-permission identity", () => {
+  for (const entry of senderPermissionCases) {
+    it(`stores the sender key at header ingestion: ${entry.name}`, () => {
+      const result = resolveMessageAddresses(undefined, new Map([["from", [entry.from]]]), account.email);
+      const key = "permissionKey" in entry ? entry.permissionKey : entry.key;
+      expect(result.senderKey).toBe(key || null);
+    });
+  }
+
+  it("does not grant the account address when the real From header is missing", () => {
+    expect(resolveMessageAddresses(undefined, new Map(), account.email).senderKey).toBeNull();
+  });
+
+  it("header fallback keeps mailboxes with nested comments, quoted commas and escaped quotes", () => {
+    for (const first of [
+      "Actual (one, two) <actual@example.test>",
+      String.raw`Actual (one, (two, three) four\), five) <actual@example.test>`,
+      '"Actual, Synthetic" <actual@example.test>',
+      String.raw`"Actual \", Synthetic" <actual@example.test>`
+    ]) {
+      const resolved = resolveMessageAddresses(undefined, new Map([["from", [`${first}, other@example.test`]]]), account.email);
+      expect(resolved.from).toContain("actual@example.test");
+      expect(resolved.from).toContain("other@example.test");
+      expect(resolved.senderKey).toBe("actual@example.test");
+    }
+  });
   for (const entry of ingestedSenderCases) {
     for (const headerFallback of [false, true]) {
       it(`keeps the actual mailbox and rejects trusted permission: ${entry.name}, header fallback=${headerFallback}`, async () => {
         const message = await ingestSenderPermissionMessage(account, entry, '<img src="https://images.example.test/pixel">', headerFallback);
-        expect(remoteContentSenderKey(message.from)).toBe(entry.key);
-        expect(remoteContentSenderKey(message.from)).not.toBe("trusted@example.test");
-        expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }, message.from)).toBe(false);
+        expect(message.senderKey).toBe(entry.key);
+        expect(message.senderKey).not.toBe("trusted@example.test");
+        expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }, message.senderKey)).toBe(false);
       });
     }
   }
@@ -153,8 +179,8 @@ describe("RFC 5322 ingestion-to-permission identity", () => {
     for (const local of [' a  b ', 'a"b\\c', '"literal"', 'attacker <trusted@example.test>']) {
       const from = formatEnvelopeAddresses([{ name: "Synthetic", address: `${local}@example.test` }]);
       expect(from).toBe(`Synthetic <${JSON.stringify(local)}@example.test>`);
-      expect(remoteContentSenderKey(from)).toBe(canonicalizeMailboxAddress(`${JSON.stringify(local)}@example.test`));
-      expect(remoteContentSenderKey(from)).not.toBe("trusted@example.test");
+      expect(extractUnambiguousPrimaryEmail(from)).toBe(canonicalizeMailboxAddress(`${JSON.stringify(local)}@example.test`));
+      expect(extractUnambiguousPrimaryEmail(from)).not.toBe("trusted@example.test");
     }
     expect(formatHeaderAddresses('" a  b "@example.test, Actual <"a\\\"b\\\\c"@example.test>')).toBe('" a  b "@example.test, Actual <"a\\\"b\\\\c"@example.test>');
     expect(formatEnvelopeAddresses([{ address: "invalid" }, { address: "trusted@example.test" }])).toBe("");

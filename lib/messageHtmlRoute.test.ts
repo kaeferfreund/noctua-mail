@@ -3,15 +3,34 @@ import { createAuthenticatedTestSession } from "./testAuthHarness";
 import { createCollabFixture } from "./testThreadCollabHarness";
 import { GET } from "@/app/api/accounts/[accountId]/messages/[messageId]/html/route";
 import { GET as getPrefs, PUT } from "@/app/api/accounts/[accountId]/prefs/route";
-import { remoteContentSenderKey } from "./html/remoteContent";
-import { senderPermissionLookupCases } from "./testFixtures/senderPermissions";
+import { legacyUnkeyedSenders, senderPermissionLookupCases } from "./testFixtures/senderPermissions";
+
+test("HTML route never recovers a sender permission from ambiguous unkeyed legacy strings", async () => {
+  const f = await createCollabFixture();
+  const user = await createAuthenticatedTestSession(f.accountId);
+  const response = await PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
+    method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
+    body: JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true } } })
+  }), { params: Promise.resolve({ accountId: f.accountId }) });
+  expect(response.status).toBe(200);
+  for (const from of legacyUnkeyedSenders) {
+    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, {
+      from, senderKey: null, htmlBody: '<img src="https://images.example.test/pixel">'
+    }));
+    const get = (query = "") => GET(new Request(`http://localhost:3000/html${query}`, { headers: user.jar.headers() }), {
+      params: Promise.resolve({ accountId: f.accountId, messageId: message.id })
+    });
+    expect(await (await get()).text(), from).not.toMatch(/\ssrc="https:\/\//);
+    expect(await (await get("?remoteContent=allow")).text(), from).toContain('src="https://images.example.test/pixel"');
+  }
+});
 
 // Regression scenario copied from the S3 review probe, with privacy expectations.
 test("HTML route blocks remote resources and navigation and applies document policies", async () => {
   const f = await createCollabFixture();
   const user = await createAuthenticatedTestSession(f.accountId);
   const html = '<html><head><meta http-equiv="refresh" content="0;url=https://images.example.test/next"><style>@import url("https://images.example.test/style");</style></head><body><img src="https://images.example.test/pixel?message=synthetic" onerror="alert(1)"><script>alert(1)</script><form action="https://images.example.test/"></form><img src="cid:logo"></body></html>';
-  const [message] = await f.seed(f.message("<privacy@example.test>", { from: "Synthetic <SENDER@EXAMPLE.TEST>", htmlBody: html }));
+  const [message] = await f.seed(f.message("<privacy@example.test>", { from: "Synthetic <SENDER@EXAMPLE.TEST>", senderKey: "sender@example.test", htmlBody: html }));
   const params = { params: Promise.resolve({ accountId: f.accountId, messageId: message.id }) };
   const get = (query = "") => GET(new Request(`http://localhost:3000/html${query}`, { headers: user.jar.headers() }), params);
   const blocked = await get();
@@ -53,7 +72,7 @@ test("HTML route matches the real From mailbox and rejects a quoted display-name
   const f = await createCollabFixture();
   const user = await createAuthenticatedTestSession(f.accountId);
   const [message] = await f.seed(f.message("<sender-privacy@example.test>", {
-    from: '"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>',
+    from: '"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>', senderKey: "actual@example.test",
     htmlBody: '<img src="https://images.example.test/pixel">'
   }));
   const params = { params: Promise.resolve({ accountId: f.accountId, messageId: message.id }) };
@@ -79,7 +98,7 @@ test("HTML route rejects unrelated sender permissions and saves/reads the full s
   for (const { name, from, key } of senderPermissionLookupCases) {
     await patchPrefs({ remoteContent: null });
     expect((await patchPrefs({ remoteContent: { allowedSenders: { "trusted@example.test": true } } })).status).toBe(200);
-    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, { from, htmlBody: '<img src="https://images.example.test/pixel">' }));
+    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, { from, senderKey: key || null, htmlBody: '<img src="https://images.example.test/pixel">' }));
     const get = () => GET(new Request("http://localhost:3000/html", { headers: user.jar.headers() }), {
       params: Promise.resolve({ accountId: f.accountId, messageId: message.id })
     });
@@ -87,7 +106,7 @@ test("HTML route rejects unrelated sender permissions and saves/reads the full s
     expect(blocked.status, name).toBe(200);
     expect(await blocked.text(), name).not.toMatch(/\ssrc="https:\/\/images\.example\.test\/pixel"/);
     expect(blocked.headers.get("content-security-policy"), name).not.toContain("https: http:");
-    expect(remoteContentSenderKey(from), name).toBe(key);
+    expect(message.senderKey, name).toBe(key || null);
     if (!key) continue;
     const saved = await patchPrefs({ remoteContent: { allowedSenders: { [key]: true } } });
     expect(saved.status, name).toBe(200);
@@ -101,7 +120,7 @@ test("sender preference saves canonicalize IDN, case and whitespace into one key
   const f = await createCollabFixture();
   const user = await createAuthenticatedTestSession(f.accountId);
   const params = { params: Promise.resolve({ accountId: f.accountId }) };
-  for (const input of [" \t ACTUAL@BÜCHER.EXAMPLE \t ", "actual@xn--bcher-kva.example", '  "ATTACKER TRUSTED"@EXAMPLE.TEST  ']) {
+  for (const input of [" \t ACTUAL@BÜCHER.EXAMPLE \t ", "actual@xn--bcher-kva.example", '  "ATTACKER TRUSTED"@EXAMPLE.TEST  ', 'tést@bücher.example']) {
     const saved = await PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
       method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
       body: JSON.stringify({ remoteContent: { allowedSenders: { [input]: true } } })
@@ -111,6 +130,7 @@ test("sender preference saves canonicalize IDN, case and whitespace into one key
   const read = await getPrefs(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, { headers: user.jar.headers() }), params);
   expect((await read.json()).prefs.remoteContent.allowedSenders).toEqual({
     "actual@xn--bcher-kva.example": true,
+    "tést@xn--bcher-kva.example": true,
     '"attacker trusted"@example.test': true
   });
 });

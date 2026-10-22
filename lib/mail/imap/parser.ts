@@ -11,7 +11,7 @@
 
 import type { Account } from "@/lib/data";
 import addressParser from "nodemailer/lib/addressparser/index.js";
-import { extractUnambiguousPrimaryMailbox, formatAddress, splitAddressList } from "@/lib/senderIdentity";
+import { canonicalizeMailboxAddress, extractUnambiguousPrimaryEmail, extractUnambiguousPrimaryMailbox, formatAddress, formatMailboxAddress, splitAddressList } from "@/lib/senderIdentity";
 import type { ImapBodyStructure, ImapEnvelope, ImapEnvelopeAddress } from "./_shared";
 
 export type { ImapBodyStructure } from "./_shared";
@@ -40,6 +40,17 @@ export function formatHeaderAddresses(value?: string | null) {
   return addresses.map((address, index) => formatAddress(address.name ?? "", sources[index]!)).join(", ");
 }
 
+/** Derive identity from parsed wire data, never from a stored display string. */
+export function resolveMessageSenderKey(envelope: ImapEnvelope | undefined, headers: Map<string, string[]>) {
+  if (envelope?.from?.length) {
+    const first = envelope.from.find(address => address.address || (address.mailbox && address.host));
+    if (!first) return null;
+    const mailbox = first.address || `${first.mailbox}@${first.host}`;
+    return canonicalizeMailboxAddress(formatMailboxAddress(mailbox, true));
+  }
+  return extractUnambiguousPrimaryEmail(getHeaderValue(headers, "from"));
+}
+
 export function resolveMessageAddresses(
   envelope: ImapEnvelope | undefined,
   headers: Map<string, string[]>,
@@ -52,6 +63,7 @@ export function resolveMessageAddresses(
     return field === "from" ? formatAddress("", fallbackFrom) : "";
   };
   return {
+    senderKey: resolveMessageSenderKey(envelope, headers),
     from: resolve("from"), to: resolve("to"), cc: resolve("cc"), bcc: resolve("bcc"),
     replyTo: formatHeaderAddresses(getHeaderValue(headers, "reply-to")) || undefined
   };

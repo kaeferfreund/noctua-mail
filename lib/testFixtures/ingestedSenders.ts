@@ -18,7 +18,13 @@ export const ingestedSenderCases = [
     name: "quoted local part from an IMAP envelope",
     from: '"attacker trusted"@example.test',
     displayName: "", mailbox: "attacker trusted", key: '"attacker trusted"@example.test'
-  }
+  },
+  { name: "quoted colon local", from: '"attacker:trusted"@example.test', displayName: "", mailbox: "attacker:trusted", key: '"attacker:trusted"@example.test' },
+  { name: "quoted comment local", from: '"trus(foo)ted"@example.test', displayName: "", mailbox: "trus(foo)ted", key: '"trus(foo)ted"@example.test' },
+  { name: "quoted leading space local", from: '" trusted"@example.test', displayName: "", mailbox: " trusted", key: '" trusted"@example.test' },
+  { name: "SMTPUTF8 local", from: "tést@example.test", displayName: "", mailbox: "tést", key: "tést@example.test" },
+  { name: "comment comma", from: "Actual (one, two) <actual@example.test>", displayName: "Actual", mailbox: "actual", key: "actual@example.test" },
+  { name: "nested escaped comment", from: 'Actual (one, (two, three) four\\), five) <actual@example.test>', displayName: "Actual", mailbox: "actual", key: "actual@example.test" }
 ] as const;
 
 // Real ImapFlow response parsing followed by the same MIME/envelope ingestion

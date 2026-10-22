@@ -356,7 +356,7 @@ function buildLightweightImapMessage(params: {
   });
   const { seen, answered, flagged, deleted, draft, recent, unread } = deriveFlagState(flagList);
   const headers = parseHeaderMap(rawHeaders);
-  const { from, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
+  const { from, senderKey, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
   const unsubParts: string[] = [];
   const listUnsubVal = getHeaderValue(headers, "list-unsubscribe");
   const listUnsubPostVal = getHeaderValue(headers, "list-unsubscribe-post");
@@ -393,6 +393,7 @@ function buildLightweightImapMessage(params: {
     xForwardedMessageId: undefined,
     subject: envelope?.subject?.trim() || "(no subject)",
     from,
+    senderKey,
     replyTo,
     to,
     cc,
@@ -439,7 +440,7 @@ export async function parseImapMessage(
   const { seen, answered, flagged, deleted, draft, recent, unread } = deriveFlagState(flags);
   const envelope = message.envelope;
   const headers = parseHeaderMap(message.headers ?? message.source);
-  const { from, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
+  const { from, senderKey, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
   let {
     attachments
   } = extractMessageStructureMetadata(account, message.uid, message.bodyStructure);
@@ -586,6 +587,7 @@ export async function parseImapMessage(
     xForwardedMessageId: xForwardedMessageId ?? undefined,
     subject: envelope?.subject?.trim() || headerValue("subject") || "(no subject)",
     from,
+    senderKey,
     replyTo,
     to,
     cc,

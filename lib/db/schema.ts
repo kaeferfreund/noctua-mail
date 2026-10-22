@@ -966,6 +966,7 @@ export function initAccountSchema(db: any) {
       quotedHtmlEdited INTEGER DEFAULT 0,
       subject TEXT NOT NULL,
       fromAddr TEXT NOT NULL,
+      senderKey TEXT,
       fromEmail TEXT,
       replyToAddr TEXT,
       toAddr TEXT NOT NULL,
@@ -1350,6 +1351,9 @@ export function initAccountSchema(db: any) {
       String(row.name ?? "")
     )
   );
+  if (!messageColumns.has("senderKey")) {
+    db.prepare(`ALTER TABLE messages ADD COLUMN senderKey TEXT`).run();
+  }
   if (!messageColumns.has("categorySignals")) {
     db.prepare(`ALTER TABLE messages ADD COLUMN categorySignals TEXT`).run();
   }

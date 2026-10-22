@@ -3,8 +3,9 @@
 Remote images remain blocked until the reader loads them once or grants a
 per-user permission for the sender mailbox. Sender CSS cannot fetch remote
 resources, including after image opt-in. The reader and standalone HTML route
-use the same mailbox key and reject ambiguous or unparseable stored From
-strings as an unknown sender. Unknown senders can use Load once but cannot
+use only the explicitly stored canonical `messages.senderKey`. Rows without a
+key are unknown senders, regardless of the stored From display string.
+Unknown senders can use Load once but cannot
 match or save an Always load permission.
 
 IMAP ingestion now serializes decoded envelope names and mailbox local parts
@@ -15,13 +16,18 @@ Quoted local-part whitespace and escaped characters remain part of the mailbox
 identity; sender permission keys retain the existing case-insensitive and IDN
 normalization policy.
 
-Rows written by the previous envelope formatter may contain unescaped display
-names or unquoted local parts. Their ambiguous strings stay blocked even when
-another sender has an Always load permission. Re-fetching and resyncing the
-message (or running a full folder resync that re-ingests existing messages)
-refreshes these stored strings from IMAP. A new-message-only sync does not
-refresh existing rows. No one-off database repair or migration is required or
-included; the stricter permission lookup protects existing rows immediately.
+The additive account-shard migration adds nullable `messages.senderKey TEXT`
+without changing `PRAGMA user_version` or the shard v2 key/guard contract.
+Existing rows start with NULL: no identity is recovered from legacy display
+strings, which may have lost quotes, spaces or special characters.
+Opening a message (including thread readers and standalone HTML) lazily fills
+the key from the real From header in its retained raw source, when available.
+Resync/re-ingestion also writes the key from the parsed envelope/header.
+A new-message-only sync does not refresh existing rows. No bulk backfill CLI is
+included: lazy backfill avoids scanning every retained source at startup.
+Rows without source stay unknown until resynced; the reader explains why their
+Always load button is disabled. SMTPUTF8 local parts remain UTF-8, while IDN
+domains are canonicalized to punycode for permission keys.
 
 Fragment links in the reader scroll to an ID or legacy named anchor inside the
 mail document. A missing or malformed target is a no-op. External links continue
