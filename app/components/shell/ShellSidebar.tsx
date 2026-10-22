@@ -48,7 +48,7 @@ export type ShellSidebarProps = {
     accounts: ShellAccount[];
     activeAccountId: string;
     onSwitch: (accountId: string) => void;
-    onAdd: () => void;
+    onAdd?: () => void;
   };
   views: ShellViews;
   topics: {
@@ -184,9 +184,9 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
             </SidebarGroup>
             <SidebarGroup>
               <SidebarGroupLabel>My mailboxes</SidebarGroupLabel>
-              <SidebarGroupAction title="Add mailbox" aria-label="Add mailbox" onClick={closeAfter(mailboxes.onAdd)}>
+              {mailboxes.onAdd && <SidebarGroupAction title="Add mailbox" aria-label="Add mailbox" onClick={closeAfter(mailboxes.onAdd)}>
                 <Plus />
-              </SidebarGroupAction>
+              </SidebarGroupAction>}
               <SidebarGroupContent>
                 {mine.length > 0 ? (
                   <MailboxRows

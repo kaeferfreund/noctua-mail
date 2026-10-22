@@ -1,7 +1,9 @@
 // @ts-expect-error -- Bun supplies this test API at runtime; the project has no bun:test declarations.
 import { afterEach, describe, expect, it } from "bun:test";
 import { useState } from "react";
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, render, renderHook, waitFor } from "@testing-library/react";
+import AccountSettingsModal from "../AccountSettingsModal";
+import type { AuthUser } from "@/lib/authClient";
 import type { Account } from "@/lib/data";
 import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "./useSearchState";
 import { useAccountController, type UseAccountControllerParams } from "./useAccountController";
@@ -11,10 +13,10 @@ afterEach(cleanup);
 const accounts = [{ id: "account-a" }, { id: "account-b" }] as Account[];
 const noop = () => {};
 
-function mount(apiFetch: UseAccountControllerParams["apiFetch"]) {
+function mount(apiFetch: UseAccountControllerParams["apiFetch"], overrides: Partial<UseAccountControllerParams> = {}) {
   const errors: string[] = [];
   const defaults: UseAccountControllerParams = {
-    activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
+    currentUser: null, activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
     deletingFolderIds: new Set(), refreshFolders: async () => null, runSyncJob: async () => ({ count: 0 }),
     defaultSearchFields: DEFAULT_SEARCH_FIELDS, defaultSearchBadges: DEFAULT_SEARCH_BADGES,
     apiFetch, reportError: (error: string) => errors.push(error),
@@ -46,13 +48,15 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"]) {
     setManageTab: noop,
     setEditingAccount: noop,
     setDeletingFolderIds: noop,
+    ...overrides,
   };
   const hook = renderHook(() => {
+    const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
     const [activeAccountId, setActiveAccountId] = useState("");
     const [ready, setInitialDataReady] = useState(false);
     const [loadedAccounts, setAccounts] = useState<Account[]>([]);
     const [auth, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
-    const controller = useAccountController({ ...defaults, activeAccountId, setActiveAccountId,
+    const controller = useAccountController({ ...defaults, currentUser, setCurrentUser, activeAccountId, setActiveAccountId,
       accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState });
     return { ...controller, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts };
   });
@@ -179,5 +183,128 @@ describe("identity and mailbox state transitions", () => {
     expect(errors.at(-1)).toContain("session is still open"); failLogout = false;
     await act(async () => { expect(await result.current.logout()).toBe(true); });
     expect(result.current.auth).toBe("unauth"); expect(result.current.activeAccountId).toBe(""); expect(result.current.loadedAccounts).toEqual([]);
+  });
+});
+
+const draft: Account = {
+  id: "draft-synthetic", name: "Synthetic mailbox", email: "mail@example.test", avatar: "",
+  imap: { host: "imap.example.test", port: 993, secure: true, user: "mail@example.test", password: "synthetic" },
+  smtp: { host: "smtp.example.test", port: 465, secure: true, user: "mail@example.test", password: "synthetic" }
+};
+const admin = { id: "synthetic-admin", email: "admin@example.test", name: "Synthetic admin", role: "admin" };
+const me = (user = admin) => ({ user, accounts: [], accountId: null, mailboxState: "none" });
+
+describe("mailbox creation", () => {
+  it("creates through admin, self-grants manager, refreshes, selects and syncs in order", async () => {
+    const calls: Array<{ path: string; method?: string; body?: unknown }> = [];
+    let selected = false;
+    const created = { ...draft, id: "server-mailbox" };
+    const { result } = mount(async (input, init) => {
+      const path = String(input);
+      calls.push({ path, method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (path === "/api/auth/me") return json({ ...me(), accounts: selected ? [created] : [], accountId: selected ? created.id : null, mailboxState: selected ? "selected" : "none" });
+      if (path === "/api/admin/accounts") return json({ ok: true, account: created });
+      if (path === "/api/accounts") return json([created]);
+      if (path === "/api/auth/switch-account") selected = true;
+      return json([]);
+    }, {
+      refreshFolders: async id => { calls.push({ path: `refresh:${id}` }); return []; },
+      runSyncJob: async payload => { calls.push({ path: `sync:${payload.accountId}`, body: payload }); return { count: 1 }; }
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    calls.length = 0;
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(calls.map(call => call.path)).toEqual([
+      "/api/admin/accounts", "/api/admin/accounts/server-mailbox/members/synthetic-admin",
+      "/api/accounts", "/api/auth/switch-account", "/api/auth/me", "/api/accounts/server-mailbox/folders",
+      "refresh:server-mailbox", "sync:server-mailbox"
+    ]);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].body).toEqual({ name: draft.name, email: draft.email, avatar: "", imap: draft.imap, smtp: draft.smtp });
+    expect(calls[1]).toEqual({ path: "/api/admin/accounts/server-mailbox/members/synthetic-admin", method: "PUT", body: { role: "manager" } });
+    expect(calls[3].body).toEqual({ accountId: created.id });
+    expect(result.current.activeAccountId).toBe(created.id);
+    expect(result.current.loadedAccounts).toEqual([created]);
+    expect(result.current.accountSaveError).toBeNull();
+  });
+
+  for (const [status, message] of [[400, "Invalid mailbox credentials"], [403, "Forbidden"], [409, "Mailbox already exists"]] as const) {
+    it(`keeps the dialog open and surfaces server ${status} errors`, async () => {
+      let closes = 0;
+      const { result } = mount(async input => String(input) === "/api/auth/me" ? json(me()) : Response.json({ message }, { status }), {
+        readErrorMessage: async response => (await response.json()).message,
+        setManageOpen: () => { closes++; }
+      });
+      await waitFor(() => expect(result.current.ready).toBe(true));
+      await act(async () => { await result.current.saveAccount(draft); });
+      expect(closes).toBe(0);
+      expect(result.current.accountSaveError).toBe(message);
+      const view = render(<AccountSettingsModal editingAccount={draft} isOpen manageTab="account" isExistingAccount={false}
+        isAdminUser saveError={result.current.accountSaveError} onClose={noop} onTabChange={noop} onSave={noop} onDelete={noop} />);
+      expect(view.getByRole("alert").textContent).toBe(message);
+    });
+  }
+
+  it("surfaces network errors and allows retry", async () => {
+    const { result } = mount(async input => {
+      if (String(input) === "/api/auth/me") return json(me());
+      throw new Error("Synthetic network failure");
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(result.current.accountSaveError).toBe("Synthetic network failure");
+    expect(result.current.accountSaving).toBe(false);
+  });
+
+  it("does not select or sync after a failed self-grant, and retries without recreating", async () => {
+    const calls: string[] = [];
+    let failGrant = true;
+    const { result } = mount(async input => {
+      const path = String(input); calls.push(path);
+      if (path === "/api/auth/me") return json(me());
+      if (path === "/api/admin/accounts") return json({ account: { ...draft, id: "created" } });
+      if (path.endsWith("/members/synthetic-admin")) return Response.json({}, { status: failGrant ? 403 : 200 });
+      return json([]);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    calls.length = 0;
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(calls).toEqual(["/api/admin/accounts", "/api/admin/accounts/created/members/synthetic-admin"]);
+    expect(result.current.accountSaveError).toContain("Mailbox created, but access could not be granted: HTTP 403");
+    failGrant = false; calls.length = 0;
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(calls[0]).toBe("/api/admin/accounts/created/members/synthetic-admin");
+    expect(calls).not.toContain("/api/admin/accounts");
+  });
+
+  it("gates non-admin entry and direct saves without a create request", async () => {
+    let opens = 0;
+    const paths: string[] = [];
+    const { result, errors } = mount(async input => { paths.push(String(input)); return json(me({ ...admin, role: "user" })); }, {
+      setManageOpen: () => { opens++; }
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    act(() => result.current.startEditAccount());
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(paths).toEqual(["/api/auth/me"]);
+    expect(opens).toBe(0);
+    expect(errors).toEqual(["Only an admin can add mailboxes", "Only an admin can add mailboxes"]);
+    expect(result.current.accountSaveError).toBe("Only an admin can add mailboxes");
+    const view = render(<AccountSettingsModal editingAccount={draft} isOpen manageTab="account" isExistingAccount={false}
+      onClose={noop} onTabChange={noop} onSave={noop} onDelete={noop} />);
+    expect(view.getByRole("alert").textContent).toBe("Only an admin can add mailboxes");
+    expect(view.getByRole("button", { name: /^Save$/ }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps existing-mailbox edits on PUT without an admin grant", async () => {
+    const calls: Array<{ path: string; method?: string }> = [];
+    const { result } = mount(async (input, init) => {
+      const path = String(input); calls.push({ path, method: init?.method });
+      if (path === "/api/auth/me") return json({ ...me({ ...admin, role: "user" }), accounts: [draft], mailboxState: "unselected" });
+      return json([draft]);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true)); calls.length = 0;
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(calls).toEqual([{ path: "/api/accounts/draft-synthetic", method: "PUT" }, { path: "/api/accounts", method: undefined }]);
   });
 });
