@@ -1,10 +1,11 @@
+import { collabActorFromSession } from "@/lib/threadCollab";
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { DraftSendError, sendDraftForAccount } from "@/lib/drafts";
 import {
   getAccountIdFromParams,
-  requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { errorResponse, okResponse } from "@/app/api/_helpers/response";
@@ -25,7 +26,6 @@ type Params = AccountRouteParams & {
 };
 
 export async function POST(request: Request, { params }: Params) {
-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { draftId: rawDraftId } = await params;
   const draftId = typeof rawDraftId === "string" ? rawDraftId.trim() : "";
@@ -38,6 +38,8 @@ export async function POST(request: Request, { params }: Params) {
   });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
+    const originError = requireMutationSameOrigin(request);
+    if (originError) return originError;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
 
     try {
@@ -45,13 +47,10 @@ export async function POST(request: Request, { params }: Params) {
         account,
         accountId: resolvedAccountId,
         clientId: clientId ?? "",
-        draftId
+        draftId,
+        actor: collabActorFromSession(accountContext.session, accountContext.clientId)
       });
-      return okResponse({
-        sentFolderId: result.sentFolderId,
-        sentMessageUid: result.sentMessageUid,
-        messageId: result.messageId
-      });
+      return okResponse(result);
     } catch (error) {
       if (error instanceof DraftSendError) {
         return errorResponse(error.message, error.status);

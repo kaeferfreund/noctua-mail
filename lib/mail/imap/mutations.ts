@@ -39,7 +39,8 @@ export async function appendImapMessage(
   rawMessage: Buffer,
   flags: string[] = ["\\Seen"],
   clientId?: string,
-  internalDate: Date = new Date()
+  internalDate: Date = new Date(),
+  options?: { fresh?: boolean }
 ) {
   const logContext = buildLogContext(account, clientId);
   return withPooledImapClient(account, logContext, async (client) => {
@@ -48,10 +49,10 @@ export async function appendImapMessage(
       { mailbox: mailboxPath, ...logContext },
       () => client.append(mailboxPath, rawMessage, flags, internalDate)
     );
-    if (!result) return null;
+    if (!result) throw new Error("IMAP APPEND was not accepted");
     const uid = (result as any).uid;
     return typeof uid === "number" ? uid : null;
-  });
+  }, options);
 }
 
 // Fetches the full RFC 2822 source of a single message. Used as a fallback when

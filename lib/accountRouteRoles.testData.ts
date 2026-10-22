@@ -496,5 +496,10 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "method": "POST",
     "path": "translation/test",
     "minRole": "manager"
-  }
+  },
+  {"method": "GET", "path": "threads/[threadId]/activity", "minRole": "viewer"},
+  {"method": "GET", "path": "threads/[threadId]/collab", "minRole": "viewer"},
+  {"method": "PATCH", "path": "threads/[threadId]/collab", "minRole": "editor"},
+  {"method": "POST", "path": "threads/[threadId]/comments", "minRole": "editor"},
+  {"method": "DELETE", "path": "threads/[threadId]/comments/[commentId]", "minRole": "editor"}
 ];

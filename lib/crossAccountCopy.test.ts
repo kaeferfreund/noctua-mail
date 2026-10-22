@@ -173,7 +173,7 @@ describe("ingestCopiedMessages", () => {
     const deps: IngestDeps = {
       resolveThreadingForAccountMessages: async (_accountId, messages) => {
         resolveThreadingCalls.push(messages as Message[]);
-        return (messages as Message[]).map((m) => ({ ...m, threadId: "thread-1" }));
+        return messages.map((m) => ({ ...m, threadId: "thread-1" }));
       },
       sanitizeSyncedMessage: async (message) => message,
       upsertMessages: async (_accountId, _folderId, messages) => {

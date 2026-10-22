@@ -823,7 +823,7 @@ function getThreadDateColumn(
   return threadDateSource === "latestDateValue" ? "latestDateValue" : "latestReceivedDateValue";
 }
 
-function applyBadgeFilters(where: string, args: any[], badges?: string[] | null) {
+function applyBadgeFilters(where: string, args: any[], badges?: string[] | null, options: { viewerUserId?: string | null } = {}) {
   const normalized = (badges ?? []).map((badge) => badge.toLowerCase());
   const todoFlagPattern = `%"${TODO_FLAG.toLowerCase()}"%`;
   const doneFlagPattern = `%"${DONE_FLAG.toLowerCase()}"%`;
@@ -857,6 +857,18 @@ function applyBadgeFilters(where: string, args: any[], badges?: string[] | null)
   if (normalized.includes("calendar")) {
     where += " AND m.flags IS NOT NULL AND lower(m.flags) LIKE ?";
     args.push(`%"${CALENDAR_INVITE_FLAG}"%`);
+  }
+  const collabScope = "tc.accountId = m.accountId AND tc.threadId = m.threadId";
+  if (normalized.includes("assigned-to-me")) {
+    where += options.viewerUserId
+      ? ` AND EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.assigneeUserId=?)`
+      : " AND 0 = 1";
+    if (options.viewerUserId) args.push(options.viewerUserId);
+  }
+  if (normalized.includes("unassigned")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.assigneeUserId IS NOT NULL)`;
+  if (normalized.includes("open")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status='closed')`;
+  for (const [badge,status] of [["closed","closed"],["in-progress","in_progress"],["waiting","waiting"]]) {
+    if (normalized.includes(badge)) { where += ` AND EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status=?)`; args.push(status); }
   }
   // Category filters
   if (normalized.includes("newsletter")) {
@@ -982,6 +994,7 @@ async function getGroupCounts(params: {
   groupBy: string;
   fields?: string[] | null;
   badges?: string[] | null;
+  viewerUserId?: string | null;
   attachmentsOnly?: boolean;
   excludedFolderIds?: string[] | null;
   from?: string[] | null;
@@ -995,6 +1008,7 @@ async function getGroupCounts(params: {
     groupBy,
     fields,
     badges,
+    viewerUserId,
     attachmentsOnly,
     excludedFolderIds,
     from,
@@ -1074,7 +1088,7 @@ async function getGroupCounts(params: {
     attachmentFilenameTerms
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
-  where = applyBadgeFilters(where, args, badges);
+  where = applyBadgeFilters(where, args, badges, { viewerUserId });
   where = applyExcludedFolderFilters(where, args, excludedFolderIds);
   const attachmentsFilter = attachmentsOnly ?? badges?.includes("attachments");
   if (attachmentsFilter) {
@@ -1211,6 +1225,7 @@ async function getGroupCounts(params: {
         query: query ?? undefined,
         fields,
         badges,
+        viewerUserId,
         attachmentsOnly,
         excludedFolderIds,
         from,
@@ -1227,6 +1242,7 @@ async function getTotalCount(params: {
   query?: string;
   fields?: string[] | null;
   badges?: string[] | null;
+  viewerUserId?: string | null;
   attachmentsOnly?: boolean;
   excludedFolderIds?: string[] | null;
   from?: string[] | null;
@@ -1240,6 +1256,7 @@ async function getTotalCount(params: {
     query,
     fields,
     badges,
+    viewerUserId,
     attachmentsOnly,
     excludedFolderIds,
     from,
@@ -1318,7 +1335,7 @@ async function getTotalCount(params: {
     attachmentFilenameTerms
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
-  where = applyBadgeFilters(where, args, badges);
+  where = applyBadgeFilters(where, args, badges, { viewerUserId });
   where = applyExcludedFolderFilters(where, args, excludedFolderIds);
   const attachmentsFilter = attachmentsOnly ?? badges?.includes("attachments");
   if (attachmentsFilter) {
@@ -1422,6 +1439,7 @@ export async function listRelatedMessages(params: {
   pageSize: number;
   groupBy?: string;
   badges?: string[] | null;
+  viewerUserId?: string | null;
   attachmentsOnly?: boolean;
   excludedFolderIds?: string[] | null;
 }) {
@@ -1432,6 +1450,7 @@ export async function listRelatedMessages(params: {
     pageSize,
     groupBy = "date",
     badges,
+    viewerUserId,
     attachmentsOnly,
     excludedFolderIds
   } = params;
@@ -1553,7 +1572,7 @@ export async function listRelatedMessages(params: {
 
   let where = `m.accountId = ? AND (${clauses.join(" OR ")})`;
   where = applyVisibleMessageFilters(where);
-  where = applyBadgeFilters(where, args, badges);
+  where = applyBadgeFilters(where, args, badges, { viewerUserId });
   const effectiveExcludedFolderIds = Array.from(
     new Set([...(excludedFolderIds ?? []), ...getRelatedExcludedFolderIds(db, accountId)])
   );
@@ -1857,6 +1876,7 @@ export async function listMessages(params: {
   groupBy?: string;
   fields?: string[] | null;
   badges?: string[] | null;
+  viewerUserId?: string | null;
   attachmentsOnly?: boolean;
   excludedFolderIds?: string[] | null;
   from?: string[] | null;
@@ -1873,6 +1893,7 @@ export async function listMessages(params: {
     groupBy = "date",
     fields,
     badges,
+    viewerUserId,
     attachmentsOnly,
     excludedFolderIds,
     from,
@@ -1958,7 +1979,7 @@ export async function listMessages(params: {
   const hasIdQuery = searchQueryState.hasIdQuery;
   const hasAttachmentFilenameQuery = searchQueryState.hasAttachmentFilenameQuery;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
-  where = applyBadgeFilters(where, args, badges);
+  where = applyBadgeFilters(where, args, badges, { viewerUserId });
   where = applyExcludedFolderFilters(where, args, excludedFolderIds);
   const attachmentsFilter = attachmentsOnly ?? badges?.includes("attachments");
   if (attachmentsFilter) {
@@ -2127,6 +2148,7 @@ export async function listMessages(params: {
           groupBy,
           fields,
           badges,
+          viewerUserId,
           attachmentsOnly,
           excludedFolderIds,
           from,
@@ -2141,6 +2163,7 @@ export async function listMessages(params: {
       query: query ?? undefined,
       fields,
       badges,
+      viewerUserId,
       attachmentsOnly,
       excludedFolderIds,
       from,
@@ -2161,6 +2184,7 @@ export async function listThreads(params: {
   threadDateSource?: ThreadDateSource;
   fields?: string[] | null;
   badges?: string[] | null;
+  viewerUserId?: string | null;
   attachmentsOnly?: boolean;
   excludedFolderIds?: string[] | null;
   from?: string[] | null;
@@ -2177,6 +2201,7 @@ export async function listThreads(params: {
     threadDateSource = DEFAULT_THREAD_DATE_SOURCE,
     fields,
     badges,
+    viewerUserId,
     attachmentsOnly,
     excludedFolderIds,
     from,
@@ -2263,7 +2288,7 @@ export async function listThreads(params: {
   const hasIdQuery = searchQueryState.hasIdQuery;
   const hasAttachmentFilenameQuery = searchQueryState.hasAttachmentFilenameQuery;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
-  where = applyBadgeFilters(where, args, badges);
+  where = applyBadgeFilters(where, args, badges, { viewerUserId });
   where = applyExcludedFolderFilters(where, args, excludedFolderIds);
   const attachmentsFilter = attachmentsOnly ?? badges?.includes("attachments");
   if (attachmentsFilter) {
@@ -2457,6 +2482,7 @@ export async function listThreads(params: {
         query: query ?? undefined,
         fields,
         badges,
+        viewerUserId,
         attachmentsOnly,
         excludedFolderIds,
         from,
@@ -2666,6 +2692,7 @@ export async function listThreads(params: {
             groupBy,
             fields,
             badges,
+            viewerUserId,
             attachmentsOnly,
             excludedFolderIds,
             from,

@@ -40,3 +40,10 @@ export async function updateImapFlagsBulk(
   const imap = await loadServerImap();
   return imap.updateImapFlagsBulk(...args);
 }
+
+export async function listImapFolders(...args: Parameters<ServerImapModule["listImapFolders"]>) {
+  return (await loadServerImap()).listImapFolders(...args);
+}
+export async function findImapMessageUid(...args: Parameters<ServerImapModule["findImapMessageUid"]>) {
+  return (await loadServerImap()).findImapMessageUid(...args);
+}

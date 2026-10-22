@@ -25,6 +25,5 @@ declare module "bun:sqlite" {
       all: (...params: any[]) => any[];
     };
     transaction<T>(fn: () => T): Transaction<T>;
-    close(): void;
   }
 }

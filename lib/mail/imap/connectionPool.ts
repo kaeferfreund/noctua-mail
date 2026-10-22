@@ -51,6 +51,7 @@
 // already used by the circuit breaker in `imapClientOptions.ts` and the
 // sync-job registry.
 
+import { bindImapCancellation, throwIfImapCancelled } from "../imapCancellation";
 import type { Account } from "@/lib/data";
 import type { ImapFlow } from "imapflow";
 import {
@@ -156,11 +157,14 @@ function attachErrorListeners(client: ImapFlow, key: string): () => void {
  */
 export async function acquirePooledImapClient(
   account: Account,
-  logContext: ImapLogContext
+  logContext: ImapLogContext,
+  fresh = false
 ): Promise<ImapFlow> {
+  throwIfImapCancelled();
   const key = buildImapIdentityKey(account);
   const cached = state.pool.get(key);
-  if (cached) {
+  if (cached && fresh) evictEntry(key, cached, "fresh-request");
+  if (cached && !fresh) {
     // Remove from pool immediately so a concurrent acquire doesn't see it.
     state.pool.delete(key);
     cached.detach();
@@ -223,17 +227,21 @@ export function releasePooledImapClient(
 export async function withPooledImapClient<T>(
   account: Account,
   logContext: ImapLogContext,
-  fn: (client: ImapFlow) => Promise<T>
+  fn: (client: ImapFlow) => Promise<T>,
+  options?: { fresh?: boolean }
 ): Promise<T> {
-  const client = await acquirePooledImapClient(account, logContext);
+  const client = await acquirePooledImapClient(account, logContext, options?.fresh);
+  let detach: (() => void) | undefined;
   try {
+    detach = bindImapCancellation(client);
     const result = await fn(client);
+    throwIfImapCancelled();
     releasePooledImapClient(account, client, logContext);
     return result;
   } catch (error) {
     releasePooledImapClient(account, client, logContext, { evict: true });
     throw error;
-  }
+  } finally { detach?.(); }
 }
 
 /** Size of the current idle pool. For tests / telemetry. */

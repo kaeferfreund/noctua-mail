@@ -201,10 +201,12 @@ describe("Slice 3 live MCP/streams and shard cleanup", () => {
   });
   test("absent both, installed idempotent unassign/audit, partial schema durable failure after revoke", async () => {
     const f = await fixture();
-    expect((await cleanupUserAccountAccess(f.id, f.user.id, { userId: f.user.id, clientId: "synthetic" })).status).toBe("not_installed");
     const shardPath = getDefaultAccountDbPath(f.id); mkdirSync(path.dirname(shardPath), { recursive: true });
     const shard = new Database(shardPath);
     try {
+      // Merged shards install collaboration by default; explicitly model the pre-install state.
+      shard.exec("DROP TABLE IF EXISTS thread_collab_state; DROP TABLE IF EXISTS thread_activity");
+      expect((await cleanupUserAccountAccess(f.id, f.user.id, { userId: f.user.id, clientId: "synthetic" })).status).toBe("not_installed");
       shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER)");
       const target = await f.createUser(`cleanup-${crypto.randomUUID()}@example.test`); await f.db.addUserAccountLink(target.id, f.id, "editor");
       expect((await changeAccountMember(f.id, target.id, f.user.id, null)).cleanupPending).toBe(true);
@@ -360,6 +362,8 @@ test("installed malformed activity schema with zero assignments remains cleanup_
   const shardPath = getDefaultAccountDbPath(f.id); mkdirSync(path.dirname(shardPath), { recursive: true });
   const shard = new Database(shardPath);
   try {
+    // Deliberately replace the installed schema with the corruption under test.
+    shard.exec("DROP TABLE IF EXISTS thread_collab_state; DROP TABLE IF EXISTS thread_activity");
     shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER)");
     shard.exec("CREATE TABLE thread_activity(id TEXT PRIMARY KEY)");
     const target = await f.createUser(`zero-assignment-${crypto.randomUUID()}@example.test`);

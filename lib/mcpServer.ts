@@ -1,5 +1,9 @@
-import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
+import { listAccessibleAccountsForUser, listAccountMembersForRole } from "@/lib/accountAccess";
 import { resolveMcpToolContext } from "@/lib/mcpAuth";
+import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
+import { getThreadCollabState, listThreadComments, listThreadActivity,
+  updateThreadCollabState, addThreadComment } from "@/lib/threadCollab";
+import type { AccountRole } from "@/lib/data";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
@@ -51,12 +55,12 @@ const MCP_DEFAULT_PAGE_SIZE = 50;
 const MCP_MAX_PAGE_SIZE = 200;
 
 type McpAccountContext = {
-  role?: import("@/lib/data").AccountRole;
   accountId: string;
   account: Account;
   tokenRecord: McpTokenMetadata;
   authInfo?: MessageExtraInfo["authInfo"];
   requestInfo?: MessageExtraInfo["requestInfo"];
+  role?: AccountRole;
 };
 
 type SearchMessagesArgs = {
@@ -301,7 +305,8 @@ const SEARCH_RESULT_MESSAGE_SCHEMA = {
   groupKey: z.string().optional(),
   threadSortDateValue: z.number().optional(),
   topics: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
-  topicSuggestions: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional()
+  topicSuggestions: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
+  collab: z.object({ status: z.enum(["open", "in_progress", "waiting", "closed"]), assigneeUserId: z.string().nullable(), commentCount: z.number(), updatedAt: z.number() }).optional()
 };
 
 const SEARCH_RESULT_GROUP_SCHEMA = {
@@ -331,6 +336,9 @@ async function resolveAccountContext(
   if (id !== baseContext.accountId) throw new Error("MCP token is bound to another mailbox");
   const live = await resolveMcpToolContext(baseContext.tokenRecord.id, id, minRole);
   return { ...baseContext, ...live };
+}
+function mcpActor(context: McpAccountContext) {
+  return { userId: context.tokenRecord.createdByUserId, clientId: `mcp:${context.tokenRecord.id}` };
 }
 
 function normalizeStringList(values?: string[] | null) {
@@ -608,6 +616,7 @@ async function listMessagesForFolder(
   const excludedFolderIds = normalizeStringList(args.excludedFolderIds);
   const data = await listMessages({
     accountId: context.accountId,
+    viewerUserId: context.tokenRecord.createdByUserId,
     folderId: args.folderId,
     page,
     pageSize,
@@ -617,6 +626,7 @@ async function listMessagesForFolder(
     attachmentsOnly: args.attachmentsOnly,
     excludedFolderIds
   });
+  await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
   await enrichMessagesWithThreadTopics(data.items, { accountId: context.accountId });
   return {
     ...data,
@@ -678,6 +688,7 @@ async function searchMessages(
       messageIds,
       groupBy: args.groupBy ?? "date"
     });
+    await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
       accountEmail: context.account.email,
@@ -704,6 +715,7 @@ async function searchMessages(
     }
     const data = await listRelatedMessages({
       accountId: context.accountId,
+      viewerUserId: context.tokenRecord.createdByUserId,
       relatedId: normalizedRelatedId,
       page,
       pageSize,
@@ -712,6 +724,7 @@ async function searchMessages(
       attachmentsOnly: args.attachmentsOnly,
       excludedFolderIds
     });
+    await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
       accountEmail: context.account.email,
@@ -729,6 +742,7 @@ async function searchMessages(
   const query = appendTopicTerms(rawQuery, topicIds);
   const data = await listMessages({
     accountId: context.accountId,
+    viewerUserId: context.tokenRecord.createdByUserId,
     folderId: args.folderId?.trim() || undefined,
     page,
     pageSize,
@@ -742,6 +756,7 @@ async function searchMessages(
     attachmentsOnly: args.attachmentsOnly,
     excludedFolderIds
   });
+  await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
   await enrichMessagesWithThreadTopics(data.items, { accountId: context.accountId });
   return {
     ...data,
@@ -788,6 +803,7 @@ async function createDraftMessage(
     message = await getMessageById(context.accountId, result.draftId);
   }
 
+  if (message) await enrichMessagesWithThreadCollab([message], { accountId: context.accountId });
   return {
     ok: true,
     mode: args.mode ?? "new",
@@ -1166,6 +1182,46 @@ export async function executeMcpHttpRequest(params: {
       return buildToolResult(`Cleared To-Do state from message ${messageId}.`, result);
     }
   );
+
+  const targetSchema = { ...ACCOUNT_ID_ARG, threadId: z.string().min(1).optional(), messageId: z.string().min(1).optional() };
+  const statusSchema = z.enum(["open", "in_progress", "waiting", "closed"]);
+  const stateSchema = z.object({ accountId: z.string(), threadId: z.string(), status: statusSchema,
+    assigneeUserId: z.string().nullable(), assignedByUserId: z.string().nullable(), assignedAt: z.number().nullable(),
+    statusChangedAt: z.number().nullable(), statusChangedByUserId: z.string().nullable(), commentCount: z.number(),
+    lastActivityAt: z.number(), updatedAt: z.number(), updatedByUserId: z.string().nullable() });
+  const commentSchema = z.object({ id: z.string(), accountId: z.string(), threadId: z.string(), authorUserId: z.string(),
+    body: z.string(), createdAt: z.number(), updatedAt: z.number(), deletedAt: z.number().nullable() });
+  const activitySchema = z.object({ id: z.string(), accountId: z.string(), threadId: z.string(), type: z.string(),
+    actorUserId: z.string().nullable(), actorClientId: z.string(), payload: z.record(z.string(), z.unknown()), createdAt: z.number() });
+  server.registerTool("list_mailbox_members", { description: "List mailbox members; disabled members are visible to managers only.", inputSchema: ACCOUNT_ID_ARG,
+    outputSchema: { ok: z.boolean(), members: z.array(z.object({ userId: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["viewer", "editor", "manager"]), isOwner: z.boolean(), disabled: z.boolean().optional() })) } },
+    async args => { const ctx = await resolveAccountContext(context, args.accountId);
+      return buildToolResult("Mailbox members.", { ok: true, members: await listAccountMembersForRole(ctx.accountId, ctx.role) }); });
+  server.registerTool("get_thread_collaboration", { description: "Read thread state, internal comments and activity.", inputSchema: targetSchema,
+    outputSchema: { ok: z.boolean(), threadId: z.string(), state: stateSchema, comments: z.array(commentSchema), activity: z.array(activitySchema) } },
+    async args => { const ctx = await resolveAccountContext(context, args.accountId); const { threadId } = await resolveThreadTarget(ctx, args);
+      const [state, comments, activity] = await Promise.all([getThreadCollabState(ctx.accountId, threadId), listThreadComments(ctx.accountId, threadId), listThreadActivity(ctx.accountId, threadId)]);
+      return buildToolResult("Thread collaboration.", { ok: true, threadId, state, comments, activity }); });
+  server.registerTool("set_thread_status", { description: "Set thread status without changing message flags.", inputSchema: { ...targetSchema, status: statusSchema },
+    outputSchema: { ok: z.boolean(), state: stateSchema } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
+      const state = await updateThreadCollabState(ctx.accountId, threadId, { status: args.status }, mcpActor(ctx));
+      if (!state) throw new Error("Thread not found"); return buildToolResult("Thread status updated.", { ok: true, state }); });
+  server.registerTool("assign_thread", { description: "Assign an enabled mailbox member; 'me' selects the token creator; null unassigns.",
+    inputSchema: { ...targetSchema, assigneeUserId: z.string().min(1).nullable() }, outputSchema: { ok: z.boolean(), state: stateSchema } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
+      const assigneeUserId = args.assigneeUserId === "me" ? ctx.tokenRecord.createdByUserId : args.assigneeUserId;
+      const state = await updateThreadCollabState(ctx.accountId, threadId, { assigneeUserId }, mcpActor(ctx));
+      if (!state) throw new Error("Thread not found"); return buildToolResult("Thread assignment updated.", { ok: true, state }); });
+  server.registerTool("add_internal_comment", { description: "Add an internal Markdown comment.", inputSchema: { ...targetSchema, body: z.string().min(1).max(20000) },
+    outputSchema: { ok: z.boolean(), comment: commentSchema, state: stateSchema } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
+      const result = await addThreadComment(ctx.accountId, threadId, args.body, mcpActor(ctx));
+      if (!result) throw new Error("Thread not found"); return buildToolResult("Internal comment added.", { ok: true, ...result }); });
+  server.registerTool("list_thread_activity", { description: "List recent thread activity, newest first.",
+    inputSchema: { ...targetSchema, limit: z.number().int().min(1).max(500).optional() }, outputSchema: { ok: z.boolean(), activity: z.array(activitySchema) } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId); const { threadId } = await resolveThreadTarget(ctx, args);
+      return buildToolResult("Thread activity.", { ok: true, activity: await listThreadActivity(ctx.accountId, threadId, { limit: args.limit }) }); });
 
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,
