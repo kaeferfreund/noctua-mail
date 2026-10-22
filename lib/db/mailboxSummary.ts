@@ -1,6 +1,6 @@
 import { getAccountDb } from "./connection";
 import { withDbWriteRetry } from "../dbWriteRetry";
-import { shouldStorePasswordInDb } from "../secret";
+import { teamFeaturesSupported } from "../teamFeatures";
 
 export type WatcherState = "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped";
 export type MailboxSummary = {
@@ -27,7 +27,7 @@ export async function getMailboxSummaries(accountIds: readonly string[]): Promis
     summaries.push({
       accountId, unreadInbox: row.unreadInbox,
       lastSyncAt: state?.lastSyncAt ?? null,
-      watcherState: process.env.NOCTUA_MAILBOX_WATCHER === "1" && shouldStorePasswordInDb()
+      watcherState: process.env.NOCTUA_MAILBOX_WATCHER === "1" && teamFeaturesSupported()
         ? state?.watcherState ?? "starting" : "disabled"
     });
   }

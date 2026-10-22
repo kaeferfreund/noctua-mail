@@ -175,28 +175,77 @@ try {
   await repairInbox();
   assert.equal(await count("Synthetic OLD namespace"), 1);
   const oldValidity = (await getMailboxState(accountId, `${accountId}:INBOX`))?.uidValidity;
-  const oldMessageId = await withAccountDb(accountId, db => (db.prepare("SELECT id FROM messages WHERE accountId=? AND folderId=? AND imapUid=61")
+  const stagedMessageId = await withAccountDb(accountId, db => (db.prepare("SELECT id FROM messages WHERE accountId=? AND folderId=? AND imapUid=60")
     .get(accountId, `${accountId}:INBOX`) as { id: string }).id);
   const { stageMessageMoves, getPendingMoveSourceUids } = await import("@/lib/db");
-  await stageMessageMoves({ accountId, messageIds: [oldMessageId], destinationFolderId: `${accountId}:Archive`, destinationMailboxPath: "Archive" });
+  await stageMessageMoves({ accountId, messageIds: [stagedMessageId], destinationFolderId: `${accountId}:Archive`, destinationMailboxPath: "Archive" });
+  // Stage a different row: OLD must still occupy UID 61 when the browser opens.
+  assert.equal(await count("Synthetic OLD namespace"), 1);
+  assert.equal((await getPendingMoveSourceUids(accountId, `${accountId}:INBOX`)).has(60), true);
   await resetAndInject("Synthetic NEW namespace", "Synthetic NEW body");
-  await repairInbox();
+  // Exact regression: a browser SELECT runs before repair sees the new validity.
+  // Use the actual authenticated SSE handler, including its persisted-state writes.
+  const { GET: browserStream } = await import("@/app/api/accounts/[accountId]/imap/stream/route");
+  const { sealSession } = await import("@/lib/auth");
+  const browserAbort = new AbortController();
+  const browserResponse = await browserStream(new Request(`http://example.test/api/accounts/${accountId}/imap/stream`, {
+    signal: browserAbort.signal, headers: { cookie: `noctua_session=${sealSession({ userId: "synthetic-user", accountId,
+      exp: Math.floor(Date.now() / 1000) + 600 })}` }
+  }), { params: Promise.resolve({ accountId }) });
+  assert.equal(browserResponse.status, 200);
+  const reader = browserResponse.body!.getReader();
+  try {
+    let browserEvents = "";
+    while (!browserEvents.includes("event: folder:update")) {
+      const chunk = await reader.read();
+      assert(!chunk.done, `Browser SSE ended before SELECT: ${browserEvents}`);
+      browserEvents += new TextDecoder().decode(chunk.value);
+      assert(!browserEvents.includes("event: error"), browserEvents);
+    }
+    const browserState = await getMailboxState(accountId, `${accountId}:INBOX`);
+    assert.notEqual(browserState?.uidValidity, oldValidity);
+    assert.equal(browserState?.highestUid, null);
+    assert.equal(browserState?.highestModSeq, null);
+    assert.equal(await count("Synthetic OLD namespace"), 0);
+    assert.equal((await getPendingMoveSourceUids(accountId, `${accountId}:INBOX`)).has(60), false);
+    await repairInbox();
+  } finally {
+    browserAbort.abort();
+    await reader.cancel();
+  }
   assert.notEqual((await getMailboxState(accountId, `${accountId}:INBOX`))?.uidValidity, oldValidity);
   assert.equal(await count("Synthetic OLD namespace"), 0);
   assert.equal(await count("Synthetic NEW namespace"), 1);
-  assert.equal((await getPendingMoveSourceUids(accountId, `${accountId}:INBOX`)).has(61), false);
+  assert.equal((await getPendingMoveSourceUids(accountId, `${accountId}:INBOX`)).has(60), false);
   assert.equal(await count(), 61);
   await withAccountDb(accountId, db => {
     const row = db.prepare("SELECT subject,body FROM messages WHERE accountId=? AND folderId=? AND imapUid=61").get(accountId, `${accountId}:INBOX`) as { subject: string; body: string };
     assert.equal(row?.subject, "Synthetic NEW namespace");
     assert(row.body.includes("Synthetic NEW body") && !row.body.includes("Synthetic OLD body"));
   });
-  console.info("WATCHER_FIXTURE UIDVALIDITY reset re-ingested reused UID=61 with replacement subject/body");
+  console.info("WATCHER_FIXTURE UIDVALIDITY browser-before-repair: OLD=0 NEW=1 reused UID=61 replacement subject/body, watermarks and pending moves cleared");
   await resetAndInject("Synthetic WATCHER namespace", "Synthetic WATCHER body");
   startMailboxWatcher();
   await until(async () => (await count("Synthetic WATCHER namespace")) === 1 && (await count("Synthetic NEW namespace")) === 0,
     "watcher UIDVALIDITY re-ingestion");
   console.info("WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61");
+  await stopMailboxWatcher();
+  for (const mode of ["new", "full"] as const) {
+    const subject = `Synthetic ${mode} reset namespace`;
+    await resetAndInject(subject, `Synthetic ${mode} replacement body`);
+    const job = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode,
+      ...(mode === "full" ? { resumeFromUid: 61 } : {}) });
+    await until(async () => {
+      const current = getSyncJob(job.id);
+      if (current?.status === "failed") throw new Error(current.error);
+      return current?.status === "done";
+    }, `${mode} namespace recovery`);
+    assert.equal(await count(subject), 1);
+    assert.equal(await count(), 61);
+  }
+  console.info("WATCHER_FIXTURE UIDVALIDITY direct-new and resumed-full reset re-ingest replacement UID=61");
+  startMailboxWatcher();
+  await until(async () => (await status()).watcherState === "idling", "watcher restart after direct syncs");
 
   // Observe authentication attempts at the wire over multiple reconnect windows.
   await patchAccount(accountId, { imap: { ...endpoint, password: "wrong-synthetic-password" } });

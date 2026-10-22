@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { NextResponse } from "next/server";
-import { createMailboxSummaryHandler } from "@/app/api/_helpers/mailboxSummary";
+import { createMailboxSummaryHandler, mailboxSummarySessionGuard } from "@/app/api/_helpers/mailboxSummary";
 
 test("summary rejects unauthenticated requests before opening shards", async () => {
   const handler = createMailboxSummaryHandler({
@@ -50,3 +50,18 @@ test("summary propagates async guard headers and enumerates only through the acc
   expect(response.headers.get("set-cookie")).toContain("session=renewed");
   expect(response.headers.get("x-session")).toBe("renewed");
 });
+
+for (const asyncGuard of [false, true]) {
+  test(`summary adapter selects ${asyncGuard ? "team-auth async" : "legacy sync"} export and forwards headers`, async () => {
+    const expected = { userId: "synthetic", responseHeaders: new Headers({ "X-Session": "kept" }) };
+    const guard = mailboxSummarySessionGuard({
+      ...(asyncGuard ? { requireActiveUserSession: async () => expected } : {}),
+      requireSessionOr401: () => {
+        if (asyncGuard) throw new Error("Retiring guard must not run when team-auth is present");
+        return expected;
+      }
+    });
+    const handler = createMailboxSummaryHandler({ requireActiveUserSession: guard, getMailboxSummaries: async () => [] });
+    expect((await handler(new Request("http://example.test/api/accounts/summary"))).headers.get("x-session")).toBe("kept");
+  });
+}
