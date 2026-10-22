@@ -62,6 +62,18 @@ test("production handles: blank dbPath contention, concurrent path wins, shard t
         assert.equal(db.prepare("PRAGMA foreign_keys").get().foreign_keys,1);
         assert.equal(db.prepare("PRAGMA journal_mode").get().journal_mode,"wal");
       }
+      // A cold module graph must yield/retry while another process/handle owns
+      // the master writer lock; concurrent callers cannot observe partial init.
+      const cold = await import("./lib/db/connection.ts?watcher-startup-contention");
+      authDb.exec("BEGIN IMMEDIATE");
+      let coldResolved = false;
+      const firstCold = cold.getDb().then(db => { coldResolved = true; return db; });
+      const secondCold = cold.getDb();
+      await new Promise(resolve => setTimeout(resolve, 40));
+      assert.equal(coldResolved, false);
+      authDb.exec("ROLLBACK");
+      assert.equal(await firstCold, await secondCold);
+      cold.closeAllDbConnections();
       const insert = master.prepare(
         "INSERT INTO accounts(id,name,email,avatar,dbPath,imapHost,imapPort,imapSecure,imapUser,imapPassword,smtpHost,smtpPort,smtpSecure,smtpUser,smtpPassword) VALUES(?,?,?,'','',?,993,1,?,'',?,465,1,?,'')"
       );

@@ -1,4 +1,5 @@
 import {
+  recordMailboxSync,
   bulkUpdateMessageFlags,
   deleteMessagesByIds,
   deleteMessagesWithFilesByIds,
@@ -227,6 +228,7 @@ export function resolveOrphanedMessageFileRefs(params: {
   });
 }
 
+
 export async function runSyncOperation(
   payload: SyncPayload,
   clientId?: string,
@@ -234,7 +236,9 @@ export async function runSyncOperation(
 ): Promise<SyncOperationResult> {
   // Use batched version by default for better memory efficiency
   // This reduces peak memory usage by 80-90% for large folders
-  return runSyncOperationBatched(payload, clientId, options);
+  const result = await runSyncOperationBatched(payload, clientId, options);
+  await recordMailboxSync(payload.accountId);
+  return result;
 }
 
 /**
@@ -318,6 +322,11 @@ export async function runSyncOperationBatched(
       listFolderMessageUidAndFlagRows(account.id, payload.folderId)
     ]);
 
+    if (await saveMailboxState({ accountId: account.id, folderId: payload.folderId, mailboxPath,
+      uidValidity: remoteSnapshot.uidValidity }, { onlyIfUidValidityChanged: true })) {
+      return runSyncOperationBatched({ ...payload, mode: "full", fullSync: true,
+        resumeFromUid: undefined, backfillUids: undefined }, clientId, options);
+    }
     const repairDiff = diffLocalAndRemoteWithFlags(localRows, remoteSnapshot.entries);
 
     // Exclude UIDs queued for move out of this folder (same reason as two-phase sync).
@@ -439,6 +448,11 @@ export async function runSyncOperationBatched(
     folders = snapshot.folders;
 
     const localRows = await listFolderMessageUidAndFlagRows(account.id, twoPhaseFolderId);
+    if (await saveMailboxState({ accountId: account.id, folderId: twoPhaseFolderId, mailboxPath: twoPhaseMailboxPath,
+      uidValidity: snapshot.uidValidity }, { onlyIfUidValidityChanged: true })) {
+      return runSyncOperationBatched({ ...payload, mode: "full", fullSync: true,
+        resumeFromUid: undefined, backfillUids: undefined }, clientId, options);
+    }
     const diff = diffLocalAndRemoteWithFlags(localRows, snapshot.entries);
 
     // Exclude UIDs that are queued for move out of this folder. These messages

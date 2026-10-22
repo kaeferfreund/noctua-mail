@@ -41,6 +41,7 @@ function loadThreadsModule() {
 
 let masterDbInstance: any | null = null;
 let masterInitialized = false;
+let masterInitializationPromise: Promise<void> | null = null;
 const accountDbInstances = new Map<string, any>();
 const accountDbInitialized = new Set<string>();
 const accountDbIdleTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -168,6 +169,7 @@ function scheduleAccountDbIdleClose(dbPath: string) {
 
 export function closeAllDbConnections() {
   connectionGeneration++;
+  masterInitializationPromise = null;
   if (authDbInstance) {
     try { authDbInstance.close(); } catch { /* Already closed during shutdown. */ }
     authDbInstance = null;
@@ -197,25 +199,38 @@ export async function getDb() {
   registerDbShutdownHooks();
   if (!masterDbInstance) {
     await ensureDatabaseCtor();
-    // A concurrent startup may have opened the handle during the import.
-    if (masterDbInstance) return masterDbInstance;
-    const dbPath = getMainDbPath();
-    ensureDbParentDir(dbPath);
-    masterDbInstance = new DatabaseCtor(dbPath);
-    configureDb(masterDbInstance, 0);
-    if (!startupStoragePathLogged) {
-      console.info("[startup] opened storage", {
-        dataDir: getDataDir(),
-        dbPath
-      });
-      startupStoragePathLogged = true;
+    if (!masterDbInstance) {
+      const dbPath = getMainDbPath();
+      ensureDbParentDir(dbPath);
+      masterDbInstance = new DatabaseCtor(dbPath);
+      configureDb(masterDbInstance, 0);
+      if (!startupStoragePathLogged) {
+        console.info("[startup] opened storage", { dataDir: getDataDir(), dbPath });
+        startupStoragePathLogged = true;
+      }
     }
   }
-  if (!masterInitialized && masterDbInstance) {
-    initMasterSchema(masterDbInstance);
-    masterInitialized = true;
+  const db = masterDbInstance;
+  if (!masterInitialized) {
+    if (!masterInitializationPromise) {
+      const generation = connectionGeneration;
+      // Worker/module startup competes with watcher leases and auth writes.
+      // Retry only idempotent schema initialization and make every caller wait.
+      const pending = withDbWriteRetry("initializeMasterSchema", () => {
+        if (generation !== connectionGeneration || db !== masterDbInstance) throw new Error("Storage closed during initialization");
+        initMasterSchema(db);
+      }).then(() => {
+        if (generation !== connectionGeneration || db !== masterDbInstance) throw new Error("Storage closed during initialization");
+        masterInitialized = true;
+      });
+      masterInitializationPromise = pending;
+      void pending.catch(() => {
+        if (masterInitializationPromise === pending) masterInitializationPromise = null;
+      });
+    }
+    await masterInitializationPromise;
   }
-  return masterDbInstance;
+  return db;
 }
 
 export async function initializeMasterDb() {

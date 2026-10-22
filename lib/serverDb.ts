@@ -179,3 +179,6 @@ export async function deleteMessageByFolderUid(...args: Parameters<ServerDbModul
 export async function saveFoldersForAccount(...args: Parameters<ServerDbModule["saveFoldersForAccount"]>) {
   return (await loadServerDb()).saveFoldersForAccount(...args);
 }
+export async function getMailboxSummaries(...args: Parameters<ServerDbModule["getMailboxSummaries"]>) {
+  return (await loadServerDb()).getMailboxSummaries(...args);
+}
