@@ -624,7 +624,7 @@ export default function ThreadMessageCard({
                   <MoveRight size={12} />
                 </span>
               )}
-              {senderText}
+              <span className={styles.compactSenderText}>{senderText}</span>
               {showSenderEmail && (
                 <span className={styles.compactSenderEmail}>{senderEmail}</span>
               )}

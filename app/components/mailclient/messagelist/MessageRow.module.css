@@ -289,7 +289,7 @@
 }
 
 .unreadText {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--gray-12);
 }
 
@@ -318,7 +318,7 @@
   /* Compact retains two text lines while reserving independent action areas. */
   .rowCompact {
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr) auto 44px;
+    grid-template-columns: 64px minmax(0, 1fr) auto 44px;
     grid-template-rows: 24px 24px;
     gap: 4px 6px;
     height: 72px;
@@ -327,8 +327,10 @@
     flex: 1;
   }
   .rowCompact .header, .rowCompact .actions { display: contents; }
-  .rowCompact :global([data-message-cell="unread"]) { grid-column: 1; grid-row: 1 / 3; justify-content: flex-end; gap: 16px; --unread-dot-hit-touch: -16px; }
-  .rowCompact :global([data-message-cell="unread"] > :not(button[title^="Mark as"]):not([aria-label="Select message"])) { display: none; }
+  /* Only the checkbox's 44px touch box; it stays right of the thread caret,
+     which overhangs the first ~20px of the row. */
+  .rowCompact :global([data-message-cell="unread"]) { grid-column: 1; grid-row: 1 / 3; justify-content: flex-end; }
+  .rowCompact :global([data-message-cell="unread"] > :not([aria-label="Select message"])) { display: none; }
   .rowCompact :global([aria-label="Select message"]) { flex: 0 0 44px; width: 44px; height: 44px; }
   .rowCompact .from { grid-column: 2; grid-row: 1; min-width: 0; }
   .rowCompact .date { grid-column: 3; grid-row: 1; }

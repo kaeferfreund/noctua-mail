@@ -11,6 +11,8 @@ type SenderIconProps = {
   size?: "sm" | "md";
   className?: string;
   title?: string;
+  /** Draws the accent ring that marks an unread row in the message lists. */
+  unread?: boolean;
 };
 
 export default function SenderIcon({
@@ -20,7 +22,8 @@ export default function SenderIcon({
   enabled = true,
   size = "sm",
   className = "",
-  title
+  title,
+  unread = false
 }: SenderIconProps) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const identity = useMemo(
@@ -50,6 +53,7 @@ export default function SenderIcon({
         .join(" ")}
       title={title}
       aria-hidden="true"
+      data-unread={unread || undefined}
       style={
         {
           "--sender-icon-bg": colors.background,
