@@ -1,0 +1,183 @@
+{
+  "timings": [
+    {
+      "label": "current thread selector",
+      "ms": 149.47044200000005,
+      "min": 148.9530779999999,
+      "max": 150.06500799999992
+    },
+    {
+      "label": "EXISTS thread selector",
+      "ms": 8.833039999999983,
+      "min": 8.713159000000132,
+      "max": 8.917801999999938
+    },
+    {
+      "label": " SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t ",
+      "ms": 149.3870020000004,
+      "min": 149.0088380000002,
+      "max": 150.53641199999993
+    },
+    {
+      "label": "SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND EXISTS ( ",
+      "ms": 3.654073000000153,
+      "min": 3.502711999999974,
+      "max": 3.7828349999999773
+    },
+    {
+      "label": "SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = ",
+      "ms": 5.114687000000231,
+      "min": 5.012165999999979,
+      "max": 5.278887999999824
+    },
+    {
+      "label": "SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? ",
+      "ms": 0.8215679999998429,
+      "min": 0.802646999999979,
+      "max": 0.834447000000182
+    },
+    {
+      "label": " SELECT m.id, m.accountId, m.folderId, m.m",
+      "ms": 10.578856000000087,
+      "min": 10.549456000000191,
+      "max": 10.794938000000002
+    },
+    {
+      "label": " SELECT CASE WHEN t.latestReceivedDateValue >= ? THEN 'Today' WHEN t",
+      "ms": 13.820646000000124,
+      "min": 13.648243999999977,
+      "max": 14.006207999999788
+    },
+    {
+      "label": "comments 1000 existing index",
+      "ms": 1.4807730000002266,
+      "min": 1.3726130000000012,
+      "max": 3.8885549999999967
+    },
+    {
+      "label": "comments 1000 complete index",
+      "ms": 0.9068890000003194,
+      "min": 0.8576480000001538,
+      "max": 0.9414879999999357
+    },
+    {
+      "label": "real remap 1000 notes + 1000 activities prepare",
+      "ms": 56.88011800000004,
+      "min": 55.55718700000034,
+      "max": 57.56196500000033,
+      "last": {
+        "events": [
+          {
+            "accountId": "a0",
+            "threadId": "old",
+            "revision": 2
+          },
+          {
+            "accountId": "a0",
+            "threadId": "t0",
+            "revision": 2
+          }
+        ],
+        "comments": {
+          "n": 1000,
+          "r": 2
+        },
+        "activities": {
+          "n": 1001
+        }
+      }
+    },
+    {
+      "label": "real remap 1000 notes + 1000 activities cache",
+      "ms": 16.88451400000031,
+      "min": 16.69939199999999,
+      "max": 17.024155000000064,
+      "last": {
+        "events": [
+          {
+            "accountId": "a0",
+            "threadId": "old",
+            "revision": 2
+          },
+          {
+            "accountId": "a0",
+            "threadId": "t0",
+            "revision": 2
+          }
+        ],
+        "comments": {
+          "n": 1000,
+          "r": 2
+        },
+        "activities": {
+          "n": 1001
+        }
+      }
+    }
+  ],
+  "plans": [
+    {
+      "label": "EXISTS thread selector",
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH t USING INDEX idx_threads_account_latest (accountId=?)"
+        },
+        {
+          "id": 16,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 21,
+          "parent": 16,
+          "notused": 60,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 38,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 43,
+          "parent": 38,
+          "notused": 59,
+          "detail": "SEARCH f USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=? AND threadId=?)"
+        },
+        {
+          "id": 76,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "comments full order index",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH thread_comments USING INDEX perf_comments_order (accountId=? AND threadId=?)"
+        }
+      ]
+    }
+  ],
+  "loadStart": [
+    3.02,
+    2.9,
+    2.72
+  ],
+  "sameSelectorRows": true,
+  "loadEnd": [
+    3.02,
+    2.9,
+    2.72
+  ]
+}

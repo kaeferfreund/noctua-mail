@@ -1,0 +1,3753 @@
+{
+  "sqlite": {
+    "v": "3.53.4"
+  },
+  "loadStart": [
+    5.52,
+    3.16,
+    2.79
+  ],
+  "schema": {
+    "master": [
+      {
+        "type": "table",
+        "name": "sync_worker_leases",
+        "tbl_name": "sync_worker_leases",
+        "sql": "CREATE TABLE sync_worker_leases (\n      slot INTEGER PRIMARY KEY, jobId TEXT UNIQUE NOT NULL, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL,\n      ownerPid INTEGER NOT NULL, pid INTEGER, expiresAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_sync_worker_leases_1",
+        "tbl_name": "sync_worker_leases",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "sync_worker_owners",
+        "tbl_name": "sync_worker_owners",
+        "sql": "CREATE TABLE sync_worker_owners (\n      ownerInstance TEXT PRIMARY KEY, expiresAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_sync_worker_owners_1",
+        "tbl_name": "sync_worker_owners",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "sync_worker_queue",
+        "tbl_name": "sync_worker_queue",
+        "sql": "CREATE TABLE sync_worker_queue (\n      jobId TEXT PRIMARY KEY, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL, ownerPid INTEGER NOT NULL,\n      priority INTEGER NOT NULL, queuedAt INTEGER NOT NULL, bypasses INTEGER NOT NULL DEFAULT 0\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_sync_worker_queue_1",
+        "tbl_name": "sync_worker_queue",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "mailbox_watcher_auth",
+        "tbl_name": "mailbox_watcher_auth",
+        "sql": "CREATE TABLE mailbox_watcher_auth (\n      accountId TEXT PRIMARY KEY, identity TEXT NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_mailbox_watcher_auth_1",
+        "tbl_name": "mailbox_watcher_auth",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "mailbox_watcher_lease",
+        "tbl_name": "mailbox_watcher_lease",
+        "sql": "CREATE TABLE mailbox_watcher_lease (\n      slot INTEGER PRIMARY KEY CHECK(slot=1), ownerInstance TEXT NOT NULL,\n      pid INTEGER NOT NULL, expiresAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "table",
+        "name": "accounts",
+        "tbl_name": "accounts",
+        "sql": "CREATE TABLE accounts (\n      id TEXT PRIMARY KEY,\n      name TEXT NOT NULL,\n      email TEXT NOT NULL,\n      avatar TEXT NOT NULL,\n      ownerUserId TEXT,\n      settings TEXT,\n      dbPath TEXT,\n      imapHost TEXT NOT NULL,\n      imapPort INTEGER NOT NULL,\n      imapSecure INTEGER NOT NULL,\n      imapUser TEXT NOT NULL,\n      imapPassword TEXT NOT NULL,\n      smtpHost TEXT NOT NULL,\n      smtpPort INTEGER NOT NULL,\n      smtpSecure INTEGER NOT NULL,\n      smtpUser TEXT NOT NULL,\n      smtpPassword TEXT NOT NULL\n    , caldavUrl TEXT, caldavUser TEXT, caldavPassword TEXT, caldavCalendarPath TEXT, caldavSyncIntervalMs INTEGER, deeplApiKey TEXT, deeplEnabled INTEGER, deeplTargetLang TEXT)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_accounts_1",
+        "tbl_name": "accounts",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "sender_identities",
+        "tbl_name": "sender_identities",
+        "sql": "CREATE TABLE sender_identities (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      email TEXT NOT NULL COLLATE NOCASE,\n      displayName TEXT NOT NULL,\n      replyTo TEXT,\n      signatureId TEXT,\n      isDefault INTEGER NOT NULL DEFAULT 0 CHECK(isDefault IN (0,1)),\n      enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),\n      createdBy TEXT,\n      createdAt INTEGER NOT NULL,\n      updatedAt INTEGER NOT NULL,\n      CHECK(isDefault = 0 OR enabled = 1)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_sender_identities_1",
+        "tbl_name": "sender_identities",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_sender_identity_address",
+        "tbl_name": "sender_identities",
+        "sql": "CREATE UNIQUE INDEX idx_sender_identity_address ON sender_identities(accountId,email)"
+      },
+      {
+        "type": "index",
+        "name": "idx_sender_identity_default",
+        "tbl_name": "sender_identities",
+        "sql": "CREATE UNIQUE INDEX idx_sender_identity_default ON sender_identities(accountId) WHERE isDefault=1"
+      },
+      {
+        "type": "table",
+        "name": "users",
+        "tbl_name": "users",
+        "sql": "CREATE TABLE users (\n      id TEXT PRIMARY KEY,\n      email TEXT NOT NULL UNIQUE,\n      role TEXT NOT NULL,\n      createdAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_users_1",
+        "tbl_name": "users",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_users_2",
+        "tbl_name": "users",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "user_accounts",
+        "tbl_name": "user_accounts",
+        "sql": "CREATE TABLE user_accounts (\n      userId TEXT NOT NULL,\n      accountId TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'manager', grantedByUserId TEXT, grantedAt INTEGER,\n      PRIMARY KEY (userId, accountId)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_user_accounts_1",
+        "tbl_name": "user_accounts",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "invite_codes",
+        "tbl_name": "invite_codes",
+        "sql": "CREATE TABLE invite_codes (\n      code TEXT PRIMARY KEY,\n      role TEXT NOT NULL,\n      maxUses INTEGER,\n      uses INTEGER DEFAULT 0,\n      expiresAt INTEGER,\n      createdAt INTEGER NOT NULL,\n      usedByUserId TEXT\n    , email TEXT, issuedByUserId TEXT, provenance TEXT NOT NULL DEFAULT 'operator', revokedAt INTEGER)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_invite_codes_1",
+        "tbl_name": "invite_codes",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "mcp_tokens",
+        "tbl_name": "mcp_tokens",
+        "sql": "CREATE TABLE mcp_tokens (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      createdByUserId TEXT NOT NULL,\n      label TEXT NOT NULL,\n      tokenHash TEXT NOT NULL UNIQUE,\n      tokenSuffix TEXT NOT NULL,\n      createdAt INTEGER NOT NULL,\n      expiresAt INTEGER,\n      lastUsedAt INTEGER\n    , scopes TEXT, securityGeneration INTEGER)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_mcp_tokens_1",
+        "tbl_name": "mcp_tokens",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_mcp_tokens_2",
+        "tbl_name": "mcp_tokens",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "user_account_prefs",
+        "tbl_name": "user_account_prefs",
+        "sql": "CREATE TABLE user_account_prefs (\n      userId TEXT NOT NULL,\n      accountId TEXT NOT NULL,\n      prefs TEXT NOT NULL,\n      updatedAt INTEGER NOT NULL,\n      PRIMARY KEY (userId, accountId)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_user_account_prefs_1",
+        "tbl_name": "user_account_prefs",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "admin_audit",
+        "tbl_name": "admin_audit",
+        "sql": "CREATE TABLE admin_audit (\n      id TEXT PRIMARY KEY,\n      actorUserId TEXT NOT NULL,\n      action TEXT NOT NULL,\n      targetUserId TEXT,\n      targetAccountId TEXT,\n      payload TEXT,\n      createdAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_admin_audit_1",
+        "tbl_name": "admin_audit",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_mcp_tokens_account_created",
+        "tbl_name": "mcp_tokens",
+        "sql": "CREATE INDEX idx_mcp_tokens_account_created\n     ON mcp_tokens(accountId, createdAt DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_admin_audit_created",
+        "tbl_name": "admin_audit",
+        "sql": "CREATE INDEX idx_admin_audit_created\n     ON admin_audit(createdAt DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_user_accounts_account",
+        "tbl_name": "user_accounts",
+        "sql": "CREATE INDEX idx_user_accounts_account\n     ON user_accounts(accountId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_users_email_lower",
+        "tbl_name": "users",
+        "sql": "CREATE UNIQUE INDEX idx_users_email_lower ON users(lower(email))"
+      },
+      {
+        "type": "table",
+        "name": "auth_user",
+        "tbl_name": "auth_user",
+        "sql": "CREATE TABLE \"auth_user\" (\"id\" text not null primary key, \"name\" text not null, \"email\" text not null unique, \"emailVerified\" integer not null, \"image\" text, \"createdAt\" date not null, \"updatedAt\" date not null, \"role\" text, \"banned\" integer, \"banReason\" text, \"banExpires\" date, \"twoFactorEnabled\" integer)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_user_1",
+        "tbl_name": "auth_user",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_user_2",
+        "tbl_name": "auth_user",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_session",
+        "tbl_name": "auth_session",
+        "sql": "CREATE TABLE \"auth_session\" (\"id\" text not null primary key, \"expiresAt\" date not null, \"token\" text not null unique, \"createdAt\" date not null, \"updatedAt\" date not null, \"ipAddress\" text, \"userAgent\" text, \"userId\" text not null references \"auth_user\" (\"id\") on delete cascade, \"impersonatedBy\" text, \"activeAccountId\" text)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_session_1",
+        "tbl_name": "auth_session",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_session_2",
+        "tbl_name": "auth_session",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_account",
+        "tbl_name": "auth_account",
+        "sql": "CREATE TABLE \"auth_account\" (\"id\" text not null primary key, \"accountId\" text not null, \"providerId\" text not null, \"userId\" text not null references \"auth_user\" (\"id\") on delete cascade, \"accessToken\" text, \"refreshToken\" text, \"idToken\" text, \"accessTokenExpiresAt\" date, \"refreshTokenExpiresAt\" date, \"scope\" text, \"password\" text, \"createdAt\" date not null, \"updatedAt\" date not null)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_account_1",
+        "tbl_name": "auth_account",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_verification",
+        "tbl_name": "auth_verification",
+        "sql": "CREATE TABLE \"auth_verification\" (\"id\" text not null primary key, \"identifier\" text not null, \"value\" text not null, \"expiresAt\" date not null, \"createdAt\" date not null, \"updatedAt\" date not null)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_verification_1",
+        "tbl_name": "auth_verification",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_two_factor",
+        "tbl_name": "auth_two_factor",
+        "sql": "CREATE TABLE \"auth_two_factor\" (\"id\" text not null primary key, \"secret\" text not null, \"backupCodes\" text not null, \"userId\" text not null references \"auth_user\" (\"id\") on delete cascade, \"verified\" integer, \"failedVerificationCount\" integer, \"lockedUntil\" date)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_two_factor_1",
+        "tbl_name": "auth_two_factor",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_passkey",
+        "tbl_name": "auth_passkey",
+        "sql": "CREATE TABLE \"auth_passkey\" (\"id\" text not null primary key, \"name\" text, \"publicKey\" text not null, \"userId\" text not null references \"auth_user\" (\"id\") on delete cascade, \"credentialID\" text not null, \"counter\" integer not null, \"deviceType\" text not null, \"backedUp\" integer not null, \"transports\" text, \"createdAt\" date, \"aaguid\" text)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_passkey_1",
+        "tbl_name": "auth_passkey",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "auth_session_userId_idx",
+        "tbl_name": "auth_session",
+        "sql": "CREATE INDEX \"auth_session_userId_idx\" on \"auth_session\" (\"userId\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_account_userId_idx",
+        "tbl_name": "auth_account",
+        "sql": "CREATE INDEX \"auth_account_userId_idx\" on \"auth_account\" (\"userId\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_verification_identifier_idx",
+        "tbl_name": "auth_verification",
+        "sql": "CREATE INDEX \"auth_verification_identifier_idx\" on \"auth_verification\" (\"identifier\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_two_factor_secret_idx",
+        "tbl_name": "auth_two_factor",
+        "sql": "CREATE INDEX \"auth_two_factor_secret_idx\" on \"auth_two_factor\" (\"secret\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_two_factor_userId_idx",
+        "tbl_name": "auth_two_factor",
+        "sql": "CREATE INDEX \"auth_two_factor_userId_idx\" on \"auth_two_factor\" (\"userId\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_passkey_userId_idx",
+        "tbl_name": "auth_passkey",
+        "sql": "CREATE INDEX \"auth_passkey_userId_idx\" on \"auth_passkey\" (\"userId\")"
+      },
+      {
+        "type": "index",
+        "name": "auth_passkey_credentialID_idx",
+        "tbl_name": "auth_passkey",
+        "sql": "CREATE INDEX \"auth_passkey_credentialID_idx\" on \"auth_passkey\" (\"credentialID\")"
+      },
+      {
+        "type": "table",
+        "name": "auth_login_epoch",
+        "tbl_name": "auth_login_epoch",
+        "sql": "CREATE TABLE auth_login_epoch (\n    id INTEGER PRIMARY KEY CHECK(id=1), generation INTEGER NOT NULL DEFAULT 0\n  )"
+      },
+      {
+        "type": "table",
+        "name": "auth_security_state",
+        "tbl_name": "auth_security_state",
+        "sql": "CREATE TABLE auth_security_state (\n    userId TEXT PRIMARY KEY REFERENCES auth_user(id) ON DELETE CASCADE,\n    generation INTEGER NOT NULL DEFAULT 0\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_security_state_1",
+        "tbl_name": "auth_security_state",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_session_security",
+        "tbl_name": "auth_session_security",
+        "sql": "CREATE TABLE auth_session_security (\n    sessionId TEXT PRIMARY KEY REFERENCES auth_session(id) ON DELETE CASCADE,\n    userId TEXT NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,\n    generation INTEGER NOT NULL,\n    assurance TEXT NOT NULL CHECK(assurance IN ('setup','mfa')),\n    authenticatedAt INTEGER NOT NULL, method TEXT NOT NULL\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_session_security_1",
+        "tbl_name": "auth_session_security",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_pending_challenges",
+        "tbl_name": "auth_pending_challenges",
+        "sql": "CREATE TABLE auth_pending_challenges (\n    identifier TEXT PRIMARY KEY,\n    userId TEXT REFERENCES auth_user(id) ON DELETE CASCADE,\n    generation INTEGER, loginEpoch INTEGER, authenticatedAt INTEGER NOT NULL,\n    kind TEXT NOT NULL, sourceSessionId TEXT, expiresAt INTEGER NOT NULL,\n    CHECK((userId IS NOT NULL AND generation IS NOT NULL) OR\n      (kind='passkey_login' AND loginEpoch IS NOT NULL))\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_pending_challenges_1",
+        "tbl_name": "auth_pending_challenges",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_reauth_grants",
+        "tbl_name": "auth_reauth_grants",
+        "sql": "CREATE TABLE auth_reauth_grants (\n    tokenHash TEXT PRIMARY KEY,\n    userId TEXT NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,\n    sessionId TEXT NOT NULL REFERENCES auth_session(id) ON DELETE CASCADE,\n    purpose TEXT NOT NULL, generation INTEGER NOT NULL, challengeId TEXT,\n    state TEXT NOT NULL DEFAULT 'issued', expiresAt INTEGER NOT NULL\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_auth_reauth_grants_1",
+        "tbl_name": "auth_reauth_grants",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "user_provisioning",
+        "tbl_name": "user_provisioning",
+        "sql": "CREATE TABLE user_provisioning (\n    id TEXT PRIMARY KEY, userId TEXT NOT NULL, normalizedEmail TEXT NOT NULL,\n    inviteCode TEXT, kind TEXT NOT NULL, state TEXT NOT NULL,\n    createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_user_provisioning_1",
+        "tbl_name": "user_provisioning",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "admin_lifecycle_operations",
+        "tbl_name": "admin_lifecycle_operations",
+        "sql": "CREATE TABLE admin_lifecycle_operations (\n    id TEXT PRIMARY KEY, slot TEXT UNIQUE, actorUserId TEXT NOT NULL,\n    targetUserId TEXT NOT NULL, action TEXT NOT NULL, payload TEXT,\n    state TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL\n  )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_admin_lifecycle_operations_1",
+        "tbl_name": "admin_lifecycle_operations",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_admin_lifecycle_operations_2",
+        "tbl_name": "admin_lifecycle_operations",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_user_provisioning_active_email",
+        "tbl_name": "user_provisioning",
+        "sql": "CREATE UNIQUE INDEX idx_user_provisioning_active_email\n  ON user_provisioning(normalizedEmail) WHERE state IN ('reserved','auth_created','cleanup_required')"
+      },
+      {
+        "type": "table",
+        "name": "noctua_auth_migrations",
+        "tbl_name": "noctua_auth_migrations",
+        "sql": "CREATE TABLE noctua_auth_migrations (id TEXT PRIMARY KEY)"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_noctua_auth_migrations_1",
+        "tbl_name": "noctua_auth_migrations",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "auth_control_plane_installation",
+        "tbl_name": "auth_control_plane_installation",
+        "sql": "CREATE TABLE auth_control_plane_installation (\n  id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL CHECK(version=1)\n)"
+      }
+    ],
+    "shard": [
+      {
+        "type": "table",
+        "name": "thread_collab_state",
+        "tbl_name": "thread_collab_state",
+        "sql": "CREATE TABLE thread_collab_state (\n        accountId TEXT NOT NULL, threadId TEXT NOT NULL,\n        status TEXT NOT NULL DEFAULT 'open', assigneeUserId TEXT,\n        assignedByUserId TEXT, assignedAt INTEGER, statusChangedAt INTEGER,\n        statusChangedByUserId TEXT, commentCount INTEGER NOT NULL DEFAULT 0,\n        lastActivityAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, updatedByUserId TEXT,\n        revision INTEGER NOT NULL DEFAULT 0,\n        PRIMARY KEY (accountId, threadId)\n      )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_thread_collab_state_1",
+        "tbl_name": "thread_collab_state",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "thread_comments",
+        "tbl_name": "thread_comments",
+        "sql": "CREATE TABLE thread_comments (\n        id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,\n        authorUserId TEXT NOT NULL, body TEXT NOT NULL, createdAt INTEGER NOT NULL,\n        updatedAt INTEGER NOT NULL, deletedAt INTEGER, revision INTEGER NOT NULL DEFAULT 0\n      )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_thread_comments_1",
+        "tbl_name": "thread_comments",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "sent_by",
+        "tbl_name": "sent_by",
+        "sql": "CREATE TABLE sent_by (\n        accountId TEXT NOT NULL, messageId TEXT NOT NULL, userId TEXT NOT NULL, sentAt INTEGER NOT NULL,\n        PRIMARY KEY (accountId, messageId)\n      )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_sent_by_1",
+        "tbl_name": "sent_by",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "thread_activity",
+        "tbl_name": "thread_activity",
+        "sql": "CREATE TABLE thread_activity (\n        id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,\n        type TEXT NOT NULL, actorUserId TEXT, actorClientId TEXT, payload TEXT,\n        createdAt INTEGER NOT NULL\n      )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_thread_activity_1",
+        "tbl_name": "thread_activity",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_collab_state_assignee",
+        "tbl_name": "thread_collab_state",
+        "sql": "CREATE INDEX idx_thread_collab_state_assignee\n        ON thread_collab_state(accountId, assigneeUserId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_collab_state_status",
+        "tbl_name": "thread_collab_state",
+        "sql": "CREATE INDEX idx_thread_collab_state_status\n        ON thread_collab_state(accountId, status)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_collab_state_summary",
+        "tbl_name": "thread_collab_state",
+        "sql": "CREATE INDEX idx_thread_collab_state_summary\n        ON thread_collab_state(accountId, assigneeUserId, status)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_comments_thread",
+        "tbl_name": "thread_comments",
+        "sql": "CREATE INDEX idx_thread_comments_thread\n        ON thread_comments(accountId, threadId, createdAt)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_activity_thread",
+        "tbl_name": "thread_activity",
+        "sql": "CREATE INDEX idx_thread_activity_thread\n        ON thread_activity(accountId, threadId, createdAt)"
+      },
+      {
+        "type": "table",
+        "name": "mailbox_summary",
+        "tbl_name": "mailbox_summary",
+        "sql": "CREATE TABLE mailbox_summary (\n      accountId TEXT PRIMARY KEY,\n      lastSyncAt INTEGER,\n      watcherState TEXT NOT NULL DEFAULT 'disabled'\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_mailbox_summary_1",
+        "tbl_name": "mailbox_summary",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "folders",
+        "tbl_name": "folders",
+        "sql": "CREATE TABLE folders (\n      id TEXT PRIMARY KEY,\n      name TEXT NOT NULL,\n      parentId TEXT,\n      accountId TEXT NOT NULL,\n      count INTEGER DEFAULT 0,\n      specialUse TEXT,\n      flags TEXT,\n      delimiter TEXT\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_folders_1",
+        "tbl_name": "folders",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "messages",
+        "tbl_name": "messages",
+        "sql": "CREATE TABLE messages (\n      id TEXT NOT NULL,\n      accountId TEXT NOT NULL,\n      folderId TEXT NOT NULL,\n      threadId TEXT NOT NULL,\n      parentId TEXT,\n      messageId TEXT,\n      inReplyTo TEXT,\n      \"references\" TEXT,\n      xForwardedMessageId TEXT,\n      xComposeFormat TEXT,\n      quotedHtmlEdited INTEGER DEFAULT 0,\n      subject TEXT NOT NULL,\n      fromAddr TEXT NOT NULL,\n      fromEmail TEXT,\n      replyToAddr TEXT,\n      toAddr TEXT NOT NULL,\n      ccAddr TEXT,\n      bccAddr TEXT,\n      mailboxPath TEXT,\n      imapUid INTEGER,\n      pendingMoveSourceFolderId TEXT,\n      pendingMoveSourceMailboxPath TEXT,\n      pendingMoveSourceUid INTEGER,\n      pendingMoveStartedAt INTEGER,\n      preview TEXT NOT NULL,\n      date TEXT NOT NULL,\n      dateValue INTEGER NOT NULL,\n      body TEXT NOT NULL,\n      htmlBody TEXT,\n      priority TEXT,\n      hasSource INTEGER DEFAULT 0,\n      unread INTEGER DEFAULT 0,\n      flags TEXT,\n      seen INTEGER DEFAULT 0,\n      answered INTEGER DEFAULT 0,\n      flagged INTEGER DEFAULT 0,\n      deleted INTEGER DEFAULT 0,\n      draft INTEGER DEFAULT 0,\n      recent INTEGER DEFAULT 0,\n      category TEXT,\n      categoryScore REAL,\n      categorySignals TEXT,\n      categoryManualState TEXT,\n      listId TEXT,\n      sizeBytes INTEGER,\n      listUnsubscribe TEXT,\n      deliveredTo TEXT,\n      originalTo TEXT,\n      senderIdentityId TEXT,\n      PRIMARY KEY (accountId, id)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_messages_1",
+        "tbl_name": "messages",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "attachments",
+        "tbl_name": "attachments",
+        "sql": "CREATE TABLE attachments (\n      id TEXT NOT NULL,\n      accountId TEXT NOT NULL,\n      messageId TEXT NOT NULL,\n      filename TEXT NOT NULL,\n      contentType TEXT NOT NULL,\n      size INTEGER NOT NULL,\n      inline INTEGER NOT NULL,\n      cid TEXT,\n      url TEXT,\n      PRIMARY KEY (accountId, messageId, id),\n      FOREIGN KEY(accountId, messageId) REFERENCES messages(accountId, id) ON DELETE CASCADE\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_attachments_1",
+        "tbl_name": "attachments",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "message_translations",
+        "tbl_name": "message_translations",
+        "sql": "CREATE TABLE message_translations (\n      accountId TEXT NOT NULL,\n      messageId TEXT NOT NULL,\n      targetLang TEXT NOT NULL,\n      format TEXT NOT NULL,\n      marker TEXT,\n      translatedText TEXT NOT NULL,\n      detectedSourceLang TEXT,\n      createdAt INTEGER NOT NULL,\n      PRIMARY KEY (accountId, messageId, targetLang, format),\n      FOREIGN KEY(accountId, messageId) REFERENCES messages(accountId, id) ON DELETE CASCADE\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_message_translations_1",
+        "tbl_name": "message_translations",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "message_calendar_events",
+        "tbl_name": "message_calendar_events",
+        "sql": "CREATE TABLE message_calendar_events (\n      accountId TEXT NOT NULL,\n      messageId TEXT NOT NULL,\n      eventUid TEXT NOT NULL,\n      eventUidKey TEXT,\n      eventFirstStartAtMs INTEGER,\n      eventLastEndAtMs INTEGER,\n      inviteActionType TEXT,\n      processedAtMs INTEGER,\n      processedByUserId TEXT,\n      processedAutomatically INTEGER,\n      unprocessedReason TEXT,\n      snapshotJson TEXT,\n      snapshotVersion INTEGER,\n      PRIMARY KEY (accountId, messageId, eventUid),\n      FOREIGN KEY(accountId, messageId) REFERENCES messages(accountId, id) ON DELETE CASCADE\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_message_calendar_events_1",
+        "tbl_name": "message_calendar_events",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "threads",
+        "tbl_name": "threads",
+        "sql": "CREATE TABLE threads (\n      threadId TEXT NOT NULL,\n      accountId TEXT NOT NULL,\n      rootMessageId TEXT,\n      latestMessageId TEXT,\n      latestDateValue INTEGER,\n      latestReceivedDateValue INTEGER,\n      messageCount INTEGER,\n      unreadCount INTEGER,\n      PRIMARY KEY (accountId, threadId)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_threads_1",
+        "tbl_name": "threads",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "mailbox_state",
+        "tbl_name": "mailbox_state",
+        "sql": "CREATE TABLE mailbox_state (\n      folderId TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      mailboxPath TEXT NOT NULL,\n      uidValidity TEXT,\n      highestModSeq TEXT,\n      highestUid INTEGER,\n      supportsQresync INTEGER\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_mailbox_state_1",
+        "tbl_name": "mailbox_state",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "category_model_state",
+        "tbl_name": "category_model_state",
+        "sql": "CREATE TABLE category_model_state (\n      accountId TEXT PRIMARY KEY,\n      modelJson TEXT NOT NULL,\n      updatedAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_category_model_state_1",
+        "tbl_name": "category_model_state",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "category_feedback_events",
+        "tbl_name": "category_feedback_events",
+        "sql": "CREATE TABLE category_feedback_events (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      messageId TEXT NOT NULL,\n      previousCategory TEXT,\n      nextCategory TEXT,\n      featureJson TEXT,\n      createdAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_category_feedback_events_1",
+        "tbl_name": "category_feedback_events",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "topics",
+        "tbl_name": "topics",
+        "sql": "CREATE TABLE topics (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      name TEXT NOT NULL,\n      shortName TEXT,\n      color TEXT NOT NULL,\n      imapKeyword TEXT NOT NULL,\n      createdAt INTEGER NOT NULL,\n      updatedAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_topics_1",
+        "tbl_name": "topics",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "recipient_aliases",
+        "tbl_name": "recipient_aliases",
+        "sql": "CREATE TABLE recipient_aliases (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      name TEXT NOT NULL,\n      recipients TEXT NOT NULL,\n      normalizedRecipients TEXT NOT NULL,\n      createdAt INTEGER NOT NULL,\n      updatedAt INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_recipient_aliases_1",
+        "tbl_name": "recipient_aliases",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "thread_topics",
+        "tbl_name": "thread_topics",
+        "sql": "CREATE TABLE thread_topics (\n      threadId TEXT NOT NULL,\n      topicId TEXT NOT NULL,\n      accountId TEXT NOT NULL,\n      assignedAt INTEGER NOT NULL,\n      PRIMARY KEY (accountId, threadId, topicId)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_thread_topics_1",
+        "tbl_name": "thread_topics",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "thread_signals",
+        "tbl_name": "thread_signals",
+        "sql": "CREATE TABLE thread_signals (\n      accountId TEXT NOT NULL,\n      threadId TEXT NOT NULL,\n      signalType TEXT NOT NULL,\n      signalValue TEXT NOT NULL,\n      PRIMARY KEY (accountId, threadId, signalType, signalValue)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_thread_signals_1",
+        "tbl_name": "thread_signals",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "topic_learning_signals",
+        "tbl_name": "topic_learning_signals",
+        "sql": "CREATE TABLE topic_learning_signals (\n      accountId TEXT NOT NULL,\n      topicId TEXT NOT NULL,\n      threadId TEXT NOT NULL,\n      signalType TEXT NOT NULL,\n      signalValue TEXT NOT NULL,\n      PRIMARY KEY (accountId, topicId, threadId, signalType, signalValue)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_topic_learning_signals_1",
+        "tbl_name": "topic_learning_signals",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "topic_signal_exclusions",
+        "tbl_name": "topic_signal_exclusions",
+        "sql": "CREATE TABLE topic_signal_exclusions (\n      accountId TEXT NOT NULL,\n      topicId TEXT NOT NULL,\n      signalType TEXT NOT NULL,\n      signalValue TEXT NOT NULL,\n      createdAt INTEGER NOT NULL,\n      PRIMARY KEY (accountId, topicId, signalType, signalValue)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_topic_signal_exclusions_1",
+        "tbl_name": "topic_signal_exclusions",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "calendar_reminders",
+        "tbl_name": "calendar_reminders",
+        "sql": "CREATE TABLE calendar_reminders (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      userId TEXT NOT NULL,\n      messageId TEXT,\n      eventUid TEXT,\n      eventUidKey TEXT,\n      eventTitle TEXT NOT NULL,\n      eventLocation TEXT,\n      eventDescription TEXT,\n      eventStartAtMs INTEGER NOT NULL,\n      eventEndAtMs INTEGER,\n      startTimezone TEXT,\n      recurrenceRule TEXT,\n      recurrenceDates TEXT,\n      excludedDates TEXT,\n      leadMinutes INTEGER NOT NULL,\n      leadLabel TEXT NOT NULL,\n      createdAtMs INTEGER NOT NULL,\n      updatedAtMs INTEGER NOT NULL,\n      deletedAtMs INTEGER\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_calendar_reminders_1",
+        "tbl_name": "calendar_reminders",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2",
+        "tbl_name": "message_fts_v2",
+        "sql": "CREATE VIRTUAL TABLE \"message_fts_v2\"\n    USING fts5(accountId UNINDEXED, messageId UNINDEXED, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)"
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2_data",
+        "tbl_name": "message_fts_v2_data",
+        "sql": "CREATE TABLE \"message_fts_v2_data\"(id INTEGER PRIMARY KEY, block BLOB)"
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2_idx",
+        "tbl_name": "message_fts_v2_idx",
+        "sql": "CREATE TABLE \"message_fts_v2_idx\"(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2_content",
+        "tbl_name": "message_fts_v2_content",
+        "sql": "CREATE TABLE \"message_fts_v2_content\"(id INTEGER PRIMARY KEY, c0, c1, c2, c3, c4, c5, c6, c7, c8)"
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2_docsize",
+        "tbl_name": "message_fts_v2_docsize",
+        "sql": "CREATE TABLE \"message_fts_v2_docsize\"(id INTEGER PRIMARY KEY, sz BLOB)"
+      },
+      {
+        "type": "table",
+        "name": "message_fts_v2_config",
+        "tbl_name": "message_fts_v2_config",
+        "sql": "CREATE TABLE \"message_fts_v2_config\"(k PRIMARY KEY, v) WITHOUT ROWID"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_live_thread_summary",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_live_thread_summary\n      ON messages(accountId, threadId, dateValue DESC) WHERE COALESCE(deleted, 0) = 0"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_unread_mailbox_summary",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_unread_mailbox_summary\n      ON messages(accountId, folderId) WHERE unread = 1 AND COALESCE(deleted, 0) = 0"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_folder_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_folder_date\n      ON messages(accountId, folderId, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_date\n      ON messages(accountId, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_thread",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_thread\n      ON messages(threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_thread_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_thread_date\n      ON messages(accountId, threadId, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_flagged_thread",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_flagged_thread\n      ON messages(accountId, flagged, threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_flagged_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_flagged_date\n      ON messages(accountId, flagged DESC, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_folder_flagged_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_folder_flagged_date\n      ON messages(accountId, folderId, flagged DESC, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_category",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_category\n      ON messages(accountId, category, dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_from_lower",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_from_lower\n      ON messages(accountId, lower(COALESCE(fromAddr, '')))"
+      },
+      {
+        "type": "index",
+        "name": "idx_threads_account_latest",
+        "tbl_name": "threads",
+        "sql": "CREATE INDEX idx_threads_account_latest\n      ON threads(accountId, latestDateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_attachments_message",
+        "tbl_name": "attachments",
+        "sql": "CREATE INDEX idx_attachments_message\n      ON attachments(messageId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_message_calendar_events_account_uid",
+        "tbl_name": "message_calendar_events",
+        "sql": "CREATE INDEX idx_message_calendar_events_account_uid\n      ON message_calendar_events(accountId, eventUid)"
+      },
+      {
+        "type": "index",
+        "name": "idx_message_calendar_events_account_message",
+        "tbl_name": "message_calendar_events",
+        "sql": "CREATE INDEX idx_message_calendar_events_account_message\n      ON message_calendar_events(accountId, messageId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_reminders_account_user_uid",
+        "tbl_name": "calendar_reminders",
+        "sql": "CREATE INDEX idx_calendar_reminders_account_user_uid\n      ON calendar_reminders(accountId, userId, eventUid)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_reminders_account_user_updated",
+        "tbl_name": "calendar_reminders",
+        "sql": "CREATE INDEX idx_calendar_reminders_account_user_updated\n      ON calendar_reminders(accountId, userId, updatedAtMs DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_category_feedback_events_account_created",
+        "tbl_name": "category_feedback_events",
+        "sql": "CREATE INDEX idx_category_feedback_events_account_created\n      ON category_feedback_events(accountId, createdAt DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_topics_account",
+        "tbl_name": "topics",
+        "sql": "CREATE INDEX idx_topics_account\n      ON topics(accountId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_recipient_aliases_account",
+        "tbl_name": "recipient_aliases",
+        "sql": "CREATE INDEX idx_recipient_aliases_account\n      ON recipient_aliases(accountId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_recipient_aliases_account_normalized_recipients",
+        "tbl_name": "recipient_aliases",
+        "sql": "CREATE INDEX idx_recipient_aliases_account_normalized_recipients\n      ON recipient_aliases(accountId, normalizedRecipients)"
+      },
+      {
+        "type": "index",
+        "name": "idx_recipient_aliases_account_name",
+        "tbl_name": "recipient_aliases",
+        "sql": "CREATE UNIQUE INDEX idx_recipient_aliases_account_name\n      ON recipient_aliases(accountId, lower(name))"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_topics_thread",
+        "tbl_name": "thread_topics",
+        "sql": "CREATE INDEX idx_thread_topics_thread\n      ON thread_topics(threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_topics_topic",
+        "tbl_name": "thread_topics",
+        "sql": "CREATE INDEX idx_thread_topics_topic\n      ON thread_topics(topicId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_signals_account_thread",
+        "tbl_name": "thread_signals",
+        "sql": "CREATE INDEX idx_thread_signals_account_thread\n      ON thread_signals(accountId, threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_thread_signals_account_signal",
+        "tbl_name": "thread_signals",
+        "sql": "CREATE INDEX idx_thread_signals_account_signal\n      ON thread_signals(accountId, signalType, signalValue, threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_topic_learning_signals_account_topic",
+        "tbl_name": "topic_learning_signals",
+        "sql": "CREATE INDEX idx_topic_learning_signals_account_topic\n      ON topic_learning_signals(accountId, topicId, threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_topic_learning_signals_account_signal",
+        "tbl_name": "topic_learning_signals",
+        "sql": "CREATE INDEX idx_topic_learning_signals_account_signal\n      ON topic_learning_signals(accountId, signalType, signalValue, topicId, threadId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_topic_signal_exclusions_account_topic",
+        "tbl_name": "topic_signal_exclusions",
+        "sql": "CREATE INDEX idx_topic_signal_exclusions_account_topic\n      ON topic_signal_exclusions(accountId, topicId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_topic_signal_exclusions_account_signal",
+        "tbl_name": "topic_signal_exclusions",
+        "sql": "CREATE INDEX idx_topic_signal_exclusions_account_signal\n      ON topic_signal_exclusions(accountId, signalType, signalValue, topicId)"
+      },
+      {
+        "type": "table",
+        "name": "calendar_events",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE TABLE calendar_events (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      calendarId TEXT,\n      eventUid TEXT NOT NULL,\n      summary TEXT NOT NULL,\n      description TEXT,\n      location TEXT,\n      startAtMs INTEGER NOT NULL,\n      endAtMs INTEGER,\n      allDay INTEGER NOT NULL DEFAULT 0,\n      startTimezone TEXT,\n      endTimezone TEXT,\n      recurrenceRule TEXT,\n      recurrenceDates TEXT,\n      excludedDates TEXT,\n      status TEXT,\n      organizer TEXT,\n      attendees TEXT,\n      myPartstat TEXT,\n      myPartstatUpdatedAtMs INTEGER,\n      myAttendeeEmail TEXT,\n      replyRequested INTEGER,\n      remoteEtag TEXT,\n      remoteHref TEXT,\n      rawIcs TEXT,\n      pendingRemoteSync INTEGER,\n      sourceType TEXT NOT NULL DEFAULT 'local',\n      messageId TEXT,\n      occurrenceMessageIds TEXT,\n      sourceSubject TEXT,\n      sourceFromAddr TEXT,\n      sourceToAddr TEXT,\n      sourceCcAddr TEXT,\n      sourceBccAddr TEXT,\n      sourceDateMs INTEGER,\n      sourceBodyText TEXT,\n      sourceBodyHtml TEXT,\n      occurrenceSnapshots TEXT,\n      occurrenceRecurrenceIds TEXT,\n      eventUidKey TEXT,\n      createdAtMs INTEGER NOT NULL,\n      updatedAtMs INTEGER NOT NULL,\n      deletedAtMs INTEGER\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_calendar_events_1",
+        "tbl_name": "calendar_events",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_events_account_start",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE INDEX idx_calendar_events_account_start\n      ON calendar_events(accountId, startAtMs)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_events_account_uid",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE INDEX idx_calendar_events_account_uid\n      ON calendar_events(accountId, eventUid)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_events_account_source",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE INDEX idx_calendar_events_account_source\n      ON calendar_events(accountId, sourceType)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_events_account_calendar",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE INDEX idx_calendar_events_account_calendar\n      ON calendar_events(accountId, calendarId)"
+      },
+      {
+        "type": "table",
+        "name": "calendar_participation_overrides",
+        "tbl_name": "calendar_participation_overrides",
+        "sql": "CREATE TABLE calendar_participation_overrides (\n      id TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      eventUid TEXT NOT NULL,\n      occurrenceStartAtMs INTEGER NOT NULL,\n      partstat TEXT NOT NULL,\n      attendeeEmail TEXT,\n      updatedAtMs INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_calendar_participation_overrides_1",
+        "tbl_name": "calendar_participation_overrides",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_participation_overrides_account_uid_occurrence",
+        "tbl_name": "calendar_participation_overrides",
+        "sql": "CREATE UNIQUE INDEX idx_calendar_participation_overrides_account_uid_occurrence\n      ON calendar_participation_overrides(accountId, eventUid, occurrenceStartAtMs)"
+      },
+      {
+        "type": "table",
+        "name": "draft_tombstones",
+        "tbl_name": "draft_tombstones",
+        "sql": "CREATE TABLE draft_tombstones (\n      accountId TEXT NOT NULL,\n      messageId TEXT NOT NULL,\n      mailboxPath TEXT,\n      createdAtMs INTEGER NOT NULL,\n      PRIMARY KEY (accountId, messageId)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_draft_tombstones_1",
+        "tbl_name": "draft_tombstones",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "calendar_event_suppressions",
+        "tbl_name": "calendar_event_suppressions",
+        "sql": "CREATE TABLE calendar_event_suppressions (\n      accountId TEXT NOT NULL,\n      eventUidKey TEXT NOT NULL,\n      createdAtMs INTEGER NOT NULL,\n      PRIMARY KEY (accountId, eventUidKey)\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_calendar_event_suppressions_1",
+        "tbl_name": "calendar_event_suppressions",
+        "sql": null
+      },
+      {
+        "type": "table",
+        "name": "calendar_event_conflicts",
+        "tbl_name": "calendar_event_conflicts",
+        "sql": "CREATE TABLE calendar_event_conflicts (\n      eventId TEXT PRIMARY KEY,\n      accountId TEXT NOT NULL,\n      eventUid TEXT NOT NULL,\n      summary TEXT,\n      timeZone TEXT,\n      allDay INTEGER NOT NULL DEFAULT 0,\n      baseIcs TEXT,\n      localIcs TEXT NOT NULL,\n      remoteIcs TEXT NOT NULL,\n      remoteEtag TEXT,\n      localChangedAtMs INTEGER,\n      remoteChangedAtMs INTEGER,\n      detectedAtMs INTEGER NOT NULL\n    )"
+      },
+      {
+        "type": "index",
+        "name": "sqlite_autoindex_calendar_event_conflicts_1",
+        "tbl_name": "calendar_event_conflicts",
+        "sql": null
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_event_conflicts_account",
+        "tbl_name": "calendar_event_conflicts",
+        "sql": "CREATE INDEX idx_calendar_event_conflicts_account\n      ON calendar_event_conflicts(accountId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_pending_move_source",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_pending_move_source\n      ON messages(accountId, pendingMoveSourceFolderId, pendingMoveSourceUid)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_pending_move_destination",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_pending_move_destination\n      ON messages(accountId, folderId, pendingMoveSourceFolderId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_size",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_size\n      ON messages(accountId, sizeBytes DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_folder_size",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_folder_size\n      ON messages(accountId, folderId, sizeBytes DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_folder_messageid",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_folder_messageid\n      ON messages(accountId, folderId, messageId)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_msgid_date",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_msgid_date\n      ON messages(accountId, lower(messageId), dateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_messages_account_folder_unread",
+        "tbl_name": "messages",
+        "sql": "CREATE INDEX idx_messages_account_folder_unread\n      ON messages(accountId, folderId, unread)"
+      },
+      {
+        "type": "index",
+        "name": "idx_threads_account_latest_received",
+        "tbl_name": "threads",
+        "sql": "CREATE INDEX idx_threads_account_latest_received\n     ON threads(accountId, latestReceivedDateValue DESC)"
+      },
+      {
+        "type": "index",
+        "name": "idx_message_calendar_events_account_uid_key",
+        "tbl_name": "message_calendar_events",
+        "sql": "CREATE INDEX idx_message_calendar_events_account_uid_key\n     ON message_calendar_events(accountId, eventUidKey)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_reminders_account_user_uid_key",
+        "tbl_name": "calendar_reminders",
+        "sql": "CREATE INDEX idx_calendar_reminders_account_user_uid_key\n     ON calendar_reminders(accountId, userId, eventUidKey)"
+      },
+      {
+        "type": "index",
+        "name": "idx_calendar_events_account_uid_key",
+        "tbl_name": "calendar_events",
+        "sql": "CREATE INDEX idx_calendar_events_account_uid_key\n     ON calendar_events(accountId, eventUidKey)"
+      }
+    ]
+  },
+  "timings": [
+    {
+      "label": "accessible accounts, 12 accounts / 2 users",
+      "ms": 3.736953999999969,
+      "min": 3.133827999999994,
+      "max": 4.732883000000129,
+      "samples": [
+        4.732883000000129,
+        4.239679000000251,
+        3.7708339999999225,
+        3.6219929999997476,
+        3.736953999999969,
+        3.2187900000003538,
+        3.133827999999994
+      ],
+      "calls": 61,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 7081
+    },
+    {
+      "label": "summary, 12 accounts / 2 users",
+      "ms": 21.45619600000009,
+      "min": 20.383706000000075,
+      "max": 21.983960000000025,
+      "samples": [
+        21.978720000000067,
+        21.45619600000009,
+        21.983960000000025,
+        20.670948999999837,
+        21.637117000000217,
+        20.85371000000032,
+        20.383706000000075
+      ],
+      "calls": 267,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 2453
+    },
+    {
+      "label": "real listThreads default all 300",
+      "ms": 194.44489199999953,
+      "min": 194.19421000000057,
+      "max": 197.72816200000034,
+      "samples": [
+        195.16065799999978,
+        197.72816200000034,
+        196.42166999999972,
+        194.23924999999963,
+        194.19421000000057,
+        194.33653099999992,
+        194.44489199999953
+      ],
+      "calls": 13,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 583492
+    },
+    {
+      "label": "real listThreads search needle",
+      "ms": 80.362932,
+      "min": 79.77216700000008,
+      "max": 81.15693999999985,
+      "samples": [
+        81.15693999999985,
+        79.90244799999982,
+        80.12237099999948,
+        80.90225699999974,
+        80.71021599999949,
+        79.77216700000008,
+        80.362932
+      ],
+      "calls": 15,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 54539
+    },
+    {
+      "label": "snapshot 1000 comments + 100 activities",
+      "ms": 2.2500609999997323,
+      "min": 2.147379000000001,
+      "max": 2.5386630000002697,
+      "samples": [
+        2.5386630000002697,
+        2.3059009999997215,
+        2.1656199999997625,
+        2.2346600000000763,
+        2.337021000000277,
+        2.2500609999997323,
+        2.147379000000001
+      ],
+      "calls": 7,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 367958
+    },
+    {
+      "label": "accessible accounts, 12 accounts / 100 users / 20k history",
+      "ms": 22.21772299999975,
+      "min": 22.05384099999992,
+      "max": 22.922169000000395,
+      "samples": [
+        22.922169000000395,
+        22.21772299999975,
+        22.05384099999992,
+        22.476685000000543,
+        22.49932499999977,
+        22.13412100000005,
+        22.119042000000263
+      ],
+      "calls": 61,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 7081
+    },
+    {
+      "label": "one provisioning lookup, 20k history",
+      "ms": 1.1907710000004954,
+      "min": 1.164651000000049,
+      "max": 1.259570999999596,
+      "samples": [
+        1.20665100000042,
+        1.1799709999995684,
+        1.164651000000049,
+        1.2056110000003173,
+        1.1702500000001237,
+        1.1709700000001249,
+        1.2489720000003217,
+        1.1880099999998492,
+        1.1921309999997902,
+        1.1805309999999736,
+        1.2240509999992355,
+        1.182090999999673,
+        1.1682510000000548,
+        1.2426510000004782,
+        1.1907710000004954,
+        1.193370999999388,
+        1.259570999999596,
+        1.1936109999996916,
+        1.1856910000005882,
+        1.1687709999996514,
+        1.2122909999998228
+      ],
+      "calls": 1,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 4
+    },
+    {
+      "label": "one provisioning lookup, indexed",
+      "ms": 0.009320000000116124,
+      "min": 0.008240000000114378,
+      "max": 0.020319999999628635,
+      "samples": [
+        0.020319999999628635,
+        0.012520999999651394,
+        0.011359999999513093,
+        0.010320000000319851,
+        0.01055999999971391,
+        0.01055999999971391,
+        0.009919999999510765,
+        0.009280000000217115,
+        0.012639999999919382,
+        0.009360000000015134,
+        0.009119999999711581,
+        0.00872099999924103,
+        0.008240000000114378,
+        0.009439999999813153,
+        0.008840000000418513,
+        0.008480000000417931,
+        0.0091999999995096,
+        0.00923999999940861,
+        0.009079999999812571,
+        0.009320000000116124,
+        0.008839999999509018
+      ],
+      "calls": 1,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 4
+    },
+    {
+      "label": "accessible accounts with provisioning index",
+      "ms": 5.284288000000743,
+      "min": 4.407279999999446,
+      "max": 6.465019000000211,
+      "samples": [
+        5.04100599999947,
+        5.483610000000226,
+        4.511161000000357,
+        4.407279999999446,
+        5.665132000000085,
+        6.465019000000211,
+        5.284288000000743
+      ],
+      "calls": 61,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 7081
+    },
+    {
+      "label": "5000 stable attachment reads reprepare",
+      "ms": 73.56211100000019,
+      "min": 69.16039,
+      "max": 76.55237800000032,
+      "samples": [
+        76.55237800000032,
+        70.38124200000038,
+        75.31984600000033,
+        74.97856299999967,
+        73.56211100000019,
+        69.16039,
+        71.0754479999996
+      ],
+      "calls": 5000,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 0
+    },
+    {
+      "label": "5000 stable attachment reads reuse",
+      "ms": 21.620796999999584,
+      "min": 21.291113999999652,
+      "max": 22.16848200000004,
+      "samples": [
+        22.16848200000004,
+        21.81495900000027,
+        21.291113999999652,
+        21.620796999999584,
+        21.558555999999953,
+        21.599796999999853,
+        21.74131800000032
+      ],
+      "calls": 0,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 0
+    },
+    {
+      "label": "FTS OR scan raw SQL",
+      "ms": 13.700765000000501,
+      "min": 13.616284000000633,
+      "max": 13.933807000000343,
+      "samples": [
+        13.675164999999652,
+        13.681924000000436,
+        13.700765000000501,
+        13.616284000000633,
+        13.933807000000343,
+        13.78408600000057,
+        13.702844999999797
+      ],
+      "calls": 1,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 419
+    },
+    {
+      "label": "FTS driven raw SQL",
+      "ms": 0.20656199999939417,
+      "min": 0.18280200000026525,
+      "max": 0.34016299999984767,
+      "samples": [
+        0.34016299999984767,
+        0.21992200000022422,
+        0.19780199999968318,
+        0.18864200000007258,
+        0.18280200000026525,
+        0.2738820000004125,
+        0.20656199999939417
+      ],
+      "calls": 1,
+      "load": [
+        5.52,
+        3.16,
+        2.79
+      ],
+      "jsonBytes": 419
+    }
+  ],
+  "plans": [
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT * FROM accounts WHERE id = ?",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 39,
+          "detail": "SEARCH accounts USING INDEX sqlite_autoindex_accounts_1 (id=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT * FROM sender_identities WHERE accountId=?\n    ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH sender_identities USING INDEX idx_sender_identity_address (accountId=?)"
+        },
+        {
+          "id": 25,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT id,email FROM accounts WHERE id=?",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 39,
+          "detail": "SEARCH accounts USING INDEX sqlite_autoindex_accounts_1 (id=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT * FROM sender_identities WHERE accountId=?\n    ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH sender_identities USING INDEX idx_sender_identity_address (accountId=?)"
+        },
+        {
+          "id": 25,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "\n          SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue\n          FROM threads t\n          LEFT JOIN (\n            SELECT DISTINCT m.threadId\n            FROM messages m\n            WHERE m.accountId = ? AND m.flagged = 1 AND COALESCE(m.deleted, 0) = 0\n          ) flaggedThreads\n            ON flaggedThreads.threadId = t.threadId\n          WHERE t.accountId = ?\n            AND EXISTS (\n              SELECT 1\n              FROM messages m\n              WHERE m.accountId = t.accountId\n                AND m.threadId = t.threadId\n                AND COALESCE(m.deleted, 0) = 0\n            )\n          ORDER BY\n            CASE WHEN flaggedThreads.threadId IS NULL THEN 0 ELSE 1 END DESC,\n            t.latestReceivedDateValue DESC\n          LIMIT ? OFFSET ?\n        ",
+      "args": [
+        "a0",
+        "a0",
+        300,
+        0
+      ],
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 0,
+          "detail": "MATERIALIZE flaggedThreads"
+        },
+        {
+          "id": 8,
+          "parent": 3,
+          "notused": 60,
+          "detail": "SEARCH m USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=?)"
+        },
+        {
+          "id": 35,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH t USING INDEX idx_threads_account_latest (accountId=?)"
+        },
+        {
+          "id": 43,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 48,
+          "parent": 43,
+          "notused": 60,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 66,
+          "parent": 0,
+          "notused": 16,
+          "detail": "SCAN flaggedThreads LEFT-JOIN"
+        },
+        {
+          "id": 99,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT COUNT(*) as count\n         FROM threads t\n         WHERE t.accountId = ?\n           AND EXISTS (\n             SELECT 1\n             FROM messages m\n             WHERE m.accountId = t.accountId\n               AND m.threadId = t.threadId\n               AND COALESCE(m.deleted, 0) = 0\n           )",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 6,
+          "parent": 0,
+          "notused": 55,
+          "detail": "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=?)"
+        },
+        {
+          "id": 12,
+          "parent": 0,
+          "notused": 60,
+          "detail": "SEARCH m EXISTS USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT COUNT(*) as count\n         FROM messages m\n         WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0",
+      "args": [
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT COUNT(*) as count\n               FROM messages m\n               WHERE m.accountId = ?\n                 AND COALESCE(m.deleted, 0) = 0\n                 AND m.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "args": [
+        "a0",
+        "t3666",
+        "t3660",
+        "t3655",
+        "t3649",
+        "t3643",
+        "t3638",
+        "t3632",
+        "t3626",
+        "t3621",
+        "t3615",
+        "t3609",
+        "t3604",
+        "t3598",
+        "t3592",
+        "t3587",
+        "t3581",
+        "t3575",
+        "t3570",
+        "t3564",
+        "t3558",
+        "t3553",
+        "t3547",
+        "t3541",
+        "t3536",
+        "t3530",
+        "t3524",
+        "t3519",
+        "t3513",
+        "t3507",
+        "t3502",
+        "t3496",
+        "t3490",
+        "t3485",
+        "t3479",
+        "t3473",
+        "t3468",
+        "t3462",
+        "t3456",
+        "t3451",
+        "t3445",
+        "t3439",
+        "t3434",
+        "t3428",
+        "t3422",
+        "t3417",
+        "t3411",
+        "t3405",
+        "t3400",
+        "t3394",
+        "t3388",
+        "t3383",
+        "t3377",
+        "t3371",
+        "t3366",
+        "t3360",
+        "t3354",
+        "t3349",
+        "t3343",
+        "t3337",
+        "t3332",
+        "t3326",
+        "t3320",
+        "t3315",
+        "t3309",
+        "t3303",
+        "t3298",
+        "t3292",
+        "t3286",
+        "t3281",
+        "t3275",
+        "t3269",
+        "t3264",
+        "t3258",
+        "t3252",
+        "t3247",
+        "t3241",
+        "t3235",
+        "t3230",
+        "t3224",
+        "t3218",
+        "t3213",
+        "t3207",
+        "t3201",
+        "t3196",
+        "t3190",
+        "t3184",
+        "t3179",
+        "t3173",
+        "t3167",
+        "t3162",
+        "t3156",
+        "t3150",
+        "t3145",
+        "t3139",
+        "t3133",
+        "t3128",
+        "t3122",
+        "t3116",
+        "t3111",
+        "t3105",
+        "t3099",
+        "t3094",
+        "t3088",
+        "t3082",
+        "t3077",
+        "t3071",
+        "t3065",
+        "t3060",
+        "t3054",
+        "t3048",
+        "t3043",
+        "t3037",
+        "t3031",
+        "t3026",
+        "t3020",
+        "t3014",
+        "t3009",
+        "t3003",
+        "t2997",
+        "t2992",
+        "t2986",
+        "t2980",
+        "t2975",
+        "t2969",
+        "t2963",
+        "t2958",
+        "t2952",
+        "t2946",
+        "t2941",
+        "t2935",
+        "t2929",
+        "t2924",
+        "t2918",
+        "t2912",
+        "t2907",
+        "t2901",
+        "t2895",
+        "t2890",
+        "t2884",
+        "t2878",
+        "t2873",
+        "t2867",
+        "t2861",
+        "t2856",
+        "t2850",
+        "t2844",
+        "t2839",
+        "t2833",
+        "t2827",
+        "t2822",
+        "t2816",
+        "t2810",
+        "t2805",
+        "t2799",
+        "t2793",
+        "t2788",
+        "t2782",
+        "t2776",
+        "t2771",
+        "t2765",
+        "t2759",
+        "t2754",
+        "t2748",
+        "t2742",
+        "t2737",
+        "t2731",
+        "t2725",
+        "t2720",
+        "t2714",
+        "t2708",
+        "t2703",
+        "t2697",
+        "t2691",
+        "t2686",
+        "t2680",
+        "t2674",
+        "t2669",
+        "t2663",
+        "t2657",
+        "t2652",
+        "t2646",
+        "t2640",
+        "t2635",
+        "t2629",
+        "t2623",
+        "t2618",
+        "t2612",
+        "t2606",
+        "t2601",
+        "t2595",
+        "t2589",
+        "t2584",
+        "t2578",
+        "t2572",
+        "t2567",
+        "t2561",
+        "t2555",
+        "t2550",
+        "t2544",
+        "t2538",
+        "t2533",
+        "t2527",
+        "t2521",
+        "t2516",
+        "t2510",
+        "t2504",
+        "t2499",
+        "t2493",
+        "t2487",
+        "t2482",
+        "t2476",
+        "t2470",
+        "t2465",
+        "t2459",
+        "t2453",
+        "t2448",
+        "t2442",
+        "t2436",
+        "t2431",
+        "t2425",
+        "t2419",
+        "t2414",
+        "t2408",
+        "t2402",
+        "t2397",
+        "t2391",
+        "t2385",
+        "t2380",
+        "t2374",
+        "t2368",
+        "t2363",
+        "t2357",
+        "t2351",
+        "t2346",
+        "t2340",
+        "t2334",
+        "t2329",
+        "t2323",
+        "t2317",
+        "t2312",
+        "t2306",
+        "t2300",
+        "t2295",
+        "t2289",
+        "t2283",
+        "t2278",
+        "t2272",
+        "t2266",
+        "t2261",
+        "t2255",
+        "t2249",
+        "t2244",
+        "t2238",
+        "t2232",
+        "t2227",
+        "t2221",
+        "t2215",
+        "t2210",
+        "t2204",
+        "t2198",
+        "t2193",
+        "t2187",
+        "t2181",
+        "t2176",
+        "t2170",
+        "t2164",
+        "t2159",
+        "t2153",
+        "t2147",
+        "t2142",
+        "t2136",
+        "t2130",
+        "t2125",
+        "t2119",
+        "t2113",
+        "t2108",
+        "t2102",
+        "t2096",
+        "t2091",
+        "t2085",
+        "t2079",
+        "t2074",
+        "t2068",
+        "t2062",
+        "t2057",
+        "t2051",
+        "t2045",
+        "t2040",
+        "t2034",
+        "t2028",
+        "t2023",
+        "t2017",
+        "t2011",
+        "t2006",
+        "t2000",
+        "t1994",
+        "t1989",
+        "t1983",
+        "t1977",
+        "t1972"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "\n            SELECT\n              m.id,\n              m.accountId,\n              m.folderId,\n              m.mailboxPath,\n              m.imapUid,\n              m.threadId,\n              m.parentId,\n              m.messageId,\n              m.inReplyTo,\n              m.\"references\" as \"references\",\n              m.xForwardedMessageId,\n              m.subject,\n              m.fromAddr,\n              m.replyToAddr,\n              m.toAddr,\n              m.ccAddr,\n              m.bccAddr,\n              m.preview,\n              m.date,\n              m.dateValue,\n              m.priority,\n              m.hasSource,\n              m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,\n              m.unread,\n              m.flags,\n              m.seen,\n              m.answered,\n              m.flagged,\n              m.deleted,\n              m.draft,\n              m.recent,\n              m.category,\n              m.categoryScore,\n              m.categorySignals,\n              EXISTS (\n    SELECT 1\n    FROM attachments a\n    WHERE a.accountId = m.accountId AND a.messageId = m.id\n      AND a.inline = 0\n    AND COALESCE(a.size, 0) >= 1024\n    AND NOT (lower(COALESCE(a.contentType, '')) LIKE '%text/calendar%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/ics%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/icalendar%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/calendar%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/x-ical%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/x-vcalendar%' OR lower(COALESCE(a.contentType, '')) LIKE '%text/x-vcalendar%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/vnd.ms-outlook%' OR lower(COALESCE(a.filename, '')) LIKE '%.ics' OR lower(COALESCE(a.filename, '')) LIKE '%.ical' OR lower(COALESCE(a.filename, '')) LIKE '%.ifb' OR lower(COALESCE(a.filename, '')) LIKE '%.vcs')\n    AND NOT (lower(COALESCE(a.contentType, '')) LIKE '%application/pgp-signature%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/pkcs7-signature%' OR lower(COALESCE(a.contentType, '')) LIKE '%application/x-pkcs7-signature%' OR lower(COALESCE(a.filename, '')) LIKE '%.asc' OR lower(COALESCE(a.filename, '')) LIKE '%.sig' OR lower(COALESCE(a.filename, '')) LIKE '%.p7s')\n  ) as hasAttachments,\n              EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)\n                as hasInlineAttachments\n            FROM messages m\n            WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0\n              AND m.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ORDER BY m.dateValue DESC\n          ",
+      "args": [
+        "a0",
+        "t3666",
+        "t3660",
+        "t3655",
+        "t3649",
+        "t3643",
+        "t3638",
+        "t3632",
+        "t3626",
+        "t3621",
+        "t3615",
+        "t3609",
+        "t3604",
+        "t3598",
+        "t3592",
+        "t3587",
+        "t3581",
+        "t3575",
+        "t3570",
+        "t3564",
+        "t3558",
+        "t3553",
+        "t3547",
+        "t3541",
+        "t3536",
+        "t3530",
+        "t3524",
+        "t3519",
+        "t3513",
+        "t3507",
+        "t3502",
+        "t3496",
+        "t3490",
+        "t3485",
+        "t3479",
+        "t3473",
+        "t3468",
+        "t3462",
+        "t3456",
+        "t3451",
+        "t3445",
+        "t3439",
+        "t3434",
+        "t3428",
+        "t3422",
+        "t3417",
+        "t3411",
+        "t3405",
+        "t3400",
+        "t3394",
+        "t3388",
+        "t3383",
+        "t3377",
+        "t3371",
+        "t3366",
+        "t3360",
+        "t3354",
+        "t3349",
+        "t3343",
+        "t3337",
+        "t3332",
+        "t3326",
+        "t3320",
+        "t3315",
+        "t3309",
+        "t3303",
+        "t3298",
+        "t3292",
+        "t3286",
+        "t3281",
+        "t3275",
+        "t3269",
+        "t3264",
+        "t3258",
+        "t3252",
+        "t3247",
+        "t3241",
+        "t3235",
+        "t3230",
+        "t3224",
+        "t3218",
+        "t3213",
+        "t3207",
+        "t3201",
+        "t3196",
+        "t3190",
+        "t3184",
+        "t3179",
+        "t3173",
+        "t3167",
+        "t3162",
+        "t3156",
+        "t3150",
+        "t3145",
+        "t3139",
+        "t3133",
+        "t3128",
+        "t3122",
+        "t3116",
+        "t3111",
+        "t3105",
+        "t3099",
+        "t3094",
+        "t3088",
+        "t3082",
+        "t3077",
+        "t3071",
+        "t3065",
+        "t3060",
+        "t3054",
+        "t3048",
+        "t3043",
+        "t3037",
+        "t3031",
+        "t3026",
+        "t3020",
+        "t3014",
+        "t3009",
+        "t3003",
+        "t2997",
+        "t2992",
+        "t2986",
+        "t2980",
+        "t2975",
+        "t2969",
+        "t2963",
+        "t2958",
+        "t2952",
+        "t2946",
+        "t2941",
+        "t2935",
+        "t2929",
+        "t2924",
+        "t2918",
+        "t2912",
+        "t2907",
+        "t2901",
+        "t2895",
+        "t2890",
+        "t2884",
+        "t2878",
+        "t2873",
+        "t2867",
+        "t2861",
+        "t2856",
+        "t2850",
+        "t2844",
+        "t2839",
+        "t2833",
+        "t2827",
+        "t2822",
+        "t2816",
+        "t2810",
+        "t2805",
+        "t2799",
+        "t2793",
+        "t2788",
+        "t2782",
+        "t2776",
+        "t2771",
+        "t2765",
+        "t2759",
+        "t2754",
+        "t2748",
+        "t2742",
+        "t2737",
+        "t2731",
+        "t2725",
+        "t2720",
+        "t2714",
+        "t2708",
+        "t2703",
+        "t2697",
+        "t2691",
+        "t2686",
+        "t2680",
+        "t2674",
+        "t2669",
+        "t2663",
+        "t2657",
+        "t2652",
+        "t2646",
+        "t2640",
+        "t2635",
+        "t2629",
+        "t2623",
+        "t2618",
+        "t2612",
+        "t2606",
+        "t2601",
+        "t2595",
+        "t2589",
+        "t2584",
+        "t2578",
+        "t2572",
+        "t2567",
+        "t2561",
+        "t2555",
+        "t2550",
+        "t2544",
+        "t2538",
+        "t2533",
+        "t2527",
+        "t2521",
+        "t2516",
+        "t2510",
+        "t2504",
+        "t2499",
+        "t2493",
+        "t2487",
+        "t2482",
+        "t2476",
+        "t2470",
+        "t2465",
+        "t2459",
+        "t2453",
+        "t2448",
+        "t2442",
+        "t2436",
+        "t2431",
+        "t2425",
+        "t2419",
+        "t2414",
+        "t2408",
+        "t2402",
+        "t2397",
+        "t2391",
+        "t2385",
+        "t2380",
+        "t2374",
+        "t2368",
+        "t2363",
+        "t2357",
+        "t2351",
+        "t2346",
+        "t2340",
+        "t2334",
+        "t2329",
+        "t2323",
+        "t2317",
+        "t2312",
+        "t2306",
+        "t2300",
+        "t2295",
+        "t2289",
+        "t2283",
+        "t2278",
+        "t2272",
+        "t2266",
+        "t2261",
+        "t2255",
+        "t2249",
+        "t2244",
+        "t2238",
+        "t2232",
+        "t2227",
+        "t2221",
+        "t2215",
+        "t2210",
+        "t2204",
+        "t2198",
+        "t2193",
+        "t2187",
+        "t2181",
+        "t2176",
+        "t2170",
+        "t2164",
+        "t2159",
+        "t2153",
+        "t2147",
+        "t2142",
+        "t2136",
+        "t2130",
+        "t2125",
+        "t2119",
+        "t2113",
+        "t2108",
+        "t2102",
+        "t2096",
+        "t2091",
+        "t2085",
+        "t2079",
+        "t2074",
+        "t2068",
+        "t2062",
+        "t2057",
+        "t2051",
+        "t2045",
+        "t2040",
+        "t2034",
+        "t2028",
+        "t2023",
+        "t2017",
+        "t2011",
+        "t2006",
+        "t2000",
+        "t1994",
+        "t1989",
+        "t1983",
+        "t1977",
+        "t1972"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_date (accountId=?)"
+        },
+        {
+          "id": 962,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 967,
+          "parent": 962,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        },
+        {
+          "id": 1093,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 1098,
+          "parent": 1093,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT\n           messageId,\n           eventUid,\n           inviteActionType,\n           processedAtMs,\n           processedByUserId,\n           processedAutomatically,\n           unprocessedReason\n         FROM message_calendar_events\n         WHERE accountId = ?\n           AND messageId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n         ORDER BY messageId ASC, eventUid ASC",
+      "args": [
+        "a0",
+        "m10999",
+        "m10998",
+        "m10982",
+        "m10981",
+        "m10980",
+        "m10967",
+        "m10966",
+        "m10965",
+        "m10949",
+        "m10948",
+        "m10947",
+        "m10931",
+        "m10930",
+        "m10929",
+        "m10916",
+        "m10915",
+        "m10914",
+        "m10898",
+        "m10897",
+        "m10896",
+        "m10880",
+        "m10879",
+        "m10878",
+        "m10865",
+        "m10864",
+        "m10863",
+        "m10847",
+        "m10846",
+        "m10845",
+        "m10829",
+        "m10828",
+        "m10827",
+        "m10814",
+        "m10813",
+        "m10812",
+        "m10796",
+        "m10795",
+        "m10794",
+        "m10778",
+        "m10777",
+        "m10776",
+        "m10763",
+        "m10762",
+        "m10761",
+        "m10745",
+        "m10744",
+        "m10743",
+        "m10727",
+        "m10726",
+        "m10725",
+        "m10712",
+        "m10711",
+        "m10710",
+        "m10694",
+        "m10693",
+        "m10692",
+        "m10676",
+        "m10675",
+        "m10674",
+        "m10661",
+        "m10660",
+        "m10659",
+        "m10643",
+        "m10642",
+        "m10641",
+        "m10625",
+        "m10624",
+        "m10623",
+        "m10610",
+        "m10609",
+        "m10608",
+        "m10592",
+        "m10591",
+        "m10590",
+        "m10574",
+        "m10573",
+        "m10572",
+        "m10559",
+        "m10558",
+        "m10557",
+        "m10541",
+        "m10540",
+        "m10539",
+        "m10523",
+        "m10522",
+        "m10521",
+        "m10508",
+        "m10507",
+        "m10506",
+        "m10490",
+        "m10489",
+        "m10488",
+        "m10472",
+        "m10471",
+        "m10470",
+        "m10457",
+        "m10456",
+        "m10455",
+        "m10439",
+        "m10438",
+        "m10437",
+        "m10421",
+        "m10420",
+        "m10419",
+        "m10406",
+        "m10405",
+        "m10404",
+        "m10388",
+        "m10387",
+        "m10386",
+        "m10370",
+        "m10369",
+        "m10368",
+        "m10355",
+        "m10354",
+        "m10353",
+        "m10337",
+        "m10336",
+        "m10335",
+        "m10319",
+        "m10318",
+        "m10317",
+        "m10304",
+        "m10303",
+        "m10302",
+        "m10286",
+        "m10285",
+        "m10284",
+        "m10268",
+        "m10267",
+        "m10266",
+        "m10253",
+        "m10252",
+        "m10251",
+        "m10235",
+        "m10234",
+        "m10233",
+        "m10217",
+        "m10216",
+        "m10215",
+        "m10202",
+        "m10201",
+        "m10200",
+        "m10184",
+        "m10183",
+        "m10182",
+        "m10166",
+        "m10165",
+        "m10164",
+        "m10151",
+        "m10150",
+        "m10149",
+        "m10133",
+        "m10132",
+        "m10131",
+        "m10115",
+        "m10114",
+        "m10113",
+        "m10100",
+        "m10099",
+        "m10098",
+        "m10082",
+        "m10081",
+        "m10080",
+        "m10064",
+        "m10063",
+        "m10062",
+        "m10049",
+        "m10048",
+        "m10047",
+        "m10031",
+        "m10030",
+        "m10029",
+        "m10013",
+        "m10012",
+        "m10011",
+        "m9998",
+        "m9997",
+        "m9996",
+        "m9980",
+        "m9979",
+        "m9978",
+        "m9962",
+        "m9961",
+        "m9960",
+        "m9947",
+        "m9946",
+        "m9945",
+        "m9929",
+        "m9928",
+        "m9927",
+        "m9911",
+        "m9910",
+        "m9909",
+        "m9896",
+        "m9895",
+        "m9894",
+        "m9878",
+        "m9877",
+        "m9876",
+        "m9860",
+        "m9859",
+        "m9858",
+        "m9845",
+        "m9844",
+        "m9843",
+        "m9827",
+        "m9826",
+        "m9825",
+        "m9809",
+        "m9808",
+        "m9807",
+        "m9794",
+        "m9793",
+        "m9792",
+        "m9776",
+        "m9775",
+        "m9774",
+        "m9758",
+        "m9757",
+        "m9756",
+        "m9743",
+        "m9742",
+        "m9741",
+        "m9725",
+        "m9724",
+        "m9723",
+        "m9707",
+        "m9706",
+        "m9705",
+        "m9692",
+        "m9691",
+        "m9690",
+        "m9674",
+        "m9673",
+        "m9672",
+        "m9656",
+        "m9655",
+        "m9654",
+        "m9641",
+        "m9640",
+        "m9639",
+        "m9623",
+        "m9622",
+        "m9621",
+        "m9605",
+        "m9604",
+        "m9603",
+        "m9590",
+        "m9589",
+        "m9588",
+        "m9572",
+        "m9571",
+        "m9570",
+        "m9554",
+        "m9553",
+        "m9552",
+        "m9539",
+        "m9538",
+        "m9537",
+        "m9521",
+        "m9520",
+        "m9519",
+        "m9503",
+        "m9502",
+        "m9501",
+        "m9488",
+        "m9487",
+        "m9486",
+        "m9470",
+        "m9469",
+        "m9468",
+        "m9452",
+        "m9451",
+        "m9450",
+        "m9437",
+        "m9436",
+        "m9435",
+        "m9419",
+        "m9418",
+        "m9417",
+        "m9401",
+        "m9400",
+        "m9399",
+        "m9386",
+        "m9385",
+        "m9384",
+        "m9368",
+        "m9367",
+        "m9366",
+        "m9350",
+        "m9349",
+        "m9348",
+        "m9335",
+        "m9334",
+        "m9333",
+        "m9317",
+        "m9316",
+        "m9315",
+        "m9299",
+        "m9298",
+        "m9297",
+        "m9284",
+        "m9283",
+        "m9282",
+        "m9266",
+        "m9265",
+        "m9264",
+        "m9248",
+        "m9247",
+        "m9246",
+        "m9233",
+        "m9232",
+        "m9231",
+        "m9215",
+        "m9214",
+        "m9213",
+        "m9197",
+        "m9196",
+        "m9195",
+        "m9182",
+        "m9181",
+        "m9180",
+        "m9164",
+        "m9163",
+        "m9162",
+        "m9146",
+        "m9145",
+        "m9144",
+        "m9131",
+        "m9130",
+        "m9129",
+        "m9113",
+        "m9112",
+        "m9111",
+        "m9095",
+        "m9094",
+        "m9093",
+        "m9080",
+        "m9079",
+        "m9078",
+        "m9062",
+        "m9061",
+        "m9060",
+        "m9044",
+        "m9043",
+        "m9042",
+        "m9029",
+        "m9028",
+        "m9027",
+        "m9011",
+        "m9010",
+        "m9009",
+        "m8993",
+        "m8992",
+        "m8991",
+        "m8978",
+        "m8977",
+        "m8976",
+        "m8960",
+        "m8959",
+        "m8958",
+        "m8942",
+        "m8941",
+        "m8940",
+        "m8927",
+        "m8926",
+        "m8925",
+        "m8909",
+        "m8908",
+        "m8907",
+        "m8891",
+        "m8890",
+        "m8889",
+        "m8876",
+        "m8875",
+        "m8874",
+        "m8858",
+        "m8857",
+        "m8856",
+        "m8840",
+        "m8839",
+        "m8838",
+        "m8825",
+        "m8824",
+        "m8823",
+        "m8807",
+        "m8806",
+        "m8805",
+        "m8789",
+        "m8788",
+        "m8787",
+        "m8774",
+        "m8773",
+        "m8772",
+        "m8756",
+        "m8755",
+        "m8754",
+        "m8738",
+        "m8737"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT\n           messageId,\n           eventUid,\n           inviteActionType,\n           processedAtMs,\n           processedByUserId,\n           processedAutomatically,\n           unprocessedReason\n         FROM message_calendar_events\n         WHERE accountId = ?\n           AND messageId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n         ORDER BY messageId ASC, eventUid ASC",
+      "args": [
+        "a0",
+        "m8736",
+        "m8723",
+        "m8722",
+        "m8721",
+        "m8705",
+        "m8704",
+        "m8703",
+        "m8687",
+        "m8686",
+        "m8685",
+        "m8672",
+        "m8671",
+        "m8670",
+        "m8654",
+        "m8653",
+        "m8652",
+        "m8636",
+        "m8635",
+        "m8634",
+        "m8621",
+        "m8620",
+        "m8619",
+        "m8603",
+        "m8602",
+        "m8601",
+        "m8585",
+        "m8584",
+        "m8583",
+        "m8570",
+        "m8569",
+        "m8568",
+        "m8552",
+        "m8551",
+        "m8550",
+        "m8534",
+        "m8533",
+        "m8532",
+        "m8519",
+        "m8518",
+        "m8517",
+        "m8501",
+        "m8500",
+        "m8499",
+        "m8483",
+        "m8482",
+        "m8481",
+        "m8468",
+        "m8467",
+        "m8466",
+        "m8450",
+        "m8449",
+        "m8448",
+        "m8432",
+        "m8431",
+        "m8430",
+        "m8417",
+        "m8416",
+        "m8415",
+        "m8399",
+        "m8398",
+        "m8397",
+        "m8381",
+        "m8380",
+        "m8379",
+        "m8366",
+        "m8365",
+        "m8364",
+        "m8348",
+        "m8347",
+        "m8346",
+        "m8330",
+        "m8329",
+        "m8328",
+        "m8315",
+        "m8314",
+        "m8313",
+        "m8297",
+        "m8296",
+        "m8295",
+        "m8279",
+        "m8278",
+        "m8277",
+        "m8264",
+        "m8263",
+        "m8262",
+        "m8246",
+        "m8245",
+        "m8244",
+        "m8228",
+        "m8227",
+        "m8226",
+        "m8213",
+        "m8212",
+        "m8211",
+        "m8195",
+        "m8194",
+        "m8193",
+        "m8177",
+        "m8176",
+        "m8175",
+        "m8162",
+        "m8161",
+        "m8160",
+        "m8144",
+        "m8143",
+        "m8142",
+        "m8126",
+        "m8125",
+        "m8124",
+        "m8111",
+        "m8110",
+        "m8109",
+        "m8093",
+        "m8092",
+        "m8091",
+        "m8075",
+        "m8074",
+        "m8073",
+        "m8060",
+        "m8059",
+        "m8058",
+        "m8042",
+        "m8041",
+        "m8040",
+        "m8024",
+        "m8023",
+        "m8022",
+        "m8009",
+        "m8008",
+        "m8007",
+        "m7991",
+        "m7990",
+        "m7989",
+        "m7973",
+        "m7972",
+        "m7971",
+        "m7958",
+        "m7957",
+        "m7956",
+        "m7940",
+        "m7939",
+        "m7938",
+        "m7922",
+        "m7921",
+        "m7920",
+        "m7907",
+        "m7906",
+        "m7905",
+        "m7889",
+        "m7888",
+        "m7887",
+        "m7871",
+        "m7870",
+        "m7869",
+        "m7856",
+        "m7855",
+        "m7854",
+        "m7838",
+        "m7837",
+        "m7836",
+        "m7820",
+        "m7819",
+        "m7818",
+        "m7805",
+        "m7804",
+        "m7803",
+        "m7787",
+        "m7786",
+        "m7785",
+        "m7769",
+        "m7768",
+        "m7767",
+        "m7754",
+        "m7753",
+        "m7752",
+        "m7736",
+        "m7735",
+        "m7734",
+        "m7718",
+        "m7717",
+        "m7716",
+        "m7703",
+        "m7702",
+        "m7701",
+        "m7685",
+        "m7684",
+        "m7683",
+        "m7667",
+        "m7666",
+        "m7665",
+        "m7652",
+        "m7651",
+        "m7650",
+        "m7634",
+        "m7633",
+        "m7632",
+        "m7616",
+        "m7615",
+        "m7614",
+        "m7601",
+        "m7600",
+        "m7599",
+        "m7583",
+        "m7582",
+        "m7581",
+        "m7565",
+        "m7564",
+        "m7563",
+        "m7550",
+        "m7549",
+        "m7548",
+        "m7532",
+        "m7531",
+        "m7530",
+        "m7514",
+        "m7513",
+        "m7512",
+        "m7499",
+        "m7498",
+        "m7497",
+        "m7481",
+        "m7480",
+        "m7479",
+        "m7463",
+        "m7462",
+        "m7461",
+        "m7448",
+        "m7447",
+        "m7446",
+        "m7430",
+        "m7429",
+        "m7428",
+        "m7412",
+        "m7411",
+        "m7410",
+        "m7397",
+        "m7396",
+        "m7395",
+        "m7379",
+        "m7378",
+        "m7377",
+        "m7361",
+        "m7360",
+        "m7359",
+        "m7346",
+        "m7345",
+        "m7344",
+        "m7328",
+        "m7327",
+        "m7326",
+        "m7310",
+        "m7309",
+        "m7308",
+        "m7295",
+        "m7294",
+        "m7293",
+        "m7277",
+        "m7276",
+        "m7275",
+        "m7259",
+        "m7258",
+        "m7257",
+        "m7244",
+        "m7243",
+        "m7242",
+        "m7226",
+        "m7225",
+        "m7224",
+        "m7208",
+        "m7207",
+        "m7206",
+        "m7193",
+        "m7192",
+        "m7191",
+        "m7175",
+        "m7174",
+        "m7173",
+        "m7157",
+        "m7156",
+        "m7155",
+        "m7142",
+        "m7141",
+        "m7140",
+        "m7124",
+        "m7123",
+        "m7122",
+        "m7106",
+        "m7105",
+        "m7104",
+        "m7091",
+        "m7090",
+        "m7089",
+        "m7073",
+        "m7072",
+        "m7071",
+        "m7055",
+        "m7054",
+        "m7053",
+        "m7040",
+        "m7039",
+        "m7038",
+        "m7022",
+        "m7021",
+        "m7020",
+        "m7004",
+        "m7003",
+        "m7002",
+        "m6989",
+        "m6988",
+        "m6987",
+        "m6971",
+        "m6970",
+        "m6969",
+        "m6953",
+        "m6952",
+        "m6951",
+        "m6938",
+        "m6937",
+        "m6936",
+        "m6920",
+        "m6919",
+        "m6918",
+        "m6902",
+        "m6901",
+        "m6900",
+        "m6887",
+        "m6886",
+        "m6885",
+        "m6869",
+        "m6868",
+        "m6867",
+        "m6851",
+        "m6850",
+        "m6849",
+        "m6836",
+        "m6835",
+        "m6834",
+        "m6818",
+        "m6817",
+        "m6816",
+        "m6800",
+        "m6799",
+        "m6798",
+        "m6785",
+        "m6784",
+        "m6783",
+        "m6767",
+        "m6766",
+        "m6765",
+        "m6749",
+        "m6748",
+        "m6747",
+        "m6734",
+        "m6733",
+        "m6732",
+        "m6716",
+        "m6715",
+        "m6714",
+        "m6698",
+        "m6697",
+        "m6696",
+        "m6683",
+        "m6682",
+        "m6681",
+        "m6665",
+        "m6664",
+        "m6663",
+        "m6647",
+        "m6646",
+        "m6645",
+        "m6632",
+        "m6631",
+        "m6630",
+        "m6614",
+        "m6613",
+        "m6612",
+        "m6596",
+        "m6595",
+        "m6594",
+        "m6581",
+        "m6580",
+        "m6579",
+        "m6563",
+        "m6562",
+        "m6561",
+        "m6545",
+        "m6544",
+        "m6543",
+        "m6530",
+        "m6529",
+        "m6528",
+        "m6512",
+        "m6511",
+        "m6510",
+        "m6494",
+        "m6493",
+        "m6492",
+        "m6479",
+        "m6478",
+        "m6477"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "SELECT\n           messageId,\n           eventUid,\n           inviteActionType,\n           processedAtMs,\n           processedByUserId,\n           processedAutomatically,\n           unprocessedReason\n         FROM message_calendar_events\n         WHERE accountId = ?\n           AND messageId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n         ORDER BY messageId ASC, eventUid ASC",
+      "args": [
+        "a0",
+        "m6461",
+        "m6460",
+        "m6459",
+        "m6443",
+        "m6442",
+        "m6441",
+        "m6428",
+        "m6427",
+        "m6426",
+        "m6410",
+        "m6409",
+        "m6408",
+        "m6392",
+        "m6391",
+        "m6390",
+        "m6377",
+        "m6376",
+        "m6375",
+        "m6359",
+        "m6358",
+        "m6357",
+        "m6341",
+        "m6340",
+        "m6339",
+        "m6326",
+        "m6325",
+        "m6324",
+        "m6308",
+        "m6307",
+        "m6306",
+        "m6290",
+        "m6289",
+        "m6288",
+        "m6275",
+        "m6274",
+        "m6273",
+        "m6257",
+        "m6256",
+        "m6255",
+        "m6239",
+        "m6238",
+        "m6237",
+        "m6224",
+        "m6223",
+        "m6222",
+        "m6206",
+        "m6205",
+        "m6204",
+        "m6188",
+        "m6187",
+        "m6186",
+        "m6173",
+        "m6172",
+        "m6171",
+        "m6155",
+        "m6154",
+        "m6153",
+        "m6137",
+        "m6136",
+        "m6135",
+        "m6122",
+        "m6121",
+        "m6120",
+        "m6104",
+        "m6103",
+        "m6102",
+        "m6086",
+        "m6085",
+        "m6084",
+        "m6071",
+        "m6070",
+        "m6069",
+        "m6053",
+        "m6052",
+        "m6051",
+        "m6035",
+        "m6034",
+        "m6033",
+        "m6020",
+        "m6019",
+        "m6018",
+        "m6002",
+        "m6001",
+        "m6000",
+        "m5984",
+        "m5983",
+        "m5982",
+        "m5969",
+        "m5968",
+        "m5967",
+        "m5951",
+        "m5950",
+        "m5949",
+        "m5933",
+        "m5932",
+        "m5931",
+        "m5918",
+        "m5917",
+        "m5916"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual list SQL",
+      "sql": "\n        SELECT\n          CASE\n            WHEN t.latestReceivedDateValue >= ? THEN 'Today'\n            WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday'\n            WHEN t.latestReceivedDateValue >= ? THEN 'This Week'\n            ELSE 'Older'\n          END as key,\n          COUNT(*) as count\n        \n    FROM messages m\n    JOIN threads t\n      ON t.accountId = m.accountId\n     AND t.threadId = m.threadId\n  \n        WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0\n        GROUP BY key\n      ",
+      "args": [
+        1792627200000,
+        1792540800000,
+        1792022400000,
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 9,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+        },
+        {
+          "id": 20,
+          "parent": 0,
+          "notused": 47,
+          "detail": "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 27,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR GROUP BY"
+        }
+      ]
+    },
+    {
+      "label": "actual search SQL",
+      "sql": "\n        SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue\n        FROM threads t\n        \n        WHERE t.accountId = ?\n          AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR EXISTS (\n            SELECT 1\n            FROM attachments a\n            WHERE a.accountId = m.accountId AND a.messageId = m.id\n              AND lower(COALESCE(a.filename, '')) LIKE ?\n          ))) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?))\n        ORDER BY t.latestReceivedDateValue DESC\n        LIMIT ? OFFSET ?\n      ",
+      "args": [
+        "a0",
+        "a0",
+        "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        300,
+        0
+      ],
+      "plan": [
+        {
+          "id": 8,
+          "parent": 0,
+          "notused": 62,
+          "detail": "SEARCH t USING INDEX idx_threads_account_latest_received (accountId=?)"
+        },
+        {
+          "id": 18,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 3"
+        },
+        {
+          "id": 23,
+          "parent": 18,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+        },
+        {
+          "id": 49,
+          "parent": 18,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 52,
+          "parent": 49,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 62,
+          "parent": 49,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        },
+        {
+          "id": 74,
+          "parent": 18,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 79,
+          "parent": 74,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        },
+        {
+          "id": 103,
+          "parent": 18,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        }
+      ]
+    },
+    {
+      "label": "actual search SQL",
+      "sql": "\n        SELECT COUNT(*) as count\n        FROM threads t\n        WHERE t.accountId = ?\n          AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR EXISTS (\n            SELECT 1\n            FROM attachments a\n            WHERE a.accountId = m.accountId AND a.messageId = m.id\n              AND lower(COALESCE(a.filename, '')) LIKE ?\n          ))) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?))\n      ",
+      "args": [
+        "a0",
+        "a0",
+        "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "%needle%"
+      ],
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 55,
+          "detail": "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 9,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 3"
+        },
+        {
+          "id": 13,
+          "parent": 9,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+        },
+        {
+          "id": 39,
+          "parent": 9,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 42,
+          "parent": 39,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 52,
+          "parent": 39,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        },
+        {
+          "id": 64,
+          "parent": 9,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 69,
+          "parent": 64,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual search SQL",
+      "sql": "\n      SELECT COUNT(*) as count\n      FROM messages m\n      WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR EXISTS (\n            SELECT 1\n            FROM attachments a\n            WHERE a.accountId = m.accountId AND a.messageId = m.id\n              AND lower(COALESCE(a.filename, '')) LIKE ?\n          ))) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?)\n    ",
+      "args": [
+        "a0",
+        "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "%needle%"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+        },
+        {
+          "id": 30,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 33,
+          "parent": 30,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 43,
+          "parent": 30,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        },
+        {
+          "id": 55,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 60,
+          "parent": 55,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual search SQL",
+      "sql": "\n              SELECT COUNT(*) as count\n              FROM messages m\n              WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR EXISTS (\n            SELECT 1\n            FROM attachments a\n            WHERE a.accountId = m.accountId AND a.messageId = m.id\n              AND lower(COALESCE(a.filename, '')) LIKE ?\n          ))) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?)\n                AND m.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)\n            ",
+      "args": [
+        "a0",
+        "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "t3600",
+        "t3466",
+        "t3333",
+        "t3200",
+        "t3066",
+        "t2933",
+        "t2800",
+        "t2666",
+        "t2533",
+        "t2400",
+        "t2266",
+        "t2133",
+        "t2000",
+        "t1866",
+        "t1733",
+        "t1600",
+        "t1466",
+        "t1333",
+        "t1200",
+        "t1066",
+        "t933",
+        "t800",
+        "t666",
+        "t533",
+        "t400",
+        "t266",
+        "t133",
+        "t0"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 124,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 127,
+          "parent": 124,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 137,
+          "parent": 124,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        },
+        {
+          "id": 149,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 154,
+          "parent": 149,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        }
+      ]
+    },
+    {
+      "label": "actual search SQL",
+      "sql": "\n        SELECT\n          CASE\n            WHEN t.latestReceivedDateValue >= ? THEN 'Today'\n            WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday'\n            WHEN t.latestReceivedDateValue >= ? THEN 'This Week'\n            ELSE 'Older'\n          END as key,\n          COUNT(*) as count\n        \n    FROM messages m\n    JOIN threads t\n      ON t.accountId = m.accountId\n     AND t.threadId = m.threadId\n  \n        WHERE m.accountId = ?  AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR EXISTS (\n            SELECT 1\n            FROM attachments a\n            WHERE a.accountId = m.accountId AND a.messageId = m.id\n              AND lower(COALESCE(a.filename, '')) LIKE ?\n          ))) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?)\n        GROUP BY key\n      ",
+      "args": [
+        1792627200000,
+        1792540800000,
+        1792022400000,
+        "a0",
+        "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+        "%needle%",
+        "%needle%",
+        "%needle%",
+        "%needle%"
+      ],
+      "plan": [
+        {
+          "id": 9,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+        },
+        {
+          "id": 35,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 38,
+          "parent": 35,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 48,
+          "parent": 35,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        },
+        {
+          "id": 60,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 65,
+          "parent": 60,
+          "notused": 61,
+          "detail": "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+        },
+        {
+          "id": 83,
+          "parent": 0,
+          "notused": 47,
+          "detail": "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 90,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR GROUP BY"
+        }
+      ]
+    },
+    {
+      "label": "comments ties",
+      "sql": "SELECT * FROM thread_comments WHERE accountId=? AND threadId=? AND deletedAt IS NULL ORDER BY createdAt,id",
+      "args": [
+        "a0",
+        "t0"
+      ],
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH thread_comments USING INDEX idx_thread_comments_thread (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 34,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "activity ties",
+      "sql": "SELECT * FROM thread_activity WHERE accountId=? AND threadId=? ORDER BY createdAt DESC,id DESC LIMIT ?",
+      "args": [
+        "a0",
+        "t0",
+        100
+      ],
+      "plan": [
+        {
+          "id": 5,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH thread_activity USING INDEX idx_thread_activity_thread (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 38,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+        }
+      ]
+    },
+    {
+      "label": "collab counts",
+      "sql": "SELECT\n  (SELECT COUNT(*) FROM thread_collab_state tc\n    WHERE tc.accountId = ?1 AND tc.assigneeUserId = ?2\n      AND EXISTS (SELECT 1 FROM messages m INDEXED BY idx_messages_live_thread_summary WHERE m.accountId = tc.accountId\n        AND m.threadId = tc.threadId AND COALESCE(m.deleted, 0) = 0)) AS assignedToMe,\n  (SELECT COUNT(*) FROM\n    (SELECT DISTINCT threadId FROM messages INDEXED BY idx_messages_live_thread_summary WHERE accountId = ?1 AND COALESCE(deleted, 0) = 0) live\n    LEFT JOIN thread_collab_state tc ON tc.accountId = ?1 AND tc.threadId = live.threadId\n    WHERE tc.assigneeUserId IS NULL AND (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting'))\n  ) AS unassignedOpen",
+      "args": [
+        "a0",
+        "u0"
+      ],
+      "plan": [
+        {
+          "id": 1,
+          "parent": 0,
+          "notused": 0,
+          "detail": "SCAN CONSTANT ROW"
+        },
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 0,
+          "detail": "SCALAR SUBQUERY 2"
+        },
+        {
+          "id": 13,
+          "parent": 4,
+          "notused": 61,
+          "detail": "SEARCH tc USING INDEX idx_thread_collab_state_summary (accountId=? AND assigneeUserId=?)"
+        },
+        {
+          "id": 22,
+          "parent": 4,
+          "notused": 60,
+          "detail": "SEARCH m EXISTS USING INDEX idx_messages_live_thread_summary (accountId=? AND threadId=?)"
+        },
+        {
+          "id": 40,
+          "parent": 0,
+          "notused": 0,
+          "detail": "SCALAR SUBQUERY 4"
+        },
+        {
+          "id": 43,
+          "parent": 40,
+          "notused": 0,
+          "detail": "CO-ROUTINE live"
+        },
+        {
+          "id": 47,
+          "parent": 43,
+          "notused": 61,
+          "detail": "SEARCH messages USING INDEX idx_messages_live_thread_summary (accountId=?)"
+        },
+        {
+          "id": 64,
+          "parent": 40,
+          "notused": 18,
+          "detail": "SCAN live"
+        },
+        {
+          "id": 67,
+          "parent": 40,
+          "notused": 47,
+          "detail": "SEARCH tc USING INDEX sqlite_autoindex_thread_collab_state_1 (accountId=? AND threadId=?) LEFT-JOIN"
+        }
+      ]
+    },
+    {
+      "label": "provisioning initial",
+      "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+      "args": [
+        "u0"
+      ],
+      "plan": [
+        {
+          "id": 2,
+          "parent": 0,
+          "notused": 216,
+          "detail": "SCAN user_provisioning"
+        }
+      ]
+    },
+    {
+      "label": "provisioning indexed",
+      "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+      "args": [
+        "u0"
+      ],
+      "plan": [
+        {
+          "id": 2,
+          "parent": 0,
+          "notused": 54,
+          "detail": "SEARCH user_provisioning USING COVERING INDEX perf_provisioning_user_state (userId=?)"
+        }
+      ]
+    },
+    {
+      "label": "FTS OR scan",
+      "sql": "SELECT m.id FROM messages m WHERE m.accountId=? AND ((m.accountId,m.id) IN (SELECT accountId,messageId FROM message_fts_v2 WHERE message_fts_v2 MATCH ?) OR lower(m.messageId) LIKE ? OR lower(m.threadId) LIKE ? OR lower(m.id) LIKE ?) ORDER BY m.dateValue DESC LIMIT 50",
+      "args": [
+        "a0",
+        "needle*",
+        "%needle%",
+        "%needle%",
+        "%needle%"
+      ],
+      "plan": [
+        {
+          "id": 5,
+          "parent": 0,
+          "notused": 61,
+          "detail": "SEARCH m USING INDEX idx_messages_account_date (accountId=?)"
+        },
+        {
+          "id": 27,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 30,
+          "parent": 27,
+          "notused": 156,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 40,
+          "parent": 27,
+          "notused": 0,
+          "detail": "CREATE BLOOM FILTER"
+        }
+      ]
+    },
+    {
+      "label": "FTS driven",
+      "sql": "SELECT m.id FROM message_fts_v2 f JOIN messages m ON m.accountId=f.accountId AND m.id=f.messageId WHERE message_fts_v2 MATCH ? AND f.accountId=? ORDER BY m.dateValue DESC LIMIT 50",
+      "args": [
+        "needle*",
+        "a0"
+      ],
+      "plan": [
+        {
+          "id": 6,
+          "parent": 0,
+          "notused": 156,
+          "detail": "SCAN f VIRTUAL TABLE INDEX 0:M9"
+        },
+        {
+          "id": 13,
+          "parent": 0,
+          "notused": 46,
+          "detail": "SEARCH m USING INDEX sqlite_autoindex_messages_1 (accountId=? AND id=?)"
+        },
+        {
+          "id": 31,
+          "parent": 0,
+          "notused": 0,
+          "detail": "USE TEMP B-TREE FOR ORDER BY"
+        }
+      ]
+    }
+  ],
+  "ftsSameIds": true,
+  "loadEnd": [
+    5.52,
+    3.16,
+    2.79
+  ]
+}

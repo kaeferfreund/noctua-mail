@@ -1,0 +1,502 @@
+{
+  "routes": [
+    {
+      "route": "/",
+      "count": 25,
+      "raw": 2314843,
+      "gzip": 694060,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        },
+        {
+          "path": "static/chunks/127ub~rg9qxa7.css",
+          "raw": 43188,
+          "gzip": 7282
+        },
+        {
+          "path": "static/chunks/0ut6a0x367l5j.css",
+          "raw": 39189,
+          "gzip": 5544
+        },
+        {
+          "path": "static/chunks/0hbnpxwednjqb.css",
+          "raw": 15606,
+          "gzip": 3376
+        }
+      ],
+      "cssRaw": 909784,
+      "cssGzip": 120228
+    },
+    {
+      "route": "/message/window",
+      "count": 20,
+      "raw": 1379580,
+      "gzip": 420372,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        },
+        {
+          "path": "static/chunks/127ub~rg9qxa7.css",
+          "raw": 43188,
+          "gzip": 7282
+        },
+        {
+          "path": "static/chunks/0hbnpxwednjqb.css",
+          "raw": 15606,
+          "gzip": 3376
+        },
+        {
+          "path": "static/chunks/0ut6a0x367l5j.css",
+          "raw": 39189,
+          "gzip": 5544
+        }
+      ],
+      "cssRaw": 909784,
+      "cssGzip": 120228
+    },
+    {
+      "route": "/compose/window",
+      "count": 18,
+      "raw": 1293478,
+      "gzip": 396370,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        },
+        {
+          "path": "static/chunks/127ub~rg9qxa7.css",
+          "raw": 43188,
+          "gzip": 7282
+        },
+        {
+          "path": "static/chunks/0hbnpxwednjqb.css",
+          "raw": 15606,
+          "gzip": 3376
+        }
+      ],
+      "cssRaw": 870595,
+      "cssGzip": 114684
+    },
+    {
+      "route": "/calendar/window",
+      "count": 18,
+      "raw": 1215081,
+      "gzip": 366471,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        },
+        {
+          "path": "static/chunks/127ub~rg9qxa7.css",
+          "raw": 43188,
+          "gzip": 7282
+        },
+        {
+          "path": "static/chunks/0ut6a0x367l5j.css",
+          "raw": 39189,
+          "gzip": 5544
+        },
+        {
+          "path": "static/chunks/0hbnpxwednjqb.css",
+          "raw": 15606,
+          "gzip": 3376
+        }
+      ],
+      "cssRaw": 909784,
+      "cssGzip": 120228
+    },
+    {
+      "route": "/calendar/import",
+      "count": 12,
+      "raw": 660853,
+      "gzip": 197587,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        }
+      ],
+      "cssRaw": 811801,
+      "cssGzip": 104026
+    },
+    {
+      "route": "/reset-password",
+      "count": 11,
+      "raw": 640729,
+      "gzip": 195191,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        }
+      ],
+      "cssRaw": 811801,
+      "cssGzip": 104026
+    },
+    {
+      "route": "/_not-found",
+      "count": 10,
+      "raw": 587005,
+      "gzip": 174443,
+      "css": [
+        {
+          "path": "static/chunks/0rj0tz7tev8fx.css",
+          "raw": 811801,
+          "gzip": 104026
+        }
+      ],
+      "cssRaw": 811801,
+      "cssGzip": 104026
+    }
+  ],
+  "fingerprints": [
+    {
+      "ids": [
+        98189
+      ],
+      "found": [
+        {
+          "file": "01ohvbq7a~9wj.js",
+          "ids": [
+            98189,
+            69489,
+            109334,
+            431369,
+            35198
+          ],
+          "raw": 24491,
+          "gzip": 6975,
+          "routes": []
+        },
+        {
+          "file": "1695z--pnke7..js",
+          "ids": [
+            98189,
+            69489,
+            109334,
+            431369,
+            35198
+          ],
+          "raw": 24491,
+          "gzip": 6975,
+          "routes": [
+            "/"
+          ]
+        },
+        {
+          "file": "0nzxgt1.5pdz3.js",
+          "ids": [
+            98189,
+            69489,
+            109334,
+            431369,
+            35198
+          ],
+          "raw": 24491,
+          "gzip": 6975,
+          "routes": []
+        }
+      ]
+    },
+    {
+      "ids": [
+        713059
+      ],
+      "found": [
+        {
+          "file": "01ohvbq7a~9wj.js",
+          "ids": [
+            713059
+          ],
+          "raw": 10388,
+          "gzip": 3073,
+          "routes": []
+        },
+        {
+          "file": "1695z--pnke7..js",
+          "ids": [
+            713059
+          ],
+          "raw": 10388,
+          "gzip": 3073,
+          "routes": [
+            "/"
+          ]
+        },
+        {
+          "file": "0nzxgt1.5pdz3.js",
+          "ids": [
+            713059
+          ],
+          "raw": 10388,
+          "gzip": 3073,
+          "routes": []
+        }
+      ]
+    },
+    {
+      "ids": [
+        175765
+      ],
+      "found": [
+        {
+          "file": "01ohvbq7a~9wj.js",
+          "ids": [
+            175765,
+            541991
+          ],
+          "raw": 9362,
+          "gzip": 3531,
+          "routes": []
+        },
+        {
+          "file": "1695z--pnke7..js",
+          "ids": [
+            175765,
+            541991
+          ],
+          "raw": 9362,
+          "gzip": 3531,
+          "routes": [
+            "/"
+          ]
+        },
+        {
+          "file": "0nzxgt1.5pdz3.js",
+          "ids": [
+            175765,
+            541991
+          ],
+          "raw": 9362,
+          "gzip": 3531,
+          "routes": []
+        }
+      ]
+    },
+    {
+      "ids": [
+        356729,
+        934838,
+        918789
+      ],
+      "found": [
+        {
+          "file": "0cign5ui955j2.js",
+          "ids": [
+            918789
+          ],
+          "raw": 9997,
+          "gzip": 3989,
+          "routes": [
+            "/"
+          ]
+        },
+        {
+          "file": "0cign5ui955j2.js",
+          "ids": [
+            934838
+          ],
+          "raw": 841,
+          "gzip": 564,
+          "routes": [
+            "/"
+          ]
+        },
+        {
+          "file": "0lvl0zhisiwa~.js",
+          "ids": [
+            918789
+          ],
+          "raw": 9997,
+          "gzip": 3990,
+          "routes": []
+        },
+        {
+          "file": "0lvl0zhisiwa~.js",
+          "ids": [
+            934838
+          ],
+          "raw": 841,
+          "gzip": 564,
+          "routes": []
+        },
+        {
+          "file": "0lvl0zhisiwa~.js",
+          "ids": [
+            356729
+          ],
+          "raw": 21,
+          "gzip": 41,
+          "routes": []
+        },
+        {
+          "file": "04_e0ub-5g9o8.js",
+          "ids": [
+            918789
+          ],
+          "raw": 9997,
+          "gzip": 3990,
+          "routes": []
+        },
+        {
+          "file": "0dyd792xz~cf_.js",
+          "ids": [
+            356729
+          ],
+          "raw": 21,
+          "gzip": 41,
+          "routes": []
+        }
+      ]
+    },
+    {
+      "ids": [
+        715530
+      ],
+      "found": [
+        {
+          "file": "0zkhfao3y_bej.js",
+          "ids": [
+            715530
+          ],
+          "raw": 11383,
+          "gzip": 4379,
+          "routes": []
+        }
+      ]
+    },
+    {
+      "ids": [
+        130562,
+        241631,
+        789213,
+        161505,
+        282643,
+        207026
+      ],
+      "found": [
+        {
+          "file": "0ldsqb0408gaj.js",
+          "ids": [
+            130562,
+            241631,
+            789213,
+            161505,
+            282643
+          ],
+          "raw": 152209,
+          "gzip": 51368,
+          "routes": []
+        },
+        {
+          "file": "0ldsqb0408gaj.js",
+          "ids": [
+            207026
+          ],
+          "raw": 11259,
+          "gzip": 4627,
+          "routes": []
+        },
+        {
+          "file": "1027a53uzko92.js",
+          "ids": [
+            130562,
+            241631,
+            789213,
+            161505,
+            282643
+          ],
+          "raw": 152209,
+          "gzip": 51368,
+          "routes": []
+        },
+        {
+          "file": "1027a53uzko92.js",
+          "ids": [
+            207026
+          ],
+          "raw": 11259,
+          "gzip": 4627,
+          "routes": []
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "marker": "Account settings",
+      "file": ".next/static/chunks/02wh2zzh50btc.js",
+      "name": "uW",
+      "start": 425802,
+      "end": 432815,
+      "raw": 7013,
+      "gzip": 2174
+    },
+    {
+      "marker": "Change user role",
+      "file": ".next/static/chunks/02wh2zzh50btc.js",
+      "name": "anonymous",
+      "start": 13810,
+      "end": 586361,
+      "raw": 572684,
+      "gzip": 163182
+    },
+    {
+      "marker": "Reset MFA",
+      "file": ".next/static/chunks/02wh2zzh50btc.js",
+      "name": "anonymous",
+      "start": 66312,
+      "end": 68084,
+      "raw": 1776,
+      "gzip": 592
+    },
+    {
+      "marker": "Internal notes and activity",
+      "file": ".next/static/chunks/02wh2zzh50btc.js",
+      "name": "s5",
+      "start": 230743,
+      "end": 233446,
+      "raw": 2703,
+      "gzip": 1244
+    },
+    {
+      "marker": "Revoke sessions",
+      "file": ".next/static/chunks/02wh2zzh50btc.js",
+      "name": "anonymous",
+      "start": 66312,
+      "end": 68084,
+      "raw": 1776,
+      "gzip": 592
+    }
+  ],
+  "settingsExternalizedEstimate": {
+    "files": [
+      "app/components/AccountSettingsModal.tsx",
+      "app/components/account-settings/tabs/McpTabContent.tsx",
+      "app/components/account-settings/tabs/ImportReplaceConfirmDialog.tsx",
+      "app/components/account-settings/tabs/SignaturesTabContent.tsx",
+      "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+      "app/components/account-settings/tabs/CalendarTabContent.tsx",
+      "app/components/account-settings/tabs/TranslationTabContent.tsx",
+      "app/components/account-settings/tabs/CategorizationTabContent.tsx",
+      "app/components/account-settings/tabs/MembersTabContent.tsx",
+      "app/components/account-settings/tabs/TopicsTabContent.tsx",
+      "app/components/account-settings/tabs/AccountTabContent.tsx",
+      "app/components/account-settings/tabs/RecipientAliasesTabContent.tsx"
+    ],
+    "raw": 68363,
+    "gzip": 16115
+  }
+}

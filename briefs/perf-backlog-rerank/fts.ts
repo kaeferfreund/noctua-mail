@@ -1,0 +1,6 @@
+import {Database} from 'bun:sqlite';import {writeFileSync} from 'node:fs';import {loadavg} from 'node:os';
+const db=new Database('/tmp/perf-backlog/data/db/accounts/a0.db');const root='/home/monkey/code/noctua-mail/wt-perf-backlog';const {configureAccountDb}=await import(root+'/lib/db/connection.ts');configureAccountDb(db);
+const out:any={load:loadavg(),timings:[],plans:[]};
+for(const [label,sql,args] of [['fts key delete',`DELETE FROM message_fts_v2 WHERE accountId=? AND messageId=?`,['a0','missing']],['fts rowid delete',`DELETE FROM message_fts_v2 WHERE rowid=?`,[-1]]] as const){const stmt=db.prepare(sql);out.plans.push({label,plan:db.prepare('EXPLAIN QUERY PLAN '+sql).all(...args)});let samples=[];for(let i=0;i<8;i++){db.exec('BEGIN');let s=performance.now();for(let n=0;n<200;n++)stmt.run(...args);let ms=performance.now()-s;db.exec('ROLLBACK');if(i)samples.push(ms)}samples.sort((a,b)=>a-b);out.timings.push({label,ms:samples[3],min:samples[0],max:samples.at(-1)})}
+try{out.storage=db.prepare(`SELECT name,sum(pgsize) bytes FROM dbstat WHERE name='messages' OR name LIKE 'message_fts_v2%' GROUP BY name`).all()}catch(e){out.storageError=String(e)}
+out.ftsBodyBytes=db.prepare(`SELECT count(*) n,sum(length(body)) bodyChars FROM message_fts_v2`).get();writeFileSync('/tmp/perf-backlog/fts-results.json',JSON.stringify(out,null,2));db.close();

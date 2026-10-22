@@ -1,0 +1,21 @@
+{
+  "load": [
+    2.62,
+    3.02,
+    2.82
+  ],
+  "timings": [
+    {
+      "label": "public recompute one thread (all authors already canonical)",
+      "ms": 67.21353199999999,
+      "min": 64.10562500000003,
+      "max": 69.3197120000001
+    },
+    {
+      "label": "internal recompute one thread",
+      "ms": 0.8824080000000549,
+      "min": 0.7892070000000331,
+      "max": 1.8746169999999438
+    }
+  ]
+}

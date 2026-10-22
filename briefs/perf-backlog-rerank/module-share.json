@@ -1,0 +1,33 @@
+{
+  "admin": {
+    "files": [
+      "app/components/admin/AdminPanel.tsx",
+      "app/components/admin/AdminMailboxes.tsx",
+      "app/components/admin/AdminAuditLog.tsx",
+      "app/components/admin/AdminConfirmDialog.tsx"
+    ],
+    "raw": 18935,
+    "gzip": 5269
+  },
+  "security": {
+    "files": [
+      "app/components/auth/SecuritySettings.tsx",
+      "app/components/auth/ReauthDialog.tsx"
+    ],
+    "raw": 9869,
+    "gzip": 3059
+  },
+  "collab": {
+    "files": [
+      "app/components/collab/ThreadActivityPanel.tsx",
+      "app/components/collab/InternalNoteComposer.tsx",
+      "app/components/collab/ThreadCollaborationBar.tsx",
+      "app/components/collab/AssigneeCombobox.tsx",
+      "app/components/collab/StatusSelect.tsx",
+      "app/components/collab/CollabRowBadges.tsx",
+      "app/hooks/useThreadCollab.ts"
+    ],
+    "raw": 15117,
+    "gzip": 5351
+  }
+}

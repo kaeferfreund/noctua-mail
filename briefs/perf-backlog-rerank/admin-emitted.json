@@ -1,0 +1,27 @@
+{
+  "chunk": "02wh2zzh50btc.js",
+  "parts": [
+    {
+      "name": "AdminPanel + helpers + InviteHistory",
+      "start": 62541,
+      "end": 72237,
+      "raw": 9705,
+      "gzip": 3118
+    },
+    {
+      "name": "AdminAuditLog",
+      "start": 43849,
+      "end": 45487,
+      "raw": 1644,
+      "gzip": 770
+    }
+  ],
+  "exclusiveRaw": 11349,
+  "exclusiveConcatenatedGzip": 3448,
+  "sumSeparateGzip": 3888,
+  "wholeChunkGzip": 165692,
+  "sameChunkWithoutExclusiveGzip": 162868,
+  "compressionDelta": 2824,
+  "rawRoute": 2314843,
+  "gzipRoute": 694060
+}

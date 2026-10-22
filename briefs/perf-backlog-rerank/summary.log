@@ -1,0 +1,4 @@
+[startup] opened storage {
+  dataDir: "/tmp/perf-backlog/data",
+  dbPath: "/tmp/perf-backlog/data/db/main.db",
+}

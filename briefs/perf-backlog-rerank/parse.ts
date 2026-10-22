@@ -1,0 +1,8 @@
+import {writeFileSync} from 'node:fs';import {loadavg} from 'node:os';
+const root='/home/monkey/code/noctua-mail/wt-perf-backlog';
+const {sanitizeHtmlForDisplay}=await import(root+'/lib/html/index.ts');
+const {parseMailForCategorization}=await import(root+'/lib/mail/categorization/classifier.ts');
+const html='<html><body><table>'+Array.from({length:450},(_,i)=>`<tr><td style="color:#222;padding:4px">Synthetic row ${i}</td><td><img src="https://example.invalid/p.png">value</td></tr>`).join('')+'</table></body></html>';
+const raw=Buffer.from(`From: sender@example.test\r\nTo: a0@example.test\r\nSubject: Synthetic\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=perf\r\n\r\n--perf\r\nContent-Type: text/html\r\n\r\n${html}\r\n--perf\r\nContent-Type: application/pdf\r\nContent-Disposition: attachment; filename="synthetic.pdf"\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.alloc(180000,1).toString('base64')}\r\n--perf--\r\n`);
+const results:any={htmlBytes:html.length,sourceBytes:raw.length,load:loadavg(),timings:[]};
+for(const [label,fn] of [['sanitize block',()=>sanitizeHtmlForDisplay(html)],['sanitize allow',()=>sanitizeHtmlForDisplay(html,'allow')],['sanitize pair',()=>{sanitizeHtmlForDisplay(html);sanitizeHtmlForDisplay(html,'allow')}],['full parse',()=>parseMailForCategorization(raw)]] as const){await fn();let times=[];for(let i=0;i<9;i++){let s=performance.now();await fn();times.push(performance.now()-s)}times.sort((a,b)=>a-b);results.timings.push({label,ms:times[4],min:times[0],max:times.at(-1)})}writeFileSync('/tmp/perf-backlog/parse-results.json',JSON.stringify(results,null,2));

@@ -1,0 +1,119 @@
+{
+  "currentExclusive": [
+    "app/components/admin/AdminPanel.tsx",
+    "app/components/admin/AdminAuditLog.tsx"
+  ],
+  "afterSettingsLazyExclusive": [
+    "app/components/admin/AdminPanel.tsx",
+    "app/components/shell/SettingsFrame.tsx",
+    "app/components/admin/AdminAuditLog.tsx"
+  ],
+  "retainedTabs": [
+    {
+      "file": "app/components/admin/AdminMailboxes.tsx",
+      "retainedNow": true,
+      "retainedAfterSettings": true
+    },
+    {
+      "file": "app/components/account-settings/tabs/AccountTabContent.tsx",
+      "retainedNow": true,
+      "retainedAfterSettings": true
+    },
+    {
+      "file": "app/components/account-settings/tabs/MembersTabContent.tsx",
+      "retainedNow": true,
+      "retainedAfterSettings": true
+    }
+  ],
+  "functions": [
+    {
+      "name": "eS",
+      "start": 43849,
+      "end": 45487,
+      "raw": 1638,
+      "gzip": 770,
+      "markers": [
+        "/api/admin/audit?limit=50"
+      ]
+    },
+    {
+      "name": "eJ",
+      "start": 53717,
+      "end": 58599,
+      "raw": 4882,
+      "gzip": 1856,
+      "markers": [
+        "/api/admin/users"
+      ]
+    },
+    {
+      "name": "eY",
+      "start": 60346,
+      "end": 62541,
+      "raw": 2195,
+      "gzip": 946,
+      "markers": [
+        "Refresh mailboxes"
+      ]
+    },
+    {
+      "name": "e1",
+      "start": 62784,
+      "end": 62909,
+      "raw": 125,
+      "gzip": 116,
+      "markers": [
+        "isAdminUser"
+      ]
+    },
+    {
+      "name": "e2",
+      "start": 62909,
+      "end": 71489,
+      "raw": 8580,
+      "gzip": 2780,
+      "markers": [
+        "/api/admin/users",
+        "One-time invite code"
+      ]
+    },
+    {
+      "name": "cC",
+      "start": 334580,
+      "end": 336981,
+      "raw": 2401,
+      "gzip": 852,
+      "markers": [
+        "isAdminUser"
+      ]
+    },
+    {
+      "name": "uw",
+      "start": 380267,
+      "end": 380395,
+      "raw": 128,
+      "gzip": 111,
+      "markers": [
+        "isAdminUser"
+      ]
+    },
+    {
+      "name": "uW",
+      "start": 425802,
+      "end": 432815,
+      "raw": 7013,
+      "gzip": 2174,
+      "markers": [
+        "isAdminUser"
+      ]
+    }
+  ],
+  "currentExclusiveSize": {
+    "raw": 13305,
+    "gzip": 3882
+  },
+  "afterSettingsExclusiveSize": {
+    "raw": 14516,
+    "gzip": 4248
+  }
+}

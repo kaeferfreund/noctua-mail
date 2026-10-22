@@ -1,0 +1,5 @@
+[startup] opened storage {
+  dataDir: "/tmp/perf-backlog/data",
+  dbPath: "/tmp/perf-backlog/data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).

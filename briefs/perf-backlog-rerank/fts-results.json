@@ -1,0 +1,75 @@
+{
+  "load": [
+    4.92,
+    3.28,
+    2.85
+  ],
+  "timings": [
+    {
+      "label": "fts key delete",
+      "ms": 2127.9575139999997,
+      "min": 2101.480271999999,
+      "max": 2199.8722500000003
+    },
+    {
+      "label": "fts rowid delete",
+      "ms": 0.21584200000143028,
+      "min": 0.1919210000014573,
+      "max": 0.24244200000248384
+    }
+  ],
+  "plans": [
+    {
+      "label": "fts key delete",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 215,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:"
+        }
+      ]
+    },
+    {
+      "label": "fts rowid delete",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 46,
+          "detail": "SCAN message_fts_v2 VIRTUAL TABLE INDEX 0:="
+        }
+      ]
+    }
+  ],
+  "storage": [
+    {
+      "name": "message_fts_v2_config",
+      "bytes": 4096
+    },
+    {
+      "name": "message_fts_v2_content",
+      "bytes": 45162496
+    },
+    {
+      "name": "message_fts_v2_data",
+      "bytes": 7659520
+    },
+    {
+      "name": "message_fts_v2_docsize",
+      "bytes": 204800
+    },
+    {
+      "name": "message_fts_v2_idx",
+      "bytes": 4096
+    },
+    {
+      "name": "messages",
+      "bytes": 90218496
+    }
+  ],
+  "ftsBodyBytes": {
+    "n": 11000,
+    "bodyChars": 42900000
+  }
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "type": "VariableDeclaration",
+    "start": 62541,
+    "end": 62728,
+    "raw": 187,
+    "gzip": 144,
+    "head": "let eX={role:\"Change user role\",status:\"Change user status\",delete:\"Delete user\",recovery:"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "e0",
+    "start": 62728,
+    "end": 62784,
+    "raw": 56,
+    "gzip": 76,
+    "head": "function e0(e){return void 0===e?\"Unknown\":e?\"Yes\":\"No\"}"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "e1",
+    "start": 62784,
+    "end": 62909,
+    "raw": 125,
+    "gzip": 116,
+    "head": "function e1({isAdminUser:e,apiFetch:t=fetch,client:a,onClose:r}){return e?(0,s.jsx)(e2,{ap"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "e2",
+    "start": 62909,
+    "end": 71489,
+    "raw": 8580,
+    "gzip": 2780,
+    "head": "function e2({apiFetch:e,client:t,onClose:a}){var r;let[n,l]=(0,i.useState)([]),[o,d]=(0,i."
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "e4",
+    "start": 71489,
+    "end": 72237,
+    "raw": 748,
+    "gzip": 438,
+    "head": "function e4({apiFetch:e,revision:t}){let[a,r]=(0,i.useState)([]),[n,l]=(0,i.useState)(\"\");"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "e9",
+    "start": 72301,
+    "end": 73577,
+    "raw": 1276,
+    "gzip": 579,
+    "head": "function e9({folder:e,depth:t,forceShow:a,folderTree:r,folderById:n,folderQueryText:i,coll"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "th",
+    "start": 74255,
+    "end": 74364,
+    "raw": 109,
+    "gzip": 115,
+    "head": "function th(e){try{let t=localStorage.getItem(tm);if(!t)return[];return JSON.parse(t)[e]??"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "tp",
+    "start": 74364,
+    "end": 76745,
+    "raw": 2381,
+    "gzip": 991,
+    "head": "function tp({open:e,onOpenChange:t,accountId:a,rootFolders:r,folderTree:n,folderById:l,onM"
+  },
+  {
+    "type": "FunctionDeclaration",
+    "name": "x",
+    "start": 74663,
+    "end": 74757,
+    "raw": 94,
+    "gzip": 107,
+    "head": "function x(e){return!!(!f||e.name.toLowerCase().includes(f))||(n.get(e.id)??[]).some(e=>x("
+  }
+]
