@@ -67,6 +67,7 @@ export function useThreadCollab(
   const generation = useRef(0);
   const loadSequence = useRef(0);
   const scopeLoadSequence = useRef(new Map<string, number>());
+  const scopeSuccessfulLoadSequence = useRef(new Map<string, number>());
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
   const accept = useCallback((data: Snapshot, requestKey: string) => {
@@ -125,11 +126,11 @@ export function useThreadCollab(
     scopeLoadSequence.current.set(memberScope, sequence);
     const response = await apiFetch(`${path}/collab`, { cache: "no-store" });
     const data = await response.json().catch(() => null);
-    // A denial is account-wide, but only the latest read in that login/account
-    // scope can revoke it. Another thread may already have restored access.
-    if (!mounted.current || sessionRef.current !== sessionKey ||
-        scopeLoadSequence.current.get(memberScope) !== sequence) return;
+    if (!mounted.current || sessionRef.current !== sessionKey) return;
     if (response.status === 403) {
+      // Only a newer successful read in this login/account can supersede a
+      // denial. A pending or failed refresh has not restored mailbox access.
+      if ((scopeSuccessfulLoadSequence.current.get(memberScope) ?? 0) > sequence) return;
       for (const cachedKey of cache.current.keys()) {
         const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
         if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
@@ -143,6 +144,7 @@ export function useThreadCollab(
         onReadDenied.current?.(accountId);
       }
     }
+    if (scopeLoadSequence.current.get(memberScope) !== sequence) return;
     if (!response.ok || !data?.ok)
       throw new Error(data?.message ?? "Could not load collaboration.");
     if (
@@ -152,6 +154,7 @@ export function useThreadCollab(
       !mounted.current
     )
       return;
+    scopeSuccessfulLoadSequence.current.set(memberScope, sequence);
     denied.current.delete(memberScope);
     setDeniedScopes(new Set(denied.current));
     membersCache.current.set(memberScope, data.members);
