@@ -1074,3 +1074,7 @@ systemctl list-timers noctua-backup.timer
 9. Welche maximale **gesamte Anhangsgröße pro Mail** muss zuverlässig funktionieren, und welche zusätzlichen IMAP-Clients/Tabs bleiben parallel aktiv?
 
 Nicht live verifiziert: echte Mailboxfähigkeiten/Ordner/Counts/Quoten/Limits, NAS-Zugriff und imapsync-Läufe, GTUBE/Autoresponder, TLS-Ausstellung/Renewal, endgültige Caddy-/Bun-/SQLite-/Archivtoolversionen, Auth Slices 3–7 und collab-ui-Endpunkte, Realgeräte/Passkeys, Backup-/Restorelauf und Versand. Die gelesenen Dateien und read-only Host-/DNS-Befunde belegen den Plan, **keinen abgeschlossenen Go-live**. Einzige bei dieser Recherche neu angelegte Datei ist dieses Runbook; es wurden keine Dienste/DNS/Packages/Produktivmail geändert.
+
+## Ops files
+
+Reviewbare Betriebsvorlagen liegen unter [ops/](../ops/README.md): [systemd](../ops/systemd/), [Environment-Beispiel](../ops/env/noctua.env.example), [Caddy](../ops/caddy/README.md), [Release-Gate/Aktivierung/Rollback](../ops/release/README.md), [Backup/Archiv/Restore-Drill](../ops/backup/README.md) und [imapsync-Migrationsplan](../ops/migration/imapsync-plan.md). **REVIEW BEFORE USE**; keine Installation oder Ausführung ist damit erfolgt. Vor Nutzung die dort dokumentierten Pfad-/Layout-Abweichungen, offenen Entscheidungen und Verweise auf den finalen Slice-6-Auth-Vertrag lesen; insbesondere Bootstrap-/Accountanlage-Anweisungen dieses älteren Runbooks mit dem finalen Vertrag abgleichen.

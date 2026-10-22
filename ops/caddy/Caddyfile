@@ -1,0 +1,77 @@
+# Purpose: tailnet-only DNS-01 TLS proxy; runbook §2.4 + slice-6 nginx-auth.conf; REVIEW BEFORE USE.
+# Default :443 REQUIRES moving the existing Tailscale Serve endpoint first.
+# Alternative: change site to https://mails.monkeymed.de:8443 AND Host/XFH to
+# mails.monkeymed.de:8443 AND X-Forwarded-Port to 8443. See README for auth origin changes.
+{
+    auto_https disable_redirects
+    # Runtime errors may contain complete reset URLs: suppress request diagnostics.
+    # No debug mode. Access logs below use a separate, sanitized logger.
+    log default {
+        output discard
+    }
+    servers {
+        timeouts {
+            read_header 15s
+            read_body 15m
+            write 0
+            write_idle -1s
+            idle 5m
+        }
+    }
+}
+
+https://mails.monkeymed.de {
+    bind 100.92.134.1
+    tls {
+        dns netcup {
+            # Private Caddy EnvironmentFile supplies placeholders, never literal credentials.
+            customer_number {env.NETCUP_CUSTOMER_NUMBER}
+            api_key {env.NETCUP_API_KEY}
+            api_password {env.NETCUP_API_PASSWORD}
+        }
+        propagation_delay 600s
+        propagation_timeout 1200s
+        resolvers 1.1.1.1 8.8.8.8
+    }
+    header {
+        Referrer-Policy no-referrer
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+    # Runbook §2.4: proposed entire request limit, NOT raw attachment size.
+    request_body {
+        max_size 64MB
+    }
+    # Omit all auth/admin/reset access logs (path tokens included); strip ALL URIs
+    # and headers from remaining logs. This is stricter than query-only redaction.
+    @sensitive path_regexp sensitive (?i)^/(api/(ba|auth|admin)(/|$)|reset-password(/|$))
+    log_skip @sensitive
+    log {
+        output stdout
+        format filter {
+            wrap json
+            fields {
+                request>uri delete
+                request>headers delete
+                resp_headers delete
+                request>tls delete
+            }
+        }
+    }
+    reverse_proxy 127.0.0.1:3654 {
+        header_up Host mails.monkeymed.de
+        header_up X-Forwarded-Host mails.monkeymed.de
+        header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Port 443
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote_host}
+        header_up -Forwarded
+        flush_interval -1
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 15m
+        }
+    }
+}

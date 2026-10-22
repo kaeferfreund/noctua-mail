@@ -1,0 +1,19 @@
+# Purpose: consistent app backup to restic; runbook §6.2–6.3; REVIEW BEFORE USE.
+# Install this ops tree at /opt/noctua/ops, root-owned; approval marker is operator-created.
+[Unit]
+Description=Noctua consistent snapshot and encrypted NAS backup
+Wants=network-online.target
+After=network-online.target noctua-mailarchive.service
+ConditionPathExists=/etc/noctua/backup-reviewed
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/noctua/backup.env
+ExecStart=/opt/noctua/ops/backup/restic-backup.sh --execute --confirm-no-other-writers
+TimeoutStartSec=6h
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal

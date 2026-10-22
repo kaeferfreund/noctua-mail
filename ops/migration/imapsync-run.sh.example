@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Purpose: reviewed per-mailbox dry-run/import/delta example; runbook §4.1–4.3; REVIEW BEFORE USE.
+# Copy/edit privately on the LAN migration host. Default --dry-run DOES contact IMAP but transfers nothing.
+# Usage: imapsync-run.sh.example [--dry-run|--execute] [--confirm-import] [--post-cutover-delta]
+set -euo pipefail
+umask 077
+mode=--dry-run
+confirmed=0
+postcutover=0
+for arg in "$@"; do
+    case $arg in
+        --dry-run|--execute) mode=$arg ;;
+        --confirm-import) confirmed=1 ;;
+        --post-cutover-delta) postcutover=1 ;;
+        *) printf 'Unknown argument\n' >&2; exit 1 ;;
+    esac
+done
+NAS_IMAP='<certified-nas-imap-host>'
+NAS_USER='<mailplus-owner-login>'
+TARGET_IMAP='<verified-netcup-imap-host>'
+TARGET_USER='<actual-netcup-login>'
+MIGRATION_DIR="${HOME:?}/noctua-migration/<mailbox-inventory-id>"
+PASSFILE1="$MIGRATION_DIR/nas.pass"
+PASSFILE2="$MIGRATION_DIR/netcup.pass"
+# Set only after reviewing paths, shared-owner deduplication, TLS and both dry runs.
+MAPPING_REVIEWED=0
+# This private signed checklist must confirm per-account AND global POP3 stop + two poll intervals.
+POP3_EVIDENCE="$MIGRATION_DIR/POP3_STOP_SIGNOFF"
+[[ $NAS_IMAP != *'<'* && $TARGET_IMAP != *'<'* && $NAS_USER != *'<'* && $TARGET_USER != *'<'* && $MAPPING_REVIEWED == 1 ]] || { printf 'Replace placeholders and approve mapping before use.\n' >&2; exit 1; }
+[[ -d $MIGRATION_DIR && $(stat -c '%a' "$MIGRATION_DIR") == 700 && -s $POP3_EVIDENCE ]] || { printf 'Private directory and signed POP3 stop evidence required.\n' >&2; exit 1; }
+for passfile in "$PASSFILE1" "$PASSFILE2"; do
+    [[ -f $passfile && ! -L $passfile && -s $passfile && $(stat -c '%a:%u' "$passfile") == "600:$EUID" ]] || { printf 'Each passfile must be a private, owned regular file mode 0600.\n' >&2; exit 1; }
+done
+exec 9>"$MIGRATION_DIR/run.lock"
+flock -n 9 || { printf 'Another mailbox run holds the lock.\n' >&2; exit 1; }
+common=(
+    --host1 "$NAS_IMAP" --port1 993 --ssl1 --user1 "$NAS_USER" --passfile1 "$PASSFILE1"
+    --host2 "$TARGET_IMAP" --port2 993 --ssl2 --user2 "$TARGET_USER" --passfile2 "$PASSFILE2"
+    --sslargs1 SSL_verify_mode=1 --sslargs1 "SSL_verifycn_name=$NAS_IMAP"
+    --sslargs2 SSL_verify_mode=1 --sslargs2 "SSL_verifycn_name=$TARGET_IMAP"
+    --syncinternaldates --useheader Message-Id --addheader --noexpunge1 --noexpunge2
+)
+maps=(
+    --f1f2 '<actual-source-sent>=<actual-target-sent>'
+    --f1f2 '<actual-source-drafts>=<actual-target-drafts>'
+    --f1f2 '<actual-source-trash>=<actual-target-trash>'
+    --f1f2 '<actual-source-junk>=<actual-target-junk>'
+    --f1f2 '<actual-source-archive>=<actual-target-archive>'
+)
+# PERSONAL: replace empty list with --exclude '^<exact-escaped-shared-prefix>'.
+# SHARED OWNER: select that mailbox exactly once; review --folder or --subfolder2 separately.
+excludes=()
+[[ ${maps[*]} != *'<'* ]] || { printf 'Replace every folder mapping before use.\n' >&2; exit 1; }
+extra=()
+if [[ $postcutover == 1 ]]; then extra+=(--noresyncflags); fi
+run_dir=$(mktemp -d "$MIGRATION_DIR/run-$(date -u +%Y%m%dT%H%M%SZ).XXXXXXXX")
+if [[ $mode == --dry-run ]]; then
+    imapsync "${common[@]}" "${maps[@]}" "${excludes[@]}" "${extra[@]}" --dry --justfolders --logfile "$run_dir/folders-dry.log"
+    imapsync "${common[@]}" "${maps[@]}" "${excludes[@]}" "${extra[@]}" --dry --logfile "$run_dir/messages-dry.log"
+else
+    [[ $confirmed == 1 && -s $MIGRATION_DIR/DRY_RUN_SIGNOFF ]] || { printf 'Import requires --confirm-import and private reviewed DRY_RUN_SIGNOFF.\n' >&2; exit 1; }
+    imapsync "${common[@]}" "${maps[@]}" "${excludes[@]}" "${extra[@]}" --logfile "$run_dir/import.log"
+    imapsync "${common[@]}" "${maps[@]}" "${excludes[@]}" "${extra[@]}" --logfile "$run_dir/delta.log"
+fi
+printf 'Review private per-folder counts and logs in %s; exit 0 alone is not acceptance.\n' "$run_dir"

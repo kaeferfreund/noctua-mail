@@ -1,0 +1,10 @@
+# Purpose: proposed daily Maildir pull; runbook §6.3–6.4; REVIEW BEFORE USE.
+# DISABLED BY DEFAULT; confirm completion before 03:15 UTC app backup (cross-host gate is manual).
+[Unit]
+Description=Daily Noctua independent Maildir archive
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+Persistent=true
+Unit=noctua-mailarchive.service
+[Install]
+WantedBy=timers.target

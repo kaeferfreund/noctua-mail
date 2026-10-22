@@ -1,0 +1,37 @@
+# Purpose: production Bun server; runbook §2.3; REVIEW BEFORE USE.
+[Unit]
+Description=Noctua production mail client
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/srv/noctua/current/server.js
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=noctua
+Group=noctua
+WorkingDirectory=/srv/noctua/current
+EnvironmentFile=/srv/noctua/env/noctua.env
+Environment=PATH=/opt/noctua/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/opt/noctua/bin/bun --bun server.js
+Restart=on-failure
+RestartSec=10s
+KillMode=control-group
+TimeoutStopSec=120s
+UMask=0077
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/noctua/data
+CacheDirectory=noctua
+CacheDirectoryMode=0700
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctua
+
+[Install]
+WantedBy=multi-user.target

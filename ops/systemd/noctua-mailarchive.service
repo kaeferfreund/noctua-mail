@@ -1,0 +1,26 @@
+# Purpose: daily pull-only Maildir archive on the NAS/archive host; runbook §6.4; REVIEW BEFORE USE.
+# Install ONLY on the chosen archive host with systemd/isync, not blindly on the app host.
+# /etc/noctua-archive/mbsyncrc: one channel per mailbox, Pull New Flags, Remove/Expunge None.
+[Unit]
+Description=Noctua independent netcup Maildir archive
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/noctua-archive/reviewed
+ConditionPathExists=/etc/noctua-archive/mbsyncrc
+[Service]
+Type=oneshot
+User=noctua-archive
+Group=noctua-archive
+ExecStart=/usr/bin/flock -n /var/lib/noctua-archive/archive.lock /usr/bin/mbsync -c /etc/noctua-archive/mbsyncrc -a
+TimeoutStartSec=6h
+UMask=0077
+StateDirectory=noctua-archive
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+# TODO: replace with the actual private NAS volume before use.
+ReadWritePaths=/volume1/noctua-mail-archive
+StandardOutput=journal
+StandardError=journal

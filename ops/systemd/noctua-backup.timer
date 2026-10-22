@@ -1,0 +1,11 @@
+# Purpose: proposed daily app backup; runbook §6.3; REVIEW BEFORE USE.
+# DISABLED BY DEFAULT: installing this file does not enable it. No enable step is automated.
+[Unit]
+Description=Daily Noctua app backup
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=5m
+Persistent=true
+Unit=noctua-backup.service
+[Install]
+WantedBy=timers.target
