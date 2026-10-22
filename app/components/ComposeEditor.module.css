@@ -87,19 +87,19 @@
   flex: 1;
   min-height: 0;
   outline: none;
-  font-family: "Sora", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.6;
   color: var(--input-fg);
 }
 
 .composeEditorInput :global(a) {
-  color: var(--accent);
+  color: var(--link);
   text-decoration: underline;
 }
 
 .composeEditorInput :global(a:hover) {
-  color: var(--accent);
+  color: var(--link);
 }
 
 .composeEditorInput :global(img) {

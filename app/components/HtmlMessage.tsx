@@ -20,6 +20,7 @@ import {
   isTrustedFontStylesheetUrl,
   stripPromotedFontImports
 } from "@/app/components/emailFontRegistry";
+import { APP_FONT_FACE_CSS, APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const NOCTUA_EMAIL_CONTENT_CLASS = "noctua-email-content";
 const NOCTUA_EMAIL_VIEWPORT_CLASS = "noctua-email-viewport";
@@ -415,10 +416,11 @@ function buildPreviewDocument({
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     stylesheetTags,
     "<style>",
+    APP_FONT_FACE_CSS,
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; }`,
     "html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-size: 100%; }",
     `body { margin: 0; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; background: transparent; ${hostTextColor} font-size: 100%; }`,
-    `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: "Sora", system-ui, -apple-system, sans-serif; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
+    `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: ${APP_FONT_STACK}; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
     // The width must counter the scale so the visual width stays the pane
     // width at any zoom; a max-width would cap it below 100% when zoomed out,
     // shrinking the scroll viewport (and its clip edge) along with the content.
