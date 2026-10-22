@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { buildAccountRecipientAliasesPath } from "@/lib/accountApiPaths";
-import type { RecipientAlias } from "@/lib/data";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { deferUntilIdle } from "./deferUntilIdle";
+import { getRecipientAliasesResource } from "./recipientAliasesResource";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -11,63 +11,28 @@ type UseRecipientAliasesOptions = {
   apiFetch: ApiFetch;
 };
 
-export function useRecipientAliases({
-  activeAccountId,
-  apiFetch
-}: UseRecipientAliasesOptions) {
-  const [recipientAliases, setRecipientAliases] = useState<RecipientAlias[]>([]);
-
+export function useRecipientAliases({ activeAccountId, apiFetch }: UseRecipientAliasesOptions) {
+  const resource = useMemo(
+    () => getRecipientAliasesResource(apiFetch, activeAccountId),
+    [apiFetch, activeAccountId]
+  );
+  const recipientAliases = useSyncExternalStore(
+    resource.subscribe, resource.getSnapshot, resource.getSnapshot
+  );
   const refreshRecipientAliases = useCallback(
-    async (accountId: string) => {
-      if (!accountId) {
-        setRecipientAliases([]);
-        return [];
-      }
-      try {
-        const response = await apiFetch(buildAccountRecipientAliasesPath(accountId), {
-          cache: "no-store"
-        });
-        const data = (await response.json()) as {
-          ok?: boolean;
-          aliases?: RecipientAlias[];
-        };
-        const next = data.ok && Array.isArray(data.aliases) ? data.aliases : [];
-        setRecipientAliases(next);
-        return next;
-      } catch {
-        setRecipientAliases([]);
-        return [];
-      }
-    },
+    (accountId: string) => getRecipientAliasesResource(apiFetch, accountId).load(true),
     [apiFetch]
   );
 
   useEffect(() => {
-    if (!activeAccountId) {
-      return;
-    }
-    let cancelled = false;
-    apiFetch(buildAccountRecipientAliasesPath(activeAccountId), { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data: { ok?: boolean; aliases?: RecipientAlias[] }) => {
-        if (cancelled) {
-          return;
-        }
-        setRecipientAliases(data.ok && Array.isArray(data.aliases) ? data.aliases : []);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRecipientAliases([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeAccountId, apiFetch]);
+    if (!activeAccountId) return;
+    resource.invalidate();
+    return deferUntilIdle(() => { void resource.load(); });
+  }, [activeAccountId, resource]);
 
   return {
-    recipientAliases: activeAccountId ? recipientAliases : [],
-    setRecipientAliases,
+    recipientAliases,
+    setRecipientAliases: resource.set,
     refreshRecipientAliases
   };
 }

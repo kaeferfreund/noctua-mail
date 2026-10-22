@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buildAccountTopicStatsPath, buildAccountTopicsPath } from "@/lib/accountApiPaths";
+import { deferUntilIdle } from "./deferUntilIdle";
 import type { Topic } from "@/lib/data";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -21,8 +22,10 @@ type TopicStatsResponse = {
 
 export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
   const [storedTopics, setStoredTopics] = useState<Topic[]>([]);
-  const [storedTopicMessageCountById, setStoredTopicMessageCountById] =
-    useState<Map<string, number>>(new Map());
+  const [topicStats, setTopicStats] = useState({
+    accountId: "", counts: new Map<string, number>()
+  });
+  const statsVersionRef = useRef(0);
 
   const fetchTopicMessageCounts = useCallback(async (accountId: string) => {
     try {
@@ -45,7 +48,9 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
   }, [apiFetch]);
 
   const refreshTopicStats = useCallback(async (accountId: string) => {
-    setStoredTopicMessageCountById(await fetchTopicMessageCounts(accountId));
+    const version = ++statsVersionRef.current;
+    const counts = await fetchTopicMessageCounts(accountId);
+    if (version === statsVersionRef.current) setTopicStats({ accountId, counts });
   }, [fetchTopicMessageCounts]);
 
   useEffect(() => {
@@ -59,24 +64,26 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
         }
       })
       .catch(() => {});
-    fetchTopicMessageCounts(activeAccountId)
-      .then((counts) => {
-        if (!cancelled) {
-          setStoredTopicMessageCountById(counts);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setStoredTopicMessageCountById(new Map());
+    const statsVersion = ++statsVersionRef.current;
+    const cancelStats = deferUntilIdle(() => {
+      // An explicit refresh supersedes this scheduled startup read.
+      if (statsVersion !== statsVersionRef.current) return;
+      void fetchTopicMessageCounts(activeAccountId).then((counts) => {
+        if (!cancelled && statsVersion === statsVersionRef.current) {
+          setTopicStats({ accountId: activeAccountId, counts });
         }
       });
+    });
     return () => {
       cancelled = true;
+      cancelStats();
+      statsVersionRef.current += 1;
     };
   }, [activeAccountId, apiFetch, fetchTopicMessageCounts]);
 
   const allTopics = activeAccountId ? storedTopics : [];
-  const topicMessageCountById = activeAccountId ? storedTopicMessageCountById : new Map<string, number>();
+  const topicMessageCountById = activeAccountId && topicStats.accountId === activeAccountId
+    ? topicStats.counts : new Map<string, number>();
   const setAllTopics = setStoredTopics;
 
   return {
