@@ -447,6 +447,7 @@
 @media (width < 768px) {
   .composeBackdrop { width: 100dvw; height: 100dvh; padding: 0; }
   .composeModal { padding: 12px; min-height: 0; width: 100dvw !important; height: 100dvh !important; min-width: 0; max-width: none; max-height: none; border-radius: 0; }
+  .composeModal[role="dialog"] { position: fixed; inset: 0; z-index: 9994; box-sizing: border-box; }
   .composeResizer { display: none; }
   .composeHeader { padding: 12px; }
 }

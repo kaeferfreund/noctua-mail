@@ -2,13 +2,23 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { useIsMobile } from "@/app/hooks/use-mobile"
+import { useMobileOverlayHistory } from "@/app/hooks/useMobileOverlayHistory"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { Button } from "@/app/components/ui/button"
 import { XIcon } from "lucide-react"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({ open: controlledOpen, defaultOpen = false, onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  const isMobile = useIsMobile()
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen)
+  const open = controlledOpen ?? internalOpen
+  const changeOpen = (next: boolean) => {
+    setInternalOpen(next)
+    onOpenChange?.(next)
+  }
+  useMobileOverlayHistory(isMobile && open, () => changeOpen(false))
+  return <SheetPrimitive.Root data-slot="sheet" open={open} onOpenChange={changeOpen} {...props} />
 }
 
 function SheetTrigger({

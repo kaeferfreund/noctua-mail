@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { MobileStatusFocusContext, restoreStatusFocus } from "@/app/components/shell/MobileStatusFocus";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { Activity } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
@@ -25,6 +26,7 @@ import CalendarPopover from "@/app/components/calendar/CalendarPopover";
 export type BottomStatusPanel = "process" | "exception" | "reminder" | "calendar" | "mail-check" | null;
 
 type BottomStatusBarProps = {
+  onClearMobileSelection?: () => void;
   onCheckNewMail?: () => void;
   isSyncing: boolean;
   isRecomputingThreads: boolean;
@@ -53,6 +55,7 @@ type BottomStatusBarProps = {
 };
 
 export default function BottomStatusBar({
+  onClearMobileSelection,
   onCheckNewMail,
   isSyncing,
   isRecomputingThreads,
@@ -80,6 +83,7 @@ export default function BottomStatusBar({
   accountDateFormat
 }: BottomStatusBarProps) {
   const isMobile = useIsMobile();
+  const indicatorRef = useRef<HTMLButtonElement>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState<number | null>(null);
   const processPanelOpen = openPanel === "process";
   const exceptionPanelOpen = openPanel === "exception";
@@ -129,9 +133,10 @@ export default function BottomStatusBar({
   const mailCheckStatusTone: BottomStatusTone = mailCheckMode === "idle" ? "muted" : "normal";
 
   return (
+    <MobileStatusFocusContext.Provider value={indicatorRef}>
     <div className={isMobile ? mobileStyles.indicators : `bottom-bar ${mobileStyles.desktopStatusBar}`}>
       {isMobile ? <DropdownMenu><DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Activity and calendar" aria-busy={isSyncing}><Activity />{exceptionEntries.length > 0 ? <span className={mobileStyles.activityDot} /> : null}</Button>
+        <Button ref={indicatorRef} variant="ghost" size="icon" aria-label="Activity and calendar" aria-busy={isSyncing}><Activity />{exceptionEntries.length > 0 ? <span className={mobileStyles.activityDot} /> : null}</Button>
       </DropdownMenuTrigger><DropdownMenuContent align="end">
         <DropdownMenuItem disabled={isSyncing} onSelect={() => { void onCheckNewMail?.(); }}>Check for new mail</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setOpenPanel("process")}>Processes</DropdownMenuItem>
@@ -187,22 +192,23 @@ export default function BottomStatusBar({
       />
       {isMobile ? <>
         <Sheet open={calendarPanelOpen} onOpenChange={handleCalendarPanelOpenChange}>
-          <SheetContent aria-describedby={undefined} className={mobileStyles.fullscreenSheet}>
+          <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined} className={mobileStyles.fullscreenSheet}>
             <SheetTitle className="m-0 p-4">Calendar</SheetTitle>
             <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-2">
               <CalendarEventBrowser accountId={activeAccountId} firstDay={calendarFirstDay}
                 onOpenMessage={onOpenCalendarMessage ? (id) => { onOpenCalendarMessage(id); setOpenPanel(null); } : undefined}
-                onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid ? (uid) => { onFindRelatedCalendarInviteUid(uid); setOpenPanel(null); } : undefined} />
+                onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid ? (uid) => { onClearMobileSelection?.(); onFindRelatedCalendarInviteUid(uid); setOpenPanel(null); } : undefined} />
             </div></Theme>
           </SheetContent>
         </Sheet>
         <Sheet open={openPanel === "mail-check"} onOpenChange={(open) => { if (!open) setOpenPanel(null); }}>
-          <SheetContent side="bottom" aria-describedby={undefined}>
+          <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} side="bottom" aria-describedby={undefined}>
             <SheetTitle className="px-4">Mail check</SheetTitle>
             <p className="px-4">{mailCheckStatusValue}</p>
           </SheetContent>
         </Sheet>
       </> : null}
     </div>
+    </MobileStatusFocusContext.Provider>
   );
 }

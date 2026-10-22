@@ -5667,6 +5667,7 @@ export default function MailClient({
         }}
         statusBar={
           <BottomStatusBar
+            onClearMobileSelection={() => setViewMessage(null)}
             onCheckNewMail={() => syncAccount(undefined, "new")}
             isSyncing={isSyncing}
             isRecomputingThreads={isRecomputingThreads}

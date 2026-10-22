@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMobile } from "@/app/hooks/use-mobile";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
 import { Monitor, Moon, RefreshCw, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -22,18 +22,22 @@ export type ShellHeaderProps = {
   sync: { isSyncing: boolean; onCheckNewMail: () => void };
 };
 
+const subscribeMounted = () => () => {};
+
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
+  const currentTheme = mounted ? theme : undefined;
+  const Icon = currentTheme === "light" ? Sun : currentTheme === "dark" ? Moon : Monitor;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label="Theme" title="Theme">
-          <Icon />
+          <span aria-hidden="true" style={{ visibility: mounted ? "visible" : "hidden", display: "contents" }}><Icon /></span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+        <DropdownMenuRadioGroup value={currentTheme ?? "system"} onValueChange={setTheme}>
           <DropdownMenuRadioItem value="light"><Sun />Light</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="dark"><Moon />Dark</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="system"><Monitor />System</DropdownMenuRadioItem>
