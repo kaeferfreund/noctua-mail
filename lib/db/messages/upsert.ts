@@ -34,6 +34,8 @@ import { parseAddressEmails } from "../../ownAddresses";
 import { publishThreadCollabEvent } from "../../threadCollabEvents";
 import { SHARD_FTS_TABLE } from "../shardFormat";
 import type { Message } from "../../data";
+import { stageMessageFiles } from "../../storage";
+import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
 import { withDbWriteRetry } from "../../dbWriteRetry";
@@ -147,7 +149,7 @@ export async function upsertMessages(
     );
     const deleteMessageById = db.prepare(`DELETE FROM messages WHERE accountId = ? AND id = ?`);
     const findMessageById = db.prepare(
-      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId
+      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId, sourceSha256
        FROM messages
        WHERE accountId = ? AND id = ?`
     );
@@ -191,10 +193,10 @@ export async function upsertMessages(
     const insertMessage = db.prepare(`
       INSERT INTO messages (
         id, accountId, folderId, threadId, parentId, messageId, inReplyTo, "references", xForwardedMessageId, xComposeFormat, quotedHtmlEdited,
-        subject, fromAddr, fromEmail, replyToAddr, toAddr, ccAddr, bccAddr, mailboxPath, imapUid, preview, date, dateValue,
+        subject, fromAddr, fromEmail, senderKey, sourceSha256, replyToAddr, toAddr, ccAddr, bccAddr, mailboxPath, imapUid, preview, date, dateValue,
         body, htmlBody, priority, hasSource, unread, flags, seen, answered, flagged, deleted, draft, recent,
         category, categoryScore, categorySignals, categoryManualState, listUnsubscribe, listId, sizeBytes, deliveredTo, originalTo, senderIdentityId
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(accountId, id) DO UPDATE SET
         folderId=excluded.folderId,
         threadId=excluded.threadId,
@@ -208,6 +210,8 @@ export async function upsertMessages(
         subject=excluded.subject,
         fromAddr=excluded.fromAddr,
         fromEmail=excluded.fromEmail,
+        senderKey=excluded.senderKey,
+        sourceSha256=excluded.sourceSha256,
         replyToAddr=excluded.replyToAddr,
         toAddr=excluded.toAddr,
         ccAddr=excluded.ccAddr,
@@ -337,13 +341,13 @@ export async function upsertMessages(
     type IdentitySnapshot = {
       id: string; threadId: string; dateValue: number; messageId?: string | null; folderId?: string | null; mailboxPath?: string | null;
       imapUid?: number | null; flags?: string | null; sizeBytes?: number | null;
-      deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null;
+      deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null; sourceSha256?: string | null;
     };
     const replacedMetadata = new Map<string, IdentitySnapshot>();
     const replacedMetadataByHeader = new Map<string, IdentitySnapshot[]>();
     const captureIdentitySnapshots = () => {
       if (!replaceExisting) return;
-      const rows = db.prepare(`SELECT id,threadId,dateValue,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
+      const rows = db.prepare(`SELECT id,threadId,dateValue,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId,sourceSha256
         FROM messages WHERE accountId=? ${folderId ? "AND folderId=?" : ""}`).all(...deleteArgs) as IdentitySnapshot[];
       for (const row of rows) {
         replacedMetadata.set(row.id, row);
@@ -379,6 +383,7 @@ export async function upsertMessages(
               deliveredTo?: string | null;
               originalTo?: string | null;
               senderIdentityId?: string | null;
+              sourceSha256?: string | null;
             }
           | undefined;
         let existingRow = existingById;
@@ -388,14 +393,8 @@ export async function upsertMessages(
             message.mailboxPath ?? message.folderId,
             message.imapUid ?? null
           );
-          // Keep any existing on-disk blobs attached to the base message id.
-          // The existing database row remains at `message.id`, so moving
-          // files from the base id to the collision variant would orphan
-          // the base row's source / attachment paths. Variant rows already
-          // fall back to the base id during lookup (see
-          // `buildMessageRowIdLookupCandidates`); the reverse direction is
-          // not guaranteed. The newly-assigned variant row is fresh and
-          // will fetch its own source/attachments on first access.
+          // The base row keeps its own blobs. Publish this copy only under
+          // its final id, alongside the row and its source ownership digest.
           existingRow = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId)) as typeof existingById;
         }
         messageRowIds.set(message.id, rowId);
@@ -558,11 +557,13 @@ export async function upsertMessages(
         // so preserve a size the
         // stored .eml still backs.
         const sizeBytes =
-          typeof message.sizeBytes === "number" && Number.isFinite(message.sizeBytes)
-            ? message.sizeBytes
-            : typeof existingRow?.sizeBytes === "number"
-              ? existingRow.sizeBytes
-              : null;
+          message.source !== undefined
+            ? Buffer.byteLength(message.source)
+            : typeof message.sizeBytes === "number" && Number.isFinite(message.sizeBytes)
+              ? message.sizeBytes
+              : typeof existingRow?.sizeBytes === "number"
+                ? existingRow.sizeBytes
+                : null;
         const category =
           manualCategoryState === "cleared" ? null : normalizeCategory(message.category) ?? null;
         const categoryScore =
@@ -607,6 +608,8 @@ export async function upsertMessages(
           message.subject,
           message.from,
           fromEmail,
+          message.senderKey ?? null,
+          fileEntries.get(message)?.sourceSha256 ?? existingRow?.sourceSha256 ?? null,
           message.replyTo?.trim() || null,
           message.to,
           message.cc ?? null,
@@ -619,7 +622,7 @@ export async function upsertMessages(
           message.body,
           rewrittenHtmlBody ?? null,
           message.priority ?? null,
-          message.hasSource ? 1 : 0,
+          message.source !== undefined || message.hasSource ? 1 : 0,
           unread ? 1 : 0,
           message.flags ? JSON.stringify(normalizedFlags) : null,
           seen ? 1 : 0,
@@ -686,33 +689,58 @@ export async function upsertMessages(
             rewriteAttachmentUrl(att.url) ?? null
           );
         });
+        files.install(fileIndexes.get(message)!, rowId);
       });
     };
 
+    const files = await stageMessageFiles(accountId, nextMessages.map(message => ({
+      source: message.source,
+      attachments: (message.attachments ?? []).flatMap(attachment => {
+        const data = getAttachmentContentBuffer(attachment);
+        return data ? [{ id: attachment.id, data }] : [];
+      })
+    })));
+    const fileIndexes = new Map(nextMessages.map((message, index) => [message, index]));
+    const fileEntries = new Map(nextMessages.map((message, index) => [message, files.entries[index]]));
+
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
-    const collabChanges = db.transaction(() => {
-      captureIdentitySnapshots();
-      if (replaceExisting) {
-        // Capture identities under the same writer lock as delete + remap.
-        const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
-          WHERE accountId=?${folderId ? " AND folderId=?" : ""}`).all(...deleteArgs) as ReplacedRow[];
-        for (const row of replacedRows) {
-          replacedById.set(row.id, row);
-          if (row.messageId) replacedByHeader.set(row.messageId, row);
+    try {
+      const collabChanges = db.transaction(() => {
+        try {
+          captureIdentitySnapshots();
+          if (replaceExisting) {
+            // Capture identities under the same writer lock as delete + remap.
+            const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
+              WHERE accountId=?${folderId ? " AND folderId=?" : ""}`).all(...deleteArgs) as ReplacedRow[];
+            for (const row of replacedRows) {
+              replacedById.set(row.id, row);
+              if (row.messageId) replacedByHeader.set(row.messageId, row);
+            }
+            deleteAttachmentsByScope.run(...deleteArgs);
+            if (folderId) deleteCalendarEventsByScope.run(accountId, accountId, folderId);
+            else deleteCalendarEventsByScope.run(accountId);
+            deleteFtsByScope.run(...deleteArgs);
+            deleteMessages.run(...deleteArgs);
+          }
+          for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
+            upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
+          }
+          return remapThreadCollab(db, accountId, remaps);
+        } catch (error) {
+          // Restore overwritten files while the shard writer lock is held.
+          files.rollback();
+          throw error;
         }
-        deleteAttachmentsByScope.run(...deleteArgs);
-        if (folderId) deleteCalendarEventsByScope.run(accountId, accountId, folderId);
-        else deleteCalendarEventsByScope.run(accountId);
-        deleteFtsByScope.run(...deleteArgs);
-        deleteMessages.run(...deleteArgs);
-      }
-      for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
-        upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
-      }
-      return remapThreadCollab(db, accountId, remaps);
-    }).immediate();
-    for (const event of collabChanges) publishThreadCollabEvent(event);
+      }).immediate();
+      for (const event of collabChanges) publishThreadCollabEvent(event);
+    } catch (error) {
+      // Also cover a commit failure, after the callback has returned.
+      files.rollback();
+      throw error;
+    } finally {
+      await files.cleanup();
+    }
 
     let affectedThreadIds: string[] = [];
     let requiresFullRecompute = false;

@@ -1,4 +1,5 @@
-import { promises as fs } from "fs";
+import { promises as fs, existsSync, mkdirSync, renameSync, unlinkSync } from "fs";
+import { createHash, randomUUID } from "crypto";
 import path from "path";
 import type { Account, Folder, Message } from "./data";
 import { buildMessageRowIdLookupCandidates } from "./messageIds";
@@ -190,6 +191,80 @@ export async function saveMessageSource(
   return Buffer.byteLength(source);
 }
 
+/**
+ * Stage bytes without publishing them under a message id. Upsert installs them
+ * only after resolving the final row identity in its immediate transaction.
+ * Renames are synchronous so no other writer can interleave between id
+ * assignment, file publication and the ownership digest stored in that row.
+ */
+export async function stageMessageFiles(accountId: string, messages: Array<{
+  source?: string;
+  attachments: Array<{ id: string; data: Buffer }>;
+}>) {
+  type StagedFile = { path: string; attachmentId?: string };
+  const temporaryPaths = new Set<string>();
+  const installed: Array<{ target: string; backup: string; published: boolean; hadPrevious: boolean }> = [];
+  const stage = async (directory: string, data: string | Buffer, attachmentId?: string): Promise<StagedFile> => {
+    await fs.mkdir(directory, { recursive: true });
+    const temporary = path.join(directory, `.pending-${randomUUID()}`);
+    temporaryPaths.add(temporary);
+    await fs.writeFile(temporary, data, { flag: "wx" });
+    return { path: temporary, attachmentId };
+  };
+  const cleanup = async () => {
+    await Promise.all(Array.from(temporaryPaths, temporary => fs.rm(temporary, { force: true })));
+  };
+  const rollback = () => {
+    for (const entry of installed.reverse()) {
+      if (entry.published) unlinkSync(entry.target);
+      if (entry.hadPrevious) renameSync(entry.backup, entry.target);
+    }
+    installed.length = 0;
+  };
+  try {
+    const entries: Array<{ source: StagedFile | null; sourceSha256: string | null; attachments: StagedFile[] }> = [];
+    for (const message of messages) {
+      const source = message.source !== undefined
+        ? await stage(getSourcesAccountDir(accountId), message.source) : null;
+      const attachments: StagedFile[] = [];
+      for (const attachment of message.attachments) {
+        attachments.push(await stage(getAttachmentsAccountDir(accountId), attachment.data, attachment.id));
+      }
+      entries.push({
+        source,
+        sourceSha256: message.source !== undefined
+          ? createHash("sha256").update(message.source).digest("hex") : null,
+        attachments
+      });
+    }
+    const publish = (file: StagedFile, target: string) => {
+      mkdirSync(path.dirname(target), { recursive: true });
+      const backup = `${file.path}.previous`;
+      const entry = { target, backup, published: false, hadPrevious: false };
+      installed.push(entry);
+      temporaryPaths.add(backup);
+      if (existsSync(target)) {
+        renameSync(target, backup);
+        entry.hadPrevious = true;
+      }
+      renameSync(file.path, target);
+      entry.published = true;
+    };
+    // Attachment message directories depend on final row ids. Preparing them
+    // inside the transaction is synchronous; all bulk byte IO happened above.
+    return { entries, cleanup, rollback, install(index: number, finalId: string) {
+      const entry = entries[index];
+      if (entry.source) publish(entry.source, sourceFilePath(accountId, finalId));
+      for (const file of entry.attachments) {
+        publish(file, attachmentFilePath(accountId, finalId, file.attachmentId!));
+      }
+    } };
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+}
+
 /** Concurrent stat calls per chunk while walking an account's source directory. */
 const SOURCE_STAT_CONCURRENCY = 64;
 
@@ -243,9 +318,9 @@ export async function listMessageSourceSizes(accountId: string) {
   return sizes;
 }
 
-export async function getMessageSource(accountId: string, messageId: string) {
+export async function getMessageSource(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
-  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
   for (const candidateId of candidates) {
     try {
       return await fs.readFile(sourceFilePath(accountId, candidateId), "utf-8");

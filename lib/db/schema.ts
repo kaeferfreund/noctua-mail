@@ -1296,6 +1296,12 @@ export function initAccountSchema(db: any) {
       String(row.name ?? "")
     )
   );
+  if (!messageColumns.has("sourceSha256")) {
+    db.prepare(`ALTER TABLE messages ADD COLUMN sourceSha256 TEXT`).run();
+  }
+  if (!messageColumns.has("senderKey")) {
+    db.prepare(`ALTER TABLE messages ADD COLUMN senderKey TEXT`).run();
+  }
   if (!messageColumns.has("categorySignals")) {
     db.prepare(`ALTER TABLE messages ADD COLUMN categorySignals TEXT`).run();
   }
