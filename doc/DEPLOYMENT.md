@@ -242,3 +242,11 @@ manifest and two-run procedure in [AUTHENTICATION.md](AUTHENTICATION.md#slice-6-
 Recovery links are handed over personally and printed once only in a private operator terminal.
 No SMTP delivery is configured. The local synthetic restore smoke covers auth IDs/factors and a
 shard/key snapshot; application-wide restore acceptance stays Stage 4 in TEAM-INBOX.md §11.
+
+## Integrated authentication readiness
+
+The auth/admin UI and policy-controlled public backend are integrated. Migration and recovery
+both hold the shared operator lifetime lock; follow the [offline runbook](AUTHENTICATION.md#offline-migration-and-bootstrap-runbook),
+including stopped service, consistent backup and personally verified handover. The build, local
+compiled smoke and virtual-authenticator suite do not establish live tailnet DNS/TLS, mailprovider renewal,
+physical phone/PWA acceptance or the final application-wide restore. Those remain release gates.
