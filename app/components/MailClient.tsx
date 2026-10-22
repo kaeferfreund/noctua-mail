@@ -4790,9 +4790,7 @@ export default function MailClient({
     groupBy,
     activeAccountId,
     folders,
-    pendingMessageActions,
     toggleFlaggedFlag,
-    updateFlagState,
     setSearchScope,
     setActiveFolderId
   });
