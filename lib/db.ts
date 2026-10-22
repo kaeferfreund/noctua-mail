@@ -132,29 +132,19 @@ export {
 } from "./db/translations";
 
 export {
-  DuplicateUserEmailError,
   addUserAccountLink,
   deleteUser,
   deleteUserAccountLinksForUser,
   getUserAccountRole,
   getUserAccounts,
-  getUserAuthByEmail,
   getUserById,
-  getUserLiveness,
   getUsers,
-  insertUser,
   listAccessibleAccountIdsForUser,
   listUserAccountLinks,
   listUserAccountLinksForUser,
   normalizeUserEmail,
   removeUserAccountLink,
   setUserAccountRole,
-  setUserDisabled,
-  updateUserPassword,
-  updateUserProfile,
-  type NewUser,
-  type UserAuthRecord,
-  type UserLiveness,
   type UserRole
 } from "./db/users";
 
@@ -434,3 +424,5 @@ export function listCalendarInviteSourceMessagesByEventUid(
 ): ReturnType<typeof _listCalendarInviteSourceMessagesByEventUidImpl> {
   return _listCalendarInviteSourceMessagesByEventUidImpl(...args);
 }
+
+export { deleteSessionProofState } from "./db/authPolicy";

@@ -1,10 +1,10 @@
+import { getSharedTestAuthHarness } from "../testAuthHarness";
 import { randomUUID } from "crypto";
 import { describe, expect, test } from "bun:test";
 import type { Account } from "../data";
 import { dbModulePromise } from "../testDbHarness";
 
 const {
-  DuplicateUserEmailError,
   addUserAccountLink,
   deleteUser,
   deleteUserAccountLinksForUser,
@@ -12,12 +12,9 @@ const {
   getUserAccountPrefs,
   getUserAccountRole,
   getUserAccounts,
-  getUserAuthByEmail,
   getUserById,
-  getUserLiveness,
   getUsers,
   insertMcpToken,
-  insertUser,
   listMcpTokens,
   listUserAccountLinks,
   listUserAccountLinksForUser,
@@ -25,9 +22,6 @@ const {
   normalizeUserEmail,
   removeUserAccountLink,
   setUserAccountRole,
-  setUserDisabled,
-  updateUserPassword,
-  updateUserProfile,
   upsertAccount
 } = await dbModulePromise;
 
@@ -83,193 +77,6 @@ async function insertToken(accountId: string, createdByUserId: string) {
 describe("normalizeUserEmail", () => {
   test("trims and lowercases", () => {
     expect(normalizeUserEmail("  Person.Name@Example.TEST \n")).toBe("person.name@example.test");
-  });
-});
-
-describe("insertUser", () => {
-  test("stores the e-mail normalised and never exposes the password hash", async () => {
-    const email = uniqueEmail("Insert-Plain");
-    const user = await insertUser({
-      email: `  ${email.toUpperCase()} `,
-      role: "user",
-      name: "  Example Person  "
-    });
-
-    expect(user).toEqual({
-      id: user.id,
-      email: email.toLowerCase(),
-      name: "Example Person",
-      role: "user",
-      createdAt: user.createdAt,
-      hasPassword: false,
-      mustChangePassword: false,
-      disabledAt: null
-    });
-    expect(await getUserById(user.id)).toEqual(user);
-    expect((await getUsers()).find((entry) => entry.id === user.id)).toEqual(user);
-  });
-
-  test("records a password hash without returning it", async () => {
-    const before = Math.floor(Date.now() / 1000);
-    const user = await insertUser({
-      email: uniqueEmail("insert-hash"),
-      role: "admin",
-      passwordHash: "$argon2id$example-hash",
-      mustChangePassword: true
-    });
-
-    expect(user.hasPassword).toBe(true);
-    expect(user.mustChangePassword).toBe(true);
-    expect(user.role).toBe("admin");
-    expect(Object.keys(user)).not.toContain("passwordHash");
-    expect(JSON.stringify(await getUsers())).not.toContain("$argon2id$example-hash");
-
-    const liveness = await getUserLiveness(user.id);
-    expect(liveness?.passwordUpdatedAt).toBeGreaterThanOrEqual(before);
-    expect(liveness?.mustChangePassword).toBe(true);
-  });
-
-  test("throws DuplicateUserEmailError for a case variant of an existing address", async () => {
-    const email = uniqueEmail("insert-dup");
-    const first = await insertUser({ email, role: "user" });
-
-    const duplicate = insertUser({ email: ` ${email.toUpperCase()}`, role: "user" });
-    await expect(duplicate).rejects.toBeInstanceOf(DuplicateUserEmailError);
-    await expect(duplicate).rejects.toThrow("A user with this email address already exists");
-
-    const matching = (await getUsers()).filter((user) => user.email === email.toLowerCase());
-    expect(matching.map((user) => user.id)).toEqual([first.id]);
-  });
-
-  test("rejects a blank e-mail and an unknown role", async () => {
-    await expect(insertUser({ email: "   ", role: "user" })).rejects.toThrow(
-      "User e-mail is required"
-    );
-    await expect(
-      // Simulates an unchecked request body reaching the DB layer.
-      insertUser(JSON.parse(`{"email":"${uniqueEmail("bad-role")}","role":"owner"}`))
-    ).rejects.toThrow("Invalid user role: owner");
-  });
-});
-
-describe("getUserAuthByEmail", () => {
-  test("finds the user case-insensitively with its auth fields", async () => {
-    const email = uniqueEmail("auth-lookup");
-    const user = await insertUser({
-      email,
-      role: "user",
-      passwordHash: "$argon2id$auth-lookup"
-    });
-
-    expect(await getUserAuthByEmail(` ${email.toUpperCase()} `)).toEqual({
-      id: user.id,
-      role: "user",
-      passwordHash: "$argon2id$auth-lookup",
-      disabledAt: null,
-      mustChangePassword: false
-    });
-  });
-
-  test("returns null for unknown and blank addresses", async () => {
-    expect(await getUserAuthByEmail(uniqueEmail("auth-missing"))).toBeNull();
-    expect(await getUserAuthByEmail("  ")).toBeNull();
-  });
-
-  test("reports a missing hash as null for legacy users", async () => {
-    const email = uniqueEmail("auth-legacy");
-    await insertUser({ email, role: "user" });
-    expect((await getUserAuthByEmail(email))?.passwordHash).toBeNull();
-  });
-});
-
-describe("getUserLiveness", () => {
-  test("returns the guard fields, or null for an unknown user", async () => {
-    const user = await insertUser({ email: uniqueEmail("liveness"), role: "admin" });
-    expect(await getUserLiveness(user.id)).toEqual({
-      disabledAt: null,
-      passwordUpdatedAt: null,
-      mustChangePassword: false,
-      role: "admin"
-    });
-    expect(await getUserLiveness(randomUUID())).toBeNull();
-  });
-});
-
-describe("updateUserPassword", () => {
-  test("stores the hash, bumps passwordUpdatedAt and sets mustChangePassword", async () => {
-    const email = uniqueEmail("password-update");
-    const user = await insertUser({ email, role: "user" });
-
-    expect(
-      await updateUserPassword(user.id, "$argon2id$reset", {
-        mustChangePassword: true,
-        passwordUpdatedAt: 1_900_000_000
-      })
-    ).toBe(true);
-    expect(await getUserLiveness(user.id)).toMatchObject({
-      passwordUpdatedAt: 1_900_000_000,
-      mustChangePassword: true
-    });
-    expect((await getUserAuthByEmail(email))?.passwordHash).toBe("$argon2id$reset");
-
-    const before = Math.floor(Date.now() / 1000);
-    expect(
-      await updateUserPassword(user.id, "$argon2id$changed", { mustChangePassword: false })
-    ).toBe(true);
-    const liveness = await getUserLiveness(user.id);
-    expect(liveness?.mustChangePassword).toBe(false);
-    expect(liveness?.passwordUpdatedAt).toBeGreaterThanOrEqual(before);
-    expect((await getUserById(user.id))?.hasPassword).toBe(true);
-  });
-
-  test("returns false for an unknown user and refuses an empty hash", async () => {
-    expect(
-      await updateUserPassword(randomUUID(), "$argon2id$x", { mustChangePassword: false })
-    ).toBe(false);
-    const user = await insertUser({ email: uniqueEmail("password-empty"), role: "user" });
-    await expect(
-      updateUserPassword(user.id, "", { mustChangePassword: false })
-    ).rejects.toThrow("Password hash is required");
-  });
-});
-
-describe("updateUserProfile", () => {
-  test("updates only the given fields and clears a blank name", async () => {
-    const user = await insertUser({ email: uniqueEmail("profile"), role: "user", name: "Before" });
-
-    const renamed = await updateUserProfile(user.id, { name: " After " });
-    expect(renamed?.name).toBe("After");
-    expect(renamed?.role).toBe("user");
-
-    const promoted = await updateUserProfile(user.id, { role: "admin" });
-    expect(promoted?.name).toBe("After");
-    expect(promoted?.role).toBe("admin");
-
-    const cleared = await updateUserProfile(user.id, { name: "  " });
-    expect(cleared?.name).toBeUndefined();
-    expect(await updateUserProfile(user.id, {})).toEqual(cleared);
-  });
-
-  test("returns null for an unknown user", async () => {
-    expect(await updateUserProfile(randomUUID(), { name: "Nobody" })).toBeNull();
-  });
-});
-
-describe("setUserDisabled", () => {
-  test("keeps the first disabledAt and clears it on enable", async () => {
-    const email = uniqueEmail("disable");
-    const user = await insertUser({ email, role: "user" });
-
-    const disabled = await setUserDisabled(user.id, true);
-    expect(disabled?.disabledAt).toEqual(expect.any(Number));
-    const disabledAgain = await setUserDisabled(user.id, true);
-    expect(disabledAgain?.disabledAt).toBe(disabled!.disabledAt);
-    expect((await getUserAuthByEmail(email))?.disabledAt).toBe(disabled!.disabledAt);
-    expect((await getUserLiveness(user.id))?.disabledAt).toBe(disabled!.disabledAt);
-
-    const enabled = await setUserDisabled(user.id, false);
-    expect(enabled?.disabledAt).toBeNull();
-    expect(await setUserDisabled(randomUUID(), true)).toBeNull();
   });
 });
 
@@ -364,8 +171,8 @@ describe("mailbox memberships", () => {
 
 describe("deleteUser", () => {
   test("removes the user with memberships, prefs and MCP tokens in one go", async () => {
-    const user = await insertUser({ email: uniqueEmail("delete"), role: "user" });
-    const bystander = await insertUser({ email: uniqueEmail("delete-bystander"), role: "user" });
+    const user = await createFixtureUser({ email: uniqueEmail("delete"), role: "user" });
+    const bystander = await createFixtureUser({ email: uniqueEmail("delete-bystander"), role: "user" });
     const accountId = uniqueAccountId("acc-delete");
     await upsertAccount(buildAccount(accountId));
     await addUserAccountLink(user.id, accountId, "editor");
@@ -390,8 +197,8 @@ describe("deleteUser", () => {
   });
 
   test("refuses to orphan an owned mailbox and moves it to reassignOwnerTo", async () => {
-    const owner = await insertUser({ email: uniqueEmail("delete-owner"), role: "user" });
-    const successor = await insertUser({ email: uniqueEmail("delete-successor"), role: "user" });
+    const owner = await createFixtureUser({ email: uniqueEmail("delete-owner"), role: "user" });
+    const successor = await createFixtureUser({ email: uniqueEmail("delete-successor"), role: "user" });
     const accountId = uniqueAccountId("acc-owned");
     await upsertAccount(buildAccount(accountId, owner.id));
     await addUserAccountLink(owner.id, accountId, "manager");
@@ -403,5 +210,26 @@ describe("deleteUser", () => {
     expect(await deleteUser(owner.id, { reassignOwnerTo: successor.id })).toBe(true);
     expect((await getAccountById(accountId))?.ownerUserId).toBe(successor.id);
     expect(await getUserById(owner.id)).toBeNull();
+  });
+});
+
+async function createFixtureUser(input: {email:string; role:"user"|"admin"}) {
+  return (await getSharedTestAuthHarness()).createUser(input.email, undefined, input.role);
+}
+
+describe("authoritative joined user DTO",()=>{
+  test("reads auth name, role, active ban and factor state without selecting secrets",async()=>{
+    const h=await getSharedTestAuthHarness(); const user=await h.createUser(uniqueEmail("dto"));
+    const {withDbWriteRetry}=await import("../dbWriteRetry");
+    await withDbWriteRetry("test.dto",()=>{
+      h.master.prepare("UPDATE auth_user SET name='Authoritative',role='admin',twoFactorEnabled=1,banned=1,banExpires=NULL WHERE id=?").run(user.id);
+      h.master.prepare("UPDATE users SET role='user' WHERE id=?").run(user.id);
+    });
+    const dto=await getUserById(user.id);
+    expect(dto).toEqual({id:user.id,email:user.email,name:"Authoritative",role:"admin",createdAt:expect.any(Number),hasPassword:true,twoFactorEnabled:true,passkeyCount:0,disabled:true});
+    expect(Number.isInteger(dto!.createdAt)).toBe(true);
+    expect(JSON.stringify(dto)).not.toMatch(/passwordHash|passwordUpdatedAt|mustChangePassword|disabledAt|sessionToken|secret|backupCodes/);
+    await withDbWriteRetry("test.dto",()=>h.master.prepare("UPDATE auth_user SET banExpires=? WHERE id=?").run(new Date(Date.now()-1000).toISOString(),user.id));
+    expect((await getUserById(user.id))!.disabled).toBe(false);
   });
 });

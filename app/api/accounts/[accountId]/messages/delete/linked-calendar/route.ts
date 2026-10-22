@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -34,36 +35,38 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  const reminderIds = normalizeStringArray(payload?.reminderIds);
-  const eventIds = normalizeStringArray(payload?.eventIds);
+    const reminderIds = normalizeStringArray(payload?.reminderIds);
+    const eventIds = normalizeStringArray(payload?.eventIds);
 
-  try {
-    const reminderResults = await Promise.all(
-      reminderIds.map(async (reminderId) => {
-        const deleted = await deleteCalendarReminderById(
-          accountContext.accountId,
-          accountContext.session.userId,
-          reminderId
-        );
-        return deleted ? 1 : 0;
-      })
-    );
-    await Promise.all(
-      eventIds.map((eventId) =>
-        deleteCalendarEventAndRelatedData({ accountId: accountContext.accountId, eventId })
-      )
-    );
-    return NextResponse.json({
-      ok: true,
-      deletedReminders: reminderResults.reduce<number>((sum, value) => sum + value, 0),
-      deletedEvents: eventIds.length
-    });
-  } catch (error) {
-    console.error("[message/delete/linked-calendar] POST error:", error);
-    return NextResponse.json(
-      { ok: false, message: "Failed to delete linked calendar items" },
-      { status: 500 }
-    );
-  }
+    try {
+      const reminderResults = await Promise.all(
+        reminderIds.map(async (reminderId) => {
+          const deleted = await deleteCalendarReminderById(
+            accountContext.accountId,
+            accountContext.session.userId,
+            reminderId
+          );
+          return deleted ? 1 : 0;
+        })
+      );
+      await Promise.all(
+        eventIds.map((eventId) =>
+          deleteCalendarEventAndRelatedData({ accountId: accountContext.accountId, eventId })
+        )
+      );
+      return NextResponse.json({
+        ok: true,
+        deletedReminders: reminderResults.reduce<number>((sum, value) => sum + value, 0),
+        deletedEvents: eventIds.length
+      });
+    } catch (error) {
+      console.error("[message/delete/linked-calendar] POST error:", error);
+      return NextResponse.json(
+        { ok: false, message: "Failed to delete linked calendar items" },
+        { status: 500 }
+      );
+    }
+  });
 }

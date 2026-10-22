@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { resyncImapMessageIntoDb } from "@/lib/mail/resyncMessage";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
@@ -22,33 +23,35 @@ export async function POST(request: Request, { params }: Params) {
     }
   );
   if (context instanceof NextResponse) return context;
-  const { account, clientId, message: existing, messageId: resolvedMessageId } = context;
+  return withAuthResponse(context, async () => {
+    const { account, clientId, message: existing, messageId: resolvedMessageId } = context;
 
-  const mailboxPath = existing?.mailboxPath;
-  const imapUid = typeof existing?.imapUid === "number" ? existing.imapUid : undefined;
-  if (!mailboxPath || typeof imapUid !== "number" || Number.isNaN(imapUid)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: appendMessageIdToError(
-          "Message is missing IMAP metadata to re-sync.",
-          resolvedMessageId
-        )
-      },
-      { status: 400 }
-    );
-  }
+    const mailboxPath = existing?.mailboxPath;
+    const imapUid = typeof existing?.imapUid === "number" ? existing.imapUid : undefined;
+    if (!mailboxPath || typeof imapUid !== "number" || Number.isNaN(imapUid)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: appendMessageIdToError(
+            "Message is missing IMAP metadata to re-sync.",
+            resolvedMessageId
+          )
+        },
+        { status: 400 }
+      );
+    }
 
-  const resynced = await resyncImapMessageIntoDb(account, existing, imapUid, clientId);
-  if (!resynced) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: appendMessageIdToError("Message not found on server.", resolvedMessageId)
-      },
-      { status: 404 }
-    );
-  }
+    const resynced = await resyncImapMessageIntoDb(account, existing, imapUid, clientId);
+    if (!resynced) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: appendMessageIdToError("Message not found on server.", resolvedMessageId)
+        },
+        { status: 404 }
+      );
+    }
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  });
 }

@@ -142,16 +142,6 @@ export function ensureTableColumns(
 // the PRAGMA reads and the ALTERs a unit (see `ensureTableColumns`).
 function ensureMasterTeamColumns(db: any) {
   db.transaction(() => {
-    ensureTableColumns(db, "users", [
-      ["name", "TEXT"],
-      // argon2id; NULL = legacy IMAP login only.
-      ["passwordHash", "TEXT"],
-      // Unix seconds; sessions with iat < this are invalid.
-      ["passwordUpdatedAt", "INTEGER"],
-      ["mustChangePassword", "INTEGER NOT NULL DEFAULT 0"],
-      // Unix milliseconds; NULL = active.
-      ["disabledAt", "INTEGER"]
-    ]);
     ensureTableColumns(db, "user_accounts", [
       // Links that predate roles were self-created, hence the default.
       ["role", "TEXT NOT NULL DEFAULT 'manager'"],
@@ -180,7 +170,7 @@ function getUsersEmailLowerIndexState(db: any): "missing" | "unique" | "non-uniq
 // a row whose normalised value collides with another row is left as is, the
 // collision is logged with the ids involved (not the addresses), and the
 // lower(email) index is created non-unique until an admin resolves the
-// duplicates (`insertUser` enforces uniqueness itself in the meantime). Once
+// duplicates (identity activation must reject ambiguity). Once
 // they are resolved, the next start replaces it with the unique index.
 // Idempotent, runs on every start, and never throws: start-up must not fail
 // because of this step.

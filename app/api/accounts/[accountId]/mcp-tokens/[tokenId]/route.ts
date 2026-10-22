@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { deleteMcpToken } from "@/lib/serverDb";
@@ -12,17 +13,19 @@ export async function DELETE(request: Request, { params }: Params) {
   if (context instanceof NextResponse) {
     return context;
   }
+  return withAuthResponse(context, async () => {
 
-  const { tokenId: rawTokenId } = await params;
-  const tokenId = typeof rawTokenId === "string" ? rawTokenId.trim() : "";
-  if (!tokenId) {
-    return NextResponse.json({ ok: false, message: "Missing tokenId" }, { status: 400 });
-  }
+    const { tokenId: rawTokenId } = await params;
+    const tokenId = typeof rawTokenId === "string" ? rawTokenId.trim() : "";
+    if (!tokenId) {
+      return NextResponse.json({ ok: false, message: "Missing tokenId" }, { status: 400 });
+    }
 
-  const deleted = await deleteMcpToken(context.accountId, tokenId);
-  if (!deleted) {
-    return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
-  }
+    const deleted = await deleteMcpToken(context.accountId, tokenId);
+    if (!deleted) {
+      return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
+    }
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  });
 }

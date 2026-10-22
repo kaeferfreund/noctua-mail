@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   requireImapMessageMutationContext,
@@ -15,26 +16,28 @@ export async function POST(request: Request, { params }: Params) {
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
-  const { accountId: resolvedAccountId, account, clientId, message } = context;
+  return withAuthResponse(context, async () => {
+    const { accountId: resolvedAccountId, account, clientId, message } = context;
 
-  const result = await trashMessageInAccount({
-    account,
-    accountId: resolvedAccountId,
-    message,
-    clientId
-  });
-  if (!result.ok) {
-    return NextResponse.json({ ok: false, message: "Trash folder not found" }, { status: 400 });
-  }
-  if (result.action === "deleted") {
-    return NextResponse.json({ ok: true, action: "deleted" });
-  }
-  return NextResponse.json({
-    ok: true,
-    action: "moved",
-    trashFolderId: result.trashFolderId,
-    trashMailbox: result.trashMailbox,
-    previousMessageId: result.previousMessageId,
-    messageId: result.messageId
+    const result = await trashMessageInAccount({
+      account,
+      accountId: resolvedAccountId,
+      message,
+      clientId
+    });
+    if (!result.ok) {
+      return NextResponse.json({ ok: false, message: "Trash folder not found" }, { status: 400 });
+    }
+    if (result.action === "deleted") {
+      return NextResponse.json({ ok: true, action: "deleted" });
+    }
+    return NextResponse.json({
+      ok: true,
+      action: "moved",
+      trashFolderId: result.trashFolderId,
+      trashMailbox: result.trashMailbox,
+      previousMessageId: result.previousMessageId,
+      messageId: result.messageId
+    });
   });
 }

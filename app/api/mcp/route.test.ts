@@ -1,11 +1,7 @@
 import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
-import {
-  createMcpAccessToken,
-  hashOpaqueToken,
-  type SessionData
-} from "@/lib/auth";
+import { executeMcpHttpRequest } from "@/lib/mcpServer";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { createTopic, setThreadTopics } from "@/lib/topics";
 import { createRecipientAlias } from "@/lib/recipientAliases";
@@ -76,10 +72,7 @@ mock.module("@/lib/serverSmtp", () => ({
 }));
 
 const {
-  deleteMcpToken,
-  getMcpTokenByHash,
   getMessageById,
-  insertMcpToken,
   saveFoldersForAccount,
   upsertAccount,
   upsertMessages
@@ -171,69 +164,21 @@ function buildMessage(params: {
   };
 }
 
-function buildSession(accountId: string): SessionData {
-  return {
-    userId: "user-mcp-route",
-    accountId,
-    role: "user",
-    exp: Math.floor(Date.now() / 1000) + 60 * 60,
-    imap: { user: "owner@example.test", pass: "secret-imap" },
-    smtp: { user: "owner@example.test", pass: "secret-smtp" }
-  };
+function uniqueAccountId(prefix: string) { return `${prefix}-${randomUUID()}`; }
+const fixtureContexts = new Map<string, {account:Account; tokenId:string}>();
+async function createStoredToken(params: {account:Account;accountId:string;tokenId:string;expiresAt:number|null}) {
+  fixtureContexts.set(params.tokenId, params);
+  return params.tokenId;
 }
-
-function uniqueAccountId(prefix: string) {
-  return `${prefix}-${randomUUID()}`;
-}
-
-async function createStoredToken(params: {
-  account: Account;
-  accountId: string;
-  tokenId: string;
-  expiresAt: number | null;
-}) {
-  const session = buildSession(params.accountId);
-  const { rawToken, tokenHash, tokenSuffix } = createMcpAccessToken({
-    tokenId: params.tokenId,
-    session,
-    account: params.account,
-    expiresAt: params.expiresAt
-  });
-  await insertMcpToken({
-    id: params.tokenId,
-    accountId: params.accountId,
-    createdByUserId: session.userId,
-    label: `Token ${params.tokenId}`,
-    tokenHash,
-    tokenSuffix,
-    createdAt: Date.now(),
-    expiresAt: params.expiresAt
-  });
-  return rawToken;
-}
-
-async function postMcp(body: unknown, rawToken?: string) {
-  return POST(
-    new Request("http://localhost/api/mcp", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(rawToken ? { authorization: `Bearer ${rawToken}` } : {})
-      },
-      body: JSON.stringify(body)
-    })
-  );
-}
-
-async function waitForLastUsedAt(rawToken: string, attempts = 20) {
-  for (let index = 0; index < attempts; index += 1) {
-    const tokenRecord = await getMcpTokenByHash(hashOpaqueToken(rawToken));
-    if (tokenRecord?.lastUsedAt != null) {
-      return tokenRecord.lastUsedAt;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  return null;
+// Domain tests call the MCP executor directly; HTTP activation is independently denied below.
+async function postMcp(body:unknown, tokenId?:string) {
+  const context = fixtureContexts.get(tokenId ?? "");
+  if(!context) throw new Error("Missing synthetic MCP executor context");
+  const result = await executeMcpHttpRequest({body,accountId:context.account.id,account:context.account,
+    tokenRecord:{id:context.tokenId,accountId:context.account.id,createdByUserId:"synthetic-executor",label:"Synthetic",tokenSuffix:"test",createdAt:Date.now(),expiresAt:null,lastUsedAt:null},
+    authInfo:{token:context.tokenId,clientId:"synthetic",scopes:[],extra:{accountId:context.account.id,userId:"synthetic-executor"}},
+    requestInfo:{headers:{}}});
+  return result.responses.length ? Response.json(result.responses.length===1?result.responses[0]:result.responses) : new Response(null,{status:202});
 }
 
 async function seedMailbox(accountId: string) {
@@ -339,63 +284,11 @@ describe("/api/mcp", () => {
     updateImapFlags.mockResolvedValue(undefined);
   });
 
-  test("rejects unauthenticated requests at the HTTP layer", async () => {
-    const response = await postMcp({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      }
-    });
-
-    expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({
-      ok: false,
-      message: "Unauthorized"
-    });
-  });
-
-  test("rejects malformed, wrong-prefix, deleted, and expired tokens", async () => {
-    const accountId = uniqueAccountId("acc-mcp-auth-failures");
-    const { account } = await seedMailbox(accountId);
-
-    const validToken = await createStoredToken({
-      account,
-      accountId,
-      tokenId: `${accountId}-active-token`,
-      expiresAt: Date.now() + 60 * 60 * 1000
-    });
-    await deleteMcpToken(accountId, `${accountId}-active-token`);
-
-    const expiredToken = await createStoredToken({
-      account,
-      accountId,
-      tokenId: `${accountId}-expired-token`,
-      expiresAt: Date.now() - 1000
-    });
-
-    const requestBody = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18",
-        capabilities: {},
-        clientInfo: { name: "test-client", version: "1.0.0" }
-      }
-    };
-
-    for (const token of [
-      "plain-token",
-      "mcp_invalid",
-      validToken,
-      expiredToken
-    ]) {
-      const response = await postMcp(requestBody, token);
-      expect(response.status).toBe(401);
+  test("HTTP stays closed for cookie, legacy bearer and absent authentication", async()=>{
+    for(const authorization of ["", "Bearer mcp_legacy", "Bearer plain-token"]) {
+      const response=await POST(new Request("http://localhost/api/mcp",{method:"POST",headers:{authorization}}));
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ok:false,code:"auth_integration_pending"});
     }
   });
 
@@ -428,7 +321,7 @@ describe("/api/mcp", () => {
     };
     expect(initializeBody.result?.serverInfo?.name).toBe("mywebmail-mcp");
 
-    expect(await waitForLastUsedAt(rawToken)).not.toBeNull();
+
 
     const toolsResponse = await postMcp(
       {

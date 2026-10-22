@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders } from "@/lib/db";
 import {
@@ -13,5 +14,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireOwnedAccountContext(request, accountId);
   if (accountContext instanceof NextResponse) return accountContext;
-  return NextResponse.json(await getFolders(accountContext.accountId));
+  return withAuthResponse(accountContext, async () => {
+    return NextResponse.json(await getFolders(accountContext.accountId));
+  });
 }

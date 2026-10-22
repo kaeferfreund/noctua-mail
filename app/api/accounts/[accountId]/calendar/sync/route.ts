@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -14,21 +15,23 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  if (syncInProgress.get(accountId)) {
-    return NextResponse.json({ ok: true, message: "Sync already in progress", skipped: true });
-  }
+    if (syncInProgress.get(accountId)) {
+      return NextResponse.json({ ok: true, message: "Sync already in progress", skipped: true });
+    }
 
-  syncInProgress.set(accountId, true);
-  try {
-    const result = await syncCalendarEvents(accountId);
-    return NextResponse.json({ ok: true, result });
-  } catch (err) {
-    console.error("[calendar/sync] error:", err);
-    return NextResponse.json({ ok: false, message: "Sync failed" }, { status: 500 });
-  } finally {
-    syncInProgress.delete(accountId);
-  }
+    syncInProgress.set(accountId, true);
+    try {
+      const result = await syncCalendarEvents(accountId);
+      return NextResponse.json({ ok: true, result });
+    } catch (err) {
+      console.error("[calendar/sync] error:", err);
+      return NextResponse.json({ ok: false, message: "Sync failed" }, { status: 500 });
+    } finally {
+      syncInProgress.delete(accountId);
+    }
+  });
 }
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
@@ -37,9 +40,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  return NextResponse.json({
-    ok: true,
-    syncing: syncInProgress.get(accountContext.accountId) ?? false
+    return NextResponse.json({
+      ok: true,
+      syncing: syncInProgress.get(accountContext.accountId) ?? false
+    });
   });
 }

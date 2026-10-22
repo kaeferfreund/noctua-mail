@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { NextResponse } from "next/server";
 import type { Account, Folder, Message } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { markImapConnectFailure } from "@/lib/mail/imapError";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "@/app/api/_helpers/imapUpstreamError";
@@ -83,14 +83,7 @@ function buildMessage(params: {
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-consistency",
-    accountId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
+async function buildCookieHeader(accountId: string | undefined) { return authenticatedTestCookie(accountId); }
 
 function uniqueAccountId(prefix: string) {
   return `${prefix}-${randomUUID()}`;
@@ -143,7 +136,7 @@ describe("folder consistency route pending moves", () => {
       new Request("http://localhost/api/folders/consistency", {
         method: "POST",
         headers: {
-          cookie: buildCookieHeader(accountId)
+          cookie: await buildCookieHeader(accountId)
         },
         body: JSON.stringify({})
       }),
@@ -185,7 +178,7 @@ describe("folder consistency route pending moves", () => {
       new Request("http://localhost/api/folders/consistency", {
         method: "POST",
         headers: {
-          cookie: buildCookieHeader(accountId)
+          cookie: await buildCookieHeader(accountId)
         },
         body: JSON.stringify({})
       }),
@@ -210,11 +203,11 @@ describe("folder consistency route upstream failures", () => {
     return { accountId, folder };
   }
 
-  function buildRequest(accountId: string) {
+  async function buildRequest(accountId: string) {
     return new Request("http://localhost/api/folders/consistency", {
       method: "POST",
       headers: {
-        cookie: buildCookieHeader(accountId)
+        cookie: await buildCookieHeader(accountId)
       },
       body: JSON.stringify({})
     });
@@ -228,7 +221,7 @@ describe("folder consistency route upstream failures", () => {
       )
     );
 
-    const response = await handleFolderConsistencyRequest(buildRequest(accountId), {
+    const response = await handleFolderConsistencyRequest(await buildRequest(accountId), {
       accountId,
       folderId: folder.id
     });
@@ -245,7 +238,7 @@ describe("folder consistency route upstream failures", () => {
     getImapMailboxStatus.mockRejectedValueOnce(new Error("db is locked"));
 
     expect(
-      handleFolderConsistencyRequest(buildRequest(accountId), {
+      handleFolderConsistencyRequest(await buildRequest(accountId), {
         accountId,
         folderId: folder.id
       })

@@ -11,3 +11,9 @@ if (!process.env.IMAP_SECRET_KEY) {
 if (!process.env.IMAP_CREDENTIALS_STORAGE) {
   process.env.IMAP_CREDENTIALS_STORAGE = "db";
 }
+// Real shared Better Auth fixtures always use an isolated synthetic origin/secret.
+process.env.BETTER_AUTH_SECRET = "noctua-auth-test-secret-0123456789abcdef";
+process.env.BETTER_AUTH_URL = "http://localhost:3000";
+process.env.PASSKEY_RP_ID = "localhost";
+process.env.BETTER_AUTH_TELEMETRY = "0";
+process.env.NOCTUA_DESKTOP_MODE = "false";

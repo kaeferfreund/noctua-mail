@@ -1,8 +1,9 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getMessageSource } from "@/lib/storage";
 import { getMessageById } from "@/lib/db";
-import { requireSessionAccountOr403, requireSessionOr401 } from "@/lib/auth";
+import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 
 type Params = AccountRouteParams & {
@@ -16,40 +17,42 @@ export async function handleGetMessageSourceRequest(
     messageId?: string | null;
   }
 ) {
-  const session = requireSessionOr401(request);
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const accountId = options?.accountId ?? "";
-  const messageId = options?.messageId ?? "";
+  return withAuthResponse(session, async () => {
+    const accountId = options?.accountId ?? "";
+    const messageId = options?.messageId ?? "";
 
-  if (!accountId || !messageId) {
-    return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
-  }
-  const access = requireSessionAccountOr403(session, accountId);
-  if (access instanceof NextResponse) return access;
+    if (!accountId || !messageId) {
+      return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
+    }
+    const access = await requireAccountAccessOr403(session, accountId);
+    if (access instanceof NextResponse) return access;
 
-  const message = await getMessageById(accountId, messageId);
-  if (!message) {
-    return NextResponse.json(
-      { ok: false, message: appendMessageIdToError("Message not found", messageId) },
-      { status: 404 }
-    );
-  }
+    const message = await getMessageById(accountId, messageId);
+    if (!message) {
+      return NextResponse.json(
+        { ok: false, message: appendMessageIdToError("Message not found", messageId) },
+        { status: 404 }
+      );
+    }
 
-  const storedSource = await getMessageSource(accountId, message.id);
-  const fallbackSource = message.source ?? null;
-  const source = storedSource ?? fallbackSource;
-  if (!source) {
-    return NextResponse.json({ ok: false, message: "Source not found" }, { status: 404 });
-  }
+    const storedSource = await getMessageSource(accountId, message.id);
+    const fallbackSource = message.source ?? null;
+    const source = storedSource ?? fallbackSource;
+    if (!source) {
+      return NextResponse.json({ ok: false, message: "Source not found" }, { status: 404 });
+    }
 
-  const scrubbed = source.replace(/([A-Za-z0-9+/=]{200,})/g, "[base64 omitted]");
-  const maxChars = 200_000;
-  const trimmed =
-    scrubbed.length > maxChars ? `${scrubbed.slice(0, maxChars)}\n\n[truncated]` : scrubbed;
+    const scrubbed = source.replace(/([A-Za-z0-9+/=]{200,})/g, "[base64 omitted]");
+    const maxChars = 200_000;
+    const trimmed =
+      scrubbed.length > maxChars ? `${scrubbed.slice(0, maxChars)}\n\n[truncated]` : scrubbed;
 
-  return NextResponse.json({
-    ok: true,
-    source: trimmed
+    return NextResponse.json({
+      ok: true,
+      source: trimmed
+    });
   });
 }
 

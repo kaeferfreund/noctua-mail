@@ -140,8 +140,8 @@ describe("mapUserRow", () => {
       role: "admin",
       createdAt: 1700000000000,
       hasPassword: 1,
-      mustChangePassword: 1,
-      disabledAt: 1700000001000,
+      twoFactorEnabled: 1,
+      disabled: 1, passkeyCount: 0,
       passwordHash: "$argon2id$must-not-leak"
     };
     const user = mapUserRow(row);
@@ -152,8 +152,8 @@ describe("mapUserRow", () => {
       role: "admin",
       createdAt: 1700000000000,
       hasPassword: true,
-      mustChangePassword: true,
-      disabledAt: 1700000001000
+      twoFactorEnabled: true,
+      disabled: true, passkeyCount: 0
     });
     expect(JSON.stringify(user)).not.toContain("argon2id");
   });
@@ -164,11 +164,12 @@ describe("mapUserRow", () => {
     ).toEqual({
       id: "user-2",
       email: "legacy@example.test",
+      name: null,
       role: "user",
       createdAt: 1,
       hasPassword: false,
-      mustChangePassword: false,
-      disabledAt: null
+      twoFactorEnabled: false,
+      disabled: false, passkeyCount: 0
     });
   });
 });

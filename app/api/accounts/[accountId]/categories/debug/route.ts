@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -13,15 +14,17 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (access instanceof NextResponse) return access;
-  const limitRaw = searchParams.get("limit");
-  const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : NaN;
-  const eventLimit = Number.isFinite(parsedLimit) ? parsedLimit : 20;
+  return withAuthResponse(access, async () => {
+    const limitRaw = searchParams.get("limit");
+    const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : NaN;
+    const eventLimit = Number.isFinite(parsedLimit) ? parsedLimit : 20;
 
-  try {
-    const snapshot = await getCategoryLearningDebugSnapshot(accountId, { eventLimit });
-    return NextResponse.json({ ok: true, snapshot });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load categorization debug data";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
-  }
+    try {
+      const snapshot = await getCategoryLearningDebugSnapshot(accountId, { eventLimit });
+      return NextResponse.json({ ok: true, snapshot });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load categorization debug data";
+      return NextResponse.json({ ok: false, message }, { status: 500 });
+    }
+  });
 }

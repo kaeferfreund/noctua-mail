@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { describe, expect, mock, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { markImapConnectFailure } from "@/lib/mail/imapError";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "@/app/api/_helpers/imapUpstreamError";
@@ -45,23 +45,10 @@ function buildAccount(accountId: string): Account {
   };
 }
 
-function buildSession(accountId: string): SessionData {
-  return {
-    userId: "user-new-candidates-tests",
-    accountId,
-    role: "user",
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-}
-
-function buildRequest(accountId: string) {
+async function buildRequest(accountId:string) {
   return new Request(`http://localhost/api/accounts/${accountId}/sync/new-candidates`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      cookie: `noctua_session=${encodeURIComponent(sealSession(buildSession(accountId)))}`
-    },
-    body: JSON.stringify({ folderIds: [] })
+    method:"POST",headers:{"content-type":"application/json",cookie:await authenticatedTestCookie(accountId)},
+    body:JSON.stringify({folderIds:[]})
   });
 }
 
@@ -83,7 +70,7 @@ describe("sync new-candidates route", () => {
     };
     planImapNewSyncFolders.mockResolvedValueOnce([decision]);
 
-    const response = await POST(buildRequest(accountId), {
+    const response = await POST(await buildRequest(accountId), {
       params: Promise.resolve({ accountId })
     });
 
@@ -101,7 +88,7 @@ describe("sync new-candidates route", () => {
       )
     );
 
-    const response = await POST(buildRequest(accountId), {
+    const response = await POST(await buildRequest(accountId), {
       params: Promise.resolve({ accountId })
     });
 
@@ -117,7 +104,7 @@ describe("sync new-candidates route", () => {
     planImapNewSyncFolders.mockRejectedValueOnce(new Error("db is locked"));
 
     expect(
-      POST(buildRequest(accountId), { params: Promise.resolve({ accountId }) })
+      POST(await buildRequest(accountId), { params: Promise.resolve({ accountId }) })
     ).rejects.toThrow("db is locked");
   });
 
@@ -127,7 +114,7 @@ describe("sync new-candidates route", () => {
       Object.assign(new Error("Command failed"), { authenticationFailed: true })
     );
 
-    const response = await POST(buildRequest(accountId), {
+    const response = await POST(await buildRequest(accountId), {
       params: Promise.resolve({ accountId })
     });
 

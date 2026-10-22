@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { findArchiveFolder } from "@/lib/specialFolders";
 import {
@@ -17,32 +18,34 @@ export async function POST(request: Request, { params }: Params) {
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
-  const { accountId: resolvedAccountId, account, clientId, message } = context;
+  return withAuthResponse(context, async () => {
+    const { accountId: resolvedAccountId, account, clientId, message } = context;
 
-  const { folder: archiveFolder, mailbox: archiveMailbox } = await resolveSpecialFolderAndMailbox(
-    resolvedAccountId,
-    findArchiveFolder,
-    { fallbackMailbox: "Archive" }
-  );
-  const archiveMailboxPath = archiveMailbox ?? "Archive";
-  const currentMailbox = message.mailboxPath;
+    const { folder: archiveFolder, mailbox: archiveMailbox } = await resolveSpecialFolderAndMailbox(
+      resolvedAccountId,
+      findArchiveFolder,
+      { fallbackMailbox: "Archive" }
+    );
+    const archiveMailboxPath = archiveMailbox ?? "Archive";
+    const currentMailbox = message.mailboxPath;
 
-  const { relocated } = await moveAndRelocateMessageWithFiles({
-    account,
-    currentMailbox,
-    imapUid: message.imapUid,
-    destinationMailbox: archiveMailboxPath,
-    clientId,
-    accountId: resolvedAccountId,
-    previousId: message.id,
-    destinationFolderId: archiveFolder?.id ?? message.folderId
-  });
-  return NextResponse.json({
-    ok: true,
-    action: "moved",
-    archiveFolderId: archiveFolder?.id ?? null,
-    archiveMailbox: archiveMailboxPath,
-    previousMessageId: relocated?.previousId ?? message.id,
-    messageId: relocated?.nextId ?? message.id
+    const { relocated } = await moveAndRelocateMessageWithFiles({
+      account,
+      currentMailbox,
+      imapUid: message.imapUid,
+      destinationMailbox: archiveMailboxPath,
+      clientId,
+      accountId: resolvedAccountId,
+      previousId: message.id,
+      destinationFolderId: archiveFolder?.id ?? message.folderId
+    });
+    return NextResponse.json({
+      ok: true,
+      action: "moved",
+      archiveFolderId: archiveFolder?.id ?? null,
+      archiveMailbox: archiveMailboxPath,
+      previousMessageId: relocated?.previousId ?? message.id,
+      messageId: relocated?.nextId ?? message.id
+    });
   });
 }

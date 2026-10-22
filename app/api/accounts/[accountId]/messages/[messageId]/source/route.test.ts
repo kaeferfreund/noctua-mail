@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { NextResponse } from "next/server";
 import type { Account, Folder, Message } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { saveMessageSource } from "@/lib/storage";
 import { dbModulePromise } from "@/lib/testDbHarness";
 
@@ -70,14 +70,7 @@ function buildMessage(accountId: string, folderId: string): Message {
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-source-route",
-    accountId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
+async function buildCookieHeader(accountId: string | undefined) { return authenticatedTestCookie(accountId); }
 
 describe("handleGetMessageSourceRequest", () => {
   test("loads stored source for an authorized message", async () => {
@@ -92,7 +85,7 @@ describe("handleGetMessageSourceRequest", () => {
     const response = await handleGetMessageSourceRequest(
       new Request("http://localhost/api/source", {
         headers: {
-          cookie: buildCookieHeader(accountId)
+          cookie: await buildCookieHeader(accountId)
         }
       }),
       {

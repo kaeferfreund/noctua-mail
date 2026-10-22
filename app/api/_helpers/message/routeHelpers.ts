@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAttachmentIds,
@@ -89,37 +90,39 @@ export async function requireAccountAndMessageContext(
   }
   const accountContext = await requireAccountContext(request, accountId);
   if (accountContext instanceof NextResponse) return accountContext;
-  const message = await getMessageById(accountId, messageId);
-  if (!message) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: appendMessageIdToError(
-          options?.missingMessageMessage ?? "Message not found",
-          messageId
-        )
-      },
-      { status: 404 }
-    );
-  }
-  if (options?.requireImapMetadata) {
-    const hasImapUid = typeof message.imapUid === "number" && Number.isFinite(message.imapUid);
-    const hasMailboxPath = typeof message.mailboxPath === "string" && message.mailboxPath.length > 0;
-    if (!hasImapUid || !hasMailboxPath) {
+  return withAuthResponse(accountContext, async () => {
+    const message = await getMessageById(accountId, messageId);
+    if (!message) {
       return NextResponse.json(
         {
           ok: false,
           message: appendMessageIdToError(
-            options?.missingImapMetadataMessage ?? "Message is missing IMAP metadata",
+            options?.missingMessageMessage ?? "Message not found",
             messageId
           )
         },
-        { status: 400 }
+        { status: 404 }
       );
     }
-    return { ...accountContext, message: message as MessageWithImapMetadata, messageId };
-  }
-  return { ...accountContext, message, messageId };
+    if (options?.requireImapMetadata) {
+      const hasImapUid = typeof message.imapUid === "number" && Number.isFinite(message.imapUid);
+      const hasMailboxPath = typeof message.mailboxPath === "string" && message.mailboxPath.length > 0;
+      if (!hasImapUid || !hasMailboxPath) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: appendMessageIdToError(
+              options?.missingImapMetadataMessage ?? "Message is missing IMAP metadata",
+              messageId
+            )
+          },
+          { status: 400 }
+        );
+      }
+      return { ...accountContext, message: message as MessageWithImapMetadata, messageId };
+    }
+    return { ...accountContext, message, messageId };
+  });
 }
 
 export async function requireImapMessageMutationContext(
@@ -134,7 +137,7 @@ export async function requireImapMessageMutationContext(
     missingImapMetadataMessage?: string;
   }
 ) {
-  return requireAccountAndMessageContext(request, payload, {
+  return await requireAccountAndMessageContext(request, payload, {
     missingFieldsMessage: options?.missingFieldsMessage ?? "Missing accountId or messageId",
     missingMessageMessage: options?.missingMessageMessage,
     requireImapMetadata: true,

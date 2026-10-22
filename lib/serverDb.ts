@@ -132,3 +132,15 @@ export async function getAttachmentIds(
   const db = await loadServerDb();
   return db.getAttachmentIds(...args);
 }
+
+export async function getUserById(...args: Parameters<ServerDbModule["getUserById"]>) {
+  return (await loadServerDb()).getUserById(...args);
+}
+
+export async function listAccessibleAccountIdsForUser(...args: Parameters<ServerDbModule["listAccessibleAccountIdsForUser"]>) {
+  return (await loadServerDb()).listAccessibleAccountIdsForUser(...args);
+}
+
+export async function deleteSessionProofState(...args: Parameters<ServerDbModule["deleteSessionProofState"]>) {
+  return (await loadServerDb()).deleteSessionProofState(...args);
+}
