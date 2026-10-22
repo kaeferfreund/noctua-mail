@@ -109,3 +109,91 @@ test("production handles: blank dbPath contention, concurrent path wins, shard t
     expect(stderr).toContain("[db-write-retry] retry");
   } finally { temp.cleanup(); }
 });
+
+async function checkShardConfiguration(cacheOverride: string, expectedCacheKib: number) {
+  const temp = createTempDir("noctua-shard-performance-");
+  try {
+    // A separate process exercises the real singleton/init path without changing
+    // the shared DB harness environment or closing other tests' connections.
+    const { stdout } = await execFileAsync("nice", ["-n", "10", process.execPath, "--eval", `
+      import assert from "node:assert/strict";
+      import { closeAllDbConnections, getDb, getAuthDb, getAccountDb } from "./lib/db/connection.ts";
+
+      const masterDefaults = {
+        journal_mode: "wal", synchronous: 2, busy_timeout: 0, foreign_keys: 1,
+        cache_size: -2000, temp_store: 0, mmap_size: 0,
+        wal_autocheckpoint: 1000, journal_size_limit: -1
+      };
+      function pragmas(db) {
+        return Object.fromEntries(Object.keys(masterDefaults).map(name => [
+          name, Object.values(db.prepare("PRAGMA " + name).get())[0]
+        ]));
+      }
+      const indexNames = [
+        "idx_messages_account_folder_messageid",
+        "idx_messages_account_msgid_date",
+        "idx_messages_account_folder_unread"
+      ];
+      function assertIndexes(db) {
+        const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'messages'").all();
+        for (const name of indexNames) assert.ok(indexes.some(index => index.name === name), name);
+      }
+      try {
+        const master = await getDb();
+        const auth = await getAuthDb();
+        assert.deepEqual(pragmas(master), masterDefaults);
+        assert.deepEqual(pragmas(auth), masterDefaults);
+        const shard = await getAccountDb("synthetic-performance-account");
+        const shardDefaults = {
+          ...masterDefaults, synchronous: 1, busy_timeout: 15000,
+          cache_size: -Number(process.env.EXPECTED_CACHE_KIB), temp_store: 2,
+          mmap_size: 134217728, wal_autocheckpoint: 4000, journal_size_limit: 67108864
+        };
+        assert.deepEqual(pragmas(shard), shardDefaults);
+        assertIndexes(shard);
+        assert.deepEqual(pragmas(master), masterDefaults);
+        assert.deepEqual(pragmas(auth), masterDefaults);
+        assert.equal(shard.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'sqlite_stat1'").get().n, 0);
+
+        // Simulate an existing shard missing these additive indexes, then use
+        // the real reopen path to check migration and connection-local pragmas.
+        for (const name of indexNames) shard.exec("DROP INDEX " + name);
+        closeAllDbConnections();
+        const reopened = await getAccountDb("synthetic-performance-account");
+        assertIndexes(reopened);
+        assert.deepEqual(pragmas(reopened), shardDefaults);
+        assert.equal(await getAccountDb("synthetic-performance-account"), reopened);
+        assert.deepEqual(pragmas(await getDb()), masterDefaults);
+        assert.deepEqual(pragmas(await getAuthDb()), masterDefaults);
+        console.log("shard-performance-ok");
+      } finally {
+        closeAllDbConnections();
+      }
+    `], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NOCTUA_DATA_DIR: temp.dir,
+        ACCOUNT_DB_IDLE_MS: "0",
+        ACCOUNT_DB_CACHE_KIB: cacheOverride,
+        EXPECTED_CACHE_KIB: String(expectedCacheKib)
+      },
+      timeout: 10000
+    });
+    expect(stdout).toContain("shard-performance-ok");
+  } finally {
+    temp.cleanup();
+  }
+}
+
+test("real shard init adds performance indexes and pragmas while preserving master defaults", async () => {
+  await checkShardConfiguration("", 32768);
+});
+
+test.each([
+  ["65536", 65536],
+  ["1999", 32768],
+  ["invalid", 32768]
+] as const)("shard cache override %s resolves to %i KiB", async (raw: string, expected: number) => {
+  await checkShardConfiguration(raw, expected);
+});
