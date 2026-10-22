@@ -2,7 +2,8 @@
 
 import { Braces, EllipsisVertical, Eraser, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
-import AdminPanel from "@/app/components/admin/AdminPanel";
+import dynamic from "next/dynamic";
+import LazyDialogLoading from "@/app/components/LazyDialogLoading";
 import type { Account } from "@/lib/data";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/app/components/ui/sidebar";
@@ -18,6 +19,11 @@ import {
 import { useTheme } from "next-themes";
 import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@/app/components/ui/dropdown-menu";
 import { mailboxInitials } from "./types";
+
+const AdminPanel = dynamic(() => import("@/app/components/admin/AdminPanel"), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Admin" />
+});
 
 export type ShellUserMenuProps = {
   /** E-mail of the signed-in user; null until /api/auth/me has answered. */
