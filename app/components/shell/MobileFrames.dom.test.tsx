@@ -13,7 +13,7 @@ import MessageThreadList from "@/app/components/mailclient/messagelist/MessageTh
 import { createSelectionStore } from "@/app/components/mailclient/messagelist/selectionStore";
 import { buildThreadTree, flattenThread, getThreadLatestDate } from "@/app/components/mailclient/messagelist/threadTree";
 import UnreadDot from "@/app/components/mailclient/messagelist/UnreadDot";
-import type { MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
+import type { MessageCardListProps, MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
 import StatusPanelFrame from "./StatusPanelFrame";
 import { MobileStatusFocusContext } from "./MobileStatusFocus";
 
@@ -139,6 +139,36 @@ describe("mobile message rows", () => {
     fireEvent.click(checkbox);
     expect(selected).toBe(1);
     expect(within(row).getByRole("button", { name: "Mark as read" }) !== null).toBe(true);
+  });
+
+  it("toggles read state from the dot in every layout without selecting or opening the row", () => {
+    for (const desktop of [false, true]) {
+      window.innerWidth = desktop ? 1280 : 390;
+      for (const layout of ["card", "compact", "table", "threads"] as const) {
+        let toggles = 0;
+        let rowEffects = 0;
+        const hit = () => { rowEffects++; };
+        const props = threadListProps(hit);
+        const listProps: MessageCardListProps = {
+          ...props,
+          state: { ...props.state, isCompactView: layout === "compact" },
+          actions: { ...props.actions, handleRowClick: hit, selectRangeTo: hit, toggleMessageSelection: hit, selectCollapsedThread: hit },
+          helpers: { ...props.helpers, renderUnreadDot: (_message, options) => <UnreadDot seen={Boolean(options?.seen)} onToggle={() => { toggles++; }} /> }
+        };
+        const List = layout === "table" ? MessageTable : layout === "threads" ? MessageThreadList : MessageCardList;
+        const page = render(<Theme><List {...listProps} /></Theme>);
+        const row = page.container.querySelector<HTMLElement>('[data-message-list-row]')!;
+        const dot = within(row).getByRole("button", { name: "Mark as read" });
+        expect(dot.closest('[data-message-cell="unread"]') !== null).toBe(true);
+        fireEvent.pointerDown(dot, { button: 0 });
+        fireEvent.click(dot);
+        fireEvent.click(dot, { shiftKey: true });
+        fireEvent.click(dot, { metaKey: true });
+        expect([layout, desktop, toggles, rowEffects]).toEqual([layout, desktop, 3, 0]);
+        expect(row.dataset.selected === "true").toBe(false);
+        cleanup();
+      }
+    }
   });
 
   it("allocates nonoverlapping 72px virtual rows and restores desktop density at the breakpoint", () => {
