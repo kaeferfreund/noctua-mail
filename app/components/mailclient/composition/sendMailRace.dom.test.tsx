@@ -744,3 +744,63 @@ describe("compose session delivery guard", () => {
     await waitFor(() => expect(countDraftSaves()).toBeGreaterThan(before), { timeout: 5000 });
   }, 15000);
 });
+
+for (const firstSendSucceeds of [false, true]) {
+  it(`completion of account A (${firstSendSucceeds ? "accepted" : "failed"}) cannot unlock account B's pending send`, async () => {
+    const first = deferred<Response>();
+    const second = deferred<Response>();
+    const third = deferred<Response>();
+    let sends = 0;
+    const { view, props, handleRef, sendButton, countSmtpSends } = renderCompose({
+      holdDraftSaves: false,
+      smtpResponse: () => [first, second, third][sends++].promise,
+    });
+    await act(async () => { await handleRef.current!.openCompose("new", undefined, false, { to: "a@example.test" }); });
+    await act(async () => { fireEvent.click(sendButton()!); });
+    await waitFor(() => expect(countSmtpSends()).toBe(1));
+    // MailClient resets the shared compose state on every account change.
+    await act(async () => {
+      handleRef.current!.resetSession();
+      view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...props} activeAccountId="account-b" /></Theme>);
+    });
+    await act(async () => { await handleRef.current!.openCompose("new", undefined, false, { to: "b@example.test" }); });
+    await act(async () => { fireEvent.click(sendButton()!); });
+    await waitFor(() => expect(countSmtpSends()).toBe(2));
+    expect((sendButton() as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { first.resolve(firstSendSucceeds ? jsonResponse({ ok: true }) : new Response('{"message":"Synthetic failure"}', { status: 500 })); });
+    const stillDisabled = (sendButton() as HTMLButtonElement).disabled;
+    await act(async () => { fireEvent.click(sendButton()!); });
+    await act(async () => {
+      second.resolve(new Response('{"message":"Synthetic B failure"}', { status: 500 }));
+      third.resolve(jsonResponse({ ok: true }));
+    });
+    expect(stillDisabled).toBe(true);
+    expect(countSmtpSends()).toBe(2);
+    expect((sendButton() as HTMLButtonElement).disabled).toBe(false);
+  });
+}
+
+for (const mode of ["forward", "edit"] as const) {
+  it(`account switch cancels pending ${mode} source hydration`, async () => {
+    const hydration = deferred<Message>();
+    const h = renderCompose({ isMobile: true, holdDraftSaves: false, ensureMessageContent: () => hydration.promise });
+    const source = { id: "source-a", accountId: "acc-test", folderId: "folder-inbox", threadId: "thread-a", messageId: "<a@example.test>", from: "sender@example.test", to: "me@example.test", subject: "Private synthetic A subject", date: "2026-08-14T10:00:00.000Z", dateValue: 1, preview: "", body: "", htmlBody: "" } as Message;
+    let opening: Promise<void> | undefined;
+    act(() => { opening = h.handleRef.current!.openCompose(mode, source); });
+    await act(async () => {
+      h.handleRef.current!.resetSession();
+      h.view.rerender(<Theme><ComposeOrchestrator ref={h.handleRef} {...h.props} activeAccountId="account-b" /></Theme>);
+    });
+    await act(async () => { hydration.resolve({ ...source, body: "Private synthetic A content" }); await opening; });
+    expect(h.view.queryByRole("dialog")).toBeNull();
+    expect(h.sendButton()).toBeUndefined();
+    expect(h.countSmtpSends()).toBe(0);
+    await act(async () => { await h.handleRef.current!.openCompose("new", undefined, false, { to: "recipient@example.test", subject: "Synthetic B subject", body: "Synthetic B content" }); });
+    await act(async () => { fireEvent.click(h.sendButton()!); });
+    const sent = h.calls.filter(call => call.url.includes("/smtp/send"));
+    expect(sent).toHaveLength(1);
+    expect(sent[0].url).toBe("/api/accounts/account-b/smtp/send");
+    expect(JSON.stringify(sent[0].body)).not.toContain("Private synthetic A");
+    expect(JSON.stringify(sent[0].body)).toContain("Synthetic B content");
+  });
+}

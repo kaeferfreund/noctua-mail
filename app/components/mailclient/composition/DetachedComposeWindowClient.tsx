@@ -408,6 +408,7 @@ export default function DetachedComposeWindowClient({
           }}
         />
         <ComposeOrchestrator
+          ownerUserId={handoff.ownerUserId}
           ref={composeHandleRef}
           activeAccountId={handoff.accountId}
           currentAccount={account}

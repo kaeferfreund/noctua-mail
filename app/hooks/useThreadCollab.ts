@@ -66,6 +66,7 @@ export function useThreadCollab(
   const busy = useRef(new Set<string>());
   const generation = useRef(0);
   const loadSequence = useRef(0);
+  const scopeLoadSequence = useRef(new Map<string, number>());
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
   const accept = useCallback((data: Snapshot, requestKey: string) => {
@@ -121,9 +122,14 @@ export function useThreadCollab(
     if (!accountId || !threadId) return;
     const version = generation.current;
     const sequence = ++loadSequence.current;
+    scopeLoadSequence.current.set(memberScope, sequence);
     const response = await apiFetch(`${path}/collab`, { cache: "no-store" });
     const data = await response.json().catch(() => null);
-    if (response.status === 403 && sessionRef.current === sessionKey) {
+    // A denial is account-wide, but only the latest read in that login/account
+    // scope can revoke it. Another thread may already have restored access.
+    if (!mounted.current || sessionRef.current !== sessionKey ||
+        scopeLoadSequence.current.get(memberScope) !== sequence) return;
+    if (response.status === 403) {
       for (const cachedKey of cache.current.keys()) {
         const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
         if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
