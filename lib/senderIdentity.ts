@@ -85,6 +85,36 @@ export function extractDisplayName(value?: string | null) {
 const DOT_ATOM_LOCAL = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/i;
 const QUOTED_LOCAL = /^"(?:[\x20\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*"$/;
 
+function formatMailboxLocalPart(local: string) {
+  return DOT_ATOM_LOCAL.test(local) ? local : `"${local.replace(/["\\]/g, "\\$&")}"`;
+}
+
+/** Serialize a decoded mailbox without changing the local part's identity/case. */
+export function formatMailboxAddress(value: string, localPartIsDecoded = false) {
+  const at = value.lastIndexOf("@");
+  if (at <= 0) return "";
+  let local = value.slice(0, at);
+  if (!localPartIsDecoded && QUOTED_LOCAL.test(local)) local = local.slice(1, -1).replace(/\\(.)/g, "$1");
+  const address = `${formatMailboxLocalPart(local)}@${value.slice(at + 1)}`;
+  return canonicalizeMailboxAddress(address) ? address : "";
+}
+
+const RFC5322_SPECIALS = /[(),.:;<>@[\]\\"]/;
+// Whitespace separates words, so a failed phrase cannot cause nested repetition
+// to backtrack over every possible split of an attacker-controlled atom.
+const DISPLAY_WORD = String.raw`(?:[a-z0-9!#$%&'*+\-/=?^_\x60{|}~.\x80-\uffff]+|"(?:[\x20\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*")`;
+const DISPLAY_PHRASE = new RegExp(`^(?:${DISPLAY_WORD}(?:\\s+${DISPLAY_WORD})*)?$`, "i");
+
+/** Shared by ingestion and address menus; names never become mailbox syntax. */
+export function formatAddress(displayName: string, email: string, localPartIsDecoded = false): string {
+  const address = formatMailboxAddress(email, localPartIsDecoded);
+  if (!address) return "";
+  const name = displayName.trim();
+  if (!name) return address;
+  if (!RFC5322_SPECIALS.test(name)) return `${name} <${address}>`;
+  return `"${name.replace(/(["\\])/g, "\\$1")}" <${address}>`;
+}
+
 /** Canonicalize one addr-spec, never a display name or an address list. */
 export function canonicalizeMailboxAddress(value: string): string | null {
   const address = value.trim();
@@ -100,7 +130,7 @@ export function canonicalizeMailboxAddress(value: string): string | null {
   // Keep the existing case-insensitive sender policy, but retain every space
   // and special character in a quoted local part. The key is a valid addr-spec.
   local = local.toLowerCase();
-  if (!DOT_ATOM_LOCAL.test(local)) local = `"${local.replace(/["\\]/g, "\\$&")}"`;
+  local = formatMailboxLocalPart(local);
   try {
     const domain = punycode.toASCII(address.slice(at + 1).toLowerCase());
     if (!domain || domain.length > 253 || !domain.split(".").every(label =>
@@ -112,9 +142,10 @@ export function canonicalizeMailboxAddress(value: string): string | null {
 }
 
 /** Retain the first mailbox's original spelling before the parser unquotes it. */
-function firstMailboxSource(value: string) {
+function firstMailboxSource(value: string, strict = false) {
   let mailbox = "";
   let inAngles = false;
+  let closedAngles = false;
   let quoted = false;
   let comments = 0;
   for (let i = 0; i < value.length; i++) {
@@ -127,15 +158,84 @@ function firstMailboxSource(value: string) {
     if (!quoted && char === "(") { comments++; continue; }
     if (comments > 0) { if (char === ")") comments--; continue; }
     if (char === '"') quoted = !quoted;
-    if (!quoted && char === "<") { inAngles = true; mailbox = ""; continue; }
-    if (!quoted && char === ">" && inAngles) return mailbox.trim();
+    if (!quoted && char === "<") {
+      if (strict && (inAngles || closedAngles)) return "";
+      // A display phrase may contain quoted strings and atoms, never an
+      // unquoted address or unmatched quote/special left by an old formatter.
+      if (strict && !DISPLAY_PHRASE.test(mailbox.trim())) return "";
+      inAngles = true; mailbox = ""; continue;
+    }
+    if (!quoted && char === ">") {
+      if (!strict && inAngles) return mailbox.trim();
+      if (inAngles) { inAngles = false; closedAngles = true; continue; }
+      if (strict) return "";
+    }
     if (!quoted && !inAngles) {
-      if (char === ":") { mailbox = ""; continue; } // RFC 5322 group label
+      if (char === ":" && !closedAngles) {
+        if (strict && !DISPLAY_PHRASE.test(mailbox.trim())) return "";
+        mailbox = ""; continue; // RFC 5322 group label
+      }
       if (char === "," || char === ";") return mailbox.trim();
+    }
+    if (closedAngles) {
+      if (!/\s/.test(char)) return "";
+      continue;
     }
     mailbox += char;
   }
+  if (strict && (quoted || comments > 0 || inAngles)) return "";
   return mailbox.trim();
+}
+
+/** Permission decisions must not use the permissive parser's recovery guesses. */
+export function extractUnambiguousPrimaryMailbox(value?: string | null) {
+  const source = value ?? "";
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(source)) return null;
+  const mailbox = firstMailboxSource(source, true);
+  return canonicalizeMailboxAddress(mailbox) ? mailbox : null;
+}
+
+export function extractUnambiguousPrimaryEmail(value?: string | null) {
+  const mailbox = extractUnambiguousPrimaryMailbox(value);
+  return mailbox ? canonicalizeMailboxAddress(mailbox) : null;
+}
+
+/**
+ * Splits an RFC 5322 address-list string on commas while respecting quoted
+ * display names like `"Doe, John" <john@doe.com>` and angle-bracketed addrs.
+ */
+export function splitAddressList(value: string | null | undefined): string[] {
+  const text = (value ?? "").trim();
+  if (!text) return [];
+  const parts: string[] = [];
+  let buf = "";
+  let inQuotes = false;
+  let inAngles = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes && ch === "\\" && i + 1 < text.length) {
+      buf += ch + text[i + 1];
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      buf += ch;
+      continue;
+    }
+    if (ch === "<" && !inQuotes) inAngles = true;
+    else if (ch === ">" && !inQuotes) inAngles = false;
+    if (ch === "," && !inQuotes && !inAngles) {
+      const trimmed = buf.trim();
+      if (trimmed) parts.push(trimmed);
+      buf = "";
+      continue;
+    }
+    buf += ch;
+  }
+  const tail = buf.trim();
+  if (tail) parts.push(tail);
+  return parts;
 }
 
 export function extractPrimaryEmail(value?: string | null) {

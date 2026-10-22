@@ -4,7 +4,7 @@ import { createCollabFixture } from "./testThreadCollabHarness";
 import { GET } from "@/app/api/accounts/[accountId]/messages/[messageId]/html/route";
 import { GET as getPrefs, PUT } from "@/app/api/accounts/[accountId]/prefs/route";
 import { remoteContentSenderKey } from "./html/remoteContent";
-import { senderPermissionCases } from "./testFixtures/senderPermissions";
+import { senderPermissionLookupCases } from "./testFixtures/senderPermissions";
 
 // Regression scenario copied from the S3 review probe, with privacy expectations.
 test("HTML route blocks remote resources and navigation and applies document policies", async () => {
@@ -76,7 +76,7 @@ test("HTML route rejects unrelated sender permissions and saves/reads the full s
     method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
     body: JSON.stringify(patch)
   }), prefsParams);
-  for (const { name, from, key } of senderPermissionCases) {
+  for (const { name, from, key } of senderPermissionLookupCases) {
     await patchPrefs({ remoteContent: null });
     expect((await patchPrefs({ remoteContent: { allowedSenders: { "trusted@example.test": true } } })).status).toBe(200);
     const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, { from, htmlBody: '<img src="https://images.example.test/pixel">' }));

@@ -1,11 +1,11 @@
 import type { UserAccountPrefs } from "../data";
-import { extractPrimaryEmail } from "../senderIdentity";
+import { extractUnambiguousPrimaryEmail } from "../senderIdentity";
 
 export type RemoteContentMode = "block" | "allow";
 
 export function remoteContentSenderKey(sender?: string | null) {
   // Shared with From/To parsing. Both preference reads and writes use this key.
-  return extractPrimaryEmail(sender) ?? "";
+  return extractUnambiguousPrimaryEmail(sender) ?? "";
 }
 
 export function senderAllowsRemoteContent(prefs: UserAccountPrefs, sender?: string | null) {
