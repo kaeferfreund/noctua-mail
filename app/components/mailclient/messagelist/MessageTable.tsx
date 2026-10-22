@@ -1,3 +1,4 @@
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import type { CSSProperties } from "react";
@@ -64,7 +65,8 @@ export default function MessageTable({
     findRecipientAlias,
     dateFormat,
     topicColorRows,
-    senderIconsEnabled
+    senderIconsEnabled,
+    listIsNarrow
   } = state;
   const { scrollRef } = refs;
   const {
@@ -138,7 +140,8 @@ export default function MessageTable({
     };
   }, [animationClock]);
 
-  const rowHeight = 44;
+  const narrowRows = useIsMobile() || listIsNarrow;
+  const rowHeight = narrowRows ? 72 : 44;
   const groupHeight = 32;
   const activeThreadKey =
     activeMessage?.threadId ?? activeMessage?.messageId ?? activeMessage?.id;
@@ -163,7 +166,7 @@ export default function MessageTable({
   return (
     <div className={styles.table}>
       <div className={`${styles.row} ${styles.rowHeader}`}>
-        <div className={styles.cellSelect} aria-hidden="true">
+        <div data-message-cell="unread" className={styles.cellSelect} aria-hidden="true">
           <Checkbox
             size="1"
             checked={
@@ -189,7 +192,7 @@ export default function MessageTable({
             }}
           />
         </div>
-        <div className={styles.cellFrom}>
+        <div data-message-cell="from" className={styles.cellFrom}>
           <button
             className={styles.sortButton}
             onClick={() => {
@@ -200,7 +203,7 @@ export default function MessageTable({
             From/To
           </button>
         </div>
-        <div className={styles.cellSubject}>
+        <div data-message-cell="subject" className={styles.cellSubject}>
           <button
             className={styles.sortButton}
             onClick={() => {
@@ -213,13 +216,13 @@ export default function MessageTable({
         </div>
         {showMessageSize && (
           <div
-            className={styles.cellSize}
+            data-message-cell="size" className={styles.cellSize}
             title="Largest first across the whole folder — change it with the Sort control"
           >
             Size
           </div>
         )}
-        <div className={styles.cellDate}>
+        <div data-message-cell="date" className={styles.cellDate}>
           <button
             className={styles.sortButton}
             onClick={() => {
@@ -230,7 +233,7 @@ export default function MessageTable({
             Date
           </button>
         </div>
-        <div className={styles.cellActions} aria-hidden="true">
+        <div data-message-cell="actions" className={styles.cellActions} aria-hidden="true">
           {"\u00A0"}
         </div>
       </div>
@@ -337,6 +340,8 @@ export default function MessageTable({
             <div
               className={rowClassName}
               data-message-list-row="true"
+              data-message-layout="stacked"
+              data-message-narrow={narrowRows}
               data-message-id={message.id}
               style={topicTintVar}
               role="button"
@@ -399,7 +404,7 @@ export default function MessageTable({
                 });
               }}
             >
-                <span className={styles.cellSelect}>
+                <span data-message-cell="unread" className={styles.cellSelect}>
                   {renderUnreadDot(message, {
                     seen: displaySeen,
                     threadMessages
@@ -428,7 +433,7 @@ export default function MessageTable({
                   />
                 </span>
                 <span
-                  className={styles.cellFrom}
+                  data-message-cell="from" className={styles.cellFrom}
                   style={{ paddingLeft: `${item.depth * 14}px` }}
                 >
                   {item.threadIndex === 0 && item.threadSize > 1 ? (
@@ -492,7 +497,7 @@ export default function MessageTable({
                   </FromAddressHoverCard>
                 </span>
                 <span
-                  className={styles.cellSubject}
+                  data-message-cell="subject" className={styles.cellSubject}
                   onClick={(event) => {
                     event.stopPropagation();
                     handleCollapsedThreadRootClick({
@@ -514,24 +519,24 @@ export default function MessageTable({
                   }}
                 >
                   {renderFolderBadges(item.folderIds)}
-                  <span className={styles.cellSubjectText}>{message.subject}</span>
+                  <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}
                 </span>
                 {showMessageSize && (
-                  <span className={styles.cellSize}>
+                  <span data-message-cell="size" className={styles.cellSize}>
                     <Text as="span" size="1" title={describeMessageSize(message.sizeBytes).title}>
                       {describeMessageSize(message.sizeBytes).label}
                     </Text>
                   </span>
                 )}
-                <span className={styles.cellDate}>
+                <span data-message-cell="date" className={styles.cellDate}>
                   <Text as="span" size="1" title={dateDisplay.tooltip}>
                     {dateDisplay.text}
                   </Text>
                 </span>
-                <div className={styles.cellActions}>
+                <div data-message-cell="actions" className={styles.cellActions}>
                   <TooltipIconButton
                     size="1"
                     variant="ghost"

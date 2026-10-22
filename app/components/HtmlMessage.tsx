@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import {
   QUOTE_TEXT_SCAN_LIMIT,
   canWrapQuoteInParent,
@@ -20,6 +20,7 @@ import {
   isTrustedFontStylesheetUrl,
   stripPromotedFontImports
 } from "@/app/components/emailFontRegistry";
+import { APP_FONT_FACE_CSS, APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const NOCTUA_EMAIL_CONTENT_CLASS = "noctua-email-content";
 const NOCTUA_EMAIL_VIEWPORT_CLASS = "noctua-email-viewport";
@@ -352,6 +353,7 @@ function attachQuoteAnimation(details: HTMLDetailsElement, content: HTMLElement,
 
 function buildPreviewDocument({
   html,
+  safeHtml,
   darkMode,
   fontScale,
   zoom,
@@ -359,6 +361,7 @@ function buildPreviewDocument({
   token
 }: {
   html: string;
+  safeHtml: string;
   darkMode: boolean;
   fontScale: number;
   zoom: number;
@@ -375,7 +378,6 @@ function buildPreviewDocument({
     ])
   );
   const promotedFontStylesheetUrls = new Set(fontStylesheetUrls);
-  const safeHtml = sanitizeHtmlForDisplay(cleanedHtml);
   let injectedCss = "";
   const withRewrites = safeHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
     const scaledCss = scaleFontSizes(stripPromotedFontImports(css, promotedFontStylesheetUrls));
@@ -415,10 +417,11 @@ function buildPreviewDocument({
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     stylesheetTags,
     "<style>",
+    APP_FONT_FACE_CSS,
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; }`,
     "html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-size: 100%; }",
     `body { margin: 0; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; background: transparent; ${hostTextColor} font-size: 100%; }`,
-    `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: "Sora", system-ui, -apple-system, sans-serif; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
+    `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: ${APP_FONT_STACK}; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
     // The width must counter the scale so the visual width stays the pane
     // width at any zoom; a max-width would cap it below 100% when zoomed out,
     // shrinking the scroll viewport (and its clip edge) along with the content.
@@ -459,12 +462,15 @@ function HtmlMessage({
   html,
   darkMode,
   fontScale = 1,
-  zoom = 1
+  zoom = 1,
+  sanitizeHtml = sanitizeHtmlForDisplay
 }: {
   html: string;
   darkMode: boolean;
   fontScale?: number;
   zoom?: number;
+  /** Display sanitizer. Dark mode and font scale do not change its output. */
+  sanitizeHtml?: (input: string) => string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Theme, zoom and font changes rebuild the whole srcdoc, which would silently
@@ -474,6 +480,9 @@ function HtmlMessage({
   const setLinkPreviewUrl = useMessageLinkPreview();
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
+  // sanitizeHtmlForDisplay has no per-call options. The key is the cleaned
+  // HTML plus the sanitizer function. Theme and zoom only change the wrapper.
+  const safeHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -486,6 +495,7 @@ function HtmlMessage({
     const previewToken = `preview-${(previewDocumentSequence += 1)}`;
     const previewDocument = buildPreviewDocument({
       html,
+      safeHtml,
       darkMode,
       fontScale,
       zoom,
@@ -702,7 +712,7 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [darkMode, fontScale, html, setLinkPreviewUrl, showViewerFrame, zoom]);
+  }, [darkMode, fontScale, html, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>

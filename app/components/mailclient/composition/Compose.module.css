@@ -261,7 +261,7 @@
 }
 
 .composeQuotedTrigger:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -384,11 +384,11 @@
 
 .composeDraftStatus {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .composeDraftStatusSaving {
-  color: var(--accent);
+  color: var(--link);
 }
 
 .composeDraftStatusError {
@@ -409,7 +409,7 @@
   width: 18px;
   height: 18px;
   cursor: nwse-resize;
-  color: var(--muted);
+  color: var(--muted-foreground);
   opacity: 0.9;
   z-index: 10;
 }
@@ -440,6 +440,14 @@
 }
 
 .composeDropActive {
-  outline: 2px dashed var(--accent);
+  outline: 2px dashed var(--link);
   outline-offset: 4px;
+}
+
+@media (width < 768px) {
+  .composeBackdrop { width: 100dvw; height: 100dvh; padding: 0; }
+  .composeModal { padding: 12px; min-height: 0; width: 100dvw !important; height: 100dvh !important; min-width: 0; max-width: none; max-height: none; border-radius: 0; }
+  .composeModal[role="dialog"] { position: fixed; inset: 0; z-index: 9994; box-sizing: border-box; }
+  .composeResizer { display: none; }
+  .composeHeader { padding: 12px; }
 }

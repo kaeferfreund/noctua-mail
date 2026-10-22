@@ -70,7 +70,9 @@ export class ExtendedTableNode extends TableNode {
     return {
       table: () => ({
         conversion: convertTableElement,
-        priority: 1 // Higher priority than default
+        // Built-in TableNode import is priority 1 as of 0.52. Equal priority
+        // keeps the last registered importer, which drops these attributes.
+        priority: 2
       })
     };
   }

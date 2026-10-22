@@ -37,7 +37,6 @@
   ],
   "exclude": [
     ".tmp",
-    "node_modules",
-    "src-tauri"
+    "node_modules"
   ]
 }

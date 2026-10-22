@@ -13,6 +13,7 @@ declare module "bun:sqlite" {
   export class Database {
     constructor(path: string, options?: { create?: boolean; readwrite?: boolean; readonly?: boolean });
     exec(sql: string): void;
+    close(): void;
     prepare(sql: string): {
       run: (...params: any[]) => { changes: number; lastInsertRowid: number | bigint };
       get: (...params: any[]) => any;
