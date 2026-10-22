@@ -5,5 +5,4 @@
 preload = ["./lib/testSetupDom.ts"]
 pathIgnorePatterns = [
   ".next/**",
-  "src-tauri/target/**",
 ]
