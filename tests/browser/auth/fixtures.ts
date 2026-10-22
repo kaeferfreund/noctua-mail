@@ -1,14 +1,28 @@
 import {test as base,expect,type Page} from "@playwright/test";
 import {readFileSync} from "node:fs";
 import {execFileSync} from "node:child_process";
+import {SCENARIOS} from "./scenarios";
 import {totpFromUri} from "../../helpers/totp";
 
 export {expect};
-export type Seed={email:string;password:string;totpURI:string;userId:string};
+export type Seed={email:string;password:string;totpURI:string;backupCodes:string[];userId:string;inviteCode?:string};
 export const test=base.extend<{seed:Seed;authenticator:{setUV:(verified:boolean)=>Promise<void>;id:()=>string;addDevice:()=>Promise<string>;selectDevice:(id:string)=>Promise<void>}}>({
   seed:async({},provide,testInfo)=>{await provide(JSON.parse(readFileSync(process.env.AUTH_BROWSER_SEED_FILE!,"utf8"))[testInfo.title]);},
-  page:async({page},provide)=>{
+  page:async({page},provide,testInfo)=>{
+    // Model the trusted proxy header used in production, with a distinct TEST-NET
+    // client per scenario. Never weaken server limits or share another test's bucket.
+    const index = Object.values(SCENARIOS).indexOf(testInfo.title as typeof SCENARIOS[keyof typeof SCENARIOS]);
+    if (index < 0) throw new Error("Unknown synthetic auth scenario");
+    await page.context().setExtraHTTPHeaders({"x-forwarded-for": `192.0.2.${index + 1}`});
     await page.route("**/auth-harness",route=>route.fulfill({contentType:"text/html",body:"<!doctype html><html lang=en><title>Synthetic auth fixture</title><body><main>Authentication test fixture</main></body></html>"}));
+    // Pace both client forms and direct HTTP helpers against the real 5/minute
+    // proof limit. Continue every request to the compiled production wrapper.
+    await page.route("**/api/auth/reauth", async route => {
+      const remaining = lastProofAt + 12500 - Date.now();
+      if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
+      lastProofAt = Date.now();
+      await route.continue();
+    });
     await page.goto("/auth-harness");
     await provide(page);
   },
@@ -40,6 +54,7 @@ export const test=base.extend<{seed:Seed;authenticator:{setUV:(verified:boolean)
     for(const device of devices)await cdp.send("WebAuthn.removeVirtualAuthenticator",{authenticatorId:device});
   }
 });
+let lastProofAt = 0;
 export async function api(page:Page,path:string,body?:unknown,grant?:string) {
   return page.evaluate(async({path,body,grant})=>{
     const result=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"content-type":"application/json",...(grant?{"x-noctua-reauth":grant}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
@@ -95,4 +110,14 @@ export function finalizerFault(seed:Seed,mode:"registration"|"uv"|"clear") {
 export function faultState(seed:Seed) {
   const result=execFileSync("bun",["scripts/authBrowserFault.ts","inspect",seed.userId],{env:process.env,encoding:"utf8",stdio:["ignore","pipe","pipe"]});
   return JSON.parse(result.trim().split("\n").at(-1)!);
+}
+
+/** Exercise admin issuance through the mounted wrapper; no live-process offline auth access. */
+export async function recoveryLink(page: Page, seed: Seed): Promise<string> {
+  await signIn(page, seed);
+  const proof = await grant(page, seed, "admin.recovery");
+  const issued = await api(page, `/api/admin/users/${seed.userId}/recovery`, { confirmedTarget: true }, proof);
+  expect(issued.status).toBe(200);
+  await page.context().clearCookies();
+  return issued.body.url;
 }

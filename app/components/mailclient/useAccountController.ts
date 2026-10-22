@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   buildAccountApiPath,
   buildAccountFolderDeletePath,
@@ -9,7 +9,8 @@ import {
   buildAccountFoldersCreatePath,
   buildAccountFoldersPath
 } from "@/lib/accountApiPaths";
-import type { Account, Folder, Message, User } from "@/lib/data";
+import type { Account, Folder, Message } from "@/lib/data";
+import { createAuthClient, type AuthMe, type AuthUser, type AuthSecurity, type MailboxState } from "@/lib/authClient";
 import type {
   SearchBadgesState,
   SearchFieldsState,
@@ -21,20 +22,10 @@ import {
   buildAccountSaveRequest,
   createBlankEditAccount,
   normalizeCaldavForSave,
-  normalizeDeeplForSave,
-  resolveActiveAccountId,
-  resolveSwitchedAccountId
+  normalizeDeeplForSave
 } from "./utils/accountControllerHelpers";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-
-type AuthMeResponse = {
-  ok?: boolean;
-  user?: User | null;
-  accountId?: string;
-  accounts?: Account[];
-  ttlSeconds?: number;
-};
 
 export type UseAccountControllerParams = {
   activeAccountId: string;
@@ -58,7 +49,7 @@ export type UseAccountControllerParams = {
   setActiveAccountId: React.Dispatch<React.SetStateAction<string>>;
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   setAuthState: React.Dispatch<React.SetStateAction<"loading" | "ok" | "unauth">>;
-  setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setCurrentUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   setInitialDataReady: React.Dispatch<React.SetStateAction<boolean>>;
   setInitialFoldersLoadedAccountId: React.Dispatch<React.SetStateAction<string | null>>;
   setSessionTtlSeconds: React.Dispatch<React.SetStateAction<number | null>>;
@@ -128,100 +119,75 @@ export function useAccountController({
   setEditingAccount,
   setDeletingFolderIds
 }: UseAccountControllerParams) {
-  const activeAccountIdRef = useRef(activeAccountId);
-  useEffect(() => {
-    activeAccountIdRef.current = activeAccountId;
-  }, [activeAccountId]);
-
+  const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
+  const [security, setSecurity] = useState<AuthSecurity | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const loadVersion = useRef(0);
+  const lastIdentity = useRef<string | null>(null);
   const loadInitialData = useCallback(
-    async (options?: { skipAuthCheck?: boolean; preferredAccountId?: string | null }) => {
-      const skipAuthCheck = options?.skipAuthCheck === true;
-      let preferredAccountId = options?.preferredAccountId?.trim() ?? "";
+    async () => {
+      const version = ++loadVersion.current;
       setInitialDataReady(false);
       setInitialFoldersLoadedAccountId(null);
+      setBootstrapError(null);
       try {
-        let nextAccounts: Account[] | undefined;
-        if (!skipAuthCheck) {
-          const me = await apiFetch("/api/auth/me", {
-            credentials: "include",
-            cache: "no-store"
-          });
-          if (!me.ok) {
-            setAuthState("unauth");
-            setCurrentUser(null);
-            return;
-          }
-          const meData = (await me.json()) as AuthMeResponse | null;
-          nextAccounts = meData?.accounts;
-          setAuthState("ok");
-          setCurrentUser(meData?.user ?? null);
-          if (typeof meData?.ttlSeconds === "number") {
-            setSessionTtlSeconds(meData.ttlSeconds);
-          }
-          if (typeof meData?.accountId === "string" && meData.accountId.trim()) {
-            preferredAccountId = meData.accountId.trim();
-          }
+        const me = await apiFetch("/api/auth/me", { credentials: "include", cache: "no-store" });
+        if (version !== loadVersion.current) return;
+        if (!me.ok) {
+          if (me.status === 401) {
+            lastIdentity.current = null;
+            setMessages([]); setViewMessage(null); setActiveMessageId("");
+            setAuthState("unauth"); setCurrentUser(null); setAccounts([]);
+            setActiveAccountId(""); setFolders([]); setMailboxState(null); setSecurity(null);
+          } else setBootstrapError(await readErrorMessage(me));
+          return;
         }
-        // Login/account-switch reloads lack an auth payload. Keep their fresh
-        // accounts read, but reuse the already sanitized list on bootstrap.
-        if (!Array.isArray(nextAccounts)) {
-          const accountsRes = await apiFetch("/api/accounts");
-          if (!accountsRes.ok) {
-            reportError(await readErrorMessage(accountsRes));
-            return;
-          }
-          nextAccounts = (await accountsRes.json()) as Account[];
+        const data = await me.json() as AuthMe;
+        if (version !== loadVersion.current) return;
+        if (lastIdentity.current !== data.user?.id) {
+          setMessages([]); setViewMessage(null); setActiveMessageId(""); setMessagesPage(1);
+          setHasMoreMessages(true); setTotalMessages(null); setActiveFolderId("");
         }
-        let loadedFolders = false;
-        const resolvedAccountId = resolveActiveAccountId(
-          nextAccounts,
-          preferredAccountId,
-          activeAccountIdRef.current
-        );
-        setAccounts(nextAccounts);
-        setActiveAccountId((prev) => {
-          const next = resolveActiveAccountId(nextAccounts, preferredAccountId, prev);
-          // Preserve the current id when the resolver cannot find any candidate
-          return next || prev;
-        });
-        if (resolvedAccountId) {
-          const foldersRes = await apiFetch(buildAccountFoldersPath(resolvedAccountId));
+        lastIdentity.current = data.user?.id ?? null;
+        setAuthState("ok"); setCurrentUser(data.user); setSecurity(data.security);
+        setSessionTtlSeconds(data.ttlSeconds);
+        const restricted = data.mailboxState === "enrollment";
+        const nextAccounts = restricted ? [] : data.accounts;
+        // Only the server's persisted selection can activate a mailbox. A list
+        // of memberships is never permission to select the first one locally.
+        const selected = data.mailboxState === "selected" && nextAccounts.some(account => account.id === data.accountId) ? data.accountId! : "";
+        setMailboxState(data.mailboxState === "selected" && !selected ? "unselected" : data.mailboxState);
+        setAccounts(nextAccounts); setActiveAccountId(selected); setFolders([]);
+        if (selected) {
+          const foldersRes = await apiFetch(buildAccountFoldersPath(selected));
+          if (version !== loadVersion.current) return;
           if (foldersRes.ok) {
-            const nextFolders = (await foldersRes.json()) as Folder[];
-            setFolders(nextFolders);
-            setInitialFoldersLoadedAccountId(resolvedAccountId);
-            loadedFolders = true;
-          } else {
-            reportError(await readErrorMessage(foldersRes));
-          }
-        } else {
-          setFolders([]);
-          setInitialFoldersLoadedAccountId("");
-          loadedFolders = true;
-        }
-        if (loadedFolders) {
-          setInitialDataReady(true);
-        }
+            setFolders(await foldersRes.json() as Folder[]); setInitialFoldersLoadedAccountId(selected);
+          } else reportError(await readErrorMessage(foldersRes));
+        } else setInitialFoldersLoadedAccountId("");
+        setInitialDataReady(true);
       } catch {
-        setAuthState("unauth");
-        setCurrentUser(null);
-        reportError("Failed to load mailbox data.");
+        if (version === loadVersion.current) setBootstrapError("Failed to load mailbox data. Please retry.");
       }
     },
-    [
-      apiFetch,
-      readErrorMessage,
-      reportError,
-      setAccounts,
-      setActiveAccountId,
-      setAuthState,
-      setCurrentUser,
-      setFolders,
-      setInitialDataReady,
-      setInitialFoldersLoadedAccountId,
-      setSessionTtlSeconds
-    ]
+    [apiFetch, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
+      setCurrentUser, setFolders, setInitialDataReady, setInitialFoldersLoadedAccountId, setSessionTtlSeconds,
+      setMessages, setViewMessage, setActiveMessageId, setMessagesPage, setHasMoreMessages, setTotalMessages, setActiveFolderId]
   );
+
+  const logout = async () => {
+    try {
+      await createAuthClient(apiFetch).logout();
+      loadVersion.current++; lastIdentity.current = null;
+      setAuthState("unauth"); setCurrentUser(null); setAccounts([]); setFolders([]);
+      setActiveAccountId(""); setMailboxState(null); setSecurity(null);
+      setMessages([]); setViewMessage(null); setExceptionEntries([]); setMessageListError(null);
+      return true;
+    } catch {
+      reportError("Unable to log out. Your session is still open. Try again.");
+      return false;
+    }
+  };
 
   const switchAccount = useCallback(
     async (nextAccountId: string) => {
@@ -237,10 +203,6 @@ export function useAccountController({
           reportError(await readErrorMessage(response));
           return;
         }
-        const payload = (await response.json().catch(() => null)) as {
-          accountId?: string;
-        } | null;
-        const switchedAccountId = resolveSwitchedAccountId(payload, normalizedAccountId);
         setExceptionEntries([]);
         setMessageListError(null);
         setMessages([]);
@@ -256,8 +218,7 @@ export function useAccountController({
         setActiveVirtualFolderId(null);
         setActiveFolderId("");
         setLastFolderId("");
-        setActiveAccountId(switchedAccountId);
-        await loadInitialData({ skipAuthCheck: true, preferredAccountId: switchedAccountId });
+        await loadInitialData();
       } catch {
         reportError("Failed to switch account.");
       }
@@ -268,7 +229,6 @@ export function useAccountController({
       loadInitialData,
       readErrorMessage,
       reportError,
-      setActiveAccountId,
       setActiveMessageId,
       setActiveFolderId,
       setActiveVirtualFolderId,
@@ -376,12 +336,7 @@ export function useAccountController({
     if (refreshed.ok) {
       const nextAccounts = (await refreshed.json()) as Account[];
       setAccounts(nextAccounts);
-      const nextAccountId = nextAccounts[0]?.id ?? "";
-      if (nextAccountId) {
-        await switchAccount(nextAccountId);
-      } else {
-        setActiveAccountId("");
-      }
+      await loadInitialData();
     } else {
       reportError(await readErrorMessage(refreshed));
     }
@@ -481,6 +436,7 @@ export function useAccountController({
   }, [loadInitialData]);
 
   return {
+    mailboxState, security, bootstrapError, logout,
     loadInitialData,
     switchAccount,
     refreshFolders,

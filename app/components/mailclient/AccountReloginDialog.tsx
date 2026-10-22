@@ -30,22 +30,23 @@ export default function AccountReloginDialog({
   onSuccess
 }: Props) {
   const fetchFn = apiFetch ?? fetch;
+  const canRepair = account?.accessRole === "manager";
   const [imapUser, setImapUser] = useState("");
   const [imapPassword, setImapPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!open || !account) return;
+    if (!open || !account || !canRepair) return;
     setImapUser(account.imap.user || account.email || "");
     setImapPassword("");
     setError("");
     setSubmitting(false);
-  }, [account, open]);
+  }, [account, canRepair, open]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!account || submitting) return;
+    if (!account || !canRepair || submitting) return;
     setSubmitting(true);
     setError("");
     try {
@@ -81,7 +82,7 @@ export default function AccountReloginDialog({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open && canRepair} onOpenChange={onOpenChange}>
       <Dialog.Content size="3" style={{ width: "min(460px, 92vw)" }}>
         <Flex direction="column" gap="4">
           <div>
@@ -102,6 +103,7 @@ export default function AccountReloginDialog({
 
               <Field label="IMAP user">
                 <TextField.Root
+                  aria-label="IMAP user"
                   value={imapUser}
                   onChange={(event) => setImapUser(event.target.value)}
                   autoComplete="username"
@@ -111,6 +113,7 @@ export default function AccountReloginDialog({
 
               <Field label="IMAP password">
                 <PasswordField
+                  aria-label="IMAP password"
                   value={imapPassword}
                   onChange={(event) => setImapPassword(event.target.value)}
                   autoComplete="current-password"

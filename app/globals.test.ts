@@ -380,12 +380,12 @@ describe("shell accessibility regressions", () => {
     }
   }, COMPILE_TIMEOUT_MS);
 
-  test("removes dead auth selectors and retains the floating error", async () => {
+  test("removes dead auth selectors including the retired floating error", async () => {
     const root = await compileGlobals();
     const dead = /^\.auth-(?:overlay|modal|header|close|form|grid|error)(?![\w-])/;
     const selectors: string[] = [];
     root.walkRules((rule) => { selectors.push(...rule.selectors); });
     expect(selectors.filter((selector) => dead.test(selector))).toEqual([]);
-    expect(rulesWithSelector(root, ".auth-error-floating")).toHaveLength(1);
+    expect(rulesWithSelector(root, ".auth-error-floating")).toHaveLength(0);
   }, COMPILE_TIMEOUT_MS);
 });
