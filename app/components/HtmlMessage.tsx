@@ -8,9 +8,11 @@ import {
   hasQuoteBoundaryMarker,
   isQuoteBoundaryText,
   isTableLayoutTag,
+  rewriteHtmlViewportHeightUnits,
   sanitizeHtmlForDisplay,
   shouldCollapseQuote,
   shouldShowHtmlViewerFrame,
+  stripBodyHeightStyles,
   stripConditionalComments
 } from "@/lib/html";
 import { useMessageLinkPreview } from "@/app/components/mailclient/message/MessageLinkPreviewContext";
@@ -351,13 +353,14 @@ function attachQuoteAnimation(details: HTMLDetailsElement, content: HTMLElement,
   };
 }
 
-function buildPreviewDocument({
+export function buildPreviewDocument({
   html,
   safeHtml,
   darkMode,
   fontScale,
   zoom,
   showViewerFrame,
+  hostViewportHeight,
   token
 }: {
   html: string;
@@ -366,8 +369,13 @@ function buildPreviewDocument({
   fontScale: number;
   zoom: number;
   showViewerFrame: boolean;
+  hostViewportHeight?: number;
   token: string;
 }) {
+  // Using the host height breaks the cycle between vh and the auto-sized frame.
+  const viewportUnit = typeof hostViewportHeight === "number" && Number.isFinite(hostViewportHeight) && hostViewportHeight > 0
+    ? hostViewportHeight / 100
+    : 8;
   const cleanedHtml = stripConditionalComments(html || "");
   const hasExplicitColor = /(^|[^-])color\s*:/i.test(cleanedHtml);
   const stylesheetLinks = extractStylesheetLinks(cleanedHtml);
@@ -379,7 +387,8 @@ function buildPreviewDocument({
   );
   const promotedFontStylesheetUrls = new Set(fontStylesheetUrls);
   let injectedCss = "";
-  const withRewrites = safeHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
+  const viewportHtml = rewriteHtmlViewportHeightUnits(safeHtml);
+  const withRewrites = viewportHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
     const scaledCss = scaleFontSizes(stripPromotedFontImports(css, promotedFontStylesheetUrls));
     const rewritten = extractPrefersColorScheme(scaledCss, darkMode ? "dark" : "light");
     if (rewritten.injected) {
@@ -404,21 +413,21 @@ function buildPreviewDocument({
     .filter(Boolean)
     .join(" ");
   const bodyId = escapeAttribute(bodyAttrs.id || "NoctuaMessageViewBody");
-  const bodyStyle = escapeAttribute(bodyAttrs.style || "");
+  const bodyStyle = escapeAttribute(stripBodyHeightStyles(bodyAttrs.style || ""));
   const contentMarkup = body
     ? `<div class="${escapeAttribute(bodyClassName)}" id="${bodyId}" style="${bodyStyle}">${body}</div>`
     : `<div class="${NOCTUA_EMAIL_CONTENT_CLASS} email-body" id="NoctuaMessageViewBody">${scaledHtml}</div>`;
 
   return [
     "<!doctype html>",
-    `<html data-theme="${darkMode ? "dark" : "light"}" data-noctua-preview="${token}">`,
+    `<html id="noctua-email-root" data-theme="${darkMode ? "dark" : "light"}" data-noctua-preview="${token}">`,
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     stylesheetTags,
     "<style>",
     APP_FONT_FACE_CSS,
-    `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; }`,
+    `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
     "html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-size: 100%; }",
     `body { margin: 0; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; background: transparent; ${hostTextColor} font-size: 100%; }`,
     `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: ${APP_FONT_STACK}; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
@@ -446,6 +455,9 @@ function buildPreviewDocument({
     injectedCss,
     "</style>",
     styleBlocks.join("\n"),
+    // The copied body can carry height classes or IDs with !important rules.
+    // ID specificity keeps the frame's measuring boxes content-sized even then.
+    `<style>html#noctua-email-root, html#noctua-email-root body, html#noctua-email-root .${NOCTUA_EMAIL_CONTENT_CLASS} { height: auto !important; min-height: 0 !important; max-height: none !important; }</style>`,
     "</head>",
     "<body>",
     '<div class="html-scale">',
@@ -500,6 +512,7 @@ function HtmlMessage({
       fontScale,
       zoom,
       showViewerFrame,
+      hostViewportHeight: window.innerHeight,
       token: previewToken
     });
 
