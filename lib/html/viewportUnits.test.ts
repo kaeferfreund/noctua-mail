@@ -50,6 +50,22 @@ describe("HTML CSS boundaries", () => {
     expect(rewriteHtmlViewportHeightUnits(`<div title=">" STYLE = 'height:2vh' /><p style=height:3vh>100vh</p>`))
       .toBe(`<div title=">" STYLE = 'height:calc(2 * var(--noctua-vh))' /><p style="height:calc(3 * var(--noctua-vh))">100vh</p>`);
   });
+  test("returns promptly on unterminated tags and quotes", () => {
+    // The previous tag pattern backtracked exponentially here: 20 attributes
+    // took ~100 ms, 25 hit the engine's backtracking limit after seconds.
+    const unterminated = [
+      `<a ${'b="x" '.repeat(5000)}<`,
+      `<a ${"b=c ".repeat(5000)}`,
+      `<a title="${"x".repeat(5000)}`
+    ];
+    const started = performance.now();
+    for (const html of unterminated) {
+      expect(rewriteHtmlViewportHeightUnits(html)).toBe(html);
+    }
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(rewriteHtmlViewportHeightUnits(`<a style="height:1vh"`))
+      .toBe(`<a style="height:calc(1 * var(--noctua-vh))"`);
+  });
 });
 
 describe("body height declarations", () => {
