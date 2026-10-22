@@ -183,6 +183,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "minRole": "viewer"
   },
   {
+    "method": "GET",
+    "path": "members/candidates",
+    "minRole": "manager"
+  },
+  {
     "method": "DELETE",
     "path": "members/[userId]",
     "minRole": "manager"

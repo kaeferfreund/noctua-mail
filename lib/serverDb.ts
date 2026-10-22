@@ -11,6 +11,16 @@ export async function listAdminAudit(...args: Parameters<ServerDbModule["listAdm
   return (await loadServerDb()).listAdminAudit(...args);
 }
 
+export { clampAuditLimit, decodeAdminAuditCursor, encodeAdminAuditCursor } from "./db/adminAudit";
+
+export async function listAccountMemberCandidates(...args: Parameters<ServerDbModule["listAccountMemberCandidates"]>) {
+  return (await loadServerDb()).listAccountMemberCandidates(...args);
+}
+
+export async function listAdminUserPasskeys() {
+  return (await loadServerDb()).listAdminUserPasskeys();
+}
+
 export async function getAccountById(...args: Parameters<ServerDbModule["getAccountById"]>) {
   const db = await loadServerDb();
   return db.getAccountById(...args);

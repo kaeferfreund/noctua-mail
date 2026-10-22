@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getAccounts, getUserAccounts, getUsers } from "@/lib/db";
 import { requireAdminSessionOr403 } from "../_auth";
 import { handleAdminUser } from "../_users";
+import { listAdminUserPasskeys } from "@/lib/serverDb";
 
 export async function POST(request:Request) {return handleAdminUser(request,"invite");}
 
@@ -11,7 +12,13 @@ export async function GET(request: Request) {
   if (auth instanceof NextResponse) return auth;
   return withAuthResponse(auth, async () => {
 
-    const [users, accounts, links] = await Promise.all([getUsers(), getAccounts(), getUserAccounts()]);
+    const [users, accounts, links, passkeys] = await Promise.all([getUsers(), getAccounts(), getUserAccounts(), listAdminUserPasskeys()]);
+    const passkeysByUser = new Map<string, Array<{id: string; name: string | null; createdAt: number | null}>>();
+    for (const { userId, ...passkey } of passkeys) {
+      const resources = passkeysByUser.get(userId) ?? [];
+      resources.push(passkey);
+      passkeysByUser.set(userId, resources);
+    }
     const accountById = new Map(accounts.map(account => [account.id, account]));
     const memberships = new Map(links.map(link => [JSON.stringify([link.userId, link.accountId]), link.role]));
     const accountIdsByUserId = new Map<string, Set<string>>();
@@ -55,6 +62,7 @@ export async function GET(request: Request) {
           .sort((a, b) => a.email.localeCompare(b.email));
         return {
           ...user,
+          passkeys: passkeysByUser.get(user.id) ?? [],
           accounts: userAccounts
         };
       });
@@ -62,6 +70,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       users: usersWithAccounts
-    });
+    }, { headers: { "cache-control": "no-store" } });
   });
 }
