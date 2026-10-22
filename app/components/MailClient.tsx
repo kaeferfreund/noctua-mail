@@ -22,6 +22,7 @@ import {
   Trash2,
   X
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { AccountDateFormatProvider } from "./AccountDateFormatContext";
 import LoginOverlay from "./auth/LoginOverlay";
 import FolderSidebarPane from "./mailclient/folder/FolderSidebarPane";
@@ -342,7 +343,11 @@ export default function MailClient({
   const [activeMessageId, setActiveMessageId] = useState("");
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
   const [query, setQuery] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
+  // next-themes owns the theme (class and color-scheme on <html>, persisted
+  // under "noctua:theme"); darkMode mirrors the resolved theme for the kept
+  // renderers. resolvedTheme is undefined until the provider has mounted.
+  const { resolvedTheme, setTheme } = useTheme();
+  const darkMode = resolvedTheme === "dark";
   const [manageOpen, setManageOpen] = useState(false);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -3906,15 +3911,6 @@ export default function MailClient({
   const activeFolderName = accountFolders.find((folder) => folder.id === activeFolderId)?.name;
 
   useEffect(() => {
-    const stored = localStorage.getItem("noctua:theme");
-    if (stored) {
-      const isDark = stored === "dark";
-      setDarkMode(isDark);
-      document.documentElement.classList.toggle("dark", isDark);
-    }
-  }, []);
-
-  useEffect(() => {
     if (!activeAccountId) return;
     const stored = localStorage.getItem(`noctua:lastNotifiedUid:${activeAccountId}`);
     if (stored) {
@@ -5208,10 +5204,7 @@ export default function MailClient({
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
   );
   const handleToggleDarkMode = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("noctua:theme", next ? "dark" : "light");
+    setTheme(darkMode ? "light" : "dark");
   };
 
   if (authState === "unauth") {

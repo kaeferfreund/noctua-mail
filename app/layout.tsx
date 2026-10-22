@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Theme } from "@radix-ui/themes";
+import { ThemeProvider } from "next-themes";
 import Script from "next/script";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
 import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
-import "@radix-ui/themes/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,24 +25,20 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
+    // next-themes sets the theme class and color-scheme on <html> before
+    // hydration, so the server markup cannot match it.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <Script src="/runtime-config.js" strategy="beforeInteractive" />
       </head>
       <body suppressHydrationWarning>
-        <Theme
-          grayColor="sand"
-          panelBackground="solid"
-          style={
-            {
-              "--color-background": "var(--sand-2)",
-              "--color-panel-solid": "var(--sand-3)",
-              "--color-surface": "var(--sand-2)"
-            } as CSSProperties
-          }
-        >
-          <main>{children}</main>
-        </Theme>
+        <ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem>
+          {/* Radix surface tokens are bridged to the shadcn tokens by the
+              .radix-themes rule in globals.css. */}
+          <Theme accentColor="indigo" grayColor="sand" panelBackground="solid">
+            <main>{children}</main>
+          </Theme>
+        </ThemeProvider>
       </body>
     </html>
   );

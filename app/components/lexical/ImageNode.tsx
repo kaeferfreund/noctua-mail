@@ -397,7 +397,7 @@ function ImageComponent({
           display: "block",
           maxWidth: "100%",
           height: "auto",
-          outline: isSelected ? "2px solid var(--accent, #4f86f7)" : "none",
+          outline: isSelected ? "2px solid var(--link, #4f86f7)" : "none",
           outlineOffset: "1px"
         }}
       />
@@ -408,7 +408,7 @@ function ImageComponent({
             width: 10,
             height: 10,
             padding: 0,
-            background: "var(--accent, #4f86f7)",
+            background: "var(--link, #4f86f7)",
             border: "1px solid var(--gray-1, #fff)",
             borderRadius: 2,
             cursor: CORNER_CURSOR[corner],

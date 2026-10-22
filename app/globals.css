@@ -1,58 +1,249 @@
+/* Cascade layers, lowest priority first. Unlayered rules (the token blocks in
+   this file and every CSS module) beat all layers. Tailwind is imported
+   without preflight (D10): preflight would strip list bullets, heading sizes
+   and inline SVG layout from the compose editor, .markdown-view and the
+   markdown panels. The scoped reset in `@layer base` below replaces the two
+   preflight rules the shadcn components rely on. */
+@layer theme, base, radix, legacy, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "@radix-ui/themes/styles.css" layer(radix);
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Inter Variable (OFL), vendored in public/fonts (see README.md there).
+   HtmlMessage injects the same @font-face into the e-mail iframe
+   (lib/ui/fonts.ts); app/globals.test.ts keeps the two in sync. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+
+/* `static` emits every variable below on :root even when no utility uses it:
+   CSS modules rely on --font-sans and --radius-sm/md/lg, and Tailwind does not
+   scan CSS files for variable usage. */
+@theme inline static {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* shadcn tokens, mapped onto the Radix Themes scales. Only scales that Radix
+   defines on :root (and flips under .dark) may be used here: --sand-N,
+   --indigo-N, --red-N. Never --gray-N (neutral at :root, sand only inside
+   .radix-themes), --accent-N (only on [data-accent-color]) or --space-N /
+   --radius-N (only on .radix-themes). */
+:root {
+  --background: var(--sand-2);
+  --foreground: var(--sand-12);
+  --card: var(--sand-1);
+  --card-foreground: var(--sand-12);
+  --popover: var(--sand-1);
+  --popover-foreground: var(--sand-12);
+  --primary: var(--indigo-9);
+  --primary-foreground: var(--indigo-contrast);
+  --secondary: var(--sand-3);
+  --secondary-foreground: var(--sand-12);
+  --muted: var(--sand-3);
+  --muted-foreground: var(--sand-11);
+  --accent: var(--sand-4);
+  --accent-foreground: var(--sand-12);
+  --destructive: var(--red-9);
+  --border: var(--sand-6);
+  --input: var(--sand-7);
+  --ring: var(--indigo-8);
+  --chart-1: var(--indigo-6);
+  --chart-2: var(--indigo-8);
+  --chart-3: var(--indigo-9);
+  --chart-4: var(--indigo-10);
+  --chart-5: var(--indigo-11);
+  --radius: 0.5rem;
+  --sidebar: var(--sand-3);
+  --sidebar-foreground: var(--sand-12);
+  --sidebar-primary: var(--indigo-9);
+  --sidebar-primary-foreground: var(--indigo-contrast);
+  --sidebar-accent: var(--sand-4);
+  --sidebar-accent-foreground: var(--sand-12);
+  --sidebar-border: var(--sand-6);
+  --sidebar-ring: var(--indigo-8);
+}
+
+/* Same names as :root. The Radix scales flip under .dark; the steps differ
+   where a surface has to lift above the darker background instead. */
+.dark {
+  --background: var(--sand-2);
+  --foreground: var(--sand-12);
+  --card: var(--sand-3);
+  --card-foreground: var(--sand-12);
+  --popover: var(--sand-3);
+  --popover-foreground: var(--sand-12);
+  --primary: var(--indigo-9);
+  --primary-foreground: var(--indigo-contrast);
+  --secondary: var(--sand-4);
+  --secondary-foreground: var(--sand-12);
+  --muted: var(--sand-4);
+  --muted-foreground: var(--sand-11);
+  --accent: var(--sand-5);
+  --accent-foreground: var(--sand-12);
+  --destructive: var(--red-9);
+  --border: var(--sand-6);
+  --input: var(--sand-7);
+  --ring: var(--indigo-8);
+  --chart-1: var(--indigo-6);
+  --chart-2: var(--indigo-8);
+  --chart-3: var(--indigo-9);
+  --chart-4: var(--indigo-10);
+  --chart-5: var(--indigo-11);
+  --sidebar: var(--sand-3);
+  --sidebar-foreground: var(--sand-12);
+  --sidebar-primary: var(--indigo-9);
+  --sidebar-primary-foreground: var(--indigo-contrast);
+  --sidebar-accent: var(--sand-5);
+  --sidebar-accent-foreground: var(--sand-12);
+  --sidebar-border: var(--sand-6);
+  --sidebar-ring: var(--indigo-8);
+}
+
+/* Legacy aliases used by the kept components and the @layer legacy rules.
+   The former --muted (text colour) is --muted-foreground, the former
+   --accent (link colour) is --link and the former --accent-2 is --quote-2;
+   --muted, --accent and --border now carry their shadcn meaning.
+   --radius-sm/md/lg come from the shadcn radius in @theme inline (4/6/8px). */
 :root {
   color-scheme: light;
-  --bg: #f4f3f0;
-  --surface: #ffffff;
-  --surface-2: #f0efe9;
-  --surface-3: #e6e4dc;
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-1: var(--card);
+  --surface-2: var(--sand-3);
+  --surface-3: var(--sand-4);
+  --text: var(--foreground);
+  --link: var(--indigo-11);
   --input-bg: var(--surface);
   --input-fg: var(--text);
   --mail-view-bg: var(--surface);
   --mail-view-fg: var(--text);
-  --list-row-hover-bg: var(--gray-3);
-  --list-row-hover-border: var(--gray-5);
-  --list-row-selected-bg: var(--gray-4);
-  --list-row-selected-border: var(--gray-6);
-  --list-row-active-bg: color-mix(in srgb, var(--accent-a3) 40%, var(--gray-3));
-  --list-row-active-border: var(--accent-9);
-  --list-row-focus-ring: var(--accent-8);
-  --text: #1a1a1a;
-  --muted: #5d5b55;
-  --border: #d8d5cc;
-  --accent: #1847d5;
-  --accent-2: #ffcf5a;
-  --accent-2-strong: #c28b15;
-  --accent-2-bg: rgba(194, 139, 21, 0.18);
-  --accent-2-border: rgba(194, 139, 21, 0.45);
+  --list-row-hover-bg: var(--sand-3);
+  --list-row-hover-border: var(--sand-5);
+  --list-row-selected-bg: var(--sand-4);
+  --list-row-selected-border: var(--sand-6);
+  --list-row-active-bg: color-mix(in srgb, var(--indigo-a3) 40%, var(--sand-3));
+  --list-row-active-border: var(--indigo-9);
+  --list-row-focus-ring: var(--indigo-8);
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-  --radius-lg: 4px;
-  --radius-md: 4px;
-  --radius-sm: 4px;
+  --quote-2: #ffcf5a;
 }
 
 .dark {
   color-scheme: dark;
-  --bg: #24272f;
-  --surface: #2d313b;
-  --surface-2: #363b47;
-  --surface-3: #404656;
-  --list-row-hover-bg: var(--gray-4);
-  --list-row-hover-border: var(--gray-6);
-  --list-row-selected-bg: var(--gray-6);
-  --list-row-selected-border: var(--gray-7);
-  --list-row-active-bg: color-mix(in srgb, var(--accent-a4) 52%, var(--gray-4));
-  --list-row-active-border: var(--accent-8);
-  --list-row-focus-ring: var(--accent-8);
-  --text: #f2f0ea;
-  --muted: #c8c2b6;
-  --border: #4b5264;
-  --accent: #b8d5ff;
-  --accent-2: #f7d78c;
-  --accent-2-strong: #f7d78c;
-  --accent-2-bg: rgba(247, 215, 140, 0.18);
-  --accent-2-border: rgba(247, 215, 140, 0.45);
+  --surface-2: var(--sand-4);
+  --surface-3: var(--sand-5);
+  --list-row-hover-bg: var(--sand-4);
+  --list-row-hover-border: var(--sand-6);
+  --list-row-selected-bg: var(--sand-6);
+  --list-row-selected-border: var(--sand-7);
+  --list-row-active-bg: color-mix(in srgb, var(--indigo-a4) 52%, var(--sand-4));
+  --list-row-active-border: var(--indigo-8);
   --shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
+  --quote-2: #f7d78c;
 }
 
+/* Radix Themes reads its own surface tokens; point them at the shadcn ones so
+   kept components and the new shell share one palette and one font. */
+.radix-themes {
+  --color-background: var(--background);
+  --color-panel-solid: var(--card);
+  --color-surface: var(--card);
+  --default-font-family: "Inter", system-ui, sans-serif;
+}
+
+@layer base {
+  /* Minimal reset so Tailwind border utilities work without preflight,
+     scoped to the new shell ([data-shell]) and shadcn components
+     ([data-slot]); legacy markup outside them is untouched. */
+  :where([data-shell], [data-slot]),
+  :where([data-shell], [data-slot]) *,
+  :where([data-shell], [data-slot]) ::before,
+  :where([data-shell], [data-slot]) ::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: var(--border);
+  }
+
+  :where([data-shell], [data-slot]) button {
+    cursor: pointer;
+  }
+
+  /* The rest of the preflight baseline the shadcn components are written
+     against, applied only to the generated elements themselves (each one
+     carries its own data-slot), so kept components rendered inside a
+     shadcn frame keep their user-agent defaults: no UA margins/paddings,
+     inherited heading sizes, no list markers on menu lists, and form
+     controls without the UA background, colour and font. */
+  :where([data-slot]) {
+    margin: 0;
+    padding: 0;
+  }
+
+  :where(h1, h2, h3, h4, h5, h6)[data-slot] {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  :where(ul, ol, menu)[data-slot] {
+    list-style: none;
+  }
+
+  :where(button, input, select, textarea)[data-slot] {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+  }
+}
+
+@layer legacy {
 * {
   box-sizing: border-box;
 }
@@ -77,21 +268,30 @@ body {
   min-height: 100%;
 }
 
-/* Radix Themes dialog overlays portal into `.radix-themes` with z-index: auto.
-   The floating calendar popover is position: fixed at z-index 9990, and a
-   fixed-position element always forms a stacking context — so a dialog opened
-   from the popover (e.g. EventDialog via the "＋ Event" button) would paint
-   *behind* it. Lift dialog overlays above the popover (still below the 9999
-   auth overlay, which is never shown alongside an app dialog). */
+/* z-index ladder for fixed and portalled layers, lowest first:
+     9990  floating calendar panel (CalendarPopover.module.css)
+     9994  shadcn overlays and dialog/sheet content (z-[9994] in
+           app/components/ui/{dialog,sheet}.tsx)
+     9995  Radix Themes dialog overlay (.rt-BaseDialogOverlay, below)
+     9998  shadcn popper content (z-[9998] in app/components/ui/{popover,
+           select,dropdown-menu,tooltip}.tsx) and Radix Themes popper
+           content (.rt-PopperContent, below)
+     9999  .auth-overlay (removed together with LoginOverlay) and the
+           off-screen .drag-ghost
+   Radix Themes dialog overlays portal into `.radix-themes` with z-index: auto,
+   and a fixed-position element always forms a stacking context, so without
+   the lift a dialog opened from the calendar panel (e.g. EventDialog via the
+   "＋ Event" button) would paint behind it. A Radix dialog opened from inside
+   a shadcn dialog or sheet (e.g. a confirm in the settings frame) has to
+   paint above that frame, hence shadcn 9994 < Radix 9995. */
 .rt-BaseDialogOverlay {
   z-index: 9995;
 }
 
-/* Radix popper content (Popover/Select/DropdownMenu/Tooltip — e.g. the event
+/* Radix popper content (Popover/Select/DropdownMenu/Tooltip, e.g. the event
    form's time picker and "Repeat" dropdown) portals out with z-index: auto.
-   Because the dialog overlay above sits at 9995, a popper opened from inside a
-   dialog would render behind it and look unresponsive. Lift poppers above the
-   dialog (still below the 9999 auth overlay). */
+   A popper opened from inside a dialog has to render above the dialog
+   overlay, otherwise it sits behind it and looks unresponsive. */
 .rt-PopperContent {
   z-index: 9998;
 }
@@ -102,7 +302,7 @@ button {
 
 
 main {
-  height: 100vh;
+  height: 100dvh;
   padding: 0;
 }
 
@@ -149,7 +349,7 @@ a {
   overflow: hidden;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  height: 100vh;
+  height: 100dvh;
   border: 1px solid var(--border);
   animation: floatIn 0.7s ease forwards;
 }
@@ -238,7 +438,7 @@ a {
 
 .icon-button:hover {
   transform: translateY(-1px);
-  border-color: var(--accent);
+  border-color: var(--link);
 }
 
 .icon-button:disabled {
@@ -335,7 +535,7 @@ a {
 
 .inapp-notice .notice-description {
   display: block;
-  color: var(--muted);
+  color: var(--muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -466,7 +666,7 @@ a {
 }
 
 .icon-button.active {
-  border-color: var(--accent);
+  border-color: var(--link);
   background: var(--surface-3);
 }
 
@@ -474,7 +674,7 @@ a {
   border: none;
   background: transparent;
   padding: 4px 6px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   border-radius: var(--radius-sm);
 }
 
@@ -532,12 +732,12 @@ a {
 }
 
 .markdown-view a {
-  color: var(--accent);
+  color: var(--link);
   text-decoration: underline;
 }
 
 .markdown-view a:hover {
-  color: var(--accent);
+  color: var(--link);
 }
 
 .markdown-view code {
@@ -557,12 +757,12 @@ a {
 .markdown-view blockquote {
   margin: 10px 0;
   padding-left: 12px;
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--link);
   color: var(--mail-view-fg);
 }
 
 .markdown-view blockquote blockquote {
-  border-left-color: var(--accent-2);
+  border-left-color: var(--quote-2);
   background: linear-gradient(90deg, rgba(255, 207, 90, 0.12), transparent);
 }
 
@@ -590,7 +790,7 @@ a {
   gap: 6px;
   border: 1px solid var(--border);
   background: transparent;
-  color: var(--muted);
+  color: var(--muted-foreground);
   border-radius: var(--radius-sm);
   padding: 4px 8px;
   font-size: 11px;
@@ -681,7 +881,7 @@ a {
 }
 
 .attachment-meta {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 11px;
 }
 
@@ -691,7 +891,7 @@ a {
 
 .attachment-load-spinner {
   display: block;
-  color: var(--muted);
+  color: var(--muted-foreground);
   animation: reminder-spin 1s linear infinite;
 }
 
@@ -713,18 +913,18 @@ a {
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
-  color: var(--muted);
+  color: var(--muted-foreground);
   border: 1px solid var(--border);
 }
 
 .quote-block {
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--link);
   padding-left: 12px;
   margin: 0;
 }
 
 .quote-level-2 {
-  border-left-color: var(--accent-2);
+  border-left-color: var(--quote-2);
   background: linear-gradient(90deg, rgba(255, 207, 90, 0.12), transparent);
 }
 
@@ -804,7 +1004,7 @@ a {
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   font-size: 11px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   gap: 12px;
   min-height: 32px;
   position: relative;
@@ -830,7 +1030,7 @@ a {
 }
 
 .bottom-status-trigger:focus-visible {
-  outline: 1px solid var(--accent);
+  outline: 1px solid var(--link);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
 }
@@ -865,7 +1065,7 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-size: 10px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .bottom-item {
@@ -877,7 +1077,7 @@ a {
   left: 50%;
   transform: translateX(-50%);
   cursor: pointer;
-  color: var(--muted);
+  color: var(--muted-foreground);
   text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -888,7 +1088,7 @@ a {
 }
 
 .bottom-muted {
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .bottom-error {
@@ -1101,7 +1301,7 @@ a {
 
 .exception-meta {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .exception-list {
@@ -1150,7 +1350,7 @@ a {
 }
 
 .exception-item-time {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 10px;
 }
 
@@ -1342,7 +1542,7 @@ a {
   margin: 6px 0 4px 0;
   font-size: 16px;
   font-weight: 400;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .modal h3 {
@@ -1374,7 +1574,7 @@ a {
 .section-note {
   margin: 0 0 10px 0;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .form-grid {
@@ -1388,7 +1588,7 @@ a {
   flex-direction: column;
   gap: 6px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .form-field input {
@@ -1400,7 +1600,7 @@ a {
 }
 
 .form-field input::placeholder {
-  color: var(--muted);
+  color: var(--muted-foreground);
   opacity: 0.7;
 }
 
@@ -1492,4 +1692,5 @@ a {
   font-size: 13px;
   pointer-events: none;
   z-index: 9999;
+}
 }
