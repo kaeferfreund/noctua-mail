@@ -1,3 +1,4 @@
+import { teamFeaturesSupported } from "./teamFeatures";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
@@ -182,8 +183,7 @@ export function readAuthEnv(env: Record<string, string | undefined> = process.en
   if (secret.length < 32) throw new Error("BETTER_AUTH_SECRET must be set to at least 32 characters.");
   const baseURL = parseOrigin(env.BETTER_AUTH_URL ?? "", "BETTER_AUTH_URL");
   if (env.NOCTUA_DESKTOP_MODE === "true") throw new Error("Team auth supports Linux/server mode only; desktop mode is unsupported.");
-  const storage = env.IMAP_CREDENTIALS_STORAGE?.trim().toLowerCase() || "db";
-  if (storage !== "db" && storage !== "both") throw new Error("Team auth requires IMAP_CREDENTIALS_STORAGE=db; migrate cookie credentials first.");
+  if (!teamFeaturesSupported(env)) throw new Error("Team auth requires IMAP_CREDENTIALS_STORAGE=db; migrate cookie credentials first.");
   if (env.BETTER_AUTH_TELEMETRY && env.BETTER_AUTH_TELEMETRY !== "0") throw new Error("BETTER_AUTH_TELEMETRY must be 0.");
   if (env.BETTER_AUTH_TELEMETRY_ENDPOINT) throw new Error("BETTER_AUTH_TELEMETRY_ENDPOINT must be unset.");
   const hostname = new URL(baseURL).hostname;
