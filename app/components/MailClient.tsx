@@ -32,6 +32,7 @@ import { AuthFrame } from "./auth/AuthPrimitives";
 import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
 import AdminPanel from "./admin/AdminPanel";
+import { CreateMailbox } from "./admin/AdminMailboxes";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
@@ -356,6 +357,7 @@ export default function MailClient({
   const [manageOpen, setManageOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [newMailboxOpen, setNewMailboxOpen] = useState(false);
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -5244,6 +5246,7 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
+    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
     {adminOpen && <AdminPanel isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </>;
   if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
@@ -5252,11 +5255,11 @@ export default function MailClient({
     return <EnrollmentScreen continuation={enrollmentContinuation ?? undefined} onLogout={async () => { if (await logout()) setEnrollmentContinuation(null); }} onComplete={async () => { setEnrollmentContinuation(null); await loadInitialData(); }} />;
   }
   if (mailboxState !== "selected") return <>
-    <MailboxGate state={mailboxState} accounts={accounts} error={bootstrapError || exceptionEntries[0]?.message} onAdd={() => startEditAccount()}
+    <MailboxGate state={mailboxState} accounts={accounts} error={bootstrapError || exceptionEntries[0]?.message} onAdd={isAdminUser ? () => setNewMailboxOpen(true) : undefined}
       onSwitch={id => { void switchAccount(id); }} onRetry={() => { void loadInitialData(); }} onSecurity={() => setSecurityOpen(true)}
       onAdmin={isAdminUser ? () => setAdminOpen(true) : undefined} onLogout={() => { void logout(); }} />
     {identityDialogs}
-    {manageOpen && editingAccount && <AccountSettingsModal editingAccount={editingAccount} isOpen manageTab="account" isExistingAccount={false} onClose={() => setManageOpen(false)} onTabChange={setManageTab} onSave={saveAccount} onDelete={() => {}} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
+
   </>;
 
   return (
@@ -5305,7 +5308,7 @@ export default function MailClient({
             onSwitch: (accountId: string) => {
               void switchAccount(accountId);
             },
-            onAdd: () => startEditAccount()
+            onAdd: () => { if (isAdminUser) setNewMailboxOpen(true); }
           },
           views: {
             inbox: inboxView,

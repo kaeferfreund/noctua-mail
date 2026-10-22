@@ -12,7 +12,7 @@ import type { AdminAccount, AdminUser } from "./types";
 import { adminRequest, errorMessage, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 
 const emptyAccount = (): Account => ({ id: "", name: "", email: "", avatar: "", imap: { host: "", port: 993, secure: true, user: "", password: "" }, smtp: { host: "", port: 465, secure: true, user: "", password: "" } });
-function CreateMailbox({ apiFetch, onClose, onCreated }: { apiFetch: AdminFetch; onClose: () => void; onCreated: () => void }) {
+export function CreateMailbox({ apiFetch, onClose, onCreated }: { apiFetch: AdminFetch; onClose: () => void; onCreated: () => void }) {
   const [account, setAccount] = useState(emptyAccount);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
