@@ -22,6 +22,11 @@ export async function listAccountMembers(accountId: string): Promise<Array<{ use
     name: u.name ?? null, role: roles.get(u.id)!, isOwner: account.ownerUserId === u.id, disabled: u.disabled }))
     .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email, "en") || a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.userId.localeCompare(b.userId, "en"));
 }
+/** Public member DTO follows the authenticated mailbox role. */
+export async function listAccountMembersForRole(accountId: string, role: AccountRole) {
+  const members = await listAccountMembers(accountId);
+  return role === "manager" ? members : members.filter(member => !member.disabled).map(({ disabled, ...member }) => { void disabled; return member; });
+}
 export async function listAccessibleAccountsForUser(userId: string): Promise<Array<{ account: Account; role: AccountRole; isOwner: boolean; memberCount: number }>> {
   const result = [];
   for (const account of await getAccountsForUser(userId)) {

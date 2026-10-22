@@ -254,7 +254,7 @@ export async function getAccountDb(accountId: string) {
   }
   const accountDb = accountDbInstances.get(dbPath)!;
   if (!accountDbInitialized.has(dbPath)) {
-    initAccountSchema(accountDb);
+    await withDbWriteRetry("initAccountSchema", () => initAccountSchema(accountDb));
     accountDbInitialized.add(dbPath);
   }
   ensureThreadRuntimeSchema(accountDb);

@@ -3,6 +3,7 @@
 // Not exported from the barrel (index.ts). External callers should import
 // from "@/lib/mail/imap", which only exposes the public surface.
 
+import { bindImapCancellation, throwIfImapCancelled } from "../imapCancellation";
 import type { Account } from "@/lib/data";
 import {
   bindImapClientError,
@@ -32,12 +33,22 @@ export async function connectImapClient(
   overrides: Partial<ImapFlowOptions> = {},
   connectOp = "connect"
 ) {
-  return await connectImapClientWithRetry({
-    account,
-    logContext,
-    connectOp,
-    createClient: () => buildImapClient(account, logContext, overrides)
-  });
+  const detach: Array<() => void> = [];
+  try {
+    return await connectImapClientWithRetry({
+      account,
+      logContext,
+      connectOp,
+      createClient: () => {
+        throwIfImapCancelled();
+        const client = buildImapClient(account, logContext, overrides);
+        detach.push(bindImapCancellation(client));
+        return client;
+      }
+    });
+  } finally {
+    detach.forEach(unbind => unbind());
+  }
 }
 
 export type ImapParsedMessage = {

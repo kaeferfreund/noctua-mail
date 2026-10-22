@@ -1,16 +1,16 @@
+import { collabActorFromSession } from "@/lib/threadCollab";
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
-  requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import {
   deleteCalendarParticipationOverrideForOccurrence,
   getCalendarEventById,
   getMessageById,
-  getFolders,
   markMessageCalendarInviteStatesProcessed,
   resolveCalendarParticipation,
   upsertCalendarEvent,
@@ -23,9 +23,8 @@ import type {
 import { buildCalendarReplyPayload } from "@/lib/calendarReply";
 import { sendSmtpMessage } from "@/lib/mail/smtp";
 import { smtpUpstreamErrorResponse } from "@/app/api/_helpers/smtpUpstreamError";
-import { appendImapMessage } from "@/lib/mail/imap";
-import { folderMailboxPath } from "@/lib/mailboxPaths";
-import { findSentFolder } from "@/lib/specialFolders";
+import { completeSend, type SentCopyResult } from "@/lib/mail/completeSend";
+import { randomUUID } from "crypto";
 import { normalizeCalendarParticipationStatus } from "@/lib/calendarParticipation";
 import { buildReplyThreadHeaders } from "@/lib/replyThreadHeaders";
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
@@ -87,6 +86,8 @@ export async function POST(request: Request, { params }: Params) {
   });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
+    const originError = requireJsonSameOrigin(request);
+    if (originError) return originError;
 
     const partstat = normalizeCalendarParticipationStatus(payload?.partstat);
     const scope: CalendarParticipationScope =
@@ -102,6 +103,7 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
     }
 
+    let sentResult: SentCopyResult | undefined;
     try {
       let attendeeEmail = event.myAttendeeEmail;
       const effectiveScope: CalendarParticipationScope =
@@ -132,7 +134,9 @@ export async function POST(request: Request, { params }: Params) {
         );
         attendeeEmail = reply.attendeeEmail;
         const threadHeaders = resolveCalendarReplyThreadHeaders(sourceMessage);
+        const messageId = `<${randomUUID()}@${accountContext.account.email.split("@")[1] || "example.invalid"}>`;
         const result = await sendSmtpMessage(accountContext.account, {
+          messageId,
           to: reply.to,
           subject: reply.subject,
           text: reply.text,
@@ -147,16 +151,8 @@ export async function POST(request: Request, { params }: Params) {
           ]
         });
 
-        const folders = await getFolders(accountId);
-        const sentFolder = findSentFolder(folders, accountId);
-        const sentMailbox = sentFolder ? folderMailboxPath(sentFolder, accountId) : null;
-        if (sentMailbox) {
-          try {
-            await appendImapMessage(accountContext.account, sentMailbox, result.raw, ["\\Seen"], accountContext.clientId);
-          } catch {
-            // ignore append failures
-          }
-        }
+        sentResult = await completeSend({ account: accountContext.account, raw: result.raw, messageId,
+          actor: collabActorFromSession(accountContext.session, accountContext.clientId), clientId: accountContext.clientId, ...threadHeaders });
       }
 
       let updatedEvent = event;
@@ -216,8 +212,10 @@ export async function POST(request: Request, { params }: Params) {
         inviteProcessing = { processedAtMs, processedAutomatically: false };
       }
 
-      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing });
+      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing, ...sentResult });
     } catch (error) {
+      if (sentResult) return NextResponse.json({ ok: true, ...sentResult,
+        postSendWarning: "RSVP email sent, but saving local calendar participation failed. Do not send it again." });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
         accountId,
         op: "send-calendar-response"

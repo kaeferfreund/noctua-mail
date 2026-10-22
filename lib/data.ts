@@ -112,6 +112,12 @@ export type Folder = {
 };
 
 export type Message = {
+  collab?: {
+    status: import("./threadCollab").ThreadStatus;
+    assigneeUserId: string | null;
+    commentCount: number;
+    updatedAt: number;
+  };
   id: string;
   threadId: string;
   parentId?: string;
