@@ -1429,7 +1429,7 @@ Mobile (below `md`):
   shown only when the state is non-default, keyed by `message.threadId`. The data arrives through
   `Message.collab`; MailClient keeps a `threadCollabById` map and an `applyThreadCollabUpdates`
   helper mirroring the topics pattern.
-- Colours: open = neutral, in_progress = iris (the shell accent tint), waiting = amber, closed = green.
+- Colours: open = neutral, in_progress = indigo, waiting = amber, closed = green.
 - Revoked or disabled assignees render as "Former member" from a cached members list.
 
 ### 7.4 Login, enrollment and security UI (branch `feat/ui-shell`, contract §4)
