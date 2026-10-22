@@ -18,7 +18,10 @@ process.env.NOCTUA_DATA_DIR = dir;
 const { getAccountDb, closeAllDbConnections } = await import("@/lib/db/connection");
 const { upsertAccount } = await import("@/lib/db/accounts");
 const { saveMailboxState, getMailboxState } = await import("@/lib/db/folders");
-const { authenticatedTestCookie } = await import("@/lib/testAuthHarness");
+const { authenticatedTestCookie, TEST_SECRET, TEST_BASE_URL } = await import("@/lib/testAuthHarness");
+process.env.BETTER_AUTH_SECRET = TEST_SECRET;
+process.env.BETTER_AUTH_URL = TEST_BASE_URL;
+const { getAuth } = await import("@/lib/betterAuth");
 let validity = 2n;
 const transport = Object.assign(new EventEmitter(), {
   capabilities: new Set(),
@@ -43,6 +46,7 @@ const folderId = `${accountId}:INBOX`;
 const endpoint = { host: "mail.example.test", port: 993, secure: true, user: "demo@example.test", password: "synthetic" };
 const abort = new AbortController();
 try {
+  await getAuth();
   await upsertAccount({ id: accountId, name: "Synthetic browser", email: "demo@example.test", avatar: "S", imap: endpoint, smtp: endpoint });
   const db = await getAccountDb(accountId);
   db.prepare("INSERT INTO folders(id,accountId,name,specialUse) VALUES (?,?,?,?)").run(folderId, accountId, "INBOX", "\\Inbox");

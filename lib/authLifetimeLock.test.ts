@@ -26,6 +26,16 @@ test("application auth initialization refuses operator lifetime lock before touc
   }finally{lock.release();}
 });
 
+test("instrumentation refuses operator lifetime lock before master DB or watcher startup",async()=>{
+  const data=dataDir(),lock=await lockFor(data,"operator");
+  try {
+    const result=child(data,`process.env.IMAP_SECRET_KEY='synthetic-startup-secret-32-characters';process.env.NOCTUA_MAILBOX_WATCHER='1';const {register}=await import('./instrumentation');try{await register();process.exitCode=2;}catch(error){console.error(error.message);process.exitCode=1;}`);
+    expect(result.status).toBe(1);expect(result.stderr).toContain("lifetime lock is held");
+    expect(()=>readFileSync(path.join(data,"db/main.db"))).toThrow();
+    expect(result.stdout).not.toContain("[startup] opened storage");
+  }finally{lock.release();}
+});
+
 for(const exit of ["normal","crash"] as const)test(`lifetime lock releases on ${exit} exit; stale PID/start timestamp cannot block restart`,async()=>{
   const data=dataDir();
   const result=child(data,`import {acquireAuthLifetimeLock} from './lib/authLifetimeLock';await acquireAuthLifetimeLock('application');${exit==="normal"?"":"process.kill(process.pid,'SIGKILL');"}`);
