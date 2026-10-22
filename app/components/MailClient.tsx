@@ -52,6 +52,8 @@ import {
 import MessageListOrchestrator, {
   type MessageListHandle
 } from "./mailclient/messagelist/MessageListOrchestrator";
+import MessageListHeader from "./mailclient/messagelist/MessageListHeader";
+import { useMessageViewMode } from "./mailclient/messagelist/useMessageViewMode";
 import BulkActionContextMenu from "./mailclient/messagelist/BulkActionContextMenu";
 import {
   dedupeAccountMessages,
@@ -1895,6 +1897,7 @@ export default function MailClient({
   const stripHtml = stripHtmlToText;
 
   const currentAccount = accounts.find((account) => account.id === activeAccountId) ?? null;
+  const [messageView, setMessageView] = useMessageViewMode(currentAccount?.settings?.layout?.defaultView);
   const reloginAccount = accounts.find((account) => account.id === reloginAccountId) ?? null;
 
   // The mail window is the one window that stays open, so its title names the
@@ -5423,7 +5426,38 @@ export default function MailClient({
           sync: {
             isSyncing,
             onCheckNewMail: () => syncAccount(undefined, "new")
-          }
+          },
+          toolbar: (
+            <MessageListHeader
+              state={{
+                searchScope,
+                loadedMessageCount,
+                totalMessages,
+                listLoading,
+                loadingMessages,
+                hasMoreMessages,
+                messageView,
+                groupBy,
+                messageSort,
+                eventGroupingAvailable: isCalendarGroupByAvailable,
+                threadDateSource,
+                threadsMode,
+                threadsScopeAvailable,
+                threadsAllowed,
+                groupedMessages,
+                collapsedGroups
+              }}
+              actions={{
+                setMessagesPage,
+                setMessageView,
+                setGroupBy,
+                setMessageSort: handleMessageSortChange,
+                setThreadDateSource,
+                setThreadsMode,
+                toggleAllGroups
+              }}
+            />
+          )
         }}
         panes={{
           onCloseCalendar: () => setCalendarSidebarOpen(false),
@@ -5431,35 +5465,7 @@ export default function MailClient({
             <MessageListOrchestrator
               scrollRef={listPaneRef}
               listHandleRef={listHandleRef}
-              defaultMessageView={currentAccount?.settings?.layout?.defaultView}
-              header={{
-                state: {
-                  listWidth,
-                  searchScope,
-                  loadedMessageCount,
-                  totalMessages,
-                  listLoading,
-                  loadingMessages,
-                  hasMoreMessages,
-                  groupBy,
-                  messageSort,
-                  eventGroupingAvailable: isCalendarGroupByAvailable,
-                  threadDateSource,
-                  threadsMode,
-                  threadsScopeAvailable,
-                  threadsAllowed,
-                  groupedMessages,
-                  collapsedGroups
-                },
-                actions: {
-                  setMessagesPage,
-                  setGroupBy,
-                  setMessageSort: handleMessageSortChange,
-                  setThreadDateSource,
-                  setThreadsMode,
-                  toggleAllGroups
-                }
-              }}
+              messageView={messageView}
               searchActive={searchActive}
               isRelatedSearch={isRelatedSearch}
               relatedNotice={relatedNotice}
