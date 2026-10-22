@@ -47,8 +47,8 @@ export async function getMessageById(accountId: string, messageId: string) {
   }
   if (!row) return null;
   const attachments = db
-    .prepare(`SELECT * FROM attachments WHERE messageId = ?`)
-    .all(row.id) as any[];
+    .prepare(`SELECT * FROM attachments WHERE accountId = ? AND messageId = ?`)
+    .all(accountId, row.id) as any[];
   const calendarInviteData = (await getMessageCalendarInviteDataByMessageId(
     db,
     accountId,
@@ -159,13 +159,17 @@ export async function getStoredMessagesByIds(
 export async function getAttachmentMeta(accountId: string, messageId: string, attachmentId: string) {
   const db = await getAccountDb(accountId);
   return db
-    .prepare(`SELECT * FROM attachments WHERE messageId = ? AND id = ?`)
-    .get(messageId, attachmentId) as any;
+    .prepare(`SELECT a.* FROM attachments a
+      JOIN messages m ON m.accountId = a.accountId AND m.id = a.messageId
+      WHERE m.accountId = ? AND m.id = ? AND a.id = ?`)
+    .get(accountId, messageId, attachmentId) as any;
 }
 
 export async function getAttachmentIds(accountId: string, messageId: string) {
   const db = await getAccountDb(accountId);
-  return (db.prepare(`SELECT id FROM attachments WHERE messageId = ?`).all(messageId) as any[]).map(
+  return (db.prepare(`SELECT a.id FROM attachments a
+    JOIN messages m ON m.accountId = a.accountId AND m.id = a.messageId
+    WHERE m.accountId = ? AND m.id = ?`).all(accountId, messageId) as any[]).map(
     (row) => row.id as string
   );
 }
@@ -180,7 +184,7 @@ export async function listMessageFileRefs(
         .prepare(
           `SELECT m.id as messageId, a.id as attachmentId
            FROM messages m
-           LEFT JOIN attachments a ON a.messageId = m.id
+           LEFT JOIN attachments a ON a.accountId = m.accountId AND a.messageId = m.id
            WHERE m.accountId = ? AND m.folderId = ?`
         )
         .all(accountId, folderId)
@@ -188,7 +192,7 @@ export async function listMessageFileRefs(
         .prepare(
           `SELECT m.id as messageId, a.id as attachmentId
            FROM messages m
-           LEFT JOIN attachments a ON a.messageId = m.id
+           LEFT JOIN attachments a ON a.accountId = m.accountId AND a.messageId = m.id
            WHERE m.accountId = ?`
         )
         .all(accountId)) as Array<{ messageId: string; attachmentId: string | null }>;
@@ -215,9 +219,6 @@ export async function listMessageFileRefsByMessageIds(accountId: string, message
   const db = await getAccountDb(accountId);
 
   const refs = new Map<string, string[]>();
-  uniqueIds.forEach((id) => {
-    refs.set(id, []);
-  });
 
   // Callers (e.g. `deleteMessagesWithFilesByIds` during full-sync
   // stale-message cleanup) can pass arrays larger than SQLite's default
@@ -230,7 +231,7 @@ export async function listMessageFileRefsByMessageIds(accountId: string, message
       .prepare(
         `SELECT m.id as messageId, a.id as attachmentId
          FROM messages m
-         LEFT JOIN attachments a ON a.messageId = m.id
+         LEFT JOIN attachments a ON a.accountId = m.accountId AND a.messageId = m.id
          WHERE m.accountId = ? AND m.id IN (${chunk.map(() => "?").join(",")})`
       )
       .all(accountId, ...chunk) as Array<{ messageId: string; attachmentId: string | null }>;

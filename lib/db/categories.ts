@@ -321,8 +321,8 @@ export async function applyCategoryFeedback(
 
     const previousCategory = normalizeCategory(row.category);
     const attachmentRows = db
-      .prepare(`SELECT filename FROM attachments WHERE messageId = ?`)
-      .all(messageId) as Array<{ filename?: string | null }>;
+      .prepare(`SELECT filename FROM attachments WHERE accountId = ? AND messageId = ?`)
+      .all(accountId, messageId) as Array<{ filename?: string | null }>;
     const attachmentFilenames = attachmentRows
       .map((item) => (item.filename ?? "").trim())
       .filter(Boolean);
@@ -511,8 +511,8 @@ export async function recomputeCategoriesForAccount(
 
         if (!classificationInput) {
           const attachmentRows = db
-            .prepare(`SELECT filename FROM attachments WHERE messageId = ?`)
-            .all(id) as Array<{ filename?: string | null }>;
+            .prepare(`SELECT filename FROM attachments WHERE accountId = ? AND messageId = ?`)
+            .all(accountId, id) as Array<{ filename?: string | null }>;
           const attachmentFilenames = attachmentRows
             .map((item) => (item.filename ?? "").trim())
             .filter(Boolean);

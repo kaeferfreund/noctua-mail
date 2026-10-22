@@ -44,17 +44,19 @@ export async function removeMessageAttachment(
   return withDbWriteRetry("removeMessageAttachment", async () => {
     const db = await getAccountDb(accountId);
     db.transaction(() => {
-      db.prepare(`DELETE FROM attachments WHERE messageId = ? AND id = ?`).run(
+      const removed = db.prepare(`DELETE FROM attachments WHERE accountId = ? AND messageId = ? AND id = ?
+        AND EXISTS (SELECT 1 FROM messages m WHERE m.accountId = attachments.accountId AND m.id = attachments.messageId)`).run(
+        accountId,
         messageRowId,
         attachmentId
       );
-      if (patch.imapUid !== undefined) {
+      if (removed.changes > 0 && patch.imapUid !== undefined) {
         db.prepare(`UPDATE messages SET imapUid = ? WHERE accountId = ? AND id = ?`).run(
           patch.imapUid,
           accountId,
           messageRowId
         );
       }
-    })();
+    }).immediate();
   });
 }
