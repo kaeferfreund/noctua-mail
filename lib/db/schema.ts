@@ -967,6 +967,7 @@ export function initAccountSchema(db: any) {
       subject TEXT NOT NULL,
       fromAddr TEXT NOT NULL,
       senderKey TEXT,
+      sourceSha256 TEXT,
       fromEmail TEXT,
       replyToAddr TEXT,
       toAddr TEXT NOT NULL,
@@ -1351,6 +1352,9 @@ export function initAccountSchema(db: any) {
       String(row.name ?? "")
     )
   );
+  if (!messageColumns.has("sourceSha256")) {
+    db.prepare(`ALTER TABLE messages ADD COLUMN sourceSha256 TEXT`).run();
+  }
   if (!messageColumns.has("senderKey")) {
     db.prepare(`ALTER TABLE messages ADD COLUMN senderKey TEXT`).run();
   }

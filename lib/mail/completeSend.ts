@@ -87,15 +87,7 @@ export async function completeSend(params: {
           const original = threaded ?? message;
           const sanitized = await sanitizeSyncedMessage(original, account.id);
           throwIfImapCancelled();
-          const stored = await upsertMessages(account.id, null, [sanitized], false);
-          const rowId = stored.messageRowIds.get(sanitized.id);
-          if (rowId && rowId !== sanitized.id) {
-            // The draft may own the base Message-ID row. Persist independent files
-            // under the final Sent row before draft cleanup removes the base files.
-            const ownCopy = await sanitizeSyncedMessage({ ...original, id: rowId }, account.id);
-            throwIfImapCancelled();
-            await upsertMessages(account.id, null, [ownCopy], false);
-          }
+          await upsertMessages(account.id, null, [sanitized], false);
           result.sentCopy = "appended";
         }
       } catch (error) {

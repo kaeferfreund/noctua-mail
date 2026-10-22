@@ -5,7 +5,6 @@ import {
   replaceInlineImageSources,
   stripRedundantInlineImageFallbacks
 } from "@/lib/html";
-import { saveAttachmentData, saveMessageSource } from "@/lib/storage";
 
 type AttachmentWithContent = Attachment & {
   content?: Buffer | Uint8Array | ArrayBuffer | null;
@@ -43,19 +42,14 @@ export function getAttachmentContentBuffer(attachment: Attachment) {
 }
 
 export async function sanitizeSyncedMessage(message: Message, accountId: string): Promise<Message> {
-  let sizeBytes = message.sizeBytes;
-  if (message.source) {
-    sizeBytes = await saveMessageSource(accountId, message.id, message.source);
-  }
+  // Keep bytes in memory until upsert resolves the final row id under its writer lock.
+  const sizeBytes = message.source !== undefined ? Buffer.byteLength(message.source) : message.sizeBytes;
   let htmlBody = message.htmlBody;
   const dataUrlReplacements = new Map<string, string>();
   const attachments = await Promise.all(
     (message.attachments ?? []).map(async (attachment) => {
       const attachmentWithContent = attachment as AttachmentWithContent;
       const buffer = getAttachmentContentBuffer(attachmentWithContent);
-      if (buffer) {
-        await saveAttachmentData(accountId, message.id, attachment.id, buffer);
-      }
       const url = buildAttachmentUrl(accountId, message.id, attachment.id);
       if (attachmentWithContent.dataUrl) {
         dataUrlReplacements.set(attachmentWithContent.dataUrl, url);
@@ -64,7 +58,7 @@ export async function sanitizeSyncedMessage(message: Message, accountId: string)
         htmlBody = replaceInlineImageSources(htmlBody, [{ ...attachment, url }]);
       }
       const { dataUrl, content, ...rest } = attachmentWithContent;
-      return { ...rest, url };
+      return { ...rest, ...(buffer ? { content: buffer } : {}), url };
     })
   );
   if (htmlBody) {
@@ -75,12 +69,11 @@ export async function sanitizeSyncedMessage(message: Message, accountId: string)
     htmlBody = appendUnreferencedInlineImages(htmlBody, attachments);
     htmlBody = htmlBody.replace(/data:(?!image\/)[^'")\s]+/gi, "about:blank");
   }
-  const { source, ...rest } = message;
   return {
-    ...rest,
+    ...message,
     htmlBody,
     attachments,
-    hasSource: Boolean(source ?? message.hasSource),
+    hasSource: Boolean(message.source ?? message.hasSource),
     sizeBytes
   };
 }

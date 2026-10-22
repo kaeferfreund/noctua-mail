@@ -17,16 +17,22 @@ identity; sender permission keys retain the existing case-insensitive and IDN
 normalization policy.
 
 The additive account-shard migration adds nullable `messages.senderKey TEXT`
+and `messages.sourceSha256 TEXT`
 without changing `PRAGMA user_version` or the shard v2 key/guard contract.
 Existing rows start with NULL: no identity is recovered from legacy display
 strings, which may have lost quotes, spaces or special characters.
 Opening a message (including thread readers and standalone HTML) lazily fills
-the key from the real From header in its retained raw source, when available.
+the key from the real From header only when its exact final-row-id source
+file matches the SHA-256 ownership digest recorded by the fixed ingestion
+writer in the same immediate transaction that assigned that row id. An exact
+filename alone is insufficient: unmarked legacy caches may have been
+overwritten by another copy with the same Message-ID. They stay unkeyed until
+authoritative resync/re-ingestion refreshes the source and ownership digest.
 Resync/re-ingestion also writes the key from the parsed envelope/header.
 A new-message-only sync does not refresh existing rows. No bulk backfill CLI is
 included: lazy backfill avoids scanning every retained source at startup.
-Rows without source stay unknown until resynced; the reader explains why their
-Always load button is disabled. SMTPUTF8 local parts remain UTF-8, while IDN
+Rows without an owned source stay unknown until resynced; the reader explains
+why their Always load button is disabled. SMTPUTF8 local parts remain UTF-8, while IDN
 domains are canonicalized to punycode for permission keys.
 
 Fragment links in the reader scroll to an ID or legacy named anchor inside the

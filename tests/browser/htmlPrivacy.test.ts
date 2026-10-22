@@ -13,6 +13,9 @@ import { GET } from "../../app/api/accounts/[accountId]/messages/[messageId]/htm
 import { GET as getPrefs, PUT as putPrefs } from "../../app/api/accounts/[accountId]/prefs/route";
 import { legacyUnkeyedSenders, senderPermissionLookupCases } from "../../lib/testFixtures/senderPermissions";
 import { ingestedSenderCases, ingestSenderPermissionMessage } from "../../lib/testFixtures/ingestedSenders";
+import { seedLegacySourceCollision } from "../../lib/testFixtures/sourceOwnership";
+import { sanitizeSyncedMessage } from "../../lib/mail/syncMessageSanitizer";
+import { getMessageSource } from "../../lib/storage";
 import { resolveMessageAddresses } from "../../lib/mail/imap/parser";
 
 async function listen(server: Server, port: number) {
@@ -69,6 +72,11 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     const legacyStart = senderMessages.length;
     senderMessages.push(...await fixture.seed(...legacyUnkeyedSenders.map(from =>
       fixture.message(`<${crypto.randomUUID()}@example.test>`, { from, senderKey: null, htmlBody: html }))));
+    const collision = await seedLegacySourceCollision(fixture, html);
+    await fixture.api.upsertMessages(fixture.accountId, null, [await sanitizeSyncedMessage(collision.copy, fixture.accountId)]);
+    expect(await getMessageSource(fixture.accountId, collision.base.id, { exact: true })).toBe(collision.baseSource);
+    expect((await fixture.api.getMessageById(fixture.accountId, collision.base.id))?.senderKey).toBeNull();
+    senderMessages.push(collision.base);
     const selectMessage = (url: URL) => url.searchParams.has("case") ? senderMessages[Number(url.searchParams.get("case"))] : message;
     const standalone = async (url: URL) => GET(new Request(`http://localhost:3000/html${url.search}`, { headers: user.jar.headers() }), {
       params: Promise.resolve({ accountId: fixture.accountId, messageId: selectMessage(url).id })
@@ -84,7 +92,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     const script = await readFile(path.join(scratch, "htmlPrivacyFixture.js"));
     const respond = async (url: URL, method?: string, body?: string) => {
       if (url.pathname === "/fixture.json") {
-        const selected = selectMessage(url);
+        const selected = (await fixture.api.getMessageById(fixture.accountId, selectMessage(url).id))!;
         return Response.json({ html: selected.htmlBody, accountId: fixture.accountId, senderKey: selected.senderKey, messageId: selected.id });
       }
       if (url.pathname === `/api/accounts/${fixture.accountId}/prefs`) {
@@ -131,7 +139,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
     expect(requests.every(request => request.referer === null)).toBe(true);
 
-    expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }))).status).toBe(200);
+    expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true, "second@example.test": true } } }))).status).toBe(200);
     for (let index = 0; index < senderMessages.length; index++) {
       requests.length = 0;
       await page.goto(`http://127.0.0.1:3824/?case=${index}`);

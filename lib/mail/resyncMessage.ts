@@ -50,7 +50,7 @@ export async function resyncImapMessageIntoDb(
 
   const [resolved] = await resolveThreadingForAccountMessages(account.id, [message]);
   const sanitized = await sanitizeSyncedMessage(
-    { ...message, threadId: resolved.threadId, parentId: resolved.parentId },
+    { ...message, id: existing.id, threadId: resolved.threadId, parentId: resolved.parentId },
     account.id
   );
   const merged = mergeLocalOnlyMessageState(sanitized, existing);
