@@ -54,7 +54,7 @@
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="subject"]) {
   display: contents;
 }
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-subject]) {
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-subject-line]) {
   grid-column: 2 / 4;
   grid-row: 2;
   min-width: 0;
@@ -62,7 +62,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="subject"] > :not([data-message-cell="unread"]):not([data-message-subject])) { display: none; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="subject"] > :not([data-message-cell="unread"]):not([data-message-subject-line])) { display: none; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]) {
   display: flex;
   align-items: center;
@@ -126,3 +126,11 @@
     min-height: 44px;
   }
 }
+
+
+.pane :global([data-mobile-collab]) { display: none; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-subject-line]) { display: flex; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-subject]) {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-mobile-collab]) { display: inline-flex; flex-shrink: 0; }

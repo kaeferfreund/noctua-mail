@@ -285,10 +285,11 @@ export default function DetachedComposeWindowClient({
 
   const finishDetachedCompose = useCallback((
     outcome: DetachedComposeOutcome,
-    draftId: string | null
+    draftId: string | null,
+    warnings?: string[]
   ) => {
     completedRef.current = true;
-    notifyDetachedComposeOutcome(handoffId, handoff, outcome, draftId);
+    notifyDetachedComposeOutcome(handoffId, handoff, outcome, draftId, warnings);
   }, [handoff, handoffId]);
 
   const loadRecipientOptions = useCallback(async (query: string, signal: AbortSignal) => {

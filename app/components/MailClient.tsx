@@ -1,5 +1,9 @@
 "use client";
 
+import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
+import { useThreadCollab } from "@/app/hooks/useThreadCollab";
+import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
+import type { ShellAccount } from "./shell/types";
 import type React from "react";
 import {
   startTransition,
@@ -362,6 +366,8 @@ export default function MailClient({
   const dragImageRef = useRef<HTMLDivElement | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [threadCollabCache, setThreadCollabCache] = useState<{ accountId: string; byId: Map<string, CollabSummary> }>({ accountId: "", byId: new Map() });
+  const [collabRevision, setCollabRevision] = useState(0);
   const [messageTopicsById, setMessageTopicsById] = useState<Map<string, Topic[]>>(new Map());
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [topicPickerMessage, setTopicPickerMessage] = useState<Message | null>(null);
@@ -885,7 +891,8 @@ export default function MailClient({
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion
+    syncCompletionVersion,
+    collabRevision
   });
 
   // Destructure search state and actions
@@ -898,7 +905,8 @@ export default function MailClient({
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder
+    activeVirtualFolder,
+    collabCounts
   } = searchState;
   const {
     setSearchScope,
@@ -2805,6 +2813,26 @@ export default function MailClient({
     if (viewMessage.accountId !== activeAccountId) return undefined;
     return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
   }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
+  const applyThreadCollabUpdates = useCallback((updates: Map<string, CollabSummary>) => {
+    if (!updates.size) return;
+    setThreadCollabCache(prev => ({ accountId: activeAccountId, byId: new Map([...(prev.accountId === activeAccountId ? prev.byId : []), ...updates]) }));
+    const apply = (msg: Message) => {
+      const state = updates.get(msg.threadId);
+      return msg.accountId === activeAccountId && state ? { ...msg, collab: state } : msg;
+    };
+    setMessages(prev => prev.map(apply));
+    setViewMessage(prev => prev ? apply(prev) : prev);
+    for (const [threadId] of updates) {
+      const cached = threadContentByIdRef.current[threadId];
+      if (cached) upsertThreadCache(threadId, cached.map(apply));
+    }
+  }, [activeAccountId, setMessages, setViewMessage, threadContentByIdRef, upsertThreadCache]);
+  const handleThreadCollabUpdate = useCallback((state: ThreadCollabState) => {
+    applyThreadCollabUpdates(new Map([[state.threadId, state]]));
+  }, [applyThreadCollabUpdates]);
+  const threadCollabById = useMemo(() => threadCollabCache.accountId === activeAccountId ? threadCollabCache.byId : new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
+  const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, { apiFetch, sessionKey: currentUser?.id, onUpdate: handleThreadCollabUpdate, onCommit: () => { setCollabRevision(value => value + 1); queueFilteredSearchRefresh(hasFilteredSearchCriteria); } });
+  const collabRole = (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;
   const activeMessageThreadKey = (() => {
@@ -3160,8 +3188,10 @@ export default function MailClient({
           return;
         }
         const sendResult = (await res.json().catch(() => null)) as
-          | { sentFolderId?: string | null; sentMessageUid?: number | null; messageId?: string | null }
+          | (SendOutcome & { sentFolderId?: string | null; sentMessageUid?: number | null; messageId?: string | null })
           | null;
+
+        const presentation = presentDraftSendOutcome(sendResult, message.subject ?? "", pushNotice);
 
         // Don't let the deletion-reconciler fire a misleading "draft gone on
         // server" tombstone notice for the row we're about to repurpose.
@@ -3185,7 +3215,7 @@ export default function MailClient({
         // keep the draft's own folder/mailbox, which could leave a non-draft
         // "sent" message lingering in a Drafts-scoped view — so fall back to
         // removing the row and letting the background sync surface the real one.
-        const optimisticSent = sentFolder
+        const optimisticSent = sentFolder && presentation.canCreateSentRow
           ? buildSentMessageFromDraft(message, {
               sentFolderId: sentFolder.id,
               sentMailboxPath: sentFolder.id.replace(`${activeAccountId}:`, ""),
@@ -3201,12 +3231,6 @@ export default function MailClient({
         } else {
           removeDraftFromUi(draftId);
         }
-
-        pushNotice({
-          type: "success",
-          title: "Draft sent.",
-          description: message.subject?.trim() ? message.subject.trim().slice(0, 180) : undefined
-        });
 
         // Bring the authoritative Sent message into the local store in the
         // background — it upserts onto the same row id. Best-effort: a failure
@@ -5068,6 +5092,7 @@ export default function MailClient({
       if (event.key !== DETACHED_COMPOSE_EVENT_STORAGE_KEY) return;
       const payload = parseDetachedComposeEvent(event.newValue);
       if (!payload || payload.accountId !== activeAccountId) return;
+      payload.warnings?.forEach(description => pushNotice({ type: "warning", title: "Email sent with a warning", description }));
       const affectedIds = [payload.draftId, payload.sourceMessageId].filter(
         (messageId): messageId is string => Boolean(messageId)
       );
@@ -5085,7 +5110,7 @@ export default function MailClient({
     };
     window.addEventListener("storage", handleDetachedComposeEvent);
     return () => window.removeEventListener("storage", handleDetachedComposeEvent);
-  }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id]);
+  }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice]);
   // Auto-repair empty folders: if a folder shows no messages after loading,
   // check if raw messages exist in DB (threading issue → recompute) or not (missing → sync).
   useEffect(() => {
@@ -5137,7 +5162,7 @@ export default function MailClient({
   const rootFolders = accountFolders.filter((folder) => !folder.parentId);
   const virtualFoldersForPane = useMemo(
     () =>
-      VIRTUAL_FOLDERS.map((folder) => ({
+      VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
         ...folder,
         active: activeVirtualFolder?.id === folder.id,
         onSelect: () => activateVirtualFolder(folder.id),
@@ -5291,7 +5316,7 @@ export default function MailClient({
 
   return (
     <AccountDateFormatProvider value={accountDateFormat}>
-    <>
+    <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
       <AppShell
         mobileNavigation={{ messageId: viewMessage?.id ?? null, clearMessage: clearMobileMessage }}
         sidebar={{
@@ -5346,7 +5371,11 @@ export default function MailClient({
             inbox: inboxView,
             // feat/collab-ui adds "Assigned to me", "Unassigned" and "Open"
             // here (see ShellViews in ./shell/types.ts).
-            collab: [],
+            collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
+              ...folder, active: activeVirtualFolder?.id === folder.id,
+              count: collabCounts[folder.id] ?? null, countAriaLabel: `${collabCounts[folder.id] ?? 0} messages`, icon: <ListTodo size={13} />,
+              onSelect: () => activateVirtualFolder(folder.id)
+            })),
             virtual: virtualFoldersForPane
           },
           topics: {
@@ -5587,7 +5616,8 @@ export default function MailClient({
                 activeMessage: activeMessage ?? null,
                 activeThread,
                 getAssignedThreadTopics,
-                onToggleTopic: handleToggleTopic
+                onToggleTopic: handleToggleTopic,
+                collab: { controller: collab, role: collabRole }
               }}
               body={{
                 composeHandleRef,
@@ -6015,7 +6045,7 @@ export default function MailClient({
           }
         }}
       />
-    </>
+    </CollabRowsContext.Provider>
     </AccountDateFormatProvider>
   );
 }

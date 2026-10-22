@@ -20,6 +20,9 @@ type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSign
 
 type RenderComposeOptions = {
   isMobile?: boolean;
+  onOutcome?: (outcome: string, id: string | null, warnings?: string[]) => void;
+  onNotice?: (notice: { type: string; title: string; description?: string }) => void;
+  refreshMailboxData?: () => Promise<void>;
   onSidebarToggle?: (open: boolean) => void;
   smtpResponse?: Response | (() => Response | Promise<Response>);
   reportError?: (message: string) => void;
@@ -118,8 +121,9 @@ function renderCompose(options: RenderComposeOptions = {}) {
     removeDraftFromUi: () => {},
     reconcileSavedDraftInUi: () => {},
     refreshFolders: async () => {},
-    refreshMailboxData: async () => {},
-    pushNotice: () => {},
+    refreshMailboxData: options.refreshMailboxData ?? (async () => {}),
+    pushNotice: options.onNotice ?? (() => {}),
+    onDetachedComposeOutcome: options.onOutcome,
     evictThreadCache: () => {},
     updateFlagState: () => {},
     updateKeywordFlag: options.updateKeywordFlag ?? (() => {}),
@@ -375,9 +379,8 @@ describe("detached compose semantics", () => {
       to: "recipient@example.test",
       xForwardedMessageId: "<source-1@example.test>"
     });
-    expect(forwardedFlags).toEqual([
-      { messageId: "source-1", keyword: "$Forwarded", value: true }
-    ]);
+    // SMTP completion owns the server flag; the client refreshes instead of sending a second mutation.
+    expect(forwardedFlags).toEqual([]);
 
     cleanup();
   });
@@ -660,4 +663,36 @@ describe("shell shortcut in composers", () => {
       }
     });
   }
+});
+
+
+describe("accepted send warnings", () => {
+  it("renders both warnings inline, emits notices and prevents duplicate delivery", async () => {
+    const notices: { description?: string }[] = [];
+    const errors: string[] = [];
+    const { view, handleRef, sendButton, countSmtpSends } = renderCompose({ holdDraftSaves: false, smtpResponse: jsonResponse({ ok: true, sentCopy: "failed", sentCopyWarning: "Sent copy unavailable.", postSendWarning: "Reply state refresh delayed." }), onNotice: n => notices.push(n), reportError: e => errors.push(e) });
+    await act(async () => { await handleRef.current?.openCompose("new", undefined, false, { to: "recipient@example.test" }); });
+    // Inline rendering is owned by its slot; open the modal for this receipt test.
+    await act(async () => { handleRef.current?.setComposeView("modal"); });
+    await act(async () => { fireEvent.click(sendButton()!); });
+    expect(notices.some(n => n.description === "Sent copy unavailable.")).toBe(true);
+    expect(notices.some(n => n.description === "Reply state refresh delayed.")).toBe(true);
+    expect(errors).toEqual([]);
+    expect(countSmtpSends()).toBe(1);
+    // A warning receipt replaces the footer's Send action.
+    expect(sendButton()).toBeUndefined();
+    expect(view.getByText("Sent copy unavailable.")).toBeTruthy();
+    expect(view.getByText("Reply state refresh delayed.")).toBeTruthy();
+  });
+  it("forwards warnings before a detached compose closes", async () => {
+    const order: string[] = [];
+    const originalClose = window.close;
+    window.close = () => { order.push("close"); };
+    try {
+      const { handleRef, sendButton } = renderCompose({ holdDraftSaves: false, detachedWindow: true, smtpResponse: jsonResponse({ ok: true, sentCopy: "failed", sentCopyWarning: "Sent copy unavailable.", postSendWarning: "Local refresh delayed." }), onOutcome: (outcome, _id, warnings) => { expect(outcome).toBe("sent"); expect(warnings).toEqual(["Sent copy unavailable.", "Local refresh delayed."]); order.push("outcome"); } });
+      await act(async () => { await handleRef.current?.openCompose("new", undefined, false, { to: "recipient@example.test" }); });
+      await act(async () => { fireEvent.click(sendButton()!); });
+      expect(order).toEqual(["outcome", "close"]);
+    } finally { window.close = originalClose; }
+  });
 });

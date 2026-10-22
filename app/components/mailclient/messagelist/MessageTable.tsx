@@ -1,3 +1,4 @@
+import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
@@ -519,10 +520,11 @@ export default function MessageTable({
                   }}
                 >
                   {renderFolderBadges(item.folderIds)}
-                  <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}
+                  <CollabRowBadges message={message} />
                 </span>
                 {showMessageSize && (
                   <span data-message-cell="size" className={styles.cellSize}>

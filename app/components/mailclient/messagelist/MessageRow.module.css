@@ -337,3 +337,8 @@
   .rowCompact .actions > :global(:not([data-message-cell="date"]):not([aria-label="Message actions"])) { display: none; }
   .rowCompact :global([aria-label="Message actions"]) { grid-column: 4; grid-row: 1 / 3; min-width: 44px; min-height: 44px; }
 }
+
+.mobileCollab { display: none; }
+@media (width < 768px) {
+  .rowCompact .mobileCollab { display: inline-flex; flex-shrink: 0; margin-left: auto; }
+}

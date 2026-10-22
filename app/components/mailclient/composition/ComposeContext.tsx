@@ -38,6 +38,8 @@ export type ComposeContextValue = {
   composeDragActive: boolean;
   composeSize: { width: number; height: number | null };
 
+  deliveredWarnings?: string[];
+
   // Draft/send status
   canSaveDraft: boolean;
   attachmentLoadState: "loading" | "error" | null;
