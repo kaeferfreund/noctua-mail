@@ -8,7 +8,15 @@ function toHeaderMap(headers: HeaderInput) {
   return new Map(Object.entries(headers));
 }
 
-function makeParsed(overrides?: Partial<any>) {
+type ParsedFixture = {
+  from: { value: { address: string }[] };
+  to: { value: { address: string }[] };
+  subject: string;
+  text: string;
+  attachments?: Parameters<typeof classifyCategoryFromMetadata>[0]["attachments"];
+};
+
+function makeParsed(overrides?: Partial<ParsedFixture>) {
   return {
     from: { value: [{ address: "no-reply@example.com" }] },
     to: { value: [{ address: "user@example.com" }] },

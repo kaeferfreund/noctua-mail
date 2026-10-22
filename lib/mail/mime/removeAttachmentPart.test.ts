@@ -75,7 +75,7 @@ describe("removeAttachmentPartFromRawMessage", () => {
     expect(removed).toBe(true);
 
     const parsed = await simpleParser(raw);
-    const names = (parsed.attachments ?? []).map((a) => a.filename);
+    const names = (parsed.attachments ?? []).map((a: { filename?: string }) => a.filename);
     expect(names).toEqual(["logo.png"]);
     expect(parsed.text?.trim()).toBe("Hello body");
   });
@@ -90,7 +90,7 @@ describe("removeAttachmentPartFromRawMessage", () => {
     expect(removed).toBe(true);
 
     const parsed = await simpleParser(raw);
-    const names = (parsed.attachments ?? []).map((a) => a.filename);
+    const names = (parsed.attachments ?? []).map((a: { filename?: string }) => a.filename);
     expect(names).toEqual(["report.pdf"]);
     expect(parsed.html || "").toContain("cid:sig@noctua"); // reference remains; caller strips the <img>
     expect(parsed.html || "").toContain("Hi");
@@ -104,7 +104,7 @@ describe("removeAttachmentPartFromRawMessage", () => {
     });
     expect(removed).toBe(true);
     const parsed = await simpleParser(raw);
-    expect((parsed.attachments ?? []).map((a) => a.filename)).toEqual(["invoice.pdf"]);
+    expect((parsed.attachments ?? []).map((a: { filename?: string }) => a.filename)).toEqual(["invoice.pdf"]);
   });
 
   it("aligns the positional index with the parser when a bare non-text part precedes the target", async () => {
@@ -184,6 +184,6 @@ describe("removeAttachmentPartFromRawMessage", () => {
     });
     expect(removed).toBe(true);
     const parsed = await simpleParser(raw);
-    expect((parsed.attachments ?? []).map((a) => a.filename)).toEqual(["logo.png"]);
+    expect((parsed.attachments ?? []).map((a: { filename?: string }) => a.filename)).toEqual(["logo.png"]);
   });
 });

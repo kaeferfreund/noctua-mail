@@ -1,7 +1,11 @@
 import { describe, expect, mock, test } from "bun:test";
 
-const upsertCalendarEventByUid = mock(() => Promise.resolve({ id: "cal-test" } as any));
-const cancelCalendarEventByUid = mock(() => Promise.resolve());
+type UpsertCalendarFields = Parameters<typeof import("../db").upsertCalendarEventByUid>[1];
+
+const upsertCalendarEventByUid = mock(
+  (_accountId: string, _fields: UpsertCalendarFields) => Promise.resolve({ id: "cal-test" })
+);
+const cancelCalendarEventByUid = mock((_accountId: string, _eventUid: string) => Promise.resolve());
 const actualDb = await import("../db");
 
 mock.module("@/lib/db", () => ({
