@@ -18,10 +18,6 @@ type MessageListRendererProps = {
   onGroupOpenChange: (groupKey: string, open: boolean) => void;
   classNames: {
     virtualItem: string;
-    groupTitle: string;
-    groupToggle: string;
-    groupTitleFlagged: string;
-    groupCaret: string;
     suggestionSection: string;
     suggestionSectionRows: string;
     suggestionSectionRow: string;
@@ -74,11 +70,8 @@ function MessageListRenderer({
             }
             top={top}
             height={groupHeight}
+            showDivider={index > 0}
             virtualItemClassName={classNames.virtualItem}
-            groupTitleClassName={classNames.groupTitle}
-            groupToggleClassName={classNames.groupToggle}
-            groupTitleFlaggedClassName={classNames.groupTitleFlagged}
-            groupCaretClassName={classNames.groupCaret}
             getGroupLabel={getGroupLabel}
             onOpenChange={(open) => onGroupOpenChange(item.group.key, open)}
           />
@@ -103,10 +96,8 @@ function MessageListRenderer({
               <MessageGroupRow
                 group={item.group}
                 isCollapsed={item.isCollapsed}
-                groupTitleClassName={classNames.groupTitle}
-                groupToggleClassName={classNames.groupToggle}
-                groupTitleFlaggedClassName={classNames.groupTitleFlagged}
-                groupCaretClassName={classNames.groupCaret}
+                height={groupHeight}
+                showDivider={index > 0}
                 getGroupLabel={getGroupLabel}
                 onOpenChange={(open) => onGroupOpenChange(item.group.key, open)}
                 renderAsVirtualItem={false}

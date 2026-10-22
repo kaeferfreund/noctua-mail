@@ -12,17 +12,16 @@ import { Search, X } from "lucide-react";
 import listMetaStyles from "./MessageListMeta.module.css";
 import listPaneStyles from "./MessageListPane.module.css";
 
-import MessageListHeader, { type MessageListHeaderProps } from "./MessageListHeader";
 import MessageListPane from "./MessageListPane";
 import MessageListView from "./MessageListView";
 import {
-  MESSAGE_VIEW_MODES,
   type MessageListViewActions,
   type MessageListViewHelpers,
   type MessageListViewState,
   type MessageViewMode
 } from "./messageListViewTypes";
 import { createSelectionStore, type SelectionStore } from "./selectionStore";
+import { usePruneMessageSelection } from "./usePruneMessageSelection";
 import type { MessageGroupMeta, VisibleMessageEntry } from "./listModel";
 import type { Folder, Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState, NoticeInput } from "../types";
@@ -35,25 +34,16 @@ import { useMessageDeleteActions } from "../useMessageDeleteActions";
 import { useMessageMutations } from "../useMessageMutations";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
-function isValidMessageViewMode(value: unknown): value is MessageViewMode {
-  return (
-    typeof value === "string" &&
-    (MESSAGE_VIEW_MODES as readonly string[]).includes(value)
-  );
-}
-
 /**
- * The message-list pane: header + search banner + loading/empty states +
- * the virtualized list view, composed into one component so the parent
+ * The message-list pane: search banner + loading/empty states + the
+ * virtualized list view, composed into one component so the parent
  * renders a single `<MessageListOrchestrator {...} />` rather than
- * assembling the subtree inline.
+ * assembling the subtree inline. The list's toolbar (count, view, sort and
+ * group) lives in the shell header, so MailClient renders it there.
  *
- * Owns the view-mode state (`messageView` / the derived
- * `deferredMessageView` and `isCompactView`) because it's the only
- * consumer — the header toggles it, the list view renders against it,
- * and the pane wrapper reacts to it for compact-layout CSS. The
- * `defaultMessageView` prop lets the parent seed / override the choice
- * from user account settings.
+ * The view mode arrives as `messageView` (MailClient owns it through
+ * `useMessageViewMode`, since the header menu sets it); the list renders a
+ * deferred copy of it so rapid view changes don't block the UI.
  *
  * Sort / group / thread-date state stays with the parent: those values
  * flow into cross-cutting data-fetch memos (`sortedMessages`,
@@ -99,7 +89,7 @@ export type MessageListHandle = {
     message: Message,
     options?: { allowThreadDeletion?: boolean }
   ) => Promise<void>;
-  handleDeleteMessagesByIds: (ids: string[]) => Promise<void>;
+  handleDeleteMessagesByIds: (ids: string[], options?: { selectedIds: string[] }) => Promise<void>;
   handleMoveMessages: (destinationFolderId: string, messageIds?: string[]) => void;
   moveMessagesToFolder: MoveMessagesToFolder;
   handleMarkSpam: (message: Message) => Promise<void>;
@@ -139,28 +129,6 @@ export type MessageListHandle = {
   ) => Promise<void>;
   clearTodoFlag: (message: Message) => Promise<void>;
 };
-
-/**
- * Header state fields the caller must supply. The `messageView` slot
- * from the canonical `MessageListHeaderProps["state"]` is omitted
- * because it's owned inside this component and merged in at render
- * time, so requiring it from the caller would create two sources of
- * truth.
- */
-export type MessageListOrchestratorHeaderState = Omit<
-  MessageListHeaderProps["state"],
-  "messageView"
->;
-
-/**
- * Header actions the caller must supply. `setMessageView` is omitted
- * for the same reason as `messageView` in the state type above —
- * toggles originate inside this component.
- */
-export type MessageListOrchestratorHeaderActions = Omit<
-  MessageListHeaderProps["actions"],
-  "setMessageView"
->;
 
 /**
  * The list-view state slots the caller supplies. `selectionStore` is
@@ -267,12 +235,8 @@ export type MessageListOrchestratorProps = {
   // props that could diverge.
   scrollRef: React.RefObject<HTMLDivElement | null>;
 
-  // User's preferred default view — typically sourced from account
-  // settings. The internal `messageView` state syncs to this whenever
-  // it changes to a recognized value; unrecognized values (`null`,
-  // `undefined`, a stored setting we don't know about) leave the
-  // current view alone.
-  defaultMessageView?: MessageViewMode | string | null;
+  // Current layout (card / table / compact / threads), owned by MailClient.
+  messageView: MessageViewMode;
 
   // Out-ref for MailClient-level consumers that need to reach into
   // orchestrator-owned state (selection store, pending actions) or
@@ -280,13 +244,6 @@ export type MessageListOrchestratorProps = {
   // hook, renderMessageMenu closures). See `MessageListHandle` for
   // the full surface.
   listHandleRef?: React.MutableRefObject<MessageListHandle | null>;
-
-  // Header state + actions minus the view-mode slice, which this
-  // component owns and injects at render time.
-  header: {
-    state: MessageListOrchestratorHeaderState;
-    actions: MessageListOrchestratorHeaderActions;
-  };
 
   // Search-banner UI (only rendered when `searchActive || isRelatedSearch`).
   searchActive: boolean;
@@ -297,8 +254,8 @@ export type MessageListOrchestratorProps = {
   onClearSearch: () => void;
 
   // List-view state / actions / helpers. The concrete `view` mode
-  // (card / table / compact / threads) is supplied internally from
-  // `messageView`, so the caller does not pass it as a separate prop.
+  // (card / table / compact / threads) is supplied from `messageView`,
+  // so the caller does not pass it in `listViewState` as well.
   // `selectionStore` and `pendingMessageActions` are merged in by the
   // orchestrator; `handleDeleteMessage`, `toggleFlaggedFlag`, and
   // `toggleTodoFlag` come from the internal mutation hooks.
@@ -324,9 +281,8 @@ export type MessageListOrchestratorProps = {
 
 export default function MessageListOrchestrator({
   scrollRef,
-  defaultMessageView,
+  messageView,
   listHandleRef,
-  header,
   searchActive,
   isRelatedSearch,
   relatedNotice,
@@ -346,32 +302,6 @@ export default function MessageListOrchestrator({
   searchScope,
   mutationInputs
 }: MessageListOrchestratorProps) {
-  const resolvedDefaultMessageView = isValidMessageViewMode(defaultMessageView)
-    ? defaultMessageView
-    : null;
-  const [messageViewState, setMessageViewState] = useState<{
-    sourceDefault: MessageViewMode | null;
-    value: MessageViewMode;
-  }>(() => ({
-    sourceDefault: resolvedDefaultMessageView,
-    value: resolvedDefaultMessageView ?? "threads"
-  }));
-  const messageView =
-    messageViewState.sourceDefault === resolvedDefaultMessageView
-      ? messageViewState.value
-      : resolvedDefaultMessageView ?? "threads";
-  const setMessageView: React.Dispatch<React.SetStateAction<MessageViewMode>> = (next) => {
-    setMessageViewState((current) => {
-      const currentValue =
-        current.sourceDefault === resolvedDefaultMessageView
-          ? current.value
-          : resolvedDefaultMessageView ?? "threads";
-      return {
-        sourceDefault: resolvedDefaultMessageView,
-        value: typeof next === "function" ? next(currentValue) : next
-      };
-    });
-  };
   // Render the list with a deferred value so rapid header toggles (e.g.
   // keyboard shortcuts stepping through views) don't block the UI while
   // the new view's layout computes.
@@ -382,6 +312,11 @@ export default function MessageListOrchestrator({
     createSelectionStore(mutationInputs.activeMessageId || null)
   );
   const lastSelectedIdRef = useRef<string | null>(null);
+  usePruneMessageSelection(
+    mutationInputs.threadScopeMessages,
+    selectionStore,
+    lastSelectedIdRef
+  );
 
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
     activeAccountId: mutationInputs.activeAccountId,
@@ -550,11 +485,6 @@ export default function MessageListOrchestrator({
       <div
         className={`${listPaneStyles.list} ${isCompactView ? listPaneStyles.listCompact : ""}`}
       >
-        <MessageListHeader
-          state={{ ...header.state, messageView }}
-          actions={{ ...header.actions, setMessageView }}
-        />
-
         {(searchActive || isRelatedSearch) && (
           <Card size="1" className={listMetaStyles.searchCard}>
             <Flex

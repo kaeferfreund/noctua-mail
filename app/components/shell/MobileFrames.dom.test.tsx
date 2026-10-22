@@ -12,8 +12,7 @@ import mobileStyles from "./MobileFrames.module.css";
 import MessageThreadList from "@/app/components/mailclient/messagelist/MessageThreadList";
 import { createSelectionStore } from "@/app/components/mailclient/messagelist/selectionStore";
 import { buildThreadTree, flattenThread, getThreadLatestDate } from "@/app/components/mailclient/messagelist/threadTree";
-import UnreadDot from "@/app/components/mailclient/messagelist/UnreadDot";
-import type { MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
+import type { MessageCardListProps, MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
 import StatusPanelFrame from "./StatusPanelFrame";
 import { MobileStatusFocusContext } from "./MobileStatusFocus";
 
@@ -100,7 +99,6 @@ function threadListProps(onSelect = noop): MessageThreadListProps {
     },
     helpers: {
       buildThreadTree, flattenThread, getThreadLatestDate, getGroupLabel: (group) => group.key,
-      renderUnreadDot: () => <UnreadDot seen={false} onToggle={noop} />,
       renderSelectIndicators: () => null, renderFolderBadges: () => null, renderQuickActions: () => null,
       renderMessageMenu: () => <MessageMenu {...menuProps()} />, handleShowRelated: noop, isTrashFolder: () => false
     }
@@ -138,7 +136,34 @@ describe("mobile message rows", () => {
     expect(checkbox.closest('[data-message-cell="unread"]') !== null).toBe(true);
     fireEvent.click(checkbox);
     expect(selected).toBe(1);
-    expect(within(row).getByRole("button", { name: "Mark as read" }) !== null).toBe(true);
+    expect(within(row).getByText("Unread") !== null).toBe(true);
+  });
+
+  it("marks unread rows with a ring on the sender icon instead of a dot", () => {
+    for (const desktop of [false, true]) {
+      window.innerWidth = desktop ? 1280 : 390;
+      for (const layout of ["card", "compact", "table", "threads"] as const) {
+        const props = threadListProps();
+        const read = { ...message, id: "read", threadId: "read-thread", seen: true };
+        const listProps: MessageCardListProps = {
+          ...props,
+          state: {
+            ...props.state, isCompactView: layout === "compact", senderIconsEnabled: true,
+            groupedMessages: [{ key: "Today", items: [message, read] }]
+          }
+        };
+        const List = layout === "table" ? MessageTable : layout === "threads" ? MessageThreadList : MessageCardList;
+        const page = render(<Theme><List {...listProps} /></Theme>);
+        const [unreadRow, readRow] = [...page.container.querySelectorAll<HTMLElement>('[data-message-list-row]')];
+        const ring = (row: HTMLElement) => row.querySelector('[data-message-cell="from"] [data-unread]') !== null;
+        expect([layout, desktop, ring(unreadRow), ring(readRow)]).toEqual([layout, desktop, true, false]);
+        // Screen readers still hear the state; read rows say nothing extra.
+        expect(within(unreadRow).getByText("Unread").closest('[data-message-cell="from"]') !== null).toBe(true);
+        expect(within(readRow).queryByText("Unread")).toBe(null);
+        expect(page.container.querySelector('[data-unread-dot], [title^="Mark as"], [aria-label^="Mark as"]')).toBe(null);
+        cleanup();
+      }
+    }
   });
 
   it("allocates nonoverlapping 72px virtual rows and restores desktop density at the breakpoint", () => {

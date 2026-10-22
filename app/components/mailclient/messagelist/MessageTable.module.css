@@ -43,10 +43,12 @@
   border-color: var(--gray-6);
 }
 
+/* Section eyebrow: the shared uppercase label style (globals.css type tokens). */
 .rowHeader {
-  font-size: 11px;
+  font-size: var(--text-2xs);
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-caps);
   color: var(--gray-11);
   height: 32px;
   padding: 4px 10px;
@@ -229,8 +231,9 @@
   gap: 6px;
 }
 
+.rowUnread .cellFrom,
 .rowUnread .cellSubject {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .threadCaret {

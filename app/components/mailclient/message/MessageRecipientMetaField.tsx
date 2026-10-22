@@ -111,17 +111,8 @@ export default function MessageRecipientMetaField({
   const parsed = onSearchByAddress ? parseAddressList(text) : [];
   const renderAddresses = parsed.length > 0;
 
-  const valueNode = (
-    <span
-      ref={valueRef}
-      className={[
-        styles.metaValue,
-        variant === "line" ? styles.toValue : "",
-        expanded ? styles.toValueExpanded : ""
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+  const addressesNode = (
+    <>
       {aliasName && <span className={styles.aliasPrefix}>{`${aliasName}: `}</span>}
       {renderAddresses && onSearchByAddress
         ? parsed.map((addr, idx) => (
@@ -140,6 +131,27 @@ export default function MessageRecipientMetaField({
             </Fragment>
           ))
         : text}
+    </>
+  );
+
+  const valueNode = (
+    <span
+      ref={valueRef}
+      className={[
+        styles.metaValue,
+        variant === "line" ? styles.toValue : styles.metaValueSegment,
+        expanded ? styles.toValueExpanded : ""
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {/* The segment shares its row with the date: the addresses get their own
+          clipping box so they truncate and the buttons stay beside them. */}
+      {variant === "segment" ? (
+        <span className={styles.metaValueText}>{addressesNode}</span>
+      ) : (
+        addressesNode
+      )}
       {hasCopy && (
         <TooltipIconButton
           size="1"
