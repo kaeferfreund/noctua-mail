@@ -5700,14 +5700,19 @@ export default function MailClient({
             accountDateFormat={accountDateFormat}
           />
         }
-        overlays={
+        notices={(placement) => (
           <InAppNoticeStack
-            className="inapp-notice-stack-pane"
-            style={{ right: `${isMobile ? 8 : noticePaneRightOffset}px` }}
+            placement={placement}
+            className={placement === "floating" ? "inapp-notice-stack-pane" : undefined}
+            style={
+              placement === "floating"
+                ? { right: `${isMobile ? 8 : noticePaneRightOffset}px` }
+                : undefined
+            }
             state={{ inAppNotices }}
             actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: handleDismissNotice }}
           />
-        }
+        )}
       />
       <DialogsHost
         confirm={confirmDialogsView}
