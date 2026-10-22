@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { getDb } from "./db/connection";
 import { resolveAccountRoleRow } from "./db/accountAccess";
 import { roleAtLeast } from "./accountRole";
@@ -8,13 +9,13 @@ export type AuthStreamIdentity = {
   generation: number; authenticatedAt: number; expiresAt: number; minRole?: AccountRole;
 };
 export type StreamRevocation = { userId?: string; sessionId?: string; accountId?: string };
-type Entry = { identity: AuthStreamIdentity; close: () => void };
+type Entry = { identity: AuthStreamIdentity; close: () => void; accountChanged?: (accountId: string) => void };
 const key = Symbol.for("noctua.authStreams");
 const globals = globalThis as typeof globalThis & { [key]?: Set<Entry> };
 const streams = globals[key] ??= new Set<Entry>();
 
 /** Delivery runs synchronously in the final DB snapshot; awaiting a check alone is unsafe. */
-export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliver?: () => void): Promise<void> {
+export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliver?: (db: Database) => void): Promise<void> {
   const db = await getDb();
   db.transaction(() => {
   const now = Date.now();
@@ -37,17 +38,21 @@ export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliv
       (identity.accountId && !roleAtLeast(resolveAccountRoleRow(db, identity.userId, identity.accountId), identity.minRole ?? "viewer"))) {
     throw new Error("Stream authorization revoked");
   }
-  deliver?.();
+  deliver?.(db);
   }).deferred();
 }
 
 /** Publish only after committing the authoritative DB change. Cleanup failures cannot reopen access. */
 export function revokeAuthStreams(match: StreamRevocation): void {
   for (const stream of [...streams]) {
-    if (Object.entries(match).every(([key, value]) => stream.identity[key as keyof AuthStreamIdentity] === value)) stream.close();
+    if (!Object.entries(match).every(([key, value]) => key === "accountId" || stream.identity[key as keyof AuthStreamIdentity] === value)) continue;
+    if (match.accountId && !stream.identity.accountId) {
+      // A user-wide stream survives mailbox revocation, but must refresh access.
+      try { stream.accountChanged?.(match.accountId); } catch { stream.close(); }
+    } else if (!match.accountId || match.accountId === stream.identity.accountId) stream.close();
   }
 }
-export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => void | Promise<void>) {
+export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => void | Promise<void>, accountChanged?: (accountId: string) => void) {
   let closed = false;
   let checking = false;
   const close = () => {
@@ -59,7 +64,7 @@ export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => 
     // Stop delivery/timers synchronously even if resource disposal fails.
     try { void Promise.resolve(cleanup()).catch(() => {}); } catch { /* DB checks remain authoritative. */ }
   };
-  const entry: Entry = { identity, close };
+  const entry: Entry = { identity, close, accountChanged };
   const liveness = setInterval(() => {
     if (checking || closed) return;
     checking = true;

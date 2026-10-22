@@ -1,3 +1,7 @@
+import { Database } from "bun:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { describe, expect, test } from "bun:test";
@@ -34,7 +38,9 @@ describe("collaboration shard storage", () => {
     expect(collab.getThreadComment(f.db, f.accountId, thread, added!.comment.id)!.deletedAt).toBeNumber();
     const before = collab.getThreadCollabState(f.db, f.accountId, thread);
     await collab.mutateThreadCollab(f.accountId, thread, (db, now) => collab.updateThreadCollabState(db, f.accountId, thread, { status: "waiting", assigneeUserId: actor.userId }, actor, now + 1000));
-    expect(collab.getThreadCollabState(f.db, f.accountId, thread)).toEqual(before);
+    expect(collab.getThreadCollabState(f.db, f.accountId, thread)).toMatchObject({
+      status: before.status, assigneeUserId: before.assigneeUserId, revision: before.revision + 1,
+    });
     expect((await collab.mutateThreadCollab(f.accountId, thread, (db, now) => collab.deleteThreadComment(db, f.accountId, thread, added!.comment.id, actor, now)))!.deleted).toBe(false);
     const activity = collab.listThreadActivity(f.db, f.accountId, thread);
     expect(activity.map(a => a.type).sort()).toEqual(["assigned", "comment_added", "comment_deleted", "comment_edited", "status_changed"]);
@@ -66,7 +72,7 @@ describe("collaboration shard storage", () => {
       collab.mutateThreadCollab(f.accountId, thread, (db, now) => collab.updateThreadCollabState(db, f.accountId, thread, { status: "in_progress" }, actor, now)),
       collab.mutateThreadCollab(f.accountId, thread, (db, now) => collab.updateThreadCollabState(db, f.accountId, thread, { assigneeUserId: actor.userId }, actor, now))
     ]);
-    expect(collab.getThreadCollabState(f.db, f.accountId, thread)).toMatchObject({ commentCount: 48, status: "in_progress", assigneeUserId: actor.userId });
+    expect(collab.getThreadCollabState(f.db, f.accountId, thread)).toMatchObject({ revision: 50, commentCount: 48, status: "in_progress", assigneeUserId: actor.userId });
     expect(collab.listThreadComments(f.db, f.accountId, thread)).toHaveLength(48);
     expect(collab.listThreadActivity(f.db, f.accountId, thread)).toHaveLength(50);
   });
@@ -135,7 +141,79 @@ test("independent SQLite writers racing their first mutation keep exact counts",
       throw new Error(result.stderr);
     expect(result.exit).toBe(0);
   }
-  expect(collab.getThreadCollabState(f.db, f.accountId, thread).commentCount).toBe(48);
+  expect(collab.getThreadCollabState(f.db, f.accountId, thread)).toMatchObject({ commentCount: 48, revision: 48 });
   expect(collab.listThreadComments(f.db, f.accountId, thread)).toHaveLength(48);
   expect(collab.listThreadActivity(f.db, f.accountId, thread)).toHaveLength(48);
+});
+
+
+describe("monotonic collaboration revisions", () => {
+  test("state, comments and remaps increment each affected key exactly once despite clock ties/regression", async () => {
+    const f = await createCollabFixture();
+    const thread = "revision-source", target = "revision-target";
+    await f.seed(f.message(target));
+    const run = <T>(fn: () => T) => f.db.transaction(fn).immediate();
+    const change = run(() => collab.updateThreadCollabState(f.db, f.accountId, thread, {
+      status: "waiting", assigneeUserId: actor.userId,
+    }, actor, 1000));
+    expect(change.revision).toBe(1); // Two changed fields, one mutation.
+    const added = run(() => collab.addThreadComment(f.db, f.accountId, thread, "Synthetic revision note", actor, 1000));
+    expect(added.state.revision).toBe(2);
+    expect(added.comment.revision).toBe(2);
+    const edited = run(() => collab.editThreadComment(f.db, { ...added.comment }, "Synthetic edited note", actor, 500));
+    expect(edited.state).toMatchObject({ revision: 3, updatedAt: 500 });
+    expect(edited.comment).toMatchObject({ revision: 3, updatedAt: 500 });
+    const deleted = run(() => collab.deleteThreadComment(f.db, f.accountId, thread, added.comment.id, actor, 500));
+    expect(deleted.state.revision).toBe(4);
+    expect(collab.getThreadComment(f.db, f.accountId, thread, added.comment.id)!.revision).toBe(4);
+    run(() => collab.updateThreadCollabState(f.db, f.accountId, target, { status: "closed" }, actor, 200));
+    run(() => collab.remapThreadCollab(f.db, f.accountId, [{
+      id: "synthetic-message", oldThreadId: thread, newThreadId: target, dateValue: 1,
+    }]));
+    expect(collab.getThreadCollabState(f.db, f.accountId, target).revision).toBe(2);
+    expect(collab.getThreadCollabState(f.db, f.accountId, thread).revision).toBe(5);
+    expect(collab.getThreadComment(f.db, f.accountId, target, added.comment.id)!.revision).toBe(2);
+    // Reusing a vacated key cannot restart its counter.
+    expect(run(() => collab.updateThreadCollabState(f.db, f.accountId, thread, { status: "waiting" }, actor, 1)).revision).toBe(6);
+    const before = collab.getThreadCollabState(f.db, f.accountId, target);
+    expect(() => run(() => {
+      collab.addThreadComment(f.db, f.accountId, target, "Synthetic rolled back", actor, 1);
+      throw new Error("synthetic rollback");
+    })).toThrow("synthetic rollback");
+    expect(collab.getThreadCollabState(f.db, f.accountId, target)).toEqual(before);
+  });
+
+  test("legacy rows migrate to zero and accounts sharing one SQLite file have independent counters", () => {
+    const directory = mkdtempSync(join(tmpdir(), "collab-revision-"));
+    const path = join(directory, "synthetic-shard.sqlite");
+    const db = new Database(path);
+    try {
+      // Populate the complete old schema first, including indexes, to exercise
+      // the cold-reader fast path rather than just missing-table initialization.
+      ensureThreadCollabRuntimeSchema(db);
+      db.exec("ALTER TABLE thread_collab_state DROP COLUMN revision");
+      db.exec("ALTER TABLE thread_comments DROP COLUMN revision");
+      db.exec(`INSERT INTO thread_collab_state(accountId,threadId,lastActivityAt,updatedAt)
+        VALUES ('synthetic-a','shared',100,100), ('synthetic-b','shared',100,100)`);
+      db.exec(`INSERT INTO thread_comments(id,accountId,threadId,authorUserId,body,createdAt,updatedAt)
+        VALUES ('synthetic-legacy-note','synthetic-a','shared','synthetic-user','Synthetic legacy note',100,100)`);
+      // A new connection is deliberately required because ensure* caches per db.
+      db.close();
+      const migrated = new Database(path);
+      try {
+        ensureThreadCollabRuntimeSchema(migrated);
+        ensureThreadCollabRuntimeSchema(migrated);
+        expect(collab.getThreadCollabState(migrated, "synthetic-a", "shared").revision).toBe(0);
+        expect(collab.getThreadComment(migrated, "synthetic-a", "shared", "synthetic-legacy-note")!.revision).toBe(0);
+        const update = (account: string) => migrated.transaction(() => collab.updateThreadCollabState(migrated, account, "shared", { status: "waiting" }, actor, 10)).immediate();
+        expect(update("synthetic-a").revision).toBe(1);
+        expect(update("synthetic-a").revision).toBe(2); // Accepted no-op also advances once.
+        expect(update("synthetic-b").revision).toBe(1);
+        expect(collab.getThreadCollabState(migrated, "synthetic-a", "other").revision).toBe(0);
+      } finally { migrated.close(); }
+    } finally {
+      db.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 });

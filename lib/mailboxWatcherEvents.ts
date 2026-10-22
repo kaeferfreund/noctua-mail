@@ -6,6 +6,7 @@ export type MailboxWatcherEvent =
   | { accountId: string; type: "synced" };
 const host = globalThis as typeof globalThis & { __noctuaMailboxWatcherEvents?: EventEmitter };
 const events = host.__noctuaMailboxWatcherEvents ??= new EventEmitter();
+events.setMaxListeners(0);
 // Subscribers must authorize account ids before forwarding events to users.
 export function subscribeMailboxEvents(listener: (event: MailboxWatcherEvent) => void) {
   events.on("mailbox", listener);

@@ -1,3 +1,4 @@
+import { getUserMailboxSummary } from "@/lib/mailboxSummary";
 import { listAccessibleAccountsForUser, listAccountMembersForRole } from "@/lib/accountAccess";
 import { resolveMcpToolContext } from "@/lib/mcpAuth";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
@@ -936,6 +937,30 @@ export async function executeMcpHttpRequest(params: {
         ok: true,
         accounts: summaries
       });
+    }
+  );
+
+  server.registerTool(
+    "list_mailbox_summary",
+    {
+      description: "Read unread, assigned-to-me and unassigned-open counts for the token's accessible mailbox. Counts use the token creator as viewer.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      outputSchema: {
+        ok: z.literal(true), generatedAt: z.number(), mailboxes: z.array(z.object({
+          accountId: z.string(), name: z.string(), email: z.string(), accessRole: z.enum(["viewer", "editor", "manager"]),
+          isOwner: z.boolean(), shared: z.boolean(), unread: z.number().nullable(), assignedToMe: z.number(), unassignedOpen: z.number(),
+          watcher: z.object({ state: z.enum(["disabled", "starting", "idling", "backoff", "auth_failed", "stopped"]), lastEventAt: z.number().optional() })
+        }))
+      }
+    },
+    async () => {
+      const live = await resolveAccountContext(context);
+      // MCP tokens are mailbox-bound: metadata enumeration is not authority
+      // to read counts from the creator's other mailboxes.
+      const summary = await getUserMailboxSummary(live.tokenRecord.createdByUserId, [live.accountId]);
+      await resolveAccountContext(context);
+      return buildToolResult(`Returned ${summary.mailboxes.length} mailbox summaries.`, summary);
     }
   );
 

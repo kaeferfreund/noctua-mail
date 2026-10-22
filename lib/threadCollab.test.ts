@@ -39,7 +39,10 @@ describe("collaboration domain", () => {
     expect(edited!.state.commentCount).toBe(1);
     const before = await collab.getThreadCollabState(f.accountId, f.thread);
     await collab.editThreadComment(f.accountId, f.thread, added.comment.id, "Updated note", f.actor);
-    expect(await collab.getThreadCollabState(f.accountId, f.thread)).toEqual(before);
+    expect(await collab.getThreadCollabState(f.accountId, f.thread)).toMatchObject({
+      commentCount: before.commentCount, revision: before.revision + 1,
+    });
+    expect((await collab.listThreadComments(f.accountId, f.thread))[0].revision).toBe(edited!.comment.revision);
     const other = await principal.createUser(`other-${crypto.randomUUID()}@example.test`);
     await principal.addMembership(other.id, f.accountId, "editor");
     const otherActor = { userId: other.id, clientId: "mcp:synthetic" };
