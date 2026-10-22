@@ -95,6 +95,8 @@ export async function upsertMessages(
 ) {
   return withDbWriteRetry("upsertMessages", async () => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
+    // Expose the final storage identity to callers that persist source/attachment files.
+    const messageRowIds = new Map<string, string>();
     const UPSERT_BATCH_SIZE = 200;
     const db = await getAccountDb(accountId);
     const deleteSql = folderId
@@ -311,6 +313,7 @@ export async function upsertMessages(
           // will fetch its own source/attachments on first access.
           existingRow = findMessageById.get(accountId, rowId) as typeof existingById;
         }
+        messageRowIds.set(message.id, rowId);
         const previous = existingRow ?? replacedById.get(rowId) ?? (message.messageId ? replacedByHeader.get(message.messageId) : undefined);
         if (previous?.threadId && previous.threadId !== message.threadId) remaps.push({
           ...previous, oldThreadId: previous.threadId, newThreadId: message.threadId
@@ -640,7 +643,7 @@ export async function upsertMessages(
         await rebuildThreadSignalsForThreadIds(db, accountId, affected);
         upsertTopicLearningSignalsForThreadIds(db, accountId, affected);
         pruneThreadTopicsWithoutMessages(db, accountId, affected);
-        return { affectedThreadIds: affected, requiresFullRecompute };
+        return { affectedThreadIds: affected, requiresFullRecompute, messageRowIds };
       }
       requiresFullRecompute = true;
       if (shouldRecomputeThreads) {
@@ -672,6 +675,6 @@ export async function upsertMessages(
       upsertTopicLearningSignalsForThreadIds(db, accountId, affected);
       pruneThreadTopicsWithoutMessages(db, accountId, affected);
     }
-    return { affectedThreadIds, requiresFullRecompute };
+    return { affectedThreadIds, requiresFullRecompute, messageRowIds };
   });
 }

@@ -25,7 +25,7 @@ async function fixture(role: "viewer" | "editor" | "manager") {
     const response = await executeMcpHttpRequest({ body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
       accountId: f.accountId, account: f.account, tokenRecord: { id: "synthetic-token", accountId: f.accountId, createdByUserId: principal.user.id,
         label: "Synthetic", tokenSuffix: "test", createdAt: Date.now(), expiresAt: null, lastUsedAt: null } });
-    return (response.responses[0] as unknown as { result: { isError?: boolean; structuredContent: { accounts: Array<{ accessRole: string }>; items: Array<{ collab: unknown }>; state: { assigneeUserId: string }; activity: Array<{ actorClientId: string }> }; content: Array<{ text: string }> } }).result;
+    return (response.responses[0] as unknown as { result: { isError?: boolean; structuredContent: { members: Array<{ userId: string; name: string | null; email: string; role: string; isOwner: boolean; disabled: boolean }>; accounts: Array<{ accessRole: string }>; items: Array<{ collab: unknown }>; state: { assigneeUserId: string }; activity: Array<{ actorClientId: string }> }; content: Array<{ text: string }> } }).result;
   }
   return { ...f, message, request, route, tool };
 }
@@ -39,12 +39,65 @@ describe("collaboration REST", () => {
     const realUrl = `http://localhost:3000/api/accounts/${f.accountId}/threads/${encodeURIComponent(thread)}/collab`;
     const decodedParamsResponse = await getCollab(new Request(realUrl, { headers: f.request().headers }), f.route({ threadId: thread }));
     expect((await decodedParamsResponse.json()).state.threadId).toBe(thread);
-    expect(data.members.find((m: { id: string }) => m.id === principal.user.id)).toEqual({ id: principal.user.id, name: "Synthetic User", email: principal.user.email, role });
+    expect(data.members.find((m: { userId: string }) => m.userId === principal.user.id)).toEqual({ userId: principal.user.id, name: "Synthetic User", email: principal.user.email, role, isOwner: false, disabled: false });
     expect((await members(f.request(), f.route())).status).toBe(200);
     expect((await activity(f.request(), f.route())).status).toBe(200);
     expect((await PATCH(f.request("PATCH", { status: "waiting" }), f.route())).status).toBe(role === "viewer" ? 403 : 200);
     expect((await POST(f.request("POST", { body: "Synthetic internal note" }), f.route())).status).toBe(role === "viewer" ? 403 : 201);
     expect((await DELETE(f.request("DELETE"), f.route({ commentId: "absent" }))).status).toBe(role === "viewer" ? 403 : 200);
+  });
+  test("comment DELETE accepts bodyless same-origin, rejects cross-origin and unexpected bodies", async () => {
+    const f = await fixture("editor");
+    const added = await (await POST(f.request("POST", { body: "Delete regression" }), f.route())).json();
+    const route = f.route({ commentId: added.comment.id });
+    const req = (origin: string, body?: string) => new Request("http://localhost:3000/api/comment", {
+      method: "DELETE", headers: principal.jar.headers({ origin }), ...(body === undefined ? {} : { body })
+    });
+    expect((await DELETE(req("https://evil.example.test"), route)).status).toBe(403);
+    const unexpected = await DELETE(req("http://localhost:3000", "{}"), route);
+    expect(unexpected.status).toBe(400);
+    expect((await unexpected.json()).code).toBe("unexpected_body");
+    expect((await DELETE(req("http://localhost:3000"), route)).status).toBe(200);
+  });
+  for (const role of ["viewer", "editor", "manager"] as const)
+    test(`${role}: REST, bootstrap and MCP use canonical member DTO and manager-only disabled visibility`, async () => {
+      const f = await fixture(role);
+      const owner = await principal.createUser(`owner-${crypto.randomUUID()}@example.test`);
+      const disabled = await principal.createUser(`disabled-${crypto.randomUUID()}@example.test`);
+      await principal.addMembership(disabled.id, f.accountId, "editor");
+      const db = await getDb();
+      db.prepare("UPDATE accounts SET ownerUserId=? WHERE id=?").run(owner.id, f.accountId);
+      db.prepare("UPDATE auth_user SET banned=1 WHERE id=?").run(disabled.id);
+      // Expired bans are enabled, matching team-auth's getUsers mapping.
+      const expired = await principal.createUser(`expired-${crypto.randomUUID()}@example.test`);
+      await principal.addMembership(expired.id, f.accountId, "viewer");
+      db.prepare("UPDATE auth_user SET banned=1,banExpires=? WHERE id=?").run(new Date(Date.now() - 60_000).toISOString(), expired.id);
+      const rest = (await (await members(f.request(), f.route())).json()).members;
+      const bootstrap = (await (await getCollab(f.request(), f.route())).json()).members;
+      const mcp = (await f.tool("list_mailbox_members")).structuredContent.members;
+      expect(bootstrap).toEqual(rest); expect(mcp).toEqual(rest);
+      expect(rest.find((m: { userId: string }) => m.userId === owner.id)).toEqual({
+        userId: owner.id, name: owner.name, email: owner.email, role: "manager", isOwner: true, disabled: false
+      });
+      expect(rest.find((m: { userId: string }) => m.userId === expired.id)?.disabled).toBe(false);
+      const banned = rest.find((m: { userId: string }) => m.userId === disabled.id);
+      if (role === "manager") expect(banned).toEqual({ userId: disabled.id, name: disabled.name, email: disabled.email, role: "editor", isOwner: false, disabled: true });
+      else expect(banned).toBeUndefined();
+      for (const member of rest) expect(Object.keys(member).sort()).toEqual(["disabled", "email", "isOwner", "name", "role", "userId"]);
+    });
+  test("message-less thread retains historical state with empty lists; never-known thread has defaults", async () => {
+    const f = await fixture("editor");
+    await PATCH(f.request("PATCH", { status: "waiting", assigneeUserId: principal.user.id }), f.route());
+    await POST(f.request("POST", { body: "Historical note" }), f.route());
+    const historical = (await (await getCollab(f.request(), f.route())).json()).state;
+    f.db.prepare("DELETE FROM messages WHERE accountId=?").run(f.accountId);
+    const retained = await (await getCollab(f.request(), f.route())).json();
+    expect(retained.state).toEqual(historical);
+    expect(retained.comments).toEqual([]); expect(retained.activity).toEqual([]);
+    const unknown = await (await getCollab(f.request(), f.route({ threadId: "<never-known@example.test>" }))).json();
+    expect(unknown.state.status).toBe("open"); expect(unknown.state.assigneeUserId).toBeNull();
+    expect(unknown.state.commentCount).toBe(0);
+    expect(unknown.comments).toEqual([]); expect(unknown.activity).toEqual([]);
   });
   test("validates JSON, status, assignee, comment, limit, thread existence and origin", async () => {
     const f = await fixture("editor");

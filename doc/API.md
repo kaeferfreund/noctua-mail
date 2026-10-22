@@ -3,7 +3,8 @@
 All examples use synthetic data. Browser routes require a live, MFA-assured session and
 current membership of the requested mailbox. Reads require viewer; writes require editor
 or manager. Writes require a configured same-origin Origin (or Referer) and
-`Content-Type: application/json`, including bodyless comment DELETE. Responses retain session
+`Content-Type: application/json` for JSON writes. Comment DELETE requires an empty body
+and the same-origin check, with no Content-Type requirement. Responses retain session
 refresh/deletion headers. A body-supplied accountId or userId never supplies authorization.
 
 ## REST
@@ -26,8 +27,9 @@ assigning/setting the existing value is a no-op. PATCH accepts at least one know
 `assigneeUserId:null` unassigns; a string must identify an enabled current mailbox member.
 Comments are Markdown source of 1–20000 characters, with at least one non-whitespace character.
 Only the author or a manager may soft-delete a comment; repeat deletion is idempotent.
-Members contain only `{id,name,email,role}`; ownership resolves to manager. Banned/non-members
-are excluded. Activity is newest first, default limit 100, valid integer range 1–500.
+Members contain only `{userId,name,email,role,isOwner,disabled}`; ownership resolves to
+manager and `name` is nullable. Managers see disabled members; viewers and editors see only
+enabled members. Non-members are excluded. Activity is newest first, default limit 100, valid integer range 1–500.
 
 For example:
 
@@ -42,9 +44,12 @@ Content-Type: application/json
 Errors are `{ok:false,message}`: 400 for invalid fields/status/assignee/comment/limit,
 malformed JSON or thread encoding; 401 for no live session; 403 for missing membership,
 insufficient role or another author's comment. Mutations of threads without live messages
-return 404. Unknown read threads return the default open/unassigned state and empty lists.
+return 404. A never-known read thread returns the default open/unassigned state and empty lists.
+A thread with no remaining live messages but retained collaboration state returns that historical
+state, with empty comments and activity.
 Same-origin rejection is HTTP 403 `{ok:false,code:"invalid_origin"}`; wrong media type is
-415 `{ok:false,code:"json_required"}`.
+415 `{ok:false,code:"json_required"}`. A nonempty comment DELETE body returns
+400 `{ok:false,code:"unexpected_body"}`.
 
 ## MCP tools
 
@@ -106,7 +111,8 @@ Successful SMTP acceptance always returns HTTP 200 with `ok:true` and these fiel
 `sentCopy` is:
 
 - `appended`: Sent APPEND succeeded and the message was ingested into the account shard.
-- `failed`: delivery succeeded but saving, locating or ingesting the Sent copy failed.
+- `failed`: delivery succeeded but saving, locating or ingesting the Sent copy failed,
+  or the absolute post-send IMAP deadline expired (including flags or draft cleanup).
 - `no-sent-folder`: delivery succeeded but fresh LIST found no suitable Sent folder.
 
 For example, a Sent-copy failure is still a delivered message:
@@ -123,19 +129,25 @@ the send fields, and a postSendWarning; event/participation may then be absent.
 Direct send retains inviteScheduled/inviteEventId/inviteWarning; successful calendar updates
 retain event/participation/inviteProcessing.
 
-The server prefers SPECIAL-USE `\Sent`, re-LISTs when its cached Sent folder is missing,
+The server prefers SPECIAL-USE `\Sent`, re-LISTs when its cached Sent folder is missing or APPEND reports a missing folder,
 and limits name fallback to exact top-level or INBOX-child Sent names (never Outbox or
 substring matches). A failed APPEND is retried once using a fresh pooled connection.
 Accepted APPEND without APPENDUID uses UID SEARCH Message-ID and never APPENDs again.
+Before retrying an ambiguous APPEND, it UID SEARCHes the Message-ID on a fresh connection
+and ingests any existing copy. Post-send IMAP work has an absolute deadline controlled by
+`NOCTUA_POST_SEND_TIMEOUT_MS` (default 30000 ms), including draft IMAP cleanup. Expiry closes
+the active connection and returns accepted delivery with `sentCopy:"failed"` and warnings.
+Attribution is recorded immediately after SMTP acceptance, before IMAP work.
 SMTP is never retried after success. Draft wire copies strip Bcc while their Sent copies retain it.
-Replies/forwards update `\Answered`/`$Forwarded` server-side, then record reply activity with
-the authenticated actor. Every outbound Message-ID, including new mail, gets shard
+Replies/forwards record reply activity with the authenticated actor before updating
+`\Answered`/`$Forwarded` server-side. Every outbound Message-ID, including new mail, gets shard
 `sent_by(accountId,messageId,userId,sentAt)` attribution. Sending never changes thread status.
 
 ## Integration seams
 
-`lib/threadCollab.ts` exports temporary resolveAccountRole/roleAtLeast/listCollabMembers;
+`lib/threadCollab.ts` exports temporary resolveAccountRole/roleAtLeast/listAccountMembers;
 `app/api/_helpers/threadCollabContext.ts` adapts them to the async session guard. Replace
-these with feat/team-auth's account-access/context helpers when Slice 3 lands. Do not activate
+these with feat/team-auth's account-access/context helpers when Slice 3 lands; the members
+route is team-auth-owned at integration. Do not activate
 HTTP MCP until that branch supplies its token checks. feat/collab-ui consumes the routes,
 collaboration enrichment, shared Sent state, and post-send warnings.

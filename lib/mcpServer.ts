@@ -1,5 +1,5 @@
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
-import { getThreadCollabState, listThreadComments, listThreadActivity, listCollabMembers,
+import { getThreadCollabState, listThreadComments, listThreadActivity, listAccountMembers,
   updateThreadCollabState, addThreadComment, resolveAccountRole, roleAtLeast } from "@/lib/threadCollab";
 import type { AccountRole } from "@/lib/data";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -1185,10 +1185,10 @@ export async function executeMcpHttpRequest(params: {
     body: z.string(), createdAt: z.number(), updatedAt: z.number(), deletedAt: z.number().nullable() });
   const activitySchema = z.object({ id: z.string(), accountId: z.string(), threadId: z.string(), type: z.string(),
     actorUserId: z.string().nullable(), actorClientId: z.string(), payload: z.record(z.string(), z.unknown()), createdAt: z.number() });
-  server.registerTool("list_mailbox_members", { description: "List enabled mailbox members.", inputSchema: ACCOUNT_ID_ARG,
-    outputSchema: { ok: z.boolean(), members: z.array(z.object({ id: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["viewer", "editor", "manager"]) })) } },
+  server.registerTool("list_mailbox_members", { description: "List mailbox members; disabled members are visible to managers only.", inputSchema: ACCOUNT_ID_ARG,
+    outputSchema: { ok: z.boolean(), members: z.array(z.object({ userId: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["viewer", "editor", "manager"]), isOwner: z.boolean(), disabled: z.boolean() })) } },
     async args => { const ctx = await resolveAccountContext(context, args.accountId);
-      return buildToolResult("Mailbox members.", { ok: true, members: await listCollabMembers(ctx.accountId) }); });
+      return buildToolResult("Mailbox members.", { ok: true, members: (await listAccountMembers(ctx.accountId)).filter(member => ctx.role === "manager" || !member.disabled) }); });
   server.registerTool("get_thread_collaboration", { description: "Read thread state, internal comments and activity.", inputSchema: targetSchema,
     outputSchema: { ok: z.boolean(), threadId: z.string(), state: stateSchema, comments: z.array(commentSchema), activity: z.array(activitySchema) } },
     async args => { const ctx = await resolveAccountContext(context, args.accountId); const { threadId } = await resolveThreadTarget(ctx, args);

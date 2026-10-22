@@ -1,12 +1,12 @@
-import { getThreadCollabState, listThreadComments, listThreadActivity, listCollabMembers, updateThreadCollabState, ThreadCollabError, type ThreadCollabPatch } from "@/lib/threadCollab";
+import { getThreadCollabState, listThreadComments, listThreadActivity, listAccountMembers, updateThreadCollabState, ThreadCollabError, type ThreadCollabPatch } from "@/lib/threadCollab";
 import { collabJson, threadResult, withThreadCollab, type ThreadRouteParams } from "@/app/api/_helpers/threadCollabContext";
 export async function GET(request: Request, route: ThreadRouteParams) {
   return withThreadCollab(request, route, false, async (ctx, threadId) => {
     const [state, comments, activity, members] = await Promise.all([
       getThreadCollabState(ctx.accountId, threadId), listThreadComments(ctx.accountId, threadId),
-      listThreadActivity(ctx.accountId, threadId), listCollabMembers(ctx.accountId)
+      listThreadActivity(ctx.accountId, threadId), listAccountMembers(ctx.accountId)
     ]);
-    return collabJson({ ok: true, state, comments, activity, members });
+    return collabJson({ ok: true, state, comments, activity, members: members.filter(member => ctx.role === "manager" || !member.disabled) });
   });
 }
 export async function PATCH(request: Request, route: ThreadRouteParams) {

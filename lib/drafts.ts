@@ -1,3 +1,4 @@
+import { PostSendTimeoutError, postSendDeadlineAt, withImapDeadline } from "@/lib/mail/imapCancellation";
 import { completeSend, type SentCopyResult } from "@/lib/mail/completeSend";
 import type { CollabActor } from "@/lib/threadCollab";
 import type { Account, Message } from "@/lib/data";
@@ -375,7 +376,8 @@ export async function sendDraftForAccount(params: {
     to: envelopeRecipients
   });
 
-  const sentResult = await completeSend({ account, clientId, raw: Buffer.from(rawSource),
+  const deadlineAt = postSendDeadlineAt();
+  const sentResult = await completeSend({ account, clientId, deadlineAt, raw: Buffer.from(rawSource),
     messageId, actor: params.actor, inReplyTo: draft.inReplyTo, references: draft.references,
     xForwardedMessageId: draft.xForwardedMessageId });
 
@@ -409,8 +411,13 @@ export async function sendDraftForAccount(params: {
     const attachmentIds = await getAttachmentIds(accountId, draft.id);
     if (draft.mailboxPath && typeof draft.imapUid === "number") {
       try {
-        await deleteImapMessage(account, draft.mailboxPath, draft.imapUid, clientId);
+        await withImapDeadline(deadlineAt, () => deleteImapMessage(account, draft.mailboxPath!, draft.imapUid!, clientId));
       } catch (error) {
+        if (error instanceof PostSendTimeoutError) {
+          sentResult.sentCopy = "failed";
+          sentResult.sentCopyWarning = "Email sent, but draft cleanup timed out. Do not send it again.";
+          sentResult.postSendWarning = [sentResult.postSendWarning, "Email sent, but removing the server draft failed."].filter(Boolean).join(" ");
+        }
         console.warn("[draft-send] IMAP delete failed after send", {
           accountId,
           draftId: draft.id,

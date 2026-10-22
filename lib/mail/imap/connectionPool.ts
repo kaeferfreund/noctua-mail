@@ -51,6 +51,7 @@
 // already used by the circuit breaker in `imapClientOptions.ts` and the
 // sync-job registry.
 
+import { bindImapCancellation, throwIfImapCancelled } from "../imapCancellation";
 import type { Account } from "@/lib/data";
 import type { ImapFlow } from "imapflow";
 import {
@@ -159,6 +160,7 @@ export async function acquirePooledImapClient(
   logContext: ImapLogContext,
   fresh = false
 ): Promise<ImapFlow> {
+  throwIfImapCancelled();
   const key = buildImapIdentityKey(account);
   const cached = state.pool.get(key);
   if (cached && fresh) evictEntry(key, cached, "fresh-request");
@@ -229,14 +231,17 @@ export async function withPooledImapClient<T>(
   options?: { fresh?: boolean }
 ): Promise<T> {
   const client = await acquirePooledImapClient(account, logContext, options?.fresh);
+  let detach: (() => void) | undefined;
   try {
+    detach = bindImapCancellation(client);
     const result = await fn(client);
+    throwIfImapCancelled();
     releasePooledImapClient(account, client, logContext);
     return result;
   } catch (error) {
     releasePooledImapClient(account, client, logContext, { evict: true });
     throw error;
-  }
+  } finally { detach?.(); }
 }
 
 /** Size of the current idle pool. For tests / telemetry. */

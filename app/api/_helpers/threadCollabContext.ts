@@ -3,7 +3,7 @@ import { forwardAuthHeaders, requireActiveUserSession, withAuthResponse } from "
 import { getAccountById } from "@/lib/serverDb";
 import { collabActorFromSession, resolveAccountRole, roleAtLeast, ThreadCollabError } from "@/lib/threadCollab";
 import type { AccountRole } from "@/lib/data";
-import { requireJsonSameOrigin } from "./requestOrigin";
+import { requireJsonSameOrigin, requireBodylessSameOrigin } from "./requestOrigin";
 import type { AccountRouteParams } from "./accountContext";
 
 // feat/team-auth Slice 3: replace this adapter with requireAccountContext(minRole).
@@ -24,13 +24,16 @@ export async function requireCollabAccountContext(request: Request, accountId: s
 export type ThreadRouteParams = AccountRouteParams;
 export type CollabContext = Exclude<Awaited<ReturnType<typeof requireCollabAccountContext>>, NextResponse>;
 export function collabJson(value: unknown, status = 200) { return NextResponse.json(value, { status }); }
-export async function withThreadCollab(request: Request, route: ThreadRouteParams, write: boolean,
+export async function withThreadCollab(request: Request, route: ThreadRouteParams, write: boolean | "bodyless",
   respond: (ctx: CollabContext, threadId: string, params: Record<string, string | string[] | undefined>) => Promise<NextResponse>) {
   const params = await route.params;
   const ctx = await requireCollabAccountContext(request, typeof params.accountId === "string" ? params.accountId : "", write ? "editor" : "viewer");
   if (ctx instanceof NextResponse) return ctx;
   return withAuthResponse(ctx, async () => {
-    if (write) { const error = requireJsonSameOrigin(request); if (error) return error; }
+    if (write) {
+      const error = write === "bodyless" ? await requireBodylessSameOrigin(request) : requireJsonSameOrigin(request);
+      if (error) return error;
+    }
     try {
       let threadId: string;
       try {
