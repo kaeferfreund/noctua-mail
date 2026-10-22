@@ -11,7 +11,12 @@ import { createAuthenticatedTestSession } from "../../lib/testAuthHarness";
 import { createCollabFixture } from "../../lib/testThreadCollabHarness";
 import { GET } from "../../app/api/accounts/[accountId]/messages/[messageId]/html/route";
 import { GET as getPrefs, PUT as putPrefs } from "../../app/api/accounts/[accountId]/prefs/route";
-import { senderPermissionCases } from "../../lib/testFixtures/senderPermissions";
+import { legacyUnkeyedSenders, senderPermissionLookupCases } from "../../lib/testFixtures/senderPermissions";
+import { ingestedSenderCases, ingestSenderPermissionMessage } from "../../lib/testFixtures/ingestedSenders";
+import { seedLegacySourceCollision } from "../../lib/testFixtures/sourceOwnership";
+import { sanitizeSyncedMessage } from "../../lib/mail/syncMessageSanitizer";
+import { getMessageSource } from "../../lib/storage";
+import { resolveMessageAddresses } from "../../lib/mail/imap/parser";
 
 async function listen(server: Server, port: number) {
   await new Promise<void>((resolve, reject) => {
@@ -51,8 +56,27 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     const fixture = await createCollabFixture();
     const user = await createAuthenticatedTestSession(fixture.accountId);
     const [message] = await fixture.seed(fixture.message("<privacy-browser@example.test>", { htmlBody: html }));
-    const senderMessages = await fixture.seed(...senderPermissionCases.map(({ from }) =>
-      fixture.message(`<${crypto.randomUUID()}@example.test>`, { from, htmlBody: html })));
+    const senderMessages = await fixture.seed(...senderPermissionLookupCases.map(({ from }) =>
+      fixture.message(`<${crypto.randomUUID()}@example.test>`, { ...resolveMessageAddresses(undefined, new Map([["from", [from]]]), fixture.account.email), htmlBody: html })));
+    // Start these regressions with ImapFlow's envelope parser and the production
+    // sync ingestion function, then read the persisted rows in both renderers.
+    for (const entry of ingestedSenderCases) {
+      const ingested = await ingestSenderPermissionMessage(fixture.account, entry, html);
+      await fixture.seed(ingested);
+      const stored = await fixture.api.getMessageById(fixture.accountId, ingested.id);
+      expect(stored).toBeTruthy();
+      expect(stored!.senderKey, entry.name).toBe(entry.key);
+      expect(stored!.senderKey, entry.name).not.toBe("trusted@example.test");
+      senderMessages.push(stored!);
+    }
+    const legacyStart = senderMessages.length;
+    senderMessages.push(...await fixture.seed(...legacyUnkeyedSenders.map(from =>
+      fixture.message(`<${crypto.randomUUID()}@example.test>`, { from, senderKey: null, htmlBody: html }))));
+    const collision = await seedLegacySourceCollision(fixture, html);
+    await fixture.api.upsertMessages(fixture.accountId, null, [await sanitizeSyncedMessage(collision.copy, fixture.accountId)]);
+    expect(await getMessageSource(fixture.accountId, collision.base.id, { exact: true })).toBe(collision.baseSource);
+    expect((await fixture.api.getMessageById(fixture.accountId, collision.base.id))?.senderKey).toBeNull();
+    senderMessages.push(collision.base);
     const selectMessage = (url: URL) => url.searchParams.has("case") ? senderMessages[Number(url.searchParams.get("case"))] : message;
     const standalone = async (url: URL) => GET(new Request(`http://localhost:3000/html${url.search}`, { headers: user.jar.headers() }), {
       params: Promise.resolve({ accountId: fixture.accountId, messageId: selectMessage(url).id })
@@ -68,8 +92,8 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     const script = await readFile(path.join(scratch, "htmlPrivacyFixture.js"));
     const respond = async (url: URL, method?: string, body?: string) => {
       if (url.pathname === "/fixture.json") {
-        const selected = selectMessage(url);
-        return Response.json({ html, accountId: fixture.accountId, sender: selected.from, messageId: selected.id });
+        const selected = (await fixture.api.getMessageById(fixture.accountId, selectMessage(url).id))!;
+        return Response.json({ html: selected.htmlBody, accountId: fixture.accountId, senderKey: selected.senderKey, messageId: selected.id });
       }
       if (url.pathname === `/api/accounts/${fixture.accountId}/prefs`) {
         return method === "PUT" ? savePrefs(body!) : getPrefs(new Request(`http://localhost:3000${url.pathname}`, { headers: user.jar.headers() }), prefsParams);
@@ -115,9 +139,29 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
     expect(requests.every(request => request.referer === null)).toBe(true);
 
-    for (const name of ["quoted local part containing whitespace", "quoted local part containing an angle-bracket address", "unicode IDN", "A-label IDN"]) {
-      const index = senderPermissionCases.findIndex(entry => entry.name === name);
-      const { key } = senderPermissionCases[index];
+    expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true, "second@example.test": true } } }))).status).toBe(200);
+    for (let index = 0; index < senderMessages.length; index++) {
+      requests.length = 0;
+      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.getByRole("button", { name: "Load once" }).waitFor();
+      await page.waitForLoadState("networkidle");
+      expect(requests, `reader sender case ${index}`).toEqual([]);
+      if (index >= legacyStart) {
+        expect(await page.getByRole("button", { name: "Always load from this sender" }).isDisabled()).toBe(true);
+        await page.getByText("Sender unknown until the original message is available or resynced.").waitFor();
+        await page.getByRole("button", { name: "Load once" }).click();
+        await waitForReaderImages();
+        expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
+        requests.length = 0;
+      }
+      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.waitForLoadState("networkidle");
+      expect(requests, `standalone sender case ${index}`).toEqual([]);
+    }
+
+    for (const name of ["quoted local part containing whitespace", "quoted local part containing an angle-bracket address", "unicode IDN", "A-label IDN", "SMTPUTF8 local", "SMTPUTF8 with IDN"]) {
+      const index = senderPermissionLookupCases.findIndex(entry => entry.name === name);
+      const { key } = senderPermissionLookupCases[index];
       expect((await savePrefs(JSON.stringify({ remoteContent: null }))).status).toBe(200);
       expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }))).status).toBe(200);
       requests.length = 0;

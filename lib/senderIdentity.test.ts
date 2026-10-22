@@ -5,11 +5,27 @@ import {
   getRootDomain,
   getSenderIdentity,
   isFreeMailDomain,
-  canonicalizeMailboxAddress
+  canonicalizeMailboxAddress,
+  formatMailboxAddress,
+  splitAddressList
 } from "./senderIdentity";
 import { senderPermissionCases } from "./testFixtures/senderPermissions";
 
 describe("senderIdentity", () => {
+  it("serializes and canonicalizes SMTPUTF8 local parts with punycoded domains", () => {
+    expect(formatMailboxAddress("tést@bücher.example", true)).toBe("tést@bücher.example");
+    expect(canonicalizeMailboxAddress("tést@bücher.example")).toBe("tést@xn--bcher-kva.example");
+    expect(canonicalizeMailboxAddress('"tést"@example.test')).toBe("tést@example.test");
+  });
+
+  it("splits lists respecting nested comments, quoted commas and escaped quotes", () => {
+    for (const first of [
+      "Actual (one, two) <actual@example.test>",
+      String.raw`Actual (one, (two, three) four\), five) <actual@example.test>`,
+      '"Actual, Synthetic" <actual@example.test>',
+      String.raw`"Actual \", Synthetic" <actual@example.test>`
+    ]) expect(splitAddressList(`${first}, other@example.test`)).toEqual([first, "other@example.test"]);
+  });
   for (const { name, from, key } of senderPermissionCases) {
     it(`preserves the primary mailbox identity: ${name}`, () => {
       expect(extractPrimaryEmail(from) ?? "").toBe(key);

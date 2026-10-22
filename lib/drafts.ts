@@ -433,9 +433,15 @@ export async function saveDraftForAccount(params: {
       sanitized.quotedHtmlEdited = payload.quotedHtmlEdited;
     }
     sanitized.draftInvite = payload.invite ?? null;
-    await upsertMessages(account.id, null, [sanitized], false);
-    draftId = sanitized.id;
-    savedMessage = sanitized;
+    const stored = await upsertMessages(account.id, null, [sanitized], false);
+    draftId = stored.messageRowIds.get(sanitized.id) ?? sanitized.id;
+    const storedMessage = await getMessageById(account.id, draftId);
+    savedMessage = storedMessage ? {
+      ...storedMessage,
+      xComposeFormat: sanitized.xComposeFormat,
+      quotedHtmlEdited: sanitized.quotedHtmlEdited,
+      draftInvite: sanitized.draftInvite
+    } : null;
   }
 
   return { draftId, message: savedMessage };

@@ -1,3 +1,8 @@
+import { ingestedSenderCases, ingestSenderPermissionMessage } from "../testFixtures/ingestedSenders";
+import { senderPermissionCases } from "../testFixtures/senderPermissions";
+import { senderAllowsRemoteContent } from "../html/remoteContent";
+import { extractUnambiguousPrimaryEmail, extractPrimaryEmail, canonicalizeMailboxAddress } from "../senderIdentity";
+import { resolveMessageAddresses, formatEnvelopeAddresses, formatHeaderAddresses, parseHeaderMap } from "./imap/parser";
 import { describe, expect, it } from "bun:test";
 import { createRequire } from "module";
 import type { Account } from "@/lib/data";
@@ -130,5 +135,73 @@ describe("extractMessageStructureMetadata", () => {
     expect(result.attachments).toHaveLength(1);
     expect(result.attachments[0]?.cid).toBe(cid);
     expect(result.attachments[0]?.filename).toBe(filename);
+  });
+});
+
+describe("RFC 5322 ingestion-to-permission identity", () => {
+  for (const entry of senderPermissionCases) {
+    it(`stores the sender key at header ingestion: ${entry.name}`, () => {
+      const result = resolveMessageAddresses(undefined, new Map([["from", [entry.from]]]), account.email);
+      const key = "permissionKey" in entry ? entry.permissionKey : entry.key;
+      expect(result.senderKey).toBe(key || null);
+    });
+  }
+
+  it("does not grant the account address when the real From header is missing", () => {
+    expect(resolveMessageAddresses(undefined, new Map(), account.email).senderKey).toBeNull();
+  });
+
+  it("header fallback keeps mailboxes with nested comments, quoted commas and escaped quotes", () => {
+    for (const first of [
+      "Actual (one, two) <actual@example.test>",
+      String.raw`Actual (one, (two, three) four\), five) <actual@example.test>`,
+      '"Actual, Synthetic" <actual@example.test>',
+      String.raw`"Actual \", Synthetic" <actual@example.test>`
+    ]) {
+      const resolved = resolveMessageAddresses(undefined, new Map([["from", [`${first}, other@example.test`]]]), account.email);
+      expect(resolved.from).toContain("actual@example.test");
+      expect(resolved.from).toContain("other@example.test");
+      expect(resolved.senderKey).toBe("actual@example.test");
+    }
+  });
+  for (const entry of ingestedSenderCases) {
+    for (const headerFallback of [false, true]) {
+      it(`keeps the actual mailbox and rejects trusted permission: ${entry.name}, header fallback=${headerFallback}`, async () => {
+        const message = await ingestSenderPermissionMessage(account, entry, '<img src="https://images.example.test/pixel">', headerFallback);
+        expect(message.senderKey).toBe(entry.key);
+        expect(message.senderKey).not.toBe("trusted@example.test");
+        expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }, message.senderKey)).toBe(false);
+      });
+    }
+  }
+
+  it("retains decoded envelope local-part characters and raw header quoting exactly", () => {
+    for (const local of [' a  b ', 'a"b\\c', '"literal"', 'attacker <trusted@example.test>']) {
+      const from = formatEnvelopeAddresses([{ name: "Synthetic", address: `${local}@example.test` }]);
+      expect(from).toBe(`Synthetic <${JSON.stringify(local)}@example.test>`);
+      expect(extractUnambiguousPrimaryEmail(from)).toBe(canonicalizeMailboxAddress(`${JSON.stringify(local)}@example.test`));
+      expect(extractUnambiguousPrimaryEmail(from)).not.toBe("trusted@example.test");
+    }
+    expect(formatHeaderAddresses('" a  b "@example.test, Actual <"a\\\"b\\\\c"@example.test>')).toBe('" a  b "@example.test, Actual <"a\\\"b\\\\c"@example.test>');
+    expect(formatEnvelopeAddresses([{ address: "invalid" }, { address: "trusted@example.test" }])).toBe("");
+    expect(formatHeaderAddresses("attacker trusted@example.test")).toBe("");
+  });
+
+  it("never reads a body line as an address header when falling back to raw source", () => {
+    for (const newline of ["\r\n", "\n"]) {
+      const headers = parseHeaderMap(Buffer.from(["From: actual@example.test", "Reply-To: \"attacker trusted\"@example.test", "", "From: trusted@example.test"].join(newline)));
+      expect(headers.get("from")).toEqual(["actual@example.test"]);
+      expect(resolveMessageAddresses(undefined, headers, account.email).replyTo).toBe('"attacker trusted"@example.test');
+    }
+  });
+
+  it("serializes every envelope address field with shared escaping and local-part quoting", () => {
+    const address = { name: 'Attack " <trusted@example.test> "', address: "attacker trusted@example.test" };
+    const resolved = resolveMessageAddresses({ from: [address], to: [address], cc: [address], bcc: [address] }, new Map(), account.email);
+    for (const field of ["from", "to", "cc", "bcc"] as const) {
+      expect(extractPrimaryEmail(resolved[field])).toBe('"attacker trusted"@example.test');
+      expect(resolved[field]).toBe('"Attack \\" <trusted@example.test> \\"" <"attacker trusted"@example.test>');
+    }
+    expect(formatEnvelopeAddresses([{ mailbox: "attacker trusted", host: "example.test" }])).toBe('"attacker trusted"@example.test');
   });
 });

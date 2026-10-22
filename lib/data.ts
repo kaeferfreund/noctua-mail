@@ -148,6 +148,8 @@ export type Message = {
   senderIdentityId?: string;
   subject: string;
   from: string;
+  /** Canonical mailbox from ingestion/raw source; absent legacy rows are unknown. */
+  senderKey?: string | null;
   fromEmail?: string;
   replyTo?: string;
   to: string;

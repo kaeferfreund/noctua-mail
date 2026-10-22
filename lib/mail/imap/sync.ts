@@ -61,6 +61,7 @@ import {
   parseHeaderMap,
   parseHeaderMessageIdList,
   resolveEnvelopeAddressEmail,
+  resolveMessageAddresses,
   resolveEnvelopeInReplyTo,
   resolveHeaderDate,
   resolveHeaderInReplyTo
@@ -169,12 +170,6 @@ const normalizePreviewWhitespace = (value: string) =>
     .replace(invisiblePreviewCharsPattern, "")
     .replace(/\s+/g, " ")
     .trim();
-
-function pickReplyTo(parsedSource: unknown, headerReplyTo: string | undefined) {
-  const parsed = (parsedSource as { replyTo?: { text?: string } }).replyTo?.text;
-  const parsedTrimmed = typeof parsed === "string" ? parsed.trim() : "";
-  return parsedTrimmed || headerReplyTo?.trim() || undefined;
-}
 
 function deriveFlagState(flags: string[]) {
   const hasFlag = (flag: string) =>
@@ -362,12 +357,8 @@ function buildLightweightImapMessage(params: {
     htmlBody: undefined
   });
   const { seen, answered, flagged, deleted, draft, recent, unread } = deriveFlagState(flagList);
-  const from = formatEnvelopeAddresses(envelope?.from) || account.email;
-  const to = formatEnvelopeAddresses(envelope?.to);
-  const cc = formatEnvelopeAddresses(envelope?.cc);
-  const bcc = formatEnvelopeAddresses(envelope?.bcc);
   const headers = parseHeaderMap(rawHeaders);
-  const replyTo = getHeaderValue(headers, "reply-to")?.trim() || undefined;
+  const { from, senderKey, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
   const unsubParts: string[] = [];
   const listUnsubVal = getHeaderValue(headers, "list-unsubscribe");
   const listUnsubPostVal = getHeaderValue(headers, "list-unsubscribe-post");
@@ -404,6 +395,7 @@ function buildLightweightImapMessage(params: {
     xForwardedMessageId: undefined,
     subject: envelope?.subject?.trim() || "(no subject)",
     from,
+    senderKey,
     replyTo,
     ...parseDeliveryMetadata(rawHeaders),
     to,
@@ -439,7 +431,7 @@ function buildLightweightImapMessage(params: {
   } as Message;
 }
 
-async function parseImapMessage(
+export async function parseImapMessage(
   account: Account,
   mailboxToOpen: string,
   message: ImapParsedMessage,
@@ -450,7 +442,8 @@ async function parseImapMessage(
   const flags = message.flags ? Array.from(message.flags) : [];
   const { seen, answered, flagged, deleted, draft, recent, unread } = deriveFlagState(flags);
   const envelope = message.envelope;
-  const headers = parseHeaderMap(message.headers);
+  const headers = parseHeaderMap(message.headers?.length ? message.headers : message.source);
+  const { from, senderKey, to, cc, bcc, replyTo } = resolveMessageAddresses(envelope, headers, account.email);
   let {
     attachments
   } = extractMessageStructureMetadata(account, message.uid, message.bodyStructure);
@@ -585,8 +578,8 @@ async function parseImapMessage(
   return {
     id: buildImapMessageRowId(messageId, {
       dateValue,
-      from: formatEnvelopeAddresses(envelope?.from) || account.email,
-      to: formatEnvelopeAddresses(envelope?.to),
+      from,
+      to,
       subject: envelope?.subject?.trim() || headerValue("subject") || "(no subject)",
       inReplyTo
     }),
@@ -596,12 +589,13 @@ async function parseImapMessage(
     references: referencesArray,
     xForwardedMessageId: xForwardedMessageId ?? undefined,
     subject: envelope?.subject?.trim() || headerValue("subject") || "(no subject)",
-    from: formatEnvelopeAddresses(envelope?.from) || account.email,
-    replyTo: pickReplyTo(parsedSource, headerValue("reply-to")),
+    from,
+    senderKey,
+    replyTo,
     ...parseDeliveryMetadata(message.headers?.length ? message.headers : message.source),
-    to: formatEnvelopeAddresses(envelope?.to),
-    cc: formatEnvelopeAddresses(envelope?.cc),
-    bcc: formatEnvelopeAddresses(envelope?.bcc),
+    to,
+    cc,
+    bcc,
     preview,
     date,
     dateValue,

@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { buildAccountApiPath } from "@/lib/accountApiPaths";
-import { remoteContentSenderKey } from "@/lib/html/remoteContent";
+import { senderAllowsRemoteContent } from "@/lib/html/remoteContent";
 import type { UserAccountPrefs } from "@/lib/data";
 import { hasLoadedRemoteContent, loadRemoteContentOnce, retainRemoteContentDecision, subscribeRemoteContent } from "@/lib/html/remoteContentSession";
 
 const PREFERENCES_CHANGED = "noctua:remote-content-prefs";
 
-export function useRemoteContent(accountId: string | undefined, sender: string | undefined, messageKey: string) {
-  const senderKey = remoteContentSenderKey(sender);
+export function useRemoteContent(accountId: string | undefined, senderKey: string | null | undefined, messageKey: string) {
   const preferenceKey = JSON.stringify([accountId, senderKey]);
   const key = JSON.stringify([preferenceKey, messageKey]);
   const once = useSyncExternalStore(subscribeRemoteContent, () => hasLoadedRemoteContent(accountId ?? "", messageKey), () => false);
@@ -26,7 +25,7 @@ export function useRemoteContent(accountId: string | undefined, sender: string |
         const response = await fetch(buildAccountApiPath(accountId, "/prefs"));
         if (!response.ok) return;
         const { prefs } = await response.json() as { prefs: UserAccountPrefs };
-        if (active) setPreference({ key: preferenceKey, allowed: prefs.remoteContent?.allowedSenders?.[senderKey] === true });
+        if (active) setPreference({ key: preferenceKey, allowed: senderAllowsRemoteContent(prefs, senderKey) });
       } catch { /* Keep remote content blocked when preferences are unavailable. */ }
     };
     void refresh();
