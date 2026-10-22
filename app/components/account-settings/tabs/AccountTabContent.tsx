@@ -18,6 +18,7 @@ type Props = {
   onSave: () => void;
   onDelete: () => void;
   canSave: boolean;
+  canDelete?: boolean;
   onUpdateAccount: (next: Account) => void;
   onRunProbe: (protocol: "imap" | "smtp") => void;
 };
@@ -37,6 +38,7 @@ export default function AccountTabContent({
   onSave,
   onDelete,
   canSave,
+  canDelete = true,
   onUpdateAccount,
   onRunProbe
 }: Props) {
@@ -274,7 +276,7 @@ export default function AccountTabContent({
         wrap="wrap"
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
-        <Button size="2" color="red" variant="soft" onClick={onDelete} disabled={!isExistingAccount}>
+        <Button size="2" color="red" variant="soft" onClick={onDelete} disabled={!isExistingAccount || !canDelete}>
           Delete Account
         </Button>
         <Flex gap="3" align="center">
