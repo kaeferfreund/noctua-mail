@@ -5,13 +5,14 @@ import { AuthPolicyError, assertSecurityOperation, enrollmentState, readSessionS
 import { withDbWriteRetry } from "./dbWriteRetry";
 
 export { AuthPolicyError } from "./db/authPolicy";
-export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "admin.recovery"] as const;
+export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "passkey.rename", "sessions.revoke", "admin.recovery"] as const;
 export type ReauthPurpose = typeof REAUTH_PURPOSES[number];
 export const PROOF_MATRIX = {
   "totp.enroll": "password_setup", "totp.replace": "password_factor_or_backup",
   "passkey.enroll": "password_factor_or_uv", "password.set": "imap_factor_or_onboarding",
   "password.change": "password_factor", "backup.regenerate": "password_factor",
-  "passkey.remove": "password_factor_or_uv", "admin.recovery": "admin_password_factor"
+  "passkey.remove": "password_factor_or_uv", "passkey.rename": "password_factor_or_uv",
+  "sessions.revoke": "password_factor", "admin.recovery": "admin_password_factor"
 } as const;
 export const GRANT_TTL_MS = 300000;
 export const hashProof = (token: string) => createHash("sha256").update(token).digest("hex");

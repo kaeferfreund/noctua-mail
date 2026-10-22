@@ -56,6 +56,12 @@ jobs:
       - name: Run test stress pass
         run: bun run test:stress
 
+      - name: Install auth browser
+        run: bun x playwright install --with-deps chromium
+
+      - name: Run auth browser gate
+        run: bun run test:auth-browser
+
       - name: Run Docker worker packaging check
         run: bun run test:docker-workers
 

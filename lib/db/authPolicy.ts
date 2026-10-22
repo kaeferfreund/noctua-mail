@@ -284,14 +284,19 @@ export async function deleteSessionProofState(sessionId:string, userId?:string, 
   return withDbWriteRetry("deleteSessionProofState", async()=>{
     const db=database ?? await getDb();
     db.transaction(()=>{
-      if (userId) invalidateUserChallenges(db,userId,true);
-      db.prepare(`DELETE FROM auth_verification WHERE identifier IN
-        (SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?)`).run(sessionId);
-      db.prepare("DELETE FROM auth_pending_challenges WHERE sourceSessionId=?").run(sessionId);
-      db.prepare("DELETE FROM auth_reauth_grants WHERE sessionId=?").run(sessionId);
-      db.prepare("DELETE FROM auth_session_security WHERE sessionId=?").run(sessionId);
+      deleteSessionProofStateRow(db,sessionId,userId);
     }).immediate();
   });
+}
+
+/** Synchronous form for callers already inside an immediate revocation transaction. */
+export function deleteSessionProofStateRow(db:Database, sessionId:string, userId?:string) {
+  if (userId) invalidateUserChallenges(db,userId,true);
+  db.prepare(`DELETE FROM auth_verification WHERE identifier IN
+    (SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?)`).run(sessionId);
+  db.prepare("DELETE FROM auth_pending_challenges WHERE sourceSessionId=?").run(sessionId);
+  db.prepare("DELETE FROM auth_reauth_grants WHERE sessionId=?").run(sessionId);
+  db.prepare("DELETE FROM auth_session_security WHERE sessionId=?").run(sessionId);
 }
 
 export type SessionSecurity = {
@@ -403,9 +408,20 @@ export async function reconcileSecurityOperations(db: Database, before = Date.no
   return withDbWriteRetry("reconcileSecurityOperations", () => db.transaction(() => {
     const operations = db.prepare(`SELECT id,targetUserId FROM admin_lifecycle_operations WHERE slot LIKE 'security:%' AND createdAt<?`).all(before) as {id:string;targetUserId:string}[];
     for (const op of operations) {
+      // The library commits the enabled flag before the verified-factor write. Never
+      // resume that seed or invent verification, but preserve a healthy committed factor.
+      discardPartialTotp(db, op.targetUserId);
       if (db.prepare(`SELECT 1 FROM auth_security_state WHERE userId=?`).get(op.targetUserId)) advanceSecurityGeneration(db, op.targetUserId);
       db.prepare(`UPDATE admin_lifecycle_operations SET slot=NULL,state='cancelled',updatedAt=? WHERE id=?`).run(Date.now(), op.id);
     }
     return operations.map(op => op.targetUserId);
   }).immediate());
+}
+
+/** Caller holds the user slot and an immediate transaction. */
+export function discardPartialTotp(db: Database, userId: string) {
+  db.prepare(`DELETE FROM auth_two_factor WHERE userId=? AND (verified IS NOT 1 OR length(trim(secret))=0)`).run(userId);
+  if (!db.prepare(`SELECT 1 FROM auth_two_factor WHERE userId=? AND verified=1 AND length(trim(secret))>0`).get(userId)) {
+    db.prepare(`UPDATE auth_user SET twoFactorEnabled=0 WHERE id=?`).run(userId);
+  }
 }

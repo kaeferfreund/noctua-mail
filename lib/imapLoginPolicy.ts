@@ -35,14 +35,20 @@ export async function verifyEligibleImap(db: Database, userId: string, password:
   if (!password || password.length > 256) throw new AuthPolicyError("invalid_credentials", 401);
   const account = eligibleImapLoginMailbox(db, userId);
   const ip = getRequestIp(request);
-  if (attempts.isLimited(`ip:${ip}`) || attempts.isLimited(`user:${userId}`)) throw new AuthPolicyError("invalid_credentials", 401);
-  if (!await verify(account, password, getRequestClientId(request))) throw new AuthPolicyError("invalid_credentials", 401);
-  const current = eligibleImapLoginMailbox(db, userId);
-  if (JSON.stringify(current) !== JSON.stringify(account)) throw new AuthPolicyError("invalid_credentials", 401);
+  const checkSnapshot = () => {
+    if (JSON.stringify(eligibleImapLoginMailbox(db, userId)) !== JSON.stringify(account)) throw new AuthPolicyError("invalid_credentials", 401);
+  };
+  const limitedVerify: typeof verify = async (...args) => {
+    if (attempts.isLimited(`ip:${ip}`) || attempts.isLimited(`user:${userId}`)) throw new AuthPolicyError("invalid_credentials", 401);
+    if (!await verify(...args)) throw new AuthPolicyError("invalid_credentials", 401);
+    checkSnapshot();
+    return true;
+  };
   if (writeBack) await updateMailboxCredentials(account.id, { imap: { password } },
-    { userId, clientId: getRequestClientId(request) }, { imap: verify,
+    { userId, clientId: getRequestClientId(request) }, { imap: limitedVerify,
       smtp: async () => { throw new Error("IMAP login cannot change SMTP endpoint"); },
-      authorize: () => { if (eligibleImapLoginMailbox(db, userId).id !== account.id) throw new AuthPolicyError("invalid_credentials", 401); }
+      authorize: checkSnapshot
     }, db);
+  else await limitedVerify(account, password, getRequestClientId(request));
   return true;
 }

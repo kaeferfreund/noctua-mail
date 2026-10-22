@@ -92,7 +92,7 @@ export async function caught(promise: Promise<unknown>) {
 }
 
 /** Isolated file, production connection separation and actual library cookies. */
-export async function createTestAuthHarness(options?: (config: ReturnType<typeof noctuaAuthOptions>) => void, configOverrides: Partial<NoctuaAuthConfig> = {}) {
+export async function createTestAuthHarness(options?: (config: ReturnType<typeof noctuaAuthOptions>) => void, configOverrides: Partial<NoctuaAuthConfig> = {}, settings: {libraryRateLimits?:boolean} = {}) {
   let temp: ReturnType<typeof createTempDir> | undefined;
   let master: Database | undefined;
   let database: Database | undefined;
@@ -112,7 +112,7 @@ export async function createTestAuthHarness(options?: (config: ReturnType<typeof
     const authOptions = noctuaAuthOptions(config);
     // Per-process library burst buckets outlive a fixture, especially under randomized reruns.
     // Tests that exercise rate limits opt in explicitly; production options remain enabled.
-    Object.assign(authOptions.rateLimit,{enabled:false});
+    if (!settings.libraryRateLimits) Object.assign(authOptions.rateLimit,{enabled:false});
     options?.(authOptions);
     const migration = await migrateAuthSchema(authOptions);
     installAuthControlPlane(database);

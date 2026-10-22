@@ -40,4 +40,3 @@ export function totpFromUri(uri: string, at = Date.now()) {
     hmac[offset + 3];
   return String(binary % 10 ** digits).padStart(digits, "0");
 }
-
