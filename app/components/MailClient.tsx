@@ -5396,7 +5396,7 @@ export default function MailClient({
           }
         }}
         header={{
-          title: [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter(Boolean).join(" / "),
+          title: [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter((part): part is string => Boolean(part)),
           search: {
             state: {
               query,
