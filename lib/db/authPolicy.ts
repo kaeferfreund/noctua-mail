@@ -55,6 +55,8 @@ const oldCredentialChanged = `OLD.providerId='credential' AND
 const newCredentialChanged = `NEW.providerId='credential' AND
   (OLD.password IS NOT NEW.password OR OLD.providerId IS NOT NEW.providerId OR
    OLD.userId IS NOT NEW.userId OR OLD.accountId IS NOT NEW.accountId)`;
+const credentialIdentityMoved = `OLD.userId IS NOT NEW.userId AND
+  (OLD.providerId='credential' OR NEW.providerId='credential')`;
 
 function advance(userId: string, when = "1") {
   return `
@@ -87,8 +89,8 @@ const triggers: Record<string, string> = {
     ${advance("NEW.userId")}
   END`,
   noctua_credential_update: `CREATE TRIGGER noctua_credential_update AFTER UPDATE OF password,providerId,userId,accountId ON auth_account BEGIN
-    ${advance("OLD.userId", oldCredentialChanged)}
-    ${advance("NEW.userId", `(${newCredentialChanged}) AND (OLD.providerId IS NOT 'credential' OR OLD.userId IS NOT NEW.userId)`)}
+    ${advance("OLD.userId", `(${oldCredentialChanged}) OR (${credentialIdentityMoved})`)}
+    ${advance("NEW.userId", `(${credentialIdentityMoved}) OR ((${newCredentialChanged}) AND OLD.providerId IS NOT 'credential')`)}
   END`,
   noctua_credential_delete: `CREATE TRIGGER noctua_credential_delete AFTER DELETE ON auth_account
     WHEN OLD.providerId='credential' AND EXISTS(SELECT 1 FROM auth_user WHERE id=OLD.userId) BEGIN
@@ -108,6 +110,77 @@ function schemaSql(db: Database, type: string, name: string): string | undefined
   return db.prepare(`SELECT sql FROM sqlite_master WHERE type=? AND name=?`).get(type, name)?.sql;
 }
 
+const installationDdl = `CREATE TABLE IF NOT EXISTS auth_control_plane_installation (
+  id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL CHECK(version=1)
+)`;
+const migrationsDdl = `CREATE TABLE IF NOT EXISTS noctua_auth_migrations (id TEXT PRIMARY KEY)`;
+const installationMigration = "auth-control-plane-v1";
+const provisioningIndexName = "idx_user_provisioning_active_email";
+const provisioningPredicate = "state IN ('reserved','auth_created','cleanup_required')";
+const provisioningIndexDdl = `CREATE UNIQUE INDEX ${provisioningIndexName}
+  ON user_provisioning(normalizedEmail) WHERE ${provisioningPredicate}`;
+
+function validateProvisioningIndex(db: Database) {
+  const valid = () => {
+    const index = db.prepare("PRAGMA index_list(user_provisioning)").all()
+      .find((row: { name: string }) => row.name === provisioningIndexName);
+    if (!index || index.unique !== 1 || index.partial !== 1) return false;
+    const columns = db.prepare(`PRAGMA index_xinfo(${provisioningIndexName})`).all()
+      .filter((row: { key: number }) => row.key === 1);
+    const sql = schemaSql(db, "index", provisioningIndexName) ?? "";
+    return columns.length === 1 && columns[0].name === "normalizedEmail" &&
+      columns[0].coll === "BINARY" && columns[0].desc === 0 &&
+      normalizedSql(sql.slice(sql.search(/\bWHERE\b/i))) === `WHERE ${provisioningPredicate}`;
+  };
+  if (!valid()) {
+    // Inside the install transaction: duplicates abort startup and restore the
+    // previous index, without deleting/reconciling any provisioning reservations.
+    try {
+      db.exec(`DROP INDEX IF EXISTS ${provisioningIndexName}`);
+      db.exec(provisioningIndexDdl);
+    } catch (cause) {
+      throw new Error("Cannot repair auth provisioning uniqueness index at startup", { cause });
+    }
+  }
+  if (!valid()) throw new Error("Malformed auth provisioning uniqueness index at startup");
+}
+
+/** Determine installation status before creating anything that could reset counters. */
+function isInstalledControlPlane(db: Database) {
+  const marker = schemaSql(db, "table", "auth_control_plane_installation");
+  const ledger = schemaSql(db, "table", "noctua_auth_migrations");
+  if (ledger && normalizedSql(ledger) !== normalizedSql(migrationsDdl)) {
+    throw new Error("Malformed auth migration ledger at startup");
+  }
+  const recorded = ledger && db.prepare("SELECT id FROM noctua_auth_migrations WHERE id=?").get(installationMigration);
+  if (marker && normalizedSql(marker) !== normalizedSql(installationDdl)) {
+    throw new Error("Malformed auth control-plane installation marker at startup");
+  }
+  if (marker || recorded) {
+    // Independent witnesses: dropping the marker table/row must not look like
+    // a pre-marker development DB, and losing the ledger must fail closed too.
+    if (!marker || !recorded || !db.prepare("SELECT id FROM auth_control_plane_installation WHERE id=1 AND version=1").get()) {
+      throw new Error("Missing auth control-plane installation marker or migration record at startup");
+    }
+  }
+  const expected = [
+    ...tables.map(ddl => ["table", ddl.match(/EXISTS (\w+)/)![1]]),
+    ...Object.keys(triggers).map(name => ["trigger", name]),
+  ];
+  const missing = expected.filter(([type, name]) => schemaSql(db, type, name) === undefined);
+  const hasSidecars = missing.length !== expected.length || schemaSql(db, "index", provisioningIndexName) !== undefined;
+  if ((marker || recorded || hasSidecars) && missing.length) {
+    throw new Error(`Missing installed auth control-plane objects at startup: ${missing.map(([, name]) => name).join(", ")}`);
+  }
+  // 087279b/ad6db7a predate the marker. Adopt only a complete legacy plane;
+  // table shapes, counters and index are validated below before both witnesses
+  // are written in this same transaction. No existing counter is backfilled.
+  if (!marker && hasSidecars && schemaSql(db, "index", provisioningIndexName) === undefined) {
+    throw new Error(`Missing installed auth control-plane objects at startup: ${provisioningIndexName}`);
+  }
+  return Boolean(marker || recorded || hasSidecars);
+}
+
 /**
  * Startup only, after pinned library migrations and before betterAuth(). No
  * awaits/network/raw after-hook mirror writes. DDL, backfill and trigger upgrades
@@ -115,8 +188,7 @@ function schemaSql(db: Database, type: string, name: string): string | undefined
  */
 export function installAuthControlPlane(db: Database) {
   db.transaction(() => {
-    const existingState = schemaSql(db, "table", "auth_security_state") !== undefined;
-    const existingEpoch = schemaSql(db, "table", "auth_login_epoch") !== undefined;
+    const installed = isInstalledControlPlane(db);
     // Prepare against actual library models before installing any policy DDL.
     db.prepare(`SELECT id,email,role,createdAt,banned,banExpires FROM auth_user LIMIT 0`).all();
     db.prepare(`SELECT id,userId,accountId,providerId,password FROM auth_account LIMIT 0`).all();
@@ -130,18 +202,17 @@ export function installAuthControlPlane(db: Database) {
     }
     // Initial adoption may backfill existing auth users. Once installed, missing
     // generations must never be reset to zero and revive an old bearer.
-    if (existingState && db.prepare(`SELECT id FROM auth_user WHERE NOT EXISTS
+    if (installed && db.prepare(`SELECT id FROM auth_user WHERE NOT EXISTS
       (SELECT 1 FROM auth_security_state s WHERE s.userId=auth_user.id) LIMIT 1`).get()) {
       throw new Error("Missing auth security state at startup");
     }
-    if (existingEpoch && !db.prepare(`SELECT id FROM auth_login_epoch WHERE id=1`).get()) {
+    if (installed && !db.prepare(`SELECT id FROM auth_login_epoch WHERE id=1`).get()) {
       throw new Error("Missing auth login epoch at startup");
     }
     db.exec(`INSERT OR IGNORE INTO auth_login_epoch(id,generation) VALUES(1,0)`);
     ensureTableColumns(db, "mcp_tokens", [["securityGeneration", "INTEGER"]]);
     ensureTableColumns(db, "invite_codes", [["email", "TEXT"]]);
-    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_provisioning_active_email
-      ON user_provisioning(normalizedEmail) WHERE state IN ('reserved','auth_created','cleanup_required')`);
+    validateProvisioningIndex(db);
 
     // Never choose a legacy ID by email. An explicit operator ID binding is the
     // only allowed import; even that must not bind two different identities.
@@ -167,7 +238,10 @@ export function installAuthControlPlane(db: Database) {
       }
     }
     importLegacyProfileFields(db);
-
+    db.exec(installationDdl);
+    db.exec(migrationsDdl);
+    db.exec("INSERT OR IGNORE INTO auth_control_plane_installation(id,version) VALUES(1,1)");
+    db.prepare("INSERT OR IGNORE INTO noctua_auth_migrations(id) VALUES(?)").run(installationMigration);
   }).immediate();
 }
 
@@ -175,7 +249,7 @@ export function installAuthControlPlane(db: Database) {
 function importLegacyProfileFields(db: Database) {
   const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as {name:string}[]).map(row=>row.name));
   if (!columns.has("name") && !columns.has("disabledAt")) return;
-  db.exec("CREATE TABLE IF NOT EXISTS noctua_auth_migrations (id TEXT PRIMARY KEY)");
+  db.exec(migrationsDdl);
   if (db.prepare("SELECT 1 FROM noctua_auth_migrations WHERE id='legacy-profile-v1'").get()) return;
   if (columns.has("name")) db.exec(`UPDATE auth_user SET name=(SELECT p.name FROM users p WHERE p.id=auth_user.id)
     WHERE EXISTS(SELECT 1 FROM users p WHERE p.id=auth_user.id AND length(trim(p.name))>0)`);
