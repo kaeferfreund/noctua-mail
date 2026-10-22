@@ -1,30 +1,7 @@
 import { useEffect } from "react";
-import { isDesktop } from "@/lib/desktop";
-
-type TauriInternals = {
-  invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-};
-
-let lastDesktopTitle = "";
-
-/**
- * Tauri window titles are independent of `document.title`, so the desktop
- * shell only learns a window's identity if the frontend pushes it.
- */
-function setDesktopWindowTitle(title: string) {
-  if (!isDesktop() || title === lastDesktopTitle) return;
-  const tauri = (window as unknown as { __TAURI_INTERNALS__?: TauriInternals })
-    .__TAURI_INTERNALS__;
-  if (!tauri?.invoke) return;
-  lastDesktopTitle = title;
-  tauri.invoke("set_window_title", { title }).catch((err) => {
-    console.error("[noctua] set_window_title failed:", err);
-  });
-}
 
 function applyWindowTitle(title: string) {
   if (document.title !== title) document.title = title;
-  setDesktopWindowTitle(title);
 }
 
 /**
