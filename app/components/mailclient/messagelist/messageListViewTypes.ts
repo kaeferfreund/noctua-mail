@@ -125,7 +125,8 @@ export type MessageListViewHelpers = {
   renderMessageMenu: (
     message: Message,
     view: "table" | "list",
-    onOpenChange?: (open: boolean) => void
+    onOpenChange?: (open: boolean) => void,
+    collapsedThreadSeen?: boolean
   ) => React.ReactNode;
   handleShowRelated: (message: Message) => void;
   isTrashFolder: (folderId?: string) => boolean;
