@@ -1,3 +1,5 @@
+import { withDbWriteRetry } from "../dbWriteRetry";
+import { getDb } from "./connection";
 import type { Database } from "bun:sqlite";
 import { ensureTableColumns } from "./schema";
 
@@ -164,5 +166,32 @@ export function installAuthControlPlane(db: Database) {
         throw new Error(`Missing or malformed auth trigger: ${name}`);
       }
     }
+    importLegacyProfileFields(db);
+
   }).immediate();
+}
+
+/** Historical development columns stay inert after this one-time, explicit-ID import. */
+function importLegacyProfileFields(db: Database) {
+  const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as {name:string}[]).map(row=>row.name));
+  if (!columns.has("name") && !columns.has("disabledAt")) return;
+  db.exec("CREATE TABLE IF NOT EXISTS noctua_auth_migrations (id TEXT PRIMARY KEY)");
+  if (db.prepare("SELECT 1 FROM noctua_auth_migrations WHERE id='legacy-profile-v1'").get()) return;
+  if (columns.has("name")) db.exec(`UPDATE auth_user SET name=(SELECT p.name FROM users p WHERE p.id=auth_user.id)
+    WHERE EXISTS(SELECT 1 FROM users p WHERE p.id=auth_user.id AND length(trim(p.name))>0)`);
+  if (columns.has("disabledAt")) db.exec(`UPDATE auth_user SET banned=1,banExpires=NULL
+    WHERE EXISTS(SELECT 1 FROM users p WHERE p.id=auth_user.id AND p.disabledAt IS NOT NULL)`);
+  db.exec("INSERT INTO noctua_auth_migrations(id) VALUES('legacy-profile-v1')");
+}
+
+/** Noctua proof cleanup runs on its own master handle after library signOut. */
+export async function deleteSessionProofState(sessionId:string) {
+  return withDbWriteRetry("deleteSessionProofState", async()=>{
+    const db=await getDb();
+    db.transaction(()=>{
+      db.prepare("DELETE FROM auth_pending_challenges WHERE sourceSessionId=?").run(sessionId);
+      db.prepare("DELETE FROM auth_reauth_grants WHERE sessionId=?").run(sessionId);
+      db.prepare("DELETE FROM auth_session_security WHERE sessionId=?").run(sessionId);
+    }).immediate();
+  });
 }

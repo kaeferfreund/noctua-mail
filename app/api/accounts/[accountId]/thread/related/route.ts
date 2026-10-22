@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -27,25 +28,27 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId or threadIds/messageIds"
   });
   if (context instanceof NextResponse) return context;
-  if (threadIds.length === 0 && messageIds.length === 0) {
-    return NextResponse.json(
-      { ok: false, message: "Missing accountId or threadIds/messageIds" },
-      { status: 400 }
-    );
-  }
-  const groupBy = payload.groupBy ?? "date";
-  const threadDateSource = normalizeThreadDateSource(payload.threadDateSource);
-  const data = await listThreadMessages({
-    accountId: context.accountId,
-    threadIds,
-    messageIds,
-    groupBy,
-    threadDateSource
+  return withAuthResponse(context, async () => {
+    if (threadIds.length === 0 && messageIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "Missing accountId or threadIds/messageIds" },
+        { status: 400 }
+      );
+    }
+    const groupBy = payload.groupBy ?? "date";
+    const threadDateSource = normalizeThreadDateSource(payload.threadDateSource);
+    const data = await listThreadMessages({
+      accountId: context.accountId,
+      threadIds,
+      messageIds,
+      groupBy,
+      threadDateSource
+    });
+    await enrichMessagesWithThreadTopics(data.items, {
+      accountId: context.accountId,
+      accountEmail: context.account.email,
+      includeSuggestions: true
+    });
+    return NextResponse.json({ items: data.items });
   });
-  await enrichMessagesWithThreadTopics(data.items, {
-    accountId: context.accountId,
-    accountEmail: context.account.email,
-    includeSuggestions: true
-  });
-  return NextResponse.json({ items: data.items });
 }

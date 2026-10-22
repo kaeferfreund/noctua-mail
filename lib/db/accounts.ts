@@ -1,5 +1,4 @@
 import type { Account } from "../data";
-import { applyCachedCredentials } from "../credentials";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getMainDbPath } from "../runtimePaths";
 import {
@@ -27,7 +26,7 @@ async function ensureCategoryLinearModelForAccount(accountId: string) {
 export async function getAccounts() {
   const db = await getDb();
   const rows = db.prepare(`SELECT * FROM accounts`).all() as any[];
-  return rows.map((row) => applyCachedCredentials(mapAccountRow(row))) as Account[];
+  return rows.map((row) => mapAccountRow(row)) as Account[];
 }
 
 export async function getAccountsForUser(userId: string) {
@@ -41,7 +40,7 @@ export async function getAccountsForUser(userId: string) {
        ORDER BY a.id ASC`
     )
     .all(userId, userId) as any[];
-  return rows.map((row) => applyCachedCredentials(mapAccountRow(row))) as Account[];
+  return rows.map((row) => mapAccountRow(row)) as Account[];
 }
 
 export async function saveAccounts(nextAccounts: Account[]) {
@@ -72,7 +71,7 @@ export async function getAccountById(accountId: string) {
   const db = await getDb();
   const row = db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(accountId) as any;
   if (!row) return null;
-  return applyCachedCredentials(mapAccountRow(row));
+  return mapAccountRow(row);
 }
 
 /**
@@ -102,7 +101,7 @@ export async function upsertAccount(account: Account) {
     if (!existing) {
       await ensureCategoryLinearModelForAccount(account.id);
     }
-    return applyCachedCredentials(account);
+    return account;
   });
 }
 
@@ -116,7 +115,7 @@ export async function patchAccount(accountId: string, payload: Partial<Account>)
     db.transaction(() => {
       persistAccountRow(db, next, row.dbPath ?? null);
     })();
-    return applyCachedCredentials(next);
+    return next;
   });
 }
 

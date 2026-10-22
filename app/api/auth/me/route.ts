@@ -1,40 +1,22 @@
 import { NextResponse } from "next/server";
-import { getAccountsForUser, getUsers } from "@/lib/db";
-import {
-  getSessionTtlSeconds,
-  refreshSession,
-  sessionFromCookie,
-  setSessionCookie
-} from "@/lib/auth";
+import { getUserById } from "@/lib/serverDb";
+import { ensureActiveAccountId, requireActiveUserSession, withAuthResponse, SESSION_TTL_SECONDS } from "@/lib/auth";
 import { sanitizeAccountsForClient } from "@/lib/accountPresentation";
 
 export async function GET(request: Request) {
-  const cookie = request.headers.get("cookie");
-  const session = sessionFromCookie(cookie);
-  if (!session) {
-    return NextResponse.json({ ok: false }, { status: 401 });
-  }
-  const sessionAccountId = session.accountId?.trim();
-  if (!sessionAccountId) {
-    return NextResponse.json({ ok: false }, { status: 403 });
-  }
-  const [users, accounts] = await Promise.all([
-    getUsers(),
-    getAccountsForUser(session.userId)
-  ]);
-  const user = users.find((u) => u.id === session.userId);
-  // Rotate on every poll so an idle session survives a full TTL of inactivity,
-  // not just its final refresh window — the cookie is only refreshed while a tab
-  // is open, so it must be near-full whenever the app is closed for the night.
-  const nextSession = refreshSession(session);
-  const response = NextResponse.json({
-    ok: true,
-    user: user ?? null,
-    accountId: sessionAccountId,
-    accounts: sanitizeAccountsForClient(accounts),
-    exp: nextSession.exp,
-    ttlSeconds: getSessionTtlSeconds()
+  const session = await requireActiveUserSession(request, { allowRestricted: true });
+  if (session instanceof NextResponse) return session;
+  return withAuthResponse(session, async () => {
+    const user = await getUserById(session.userId);
+    if (!user) return NextResponse.json({ok:false,message:"Unauthorized"},{status:401});
+    const restricted = session.enrollmentRequired || session.reauthRequired;
+    const selection = restricted ? { mailboxState: "enrollment", accountId: null, accounts: [] } : await ensureActiveAccountId(session);
+    return NextResponse.json({ ok: true,
+      user: restricted ? { id: user.id, email: user.email, name:user.name } : user,
+      accountId: selection.accountId, accounts: sanitizeAccountsForClient(selection.accounts),
+      exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_TTL_SECONDS,
+      mailboxState: selection.mailboxState,
+      security: { enrollmentRequired: session.enrollmentRequired, reauthRequired: session.reauthRequired,
+        ...(session.securityCode ? { code: session.securityCode } : {}) } });
   });
-  setSessionCookie(response, nextSession);
-  return response;
 }

@@ -1,3 +1,4 @@
+import "./testDbHarness";
 // Synthetic Better Auth fixtures. Never ship a test route or sign cookies by hand.
 import { Database } from "bun:sqlite";
 import { createHmac } from "crypto";
@@ -202,3 +203,24 @@ export async function enrollTestTotp(auth: NoctuaAuth, jar: CookieJar, password?
 }
 
 export type TestAuthHarness = Awaited<ReturnType<typeof createTestAuthHarness>>;
+
+/** A real fully enrolled session for HTTP fixtures; each caller gets its own principal. */
+export async function createAuthenticatedTestSession(accountId?: string, role: "admin" | "user" = "user") {
+  const harness = await getSharedTestAuthHarness();
+  const user = await harness.createUser(`fixture-${crypto.randomUUID()}@example.test`, undefined, role);
+  const { jar } = await harness.signIn(user.email);
+  await harness.enrollTotp(jar, "synthetic-password-123");
+  const current = await harness.auth.api.getSession({ headers: jar.headers() });
+  if (!current) throw new Error("Fixture session missing after TOTP rotation");
+  await harness.seedSessionSecurity(current.session.id, user.id, "mfa", "password_totp");
+  if (accountId) {
+    await harness.addMembership(user.id, accountId);
+    const { setActiveAccountId } = await import("./betterAuth");
+    await setActiveAccountId(harness.auth, current.session.token, accountId);
+  }
+  return { ...harness, user, jar, session: current.session };
+}
+
+export async function authenticatedTestCookie(accountId?: string) {
+  return (await createAuthenticatedTestSession(accountId)).jar.header();
+}

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { initMasterSchema } from "./schema";
-import { DuplicateUserEmailError, insertUserRow } from "./users";
 
 // Each test gets its own in-memory master DB so legacy layouts can be
 // pre-seeded before `initMasterSchema` runs; the shared harness DB is
@@ -95,15 +94,7 @@ describe("initMasterSchema: clean install", () => {
     expect(warnCalls).toEqual([]);
     expect(errorCalls).toEqual([]);
 
-    expect(columnNames(db, "users")).toEqual(
-      expect.arrayContaining([
-        "name",
-        "passwordHash",
-        "passwordUpdatedAt",
-        "mustChangePassword",
-        "disabledAt"
-      ])
-    );
+    expect(columnNames(db, "users")).toEqual(["id", "email", "role", "createdAt"]);
     expect(columnNames(db, "user_accounts")).toEqual(
       expect.arrayContaining(["role", "grantedByUserId", "grantedAt"])
     );
@@ -162,20 +153,7 @@ describe("initMasterSchema: legacy install", () => {
 
     runMigrationQuietly(db);
 
-    expect(
-      db
-        .prepare(
-          `SELECT name, passwordHash, passwordUpdatedAt, mustChangePassword, disabledAt
-           FROM users WHERE id = ?`
-        )
-        .get("user-legacy")
-    ).toEqual({
-      name: null,
-      passwordHash: null,
-      passwordUpdatedAt: null,
-      mustChangePassword: 0,
-      disabledAt: null
-    });
+    expect(db.prepare("SELECT id,email,role,createdAt FROM users WHERE id=?").get("user-legacy")).toEqual({id:"user-legacy",email:"legacy@example.test",role:"user",createdAt:1});
     // Links that predate roles were self-created, so they become managers.
     expect(
       db
@@ -192,7 +170,7 @@ describe("initMasterSchema: legacy install", () => {
 
     expect(() => runMigrationQuietly(db)).not.toThrow();
     expect(columnNames(db, "users").filter((name) => name === "name")).toHaveLength(1);
-    expect(columnNames(db, "users")).toContain("disabledAt");
+    expect(columnNames(db, "users")).not.toContain("disabledAt");
     expect(columnNames(db, "user_accounts")).toContain("grantedAt");
   });
 
@@ -237,18 +215,6 @@ describe("initMasterSchema: legacy install", () => {
     });
     // Ids only: the addresses themselves stay out of the log.
     expect(JSON.stringify(warnCalls[0])).not.toContain("example.test");
-
-    // Until an admin resolves them, insertUser enforces uniqueness itself.
-    expect(() =>
-      db
-        .transaction(() => insertUserRow(db, { email: "dUp@example.TEST", role: "user" }))
-        .immediate()
-    ).toThrow(DuplicateUserEmailError);
-    expect(() =>
-      db
-        .transaction(() => insertUserRow(db, { email: "other@EXAMPLE.test", role: "user" }))
-        .immediate()
-    ).toThrow(DuplicateUserEmailError);
 
     // A second start is just as safe and keeps the non-unique index.
     const second = runMigrationQuietly(db);

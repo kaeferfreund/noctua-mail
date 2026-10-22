@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { updateMessageFlags } from "@/lib/db";
 import { updateImapFlags } from "@/lib/mail/imap";
@@ -25,51 +26,53 @@ export async function POST(request: Request, { params }: Params) {
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
-  const { accountId: resolvedAccountId, account, clientId, message } = context;
+  return withAuthResponse(context, async () => {
+    const { accountId: resolvedAccountId, account, clientId, message } = context;
 
-  const { folder: inboxFolder, mailbox: inboxMailbox } = await resolveSpecialFolderAndMailbox(
-    resolvedAccountId,
-    findInboxFolder,
-    { fallbackMailbox: "INBOX" }
-  );
-  const inboxMailboxPath = inboxMailbox ?? "INBOX";
-  const currentMailbox = message.mailboxPath;
+    const { folder: inboxFolder, mailbox: inboxMailbox } = await resolveSpecialFolderAndMailbox(
+      resolvedAccountId,
+      findInboxFolder,
+      { fallbackMailbox: "INBOX" }
+    );
+    const inboxMailboxPath = inboxMailbox ?? "INBOX";
+    const currentMailbox = message.mailboxPath;
 
-  const existingFlags = message.flags ?? [];
-  await clearImapNonJunkFlags(account, currentMailbox, message.imapUid, existingFlags, clientId);
-  await updateImapFlags(
-    account,
-    currentMailbox,
-    message.imapUid,
-    NONJUNK_KEYWORD,
-    true,
-    clientId
-  );
+    const existingFlags = message.flags ?? [];
+    await clearImapNonJunkFlags(account, currentMailbox, message.imapUid, existingFlags, clientId);
+    await updateImapFlags(
+      account,
+      currentMailbox,
+      message.imapUid,
+      NONJUNK_KEYWORD,
+      true,
+      clientId
+    );
 
-  const { relocated } = await moveAndRelocateMessageWithFiles({
-    account,
-    currentMailbox,
-    imapUid: message.imapUid,
-    destinationMailbox: inboxMailboxPath,
-    clientId,
-    accountId: resolvedAccountId,
-    previousId: message.id,
-    destinationFolderId: inboxFolder?.id ?? message.folderId
-  });
+    const { relocated } = await moveAndRelocateMessageWithFiles({
+      account,
+      currentMailbox,
+      imapUid: message.imapUid,
+      destinationMailbox: inboxMailboxPath,
+      clientId,
+      accountId: resolvedAccountId,
+      previousId: message.id,
+      destinationFolderId: inboxFolder?.id ?? message.folderId
+    });
 
-  const nextFlags = appendNonJunkKeyword(existingFlags);
-  const flagsChanged = !sameFlagOrderAndValues(nextFlags, existingFlags);
-  if (flagsChanged) {
-    await updateMessageFlags(resolvedAccountId, relocated?.nextId ?? message.id, nextFlags);
-  }
+    const nextFlags = appendNonJunkKeyword(existingFlags);
+    const flagsChanged = !sameFlagOrderAndValues(nextFlags, existingFlags);
+    if (flagsChanged) {
+      await updateMessageFlags(resolvedAccountId, relocated?.nextId ?? message.id, nextFlags);
+    }
 
-  return NextResponse.json({
-    ok: true,
-    action: "moved",
-    inboxFolderId: inboxFolder?.id ?? null,
-    inboxMailbox: inboxMailboxPath,
-    flags: nextFlags,
-    previousMessageId: relocated?.previousId ?? message.id,
-    messageId: relocated?.nextId ?? message.id
+    return NextResponse.json({
+      ok: true,
+      action: "moved",
+      inboxFolderId: inboxFolder?.id ?? null,
+      inboxMailbox: inboxMailboxPath,
+      flags: nextFlags,
+      previousMessageId: relocated?.previousId ?? message.id,
+      messageId: relocated?.nextId ?? message.id
+    });
   });
 }

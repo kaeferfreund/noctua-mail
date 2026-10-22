@@ -288,3 +288,18 @@ describe("credential generation barrier", () => {
     expect((await caught(f.auth.api.resetPassword({ body: { token: resetToken, newPassword: "another-password-123" } }))).body?.code).toBe("INVALID_TOKEN");
   });
 });
+
+describe("historical profile import",()=>{
+  test("imports name and permanent ban once without reviving legacy auth authority",async()=>{
+    const f=await setup(); const user=await f.createUser("historical@example.test");
+    f.master.exec("ALTER TABLE users ADD COLUMN name TEXT; ALTER TABLE users ADD COLUMN disabledAt INTEGER");
+    f.master.prepare("UPDATE users SET name='Historical Person',disabledAt=123 WHERE id=?").run(user.id);
+    installAuthControlPlane(f.master);
+    expect(f.master.prepare("SELECT name,banned,banExpires FROM auth_user WHERE id=?").get(user.id)).toEqual({name:"Historical Person",banned:1,banExpires:null});
+    const generation=state(f,user.id);
+    f.master.prepare("UPDATE auth_user SET name='Authoritative Name',banned=0 WHERE id=?").run(user.id);
+    installAuthControlPlane(f.master);
+    expect(f.master.prepare("SELECT name,banned FROM auth_user WHERE id=?").get(user.id)).toEqual({name:"Authoritative Name",banned:0});
+    expect(state(f,user.id)).toBe(generation+1);
+  });
+});

@@ -1,48 +1,26 @@
 import { NextResponse } from "next/server";
-import { getAccountById, listAccessibleAccountIdsForUser } from "@/lib/db";
-import { refreshSession, requireSessionOr401, setSessionCookie } from "@/lib/auth";
+import { getAuth, setActiveAccountId } from "@/lib/betterAuth";
+import { requireActiveUserSession, requireAccountAccessOr403, withAuthResponse } from "@/lib/auth";
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 
 export async function POST(request: Request) {
-  const session = requireSessionOr401(request);
+  const error = requireJsonSameOrigin(request);
+  if (error) return error;
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-
-  const payload = (await request.json().catch(() => null)) as { accountId?: string } | null;
-  const accountId = payload?.accountId?.trim() ?? "";
-  if (!accountId) {
-    return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
-  }
-
-  const allowedAccountIds = new Set(await listAccessibleAccountIdsForUser(session.userId));
-  if (!allowedAccountIds.has(accountId)) {
-    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-  }
-
-  const account = await getAccountById(accountId);
-  if (!account) {
-    return NextResponse.json({ ok: false, message: "Account not found" }, { status: 404 });
-  }
-
-  const includeSessionCredentials = Boolean(session.imap || session.smtp);
-  const imapPass = account.imap.password || session.imap?.pass || "";
-  const smtpPass = account.smtp.password || session.smtp?.pass || imapPass;
-  const nextSession = refreshSession({
-    ...session,
-    accountId,
-    imap: includeSessionCredentials
-      ? {
-          user: account.imap.user,
-          pass: imapPass
-        }
-      : undefined,
-    smtp: includeSessionCredentials
-      ? {
-          user: account.smtp.user,
-          pass: smtpPass
-        }
-      : undefined
+  return withAuthResponse(session, async () => {
+    const payload = await request.json().catch(() => null) as { accountId?: unknown } | null;
+    const accountId = typeof payload?.accountId === "string" ? payload.accountId.trim() : "";
+    if (!accountId) return NextResponse.json({ok:false,message:"Missing accountId"},{status:400});
+    const access = await requireAccountAccessOr403(session, accountId);
+    if (access instanceof NextResponse) return access;
+    const updated = await setActiveAccountId(await getAuth(), session.sessionToken, accountId);
+    if (!updated) return NextResponse.json({ok:false,message:"Unauthorized"},{status:401});
+    const stillAllowed = await requireAccountAccessOr403(session, accountId);
+    if (stillAllowed instanceof NextResponse) {
+      await setActiveAccountId(await getAuth(), session.sessionToken, null);
+      return stillAllowed;
+    }
+    return NextResponse.json({ok:true,accountId});
   });
-
-  const response = NextResponse.json({ ok: true, accountId });
-  setSessionCookie(response, nextSession);
-  return response;
 }

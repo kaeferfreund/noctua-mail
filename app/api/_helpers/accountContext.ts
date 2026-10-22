@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireSessionAccountOr403, requireSessionOr401, type SessionData } from "@/lib/auth";
-import { getAccountById, getAccountsForUser } from "@/lib/serverDb";
+import { forwardAuthHeaders, requireAccountAccessOr403, requireActiveUserSession, type ActiveUserSession } from "@/lib/auth";
+import { getAccountById } from "@/lib/serverDb";
 import type { Account } from "@/lib/data";
 import { errorResponse } from "./response";
 
 export type AccountContext = {
-  session: SessionData;
+  session: ActiveUserSession;
   accountId: string;
   account: Account;
   clientId?: string;
@@ -45,24 +45,21 @@ export async function requireAccountContext(
   if (!accountId) {
     return errorResponse(options?.missingAccountMessage ?? "Missing accountId", 400);
   }
-  const session = requireSessionOr401(request);
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const access = await requireSessionAccountOr403(session, accountId);
+  const access = await requireAccountAccessOr403(session, accountId);
   if (access instanceof NextResponse) return access;
   const account = await getAccountById(accountId);
   if (!account) {
-    return errorResponse("Account not found", 404);
+    return forwardAuthHeaders(errorResponse("Account not found", 404), session.responseHeaders);
   }
-  const clientId = request.headers.get("x-noctua-client") ?? undefined;
+  const rawClientId = request.headers.get("x-noctua-client") ?? "";
+  const clientId = /^[A-Za-z0-9_-]{1,64}$/.test(rawClientId) ? rawClientId : undefined;
   return { session, accountId, account, clientId };
 }
 
 /**
- * Like `requireAccountContext`, but authorizes any account the session user
- * owns — not only the session's single active account. Cross-account features
- * (e.g. copy/move a message into a *different* account of the same user) need
- * to act on an account that `requireSessionAccountOr403` would reject because
- * it isn't the active one.
+ * Resolves a destination mailbox through the same live membership guard.
  */
 export async function requireOwnedAccountContext(
   request: Request,
@@ -74,14 +71,14 @@ export async function requireOwnedAccountContext(
   if (!accountId) {
     return errorResponse(options?.missingAccountMessage ?? "Missing accountId", 400);
   }
-  const session = requireSessionOr401(request);
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const ownedAccounts = await getAccountsForUser(session.userId);
-  const account = ownedAccounts.find((item) => item.id === accountId);
-  if (!account) {
-    return errorResponse("Forbidden", 403);
-  }
-  const clientId = request.headers.get("x-noctua-client") ?? undefined;
+  const access = await requireAccountAccessOr403(session, accountId);
+  if (access instanceof NextResponse) return access;
+  const account = await getAccountById(accountId);
+  if (!account) return forwardAuthHeaders(errorResponse("Forbidden", 403), session.responseHeaders);
+  const rawClientId = request.headers.get("x-noctua-client") ?? "";
+  const clientId = /^[A-Za-z0-9_-]{1,64}$/.test(rawClientId) ? rawClientId : undefined;
   return { session, accountId, account, clientId };
 }
 
@@ -93,5 +90,5 @@ export async function requireAccountContextFromParams(
   }
 ) {
   const accountId = await getAccountIdFromParams(paramsPromise);
-  return requireAccountContext(request, accountId, options);
+  return await requireAccountContext(request, accountId, options);
 }

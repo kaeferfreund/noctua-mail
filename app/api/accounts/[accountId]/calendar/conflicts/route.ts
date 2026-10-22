@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -20,45 +21,47 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  try {
-    const conflicts = await listUnresolvedCalendarEventConflicts(accountContext.accountId);
-    const items = conflicts.map((c) => {
-      try {
-        const base = c.baseIcs ? buildCalendarEventSnapshot(c.baseIcs, c.eventUid) : null;
-        const local = buildCalendarEventSnapshot(c.localIcs, c.eventUid);
-        const remote = buildCalendarEventSnapshot(c.remoteIcs, c.eventUid);
-        return {
-          eventId: c.eventId,
-          eventUid: c.eventUid,
-          summary: c.summary ?? null,
-          timeZone: c.timeZone ?? null,
-          allDay: c.allDay,
-          localChangedAtMs: c.localChangedAtMs ?? null,
-          remoteChangedAtMs: c.remoteChangedAtMs ?? null,
-          // Require a common base — without it the diff would be an "initial"
-          // snapshot that the UI renders as "no changes", masking a real
-          // conflict. Null instead surfaces "Couldn't compute…".
-          localDiff: base && local ? diffCalendarEventSnapshots(base, local) : null,
-          remoteDiff: base && remote ? diffCalendarEventSnapshots(base, remote) : null
-        };
-      } catch {
-        return {
-          eventId: c.eventId,
-          eventUid: c.eventUid,
-          summary: c.summary ?? null,
-          timeZone: c.timeZone ?? null,
-          allDay: c.allDay,
-          localChangedAtMs: c.localChangedAtMs ?? null,
-          remoteChangedAtMs: c.remoteChangedAtMs ?? null,
-          localDiff: null,
-          remoteDiff: null
-        };
-      }
-    });
-    return NextResponse.json({ ok: true, conflicts: items });
-  } catch (err) {
-    console.error("[calendar/conflicts] GET error:", err);
-    return NextResponse.json({ ok: false, message: "Failed to load conflicts" }, { status: 500 });
-  }
+    try {
+      const conflicts = await listUnresolvedCalendarEventConflicts(accountContext.accountId);
+      const items = conflicts.map((c) => {
+        try {
+          const base = c.baseIcs ? buildCalendarEventSnapshot(c.baseIcs, c.eventUid) : null;
+          const local = buildCalendarEventSnapshot(c.localIcs, c.eventUid);
+          const remote = buildCalendarEventSnapshot(c.remoteIcs, c.eventUid);
+          return {
+            eventId: c.eventId,
+            eventUid: c.eventUid,
+            summary: c.summary ?? null,
+            timeZone: c.timeZone ?? null,
+            allDay: c.allDay,
+            localChangedAtMs: c.localChangedAtMs ?? null,
+            remoteChangedAtMs: c.remoteChangedAtMs ?? null,
+            // Require a common base — without it the diff would be an "initial"
+            // snapshot that the UI renders as "no changes", masking a real
+            // conflict. Null instead surfaces "Couldn't compute…".
+            localDiff: base && local ? diffCalendarEventSnapshots(base, local) : null,
+            remoteDiff: base && remote ? diffCalendarEventSnapshots(base, remote) : null
+          };
+        } catch {
+          return {
+            eventId: c.eventId,
+            eventUid: c.eventUid,
+            summary: c.summary ?? null,
+            timeZone: c.timeZone ?? null,
+            allDay: c.allDay,
+            localChangedAtMs: c.localChangedAtMs ?? null,
+            remoteChangedAtMs: c.remoteChangedAtMs ?? null,
+            localDiff: null,
+            remoteDiff: null
+          };
+        }
+      });
+      return NextResponse.json({ ok: true, conflicts: items });
+    } catch (err) {
+      console.error("[calendar/conflicts] GET error:", err);
+      return NextResponse.json({ ok: false, message: "Failed to load conflicts" }, { status: 500 });
+    }
+  });
 }

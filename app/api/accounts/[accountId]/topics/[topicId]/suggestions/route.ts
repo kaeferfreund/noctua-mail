@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { getTopicThreadSuggestions } from "@/lib/topics";
@@ -19,25 +20,27 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId or topicId"
   });
   if (context instanceof NextResponse) return context;
-  if (!topicId) {
-    return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const limit = Number(searchParams.get("limit") ?? "5");
-  const maxAgeDays = Number(searchParams.get("maxAgeDays") ?? "180");
-  const suggestions = await getTopicThreadSuggestions(context.accountId, topicId, {
-    accountEmail: context.account.email,
-    limit,
-    maxAgeDays
-  });
-
-  return NextResponse.json(
-    { ok: true, suggestions },
-    {
-      headers: {
-        "Cache-Control": "no-store, max-age=0"
-      }
+  return withAuthResponse(context, async () => {
+    if (!topicId) {
+      return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
     }
-  );
+
+    const { searchParams } = new URL(request.url);
+    const limit = Number(searchParams.get("limit") ?? "5");
+    const maxAgeDays = Number(searchParams.get("maxAgeDays") ?? "180");
+    const suggestions = await getTopicThreadSuggestions(context.accountId, topicId, {
+      accountEmail: context.account.email,
+      limit,
+      maxAgeDays
+    });
+
+    return NextResponse.json(
+      { ok: true, suggestions },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0"
+        }
+      }
+    );
+  });
 }

@@ -415,13 +415,13 @@ export type User = {
   id: string;
   /** Stored lowercased and trimmed. */
   email: string;
-  name?: string;
+  name: string | null;
   role: "admin" | "user";
   createdAt: number;
   hasPassword: boolean;
-  mustChangePassword: boolean;
-  /** Unix milliseconds; `null` while the user is active. */
-  disabledAt: number | null;
+  disabled: boolean;
+  twoFactorEnabled: boolean;
+  passkeyCount: number;
 };
 
 /** Membership role on a mailbox, ordered `viewer < editor < manager`. */

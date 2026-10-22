@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders, getLatestMessageUid, getMailboxState, hasPendingMovesForFolder } from "@/lib/db";
 import { getImapMailboxStatus } from "@/lib/mail/imap";
@@ -27,112 +28,114 @@ export async function handleFolderConsistencyRequest(
     }
   );
   if (accountContext instanceof NextResponse) return accountContext;
-  const { accountId, account, clientId } = accountContext;
+  return withAuthResponse(accountContext, async () => {
+    const { accountId, account, clientId } = accountContext;
 
-  const folderId = options?.folderId ?? "";
-  if (!folderId) {
-    return NextResponse.json({ ok: false, message: "Missing folderId" }, { status: 400 });
-  }
+    const folderId = options?.folderId ?? "";
+    if (!folderId) {
+      return NextResponse.json({ ok: false, message: "Missing folderId" }, { status: 400 });
+    }
 
-  const folder = (await getFolders(accountId)).find((item) => item.id === folderId);
-  if (!folder) {
-    return NextResponse.json({ ok: false, message: "Folder not found" }, { status: 404 });
-  }
+    const folder = (await getFolders(accountId)).find((item) => item.id === folderId);
+    if (!folder) {
+      return NextResponse.json({ ok: false, message: "Folder not found" }, { status: 404 });
+    }
 
-  const mailboxPath = mailboxPathFromFolderId(folderId, accountId);
-  const currentLocalHighestUid = await getLatestMessageUid(accountId, mailboxPath);
-  const currentMailboxState = await getMailboxState(accountId, folderId);
-  const localCount = folder.count ?? 0;
-  const hasPendingMoves = await hasPendingMovesForFolder(accountId, folderId);
-  if (hasPendingMoves) {
+    const mailboxPath = mailboxPathFromFolderId(folderId, accountId);
+    const currentLocalHighestUid = await getLatestMessageUid(accountId, mailboxPath);
+    const currentMailboxState = await getMailboxState(accountId, folderId);
+    const localCount = folder.count ?? 0;
+    const hasPendingMoves = await hasPendingMovesForFolder(accountId, folderId);
+    if (hasPendingMoves) {
+      return NextResponse.json({
+        ok: true,
+        folderId,
+        mailboxPath,
+        needsRepair: false,
+        recommendedMode: "none",
+        reasons: [],
+        local: {
+          count: localCount,
+          highestUid: currentLocalHighestUid,
+          uidValidity: currentMailboxState?.uidValidity ?? null,
+          highestModSeq: currentMailboxState?.highestModSeq ?? null,
+          supportsQresync: currentMailboxState?.supportsQresync ?? null
+        },
+        remote: {
+          count: null,
+          uidNext: null,
+          uidValidity: null,
+          highestModSeq: null
+        }
+      });
+    }
+
+    // Only the remote status lookup talks to the mail server; keep the catch
+    // narrow so local failures still surface as a 500.
+    let remote: Awaited<ReturnType<typeof getImapMailboxStatus>>;
+    try {
+      remote = await getImapMailboxStatus(account, mailboxPath, clientId);
+    } catch (error) {
+      const response = imapUpstreamErrorResponse(error, {
+        accountId,
+        op: "folder.consistency"
+      });
+      if (response) return response;
+      throw error;
+    }
+    const localHighestUid = currentLocalHighestUid;
+    const mailboxState = currentMailboxState;
+    const remoteCount = remote.messages;
+    const policyInput = {
+      remote: {
+        count: remoteCount,
+        uidNext: remote.uidNext,
+        uidValidity: remote.uidValidity,
+        highestModSeq: remote.highestModSeq
+      },
+      local: {
+        count: localCount,
+        highestUid: localHighestUid,
+        uidValidity: mailboxState?.uidValidity ?? null,
+        highestModSeq: mailboxState?.highestModSeq ?? null,
+        supportsQresync: mailboxState?.supportsQresync ?? null
+      }
+    };
+    const { needsRepair, recommendedMode, reasons } = determineFolderConsistency(policyInput);
+    logSyncPolicyCall({
+      caller: "folder-consistency-route",
+      policy: "determineFolderConsistency",
+      accountId,
+      folderId,
+      input: policyInput,
+      decision: {
+        needsRepair,
+        recommendedMode,
+        reasons
+      }
+    });
+
     return NextResponse.json({
       ok: true,
       folderId,
       mailboxPath,
-      needsRepair: false,
-      recommendedMode: "none",
-      reasons: [],
-      local: {
-        count: localCount,
-        highestUid: currentLocalHighestUid,
-        uidValidity: currentMailboxState?.uidValidity ?? null,
-        highestModSeq: currentMailboxState?.highestModSeq ?? null,
-        supportsQresync: currentMailboxState?.supportsQresync ?? null
-      },
-      remote: {
-        count: null,
-        uidNext: null,
-        uidValidity: null,
-        highestModSeq: null
-      }
-    });
-  }
-
-  // Only the remote status lookup talks to the mail server; keep the catch
-  // narrow so local failures still surface as a 500.
-  let remote: Awaited<ReturnType<typeof getImapMailboxStatus>>;
-  try {
-    remote = await getImapMailboxStatus(account, mailboxPath, clientId);
-  } catch (error) {
-    const response = imapUpstreamErrorResponse(error, {
-      accountId,
-      op: "folder.consistency"
-    });
-    if (response) return response;
-    throw error;
-  }
-  const localHighestUid = currentLocalHighestUid;
-  const mailboxState = currentMailboxState;
-  const remoteCount = remote.messages;
-  const policyInput = {
-    remote: {
-      count: remoteCount,
-      uidNext: remote.uidNext,
-      uidValidity: remote.uidValidity,
-      highestModSeq: remote.highestModSeq
-    },
-    local: {
-      count: localCount,
-      highestUid: localHighestUid,
-      uidValidity: mailboxState?.uidValidity ?? null,
-      highestModSeq: mailboxState?.highestModSeq ?? null,
-      supportsQresync: mailboxState?.supportsQresync ?? null
-    }
-  };
-  const { needsRepair, recommendedMode, reasons } = determineFolderConsistency(policyInput);
-  logSyncPolicyCall({
-    caller: "folder-consistency-route",
-    policy: "determineFolderConsistency",
-    accountId,
-    folderId,
-    input: policyInput,
-    decision: {
       needsRepair,
       recommendedMode,
-      reasons
-    }
-  });
-
-  return NextResponse.json({
-    ok: true,
-    folderId,
-    mailboxPath,
-    needsRepair,
-    recommendedMode,
-    reasons,
-    local: {
-      count: localCount,
-      highestUid: localHighestUid,
-      uidValidity: mailboxState?.uidValidity ?? null,
-      highestModSeq: mailboxState?.highestModSeq ?? null,
-      supportsQresync: mailboxState?.supportsQresync ?? null
-    },
-    remote: {
-      count: remoteCount,
-      uidNext: remote.uidNext,
-      uidValidity: remote.uidValidity,
-      highestModSeq: remote.highestModSeq
-    }
+      reasons,
+      local: {
+        count: localCount,
+        highestUid: localHighestUid,
+        uidValidity: mailboxState?.uidValidity ?? null,
+        highestModSeq: mailboxState?.highestModSeq ?? null,
+        supportsQresync: mailboxState?.supportsQresync ?? null
+      },
+      remote: {
+        count: remoteCount,
+        uidNext: remote.uidNext,
+        uidValidity: remote.uidValidity,
+        highestModSeq: remote.highestModSeq
+      }
+    });
   });
 }
 

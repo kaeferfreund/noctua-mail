@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -14,21 +15,23 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
   const context = await requireAccountContext(request, accountId);
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const explanation = await getTopicSuggestionExplanationForThread(
-    accountId,
-    searchParams.get("threadId") ?? "",
-    {
-      accountEmail: context.account.email
-    }
-  );
-
-  return NextResponse.json(
-    { ok: true, explanation },
-    {
-      headers: {
-        "Cache-Control": "no-store, max-age=0"
+    const explanation = await getTopicSuggestionExplanationForThread(
+      accountId,
+      searchParams.get("threadId") ?? "",
+      {
+        accountEmail: context.account.email
       }
-    }
-  );
+    );
+
+    return NextResponse.json(
+      { ok: true, explanation },
+      {
+        headers: {
+          "Cache-Control": "no-store, max-age=0"
+        }
+      }
+    );
+  });
 }

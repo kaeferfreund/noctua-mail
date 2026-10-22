@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -109,31 +110,33 @@ export async function POST(request: Request, { params }: Params) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  const conflict = await getCalendarEventConflict(accountId, eventId);
-  if (!conflict) {
-    return NextResponse.json({ ok: false, message: "Conflict not found" }, { status: 404 });
-  }
-  const event = await getCalendarEventById(accountId, eventId);
-  if (!event) {
-    await deleteCalendarEventConflict(accountId, eventId);
-    return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
-  }
-
-  try {
-    const outcome = await applyConflictResolution({
-      accountId,
-      event,
-      conflict,
-      account: accountContext.account,
-      resolution
-    });
-    if (!outcome.ok) {
-      return NextResponse.json({ ok: false, message: outcome.message }, { status: outcome.status });
+    const conflict = await getCalendarEventConflict(accountId, eventId);
+    if (!conflict) {
+      return NextResponse.json({ ok: false, message: "Conflict not found" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[calendar/conflicts/resolve] error:", err);
-    return NextResponse.json({ ok: false, message: "Failed to resolve conflict" }, { status: 500 });
-  }
+    const event = await getCalendarEventById(accountId, eventId);
+    if (!event) {
+      await deleteCalendarEventConflict(accountId, eventId);
+      return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+    }
+
+    try {
+      const outcome = await applyConflictResolution({
+        accountId,
+        event,
+        conflict,
+        account: accountContext.account,
+        resolution
+      });
+      if (!outcome.ok) {
+        return NextResponse.json({ ok: false, message: outcome.message }, { status: outcome.status });
+      }
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      console.error("[calendar/conflicts/resolve] error:", err);
+      return NextResponse.json({ ok: false, message: "Failed to resolve conflict" }, { status: 500 });
+    }
+  });
 }

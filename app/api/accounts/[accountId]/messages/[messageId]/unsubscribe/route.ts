@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
@@ -134,65 +135,67 @@ export async function POST(request: Request, { params }: Params) {
     { missingFieldsMessage: "Missing accountId or messageId" }
   );
   if (context instanceof NextResponse) return context;
-  const { message } = context;
+  return withAuthResponse(context, async () => {
+    const { message } = context;
 
-  if (!message.listUnsubscribe) {
-    return NextResponse.json(
-      { ok: false, message: "Message has no unsubscribe header" },
-      { status: 400 }
-    );
-  }
-
-  const { listUnsubscribe, hasOneClick } = parseUnsubscribeHeaders(message.listUnsubscribe);
-
-  if (!listUnsubscribe) {
-    return NextResponse.json(
-      { ok: false, message: "Could not parse List-Unsubscribe header" },
-      { status: 400 }
-    );
-  }
-
-  const urls = parseListUnsubscribeUrls(listUnsubscribe);
-
-  // Case 1: RFC 8058 one-click (has List-Unsubscribe-Post + HTTPS URL).
-  // Server-side fetch — https-only, and validated before sending (SSRF
-  // guard). We deliberately skip `urls.http` here because RFC 8058 says
-  // one-click SHOULD be https and `assertPublicUrl` rejects http anyway.
-  if (hasOneClick && urls.https.length > 0) {
-    const targetUrl = urls.https[0];
-    const result = await performOneClickUnsubscribe(targetUrl);
-    if (result.ok) {
-      return NextResponse.json({ ok: true, method: "one-click", status: result.status });
+    if (!message.listUnsubscribe) {
+      return NextResponse.json(
+        { ok: false, message: "Message has no unsubscribe header" },
+        { status: 400 }
+      );
     }
+
+    const { listUnsubscribe, hasOneClick } = parseUnsubscribeHeaders(message.listUnsubscribe);
+
+    if (!listUnsubscribe) {
+      return NextResponse.json(
+        { ok: false, message: "Could not parse List-Unsubscribe header" },
+        { status: 400 }
+      );
+    }
+
+    const urls = parseListUnsubscribeUrls(listUnsubscribe);
+
+    // Case 1: RFC 8058 one-click (has List-Unsubscribe-Post + HTTPS URL).
+    // Server-side fetch — https-only, and validated before sending (SSRF
+    // guard). We deliberately skip `urls.http` here because RFC 8058 says
+    // one-click SHOULD be https and `assertPublicUrl` rejects http anyway.
+    if (hasOneClick && urls.https.length > 0) {
+      const targetUrl = urls.https[0];
+      const result = await performOneClickUnsubscribe(targetUrl);
+      if (result.ok) {
+        return NextResponse.json({ ok: true, method: "one-click", status: result.status });
+      }
+      return NextResponse.json(
+        { ok: false, message: result.message, method: "one-click" },
+        { status: result.status }
+      );
+    }
+
+    // Case 2: No one-click, but has an http(s) URL -> return it for the
+    // browser to open. No server-side fetch happens here, so plain http
+    // is acceptable. Prefer https when both are present.
+    const browserUrl = urls.https[0] ?? urls.http[0];
+    if (browserUrl) {
+      return NextResponse.json({
+        ok: true,
+        method: "browser",
+        url: browserUrl
+      });
+    }
+
+    // Case 3: Only mailto URLs
+    if (urls.mailto.length > 0) {
+      return NextResponse.json({
+        ok: true,
+        method: "mailto",
+        url: urls.mailto[0]
+      });
+    }
+
     return NextResponse.json(
-      { ok: false, message: result.message, method: "one-click" },
-      { status: result.status }
+      { ok: false, message: "No usable unsubscribe URL found" },
+      { status: 400 }
     );
-  }
-
-  // Case 2: No one-click, but has an http(s) URL -> return it for the
-  // browser to open. No server-side fetch happens here, so plain http
-  // is acceptable. Prefer https when both are present.
-  const browserUrl = urls.https[0] ?? urls.http[0];
-  if (browserUrl) {
-    return NextResponse.json({
-      ok: true,
-      method: "browser",
-      url: browserUrl
-    });
-  }
-
-  // Case 3: Only mailto URLs
-  if (urls.mailto.length > 0) {
-    return NextResponse.json({
-      ok: true,
-      method: "mailto",
-      url: urls.mailto[0]
-    });
-  }
-
-  return NextResponse.json(
-    { ok: false, message: "No usable unsubscribe URL found" },
-    { status: 400 }
-  );
+  });
 }
