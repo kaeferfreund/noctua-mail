@@ -45,7 +45,8 @@ function validateBody(body: string) {
 export async function getThreadCollabState(accountId: string, threadId: string) {
   return store.getThreadCollabState(await getAccountDb(accountId), accountId, threadId);
 }
-/** A revision describes one SQLite read snapshot, including comments and activity. */
+/** Read one consistent SQLite snapshot. Revision identifies collaboration writes;
+ * message presence can change visible comments/activity without advancing it. */
 export async function getThreadCollabSnapshot(accountId: string, threadId: string) {
   const db = await getAccountDb(accountId);
   return db.transaction(() => ({

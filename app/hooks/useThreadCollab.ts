@@ -1,4 +1,17 @@
 "use client";
+/**
+ * Acceptance specification (named tests in useThreadCollab.dom.test.tsx):
+ * Scope: the mounted cache key is (session, account, thread); stale sessions cannot publish. Test: "R6-scope: session/account/thread isolation".
+ * Snapshots: GET supplies complete state/comments/activity; mutation success supplies partial state plus at most its written comment. Test: "R5-completion: same-revision GET completes a partial mutation response with earlier collaborator notes".
+ * Order: higher server revision always wins; lower always loses, regardless of timestamps or request order. Test: "R6-order: higher revision wins regardless of request start".
+ * Equal complete GETs: latest request-start sequence wins regardless of content; earlier starts never regress it. Test: "R6-order: latest-started equal-revision GET wins (earlier resolves last)"; lifecycle tests: "R6-lifecycle: equal-revision complete GET must restore comments and activity when message presence changes", "R6-lifecycle: equal-revision complete GET must hide comments and activity when message presence changes", "R6-lifecycle-activity: equal-revision complete GET must restore activity even without comments".
+ * Equal partial success: preserve complete lists and GET start sequence; merge only its written comment by id without contradicting a comment at that revision. Tests: "R6-partial: equal-revision success preserves complete lists and merges its comment (missing comment)", "R6-partial: equal-revision success preserves complete lists and merges its comment (conflicting comment)".
+ * Partial completion: equal-revision GET must agree on state and comments written at that revision before completing unknown lists. Tests: "R6-completion: equal-revision GET cannot contradict its written comment (different)", "R6-completion: equal-revision GET cannot contradict partial state".
+ * Rollback: failure undoes only its own optimistic snapshot at its base revision; an accepted GET/write takes ownership. Tests: "R6-rollback: only the owning optimistic snapshot rolls back (mutation owns)", "R6-rollback: only the owning optimistic snapshot rolls back (GET owns)".
+ * Denial (r3): 403 purges/blocks its session/account until a newer successful read; pending/failed reads and mutations cannot lift it. Tests: "R3: a denial stays applied while a newer read is pending, then its success restores access", "R5-denial: older 403 still purges after newer HTTP 500 while mutation is in flight".
+ * Pending: one mutation per scope key; other keys run independently and their finalizers cannot clear this key. Test: "R5-pending: overlapping account mutations keep pending on the originating key after navigation".
+ * Limits: post-commit refresh may fail, leaving partial lists; mutation remains committed and the next successful admissible read repairs them. Test: "R6-repair: failed post-commit refresh is repaired by the next successful read".
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CollabMember,
@@ -18,28 +31,26 @@ type CachedSnapshot = Snapshot & {
   owner: number;
   serverSnapshot: Snapshot;
   complete: boolean;
+  // Retained across equal-revision partial responses and optimistic ownership.
+  completeStart: number | null;
 };
 function sameRecord(a: object, b: object): boolean {
   const left = a as Record<string, unknown>, right = b as Record<string, unknown>;
   return Object.keys(left).length === Object.keys(right).length &&
     Object.keys(left).every(key => JSON.stringify(left[key]) === JSON.stringify(right[key]));
 }
-function sameRows<T extends { id: string }>(left: T[], right: T[]) {
-  const byId = new Map(right.map(row => [row.id, row]));
-  return left.length === right.length && left.every(row => {
-    const other = byId.get(row.id);
-    return other !== undefined && sameRecord(row, other);
-  });
-}
 function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
   if (!current) return true;
   const incoming = next.serverSnapshot, accepted = current.serverSnapshot;
   if (incoming.state.revision !== accepted.state.revision)
     return incoming.state.revision > accepted.state.revision;
+  // Message presence can change visible lists without a collaboration write.
+  // Only complete GET start order breaks revision ties, never rollback ownership.
+  if (current.complete && next.complete)
+    return next.completeStart! >= current.completeStart!;
   if (!sameRecord(incoming.state, accepted.state)) return false;
-  // A mutation returns state and at most one written comment, not a full list.
-  // Its same-revision GET may complete unknown data, but cannot contradict a
-  // comment written at that revision. Complete snapshots must be idempotent.
+  // A GET may complete unknown data after a partial mutation, but cannot
+  // contradict a comment written by that mutation at this revision.
   if (!current.complete && next.complete) {
     const incomingComments = new Map(incoming.comments.map(comment => [comment.id, comment]));
     return accepted.comments.filter(comment => comment.revision === accepted.state.revision)
@@ -48,8 +59,7 @@ function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
         return other !== undefined && sameRecord(comment, other);
       });
   }
-  return sameRows(incoming.comments, accepted.comments) &&
-    (!next.complete || !current.complete || sameRows(incoming.activity, accepted.activity));
+  return true;
 }
 type Options = {
   apiFetch?: typeof fetch;
@@ -194,7 +204,7 @@ export function useThreadCollab(
       !mounted.current
     )
       return;
-    const next: CachedSnapshot = { ...data, owner, serverSnapshot: data, complete: true };
+    const next: CachedSnapshot = { ...data, owner, serverSnapshot: data, complete: true, completeStart: sequence };
     if (!canAcceptSnapshot(next, cache.current.get(key))) return;
     scopeSuccessfulLoadSequence.current.set(memberScope, Math.max(sequence, scopeSuccessfulLoadSequence.current.get(memberScope) ?? 0));
     denied.current.delete(memberScope);
@@ -245,19 +255,22 @@ export function useThreadCollab(
         if (!response.ok || !data.ok)
           throw new Error(data.message ?? "Could not save collaboration.");
         const next = cache.current.get(key) ?? previous;
-        if (data.state.revision >= next.serverSnapshot.state.revision) {
+        const sameRevision = data.state.revision === next.serverSnapshot.state.revision;
+        if (data.state.revision > next.serverSnapshot.state.revision ||
+          (sameRevision && sameRecord(data.state, next.serverSnapshot.state))) {
           const comments = new Map(next.serverSnapshot.comments.map(comment => [comment.id, comment]));
           if (data.comment) {
             const existing = comments.get(data.comment.id);
             if (!existing || data.comment.revision > existing.revision)
               comments.set(data.comment.id, data.comment);
           }
-          if (deletedCommentId) comments.delete(deletedCommentId);
+          if (deletedCommentId && !sameRevision) comments.delete(deletedCommentId);
           const committed: Snapshot = { state: data.state, comments: [...comments.values()], activity: next.activity };
           accept({
             ...committed, owner, serverSnapshot: committed,
             // An idempotent late mutation must not downgrade a complete GET.
-            complete: next.complete && data.state.revision === next.serverSnapshot.state.revision,
+            complete: next.complete && sameRevision,
+            completeStart: sameRevision ? next.completeStart : null,
           }, key);
         }
         // Reload activity after the committed mutation. A read failure must not roll it back.
