@@ -3298,8 +3298,8 @@ export default function MailClient({
     []
   );
   const handleDeleteMessagesByIds = useCallback(
-    (ids: string[]) =>
-      listHandleRef.current?.handleDeleteMessagesByIds(ids) ?? Promise.resolve(),
+    (ids: string[], options?: { selectedIds: string[] }) =>
+      listHandleRef.current?.handleDeleteMessagesByIds(ids, options) ?? Promise.resolve(),
     []
   );
   const handleMoveMessages = useCallback(
@@ -3891,7 +3891,7 @@ export default function MailClient({
           if (message) void handleDeleteMessage(message);
           return;
         }
-        void handleDeleteMessagesByIds(threadIds);
+        void handleDeleteMessagesByIds(threadIds, { selectedIds: ids });
       },
       copyToAccount: ({ threadIds }) =>
         handleCopyMessagesToAccount("copy", resolveIds(threadIds)),
