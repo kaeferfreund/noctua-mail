@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import { markdownToHtml } from "./markdownConvert";
+import { markdownToHtml } from "./markdownConverters";
 
 const MARKDOWN_PREVIEW_CSS_PATH = join(
   process.cwd(),

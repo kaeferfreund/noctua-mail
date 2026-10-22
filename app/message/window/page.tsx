@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { useSearchParams } from "next/navigation";
@@ -22,10 +24,13 @@ import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import MessageMenu from "@/app/components/mailclient/message/MessageMenu";
 import MessageQuickActions from "@/app/components/mailclient/message/MessageQuickActions";
 import MessageSourcePanel from "@/app/components/mailclient/message/MessageSourcePanel";
-import MarkdownPanel from "@/app/components/mailclient/message/MarkdownPanel";
 import MessageViewPane from "@/app/components/mailclient/message/MessageViewPane";
 import ThreadView from "@/app/components/mailclient/message/ThreadView";
 import styles from "./page.module.css";
+
+const MarkdownPanel = dynamic(() => import("@/app/components/mailclient/message/MarkdownPanel"), {
+  loading: () => <div role="status">Loading Markdown…</div>
+});
 
 type MessageTab = "html" | "text" | "markdown" | "source";
 type DeleteResponse = {

@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { loadMarkdownConverters } from "@/lib/markdownConvert";
+import { useEffect, useRef } from "react";
 import type React from "react";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import {
@@ -8,6 +9,7 @@ import {
 import type { Message } from "@/lib/data";
 import type { ComposePayload } from "./composeContentBuilder";
 import { registerRecentLocalDraftSave } from "../recentLocalDraftSaves";
+import { ensureRecipientAliasesReady } from "../recipientAliasesResource";
 import { buildDraftSavePayload, getDraftChangeState } from "./draftSaveUtils";
 import type {
   ComposeReplyHeaders,
@@ -138,6 +140,14 @@ export function useDraftManager(params: UseDraftManagerParams) {
     accountScopeVersionRef.current += 1;
   }
 
+  // Opening compose brings the shared alias read forward from browser idle.
+  // The recipient hook publishes the result to shared alias UI.
+  useEffect(() => {
+    if (composeOpen && activeAccountId) {
+      void ensureRecipientAliasesReady(apiFetch, activeAccountId);
+    }
+  }, [composeOpen, activeAccountId, apiFetch]);
+
   const saveDraftNow = async (payload: DraftSavePayload, hash: string) => {
     if (!activeAccountId) return;
     const requestAccountId = activeAccountId;
@@ -266,6 +276,13 @@ export function useDraftManager(params: UseDraftManagerParams) {
     }
   };
 
+  const flushPendingDraftSavesWithContentReady = async () => {
+    // Send awaits the exported flush before building its synchronous payload.
+    // Discard uses the queue-only flush above and needs no conversion chunks.
+    await loadMarkdownConverters();
+    await flushPendingDraftSaves();
+  };
+
   const saveDraft = (payload: DraftSavePayload, hash: string) => {
     pendingDraftSaveRef.current = { payload, hash };
     runQueuedDraftSaves();
@@ -324,8 +341,19 @@ export function useDraftManager(params: UseDraftManagerParams) {
     return true;
   };
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!composeOpen || !activeAccountId) return;
+    const sessionVersion = composeSessionVersionRef.current;
+    const scopeVersion = accountScopeVersionRef.current;
+    const isCurrent = () => composeSessionVersionRef.current === sessionVersion &&
+      accountScopeVersionRef.current === scopeVersion;
+    try {
+      await loadMarkdownConverters();
+    } catch {
+      if (isCurrent()) reportError("Failed to load composer. Please retry.");
+      return;
+    }
+    if (!isCurrent()) return;
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
     const { hash, canManualSave } = getDraftChangeState({
@@ -360,6 +388,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
     if (!composeOpen || !activeAccountId) {
       return { draftId: null, hasContent: false, saved: false };
     }
+    await loadMarkdownConverters();
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
     const changeState = getDraftChangeState({
@@ -406,6 +435,6 @@ export function useDraftManager(params: UseDraftManagerParams) {
     handleDiscardDraft,
     handleSaveDraft,
     saveDraftForHandoff,
-    flushPendingDraftSaves
+    flushPendingDraftSaves: flushPendingDraftSavesWithContentReady
   };
 }
