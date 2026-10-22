@@ -24,9 +24,6 @@
     "test:stress": "bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3",
     "test:standalone-workers": "bun run build && bun --bun build-scripts/verifyStandaloneWorkerBuild.ts",
     "test:docker-workers": "bun --bun build-scripts/verifyDockerWorkerImage.ts",
-    "desktop:dev-server": "PORT=3655 APP_ENV_LABEL=Desktop NOCTUA_DESKTOP_MODE=true IMAP_CREDENTIALS_STORAGE=db NOCTUA_DATA_DIR=../noctua-data-desktop bun run dev",
-    "desktop:dev": "bunx tauri dev",
-    "desktop:build": "bash build-scripts/build-desktop.sh",
     "test:auth-browser": "bun scripts/runAuthBrowserTests.ts",
     "dev:fixture": "bun --env-file=.env.local scripts/dev-fixture/run.ts"
   },
@@ -91,7 +88,6 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.6",
     "@playwright/test": "1.58.2",
-    "@tauri-apps/cli": "^2.10.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/html-to-text": "^9.0.4",

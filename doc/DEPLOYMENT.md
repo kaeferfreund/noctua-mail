@@ -14,27 +14,34 @@ Quick reference for deploying Noctua Mail in any environment.
 
 ## Required Environment Variables
 
-> Authentication is being migrated to Better Auth; cookie credential mode, sealed sessions, `SESSION_SEAL_KEY`, legacy IMAP login and the Tauri desktop build are no longer available in this fork; see [TEAM-INBOX.md §4](TEAM-INBOX.md#4-authentication) and [TEAM-AUTH-PLAN.md](TEAM-AUTH-PLAN.md). The legacy reference below will be rewritten in slice 6.
+One Linux/systemd Bun process serves the application behind a loopback reverse proxy.
+Better Auth stores auth tables in the master `db/main.db`; keep it with all account shards and keys.
+No native desktop mode, sealed-cookie credentials or SMTP recovery delivery is supported.
 
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `SESSION_SEAL_KEY` | 32-byte hex key for session encryption | `openssl rand -hex 32` | ✅ Yes |
-| `IMAP_SECRET_KEY` | 32-byte hex key for IMAP credential encryption | `openssl rand -hex 32` | ✅ Yes |
-| `PORT` | HTTP port to listen on | `3654` | No (default: 3654) |
-| `NOCTUA_DATA_DIR` | Directory for SQLite DB and attachments | `/app/.data/` | No (default: `.data/`) |
-| `IMAP_CREDENTIALS_STORAGE` | Where to store IMAP credentials | `cookie`, `db`, or `both` | No (default: both) |
-
-## Generating Secrets
-
-```bash
-# Generate SESSION_SEAL_KEY
-openssl rand -hex 32
-
-# Generate IMAP_SECRET_KEY
-openssl rand -hex 32
+```sh
+BETTER_AUTH_URL=https://mail.example.org
+PASSKEY_RP_ID=mail.example.org
+BETTER_AUTH_SECRET=<independent-random-secret-at-least-32-characters>
+IMAP_SECRET_KEY=<retain-existing-independent-encryption-key>
+IMAP_CREDENTIALS_STORAGE=db
+BETTER_AUTH_TELEMETRY=0
+NOCTUA_DATA_DIR=/srv/noctua/data
+PORT=3654
+# Leave NOCTUA_TRUSTED_ORIGINS, NOCTUA_IMAP_LOGIN_HOSTS,
+# BETTER_AUTH_TELEMETRY_ENDPOINT and NOCTUA_DESKTOP_MODE unset.
 ```
 
-**Important:** Use different keys for different environments (dev, staging, prod).
+`db` is the credential default; `both` is a deprecated DB-only alias and `cookie` fails startup.
+`NOCTUA_DESKTOP_MODE=true` fails startup. IMAP login is OFF unless an explicit exact host allowlist
+is set. `PASSKEY_RP_ID` defaults to the canonical hostname. Additional trusted origins are rejected.
+Keep independent random secrets in a root-readable environment file, never in source or logs.
+Generate a new auth secret with `openssl rand -hex 32`; retain the existing IMAP key for old data.
+
+Canonical DNS A is `203.0.113.10` inside the tailnet. Obtain and renew TLS via mailprovider DNS-01;
+keep mailprovider API credentials in the proxy secret store. No public HTTP challenge is required.
+The separate preview `https://preview.example.org:3790` has isolated data/auth/encryption
+secrets, its own URL and RP ID `preview.example.org`, preview-only trust and new passkeys.
+Never add preview trust to production or claim canonical passkey reuse there.
 
 ## Deployment Methods
 
@@ -58,9 +65,13 @@ This rebuilds the Docker runtime image and confirms that the worker entrypoints 
 ```bash
 docker run -d \
   --name noctua-mail \
-  -p 3654:3654 \
+  -p 127.0.0.1:3654:3654 \
   -v /path/to/data:/app/.data \
-  -e SESSION_SEAL_KEY="your_key_here" \
+  -e BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
+  -e BETTER_AUTH_URL=https://mail.example.org \
+  -e PASSKEY_RP_ID=mail.example.org \
+  -e IMAP_CREDENTIALS_STORAGE=db \
+  -e BETTER_AUTH_TELEMETRY=0 \
   -e IMAP_SECRET_KEY="your_key_here" \
   noctua-mail
 ```
@@ -86,9 +97,14 @@ This verifies that the standalone output contains the required worker entrypoint
 
 **Run:**
 ```bash
-export SESSION_SEAL_KEY="your_key_here"
+export BETTER_AUTH_SECRET="<independent-random-secret>"
+export BETTER_AUTH_URL=https://mail.example.org
+export PASSKEY_RP_ID=mail.example.org
+export BETTER_AUTH_TELEMETRY=0
 export IMAP_SECRET_KEY="your_key_here"
 export NOCTUA_DATA_DIR="/path/to/data/"
+export HOSTNAME=127.0.0.1
+export PORT=3654
 bun --bun .next/standalone/server.js
 ```
 
@@ -100,7 +116,7 @@ Noctua Mail uses a **master + sharded database architecture**:
 
 | Database | Path | Contains | Backup Priority |
 |----------|------|----------|----------------|
-| **Master DB** | `$NOCTUA_DATA_DIR/mail.db` | Users, accounts, credentials, control-plane data | **Critical** |
+| **Master DB** | `$NOCTUA_DATA_DIR/db/main.db` | Users, accounts, credentials, control-plane data | **Critical** |
 | **Account DBs** | `$NOCTUA_DATA_DIR/db/accounts/<accountId>.db` | Messages, folders, threads, FTS index (per account) | **Critical** |
 
 ### Cache Directories (Regenerable)
@@ -147,43 +163,27 @@ These are auto-managed and should be included in backups if the app is running.
 - Port 587 (Submission)
 - Port 465 (SMTPS)
 
-## Reverse Proxy (HTTPS)
+## Reverse Proxy
 
-Noctua Mail runs HTTP only. Use a reverse proxy for HTTPS:
-
-**Caddy example:**
-```
-mail.example.com {
-    reverse_proxy localhost:3654
-}
-```
-
-**nginx example:**
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name mail.example.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    location / {
-        proxy_pass http://localhost:3654;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+Use [deploy-scripts/nginx-auth.conf](../deploy-scripts/nginx-auth.conf) at the TLS terminator.
+The example binds tailnet IP 203.0.113.10, uses the canonical hostname, overwrites the complete
+forwarded-header chain, and disables access logs for all authentication/reset paths. Other access
+logs use `$uri` without query strings. Do not enable proxy/debug/body logging for auth traffic.
+Provision certificate paths through mailprovider DNS-01 before starting nginx; the actual mailprovider plugin
+and renewal service are deployment-owner responsibilities, not exercised by the local smoke.
+Only the proxy may connect to the loopback backend. With one sanitized proxy hop, Better Auth's
+pinned default IP reader takes `x-forwarded-for`; Noctua wrapper limits use `TRUSTED_PROXY_HOPS=1`.
+Do not enable dynamic Host-derived auth origins or forward external client headers unchanged.
 
 ## Health Checks
 
-**Endpoint:** `GET /`
-**Expected:** HTTP 200 with HTML response
+**Endpoint:** `GET /api/ba/ok`
+**Expected:** HTTP 200 with `{ "ok": true }`
 
 **Docker health check:**
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3654/ || exit 1
+  CMD curl -f http://localhost:3654/api/ba/ok || exit 1
 ```
 
 ## Backup & Restore
@@ -193,8 +193,9 @@ See [STORAGE.md](STORAGE.md) for detailed information about which data is stored
 ### What to Backup
 
 **Critical (must backup):**
-- Master DB: `mail.db` (+ `.db-wal`, `.db-shm` if app is running)
-- Account DBs: `db/accounts/*.db` (+ `-wal`, `-shm` files)
+- Master DB: `db/main.db` (includes all Better Auth identities, encrypted factors and policy sidecars)
+- Account DBs: `db/accounts/*.db`
+- Independent `BETTER_AUTH_SECRET` and `IMAP_SECRET_KEY`, matching the snapshot
 
 **Optional (regenerable cache):**
 - Sources: `sources/` (re-fetched from IMAP on demand)
@@ -213,7 +214,6 @@ tar czf noctua-backup-$(date +%Y%m%d).tar.gz /path/to/noctua/data/
 # Stop application (recommended)
 cd /path/to/noctua/data
 tar czf noctua-db-backup-$(date +%Y%m%d).tar.gz \
-  mail.db mail.db-wal mail.db-shm \
   db/
 ```
 
@@ -230,7 +230,15 @@ tar xzf noctua-backup-20260211.tar.gz -C /path/to/noctua/data/
 
 ### Important Notes
 
-- **WAL mode:** If app is running during backup, include `.db-wal` and `.db-shm` files. Otherwise they can be omitted.
+- **Consistency:** Stop the process and checkpoint/close every SQLite handle before copying master and shards together. Copying live WAL files is not a cross-database snapshot. Restore the same auth/encryption secrets privately; missing keys make mailbox credentials and TOTP/backup codes unusable.
 - **Cache regeneration:** Missing `sources/` or `attachments/` files are automatically re-downloaded from IMAP servers when needed.
 - **Space savings:** Database-only backups are much smaller (excludes potentially large attachment cache).
 - **IMAP requirement:** Cache regeneration requires IMAP access. Ensure credentials are valid before restoring database-only backups.
+
+## Migration and recovery
+
+Stop the service, make a consistent master/shard/key backup, and follow the explicit identity
+manifest and two-run procedure in [AUTHENTICATION.md](AUTHENTICATION.md#slice-6-contract-changes).
+Recovery links are handed over personally and printed once only in a private operator terminal.
+No SMTP delivery is configured. The local synthetic restore smoke covers auth IDs/factors and a
+shard/key snapshot; application-wide restore acceptance stays Stage 4 in TEAM-INBOX.md §11.
