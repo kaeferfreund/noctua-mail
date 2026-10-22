@@ -1683,7 +1683,7 @@ export default function MailClient({
 
   // useAccountController: manages account/folder CRUD and initial data load
   const {
-    mailboxState, security: authSecurity, bootstrapError, logout,
+    mailboxState, security: authSecurity, bootstrapError, logout, accountSaveError, accountSaving,
     loadInitialData,
     switchAccount,
     saveAccount,
@@ -1694,6 +1694,7 @@ export default function MailClient({
     handleRenameFolderItem,
     handleDeleteFolderItem
   } = useAccountController({
+    currentUser,
     activeAccountId,
     accounts,
     accountFolders,
@@ -5384,11 +5385,11 @@ export default function MailClient({
     return <EnrollmentScreen continuation={enrollmentContinuation ?? undefined} onLogout={async () => { if (await logout()) setEnrollmentContinuation(null); }} onComplete={async () => { setEnrollmentContinuation(null); await loadInitialData(); }} />;
   }
   if (mailboxState !== "selected") return <>
-    <MailboxGate state={mailboxState} accounts={accounts} error={bootstrapError || exceptionEntries[0]?.message} onAdd={() => startEditAccount()}
+    <MailboxGate state={mailboxState} accounts={accounts} error={bootstrapError || exceptionEntries[0]?.message} onAdd={isAdminUser ? () => startEditAccount() : undefined}
       onSwitch={id => { void switchAccount(id); }} onRetry={() => { void loadInitialData(); }} onSecurity={() => setSecurityOpen(true)}
       onAdmin={isAdminUser ? () => setAdminOpen(true) : undefined} onLogout={() => { void logout(); }} />
     {identityDialogs}
-    {manageOpen && editingAccount && <AccountSettingsModal editingAccount={editingAccount} isOpen manageTab="account" isExistingAccount={false} onClose={() => setManageOpen(false)} onTabChange={setManageTab} onSave={saveAccount} onDelete={() => {}} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
+    {manageOpen && editingAccount && <AccountSettingsModal editingAccount={editingAccount} isOpen manageTab="account" isExistingAccount={false} isAdminUser={isAdminUser} saveError={accountSaveError} saving={accountSaving} onClose={() => setManageOpen(false)} onTabChange={setManageTab} onSave={saveAccount} onDelete={() => {}} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
   </>;
 
   return (
@@ -5437,7 +5438,7 @@ export default function MailClient({
             onSwitch: (accountId: string) => {
               void switchAccount(accountId);
             },
-            onAdd: () => startEditAccount()
+            onAdd: isAdminUser ? () => startEditAccount() : undefined
           },
           views: {
             inbox: inboxView,
@@ -5845,6 +5846,8 @@ export default function MailClient({
           onSave={manageTab === "account" ? saveAccount : saveAccountSettings}
           onDelete={() => deleteAccount(editingAccount.id)}
           isAdminUser={isAdminUser}
+          saveError={accountSaveError}
+          saving={accountSaving}
           onNotifySuccess={(title, description) => {
             pushNotice({
               type: "success",

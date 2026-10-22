@@ -20,10 +20,11 @@ function makeAccount(id: string, overrides?: Partial<Account>): Account {
 }
 
 describe("buildAccountSaveRequest", () => {
-  it("posts to the collection endpoint without an id for new accounts", () => {
-    const request = buildAccountSaveRequest(makeAccount("temp"), false);
+  it("posts only provisioning fields to the admin endpoint without an id for new accounts", () => {
+    const request = buildAccountSaveRequest(makeAccount("temp", { settings: { appearance: {} }, caldav: { url: "https://example.test", user: "u", password: "p" } }), false);
     expect(request.method).toBe("POST");
-    expect(request.endpoint).toBe("/api/accounts");
+    expect(request.endpoint).toBe("/api/admin/accounts");
+    expect(Object.keys(request.body).sort()).toEqual(["avatar", "email", "imap", "name", "smtp"]);
     expect(request.isNew).toBe(true);
     expect((request.body as Record<string, unknown>).id).toBeUndefined();
   });
