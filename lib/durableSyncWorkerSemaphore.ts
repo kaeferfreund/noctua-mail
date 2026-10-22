@@ -8,7 +8,7 @@ export class DurableSyncWorkerSemaphore {
   readonly owner = newLeaseOwner();
   private waiting = new Map<string, { priority: number; accountId: string; start: (release: () => Promise<void>) => void }>();
   private active = new Set<string>();
-  private pumping = false;
+  private pumpPromise?: Promise<void>;
   private timer?: ReturnType<typeof setTimeout>;
   private heartbeatAt = 0;
   private retryDelay = 25;
@@ -21,7 +21,7 @@ export class DurableSyncWorkerSemaphore {
 
   enqueue(id: string, priority: number, start: (release: () => Promise<void>) => void, accountId = id) {
     this.waiting.set(id, { priority, start, accountId });
-    void this.pump();
+    return this.pump();
   }
   cancel(id: string) {
     if (!this.waiting.delete(id)) return false;
@@ -57,9 +57,15 @@ export class DurableSyncWorkerSemaphore {
     }
   }
 
-  private async pump() {
-    if (this.pumping) return;
-    this.pumping = true;
+  private pump(): Promise<void> {
+    if (this.pumpPromise) return this.pumpPromise;
+    const pending = this.runPump();
+    this.pumpPromise = pending;
+    void pending.finally(() => { if (this.pumpPromise === pending) this.pumpPromise = undefined; });
+    return pending;
+  }
+
+  private async runPump() {
     if (this.timer) clearTimeout(this.timer);
     try {
       // Reconcile before every heartbeat/admission attempt, even with no waiters.
@@ -89,7 +95,6 @@ export class DurableSyncWorkerSemaphore {
       console.error("[sync] worker admission failed; retaining leases and retrying", error);
       this.retryDelay = Math.min(2000, this.retryDelay * 2);
     } finally {
-      this.pumping = false;
       if (this.waiting.size || this.active.size || this.cleanup.size) {
         this.timer = setTimeout(() => { void this.pump(); }, this.retryDelay);
         this.timer.unref?.();

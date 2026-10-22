@@ -335,7 +335,7 @@ export async function upsertMessages(
     // Identity snapshots are scoped to account + header ID + exact mailbox copy,
     // independent of storage row IDs. Capture only inside the immediate writer.
     type IdentitySnapshot = {
-      id: string; messageId?: string | null; folderId?: string | null; mailboxPath?: string | null;
+      id: string; threadId: string; dateValue: number; messageId?: string | null; folderId?: string | null; mailboxPath?: string | null;
       imapUid?: number | null; flags?: string | null; sizeBytes?: number | null;
       deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null;
     };
@@ -343,7 +343,7 @@ export async function upsertMessages(
     const replacedMetadataByHeader = new Map<string, IdentitySnapshot[]>();
     const captureIdentitySnapshots = () => {
       if (!replaceExisting) return;
-      const rows = db.prepare(`SELECT id,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
+      const rows = db.prepare(`SELECT id,threadId,dateValue,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
         FROM messages WHERE accountId=? ${folderId ? "AND folderId=?" : ""}`).all(...deleteArgs) as IdentitySnapshot[];
       for (const row of rows) {
         replacedMetadata.set(row.id, row);

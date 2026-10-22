@@ -26,3 +26,5 @@ export function startIdentityRecomputeJob(accountId: string, invalidate = false)
 export function getIdentityRecomputeJob(accountId: string) {
   return identityRecomputeJobs.getLatestJob(accountId);
 }
+
+export const settleIdentityRecomputeAdmission = identityRecomputeJobs.settleJob;

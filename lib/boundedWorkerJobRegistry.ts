@@ -49,8 +49,12 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
   const admission = config.sharedWorkerBudget ? new DurableSyncWorkerSemaphore(
     positiveInteger(process.env.NOCTUA_MAX_SYNC_WORKERS, 2)
   ) : undefined;
+  const admissionAttempts = new Map<string, Promise<void>>();
+  const startups = new Map<string, Promise<void>>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const finish = (id: string, exitCode: number, error: string) => {
+    admissionAttempts.delete(id);
+    startups.delete(id);
     withStore(db => db.transaction(() => {
       const job = db.prepare("SELECT * FROM jobs WHERE id=?").get(id) as StoredJob | null;
       if (!job || job.status !== "running") return;
@@ -88,7 +92,9 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
           // Claim under the cross-process registry lock, then wait in the same
           // durable master queue used by sync and watcher jobs.
           db.prepare("UPDATE jobs SET ownerPid=? WHERE id=?").run(process.pid, job.id);
-          admission.enqueue(job.id, 5, release => {
+          const attempt = admission.enqueue(job.id, 5, release => {
+            let started!: () => void;
+            startups.set(job.id, new Promise<void>(resolve => { started = resolve; }));
             void (async () => {
               let childExit: Promise<number> | undefined;
               let stopChild: (() => void) | undefined;
@@ -102,6 +108,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
                 childExit = child.exited;
                 stopChild = () => child.kill("SIGKILL");
                 withStore(store => store.prepare("UPDATE jobs SET status='running',pid=? WHERE id=?").run(child.pid, job.id));
+                started();
                 const stderr = config.readStderrText !== false && child.stderr instanceof ReadableStream ? new Response(child.stderr).text().catch(() => "") : Promise.resolve("");
                 const code = await child.exited;
                 exitConfirmed = true;
@@ -117,10 +124,12 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
                 if (!(error instanceof UnconfirmedWorkerExitError) && (!childExit || exitConfirmed)) await release();
                 withStore(store => store.prepare("UPDATE jobs SET status='failed',finishedAt=?,error=? WHERE id=?")
                   .run(Date.now(), error instanceof Error ? error.message : "Failed to start worker", job.id));
+                started();
                 pump();
               }
             })();
           }, job.accountId);
+          admissionAttempts.set(job.id, attempt);
           continue;
         }
         try {
@@ -172,5 +181,13 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
     }).immediate());
     return getJob(id)!;
   };
-  return { getJob, startJob, getLatestJob };
+  const settleJob = async (id: string) => {
+    // Wait for the first admission decision, never for occupied capacity or
+    // worker completion. Free slots expose running/failed; busy slots queued.
+    await admissionAttempts.get(id);
+    await startups.get(id);
+    admissionAttempts.delete(id);
+    startups.delete(id);
+  };
+  return { getJob, startJob, getLatestJob, settleJob };
 }
