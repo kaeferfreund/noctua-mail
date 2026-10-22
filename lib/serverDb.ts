@@ -144,3 +144,7 @@ export async function listAccessibleAccountIdsForUser(...args: Parameters<Server
 export async function deleteSessionProofState(...args: Parameters<ServerDbModule["deleteSessionProofState"]>) {
   return (await loadServerDb()).deleteSessionProofState(...args);
 }
+
+export async function saveFoldersForAccount(...args: Parameters<ServerDbModule["saveFoldersForAccount"]>) {
+  return (await loadServerDb()).saveFoldersForAccount(...args);
+}

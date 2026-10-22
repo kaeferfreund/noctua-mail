@@ -156,11 +156,13 @@ function attachErrorListeners(client: ImapFlow, key: string): () => void {
  */
 export async function acquirePooledImapClient(
   account: Account,
-  logContext: ImapLogContext
+  logContext: ImapLogContext,
+  fresh = false
 ): Promise<ImapFlow> {
   const key = buildImapIdentityKey(account);
   const cached = state.pool.get(key);
-  if (cached) {
+  if (cached && fresh) evictEntry(key, cached, "fresh-request");
+  if (cached && !fresh) {
     // Remove from pool immediately so a concurrent acquire doesn't see it.
     state.pool.delete(key);
     cached.detach();
@@ -223,9 +225,10 @@ export function releasePooledImapClient(
 export async function withPooledImapClient<T>(
   account: Account,
   logContext: ImapLogContext,
-  fn: (client: ImapFlow) => Promise<T>
+  fn: (client: ImapFlow) => Promise<T>,
+  options?: { fresh?: boolean }
 ): Promise<T> {
-  const client = await acquirePooledImapClient(account, logContext);
+  const client = await acquirePooledImapClient(account, logContext, options?.fresh);
   try {
     const result = await fn(client);
     releasePooledImapClient(account, client, logContext);

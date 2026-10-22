@@ -865,6 +865,10 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
         authorUserId TEXT NOT NULL, body TEXT NOT NULL, createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL, deletedAt INTEGER
       );
+      CREATE TABLE IF NOT EXISTS sent_by (
+        accountId TEXT NOT NULL, messageId TEXT NOT NULL, userId TEXT NOT NULL, sentAt INTEGER NOT NULL,
+        PRIMARY KEY (accountId, messageId)
+      );
       CREATE TABLE IF NOT EXISTS thread_activity (
         id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,
         type TEXT NOT NULL, actorUserId TEXT, actorClientId TEXT, payload TEXT,

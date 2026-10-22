@@ -60,3 +60,5 @@ export {
 } from "./folders";
 
 export { drainImapConnectionPool } from "./connectionPool";
+
+export { findImapMessageUid } from "./sentCopy";
