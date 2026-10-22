@@ -1,6 +1,6 @@
 // Runs only under `bun run test:dom` (preloads happy-dom before component load).
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { Attachment } from "@/lib/data";
 import AttachmentsList from "./AttachmentsList";
 
@@ -33,6 +33,7 @@ describe("AttachmentsList", () => {
     const { getByText } = render(<AttachmentsList attachments={[pdf]} htmlBody={htmlBody} />);
     expect(getByText(/report\.pdf/)).toBeTruthy();
     expect(getByText(/5\.5 MB/)).toBeTruthy();
+    expect(getByText("pdf").getAttribute("aria-hidden")).toBe("true");
   });
 
   it("omits the 'Images in message' section when removal is disabled", () => {
@@ -53,5 +54,43 @@ describe("AttachmentsList", () => {
     // Remove control distinguishes image vs attachment and names the file.
     expect(getByLabelText("Remove image: sig.png")).toBeTruthy();
     expect(getByLabelText("Remove attachment: report.pdf")).toBeTruthy();
+  });
+
+  it("keeps unknown extensions, filename, download and remove actions", () => {
+    const removed: string[] = [];
+    const { getByText, getByLabelText, container } = render(
+      <AttachmentsList
+        attachments={[{ ...pdf, filename: "sample.CUSTOM", contentType: "application/octet-stream" }]}
+        onRemove={(id) => removed.push(id)}
+      />
+    );
+    expect(getByText("custom")).toBeTruthy();
+    expect(getByText(/sample.CUSTOM/)).toBeTruthy();
+    expect(container.querySelector(".attachment-icon svg")?.getAttribute("aria-hidden")).toBe("true");
+    const download = getByLabelText("Download attachment", { selector: ".attachment-preview" });
+    expect(download.getAttribute("href")).toBe(`${pdf.url}?download=1`);
+    expect(download.getAttribute("download")).toBe("sample.CUSTOM");
+    fireEvent.click(getByLabelText("Remove attachment: sample.CUSTOM"));
+    expect(removed).toEqual([pdf.id]);
+  });
+
+  it("preserves loading, error and retry states for extensionless files", () => {
+    const retried: string[] = [];
+    const attachment = { ...pdf, filename: "README", contentType: "application/octet-stream" };
+    const { getByText, getByLabelText, getByRole, rerender } = render(
+      <AttachmentsList attachments={[{ ...attachment, loadStatus: "loading" }]} />
+    );
+    expect(getByText("file")).toBeTruthy();
+    expect(getByLabelText("Loading attachment")).toBeTruthy();
+    expect(getByText(/Loading…/)).toBeTruthy();
+    rerender(
+      <AttachmentsList
+        attachments={[{ ...attachment, loadStatus: "error" }]}
+        onRetryLoad={(id) => retried.push(id)}
+      />
+    );
+    expect(getByRole("alert").textContent).toContain("Failed to load");
+    fireEvent.click(getByLabelText("Retry loading attachment: README"));
+    expect(retried).toEqual([pdf.id]);
   });
 });

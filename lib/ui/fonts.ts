@@ -4,9 +4,12 @@
 // stylesheet (the HtmlMessage srcdoc iframe) inject APP_FONT_FACE_CSS. The
 // root-absolute URL resolves against the app origin in both. app/globals.test.ts
 // checks that globals.css declares the same face.
+import fontSubsets from "./fontSubsets.json";
+
 export const APP_FONT_FAMILY = "Inter";
-export const APP_FONT_URL = "/fonts/InterVariable.woff2";
+export const APP_FONT_SUBSETS = fontSubsets;
 export const APP_FONT_STACK = `"${APP_FONT_FAMILY}", system-ui, -apple-system, sans-serif`;
-export const APP_FONT_FACE_CSS =
+export const APP_FONT_FACE_CSS = APP_FONT_SUBSETS.map(({ url, unicodeRange }) =>
   `@font-face { font-family: "${APP_FONT_FAMILY}"; font-style: normal; font-weight: 100 900; ` +
-  `font-display: swap; src: url("${APP_FONT_URL}") format("woff2"); }`;
+  `font-display: swap; src: url("${url}") format("woff2"); unicode-range: ${unicodeRange}; }`
+).join("\n");
