@@ -1,3 +1,5 @@
+import { formatEnvelopeAddresses } from "@/lib/mail/imap/parser";
+import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
 import { connectIdleImapClient, runImapIdleLoop } from "@/lib/mail/imap/idle";
 import { mailboxFailureDto } from "@/lib/mailboxFailure";
 import { getImapHttpError } from "@/lib/mail/imapError";
@@ -31,21 +33,8 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 
-type EnvelopeAddress = { name?: string | null; mailbox?: string | null; host?: string | null };
-type Envelope = { subject?: string | null; from?: EnvelopeAddress[] | null; date?: Date | null; messageId?: string | null };
-
 const DEFAULT_MAX_IDLE = 3;
 const DEFAULT_BACKGROUND_POLL_INTERVAL = 900_000; // 15 minutes
-
-function formatAddress(addresses?: EnvelopeAddress[] | null) {
-  if (!addresses || addresses.length === 0) return "";
-  const parts = addresses.map((addr) => {
-    const email = addr?.mailbox && addr?.host ? `${addr.mailbox}@${addr.host}` : "";
-    if (addr?.name && email) return `"${addr.name}" <${email}>`;
-    return addr?.name || email || "";
-  });
-  return parts.filter(Boolean).join(", ");
-}
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
@@ -296,11 +285,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                   folderId: string;
                 }> = [];
                 for await (const message of client.fetch(range, { uid: true, envelope: true })) {
-                  const env = message.envelope as Envelope | undefined;
+                  const env = message.envelope as ImapEnvelope | undefined;
                   list.push({
                     uid: message.uid,
                     subject: env?.subject ?? "(no subject)",
-                    from: formatAddress(env?.from),
+                    from: formatEnvelopeAddresses(env?.from),
                     date: env?.date ? env.date.toISOString() : null,
                     messageId: env?.messageId ?? null,
                     folderId: folder.id
@@ -466,7 +455,6 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               authStream.close();
             }
           }, 25_000);
-
 
         } catch (error) {
           await send("error", error);

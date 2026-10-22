@@ -3,7 +3,7 @@ import { afterEach, expect, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import HtmlMessage from "./HtmlMessage";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
-import { senderPermissionCases } from "@/lib/testFixtures/senderPermissions";
+import { senderPermissionLookupCases } from "@/lib/testFixtures/senderPermissions";
 import { accountPrefsPatchSchema } from "@/lib/accountPrefs";
 import type { UserAccountPrefs } from "@/lib/data";
 
@@ -12,7 +12,7 @@ const originalOpen = window.open;
 afterEach(() => { cleanup(); globalThis.fetch = originalFetch; window.open = originalOpen; });
 const html = '<img width="200" height="100" src="https://images.example.test/photo"><img src="cid:logo">';
 
-for (const { name, from, key } of senderPermissionCases) {
+for (const { name, from, key } of senderPermissionLookupCases) {
   test(`reader rejects unrelated sender permissions and saves/reads the mailbox: ${name}`, async () => {
     let prefs: UserAccountPrefs = { remoteContent: { allowedSenders: { "trusted@example.test": true } } };
     let saved: unknown;
@@ -121,4 +121,31 @@ test("links open on primary click and middle auxclick, never right auxclick or c
   fireEvent(target, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 2 }));
   fireEvent.contextMenu(target, { button: 2 });
   expect(opened).toHaveLength(2);
+});
+
+test("fragment links scroll inside the mail document and missing targets never navigate", () => {
+  const opened: unknown[][] = [];
+  window.open = ((...args: unknown[]) => { opened.push(args); return null; }) as typeof window.open;
+  const view = render(<HtmlMessage darkMode={false} html={'<a href="#end" target="_blank"><span>End</span></a><a href="#section%20two">Encoded</a><a href="#legacy">Named</a><a href="#missing">Missing</a><a href="#bad%ZZ">Malformed</a><p id="end">End target</p><p id="section two">Second target</p><a name="legacy">Legacy target</a>'} />);
+  const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
+  const doc = new DOMParser().parseFromString(frame.srcdoc, "text/html");
+  Object.defineProperty(doc, "readyState", { value: "complete" });
+  Object.defineProperty(frame, "contentDocument", { value: doc });
+  const scrolled: string[] = [];
+  for (const element of doc.querySelectorAll('[id], a[name="legacy"]')) {
+    element.scrollIntoView = () => scrolled.push(element.id || element.getAttribute("name")!);
+  }
+  fireEvent.load(frame);
+  for (const anchor of doc.querySelectorAll("a[href]")) {
+    expect(anchor.hasAttribute("target")).toBe(false);
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    fireEvent(anchor.querySelector("span") ?? anchor, click);
+    expect(click.defaultPrevented).toBe(true);
+  }
+  const middle = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+  fireEvent(doc.querySelector('a[href="#end"]')!, middle);
+  expect(middle.defaultPrevented).toBe(true);
+  expect(scrolled).toEqual(["end", "section two", "legacy", "end"]);
+  expect(opened).toEqual([]);
+  expect(frame.contentDocument).toBe(doc);
 });

@@ -554,7 +554,16 @@ function HtmlMessage({
         if (!anchor) return;
         const href = anchor.getAttribute("href");
         if (isNoOpHref(href)) event.preventDefault();
-        else if (!isHashHref(href)) {
+        else if (isHashHref(href)) {
+          event.preventDefault();
+          // srcdoc inherits the host URL, so native fragment navigation would
+          // replace the mail document with the application page.
+          let fragment = href!.trim().slice(1);
+          try { fragment = decodeURIComponent(fragment); } catch { return; }
+          const target = doc.getElementById(fragment) ??
+            Array.from(doc.getElementsByName(fragment)).find(element => element.tagName === "A");
+          target?.scrollIntoView();
+        } else {
           event.preventDefault();
           // Parent-owned click handling keeps links working without granting
           // popup or navigation capabilities to the message frame.
