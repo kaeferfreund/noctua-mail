@@ -25,8 +25,13 @@ export type ActiveUserSession = {
 /** Append each cookie separately: Headers.set would lose earlier refresh/deletion cookies. */
 export function forwardAuthHeaders<T extends Response>(response: T, headers: Headers): T {
   headers.forEach((value, key) => {
+    const name = key.toLowerCase();
     // Entity headers describe the library JSON, not this route's attachment/stream.
-    if (!["set-cookie", "content-type", "content-length"].includes(key.toLowerCase())) response.headers.set(key, value);
+    if (["set-cookie", "content-type", "content-length"].includes(name)) return;
+    // A route that set its own caching policy (private attachment cache, 304 revalidation) keeps it;
+    // the library's no-store only applies where the route stayed silent.
+    if (name === "cache-control" && response.headers.has("cache-control")) return;
+    response.headers.set(key, value);
   });
   const existing = new Set(response.headers.getSetCookie());
   for (const cookie of headers.getSetCookie()) if (!existing.has(cookie)) response.headers.append("set-cookie", cookie);

@@ -95,4 +95,13 @@ describe("live session assurance gate", () => {
     forwardAuthHeaders(response,headers);
     expect(response.headers.getSetCookie()).toEqual(["one=1; Path=/","two=2; Path=/"]);
   });
+
+  test("keeps a route's own Cache-Control and applies the library's only where the route stayed silent", () => {
+    const headers = new Headers({ "cache-control": "no-store", "x-auth-extra": "1" });
+    const cached = forwardAuthHeaders(new NextResponse(null, { headers: { "cache-control": "private, max-age=86400" } }), headers);
+    expect(cached.headers.get("cache-control")).toBe("private, max-age=86400");
+    expect(cached.headers.get("x-auth-extra")).toBe("1");
+    const silent = forwardAuthHeaders(new NextResponse(), headers);
+    expect(silent.headers.get("cache-control")).toBe("no-store");
+  });
 });

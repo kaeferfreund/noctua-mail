@@ -1,7 +1,7 @@
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
-import { getAttachmentData, getMessageSource, saveAttachmentData } from "@/lib/storage";
+import { getAttachmentData, getMessageSource, saveAttachmentData, statAttachmentData } from "@/lib/storage";
 import { getAttachmentMeta } from "@/lib/db";
 import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
 import { extractAttachmentBufferFromSource } from "@/lib/mail/attachmentFromSource";
@@ -10,6 +10,34 @@ import { formatAttachmentPageTitle } from "@/lib/appBranding";
 import { removeMessageAttachmentEverywhere } from "@/lib/mail/removeMessageAttachment";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
+
+/** Private, revalidated cache. Attachment ids are reused across resync, so this is not immutable. */
+export const ATTACHMENT_CACHE_CONTROL = "private, max-age=86400";
+
+export function attachmentEntityTag(stat: { mtimeMs: number; size: number }) {
+  return `"${stat.mtimeMs.toString(16)}-${stat.size.toString(16)}"`;
+}
+
+function etagOpaqueTag(value: string) {
+  const trimmed = value.trim();
+  const withoutWeak = /^[wW]\//.test(trimmed) ? trimmed.slice(2).trim() : trimmed;
+  return withoutWeak;
+}
+
+/** If-None-Match uses weak comparison: `W/"tag"` matches `"tag"`. */
+export function ifNoneMatchMatches(header: string | null, etag: string) {
+  if (!header) return false;
+  const expected = etagOpaqueTag(etag);
+  if (!expected) return false;
+  return header.split(",").some((part) => etagOpaqueTag(part) === expected);
+}
+
+function attachmentCacheHeaders(etag: string) {
+  return {
+    ETag: etag,
+    "Cache-Control": ATTACHMENT_CACHE_CONTROL
+  };
+}
 
 type Params = AccountRouteParams & {
   params: Promise<{
@@ -60,8 +88,22 @@ export async function GET(request: Request, { params }: Params) {
       ].join("");
       return new NextResponse(
         ensureHtmlDocumentTitle(shell, formatAttachmentPageTitle(attachment.filename)),
-        { headers: { "Content-Type": "text/html; charset=utf-8" } }
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store"
+          }
+        }
       );
+    }
+
+    const notModified = (etag: string) =>
+      new NextResponse(null, { status: 304, headers: attachmentCacheHeaders(etag) });
+
+    let fileStat = await statAttachmentData(accountId, messageId, attachmentId);
+    const currentTag = fileStat ? attachmentEntityTag(fileStat) : null;
+    if (currentTag && ifNoneMatchMatches(request.headers.get("if-none-match"), currentTag)) {
+      return notModified(currentTag);
     }
 
     let data = await getAttachmentData(accountId, messageId, attachmentId);
@@ -84,6 +126,7 @@ export async function GET(request: Request, { params }: Params) {
         const normalizedContent = Buffer.from(extractedContent);
         data = normalizedContent;
         await saveAttachmentData(accountId, messageId, attachmentId, normalizedContent);
+        fileStat = await statAttachmentData(accountId, messageId, attachmentId);
       } catch {
         return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
       }
@@ -94,10 +137,15 @@ export async function GET(request: Request, { params }: Params) {
     const encodedName = encodeURIComponent(rawName);
     const shouldDownload = searchParams.get("download") === "1";
     const disposition = shouldDownload ? "attachment" : "inline";
+    const etag = fileStat ? attachmentEntityTag(fileStat) : null;
+    if (etag && ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
+      return notModified(etag);
+    }
 
     return new NextResponse(data, {
       headers: {
         "Content-Type": attachment.contentType ?? "application/octet-stream",
+        ...(etag ? attachmentCacheHeaders(etag) : {}),
         "Content-Disposition": `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'"
