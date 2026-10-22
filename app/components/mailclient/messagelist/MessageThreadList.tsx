@@ -2,7 +2,7 @@ import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
 import { CalendarDays, GitBranch, MoveRight, Paperclip, Trash2 } from "lucide-react";
-import { Badge, Text } from "@radix-ui/themes";
+import { Badge, Text, VisuallyHidden } from "@radix-ui/themes";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import { describeMessageSize } from "@/lib/ui/byteSize";
 import type { Message } from "@/lib/data";
@@ -96,7 +96,6 @@ export default function MessageThreadList({
     flattenThread,
     getThreadLatestDate,
     getGroupLabel,
-    renderUnreadDot,
     renderFolderBadges,
     handleShowRelated,
     isTrashFolder,
@@ -217,7 +216,7 @@ export default function MessageThreadList({
           item.threadSize > 1 &&
           isActiveThread;
         const showRootActive = showCollapsedActive || showThreadSelectionActive;
-        const { isCollapsedThreadRoot, displaySeen, threadMessages } = getThreadRowDisplayMeta({
+        const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
           item
         });
 
@@ -330,6 +329,7 @@ export default function MessageThreadList({
                   fallbackTooltip={item.fromTooltip}
                 >
                   <span data-message-cell="from" className={styles.cellFrom} title={item.fromTooltip}>
+                    {!displaySeen && <VisuallyHidden>Unread</VisuallyHidden>}
                     {!item.showRecipientIcon && (
                       <SenderIcon
                         accountId={message.accountId}
@@ -338,6 +338,7 @@ export default function MessageThreadList({
                         enabled={senderIconsEnabled}
                         className={styles.senderIcon}
                         title={item.fromTooltip}
+                        unread={!displaySeen}
                       />
                     )}
                     {item.showRecipientIcon && (
@@ -354,10 +355,6 @@ export default function MessageThreadList({
                 </FromAddressHoverCard>
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
-                  <span data-message-cell="unread" className={styles.cellUnread}>
-                    {renderUnreadDot(message, { seen: displaySeen, threadMessages })}
-                  </span>
-
                   <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||

@@ -228,12 +228,12 @@
   justify-content: flex-start;
   flex-direction: row;
   flex-wrap: nowrap;
-  /* Keeps the dot's 24px hit area clear of the checkbox. */
-  gap: 8px;
+  gap: 6px;
 }
 
+.rowUnread .cellFrom,
 .rowUnread .cellSubject {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .threadCaret {
