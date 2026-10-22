@@ -744,8 +744,10 @@ async function validateAndFixMailboxHighestUid(
 export async function planImapNewSyncFolders(
   account: Account,
   folderIds: string[],
-  clientId?: string
+  clientId?: string,
+  options: { client?: ImapFlow; signal?: AbortSignal } = {}
 ): Promise<NewSyncFolderDecision[]> {
+  options.signal?.throwIfAborted();
   const logContext = buildLogContext(account, clientId);
   const uniqueFolderIds = Array.from(new Set(folderIds.filter(Boolean)));
   if (uniqueFolderIds.length === 0) return [];
@@ -756,10 +758,11 @@ export async function planImapNewSyncFolders(
     await validateAndFixMailboxHighestUid(account, folderId, mailboxPath);
   }
 
-  return withPooledImapClient(account, logContext, async (client) => {
+  const plan = async (client: ImapFlow) => {
     const decisions: NewSyncFolderDecision[] = [];
 
     for (const folderId of uniqueFolderIds) {
+      options.signal?.throwIfAborted();
       const mailboxPath = mailboxPathFromFolderId(account.id, folderId);
       try {
         const status = await logImapOp(
@@ -768,6 +771,9 @@ export async function planImapNewSyncFolders(
           () => client.status(mailboxPath, { uidNext: true, uidValidity: true })
         );
         const uidNext = toFiniteNumber((status as { uidNext?: unknown })?.uidNext) ?? null;
+        const namespaceChanged = await saveMailboxState({ accountId: account.id, folderId, mailboxPath,
+          uidValidity: status.uidValidity == null ? null : String(status.uidValidity)
+        }, { onlyIfUidValidityChanged: true });
         const [latestUid, mailboxState] = await Promise.all([
           getLatestMessageUid(account.id, mailboxPath),
           getMailboxState(account.id, folderId)
@@ -786,7 +792,9 @@ export async function planImapNewSyncFolders(
           knownUidCandidates.length > 0 ? Math.max(...knownUidCandidates) : null;
 
         let decision: NewSyncFolderDecision;
-        if (uidNext === null) {
+        if (namespaceChanged || (mailboxState?.uidValidity != null && mailboxState.highestUid == null && latestUid == null)) {
+          decision = { folderId, mailboxPath, uidNext, skip: false, reason: "has-new-uids" };
+        } else if (uidNext === null) {
           decision = {
             folderId,
             mailboxPath,
@@ -845,6 +853,7 @@ export async function planImapNewSyncFolders(
         });
         decisions.push(decision);
       } catch {
+        options.signal?.throwIfAborted();
         const decision: NewSyncFolderDecision = {
           folderId,
           mailboxPath,
@@ -864,7 +873,10 @@ export async function planImapNewSyncFolders(
     }
 
     return decisions;
-  });
+  };
+  // A server watcher can reuse its selected IDLE socket for STATUS; interactive
+  // callers retain the existing pooled-connection behavior.
+  return options.client ? plan(options.client) : withPooledImapClient(account, logContext, plan);
 }
 
 type NewModeRangeDecision = {
@@ -981,7 +993,9 @@ async function resolveNewModeRange(params: {
       ? mailboxState.highestUid
       : null;
 
-  if (uidNext !== null && highestKnownUid === null) {
+  // A known validity with cleared watermarks means invalidation already ran
+  // (possibly in another graph or the browser). Re-ingest instead of baselining.
+  if (uidNext !== null && highestKnownUid === null && mailboxState?.uidValidity == null) {
     const baselineHighestUid = Math.max(0, uidNext - 1);
     await persistMailboxHighestUid({
       account: params.account,
@@ -1090,6 +1104,14 @@ export async function* syncImapAccountBatched(
 
   // Validate and fix any existing UID mismatches before syncing
   const folderId = buildFolderId(account.id, mailboxToOpen);
+  const namespaceChanged = await saveMailboxState({ accountId: account.id, folderId, mailboxPath: mailboxToOpen,
+    uidValidity: mailboxUidValidity == null ? null : String(mailboxUidValidity)
+  }, { onlyIfUidValidityChanged: true });
+  if (namespaceChanged) {
+    // A resume cursor or explicit UID list belongs to the old namespace too.
+    mode = "full";
+    options = undefined;
+  }
   await validateAndFixMailboxHighestUid(account, folderId, mailboxToOpen);
 
   const fetchQuery = {
