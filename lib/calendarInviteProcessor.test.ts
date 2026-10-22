@@ -3,11 +3,11 @@ import type { CalendarEvent, Message } from "@/lib/data";
 import type { CalendarEventEmailSnapshot } from "@/lib/calendarEventEmailSnapshot";
 import { saveMessageSource } from "@/lib/storage";
 
-const getCalendarEventByUid = mock(() => Promise.resolve(null));
+const getCalendarEventByUid = mock((): Promise<CalendarEvent | null> => Promise.resolve(null));
 const listSiblingCalendarEventsByUidKey = mock((_acc: string, _uid: string) =>
   Promise.resolve([] as CalendarEvent[])
 );
-const listCalendarInviteSourceMessagesByEventUid = mock(() => Promise.resolve([]));
+const listCalendarInviteSourceMessagesByEventUid = mock<typeof import("./db").listCalendarInviteSourceMessagesByEventUid>(() => Promise.resolve([]));
 const upsertCalendarEventByUid = mock(
   async (
     accountId: string,
@@ -26,7 +26,7 @@ const upsertCalendarEventByUid = mock(
 const upsertMessageCalendarInviteStates = mock(() => Promise.resolve());
 const markMessageCalendarInviteStatesProcessed = mock(() => Promise.resolve(1));
 const markMessageCalendarInviteStatesUnprocessed = mock(() => Promise.resolve(1));
-const rescheduleCalendarRemindersByEventUid = mock(() => Promise.resolve(0));
+const rescheduleCalendarRemindersByEventUid = mock<typeof import("./db").rescheduleCalendarRemindersByEventUid>(() => Promise.resolve(0));
 const ensureCalendarReminder = mock(() => Promise.resolve(null));
 const cancelCalendarEventByUid = mock(() => Promise.resolve());
 const cancelCalendarRemindersByEventUid = mock(() => Promise.resolve());

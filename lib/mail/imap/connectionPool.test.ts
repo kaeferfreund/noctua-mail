@@ -95,7 +95,7 @@ describe("acquirePooledImapClient", () => {
   test("empty pool → creates a fresh connection", async () => {
     const client = await acquirePooledImapClient(makeAccount("acc-1"), logCtx);
     expect(connectCount).toBe(1);
-    expect(client).toBe(lastCreatedStub);
+    expect<unknown>(client).toBe(lastCreatedStub);
   });
 
   test("release then acquire same account → reuses cached connection", async () => {
@@ -223,7 +223,7 @@ describe("withPooledImapClient", () => {
   test("success path → client returns to pool", async () => {
     const account = makeAccount("acc-1");
     const result = await withPooledImapClient(account, logCtx, async (client) => {
-      expect(client).toBe(lastCreatedStub);
+      expect<unknown>(client).toBe(lastCreatedStub);
       return 42;
     });
     expect(result).toBe(42);

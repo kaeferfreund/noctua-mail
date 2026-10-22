@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { EventEmitter } from "events";
+import type { PeerCertificate } from "node:tls";
 
 import type { Account } from "@/lib/data";
 
@@ -92,7 +93,7 @@ describe("buildImapFlowOptions TLS identity logging", () => {
     const error = options.tls?.checkServerIdentity?.("imap.example.test", {
       subject: {},
       issuer: undefined
-    });
+    } as unknown as PeerCertificate);
 
     expect(error).toBeInstanceOf(Error);
     expect(error?.message).toContain("Peer certificate is empty");
@@ -114,7 +115,7 @@ describe("buildImapFlowOptions TLS identity logging", () => {
       subject: { O: "Legacy Mail" },
       issuer: { CN: "Legacy Issuer" },
       serialNumber: "02"
-    });
+    } as unknown as PeerCertificate);
 
     expect(error).toBeInstanceOf(Error);
     expect(error?.message).toContain("Certificate has no SAN and no CN");
@@ -132,7 +133,7 @@ describe("buildImapFlowOptions TLS identity logging", () => {
       subject: { CN: "unrelated.example.test" },
       subjectaltname: "DNS:unrelated.example.test",
       issuer: { CN: "Example Issuer" }
-    });
+    } as unknown as PeerCertificate);
 
     expect(error).toBeInstanceOf(Error);
     expect(warnings).toHaveLength(1);

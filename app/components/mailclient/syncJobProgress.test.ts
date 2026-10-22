@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { SyncJobProgress } from "./types";
 import { detectSyncEscalation, normalizeSyncJobProgress } from "./syncJobProgress";
 
 describe("detectSyncEscalation", () => {
@@ -50,10 +51,17 @@ describe("detectSyncEscalation", () => {
   });
 });
 
+const baseProgress = {
+  accountId: "account-1",
+  mailboxPath: "INBOX",
+  phase: "fetching",
+  processed: 0
+} satisfies Pick<SyncJobProgress, "accountId" | "mailboxPath" | "phase" | "processed">;
+
 describe("normalizeSyncJobProgress", () => {
   test("stamps the jobId onto the progress blob", () => {
     const progress = normalizeSyncJobProgress({
-      progress: { mode: "recent", updatedAt: 42 },
+      progress: { ...baseProgress, mode: "recent", updatedAt: 42 },
       jobId: "job-1"
     });
     expect(progress.jobId).toBe("job-1");
@@ -62,7 +70,7 @@ describe("normalizeSyncJobProgress", () => {
 
   test("fills missing updatedAt with the caller-supplied clock", () => {
     const progress = normalizeSyncJobProgress({
-      progress: { mode: "recent" },
+      progress: { ...baseProgress, mode: "recent" },
       jobId: "job-2",
       now: 1234
     });
@@ -71,7 +79,7 @@ describe("normalizeSyncJobProgress", () => {
 
   test("preserves other fields verbatim", () => {
     const progress = normalizeSyncJobProgress({
-      progress: { mode: "full", folderId: "inbox", updatedAt: 1 },
+      progress: { ...baseProgress, mode: "full", folderId: "inbox", updatedAt: 1 },
       jobId: "job-3"
     });
     expect(progress.mode).toBe("full");
