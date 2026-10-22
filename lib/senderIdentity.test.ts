@@ -4,10 +4,29 @@ import {
   extractPrimaryEmail,
   getRootDomain,
   getSenderIdentity,
-  isFreeMailDomain
+  isFreeMailDomain,
+  canonicalizeMailboxAddress
 } from "./senderIdentity";
+import { senderPermissionCases } from "./testFixtures/senderPermissions";
 
 describe("senderIdentity", () => {
+  for (const { name, from, key } of senderPermissionCases) {
+    it(`preserves the primary mailbox identity: ${name}`, () => {
+      expect(extractPrimaryEmail(from) ?? "").toBe(key);
+      if (key) expect(canonicalizeMailboxAddress(key)).toBe(key);
+    });
+  }
+
+  it("canonicalizes unicode and A-label domains and equivalent quoted atoms identically", () => {
+    expect(canonicalizeMailboxAddress(" \t ACTUAL@BÜCHER.EXAMPLE \t ")).toBe("actual@xn--bcher-kva.example");
+    expect(canonicalizeMailboxAddress('"ACTUAL"@xn--bcher-kva.example')).toBe("actual@xn--bcher-kva.example");
+  });
+
+  it("validates a mailbox without parsing display names, lists or malformed quoted local parts", () => {
+    for (const invalid of ["Actual <actual@example.test>", "a@example.test,b@example.test", "attacker trusted@example.test", '"unclosed@example.test', "a@bad domain.test", "a@-bad.example", '"a\nb"@example.test', "a@@example.test"]) {
+      expect(canonicalizeMailboxAddress(invalid)).toBeNull();
+    }
+  });
   it("extracts display names and primary emails from mailbox strings", () => {
     expect(extractDisplayName("\"Apple News\" <news@apple.com>")).toBe("Apple News");
     expect(extractPrimaryEmail("\"Apple News\" <news@apple.com>")).toBe("news@apple.com");

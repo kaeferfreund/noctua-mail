@@ -1,4 +1,5 @@
 import addressParser from "nodemailer/lib/addressparser/index.js";
+import punycode from "nodemailer/lib/punycode/index.js";
 
 const FREE_MAIL_DOMAINS = new Set([
   "gmail.com",
@@ -81,11 +82,77 @@ export function extractDisplayName(value?: string | null) {
   return stripWrappingQuotes(rawName);
 }
 
+const DOT_ATOM_LOCAL = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/i;
+const QUOTED_LOCAL = /^"(?:[\x20\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*"$/;
+
+/** Canonicalize one addr-spec, never a display name or an address list. */
+export function canonicalizeMailboxAddress(value: string): string | null {
+  const address = value.trim();
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return null;
+  let local = address.slice(0, at);
+  if (QUOTED_LOCAL.test(local)) {
+    local = local.slice(1, -1).replace(/\\(.)/g, "$1");
+  } else if (!DOT_ATOM_LOCAL.test(local)) {
+    return null;
+  }
+  if (!local || local.length > 64) return null;
+  // Keep the existing case-insensitive sender policy, but retain every space
+  // and special character in a quoted local part. The key is a valid addr-spec.
+  local = local.toLowerCase();
+  if (!DOT_ATOM_LOCAL.test(local)) local = `"${local.replace(/["\\]/g, "\\$&")}"`;
+  try {
+    const domain = punycode.toASCII(address.slice(at + 1).toLowerCase());
+    if (!domain || domain.length > 253 || !domain.split(".").every(label =>
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))) return null;
+    return `${local}@${domain}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Retain the first mailbox's original spelling before the parser unquotes it. */
+function firstMailboxSource(value: string) {
+  let mailbox = "";
+  let inAngles = false;
+  let quoted = false;
+  let comments = 0;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if ((quoted || comments > 0) && char === "\\") {
+      if (quoted) mailbox += value.slice(i, i + 2);
+      i++;
+      continue;
+    }
+    if (!quoted && char === "(") { comments++; continue; }
+    if (comments > 0) { if (char === ")") comments--; continue; }
+    if (char === '"') quoted = !quoted;
+    if (!quoted && char === "<") { inAngles = true; mailbox = ""; continue; }
+    if (!quoted && char === ">" && inAngles) return mailbox.trim();
+    if (!quoted && !inAngles) {
+      if (char === ":") { mailbox = ""; continue; } // RFC 5322 group label
+      if (char === "," || char === ";") return mailbox.trim();
+    }
+    mailbox += char;
+  }
+  return mailbox.trim();
+}
+
 export function extractPrimaryEmail(value?: string | null) {
+  const source = value ?? "";
+  // Nodemailer removes quotes (and trims their contents) from bare quoted
+  // local parts. Preserve a valid original addr-spec before that lossy step,
+  // including angle brackets or another @ inside its quoted local part.
+  const mailboxSource = firstMailboxSource(source);
+  // A comment or quoted display name alone is not a mailbox. Nodemailer's
+  // permissive fallback can otherwise promote its address-shaped text.
+  if (!mailboxSource || QUOTED_LOCAL.test(mailboxSource)) return null;
+  const originalMailbox = canonicalizeMailboxAddress(mailboxSource);
+  if (originalMailbox) return originalMailbox;
   // Use the mail stack's RFC 5322 parser: quoted display names may themselves
   // contain angle brackets and addresses, but never identify the mailbox.
-  const mailbox = addressParser(value ?? "", { flatten: true })[0];
-  return normalizeEmailAddress(mailbox?.address);
+  const mailbox = addressParser(source, { flatten: true })[0];
+  return mailbox?.address ? canonicalizeMailboxAddress(mailbox.address) : null;
 }
 
 export function getRootDomain(domain?: string | null) {

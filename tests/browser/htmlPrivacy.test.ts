@@ -10,6 +10,8 @@ import path from "node:path";
 import { createAuthenticatedTestSession } from "../../lib/testAuthHarness";
 import { createCollabFixture } from "../../lib/testThreadCollabHarness";
 import { GET } from "../../app/api/accounts/[accountId]/messages/[messageId]/html/route";
+import { GET as getPrefs, PUT as putPrefs } from "../../app/api/accounts/[accountId]/prefs/route";
+import { senderPermissionCases } from "../../lib/testFixtures/senderPermissions";
 
 async function listen(server: Server, port: number) {
   await new Promise<void>((resolve, reject) => {
@@ -23,7 +25,7 @@ async function close(server: Server) {
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 
-test("reader opt-in and standalone HTML send no Referer and never request remote CSS", async () => {
+test("reader and standalone enforce sender permissions, send no Referer and never request remote CSS", async () => {
   const scratch = await mkdtemp(path.join(process.cwd(), ".tmp/html-privacy-"));
   const requests: { path: string; referer: string | null }[] = [];
   const tracker = createServer((request, response) => {
@@ -49,22 +51,39 @@ test("reader opt-in and standalone HTML send no Referer and never request remote
     const fixture = await createCollabFixture();
     const user = await createAuthenticatedTestSession(fixture.accountId);
     const [message] = await fixture.seed(fixture.message("<privacy-browser@example.test>", { htmlBody: html }));
-    const standalone = async (query: string) => GET(new Request(`http://localhost:3000/html${query}`, { headers: user.jar.headers() }), {
-      params: Promise.resolve({ accountId: fixture.accountId, messageId: message.id })
+    const senderMessages = await fixture.seed(...senderPermissionCases.map(({ from }) =>
+      fixture.message(`<${crypto.randomUUID()}@example.test>`, { from, htmlBody: html })));
+    const selectMessage = (url: URL) => url.searchParams.has("case") ? senderMessages[Number(url.searchParams.get("case"))] : message;
+    const standalone = async (url: URL) => GET(new Request(`http://localhost:3000/html${url.search}`, { headers: user.jar.headers() }), {
+      params: Promise.resolve({ accountId: fixture.accountId, messageId: selectMessage(url).id })
     });
+    const prefsParams = { params: Promise.resolve({ accountId: fixture.accountId }) };
+    // The loopback HTTP fixture authenticates synthetic requests using the real
+    // session harness. Preference validation and persistence run in the routes.
+    const savePrefs = (body: string) => putPrefs(new Request(`http://localhost:3000/api/accounts/${fixture.accountId}/prefs`, {
+      method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }), body
+    }), prefsParams);
     await promisify(execFile)(process.execPath, ["build", "tests/browser/htmlPrivacyFixture.tsx", "--outdir", scratch,
       "--target", "browser", "--define", 'process.env.NODE_ENV="production"'], { timeout: 30_000 });
     const script = await readFile(path.join(scratch, "htmlPrivacyFixture.js"));
-    const respond = async (url: URL) => {
-      if (url.pathname === "/fixture.html") return new Response(html);
-      if (url.pathname === "/standalone") return standalone(url.search);
+    const respond = async (url: URL, method?: string, body?: string) => {
+      if (url.pathname === "/fixture.json") {
+        const selected = selectMessage(url);
+        return Response.json({ html, accountId: fixture.accountId, sender: selected.from, messageId: selected.id });
+      }
+      if (url.pathname === `/api/accounts/${fixture.accountId}/prefs`) {
+        return method === "PUT" ? savePrefs(body!) : getPrefs(new Request(`http://localhost:3000${url.pathname}`, { headers: user.jar.headers() }), prefsParams);
+      }
+      if (url.pathname === "/standalone") return standalone(url);
       if (url.pathname === "/htmlPrivacyFixture.js") return new Response(script, { headers: { "Content-Type": "text/javascript" } });
       if (url.pathname !== "/") return new Response("", { status: 404 });
       return new Response('<!doctype html><div id="root"></div><script type="module" src="/htmlPrivacyFixture.js"></script>', { headers: { "Content-Type": "text/html" } });
     };
     app = createServer(async (request, response) => {
       try {
-        const result = await respond(new URL(request.url!, "http://127.0.0.1:3824"));
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) chunks.push(Buffer.from(chunk));
+        const result = await respond(new URL(request.url!, "http://127.0.0.1:3824"), request.method, Buffer.concat(chunks).toString());
         response.statusCode = result.status;
         result.headers.forEach((value, key) => response.setHeader(key, value));
         response.end(Buffer.from(await result.arrayBuffer()));
@@ -76,6 +95,11 @@ test("reader opt-in and standalone HTML send no Referer and never request remote
     await listen(app, 3824);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
+    const waitForReaderImages = () => page.waitForFunction(() => {
+      const frame = document.querySelector<HTMLIFrameElement>('iframe[title="HTML message"]');
+      const images = Array.from(frame?.contentDocument?.images ?? []);
+      return images.length === 2 && images.every(img => img.complete && img.naturalWidth > 0 && img.currentSrc.startsWith("http://127.0.0.1:3825/"));
+    });
     // All browser traffic is synthetic and local, including dependency mistakes.
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
@@ -90,6 +114,38 @@ test("reader opt-in and standalone HTML send no Referer and never request remote
     await page.waitForLoadState("networkidle");
     expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
     expect(requests.every(request => request.referer === null)).toBe(true);
+
+    for (const name of ["quoted local part containing whitespace", "quoted local part containing an angle-bracket address", "unicode IDN", "A-label IDN"]) {
+      const index = senderPermissionCases.findIndex(entry => entry.name === name);
+      const { key } = senderPermissionCases[index];
+      expect((await savePrefs(JSON.stringify({ remoteContent: null }))).status).toBe(200);
+      expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }))).status).toBe(200);
+      requests.length = 0;
+      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.getByRole("button", { name: "Always load from this sender" }).waitFor();
+      await page.waitForLoadState("networkidle");
+      expect(requests, name).toEqual([]);
+      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.waitForLoadState("networkidle");
+      expect(requests, name).toEqual([]);
+      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.getByRole("button", { name: "Always load from this sender" }).click();
+      await page.getByRole("button", { name: "Always load from this sender" }).waitFor({ state: "hidden" });
+      await waitForReaderImages();
+      expect(requests.map(request => request.path).sort(), name).toEqual(["/picture", "/pixel"]);
+      expect(requests.every(request => request.referer === null), name).toBe(true);
+      const saved = await getPrefs(new Request(`http://localhost:3000/api/accounts/${fixture.accountId}/prefs`, { headers: user.jar.headers() }), prefsParams);
+      expect((await saved.json()).prefs.remoteContent.allowedSenders, name).toEqual({ "trusted@example.test": true, [key]: true });
+      requests.length = 0;
+      await page.reload();
+      await waitForReaderImages();
+      expect(requests.map(request => request.path).sort(), name).toEqual(["/picture", "/pixel"]);
+      requests.length = 0;
+      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.waitForLoadState("networkidle");
+      expect(requests.map(request => request.path).sort(), name).toEqual(["/picture", "/pixel"]);
+      expect(requests.every(request => request.referer === null), name).toBe(true);
+    }
     requests.length = 0;
     await page.goto("http://127.0.0.1:3824/standalone");
     await page.waitForLoadState("networkidle");
