@@ -4822,8 +4822,8 @@ export default function MailClient({
   }, [activeTopic, activeTopicSuggestionsLoading, baseGetGroupLabel]);
 
   // The list pane is sized by the shell's resizable panel group; listWidth
-  // mirrors its rendered width so listIsNarrow and the list toolbar's
-  // icon-only sort trigger keep following the pane. The pane mounts together with
+  // mirrors its rendered width so listIsNarrow and the notice offset keep
+  // following the pane. The pane mounts together with
   // the shell, i.e. whenever the auth state leaves "unauth".
   useEffect(() => {
     if (authState === "unauth") return;
@@ -5434,8 +5434,6 @@ export default function MailClient({
                 loadedMessageCount,
                 totalMessages,
                 listLoading,
-                loadingMessages,
-                hasMoreMessages,
                 messageView,
                 groupBy,
                 messageSort,
@@ -5448,7 +5446,6 @@ export default function MailClient({
                 collapsedGroups
               }}
               actions={{
-                setMessagesPage,
                 setMessageView,
                 setGroupBy,
                 setMessageSort: handleMessageSortChange,

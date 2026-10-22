@@ -2,7 +2,6 @@ import { startTransition, useEffect, useId, useRef, useState } from "react";
 import type React from "react";
 import {
   ArrowDownWideNarrow,
-  ChevronsDown,
   ListChevronsDownUp,
   ListChevronsUpDown,
   MessagesSquare,
@@ -31,8 +30,9 @@ import styles from "./MessageListHeader.module.css";
 /**
  * The message list's toolbar, rendered in the shell header next to the folder
  * title: count, view menu, sort & group menu and expand/collapse all. The
- * header is a `@container/header`, so the count and the sort label drop out
- * when it gets narrow; phones keep only the two menus.
+ * header is a `@container/header`, so the count, the sort label, the
+ * separator and the menu chevrons drop out when it gets narrow; phones keep
+ * only the two menus. Older pages load when the list scrolls to its end.
  */
 export type MessageListHeaderProps = {
   state: {
@@ -40,8 +40,6 @@ export type MessageListHeaderProps = {
     loadedMessageCount: number;
     totalMessages: number | null;
     listLoading: boolean;
-    loadingMessages: boolean;
-    hasMoreMessages: boolean;
     messageView: MessageViewMode;
     groupBy: MessageListGroupBy;
     messageSort: MessageListSortBy;
@@ -54,7 +52,6 @@ export type MessageListHeaderProps = {
     collapsedGroups: Record<string, boolean>;
   };
   actions: {
-    setMessagesPage: React.Dispatch<React.SetStateAction<number>>;
     setMessageView: React.Dispatch<React.SetStateAction<MessageViewMode>>;
     setGroupBy: React.Dispatch<React.SetStateAction<MessageListGroupBy>>;
     setMessageSort: (sortBy: MessageListSortBy) => void;
@@ -158,8 +155,6 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
     loadedMessageCount,
     totalMessages,
     listLoading,
-    loadingMessages,
-    hasMoreMessages,
     messageView,
     groupBy,
     messageSort,
@@ -172,7 +167,6 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
     collapsedGroups
   } = state;
   const {
-    setMessagesPage,
     setMessageView,
     setGroupBy,
     setMessageSort,
@@ -318,15 +312,7 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
       >
         {countText}
       </span>
-      {hasMoreMessages && !loadingMessages && (
-        <ToolbarButton
-          tooltip="Load more"
-          icon={<ChevronsDown className="size-4" />}
-          className="hidden @4xl/header:inline-flex"
-          onClick={() => setMessagesPage((prev) => prev + 1)}
-        />
-      )}
-      <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
+      <Separator orientation="vertical" className="mx-1 hidden @3xl/header:block data-[orientation=vertical]:h-4" />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <ToolbarButton
