@@ -31,7 +31,8 @@ export function mapInviteRow(row: any): InviteCode {
     uses: row.uses ?? 0,
     expiresAt: row.expiresAt === null ? null : Number(row.expiresAt),
     createdAt: Number(row.createdAt ?? 0),
-    usedByUserId: row.usedByUserId ?? null
+    usedByUserId: row.usedByUserId ?? null,
+    email: row.email ?? null
   };
 }
 
@@ -261,10 +262,10 @@ export function resolveAccountDbPathForPersist(accountId: string, dbPath?: strin
   return getDefaultAccountDbPath(accountId);
 }
 
-export function persistAccountRow(db: any, account: Account, dbPath?: string | null) {
+export function persistAccountRow(db: any, account: Account, dbPath?: string | null, insertOnly = false) {
   const settings = normalizeAccountSettings(account.settings);
   const insert = db.prepare(`
-    INSERT OR REPLACE INTO accounts (
+    INSERT ${insertOnly ? "" : "OR REPLACE"} INTO accounts (
       id, name, email, avatar, ownerUserId, dbPath,
       settings,
       imapHost, imapPort, imapSecure, imapUser, imapPassword,

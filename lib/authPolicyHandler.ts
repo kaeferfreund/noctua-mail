@@ -7,6 +7,8 @@ import { AuthPolicyError, advanceSecurityGeneration, assertSecurityOperation, en
 import { assertProofSession, hashProof, issueReauthGrant, readReauthGrant, type ReauthPurpose } from "./authPolicy";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
+import { hasResetDelivery, resetCallback } from "./authRecoveryContext";
+import { requireJsonSameOrigin } from "../app/api/_helpers/requestOrigin";
 
 export const RAW_DISABLED_PATHS = [
   "/change-password", "/update-user", "/change-email", "/delete-user", "/request-password-reset", "/set-password",
@@ -19,7 +21,7 @@ export const RAW_DISABLED_PATHS = [
 const publicPaths = new Set(["/ok", "/get-session", "/sign-out", "/sign-in/email", "/sign-in/imap",
   "/two-factor/enable", "/two-factor/verify-totp", "/two-factor/verify-backup-code",
   "/passkey/generate-register-options", "/passkey/verify-registration",
-  "/passkey/generate-authenticate-options", "/passkey/verify-authentication"]);
+  "/passkey/generate-authenticate-options", "/passkey/verify-authentication", "/reset-password/:token", "/reset-password"]);
 
 type MiddlewareContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
 function failure(code: string, status = 403): never { throw new AuthPolicyError(code, status); }
@@ -65,6 +67,20 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
   if (!path || !publicPaths.has(path)) failure("auth_endpoint_disabled");
   if (ctx.body?.trustDevice === true || ctx.body?.createSession === true || ctx.body?.disableSession !== undefined) failure("unsafe_auth_option", 400);
   const db = proof.db;
+  if (path === "/reset-password/:token") {
+    if (ctx.query?.callbackURL !== resetCallback(ctx.context.options.baseURL as string)) failure("invalid_callback",400);
+    return;
+  }
+  if (path === "/reset-password") {
+    const body=ctx.body;
+    if (!body || typeof body.token!=="string" || !/^[A-Za-z0-9_-]{1,128}$/.test(body.token) || typeof body.newPassword!=="string" || body.newPassword.length<10 || body.newPassword.length>256) failure("invalid_request",400);
+    const token=db.prepare(`SELECT value FROM auth_verification WHERE identifier=? AND julianday(expiresAt)>julianday('now')`).get(`reset-password:${body.token}`);
+    if (!token) failure("INVALID_TOKEN",400);
+    await takeSlot(proof,token.value,"security.password.reset");
+    await withDbWriteRetry("recordResetCleanupIntent",()=>db.prepare(`UPDATE admin_lifecycle_operations SET payload=?,updatedAt=? WHERE id=?`).run(JSON.stringify({generationBeforeReset:proof.op!.generation}),Date.now(),proof.op!.id));
+    proof.destructive=true;
+    return;
+  }
   if (path === "/sign-out") {
     const source = await getSessionFromCtx(ctx);
     if (source) {
@@ -216,6 +232,12 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
 /** These hooks collect metadata only; they never finalize on the library adapter connection. */
 export function authPolicyDatabaseHooks(): NonNullable<BetterAuthOptions["databaseHooks"]> {
   return {
+    user: { create: { before: async user => {
+      const creation = currentAuthProof()?.creation;
+      if (!creation) return;
+      if (user.email !== creation.email || user.role !== creation.role) failure("invalid_creation_scope");
+      return { data: { ...user, id: creation.userId } };
+    } } },
     verification: { create: { before: async value => {
       const proof = currentAuthProof();
       if (!proof || proof.internal) return;
@@ -248,7 +270,15 @@ export function authPolicyPlugin(): BetterAuthPlugin {
     hooks: {
       before: [{ matcher: () => true, handler: createAuthMiddleware(async ctx => {
         // Reviewed server APIs are scoped by Noctua wrappers; disabledPaths protects HTTP only.
-        if (!ctx.request) return;
+        if (!ctx.request) {
+          if (ctx.path === "/request-password-reset" && (!hasResetDelivery() || ctx.body?.redirectTo!==resetCallback(ctx.context.options.baseURL as string))) {
+            throw new APIError("FORBIDDEN", {code:"recovery_authority_required",message:"recovery_authority_required"});
+          }
+          if (ctx.path === "/admin/create-user" && !currentAuthProof()?.creation && !await getSessionFromCtx(ctx)) {
+            throw new APIError("FORBIDDEN", {code:"provisioning_required",message:"provisioning_required"});
+          }
+          return;
+        }
         const proof = currentAuthProof();
         if (!proof || proof.internal) throw new APIError("FORBIDDEN", {code:"missing_proof_context", message:"missing_proof_context"});
         try { await preparePolicy(ctx, proof); } catch (error) { asApiError(error); }
@@ -276,6 +306,12 @@ export function recordVerifiedPasskey(userId: string | undefined, uv: boolean, r
 
 async function finalizePolicy(proof: AuthProofContext, path: string, response: Response) {
   const { db, op } = proof;
+  if (path === "/reset-password" && op) {
+    op.generation=readGeneration(db,op.userId);
+    await finishSecurityOperation(db,op);
+    revokeAuthStreams({userId:op.userId});
+    return response;
+  }
   if (proof.kind === "passkey_login" && path.endsWith("generate-authenticate-options")) return response;
   if (!op) return response;
   assertSecurityOperation(db, op);
@@ -341,7 +377,18 @@ export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Res
     const proof: AuthProofContext = { db: await database(), request, authenticatedAt:Date.now(), method:"password", createdSessionIds:[] };
     return withAuthProof(proof, async () => {
       const path = new URL(request.url).pathname.replace(/^\/api\/ba/, "");
+      const reset=path === "/reset-password" || path.startsWith("/reset-password/");
+      const protect=(response:Response)=>{
+        response.headers.set("cache-control","no-store");
+        if (reset) response.headers.set("referrer-policy","no-referrer");
+        return response;
+      };
       try {
+        if (reset && path === "/reset-password") {
+          const origin=requireJsonSameOrigin(request);if(origin) return protect(origin);
+          const body=await request.clone().json();
+          if (new URL(request.url).search || !body || Array.isArray(body) || Object.keys(body).sort().join(",")!=="newPassword,token") return protect(Response.json({ok:false,code:"invalid_request"},{status:400}));
+        }
         const response = await handler(request);
         if (!response.ok) {
           const code = (await response.clone().json().catch(() => ({}))).code;
@@ -351,16 +398,16 @@ export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Res
               code === "INVALID_PASSWORD" &&
               proof.totpBefore === totpSnapshot(proof)) proof.destructive = false;
           await cleanupFailedPolicy(proof,code === "INVALID_CODE");
-          return response;
+          return protect(response);
         }
         const finalized = await finalizePolicy(proof, path, response);
         finalized.headers.set("cache-control", "no-store");
-        return finalized;
+        return protect(finalized);
       } catch (error) {
         await cleanupFailedPolicy(proof);
-        if (error instanceof AuthPolicyError) return Response.json({ok:false,code:error.code,message:error.status===401?"Unauthorized":error.code},{status:error.status});
+        if (error instanceof AuthPolicyError) return protect(Response.json({ok:false,code:error.code,message:error.status===401?"Unauthorized":error.code},{status:error.status}));
         // Do not echo library/network exceptions, credentials or callback data.
-        return Response.json({ok:false,code:"security_operation_failed"},{status:503});
+        return protect(Response.json({ok:false,code:error instanceof SyntaxError?"invalid_request":"security_operation_failed"},{status:error instanceof SyntaxError?400:503}));
       }
     });
   };
@@ -377,7 +424,7 @@ async function cleanupFailedPolicy(proof: AuthProofContext, invalidCode = false)
       proof.db.prepare(`SELECT twoFactorEnabled FROM auth_user WHERE id=?`).get(proof.op!.userId)?.twoFactorEnabled === 0);
     if (proof.grantHash && !retryTotp) proof.db.prepare(`DELETE FROM auth_reauth_grants WHERE tokenHash=?`).run(proof.grantHash);
     if (retryTotp) proof.db.prepare(`UPDATE admin_lifecycle_operations SET state='totp_seed_issued',updatedAt=? WHERE id=?`).run(Date.now(),proof.op!.id);
-    else if (proof.destructive) proof.db.prepare(`UPDATE admin_lifecycle_operations SET state='interrupted',action='security.interrupted',updatedAt=? WHERE id=?`).run(Date.now(),proof.op!.id);
+    else if (proof.destructive) proof.db.prepare(`UPDATE admin_lifecycle_operations SET state='interrupted',action=?,updatedAt=? WHERE id=?`).run(proof.op!.action==="security.password.reset"?proof.op!.action:"security.interrupted",Date.now(),proof.op!.id);
   }).immediate());
   if (!proof.destructive) await finishSecurityOperation(proof.db, proof.op);
   else if (!retryTotp) revokeAuthStreams({userId:proof.op.userId});

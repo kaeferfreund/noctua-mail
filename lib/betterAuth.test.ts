@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { betterAuth } from "better-auth";
+import { withAuthProof } from "./authPolicyContext";
 import { AUTH_BASE_PATH, createNoctuaAuth, migrateAuthSchema, noctuaAuthOptions, readAuthEnv, setActiveAccountId, type NoctuaAuth } from "./betterAuth";
 import { CookieJar, TEST_BASE_URL, TEST_SECRET, caught, createTempDir, openMasterDb, totpFromUri, createTestAuthHarness, enrollTestTotp, type TestAuthHarness } from "./testAuthHarness";
 
@@ -261,9 +262,9 @@ describe("table mapping: Better Auth's user model on Noctua's users table (rejec
         expect.arrayContaining(["users.emailVerified", "users.updatedAt", "users.twoFactorEnabled", "users.banned"])
       );
       const instance = betterAuth(options);
-      const { user } = await instance.api.createUser({
+      const { user } = await withAuthProof({db:handle,internal:true,creation:{userId:crypto.randomUUID(),email:"fresh@example.test",role:"user"},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]},()=>instance.api.createUser({
         body: { email: "fresh@example.test", password: "fresh-password-1", name: "Fresh", role: "user" }
-      });
+      }));
       const row = handle
         .prepare(`SELECT createdAt, typeof(createdAt) AS t FROM users WHERE id = ?`)
         .get(user.id) as { createdAt: unknown; t: string };

@@ -138,6 +138,7 @@ for(const onboarding of [true,false])test(`IMAP-only first-password enrollment s
   const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
   f.master.prepare("DELETE FROM auth_account WHERE userId=? AND providerId='credential'").run(f.user.id);
   if(onboarding) {
+    f.master.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt) VALUES(?,?,?,'migration','complete',1,1)`).run(crypto.randomUUID(),f.user.id,f.user.email);
     f.master.prepare("DELETE FROM auth_two_factor WHERE userId=?").run(f.user.id);
     f.master.prepare("UPDATE auth_user SET twoFactorEnabled=0 WHERE id=?").run(f.user.id);
   }

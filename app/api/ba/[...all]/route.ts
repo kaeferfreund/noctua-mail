@@ -6,7 +6,8 @@ async function pendingIntegration() {
   // Repeat the idempotent startup plan in Next's separate route module graph.
   await getAuth();
   // team-auth slice 6: enable only after the policy/lifecycle/reset controls land.
-  return Response.json({ code: "auth_integration_pending" }, { status: 503 });
+  return Response.json({ code: "auth_integration_pending" }, { status: 503,
+    headers:{"cache-control":"no-store","referrer-policy":"no-referrer"} });
 }
 
 export { pendingIntegration as GET, pendingIntegration as POST, pendingIntegration as PATCH,

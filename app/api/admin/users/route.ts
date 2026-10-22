@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { sanitizeAccountForClient } from "@/lib/accountPresentation";
 import { getAccounts, getUserAccounts, getUsers } from "@/lib/db";
 import { requireAdminSessionOr403 } from "../_auth";
+import { handleAdminUser } from "../_users";
+
+export async function POST(request:Request) {return handleAdminUser(request,"invite");}
 
 export async function GET(request: Request) {
   const auth = await requireAdminSessionOr403(request);

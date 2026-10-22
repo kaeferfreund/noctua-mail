@@ -808,6 +808,7 @@ export function initMasterSchema(db: any) {
   if (!inviteColumns.has("usedByUserId")) {
     db.prepare(`ALTER TABLE invite_codes ADD COLUMN usedByUserId TEXT`).run();
   }
+  if (!inviteColumns.has("email")) db.prepare(`ALTER TABLE invite_codes ADD COLUMN email TEXT`).run();
 
   const accountColumns = new Set(
     (db.prepare(`PRAGMA table_info(accounts)`).all() as Array<{ name?: string }>).map((row) =>

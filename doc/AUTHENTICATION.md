@@ -2,10 +2,11 @@
 
 > Better Auth migration: cookie credential mode, sealed sessions, SESSION_SEAL_KEY, legacy IMAP login and Tauri desktop are retired; see [TEAM-INBOX.md](TEAM-INBOX.md) and [TEAM-AUTH-PLAN.md](TEAM-AUTH-PLAN.md).
 
-This branch implements Team-Auth through Slice 4. Better Auth is pinned at 1.7.12.
+This branch implements Team-Auth through Slice 5. Better Auth is pinned at 1.7.12.
 `/api/ba/**` still returns 503 `auth_integration_pending`; backend activation belongs to Slice 6.
-Legacy sealed cookies, credential overlays and cookie-only storage are retired. Signup is pending
-Slice 5; optional IMAP login stays OFF unless an explicit host allowlist enables it. Nothing in this slice enables public sign-in or deploys the integration branch.
+Legacy sealed cookies, credential overlays and cookie-only storage are retired. Signup uses the
+invite provisioning saga; optional IMAP login stays OFF unless an explicit host allowlist enables it.
+Nothing in this slice enables public Better Auth HTTP sign-in or deploys the integration branch.
 Design v5 wins over plan shorthand: member GET is viewer-accessible; sync, recompute,
 calendar sync and related-thread lookup are viewer capabilities even when their HTTP method is POST.
 
@@ -247,10 +248,11 @@ Admin GET/POST /api/admin/accounts, DELETE /api/admin/accounts/[accountId], and 
 ## Remaining slice boundaries
 
 Slice 4 now supplies challenge/assurance finalization, fresh proof/factor operations, strict optional
-IMAP login, and the real WebAuthn browser harness described below. Slice 5 owns user provisioning/lifecycle/reset sagas.
+IMAP login, and the real WebAuthn browser harness described below. Slice 5 supplies the user provisioning/lifecycle/reset sagas below.
 Slice 6 owns migration (reuse importLegacyProfileFields), canonical deployment documentation and
 activation. Slice 7 owns actual auth/reset UI and phone/PWA acceptance. This slice does not activate
-/api/ba or the incomplete auth/admin-user mutations, deploy, or claim end-to-end login acceptance.
+/api/ba, deploy, or claim end-to-end login acceptance. Slice 5's Noctua signup/admin wrappers are
+implemented; successful signup remains restricted until Slice 6 activates factor-enrollment HTTP.
 
 ## Slice 3 verification (2026-10-22)
 
@@ -508,14 +510,15 @@ passes process start so another Next module graph cannot cancel current-process 
 operator reconciliation must run with the application stopped. Missing/partial factors remain
 restricted; do not synthesize verified records or copy assurance from another session.
 
-The current `password.set` waiver uses restricted setup plus incomplete enrollment. Slice 5 must
-supply explicit first-onboarding versus later recovery provenance in its lifecycle contract before
-activation; the new IMAP-only tests prove the current onboarding and enrolled-factor paths.
+The `password.set` first-onboarding waiver now additionally requires a complete signup/migration
+journal, no recovery history, and no `mfa-enrolled:<userId>` receipt. Initial MFA finalization records
+that receipt, and an admin MFA reset preserves it. Slice 6 must record completed migration provenance
+for an IMAP-only user's first onboarding; restricted setup alone never grants this waiver.
 
-Slice 5 still owns provisioning, admin target lifecycle/last-admin serialization, reset issuance,
-request-scoped handover delivery sink and public token-redemption policy exceptions. The internal
-handler currently rejects reset HTTP paths; add the exact canonical callback/body contract there,
-without a session/factor requirement for redemption. Credential triggers already invalidate every
+Slice 5 implements provisioning, admin target lifecycle/last-admin serialization, reset issuance,
+request-scoped handover delivery sink and token-redemption policy exceptions below. The internal
+handler permits the exact canonical callback/body contract without a session/factor requirement
+for redemption. Credential triggers invalidate every
 old generation and anonymous WebAuthn epoch; callbacks are cleanup only. Browser reset invalidation
 already exercises the real server API redemption against isolated storage. Keep MFA intact on
 password reset, reuse membership cleanup for deletion, and do not expose raw admin APIs or activate
@@ -579,3 +582,175 @@ mailbox connections were used. Both permanent reviewer regressions failed before
   usable grant/new session, and retain a quarantined intent until reconciliation.
 - `git diff --check`: exit 0. The browser gate is now invoked by CI; compiled public mount
   activation, full UI routing and both-phone acceptance remain later-slice gates.
+
+## Slice 5: provisioning, lifecycle and reset contracts
+
+`lib/userProvisioning.ts` and `lib/db/userProvisioning.ts` implement signup. Every signup requires
+an invite, even on an empty installation or a desktop-tagged request. App passwords are explicitly
+validated at 10..256 characters before admin `createUser` (the pinned library omits its minimum).
+The optional mailbox password never becomes the app password. Names are nonblank, at most 256
+characters; personal e-mail is normalized, trimmed and validated, at most 320 characters.
+
+`POST /api/auth/signup` requires same-origin JSON, limited to 3/minute/IP. Example:
+
+```json
+{"inviteCode":"synthetic-invite","email":"person@example.test","name":"Synthetic Person","password":"synthetic-app-password","account":{"email":"personal@example.test","name":"Synthetic Mailbox","imap":{"host":"imap.example.test","port":993,"secure":true,"user":"personal@example.test","password":"synthetic-imap-secret"},"smtp":{"host":"smtp.example.test","port":465,"secure":true,"user":"personal@example.test","password":"synthetic-smtp-secret"}}}
+```
+
+Omit `account` to onboard without a mailbox. Its server-derived id/email must both be new; existing
+mailboxes can only be granted via membership APIs. Existing normalized profiles (including legacy
+profiles) return 409 `user_exists`; mailbox/shared-address collisions return 409 `mailbox_exists`,
+before reservation or network. Invalid, expired or wrong-person invites return 403 `invalid_invite`;
+exhaustion returns 409 `invite_exhausted`, all with zero outbound IMAP/SMTP calls. The empty-install
+first person needs the startup admin invite (`bootstrap_invite_required` otherwise). A pending
+bootstrap returns 409 `bootstrap_pending`; a generic bootstrap admin invite cannot be used after
+bootstrap (`bootstrap_invite_closed`). Targeted admin invitations remain usable.
+
+The read-only invite preflight precedes optional IMAP/SMTP verification. A subsequent immediate
+transaction rechecks identity/mailbox/invite authority, expiry, e-mail binding and capacity, counting
+active reservations, and reserves the exact intended user ID. No transaction crosses an await.
+Request-scoped creation metadata supplies that ID to the library create hook; SQLite triggers mirror
+the identity. Unauthenticated headerless server creation outside provisioning/migration is rejected
+with `provisioning_required`. The final immediate transaction inserts a new mailbox (never REPLACE),
+manager membership, invite claim, audit and `complete` together.
+
+201 response is `{ok:true,userId,accountId:null|string,enrollmentRequired:true,loginRequired:false}`
+with a **setup-only** session cookie. If the independent post-commit sign-in fails, the same 201 has
+`loginRequired:true`; provisioning remains committed and the client proceeds to login. No mailbox
+access exists until fresh proof/TOTP activation finalizes that session. Malformed input is 400
+`invalid_request`; contention is 409 `provisioning_pending`; internal failure is 503
+`provisioning_failed`. Signup errors use `{ok:false,code}`. All responses are no-store.
+
+Active journal states are `reserved`, `auth_created`, `cleanup_required`; only these reserve e-mail
+and invite capacity. `complete`/`cancelled` history remains by operation ID, permitting deletion and
+re-invitation. Compensation deletes only the reserved identity; final domain writes/claims are atomic
+with completion, so it never decrements another operation's invite. Compensation failure retains
+`cleanup_required`; startup reconciles pre-process-start operations and rejects incomplete users at
+login/session/MCP boundaries. Manual reconciliation requires the app stopped; never cancel live slots.
+
+### Admin lifecycle and personal handover
+
+All `/api/admin` paths require an active, MFA-assured admin. JSON mutations use same-origin hygiene;
+every successful mutation records secret-free audit. `GET /api/admin/audit?limit=&before=` returns
+`{ok:true,entries:[...]}` with the existing bounded, newest-first audit pagination (unix ms `before`).
+
+- `POST /api/admin/users` JSON `{email,name,role:"admin"|"user"}` → 201
+  `{ok:true,invite:{code,email,role,maxUses:1,uses:0,createdAt,expiresAt,usedByUserId:null}}`.
+  Invitation TTL is one day. Hand over the code personally; no user/password/session is created.
+  The invite's e-mail binding is checked again on signup; the person chooses their own name/password.
+- `PATCH /api/admin/users/[userId]` sparse `{name?,role?,disabled?}` → `{ok:true}`. Names use
+  `auth.api.adminUpdateUser` for the target; `updateUser` remains a self-only library API. Role/status
+  use `setRole`, `banUser`, `unbanUser`; disable is permanent. These operations revoke target
+  sessions/MCP/challenges; enabling never restores them.
+- `DELETE /api/admin/users/[userId]` JSON `{reassignOwnerTo?:userId}` → `{ok:true}`. An owner needs
+  another existing enabled target (400 `invalid_owner` / 409 `owner_reassignment_required`). Ban,
+  revoke and persist formerly accessible account IDs before domain/shard cleanup. Memberships,
+  prefs and ownership are changed transactionally; `cleanupUserAccountAccess` handles each shard
+  without installing future collaboration tables. Only then does plugin `removeUser` run. A failed
+  cleanup leaves the identity banned and the durable slot held. Startup retries idempotently using
+  local adapter authority after shard cleanup; it does not fabricate an admin session.
+- `POST /api/admin/users/[userId]/recovery` JSON `{confirmedTarget:true}` additionally requires a
+  fresh `admin.recovery` grant in `x-noctua-reauth` (admin app password + freshly verified TOTP/UV).
+  `confirmedTarget` is the admin's explicit assertion of personal out-of-band identity verification.
+  Response `{ok:true,url,expiresIn:900}` returns the secret link once, for personal handover only.
+  Older reset links and existing sessions/MCP/challenges are revoked before a new link is issued.
+- `POST /api/admin/users/[userId]/mfa-reset` JSON `{confirmedTarget:true}` uses the same fresh proof,
+  revokes access, removes TOTP and returns `{ok:true,enrollmentRequired:true}`. Existing passkeys stay;
+  the user still needs fresh first-factor proof and new verified TOTP before mail access. Password
+  recovery remains a separate operation. The first-onboarding password waiver cannot reappear.
+- Bodyless `DELETE /api/admin/users/[userId]/sessions` and
+  `/api/admin/users/[userId]/passkeys/[passkeyId]` require a fresh `admin.recovery` header and return
+  `{ok:true}`. Passkey ownership is checked (404 `passkey_not_found`); all old target access is revoked.
+
+The unique `admin-lifecycle` slot is acquired **before** actor/target security slots. Self-demotion,
+self-disable and self-delete fail 403 `self_admin_mutation_forbidden`; removing the last enabled
+admin fails 403 `last_admin`. Incomplete provisioning cannot count as a replacement admin. Concurrent
+requests receive 409 `admin_operation_pending` or `security_operation_pending`. Mutation/audit faults
+retain access-denying user slots; startup cancels interrupted updates with an audited reconciliation
+and revokes old access, while interrupted deletion must finish cleanup. Never resume a failed mutation
+by client operation ID. The service intentionally reports partial downstream failures as 503
+`admin_operation_failed`; re-fetch status after operator reconciliation instead of replaying blindly.
+
+Recovery/admin-security attempts are limited to 3/minute/admin: 429 `recovery_rate_limited`,
+`Retry-After: 60`. Missing/stale/wrong-purpose grants fail 403 `reauth_required` / `invalid_proof`;
+missing explicit target verification fails 400 `target_verification_required`; unknown target is
+404 `user_not_found`. Invalid sessions are 401; insufficient authority is 403. Mutations and secret
+handover responses set `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+
+Local lockout equivalent (local DB/auth/encryption-key access is operator authority): stop the app,
+then run from the worktree, with a private terminal and shell tracing/session recording disabled:
+
+```sh
+bun --env-file=.env.local scripts/recoverTeamAuth.ts --application-stopped --confirm-personal-handover --user-id <id>
+```
+
+It reconciles interrupted work, records actor `operator`, and prints the link once. It never changes
+MFA, chooses a password, sends SMTP, or logs the link in the audit trail. Restart after successful
+reconciliation. A disabled user stays disabled; password recovery never unbans them.
+
+### Reset handoff for ui-shell Slice 7
+
+Production `BETTER_AUTH_URL` is `https://mail.example.org`; the sole callback is exactly
+`https://mail.example.org/reset-password`. Isolated preview/test data uses its own configured
+origin plus `/reset-password`, never another trusted origin/path/query. Issuance calls server
+`requestPasswordReset` with a request-scoped `sendResetPassword` handover sink. No global delivery
+variable, SMTP sender configuration or `/api/auth/recovery/request` exists. Raw issuance stays blocked.
+
+The following routes are allowed **inside the policy handler**, but the mounted `/api/ba/**` still
+returns 503 `auth_integration_pending` externally until Slice 6:
+
+1. Unauthenticated `GET /api/ba/reset-password/:token?callbackURL=<exact callback>` → 302 to
+   `/reset-password?token=...` or `/reset-password?error=INVALID_TOKEN` for expiry/missing/reused token.
+   A different callback fails 400 `invalid_callback` (foreign origins can fail 403 `INVALID_ORIGIN`).
+2. Unauthenticated same-origin JSON `POST /api/ba/reset-password` **only** `{token,newPassword}`
+   (10..256 chars). No query token, extra fields, session or MFA grant. 200 `{status:true}` creates
+   no session/cookie. Token expiry is 900 seconds; consumption and password change are transactional
+   with library session revocation. Expired/reused tokens fail 400 `INVALID_TOKEN`; malformed shape
+   fails 400 `invalid_request`; concurrent attempts have one winner (the other may receive retryable
+   409 `security_operation_pending`). Redemption is limited to 5/minute/IP by the library.
+
+MFA survives password reset. A durable reset intent records the prior generation without the token;
+startup can finish stale-row deletion and the missing audit even after the one-use token is spent.
+Credential-generation triggers invalidate every old bearer generation,
+reauth grant, registered login/settings challenge and anonymous WebAuthn epoch **at password commit**.
+`onPasswordReset` only deletes stale MCP rows, writes audit and publishes stream closure. Tests hold
+and then throw that callback: the actual bearer validator already rejects the old token while its
+row is still present. Raw internal password writes and caller revocation flags cannot bypass the
+generation checks. Password-change wrappers force other-session revocation and reject unknown flags.
+
+The reset page belongs to ui-shell. Copy the token to ephemeral memory, immediately replace browser
+history with `/reset-password`, exclude analytics, and clear token/password state on success/unmount.
+Next sets no-store/no-referrer on the page; both handler redemption paths carry those headers too,
+including errors/redirects. Next request logs ignore reset paths; `redactAuthUrl` strips capabilities
+for future logging callers. Slice 6 must configure proxy access-log redaction/omission for reset paths
+and query strings. Never persist links/tokens in logs, localStorage, audit or crash diagnostics.
+After success return to normal login and existing MFA. A post-commit callback failure can return 5xx
+although the new password is committed: offer login or a new personally handed-over link, never
+silently retry the password mutation. Slot reconciliation is independent of the spent reset token.
+
+### Slice 5 verification (2026-10-22)
+
+Parent `e3aad60`; Bun 1.4.4, Better Auth 1.7.12, Next.js 16.2.4. Heavy commands ran with
+`nice -n 10`, scratch in worktree-local `.tmp`, synthetic identities/storage only.
+
+- `timeout 1500 bun run test:ci`: exit 0; 2,104 server tests (226 files, 232.17s),
+  then 53 DOM tests (10 files, 12.32s), zero failures.
+- `timeout 1800 bun run test:stress`: exit 0; seed 1337, rerun-each=3;
+  6,312 passed, zero failed, 18,009 assertions, 226 files, 652.59s.
+- `timeout 600 bun run lint`: exit 1; unchanged baseline of one error in
+  `app/components/calendar/useCalendarConflicts.ts:58` plus 27 warnings; zero new findings.
+- `bun check` and `bun check --no-pretty --all`: exit 1; unchanged 151 non-`bun:test`
+  diagnostics. Comparing normalized diagnostic sets with the clean-parent capture adds/removes zero.
+- `timeout 1200 bun run build`: exit 0, including all new admin routes; public BA mount stays 503.
+- `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64 AUTH_BROWSER_USE_BUILD=1 bun run test:auth-browser`:
+  exit 0; eight actual Chromium/WebAuthn scenarios passed in 14.6s, isolated storage on port 3784.
+- `git diff --check`: exit 0. `lib/teamAuthSlice5.test.ts` adds 29 cases (including parameterized
+  provisioning write faults); `app/api/admin/users/route.test.ts` adds the full HTTP handoff case.
+  Coverage includes owned shared-address rejection, incomplete owner/admin rejection, benign missing
+  passkey slot release, two first-admin/invite contenders, retained cleanup, delete/re-invite/recovery,
+  target-name separation, real proof issuance, expiry/reuse/parallel reset, preserved MFA, actual MCP
+  bearer rejection during a suspended failing callback, and independent restart audit completion.
+
+These results verify backend contracts and the retained WebAuthn harness. Compiled public HTTP
+activation/migration/proxy log configuration remain Slice 6; the reset page, complete UI and physical
+phone/PWA acceptance remain Slice 7. No push, PR or deployment is part of this slice.

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { betterAuth } from "better-auth";
+import { withResetDelivery } from "../authRecoveryContext";
 import { importLegacyProfileFields, installAuthControlPlane } from "./authPolicy";
 import { migrateAuthSchema, noctuaAuthOptions } from "../betterAuth";
 import { caught, createTestAuthHarness, openMasterDb, TEST_BASE_URL, TEST_SECRET, type TestAuthHarness } from "../testAuthHarness";
@@ -408,7 +409,7 @@ describe("credential generation barrier", () => {
     const user = await f.createUser("reset-barrier@example.test");
     const before = state(f, user.id);
     const login = await f.signIn(user.email);
-    await f.auth.api.requestPasswordReset({ body: { email: user.email, redirectTo: `${TEST_BASE_URL}/reset-password` } });
+    await withResetDelivery({userId:user.id,deliver:()=>{}},()=>f.auth.api.requestPasswordReset({ body: { email: user.email, redirectTo: `${TEST_BASE_URL}/reset-password` } }));
     expect(resetToken).not.toBe("");
     expect((await caught(f.auth.api.resetPassword({ body: { token: resetToken, newPassword: "replacement-password-123" } }))).message).toBe("reset cleanup failed");
     expect(state(f, user.id)).toBe(before+1);
