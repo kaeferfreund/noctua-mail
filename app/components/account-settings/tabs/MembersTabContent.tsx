@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AccountRole } from "@/lib/data";
+import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
 import AdminConfirmDialog from "@/app/components/admin/AdminConfirmDialog";
-import type { AdminUser, Member } from "@/app/components/admin/types";
+import type { AdminUser, Member, MemberCandidate } from "@/app/components/admin/types";
 import { adminRequest, errorMessage, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 
 const roles: AccountRole[] = ["viewer", "editor", "manager"];
@@ -12,9 +13,11 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
   accountId: string; accessRole?: AccountRole; apiFetch?: AdminFetch; admin?: boolean; initialMembers?: Member[]; users?: AdminUser[]; currentUserId?: string; onChanged?: () => void;
 }) {
   const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
-  const [directory, setDirectory] = useState<AdminUser[]>(users ?? []);
+  const [directory, setDirectory] = useState<(MemberCandidate & { disabled?: boolean })[]>(admin ? users ?? [] : []);
   const [actor, setActor] = useState(currentUserId ?? "");
-  const [directoryUnavailable, setDirectoryUnavailable] = useState(false);
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [directoryLoading, setDirectoryLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,20 +42,33 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
     void (async () => {
       try {
         await load();
-        if (!currentUserId || !users) {
-          const me = await adminRequest<{ user: { id: string; role?: string } }>(apiFetch, "/api/auth/me");
-          if (!active) return;
-          setActor(currentUserId ?? me.user.id);
-          if (!users && (admin || me.user.role === "admin")) {
-            const data = await adminRequest<{ users: AdminUser[] }>(apiFetch, "/api/admin/users");
-            if (active) setDirectory(data.users);
-          } else if (!users) setDirectoryUnavailable(true);
+        if (!currentUserId) {
+          const me = await adminRequest<{ user: { id: string } }>(apiFetch, "/api/auth/me");
+          if (active) setActor(me.user.id);
+        }
+        if (admin && !users) {
+          const data = await adminRequest<{ users: AdminUser[] }>(apiFetch, "/api/admin/users");
+          if (active) setDirectory(data.users);
         }
       } catch (error) { if (active) setError(errorMessage(error)); }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
   }, [allowed, apiFetch, admin, currentUserId, users, load]);
+  const loadCandidates = useCallback(async () => {
+    const data = await adminRequest<{ candidates: MemberCandidate[] }>(apiFetch,
+      `/api/accounts/${encodeURIComponent(accountId)}/members/candidates?q=${encodeURIComponent(search)}&limit=100`);
+    return data.candidates;
+  }, [accountId, apiFetch, search]);
+  useEffect(() => {
+    if (!allowed || admin) return;
+    let active = true;
+    setDirectoryLoading(true);
+    void loadCandidates().then(candidates => { if (active) setDirectory(candidates); })
+      .catch(error => { if (active) { setDirectory([]); setError(errorMessage(error)); } })
+      .finally(() => { if (active) setDirectoryLoading(false); });
+    return () => { active = false; };
+  }, [allowed, admin, loadCandidates]);
   if (!allowed) return null;
   const enabledManagers = members.filter(member => !member.disabled && (member.isOwner || member.role === "manager")).length;
   const available = directory.filter(user => !user.disabled && !members.some(member => member.userId === user.id));
@@ -62,7 +78,7 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
       const base = admin ? "/api/admin/accounts" : "/api/accounts";
       const result = await adminRequest<{ cleanupPending?: boolean }>(apiFetch, `${base}/${encodeURIComponent(accountId)}/members/${encodeURIComponent(userId)}`,
         nextRole ? jsonMutation("PUT", { role: nextRole }) : jsonMutation("DELETE"));
-      setPending(null); setTarget(""); await load(); onChanged?.();
+      setPending(null); setTarget(""); await load(); if (!admin) setDirectory(await loadCandidates()); onChanged?.();
       if (result.cleanupPending) setError("Access was revoked; server cleanup is pending.");
     } catch (error) { setError(errorMessage(error)); }
     finally { setBusy(false); }
@@ -83,14 +99,18 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
           <td><Button variant="outline" disabled={busy || member.isOwner || lastManager || !actor} title={member.isOwner ? "Owner cannot be removed" : lastManager ? "Last enabled manager" : undefined}
             onClick={() => { setError(""); setPending({ member, role: null }); }}>Remove</Button></td></tr>;
       })}</tbody></table>
+    {!admin && <form className="flex items-end gap-3" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
+      <label className="grid gap-1 text-sm">Find users<Input value={query} maxLength={128} onChange={event => setQuery(event.target.value)} /></label><Button disabled={directoryLoading}>Search users</Button>
+      <p className="text-sm text-muted-foreground">Up to 100 enabled non-members. Search by name or email.</p>
+    </form>}
     <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
-      <label className="grid gap-1 text-sm">Add existing enabled user<select aria-label="Add existing enabled user" value={target} disabled={busy || loading || directoryUnavailable} onChange={event => setTarget(event.target.value)}>
+      <label className="grid gap-1 text-sm">Add existing enabled user<select aria-label="Add existing enabled user" value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
         <option value="">Choose a user</option>{available.map(user => <option key={user.id} value={user.id}>{user.name || user.email} ({user.email})</option>)}
       </select></label>
       <label className="grid gap-1 text-sm">New member role<select value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{role}</option>)}</select></label>
       <Button disabled={busy || !target}>Add member</Button>
     </form>
-    {directoryUnavailable && <p role="status" className="text-sm text-muted-foreground">The server does not provide a user picker for mailbox managers yet. Ask an administrator to grant new members.</p>}
+
     {pending && <AdminConfirmDialog title={pending.role ? "Change member role" : "Remove member"} description={`${pending.member.email}: ${pending.role ? `change role to ${pending.role}` : "revoke mailbox access"}.`}
       busy={busy} error={error} onCancel={() => { setPending(null); setError(""); }} onConfirm={() => void mutate(pending.member.userId, pending.role)} />}
   </div>;

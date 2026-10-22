@@ -5,3 +5,6 @@ export type AdminUser = Partial<Omit<User, "id" | "email" | "role">> & Pick<User
 };
 export type Member = { userId: string; email: string; name: string | null; role: AccountRole; isOwner: boolean; disabled?: boolean };
 export type AdminAccount = Account & { members: Member[] };
+
+export type MemberCandidate = { id: string; name: string | null; email: string };
+export type AdminInvite = { id: string; email: string | null; issuedBy: string | null; createdAt: number; expiresAt: number | null; status: "issued" | "redeemed" | "revoked" | "expired" };

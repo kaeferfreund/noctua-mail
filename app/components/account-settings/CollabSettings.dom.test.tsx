@@ -19,7 +19,7 @@ const members: Member[] = [
 const directory = [{ id: "synthetic-add", email: "add@example.test", role: "user" as const, disabled: false }, { id: "synthetic-disabled-add", email: "disabled-add@example.test", role: "user" as const, disabled: true }];
 function memberPage(override?: (url: string, init?: RequestInit) => Response | undefined, list = members) {
   const calls: { url: string; init?: RequestInit }[] = [];
-  const apiFetch: AdminFetch = async (input, init) => { const url = String(input); calls.push({ url, init }); return override?.(url, init) ?? response({ ok: true, members: list }); };
+  const apiFetch: AdminFetch = async (input, init) => { const url = String(input); calls.push({ url, init }); return override?.(url, init) ?? response(url.includes("/candidates?") ? { ok: true, candidates: [{ id: "synthetic-add", name: null, email: "add@example.test" }] } : { ok: true, members: list }); };
   const page = render(<Theme><MembersTabContent accountId={account.id} accessRole="manager" currentUserId="synthetic-self" users={directory} apiFetch={apiFetch} /></Theme>);
   return { page, calls };
 }
@@ -47,7 +47,7 @@ describe("Members tab", () => {
     const write = calls.find(call => call.init?.method === "PUT")!;
     expect(write.url).toBe("/api/accounts/synthetic-account/members/synthetic-add"); expect(JSON.parse(String(write.init?.body))).toEqual({ role: "editor" });
   });
-  for (const [code, message] of [["last_manager", "last enabled manager"], ["cannot_modify_owner", "owner cannot be modified"], ["cannot_change_own_role", "cannot change your own role"]]) {
+  for (const [code, message] of [["last_manager", "last enabled manager"], ["owner_immutable", "owner cannot be modified"], ["self_role_change", "cannot change your own role"], ["target_disabled", "enabled user"], ["target_missing", "no longer exists"], ["above_manager", "viewer, editor or manager"], ["not_member", "no longer a mailbox member"]]) {
     it(`maps ${code} without using display text as logic`, async () => {
       const { page } = memberPage((url, init) => init?.method === "DELETE" ? response({ ok: false, code }, 403) : undefined);
       await page.findByText("Synthetic Self"); fireEvent.click(within(page.getByText("Synthetic Self").closest("tr")!).getByRole("button", { name: "Remove" }));
@@ -55,13 +55,19 @@ describe("Members tab", () => {
       expect((await dialog.findByRole("alert")).textContent).toContain(message);
     });
   }
-  it("shows the manager-directory contract gap without probing admin APIs", async () => {
+  it("searches capped manager candidates without probing admin APIs", async () => {
     const calls: string[] = [];
     const page = render(<MembersTabContent accountId={account.id} accessRole="manager" apiFetch={async input => {
-      const url = String(input); calls.push(url); return response(url === "/api/auth/me" ? { ok: true, user: { id: "synthetic-self", role: "user" } } : { ok: true, members });
+      const url = String(input); calls.push(url);
+      return response(url === "/api/auth/me" ? { ok: true, user: { id: "synthetic-self", role: "user" } } : url.includes("/candidates?") ? { ok: true, candidates: [{ id: "synthetic-add", name: null, email: "add@example.test" }] } : { ok: true, members });
     }} />);
-    await page.findByText(/server does not provide a user picker/);
-    expect(calls).toEqual(["/api/accounts/synthetic-account/members", "/api/auth/me"]);
+    await page.findByRole("option", { name: /add@example.test/ });
+    await waitFor(() => expect((page.getByRole("button", { name: "Search users" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.change(page.getByLabelText("Find users"), { target: { value: " add+tag@example.test " } });
+    fireEvent.click(page.getByRole("button", { name: "Search users" }));
+    await waitFor(() => expect(calls).toContain("/api/accounts/synthetic-account/members/candidates?q=add%2Btag%40example.test&limit=100"));
+    expect(calls.some(url => url.startsWith("/api/admin/"))).toBe(false);
+    expect(calls).toContain("/api/auth/me");
   });
   it("does not render or fetch for viewers", () => {
     let fetched = false;
