@@ -17,8 +17,6 @@ const baseState: HeaderState = {
   loadedMessageCount: 349,
   totalMessages: 10848,
   listLoading: false,
-  loadingMessages: false,
-  hasMoreMessages: true,
   messageView: "threads",
   groupBy: "date",
   messageSort: "date",
@@ -37,7 +35,6 @@ function renderHeader(overrides: Partial<HeaderState> = {}) {
     calls.push([name, value]);
   };
   const actions: MessageListHeaderProps["actions"] = {
-    setMessagesPage: record("setMessagesPage"),
     setMessageView: record("setMessageView"),
     setGroupBy: record("setGroupBy"),
     setMessageSort: record("setMessageSort"),
@@ -91,7 +88,8 @@ describe("message list toolbar", () => {
     const count = new Intl.NumberFormat();
     const label = `${count.format(349)} of ${count.format(10848)}`;
     expect(view.getByText(label).getAttribute("title")).toBe(`${label} messages loaded`);
-    expect(view.getByRole("button", { name: "Load more" })).toBeTruthy();
+    // Older pages load on scroll; the toolbar has no Load more button.
+    expect(view.queryByRole("button", { name: "Load more" })).toBeNull();
     expect(view.getByRole("button", { name: "View: Threads" })).toBeTruthy();
     const sort = view.getByRole("button", { name: "Sort & group: Date, grouped by Date, threads on" });
     expect(sort.textContent).toBe("Date");
@@ -104,26 +102,20 @@ describe("message list toolbar", () => {
     expect(view.getByText("Loading… 1 message").getAttribute("title")).toBe("Loading… 1 message loaded");
   });
 
-  it("lets a narrow header hide the count and sort label but keeps the state in the accessible name", () => {
+  it("lets a narrow header hide the count, sort label and chevrons but keeps the state in the accessible name", () => {
     const { view } = renderHeader();
     const count = new Intl.NumberFormat();
     const label = `${count.format(349)} of ${count.format(10848)}`;
-    // happy-dom does not evaluate container queries; the classes are the contract.
-    expect(view.getByText(label).className).toContain("@4xl/header:inline");
+    // happy-dom does not evaluate container queries; hidden by default and
+    // revealed by an @container/header variant is the contract.
+    const hiddenUntil = (element: Element, reveal: string) => {
+      expect(element.classList.contains("hidden")).toBe(true);
+      expect(element.classList.contains(reveal)).toBe(true);
+    };
+    hiddenUntil(view.getByText(label), "@4xl/header:inline");
     const sort = view.getByRole("button", { name: "Sort & group: Date, grouped by Date, threads on" });
-    expect(within(sort).getByText("Date").className).toContain("@3xl/header:inline-block");
-  });
-
-  it("loads the next page and hides the button while a page is loading", () => {
-    const { view, calls } = renderHeader();
-    fireEvent.click(view.getByRole("button", { name: "Load more" }));
-    const [name, update] = calls.find(([call]) => call === "setMessagesPage") ?? [];
-    expect(name).toBe("setMessagesPage");
-    expect((update as (page: number) => number)(1)).toBe(2);
-    cleanup();
-
-    const loading = renderHeader({ loadingMessages: true });
-    expect(loading.view.queryByRole("button", { name: "Load more" })).toBeNull();
+    hiddenUntil(within(sort).getByText("Date"), "@3xl/header:inline-block");
+    hiddenUntil(sort.querySelector("svg.lucide-chevron-down")!, "@3xl/header:block");
   });
 
   it("switches the view from a radio menu and commits after the next frame", async () => {

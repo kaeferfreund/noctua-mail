@@ -24,7 +24,8 @@ type ToolbarButtonProps = Omit<
 
 /**
  * Quiet ghost button for the shell header: 28px like the header's other
- * controls, 32px on phones to match the mobile header buttons. Needs the
+ * controls, 32px on phones to match the mobile header buttons. Menu chevrons
+ * show only in a header of at least 48rem (`@container/header`). Needs the
  * shell's `TooltipProvider`.
  */
 export default function ToolbarButton({
@@ -61,7 +62,7 @@ export default function ToolbarButton({
         >
           {icon}
           {label ? <span className={cn("ml-0.5 inline-block max-w-28 truncate", labelClassName)}>{label}</span> : null}
-          {menu ? <ChevronDown className="size-3 opacity-60 max-md:hidden" /> : null}
+          {menu ? <ChevronDown className="hidden size-3 opacity-60 @3xl/header:block" /> : null}
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">{tooltip}</TooltipContent>
