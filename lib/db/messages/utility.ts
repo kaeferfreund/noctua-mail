@@ -115,15 +115,17 @@ export async function listRecipientSuggestions(
   // whole-table aggregate, far too heavy for a per-keystroke autocomplete
   // path. A bare folders-table read covers everything findSentFolder matches on.
   const folderRows = db
-    .prepare(`SELECT id, name, specialUse FROM folders WHERE accountId = ?`)
-    .all(accountId) as Array<{ id: string; name?: string | null; specialUse?: string | null }>;
+    .prepare(`SELECT id, name, specialUse, parentId, delimiter FROM folders WHERE accountId = ?`)
+    .all(accountId) as Array<{ id: string; name?: string | null; specialUse?: string | null; parentId?: string | null; delimiter?: string | null }>;
   const sentFolder = findSentFolder(
     folderRows.map((row) => ({
       id: row.id,
       name: String(row.name ?? ""),
       accountId,
       count: 0,
-      specialUse: row.specialUse ?? undefined
+      specialUse: row.specialUse ?? undefined,
+      parentId: row.parentId,
+      delimiter: row.delimiter ?? undefined
     })),
     accountId
   );

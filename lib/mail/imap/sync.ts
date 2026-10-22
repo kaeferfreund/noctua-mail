@@ -744,8 +744,10 @@ async function validateAndFixMailboxHighestUid(
 export async function planImapNewSyncFolders(
   account: Account,
   folderIds: string[],
-  clientId?: string
+  clientId?: string,
+  options: { client?: ImapFlow; signal?: AbortSignal } = {}
 ): Promise<NewSyncFolderDecision[]> {
+  options.signal?.throwIfAborted();
   const logContext = buildLogContext(account, clientId);
   const uniqueFolderIds = Array.from(new Set(folderIds.filter(Boolean)));
   if (uniqueFolderIds.length === 0) return [];
@@ -756,10 +758,11 @@ export async function planImapNewSyncFolders(
     await validateAndFixMailboxHighestUid(account, folderId, mailboxPath);
   }
 
-  return withPooledImapClient(account, logContext, async (client) => {
+  const plan = async (client: ImapFlow) => {
     const decisions: NewSyncFolderDecision[] = [];
 
     for (const folderId of uniqueFolderIds) {
+      options.signal?.throwIfAborted();
       const mailboxPath = mailboxPathFromFolderId(account.id, folderId);
       try {
         const status = await logImapOp(
@@ -845,6 +848,7 @@ export async function planImapNewSyncFolders(
         });
         decisions.push(decision);
       } catch {
+        options.signal?.throwIfAborted();
         const decision: NewSyncFolderDecision = {
           folderId,
           mailboxPath,
@@ -864,7 +868,10 @@ export async function planImapNewSyncFolders(
     }
 
     return decisions;
-  });
+  };
+  // A server watcher can reuse its selected IDLE socket for STATUS; interactive
+  // callers retain the existing pooled-connection behavior.
+  return options.client ? plan(options.client) : withPooledImapClient(account, logContext, plan);
 }
 
 type NewModeRangeDecision = {

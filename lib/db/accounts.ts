@@ -29,6 +29,12 @@ export async function getAccounts() {
   return rows.map((row) => applyCachedCredentials(mapAccountRow(row))) as Account[];
 }
 
+// Mailbox watcher: DB credentials only, never the browser session overlay.
+export async function getStoredAccounts() {
+  const db = await getDb();
+  return (db.prepare(`SELECT * FROM accounts`).all() as any[]).map(mapAccountRow);
+}
+
 export async function getAccountsForUser(userId: string) {
   const db = await getDb();
   const rows = db

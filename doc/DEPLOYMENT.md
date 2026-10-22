@@ -232,3 +232,106 @@ tar xzf noctua-backup-20260211.tar.gz -C /path/to/noctua/data/
 - **Cache regeneration:** Missing `sources/` or `attachments/` files are automatically re-downloaded from IMAP servers when needed.
 - **Space savings:** Database-only backups are much smaller (excludes potentially large attachment cache).
 - **IMAP requirement:** Cache regeneration requires IMAP access. Ensure credentials are valid before restoring database-only backups.
+
+## Background mailbox watcher (team deployments)
+
+The watcher is **off by default**. Enable it on one long-lived Bun server process:
+
+```sh
+IMAP_CREDENTIALS_STORAGE=db
+NOCTUA_MAILBOX_WATCHER=1
+NOCTUA_MAX_SYNC_WORKERS=3
+NOCTUA_WATCHER_INTERVAL_MS=300000
+```
+
+`IMAP_SECRET_KEY` must decrypt the stored mailbox passwords. Cookie-only credential storage
+cannot run the watcher; the startup gate requires `shouldStorePasswordInDb()` (`db` or `both`,
+the same predicate planned for `teamFeaturesSupported()`). The watcher reads the master DB
+without the browser credential overlay. Prefer `db` for team deployments.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOCTUA_MAILBOX_WATCHER` | unset (off) | Exactly `1` starts one watcher per server process. |
+| `NOCTUA_WATCHER_INTERVAL_MS` | `300000` | Fallback check interval per account, in milliseconds. EXISTS, EXPUNGE and flag events also request a check. |
+| `NOCTUA_WATCHER_ACCOUNTS_INTERVAL_MS` | `30000` | Master-account poll interval. Additions, removals and changes to the IMAP endpoint/user/password are detected without a restart. |
+| `NOCTUA_MAX_SYNC_WORKERS` | `3` | Maximum simultaneous sync subprocesses across accounts in this process. One worker per account still applies. Interactive new/recent sync precedes watcher work, then repair/full sweeps; ties are FIFO. Running workers are not preempted. |
+| `NOCTUA_SYNC_WORKER_TIMEOUT_MS` | `600000` | Worker deadline, including stdout/stderr draining. Expiry sends SIGKILL to that worker and releases its slot. |
+
+Intervals, capacity and deadlines must be positive integers; invalid values use the defaults.
+Jobs waiting for the global budget are reported as `status: "queued"` through the existing
+sync status endpoint, so the process panel can display the wait.
+
+Each account keeps **one read-only INBOX IDLE connection**, with no background IDLE connection
+per folder. Initial INBOX sync downloads existing mail. Each check reconciles INBOX UIDs/flags
+(including deletions and old unread messages), then uses the existing all-folder new-mail planner.
+Other folders retain the planner's upstream baseline behavior: an unsynced folder starts at its
+current UIDNEXT. Import historical Sent/other-folder mail with an explicit full sync before cut-over.
+A new remote folder is discovered when the INBOX reconciliation refreshes the folder list.
+
+Reconnects after a failed/disconnected IDLE session are limited to one attempt per minute per
+account, backing off exponentially to 30 minutes. An open connection breaker can extend the wait.
+Authentication failures use the same backoff, and state transitions are logged without credentials.
+Updating the stored IMAP configuration/password restarts that account and clears its breaker.
+Watcher workers disable their own rapid connection/job retries; the watcher owns their retry schedule.
+Event bursts are coalesced per account, and checks never overlap for the same watcher.
+SIGTERM/SIGINT abort the loops and connections and cancel watcher-owned queued/running workers;
+workers joined by an interactive caller continue under the normal server lifecycle.
+
+### Connection and memory sizing
+
+For roughly 12 accounts, budget 12 persistent IDLE connections plus up to 3 sync workers by
+default. Watcher folder checks reuse their IDLE connection for STATUS. Interactive operations can
+add a pooled connection (cached for up to 60 seconds), and browser SSE streams retain their
+existing INBOX/active-folder IDLE sessions. The worker cap limits subprocesses, not all IMAP sockets or other recompute workers.
+Use **one Bun server process** for this deployment: singleton state and the semaphore are
+process-local, and multiple server replicas would each open their own watchers and workers.
+
+**Netcup sizing assumption:** the mailbox plan permits a handful of concurrent IMAP connections
+per mailbox. This is an assumption to verify against the actual hosting plan before go-live, not
+a provider-guaranteed limit. A mailbox can need one watcher, one pooled connection and one worker,
+plus the sessions of any open browser tabs or other mail clients. Start with
+`NOCTUA_MAX_SYNC_WORKERS=1` on a small host, increase `NOCTUA_WATCHER_INTERVAL_MS` to reduce
+polling/worker activity, and lower the existing account/browser `settings.sync.maxIdleSessions`
+(minimum INBOX/active-folder behavior still applies). Limit duplicate tabs and other IMAP clients.
+If the plan cannot accommodate this footprint, turn the watcher off while adjusting the deployment.
+One worker can use substantial memory while parsing attachments; size RAM from representative
+mail and leave room for Bun/Next and SQLite caches. Twelve mailboxes do not imply twelve workers.
+
+### Summary and event integration
+
+`GET /api/accounts/summary` returns `{ accounts: [{ accountId, unreadInbox, lastSyncAt,
+watcherState }] }` with `Cache-Control: no-store`. It requires the existing session helper and
+currently returns only the session's active account. `lastSyncAt` is Unix milliseconds (null until
+a successful sync); unread counts exclude deleted rows and use a partial index in each shard.
+`watcherState` is `disabled`, `starting`, `idling`, `backoff`, `auth_failed` or `stopped`.
+The last sync time and watcher state survive process restarts in `mailbox_summary`; startup
+refreshes live states. After an unclean crash, the stored state may describe the last process
+until the server restarts. With the watcher disabled, summaries always report `disabled`.
+
+`getMailboxSummaries(accountIds)` never enumerates mailboxes: callers must pass authorized ids.
+After team-auth lands, change the route's guard and source of ids to the live user/session and
+membership helpers. `subscribeMailboxEvents(listener)` in `lib/mailboxWatcherEvents.ts` returns
+an unsubscribe function and emits `{ accountId, type: "state", watcherState }` or
+`{ accountId, type: "synced" }` after a successful check. It is a process-local invalidation feed,
+not a per-user SSE endpoint or message notification payload. The future collaboration event
+route must authorize account membership before forwarding it, then re-read summaries/messages.
+No browser UI or per-user counts are added here.
+
+### Synthetic integration proof
+
+The fixture is maintained in the separate `wt-dev-fixture` checkout. With that checkout present,
+`bun test lib/mailboxWatcher.integration.test.ts` automatically starts its IMAP/control servers
+on **OS-assigned ephemeral ports**, uses an isolated temporary `NOCTUA_DATA_DIR`, bootstraps 60 synthetic INBOX
+messages, injects one message during IDLE, and checks ingestion within five seconds, unread
+counts, flag/EXPUNGE reconciliation, periodic Sent checks, credential reload/auth
+backoff/recovery, account addition/removal, events and shutdown.
+The selected ports are read from fixture startup output. No external IMAP service or real data is used.
+
+Set `NOCTUA_TEST_IMAP_FIXTURE=/absolute/path/to/scripts/dev-fixture/imap-server.ts` to use another
+fixture checkout. Without the fixture the integration test explicitly skips; semaphore, Sent,
+summary and authorization tests still run. The standalone proof is also available as
+`bun scripts/verifyMailboxWatcher.ts /absolute/path/to/scripts/dev-fixture/imap-server.ts`.
+
+For a manual proof with fixed ports, set the test-only `NOCTUA_TEST_IMAP_PORT` and
+`NOCTUA_TEST_CONTROL_PORT` (both default to `0`, meaning OS-assigned). For example:
+`NOCTUA_TEST_IMAP_PORT=3799 NOCTUA_TEST_CONTROL_PORT=3798 bun scripts/verifyMailboxWatcher.ts /absolute/path/to/scripts/dev-fixture/imap-server.ts`.

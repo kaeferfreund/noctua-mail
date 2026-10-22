@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { SyncWorkerSemaphore, positiveInteger, withSyncWorkerTimeout } from "./syncWorkerSemaphore";
 import { parseSyncWorkerLine } from "@/lib/workers/syncProtocol";
 import { workerScriptPaths } from "@/lib/workers/entrypoints";
 import type {
@@ -21,7 +22,15 @@ export type SyncJob = {
   pid?: number;
   result?: SyncOperationResult;
   progress?: SyncOperationProgress;
+  source?: SyncJobSource;
 };
+
+export type SyncJobSource = "interactive" | "watcher" | "background";
+
+function jobPriority(job: SyncJob) {
+  if (job.source === "watcher") return 1;
+  return job.source === "background" || ["repair", "full"].includes(getSyncMode(job.payload)) ? 2 : 0;
+}
 
 type QueuedSyncEntry = {
   jobId: string;
@@ -42,6 +51,7 @@ const runtimeState = (
   globalThis as typeof globalThis & {
     __noctuaSyncJobsState?: SyncJobsRuntimeState;
     __noctuaSyncJobsBootstrapped?: boolean;
+    __noctuaSyncWorkerSemaphore?: SyncWorkerSemaphore;
   }
 );
 if (!runtimeState.__noctuaSyncJobsState) {
@@ -70,8 +80,48 @@ if (!runtimeState.__noctuaSyncJobsBootstrapped) {
   }
 }
 
+const workerKills = new Map<string, () => void>();
+const workerCompletions = new Map<string, Promise<void>>();
+const jobClientIds = new WeakMap<SyncJob, string | undefined>();
+
+/** Stop only background jobs owned by the watcher; interactive joins are retained. */
+export function cancelWatcherSyncJobs(accountId: string) {
+  const state = accountStates.get(accountId);
+  if (!state) return Promise.resolve();
+  const pending: Promise<void>[] = [];
+  state.queue = state.queue.filter((entry) => jobs.get(entry.jobId)?.source !== "watcher");
+  for (const job of jobs.values()) {
+    if (job.payload.accountId !== accountId || job.source !== "watcher" ||
+        (job.status !== "running" && job.status !== "queued")) continue;
+    const queued = workerSemaphore.cancel(job.id);
+    workerKills.get(job.id)?.();
+    const completion = workerCompletions.get(job.id);
+    if (completion) pending.push(completion);
+    markJobFailed(job, "Mailbox watcher stopped.");
+    scheduleCleanup(job.id);
+    if (queued || !job.pid) handleCompletedRunningJob(job);
+  }
+  return Promise.all(pending).then(() => {});
+}
+
+/** A globally waiting account head must not hide an interactive request behind a sweep. */
+function rescheduleQueuedHead(state: AccountSyncState) {
+  const head = jobs.get(state.runningJobId);
+  const next = state.queue[0];
+  const nextJob = next && jobs.get(next.jobId);
+  if (!head || head.status !== "queued" || !nextJob || jobPriority(head) <= jobPriority(nextJob)) return;
+  if (!workerSemaphore.cancel(head.id)) return;
+  state.queue.shift();
+  insertQueuedEntry(state.queue, { jobId: head.id, clientId: jobClientIds.get(head) });
+  state.runningJobId = nextJob.id;
+  spawnSyncWorker(nextJob, next.clientId);
+}
+
 const JOB_TTL_MS = 1000 * 60 * 30;
-const SYNC_WORKER_TIMEOUT_MS = 1000 * 60 * 10; // 10 minutes max per sync worker
+const SYNC_WORKER_TIMEOUT_MS = positiveInteger(process.env.NOCTUA_SYNC_WORKER_TIMEOUT_MS, 600_000);
+const workerSemaphore = runtimeState.__noctuaSyncWorkerSemaphore ??= new SyncWorkerSemaphore(
+  positiveInteger(process.env.NOCTUA_MAX_SYNC_WORKERS, 3)
+);
 
 const MODE_PRIORITY: Record<SyncMode, number> = {
   new: 1,
@@ -85,14 +135,8 @@ const MODE_PRIORITY: Record<SyncMode, number> = {
 const MAX_QUEUED_SYNC_JOBS = 64;
 
 const scheduleCleanup = (jobId: string) => {
-  setTimeout(() => {
-    const job = jobs.get(jobId);
-    if (job?.pid && isProcessAlive(job.pid)) {
-      try { process.kill(job.pid); } catch { /* already dead */ }
-      console.warn(`[sync] killed orphaned worker process ${job.pid} for job ${jobId}`);
-    }
-    jobs.delete(jobId);
-  }, JOB_TTL_MS);
+  const timer = setTimeout(() => { jobs.delete(jobId); }, JOB_TTL_MS);
+  timer.unref?.();
 };
 
 function getSyncMode(payload: SyncPayload): SyncMode {
@@ -345,7 +389,7 @@ function promoteNextQueuedJob(accountId: string, state: AccountSyncState) {
 
     state.runningJobId = nextJob.id;
 
-    nextJob.status = "running";
+    nextJob.status = "queued";
     nextJob.startedAt = Date.now();
     nextJob.finishedAt = undefined;
     nextJob.error = undefined;
@@ -376,6 +420,17 @@ function handleCompletedRunningJob(job: SyncJob) {
 }
 
 function spawnSyncWorker(job: SyncJob, clientId?: string) {
+  jobClientIds.set(job, clientId);
+  job.status = "queued";
+  job.queuedAt ??= Date.now();
+  workerSemaphore.enqueue(job.id, jobPriority(job), (release) => {
+    job.status = "running";
+    job.startedAt = Date.now();
+    launchSyncWorker(job, release, clientId);
+  });
+}
+
+function launchSyncWorker(job: SyncJob, release: () => void, clientId?: string) {
   try {
     const bun = (globalThis as typeof globalThis & { Bun?: any }).Bun;
     if (!bun?.spawn) {
@@ -390,10 +445,13 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
       {
         cwd: process.cwd(),
         stdout: "pipe",
-        stderr: "pipe"
+        stderr: "pipe",
+        // Watcher retries are controlled once per account by MailboxWatcher.
+        env: job.source === "watcher" ? { ...process.env, IMAP_CONNECT_RETRY_COUNT: "0", NOCTUA_SYNC_WORKER_SOURCE: "watcher" } : process.env
       }
     );
     job.pid = child.pid;
+    workerKills.set(job.id, () => { try { child.kill("SIGKILL"); } catch { /* already dead */ } });
     console.info(
       `[sync] worker started ${JSON.stringify({
         jobId: job.id,
@@ -404,9 +462,10 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
       })}`
     );
 
-    void (async () => {
+    const completion = (async () => {
       let streamedResult: SyncOperationResult | null = null;
       const stdoutTextPromise = readPipedOutput(child.stdout, (line) => {
+        if (job.status !== "running") return;
         try {
           const parsed = parseSyncWorkerLine(line);
           if (!parsed) return;
@@ -441,38 +500,11 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
         if (line.trim()) console.error(`[sync-worker] ${line}`);
       });
       try {
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        const timeoutPromise = new Promise<"timeout">((resolve) => {
-          timeoutId = setTimeout(() => resolve("timeout"), SYNC_WORKER_TIMEOUT_MS);
-        });
-        const exitOrTimeout = await Promise.race([
-          child.exited.then((code: number) => ({ kind: "exited" as const, code })),
-          timeoutPromise.then(() => ({ kind: "timeout" as const }))
-        ]);
-        if (timeoutId !== undefined) clearTimeout(timeoutId);
-
-        if (exitOrTimeout.kind === "timeout") {
-          try { child.kill(); } catch { /* already dead */ }
-          const errorMessage = `Sync worker timed out after ${SYNC_WORKER_TIMEOUT_MS / 1000}s and was killed.`;
-          markJobFailed(job, errorMessage);
-          console.error(
-            `[sync] worker timeout ${JSON.stringify({
-              jobId: job.id,
-              accountId: job.payload.accountId,
-              folderId: job.payload.folderId,
-              mode: getSyncMode(job.payload),
-              pid: job.pid,
-              error: errorMessage
-            })}`
-          );
-          return;
-        }
-
-        const [stdoutText, stderrRaw] = await Promise.all([
-          stdoutTextPromise,
-          stderrTextPromise
-        ]);
-        const exitCode = exitOrTimeout.code;
+        const [exitCode, stdoutText, stderrRaw] = await withSyncWorkerTimeout(
+          Promise.all([child.exited as Promise<number>, stdoutTextPromise, stderrTextPromise]),
+          SYNC_WORKER_TIMEOUT_MS,
+          () => { try { child.kill("SIGKILL"); } catch { /* already dead */ } }
+        );
         if (job.status !== "running") {
           return;
         }
@@ -502,6 +534,7 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
           );
         }
       } catch (error) {
+        workerKills.get(job.id)?.();
         const errorMessage =
           error instanceof Error ? error.message : "Sync worker monitor failed unexpectedly.";
         markJobFailed(job, errorMessage);
@@ -518,8 +551,13 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
         if (job.status === "running") {
           markJobFailed(job, "Sync worker monitor completed while job was still running.");
         }
+        // Do not run another queued watcher worker with the same failing credentials/network.
+        if (job.status === "failed" && job.source === "watcher") void cancelWatcherSyncJobs(job.payload.accountId);
+        workerKills.delete(job.id);
+        job.pid = undefined;
         scheduleCleanup(job.id);
         handleCompletedRunningJob(job);
+        release();
       }
     })().catch((error) => {
       const errorMessage = error instanceof Error ? error.message : "Sync worker monitor crashed unexpectedly.";
@@ -535,10 +573,16 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
           error: errorMessage
         })}`
       );
+      workerKills.delete(job.id);
+      job.pid = undefined;
       scheduleCleanup(job.id);
       handleCompletedRunningJob(job);
+      release();
     });
+    workerCompletions.set(job.id, completion);
+    void completion.finally(() => { workerCompletions.delete(job.id); });
   } catch (error) {
+    workerKills.get(job.id)?.();
     const errorMessage = error instanceof Error ? error.message : "Failed to start sync worker";
     markJobFailed(job, errorMessage);
     console.error(
@@ -550,8 +594,11 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
         error: errorMessage
       })}`
     );
+    workerKills.delete(job.id);
+    job.pid = undefined;
     scheduleCleanup(job.id);
     handleCompletedRunningJob(job);
+    release();
   }
 }
 
@@ -567,22 +614,21 @@ export function getSyncJob(jobId: string) {
 }
 
 /**
- * Insert before the first queued entry of strictly lower mode priority, so a
- * latency-sensitive `new` sync (the user is waiting for mail to appear) is not
- * stuck behind a queued `repair`/`full` sweep. Equal priorities keep FIFO order
+ * Insert before lower source/mode priorities so interactive new/recent work
+ * precedes watcher work, which precedes repair/full sweeps. Equal priorities keep FIFO order
  * — an account-wide sweep drives its own folder ordering and must not be
  * reshuffled.
  */
 function insertQueuedEntry(
   queue: QueuedSyncEntry[],
-  entry: QueuedSyncEntry,
-  payload: SyncPayload
+  entry: QueuedSyncEntry
 ) {
-  const priority = MODE_PRIORITY[getSyncMode(payload)];
+  const incomingJob = jobs.get(entry.jobId)!;
+  const priority = jobPriority(incomingJob);
   const index = queue.findIndex((queued) => {
     const queuedJob = jobs.get(queued.jobId);
     if (!queuedJob) return false;
-    return MODE_PRIORITY[getSyncMode(queuedJob.payload)] > priority;
+    return jobPriority(queuedJob) > priority;
   });
   if (index === -1) {
     queue.push(entry);
@@ -591,13 +637,14 @@ function insertQueuedEntry(
   queue.splice(index, 0, entry);
 }
 
-export function startSyncJob(payload: SyncPayload, clientId?: string) {
+export function startSyncJob(payload: SyncPayload, clientId?: string, source: SyncJobSource = "interactive") {
   const normalizedPayload = normalizeSyncPayload(payload);
   const accountId = normalizedPayload.accountId;
   const existingState = accountStates.get(accountId);
 
   if (!existingState) {
     const job = createRunningJob(normalizedPayload);
+    job.source = source;
     jobs.set(job.id, job);
     accountStates.set(accountId, { runningJobId: job.id, queue: [] });
     spawnSyncWorker(job, clientId);
@@ -610,17 +657,17 @@ export function startSyncJob(payload: SyncPayload, clientId?: string) {
   const runningJob = jobs.get(existingState.runningJobId);
   if (!runningJob) {
     promoteNextQueuedJob(accountId, existingState);
-    return startSyncJob(normalizedPayload, clientId);
+    return startSyncJob(normalizedPayload, clientId, source);
   }
-  if (runningJob.status !== "running") {
+  if (runningJob.status !== "running" && runningJob.status !== "queued") {
     handleCompletedRunningJob(runningJob);
-    return startSyncJob(normalizedPayload, clientId);
+    return startSyncJob(normalizedPayload, clientId, source);
   }
   if (typeof runningJob.pid === "number" && !isProcessAlive(runningJob.pid)) {
     markJobFailed(runningJob, "Sync worker process is no longer running.");
     scheduleCleanup(runningJob.id);
     handleCompletedRunningJob(runningJob);
-    return startSyncJob(normalizedPayload, clientId);
+    return startSyncJob(normalizedPayload, clientId, source);
   }
 
   // Drop entries whose job the TTL timer already reaped.
@@ -631,6 +678,10 @@ export function startSyncJob(payload: SyncPayload, clientId?: string) {
   // would have picked this request up, and joining it would silently drop the
   // requested folder instead of syncing it.
   if (existingState.queue.length === 0 && isSameSyncIntent(runningJob.payload, normalizedPayload)) {
+    if (source === "interactive" && runningJob.source !== source) {
+      runningJob.source = source;
+      workerSemaphore.promote(runningJob.id, jobPriority(runningJob));
+    }
     return runningJob;
   }
 
@@ -639,6 +690,11 @@ export function startSyncJob(payload: SyncPayload, clientId?: string) {
     if (!queuedJob || !isSameSyncIntent(queuedJob.payload, normalizedPayload)) continue;
     if (clientId) {
       entry.clientId = clientId;
+    }
+    if (source === "interactive") {
+      queuedJob.source = source;
+      existingState.queue.sort((a, b) => jobPriority(jobs.get(a.jobId)!) - jobPriority(jobs.get(b.jobId)!));
+      rescheduleQueuedHead(existingState);
     }
     return queuedJob;
   }
@@ -664,7 +720,9 @@ export function startSyncJob(payload: SyncPayload, clientId?: string) {
   }
 
   const queuedJob = createQueuedJob(normalizedPayload);
+  queuedJob.source = source;
   jobs.set(queuedJob.id, queuedJob);
-  insertQueuedEntry(existingState.queue, { jobId: queuedJob.id, clientId }, normalizedPayload);
+  insertQueuedEntry(existingState.queue, { jobId: queuedJob.id, clientId });
+  rescheduleQueuedHead(existingState);
   return queuedJob;
 }

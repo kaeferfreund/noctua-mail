@@ -696,6 +696,12 @@ export function initMasterSchema(db: any) {
 
 export function initAccountSchema(db: any) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS mailbox_summary (
+      accountId TEXT PRIMARY KEY,
+      lastSyncAt INTEGER,
+      watcherState TEXT NOT NULL DEFAULT 'disabled'
+    );
+
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -915,6 +921,8 @@ export function initAccountSchema(db: any) {
     CREATE VIRTUAL TABLE IF NOT EXISTS message_fts
     USING fts5(messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview);
 
+    CREATE INDEX IF NOT EXISTS idx_messages_unread_mailbox_summary
+      ON messages(accountId, folderId) WHERE unread = 1 AND COALESCE(deleted, 0) = 0;
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_date
       ON messages(accountId, folderId, dateValue DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_account_date
