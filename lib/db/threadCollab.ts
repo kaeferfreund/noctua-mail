@@ -1,5 +1,6 @@
 // This module also runs in sync/recompute workers: no Next, sessions or credentials.
 import type { Database } from "bun:sqlite";
+import { publishThreadCollabEvent } from "../threadCollabEvents";
 import { randomUUID } from "crypto";
 import { getAccountDb } from "./connection";
 import { withDbWriteRetry } from "../dbWriteRetry";
@@ -180,19 +181,23 @@ export function listThreadActivity(db: Database, accountId: string, threadId: st
 export async function mutateThreadCollab<T>(accountId: string, threadId: string, fn: (db: Database, now: number) => T) {
   return withDbWriteRetry("threadCollab.mutate", async () => {
     const db = await getAccountDb(accountId) as Database;
-    return db.transaction(() => threadHasMessages(db, accountId, threadId) ? fn(db, Date.now()) : null).immediate();
+    const result = db.transaction(() => threadHasMessages(db, accountId, threadId) ? fn(db, Date.now()) : null).immediate();
+    if (result !== null) publishThreadCollabEvent(getThreadCollabState(db, accountId, threadId));
+    return result;
   });
 }
 export async function unassignUserInAccount(accountId: string, userId: string, actor: CollabActor) {
   return withDbWriteRetry("threadCollab.unassignUserInAccount", async () => {
     const db = await getAccountDb(accountId) as Database;
-    return db.transaction(() => {
+    const changed = db.transaction(() => {
       const rows = db.prepare(`SELECT * FROM thread_collab_state WHERE accountId=? AND assigneeUserId=?`)
         .all(accountId, userId) as ThreadCollabState[];
       for (const row of rows)
         updateThreadCollabState(db, accountId, row.threadId, { assigneeUserId: null }, { ...actor, clientId: "system" }, Date.now());
-      return rows.length;
+      return rows.map(row => getThreadCollabState(db, accountId, row.threadId));
     }).immediate();
+    for (const state of changed) publishThreadCollabEvent(state);
+    return changed.length;
   });
 }
 export type ThreadRemapPair = {
@@ -223,7 +228,7 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
     moves.set(oldId, root.newThreadId);
   }
   if (!moves.size)
-    return;
+    return [];
   // Snapshot first so simultaneous A→B, B→C or swaps never cascade metadata.
   const states = new Map<string, ThreadCollabState>();
   const topics = new Map<string, Array<{
@@ -319,6 +324,11 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
       upsertThreadCollabState(db, state);
     }
   }
+  // The outer writer publishes only after its message/remap transaction commits.
+  return [...new Set([...moves.keys(), ...moves.values()])].map(threadId => {
+    const { revision } = getThreadCollabState(db, accountId, threadId);
+    return { accountId, threadId, revision };
+  });
 }
 
 export type SentMessageIdentity = { messageId: string; inReplyTo?: string; references?: string[] };
@@ -327,7 +337,7 @@ export async function recordReplySent(accountId: string, message: SentMessageIde
   if (!actor.userId || !message.messageId) return;
   return withDbWriteRetry("threadCollab.recordReplySent", async () => {
     const db = await getAccountDb(accountId) as Database;
-    return db.transaction(() => {
+    const changed = db.transaction(() => {
       const now = Date.now();
       const inserted = db.prepare(`INSERT INTO sent_by(accountId,messageId,userId,sentAt) VALUES(?,?,?,?)
         ON CONFLICT(accountId,messageId) DO NOTHING RETURNING messageId`).get(accountId, message.messageId, actor.userId, now);
@@ -339,9 +349,9 @@ export async function recordReplySent(accountId: string, message: SentMessageIde
           AND COALESCE(deleted,0)=0 ORDER BY dateValue DESC,id LIMIT 1`).get(accountId, parent, parent) as { threadId: string } | null;
         if (!target) continue;
         appendThreadActivity(db, accountId, target.threadId, "reply_sent", actor, { messageId: message.messageId }, now);
-        touchThreadCollabState(db, getThreadCollabState(db, accountId, target.threadId), actor, now);
-        return;
+        return touchThreadCollabState(db, getThreadCollabState(db, accountId, target.threadId), actor, now);
       }
     }).immediate();
+    if (changed) publishThreadCollabEvent(changed);
   });
 }

@@ -884,6 +884,7 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
   const requiredObjects = [
     "thread_collab_state", "thread_comments", "sent_by", "thread_activity",
     "idx_thread_collab_state_assignee", "idx_thread_collab_state_status",
+    "idx_thread_collab_state_summary",
     "idx_thread_comments_thread", "idx_thread_activity_thread"
   ];
   const existing = new Set((db.prepare(`SELECT name FROM sqlite_master
@@ -924,6 +925,8 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
         ON thread_collab_state(accountId, assigneeUserId);
       CREATE INDEX IF NOT EXISTS idx_thread_collab_state_status
         ON thread_collab_state(accountId, status);
+      CREATE INDEX IF NOT EXISTS idx_thread_collab_state_summary
+        ON thread_collab_state(accountId, assigneeUserId, status);
       CREATE INDEX IF NOT EXISTS idx_thread_comments_thread
         ON thread_comments(accountId, threadId, createdAt);
       CREATE INDEX IF NOT EXISTS idx_thread_activity_thread
@@ -1167,6 +1170,8 @@ export function initAccountSchema(db: any) {
     CREATE VIRTUAL TABLE IF NOT EXISTS message_fts
     USING fts5(messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview);
 
+    CREATE INDEX IF NOT EXISTS idx_messages_live_thread_summary
+      ON messages(accountId, threadId, dateValue DESC) WHERE COALESCE(deleted, 0) = 0;
     CREATE INDEX IF NOT EXISTS idx_messages_unread_mailbox_summary
       ON messages(accountId, folderId) WHERE unread = 1 AND COALESCE(deleted, 0) = 0;
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_date
