@@ -239,7 +239,8 @@ export function readAuthEnv(env: Record<string, string | undefined> = process.en
   if (passkeyRpID !== hostname) throw new Error("PASSKEY_RP_ID must equal the canonical BETTER_AUTH_URL hostname.");
   const trustedOrigins = (env.NOCTUA_TRUSTED_ORIGINS ?? "").split(",").map(value => value.trim()).filter(Boolean)
     .map(value => parseOrigin(value, "NOCTUA_TRUSTED_ORIGINS"));
-  return { secret, baseURL, passkeyRpID, trustedOrigins: [baseURL, ...trustedOrigins] };
+  if (trustedOrigins.some(origin => origin !== baseURL)) throw new Error("NOCTUA_TRUSTED_ORIGINS must contain only the canonical BETTER_AUTH_URL origin.");
+  return { secret, baseURL, passkeyRpID, trustedOrigins: [baseURL] };
 }
 
 function parseOrigin(value: string, name: string) {

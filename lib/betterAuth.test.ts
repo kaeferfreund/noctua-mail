@@ -376,7 +376,8 @@ describe("startup configuration", () => {
       { BETTER_AUTH_URL: "http://192.0.2.1" }, { PASSKEY_RP_ID: "example.test" },
       { NOCTUA_DESKTOP_MODE: "true" }, { IMAP_CREDENTIALS_STORAGE: "cookie" },
       { BETTER_AUTH_TELEMETRY: "1" }, { BETTER_AUTH_TELEMETRY_ENDPOINT: "https://telemetry.example.test" },
-      { NOCTUA_TRUSTED_ORIGINS: "https://*.example.test" }
+      { NOCTUA_TRUSTED_ORIGINS: "https://*.example.test" },
+      { NOCTUA_TRUSTED_ORIGINS: "https://preview.example.org:3790" }
     ]) expect(() => readAuthEnv({ ...valid, ...patch })).toThrow();
     expect(readAuthEnv({ ...valid, IMAP_CREDENTIALS_STORAGE: "both" }).baseURL).toBe(valid.BETTER_AUTH_URL);
     expect(readAuthEnv({ ...valid, BETTER_AUTH_URL: "http://localhost:3784" }).passkeyRpID).toBe("localhost");

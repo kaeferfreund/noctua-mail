@@ -1,12 +1,9 @@
 # Authentication
 
-> Better Auth migration: cookie credential mode, sealed sessions, SESSION_SEAL_KEY, legacy IMAP login and Tauri desktop are retired; see [TEAM-INBOX.md](TEAM-INBOX.md) and [TEAM-AUTH-PLAN.md](TEAM-AUTH-PLAN.md).
+This branch implements Team-Auth through Slice 6. Better Auth is pinned at 1.7.12.
+The backend is active; the final activation and operator/client contract is under
+[Slice 6 contract changes](#slice-6-contract-changes). Stage 1 backend completion is not go-live.
 
-This branch implements Team-Auth through Slice 5. Better Auth is pinned at 1.7.12.
-`/api/ba/**` still returns 503 `auth_integration_pending`; backend activation belongs to Slice 6.
-Legacy sealed cookies, credential overlays and cookie-only storage are retired. Signup uses the
-invite provisioning saga; optional IMAP login stays OFF unless an explicit host allowlist enables it.
-Nothing in this slice enables public Better Auth HTTP sign-in or deploys the integration branch.
 Design v5 wins over plan shorthand: member GET is viewer-accessible; sync, recompute,
 calendar sync and related-thread lookup are viewer capabilities even when their HTTP method is POST.
 
@@ -61,8 +58,8 @@ token and mailbox DELETE use the same-origin/bodyless convention. `x-noctua-clie
 `lib/mailboxCredentials.ts:updateMailboxCredentials(accountId, patch, actor, verification?)` is the
 single repair/write-back service. PUT account, relogin and POST-existing use the shared HTTP handler
 in `app/api/_helpers/mailboxPatch.ts`; Slice 4's optional IMAP bridge must call the service after its
-strict eligibility/allowlist checks. POST-new remains pending provisioning; admin mailbox creation
-uses its separate ownerless creation contract. Identity/id/e-mail/dbPath cannot be patched.
+strict eligibility/allowlist checks. Account creation/repair activation is finalized under the
+Slice 6 contract changes; admin mailbox creation uses its separate ownerless creation contract. Identity/id/e-mail/dbPath cannot be patched.
 An IMAP/SMTP host, port, secure flag or username change requires a nonblank corresponding password.
 Verification uses the new endpoint before persistence. Blank secrets preserve stored values.
 Concurrent mailbox changes during verification produce 409; no verified stale patch is written.
@@ -761,8 +758,8 @@ origin plus `/reset-password`, never another trusted origin/path/query. Issuance
 `requestPasswordReset` with a request-scoped `sendResetPassword` handover sink. No global delivery
 variable, SMTP sender configuration or `/api/auth/recovery/request` exists. Raw issuance stays blocked.
 
-The following routes are allowed **inside the policy handler**, but the mounted `/api/ba/**` still
-returns 503 `auth_integration_pending` externally until Slice 6:
+The following policy-controlled redemption routes are active at the mounted `/api/ba/**`
+(see the Slice 6 contract changes below):
 
 1. Unauthenticated `GET /api/ba/reset-password/:token?callbackURL=<exact callback>` → 302 to
    `/reset-password?token=...` or `/reset-password?error=INVALID_TOKEN` for expiry/missing/reused token.
@@ -1035,3 +1032,188 @@ route-role fixture and the inventory above, including its generated editor-denia
 - `git diff --check`: exit 0. No auth-stage activation, signup, policy-handler, schema,
   harness or script changes; `doc/AUTHENTICATION.md` is the sole overlap in the supplied merge list.
   No push, PR or deployment.
+
+## Slice 6 contract changes
+
+Integration prerequisite: this activation branch starts from `54dc833` before the parallel
+Slice 5 fix round. Merge that round's issuer-revocation, shared app/operator lifetime-lock,
+admin DTO/audit/limit and signup-contract fixes before using this activation in an installation.
+Reconcile the migration/recovery commands with its shared lock before auth initialization and
+rerun the reviewer F1/F2 rejection regressions after the merge. The flags below assert operator
+intent; this branch alone does not claim to have closed the inherited Slice 5 lock finding.
+The merge owner replaces the single `assertOperatorPreconditions()` call in
+`scripts/migrateTeamAuth.ts` with the shared lock acquire/release; no second lock is implemented.
+
+
+`/api/ba/**` now mounts the completed Noctua policy handler, with no runtime bypass/readiness flag.
+`POST /api/accounts` repairs an existing mailbox only; an absent mailbox now returns final
+404 `{ok:false,code:"account_not_found"}` without IMAP/SMTP calls. Create mailboxes through
+invite signup or the existing ownerless admin creation route.
+All existing wrapper contracts above remain enforced: signup/invites, optional IMAP login,
+mandatory TOTP gate, UV passkeys, reauthentication purposes, lifecycle, reset, mailbox repair and
+bearer MCP. Raw Better Auth admin/password/factor mutation paths stay disabled. The obsolete
+`/api/auth/login` and `/api/desktop/**` routes are removed (404); clients use
+`POST /api/ba/sign-in/email` or the separately allowlisted `/sign-in/imap`. The old
+`noctua_session` cookie is never decrypted or accepted and is expired when seen by the BA mount
+or a Noctua session guard. Native desktop code/build tooling is removed. `LoginOverlay.tsx`
+remains solely because `MailClient.tsx` imports it; Slice 7 replaces that shell entry point.
+
+### Final environment
+
+```sh
+BETTER_AUTH_URL=https://mail.example.org
+PASSKEY_RP_ID=mail.example.org
+BETTER_AUTH_SECRET=<independent-random-secret-at-least-32-characters>
+IMAP_SECRET_KEY=<retain-existing-independent-encryption-key>
+IMAP_CREDENTIALS_STORAGE=db
+BETTER_AUTH_TELEMETRY=0
+NOCTUA_DATA_DIR=/srv/noctua/data
+# NOCTUA_TRUSTED_ORIGINS unset (only the configured canonical origin is accepted).
+# NOCTUA_IMAP_LOGIN_HOSTS unset: optional IMAP first factor OFF.
+# BETTER_AUTH_TELEMETRY_ENDPOINT and NOCTUA_DESKTOP_MODE unset.
+```
+
+`PASSKEY_RP_ID` defaults to the configured hostname; it must match. DB storage is the default,
+`both` is a deprecated DB-only alias, `cookie` and `NOCTUA_DESKTOP_MODE=true` fail startup.
+Additional `NOCTUA_TRUSTED_ORIGINS` values now fail startup; canonical trust cannot include preview.
+DNS A `203.0.113.10` is tailnet-only; TLS is issued/renewed via mailprovider DNS-01. Bind the Bun backend
+to loopback and overwrite Host/X-Forwarded-* at the sole reverse proxy. The pinned Better Auth
+IP reader uses the proxy-sanitized `x-forwarded-for`; Noctua limits default to one trusted hop
+(`TRUSTED_PROXY_HOPS=1`). See `deploy-scripts/nginx-auth.conf`: auth/reset access logs are disabled,
+other access logs omit query strings, request errors cannot log reset URLs. Recovery links are
+handed over personally, never SMTP. Do not record the private operator terminal.
+
+The preview `https://preview.example.org:3790` is a separate instance with isolated auth
+data, auth/encryption secrets, preview-only URL/trust and RP ID `preview.example.org`.
+Enroll separate preview passkeys. Canonical passkeys are not reusable there. Actual tailnet DNS,
+mailprovider renewal and physical phone/PWA acceptance belong to deployment/Stage 4 and Slice 7.
+
+### Offline migration and bootstrap runbook
+
+1. Stop the application (one process only). Back up the master (`db/main.db` in this runtime), all shards and both independent
+   auth/encryption keys consistently; retain `IMAP_SECRET_KEY`. For former cookie-only installs,
+   re-enter and verify mailbox credentials into encrypted DB storage first. Never import client
+   cookies or turn mailbox passwords into app passwords.
+2. Review every legacy person and stable user ID. Duplicate case/whitespace addresses and identities
+   using shared-mailbox addresses are rejected before any import: repair those legacy profiles
+   explicitly to personal identities first, preserving IDs and ownership/membership references.
+   Legacy profiles must all be mapped unless already Better Auth identities. The migration never
+   infers an admin or identity from an account-ID cookie or a mailbox secret.
+3. Write a private JSON manifest (names/addresses are operator data, not committed). Example uses
+   synthetic values. `createdAt` is the exact legacy unix millisecond timestamp, role must match;
+   `legacyUserId` must equal `userId` for an existing profile. Name imports from the old column if
+   omitted; supply it when the old table has none. Password provenance is explicitly reviewed:
+
+```json
+{"version":1,"users":[{"userId":"legacy-person","legacyUserId":"legacy-person","email":"person@example.test","name":"Synthetic Person","role":"admin","createdAt":1234567890000,"passwordProvenance":"recovery"}],"memberships":[]}
+```
+
+   A person from an old account-ID-only session has `legacyUserId:null`, an explicitly chosen stable
+   `userId`, personal email/name/role/timestamp, `passwordProvenance:"recovery"`, and explicit
+   `memberships:[{"userId":"personal-id","accountId":"existing-mailbox-id","role":"manager"}]`.
+   Existing membership roles cannot be silently replaced. Existing owner/prefs/audit/shard IDs stay.
+   `passwordProvenance:"user-chosen"` imports only a valid bounded Argon2id hash from the legacy
+   `users.passwordHash`; any temporary-password marker rejects it. Choose `recovery` to discard an
+   admin/temporary/unknown credential. Never put hashes/passwords into the manifest or use a common
+   temporary password. `disabledAt` imports as a permanent Better Auth ban; recovery never unbans.
+4. Run twice with the exact same manifest and environment:
+
+```sh
+bun --env-file=.env.local scripts/migrateTeamAuth.ts --application-stopped --confirm-reviewed-identities --manifest /private/reviewed.json
+bun --env-file=.env.local scripts/migrateTeamAuth.ts --application-stopped --confirm-reviewed-identities --manifest /private/reviewed.json
+```
+
+   One adapter transaction creates identities, chosen hashes, completed migration provenance,
+   memberships, audit and the manifest receipt. Failure rolls it all back. First success revokes
+   every old session, MCP token and challenge; the second reports `already_complete` without
+   revoking newly created access. A different manifest after cutover is rejected; later people use
+   invites. Operator output contains IDs/count/status only; no email/hash/password/link.
+5. For a recovery-only identity use the personally verified local recovery command documented above.
+   It prints the single-use 15-minute URL once, preserves MFA and ban status, and never sends SMTP.
+   Initial IMAP-only onboarding has completed migration provenance for the first-password proof
+   waiver; admins still require a provider-independent app password before mail access.
+6. On an empty install, startup creates the bootstrap invite but logs only readiness. Retrieve its
+   code explicitly in a private terminal, with the app stopped, for personal handover:
+
+```sh
+bun --env-file=.env.local scripts/recoverTeamAuth.ts --application-stopped --confirm-personal-handover --bootstrap-invite
+```
+
+   This fails once any profile exists. Ordinary startup, including separate Next route graphs,
+   never logs the invite secret. Restart, enroll/verify TOTP and save offline backup codes, then
+   enroll passkeys at the correct origin. UI acceptance belongs to Slice 7.
+
+### Production and restore smoke
+
+`bun scripts/smokeTeamAuth.ts` uses only port 3794 and fresh worktree-local `.tmp` storage,
+canonical origin/proxy headers with real Secure cookies, the compiled production mount and
+production limits. `bun run test:auth-browser` starts compiled Next on port 3793, seeds offline,
+and exercises all real wrappers/mounts. It contains no custom HTTP auth interception or disabled
+runtime limits. ARM requires `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64`; reuse the
+fresh build with `AUTH_BROWSER_USE_BUILD=1`. Both runners stop only their own child processes.
+The auth/master/shard/key restore probe is synthetic Stage 1 evidence; application-wide restore
+and household go-live stay Stage 4 (TEAM-INBOX.md §11).
+
+### Slice 6 verification (2026-10-22)
+
+Base: clean `feat/auth-activation` at `54dc833`, directly above `48b1612`; the parallel Slice 5
+fix round was deliberately not merged here. All heavy commands used `nice -n 10`,
+`TMPDIR=$PWD/.tmp`, synthetic identities and isolated storage. No push, PR or deployment.
+Versions read from the installed runtime/packages: Bun 1.4.4 (38afee6c8), Next.js 16.2.4,
+Better Auth/passkey 1.7.12, TypeScript 6.0.3, Playwright 1.58.2, Chromium 145.0.7632.0 on ARM.
+
+- `timeout 1500 bun run test:ci`: exit 0; 2,116 server tests, 227 files, 6,113 assertions,
+  408.63s; then 69 DOM tests, 13 files, 490 assertions, 19.96s; zero failures.
+- `timeout 1800 bun run test:stress`: exit 0; seed 1337, rerun-each=3; 6,348 passed,
+  zero failed, 18,339 assertions, 227 files, 1050.31s. Includes all three executions of the final
+  one-time legacy profile receipt regression and the active mount/origin inventory.
+- Focused auth/migration/mount checks: 13 passed, zero failed, 101 assertions, three files,
+  6.61s. `lib/teamAuthMigration.test.ts` covers chosen hashes and reviewed names, stable timestamps,
+  completed provenance, second-run session preservation, discarded temporary hashes, permanent
+  bans, later name/unban preservation across startup, duplicate/shared addresses, malformed hashes,
+  wrong/missing/unmapped IDs, adapter rollback and explicit account-ID-only membership mapping.
+  `app/api/ba/[...all]/route.test.ts` calls the actual exported mount twice across process starts.
+- `timeout 600 bun run lint`: exit 1; exactly the existing
+  `app/components/calendar/useCalendarConflicts.ts:58` error and 27 warnings; zero new findings.
+- `bun check` and `bun check --no-pretty --all`: exit 1; 151 non-`bun:test` diagnostics,
+  unchanged from the captured clean baseline. Normalized diagnostic sets add/remove zero entries.
+- `timeout 1200 bun run build`: exit 0. The production route inventory includes `/api/ba/[...all]`
+  and omits the removed legacy login and desktop APIs. Standalone packaging, live TLS and rollout
+  are not asserted by the `next start` smoke.
+- `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64 AUTH_BROWSER_USE_BUILD=1 timeout 1200 bun run test:auth-browser`:
+  exit 0; `8 passed (5.1m)`, compiled Next on localhost:3793. Cases: real registration/assertion/replay
+  and rotated UV grant binding, UV=false rejection, RP/origin mismatch, anonymous challenge reset and
+  revoke invalidation, management purposes/removal, registration finalizer fault, UV finalizer fault.
+  Production proof limits remain enabled; the fixture paces proofs at 12.5 seconds. Expected origin
+  mismatch diagnostics contain only the synthetic origin; no HAR/screenshots/traces are recorded.
+- `timeout 900 bun scripts/smokeTeamAuth.ts`: exit 0, final `SMOKE PASS`, port 3794 only.
+  Transcript milestones: migration CLI `complete` then `already_complete`; stable IDs/chosen hashes
+  and old MCP removal; canonical Host/X-Forwarded-* and Secure cookie; foreign origin/raw path/old
+  cookie rejection; restricted enrollment and TOTP activation; refresh forwarded through `/me`;
+  live MCP then revoke rejection; admin ban and denied login; private operator recovery; mounted
+  reset redirect/redemption/reuse and no auto-session; old session rejection and retained MFA;
+  empty second-start schema plan; consistent master/auth/shard/key snapshot restored to another
+  isolated directory with identical IDs/factor/backup-code bytes, shard marker, decryptable IMAP
+  secret, preserved signed MFA session and a new real TOTP login. No known password/hash/key,
+  TOTP seed, backup code, session/challenge cookie, MCP token or recovery capability appeared in
+  captured production server logs. Auth factory probes run in short-lived offline children, so
+  the runner does not retain an application lifetime lock while its Next server is running.
+- Missing `--confirm-reviewed-identities`: exit 1 before storage initialization; no data directory
+  created. `bash -n deploy-scripts/deploy-instance.sh` and `git diff --check`: exit 0.
+  Both reserved ports (3793/3794) were bind-checked free after runner cleanup.
+
+The first CI attempt correctly exposed four obsolete mount-inventory 503 expectations. They now
+exercise real library media-type rejection and unavailable paths; the focused origin inventory
+passes 94 tests (182 assertions). Operational 503 errors remain where they represent actual
+failures; no readiness 503 or legacy login 410 remains in runtime handlers.
+
+Integration handoff: the single migration precondition call is
+`scripts/migrateTeamAuth.ts:17` (`assertOperatorPreconditions`, definition line 7, lock marker line 8).
+Replace that call with the fix-round-5 shared operator lock acquire/release before auth startup,
+then rerun F1/F2 rejection probes and these checks after merging both branches. Merge the recovery
+bootstrap option with that round's recovery lock integration. Protected overlap is **none**:
+`lib/userProvisioning.ts`, `lib/userLifecycle.ts`, `lib/db/userProvisioning.ts`,
+`lib/db/userLifecycle.ts`, and `app/api/admin/**` were not changed. Slice 7 must replace the retained
+LoginOverlay shell import, consume the active BA endpoints and final missing-mailbox 404, reconcile
+the parallel signup DTO fix, and perform canonical phone/PWA acceptance. Actual reverse-proxy log
+chain, tailnet DNS, mailprovider renewal and application-wide restore remain deployment/Stage 4 evidence.
