@@ -62,7 +62,7 @@ describe("sanitizeAccountForClient — DeepL key exposure", () => {
     const account = buildAccount({
       deepl: { apiKey: "secret-key:fx", enabled: true, targetLang: "DE" }
     });
-    const sanitized = sanitizeAccountForClient(account);
+    const sanitized = sanitizeAccountForClient(account, { role: "manager", viewerUserId: "synthetic", memberCount: 1 });
     expect(sanitized.deepl?.apiKey).toBe("");
     expect(sanitized.deepl?.hasApiKey).toBe(true);
     // Non-secret fields still reach the client.
@@ -72,13 +72,13 @@ describe("sanitizeAccountForClient — DeepL key exposure", () => {
 
   test("reports no key when the config has none", () => {
     const account = buildAccount({ deepl: { enabled: false, targetLang: "EN-US" } });
-    const sanitized = sanitizeAccountForClient(account);
+    const sanitized = sanitizeAccountForClient(account, { role: "manager", viewerUserId: "synthetic", memberCount: 1 });
     expect(sanitized.deepl?.apiKey).toBe("");
     expect(sanitized.deepl?.hasApiKey).toBe(false);
   });
 
   test("leaves an absent config undefined", () => {
-    const sanitized = sanitizeAccountForClient(buildAccount());
+    const sanitized = sanitizeAccountForClient(buildAccount(), { role: "manager", viewerUserId: "synthetic", memberCount: 1 });
     expect(sanitized.deepl).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 // @ts-expect-error bun:test is provided by the runner and is absent from this tsconfig.
 import { describe, expect, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { saveAttachmentData } from "@/lib/storage";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { ATTACHMENT_CACHE_CONTROL, ifNoneMatchMatches } from "./route";
@@ -69,18 +69,15 @@ function buildMessage(accountId: string, folderId: string, attachmentId: string)
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-attachment-route",
-    accountId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
-
-function attachmentRequest(accountId: string, messageId: string, attachmentId: string, headers?: HeadersInit) {
-  const url = `http://localhost/api/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}`;
-  return GET(new Request(url, { headers: { cookie: buildCookieHeader(accountId), ...headers } }), {
+function attachmentRequest(
+  cookie: string,
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+  headers?: HeadersInit
+) {
+  const url = `http://localhost:3000/api/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}`;
+  return GET(new Request(url, { headers: { cookie, ...headers } }), {
     params: Promise.resolve({ accountId, messageId, attachmentId })
   });
 }
@@ -106,8 +103,9 @@ describe("attachment byte cache", () => {
     await saveFoldersForAccount(accountId, [folder]);
     await upsertMessages(accountId, folder.id, [message], true);
     await saveAttachmentData(accountId, message.id, attachmentId, bytes);
+    const cookie = await authenticatedTestCookie(accountId);
 
-    const first = await attachmentRequest(accountId, message.id, attachmentId);
+    const first = await attachmentRequest(cookie, accountId, message.id, attachmentId);
     expect(first.status).toBe(200);
     expect(first.headers.get("cache-control")).toBe(ATTACHMENT_CACHE_CONTROL);
     expect(first.headers.get("cache-control")).not.toContain("immutable");
@@ -115,7 +113,7 @@ describe("attachment byte cache", () => {
     expect(etag).toMatch(/^"[0-9a-f.]+-[0-9a-f]+"$/i);
     expect(Buffer.from(await first.arrayBuffer())).toEqual(bytes);
 
-    const cached = await attachmentRequest(accountId, message.id, attachmentId, {
+    const cached = await attachmentRequest(cookie, accountId, message.id, attachmentId, {
       "if-none-match": etag ?? ""
     });
     expect(cached.status).toBe(304);
@@ -123,12 +121,12 @@ describe("attachment byte cache", () => {
     expect(cached.headers.get("cache-control")).toBe(ATTACHMENT_CACHE_CONTROL);
     expect(await cached.text()).toBe("");
 
-    const listed = await attachmentRequest(accountId, message.id, attachmentId, {
+    const listed = await attachmentRequest(cookie, accountId, message.id, attachmentId, {
       "if-none-match": `W/"stale", ${etag}`
     });
     expect(listed.status).toBe(304);
 
-    const missed = await attachmentRequest(accountId, message.id, attachmentId, {
+    const missed = await attachmentRequest(cookie, accountId, message.id, attachmentId, {
       "if-none-match": `"0-0"`
     });
     expect(missed.status).toBe(200);
@@ -136,7 +134,7 @@ describe("attachment byte cache", () => {
 
     const rewritten = Buffer.from("hello-image-rewritten");
     await saveAttachmentData(accountId, message.id, attachmentId, rewritten);
-    const afterRewrite = await attachmentRequest(accountId, message.id, attachmentId, {
+    const afterRewrite = await attachmentRequest(cookie, accountId, message.id, attachmentId, {
       "if-none-match": etag ?? ""
     });
     expect(afterRewrite.status).toBe(200);
@@ -153,10 +151,11 @@ describe("attachment byte cache", () => {
     await upsertAccount(buildAccount(accountId));
     await saveFoldersForAccount(accountId, [folder]);
     await upsertMessages(accountId, folder.id, [message], true);
+    const cookie = await authenticatedTestCookie(accountId);
 
-    const previewUrl = `http://localhost/api/accounts/${accountId}/messages/${message.id}/attachments/${attachmentId}?preview=1`;
+    const previewUrl = `http://localhost:3000/api/accounts/${accountId}/messages/${message.id}/attachments/${attachmentId}?preview=1`;
     const preview = await GET(
-      new Request(previewUrl, { headers: { cookie: buildCookieHeader(accountId) } }),
+      new Request(previewUrl, { headers: { cookie } }),
       { params: Promise.resolve({ accountId, messageId: message.id, attachmentId }) }
     );
     expect(preview.status).toBe(200);
@@ -164,7 +163,7 @@ describe("attachment byte cache", () => {
     expect(preview.headers.get("etag")).toBeNull();
     expect(await preview.text()).toContain("<iframe");
 
-    const missing = await attachmentRequest(accountId, message.id, "att-missing");
+    const missing = await attachmentRequest(cookie, accountId, message.id, "att-missing");
     expect(missing.status).toBe(404);
     expect(missing.headers.get("cache-control")).not.toBe(ATTACHMENT_CACHE_CONTROL);
   });

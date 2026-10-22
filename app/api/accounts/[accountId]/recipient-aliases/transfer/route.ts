@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -11,31 +13,36 @@ import {
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const data = await exportRecipientAliasTransferData(accountId);
-  return NextResponse.json({ ok: true, data });
+    const data = await exportRecipientAliasTransferData(accountId);
+    return NextResponse.json({ ok: true, data });
+  });
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;
     data?: unknown;
   } | null;
 
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  try {
-    const summary = await importRecipientAliasTransferData(accountId, body?.data);
-    return NextResponse.json({ ok: true, summary });
-  } catch (error) {
-    const message =
-      error instanceof Error && error.message.trim()
-        ? error.message
-        : "Failed to import recipient aliases data.";
-    return NextResponse.json({ ok: false, message }, { status: 400 });
-  }
+    try {
+      const summary = await importRecipientAliasTransferData(accountId, body?.data);
+      return NextResponse.json({ ok: true, summary });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Failed to import recipient aliases data.";
+      return NextResponse.json({ ok: false, message }, { status: 400 });
+    }
+  });
 }

@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { TOPIC_SUGGESTION_SIGNALS, type TopicSuggestionSignal } from "@/lib/data";
@@ -8,34 +10,37 @@ type Params = AccountRouteParams & {
 };
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { topicId: rawTopicId } = await params;
   const topicId = typeof rawTopicId === "string" ? rawTopicId.trim() : "";
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const body = (await request.json().catch(() => null)) as {
-    signalType?: string;
-    signalValue?: string;
-  } | null;
+    const body = (await request.json().catch(() => null)) as {
+      signalType?: string;
+      signalValue?: string;
+    } | null;
 
-  const signalType = (body?.signalType ?? "").trim() as TopicSuggestionSignal;
-  const signalValue = (body?.signalValue ?? "").trim();
+    const signalType = (body?.signalType ?? "").trim() as TopicSuggestionSignal;
+    const signalValue = (body?.signalValue ?? "").trim();
 
-  if (!topicId) {
-    return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
-  }
-  if (!TOPIC_SUGGESTION_SIGNALS.includes(signalType)) {
-    return NextResponse.json({ ok: false, message: "Invalid signalType" }, { status: 400 });
-  }
-  if (!signalValue) {
-    return NextResponse.json({ ok: false, message: "Missing signalValue" }, { status: 400 });
-  }
+    if (!topicId) {
+      return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
+    }
+    if (!TOPIC_SUGGESTION_SIGNALS.includes(signalType)) {
+      return NextResponse.json({ ok: false, message: "Invalid signalType" }, { status: 400 });
+    }
+    if (!signalValue) {
+      return NextResponse.json({ ok: false, message: "Missing signalValue" }, { status: 400 });
+    }
 
-  const removed = await excludeTopicLearningSignal(accountId, topicId, signalType, signalValue);
-  if (!removed) {
-    return NextResponse.json({ ok: false, message: "Topic not found" }, { status: 404 });
-  }
+    const removed = await excludeTopicLearningSignal(accountId, topicId, signalType, signalValue);
+    if (!removed) {
+      return NextResponse.json({ ok: false, message: "Topic not found" }, { status: 404 });
+    }
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  });
 }

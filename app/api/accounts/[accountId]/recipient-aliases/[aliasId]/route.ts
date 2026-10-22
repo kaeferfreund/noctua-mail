@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin, requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -15,58 +17,64 @@ type Params = AccountRouteParams & {
 };
 
 export async function PUT(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { aliasId: rawAliasId } = await params;
   const aliasId = typeof rawAliasId === "string" ? rawAliasId.trim() : "";
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const body = (await request.json().catch(() => null)) as
-    | {
-        name?: string;
-        recipients?: string;
+    const body = (await request.json().catch(() => null)) as
+      | {
+          name?: string;
+          recipients?: string;
+        }
+      | null;
+    const changes: { name?: string; recipients?: string } = {};
+    if (body?.name !== undefined) {
+      const name = body.name.trim();
+      if (!name) {
+        return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
       }
-    | null;
-  const changes: { name?: string; recipients?: string } = {};
-  if (body?.name !== undefined) {
-    const name = body.name.trim();
-    if (!name) {
-      return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
+      changes.name = name;
     }
-    changes.name = name;
-  }
-  if (body?.recipients !== undefined) {
-    const recipients = body.recipients.trim();
-    if (!recipients) {
-      return NextResponse.json({ ok: false, message: "Missing recipients" }, { status: 400 });
+    if (body?.recipients !== undefined) {
+      const recipients = body.recipients.trim();
+      if (!recipients) {
+        return NextResponse.json({ ok: false, message: "Missing recipients" }, { status: 400 });
+      }
+      changes.recipients = recipients;
     }
-    changes.recipients = recipients;
-  }
 
-  try {
-    const alias = await updateRecipientAlias(accountId, aliasId, changes);
-    if (!alias) {
-      return NextResponse.json({ ok: false, message: "Recipient alias not found" }, { status: 404 });
+    try {
+      const alias = await updateRecipientAlias(accountId, aliasId, changes);
+      if (!alias) {
+        return NextResponse.json({ ok: false, message: "Recipient alias not found" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, alias });
+    } catch (error) {
+      if (error instanceof RecipientAliasConflictError) {
+        return NextResponse.json({ ok: false, message: error.message }, { status: 409 });
+      }
+      throw error;
     }
-    return NextResponse.json({ ok: true, alias });
-  } catch (error) {
-    if (error instanceof RecipientAliasConflictError) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 409 });
-    }
-    throw error;
-  }
+  });
 }
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { aliasId: rawAliasId } = await params;
   const aliasId = typeof rawAliasId === "string" ? rawAliasId.trim() : "";
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const deleted = await deleteRecipientAlias(accountId, aliasId);
-  if (!deleted) {
-    return NextResponse.json({ ok: false, message: "Recipient alias not found" }, { status: 404 });
-  }
-  return NextResponse.json({ ok: true });
+    const deleted = await deleteRecipientAlias(accountId, aliasId);
+    if (!deleted) {
+      return NextResponse.json({ ok: false, message: "Recipient alias not found" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  });
 }

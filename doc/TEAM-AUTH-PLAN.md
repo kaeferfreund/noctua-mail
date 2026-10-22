@@ -234,6 +234,12 @@ stays OFF unless explicitly allowlisted and all canaries pass; mandatory TOTP ga
 
 ### Slice 5 — provisioning, lifecycle and password-reset backend
 
+Implementation status (2026-10-22): provisioning/active-only journals, lifecycle serialization,
+targeted invites, admin/operator handover and anonymous reset policy implemented. Contract and
+verification evidence: `doc/AUTHENTICATION.md` "Slice 5"; fault/contender tests:
+`lib/teamAuthSlice5.test.ts`, HTTP handoff: `app/api/admin/users/route.test.ts`.
+Public `/api/ba` activation remains hardcoded 503 until Slice 6; reset UI remains Slice 7.
+
 Owner: feat/team-auth. Design: §3.1 journals/triggers, §4.3–4.5, §8, §10 recovery/admin.
 Closes S5/S6, F4/F6/F8, I2 (backend), I5, I7; closes reset edge of S4.
 

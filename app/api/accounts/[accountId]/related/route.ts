@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
@@ -14,41 +15,44 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     );
   }
   const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId or relatedId"
   });
   if (context instanceof NextResponse) return context;
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
-  const pageSize = Math.max(1, Math.min(1000, Number(searchParams.get("pageSize") ?? "300") || 300));
-  const groupBy = searchParams.get("groupBy") ?? "date";
-  const badges = searchParams.get("badges")?.split(",").filter(Boolean);
-  const excludedFolderIdsParam = searchParams.get("excludeFolderIds");
-  const excludedFolderIds = excludedFolderIdsParam
-    ? excludedFolderIdsParam.split(",").map((value) => value.trim()).filter(Boolean)
-    : undefined;
-  const attachmentsOnly = searchParams.get("attachments") === "1";
+  return withAuthResponse(context, async () => {
+    const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+    const pageSize = Math.max(1, Math.min(1000, Number(searchParams.get("pageSize") ?? "300") || 300));
+    const groupBy = searchParams.get("groupBy") ?? "date";
+    const badges = searchParams.get("badges")?.split(",").filter(Boolean);
+    const excludedFolderIdsParam = searchParams.get("excludeFolderIds");
+    const excludedFolderIds = excludedFolderIdsParam
+      ? excludedFolderIdsParam.split(",").map((value) => value.trim()).filter(Boolean)
+      : undefined;
+    const attachmentsOnly = searchParams.get("attachments") === "1";
 
-  const data = await listRelatedMessages({
-    accountId: context.accountId,
-    relatedId,
-    page,
-    pageSize,
-    groupBy,
-    badges,
-    attachmentsOnly,
-    excludedFolderIds
-  });
-  await enrichMessagesWithThreadTopics(data.items, {
-    accountId: context.accountId,
-    accountEmail: context.account.email,
-    includeSuggestions: true
-  });
+    const data = await listRelatedMessages({
+      accountId: context.accountId,
+      relatedId,
+      page,
+      pageSize,
+      groupBy,
+      badges,
+      attachmentsOnly,
+      excludedFolderIds
+    });
+    await enrichMessagesWithThreadTopics(data.items, {
+      accountId: context.accountId,
+      accountEmail: context.account.email,
+      includeSuggestions: true
+    });
 
-  return NextResponse.json({
-    items: data.items,
-    groups: data.groups,
-    total: data.total,
-    baseCount: data.baseCount,
-    hasMore: data.hasMore,
-    relatedSubject: data.relatedSubject
+    return NextResponse.json({
+      items: data.items,
+      groups: data.groups,
+      total: data.total,
+      baseCount: data.baseCount,
+      hasMore: data.hasMore,
+      relatedSubject: data.relatedSubject
+    });
   });
 }

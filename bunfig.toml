@@ -1,6 +1,8 @@
 [test]
 preload = ["./lib/testSetupEnv.ts"]
 pathIgnorePatterns = [
+  "tests/browser/**",
+  ".tmp/**",
   ".next/**",
   # DOM tests need happy-dom registered globally, which breaks server-side
   # modules that branch on `typeof window`. Run via `bun run test:dom`.

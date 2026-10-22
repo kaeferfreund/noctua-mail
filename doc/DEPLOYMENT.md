@@ -14,6 +14,8 @@ Quick reference for deploying Noctua Mail in any environment.
 
 ## Required Environment Variables
 
+> Authentication is being migrated to Better Auth; cookie credential mode, sealed sessions, `SESSION_SEAL_KEY`, legacy IMAP login and the Tauri desktop build are no longer available in this fork; see [TEAM-INBOX.md §4](TEAM-INBOX.md#4-authentication) and [TEAM-AUTH-PLAN.md](TEAM-AUTH-PLAN.md). The legacy reference below will be rewritten in slice 6.
+
 | Variable | Description | Example | Required |
 |----------|-------------|---------|----------|
 | `SESSION_SEAL_KEY` | 32-byte hex key for session encryption | `openssl rand -hex 32` | ✅ Yes |

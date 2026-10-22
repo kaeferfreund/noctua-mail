@@ -1,7 +1,7 @@
 // @ts-expect-error bun:test is provided by the runner and is absent from this tsconfig.
 import { describe, expect, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { clampThreadListPageSize } from "./route";
 
@@ -62,15 +62,6 @@ function buildMessage(accountId: string, folderId: string, index: number): Messa
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-thread-list",
-    accountId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
-
 describe("thread list page size", () => {
   test("keeps the default and caps the requested page", () => {
     expect(clampThreadListPageSize(null)).toBe(300);
@@ -94,11 +85,12 @@ describe("thread list page size", () => {
       [buildMessage(accountId, folder.id, 1), buildMessage(accountId, folder.id, 2)],
       true
     );
+    const cookie = await authenticatedTestCookie(accountId);
 
     const response = await GET(
       new Request(
-        `http://localhost/api/accounts/${accountId}/threads?folderId=${encodeURIComponent(folder.id)}&pageSize=-1`,
-        { headers: { cookie: buildCookieHeader(accountId) } }
+        `http://localhost:3000/api/accounts/${accountId}/threads?folderId=${encodeURIComponent(folder.id)}&pageSize=-1`,
+        { headers: { cookie } }
       ),
       { params: Promise.resolve({ accountId }) }
     );

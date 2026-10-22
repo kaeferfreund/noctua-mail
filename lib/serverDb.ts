@@ -7,6 +7,10 @@ function loadServerDb(): Promise<ServerDbModule> {
   return import(SERVER_DB_SPECIFIER);
 }
 
+export async function listAdminAudit(...args: Parameters<ServerDbModule["listAdminAudit"]>) {
+  return (await loadServerDb()).listAdminAudit(...args);
+}
+
 export async function getAccountById(...args: Parameters<ServerDbModule["getAccountById"]>) {
   const db = await loadServerDb();
   return db.getAccountById(...args);
@@ -131,4 +135,44 @@ export async function getAttachmentIds(
 ) {
   const db = await loadServerDb();
   return db.getAttachmentIds(...args);
+}
+
+export async function getUserById(...args: Parameters<ServerDbModule["getUserById"]>) {
+  return (await loadServerDb()).getUserById(...args);
+}
+
+export async function listAccessibleAccountIdsForUser(...args: Parameters<ServerDbModule["listAccessibleAccountIdsForUser"]>) {
+  return (await loadServerDb()).listAccessibleAccountIdsForUser(...args);
+}
+
+export async function deleteSessionProofState(...args: Parameters<ServerDbModule["deleteSessionProofState"]>) {
+  return (await loadServerDb()).deleteSessionProofState(...args);
+}
+
+export async function getUserAccountPrefs(...args: Parameters<ServerDbModule["getUserAccountPrefs"]>) {
+  return (await loadServerDb()).getUserAccountPrefs(...args);
+}
+export async function mergeUserAccountPrefs(...args: Parameters<ServerDbModule["mergeUserAccountPrefs"]>) {
+  return (await loadServerDb()).mergeUserAccountPrefs(...args);
+}
+export async function recordAdminAudit(...args: Parameters<ServerDbModule["recordAdminAudit"]>) {
+  return (await loadServerDb()).recordAdminAudit(...args);
+}
+
+export { AccountDeletionForbiddenError } from "./db/accounts";
+export async function deleteAccountControlPlane(...args: Parameters<ServerDbModule["deleteAccountControlPlane"]>) {
+  return (await loadServerDb()).deleteAccountControlPlane(...args);
+}
+
+export async function getLatestMessageUid(...args: Parameters<ServerDbModule["getLatestMessageUid"]>) {
+  return (await loadServerDb()).getLatestMessageUid(...args);
+}
+export async function getMailboxState(...args: Parameters<ServerDbModule["getMailboxState"]>) {
+  return (await loadServerDb()).getMailboxState(...args);
+}
+export async function saveMailboxState(...args: Parameters<ServerDbModule["saveMailboxState"]>) {
+  return (await loadServerDb()).saveMailboxState(...args);
+}
+export async function deleteMessageByFolderUid(...args: Parameters<ServerDbModule["deleteMessageByFolderUid"]>) {
+  return (await loadServerDb()).deleteMessageByFolderUid(...args);
 }

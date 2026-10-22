@@ -1,17 +1,25 @@
-import type { Account } from "@/lib/data";
+import type { Account, AccountRole } from "@/lib/data";
 
-export function sanitizeAccountForClient(account: Account): Account {
+export function sanitizeAccountForClient(account: Account, options: { role: AccountRole; viewerUserId: string; memberCount: number }): Account {
+  const manager = options.role === "manager";
   return {
     ...account,
+    accessRole: options.role,
+    isOwner: account.ownerUserId === options.viewerUserId,
+    shared: options.memberCount > 1,
     imap: {
       ...account.imap,
+      host: manager ? account.imap.host : "",
+      user: manager ? account.imap.user : "",
       password: ""
     },
     smtp: {
       ...account.smtp,
+      host: manager ? account.smtp.host : "",
+      user: manager ? account.smtp.user : "",
       password: ""
     },
-    caldav: account.caldav
+    caldav: manager && account.caldav
       ? {
           ...account.caldav,
           password: ""
@@ -19,16 +27,18 @@ export function sanitizeAccountForClient(account: Account): Account {
       : undefined,
     deepl: account.deepl
       ? {
-          ...account.deepl,
+          enabled: account.deepl.enabled,
+          targetLang: account.deepl.targetLang,
           // Never send the DeepL key to the browser; expose only whether one
           // is stored so the settings UI can show a "configured" state.
-          apiKey: "",
-          hasApiKey: Boolean(account.deepl.apiKey && account.deepl.apiKey.trim())
+          ...(manager ? { apiKey: "", hasApiKey: Boolean(account.deepl.apiKey && account.deepl.apiKey.trim()) } : {})
         }
       : undefined
   };
 }
 
-export function sanitizeAccountsForClient(accounts: Account[]) {
-  return accounts.map((account) => sanitizeAccountForClient(account));
+export async function sanitizeAccountsForClient(userId: string) {
+  const { listAccessibleAccountsForUser } = await import("./accountAccess");
+  return (await listAccessibleAccountsForUser(userId)).map(({ account, role, memberCount }) =>
+    sanitizeAccountForClient(account, { role, viewerUserId: userId, memberCount }));
 }

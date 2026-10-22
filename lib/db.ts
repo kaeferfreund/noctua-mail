@@ -117,6 +117,7 @@ export {
 
 export {
   deleteAccountControlPlane,
+  AccountDeletionForbiddenError,
   getAccountById,
   getAccounts,
   getAccountsForUser,
@@ -133,16 +134,39 @@ export {
 
 export {
   addUserAccountLink,
+  deleteUser,
+  deleteUserAccountLinksForUser,
+  getUserAccountRole,
   getUserAccounts,
   getUserById,
   getUsers,
   listAccessibleAccountIdsForUser,
-  saveUserAccounts,
-  saveUsers
+  listUserAccountLinks,
+  listUserAccountLinksForUser,
+  normalizeUserEmail,
+  removeUserAccountLink,
+  setUserAccountRole,
+  type UserRole
 } from "./db/users";
 
 export {
+  deleteUserAccountPrefsForAccount,
+  deleteUserAccountPrefsForUser,
+  getUserAccountPrefs,
+  mergeUserAccountPrefs
+} from "./db/userAccountPrefs";
+
+export {
+  ADMIN_AUDIT_DEFAULT_LIMIT,
+  ADMIN_AUDIT_MAX_LIMIT,
+  listAdminAudit,
+  recordAdminAudit,
+  type AdminAuditInput
+} from "./db/adminAudit";
+
+export {
   deleteMcpToken,
+  deleteMcpTokensForUser,
   getMcpTokenByHash,
   insertMcpToken,
   listMcpTokens,
@@ -401,3 +425,5 @@ export function listCalendarInviteSourceMessagesByEventUid(
 ): ReturnType<typeof _listCalendarInviteSourceMessagesByEventUidImpl> {
   return _listCalendarInviteSourceMessagesByEventUidImpl(...args);
 }
+
+export { deleteSessionProofState } from "./db/authPolicy";

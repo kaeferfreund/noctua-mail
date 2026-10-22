@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getCalendarEventById,
@@ -35,23 +37,27 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({ ok: false, message: "Missing or invalid startMs/endMs" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  try {
-    if (eventUid) {
-      const event = await getCalendarEventByUid(accountId, eventUid);
-      return NextResponse.json({ ok: true, event });
+  return withAuthResponse(accountContext, async () => {
+    try {
+      if (eventUid) {
+        const event = await getCalendarEventByUid(accountId, eventUid);
+        return NextResponse.json({ ok: true, event });
+      }
+      const events = await listCalendarEvents(accountId, startMs, endMs);
+      return NextResponse.json({ ok: true, items: events });
+    } catch (err) {
+      console.error("[calendar/events] GET error:", err);
+      return NextResponse.json({ ok: false, message: "Failed to list events" }, { status: 500 });
     }
-    const events = await listCalendarEvents(accountId, startMs, endMs);
-    return NextResponse.json({ ok: true, items: events });
-  } catch (err) {
-    console.error("[calendar/events] GET error:", err);
-    return NextResponse.json({ ok: false, message: "Failed to list events" }, { status: 500 });
-  }
+  });
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
     accountId?: string;
   } | null;
@@ -60,84 +66,88 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  const summary = String(body?.summary ?? "").trim();
-  if (!summary) {
-    return NextResponse.json({ ok: false, message: "Missing summary" }, { status: 400 });
-  }
-  const startAtMs = toFiniteNumber(body?.startAtMs);
-  if (!Number.isFinite(startAtMs)) {
-    return NextResponse.json({ ok: false, message: "Missing or invalid startAtMs" }, { status: 400 });
-  }
-  const now = Date.now();
-  const isNew = !body?.id?.trim();
-  const existingId = body?.id?.trim() ?? "";
-  const eventUid = body?.eventUid?.trim() || generateId();
+  return withAuthResponse(accountContext, async () => {
+    const summary = String(body?.summary ?? "").trim();
+    if (!summary) {
+      return NextResponse.json({ ok: false, message: "Missing summary" }, { status: 400 });
+    }
+    const startAtMs = toFiniteNumber(body?.startAtMs);
+    if (!Number.isFinite(startAtMs)) {
+      return NextResponse.json({ ok: false, message: "Missing or invalid startAtMs" }, { status: 400 });
+    }
+    const now = Date.now();
+    const isNew = !body?.id?.trim();
+    const existingId = body?.id?.trim() ?? "";
+    const eventUid = body?.eventUid?.trim() || generateId();
 
-  // `existingId` is the calendar_events row id (reused as `event.id` below),
-  // so the lookup must be by-id. Using getCalendarEventByUid here would
-  // only ever hit for the edge case of id === eventUid and silently break
-  // snapshot-fallback when the POST body updates an existing event.
-  const existing = existingId ? await getCalendarEventById(accountId, existingId) : null;
-  const resolvedMessageId = body?.messageId?.trim() || undefined;
-  const freshSnapshot =
-    isNew && resolvedMessageId
-      ? await buildCalendarEventEmailSnapshotFromMessageId(accountId, resolvedMessageId)
-      : null;
+    // `existingId` is the calendar_events row id (reused as `event.id` below),
+    // so the lookup must be by-id. Using getCalendarEventByUid here would
+    // only ever hit for the edge case of id === eventUid and silently break
+    // snapshot-fallback when the POST body updates an existing event.
+    const existing = existingId ? await getCalendarEventById(accountId, existingId) : null;
+    const resolvedMessageId = body?.messageId?.trim() || undefined;
+    const freshSnapshot =
+      isNew && resolvedMessageId
+        ? await buildCalendarEventEmailSnapshotFromMessageId(accountId, resolvedMessageId)
+        : null;
 
-  const event: CalendarEvent = {
-    id: existingId || generateId(),
-    accountId,
-    calendarId: body?.calendarId?.trim() || undefined,
-    eventUid,
-    summary,
-    description: body?.description?.trim() || undefined,
-    location: body?.location?.trim() || undefined,
-    startAtMs,
-    endAtMs: toFiniteNumber(body?.endAtMs) || undefined,
-    allDay: Boolean(body?.allDay),
-    startTimezone: body?.startTimezone?.trim() || undefined,
-    endTimezone: body?.endTimezone?.trim() || undefined,
-    recurrenceRule: body?.recurrenceRule?.trim() || undefined,
-    recurrenceDates: toPositiveNumberArray(body?.recurrenceDates),
-    excludedDates: toPositiveNumberArray(body?.excludedDates),
-    status: body?.status?.trim() || undefined,
-    organizer: body?.organizer?.trim() || undefined,
-    attendees: body?.attendees ?? undefined,
-    myPartstat: body?.myPartstat ?? undefined,
-    myPartstatUpdatedAtMs: toFiniteNumber(body?.myPartstatUpdatedAtMs) || undefined,
-    myAttendeeEmail: body?.myAttendeeEmail?.trim() || undefined,
-    replyRequested: body?.replyRequested === undefined ? undefined : Boolean(body.replyRequested),
-    remoteEtag: body?.remoteEtag?.trim() || undefined,
-    remoteHref: body?.remoteHref?.trim() || undefined,
-    rawIcs: body?.rawIcs ?? undefined,
-    sourceType: (body?.sourceType as CalendarEventSourceType) ?? "local",
-    messageId: resolvedMessageId,
-    sourceSubject: freshSnapshot?.sourceSubject ?? existing?.sourceSubject,
-    sourceFromAddr: freshSnapshot?.sourceFromAddr ?? existing?.sourceFromAddr,
-    sourceToAddr: freshSnapshot?.sourceToAddr ?? existing?.sourceToAddr,
-    sourceCcAddr: freshSnapshot?.sourceCcAddr ?? existing?.sourceCcAddr,
-    sourceBccAddr: freshSnapshot?.sourceBccAddr ?? existing?.sourceBccAddr,
-    sourceDateMs: freshSnapshot?.sourceDateMs ?? existing?.sourceDateMs,
-    sourceBodyText: freshSnapshot?.sourceBodyText ?? existing?.sourceBodyText,
-    sourceBodyHtml: freshSnapshot?.sourceBodyHtml ?? existing?.sourceBodyHtml,
-    createdAtMs: existing?.createdAtMs ?? now,
-    updatedAtMs: now,
-    deletedAtMs: undefined
-  };
+    const event: CalendarEvent = {
+      id: existingId || generateId(),
+      accountId,
+      calendarId: body?.calendarId?.trim() || undefined,
+      eventUid,
+      summary,
+      description: body?.description?.trim() || undefined,
+      location: body?.location?.trim() || undefined,
+      startAtMs,
+      endAtMs: toFiniteNumber(body?.endAtMs) || undefined,
+      allDay: Boolean(body?.allDay),
+      startTimezone: body?.startTimezone?.trim() || undefined,
+      endTimezone: body?.endTimezone?.trim() || undefined,
+      recurrenceRule: body?.recurrenceRule?.trim() || undefined,
+      recurrenceDates: toPositiveNumberArray(body?.recurrenceDates),
+      excludedDates: toPositiveNumberArray(body?.excludedDates),
+      status: body?.status?.trim() || undefined,
+      organizer: body?.organizer?.trim() || undefined,
+      attendees: body?.attendees ?? undefined,
+      myPartstat: body?.myPartstat ?? undefined,
+      myPartstatUpdatedAtMs: toFiniteNumber(body?.myPartstatUpdatedAtMs) || undefined,
+      myAttendeeEmail: body?.myAttendeeEmail?.trim() || undefined,
+      replyRequested: body?.replyRequested === undefined ? undefined : Boolean(body.replyRequested),
+      remoteEtag: body?.remoteEtag?.trim() || undefined,
+      remoteHref: body?.remoteHref?.trim() || undefined,
+      rawIcs: body?.rawIcs ?? undefined,
+      sourceType: (body?.sourceType as CalendarEventSourceType) ?? "local",
+      messageId: resolvedMessageId,
+      sourceSubject: freshSnapshot?.sourceSubject ?? existing?.sourceSubject,
+      sourceFromAddr: freshSnapshot?.sourceFromAddr ?? existing?.sourceFromAddr,
+      sourceToAddr: freshSnapshot?.sourceToAddr ?? existing?.sourceToAddr,
+      sourceCcAddr: freshSnapshot?.sourceCcAddr ?? existing?.sourceCcAddr,
+      sourceBccAddr: freshSnapshot?.sourceBccAddr ?? existing?.sourceBccAddr,
+      sourceDateMs: freshSnapshot?.sourceDateMs ?? existing?.sourceDateMs,
+      sourceBodyText: freshSnapshot?.sourceBodyText ?? existing?.sourceBodyText,
+      sourceBodyHtml: freshSnapshot?.sourceBodyHtml ?? existing?.sourceBodyHtml,
+      createdAtMs: existing?.createdAtMs ?? now,
+      updatedAtMs: now,
+      deletedAtMs: undefined
+    };
 
-  try {
-    await upsertCalendarEvent(accountId, event);
-    return NextResponse.json({ ok: true, event, created: isNew });
-  } catch (err) {
-    console.error("[calendar/events] POST error:", err);
-    return NextResponse.json({ ok: false, message: "Failed to save event" }, { status: 500 });
-  }
+    try {
+      await upsertCalendarEvent(accountId, event);
+      return NextResponse.json({ ok: true, event, created: isNew });
+    } catch (err) {
+      console.error("[calendar/events] POST error:", err);
+      return NextResponse.json({ ok: false, message: "Failed to save event" }, { status: 500 });
+    }
+  });
 }
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;
     eventId?: string;
@@ -148,17 +158,20 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  try {
-    const result = await deleteCalendarEventAndRelatedData({ accountId, eventId });
-    if (!result.deleted) {
-      return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+  return withAuthResponse(accountContext, async () => {
+    try {
+      const result = await deleteCalendarEventAndRelatedData({ accountId, eventId });
+      if (!result.deleted) {
+        return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true });
+    } catch (err) {
+      console.error("[calendar/events] DELETE error:", err);
+      return NextResponse.json({ ok: false, message: "Failed to delete event" }, { status: 500 });
     }
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[calendar/events] DELETE error:", err);
-    return NextResponse.json({ ok: false, message: "Failed to delete event" }, { status: 500 });
-  }
+  });
 }

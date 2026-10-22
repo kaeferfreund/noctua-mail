@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 import {
@@ -22,6 +24,7 @@ type MovePayload = {
 };
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json().catch(() => null)) as MovePayload | null;
   const accountId = await getAccountIdFromParams(params);
   const destinationFolderId = payload?.destinationFolderId?.trim() ?? "";
@@ -39,78 +42,80 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   ) {
     return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
-  const { clientId } = accountContext;
+  return withAuthResponse(accountContext, async () => {
+    const { clientId } = accountContext;
 
-  const folders = await getFolders(accountId);
-  const destinationFolder = folders.find((folder) => folder.id === destinationFolderId);
-  if (!destinationFolder) {
-    return NextResponse.json(
-      { ok: false, message: "Destination folder not found" },
-      { status: 404 }
-    );
-  }
+    const folders = await getFolders(accountId);
+    const destinationFolder = folders.find((folder) => folder.id === destinationFolderId);
+    if (!destinationFolder) {
+      return NextResponse.json(
+        { ok: false, message: "Destination folder not found" },
+        { status: 404 }
+      );
+    }
 
-  const destinationMailbox = folderMailboxPath(destinationFolder, accountId);
-  const excludedFolderIds =
-    sourceFolderId
-      ? []
-      : [
-          findSentFolder(folders, accountId)?.id ?? "",
-          findDraftsFolder(folders, accountId)?.id ?? ""
-        ].filter(Boolean);
-  const threadMessageIds = normalizedThreadId
-    ? await getThreadMessageIdsForMove({
-        accountId,
-        threadId: normalizedThreadId,
-        sourceFolderId: sourceFolderId || null,
-        excludedFolderIds
-      })
-    : [];
-  const targetMessageIds = Array.from(new Set([...messageIds, ...threadMessageIds]));
-  if (targetMessageIds.length === 0) {
+    const destinationMailbox = folderMailboxPath(destinationFolder, accountId);
+    const excludedFolderIds =
+      sourceFolderId
+        ? []
+        : [
+            findSentFolder(folders, accountId)?.id ?? "",
+            findDraftsFolder(folders, accountId)?.id ?? ""
+          ].filter(Boolean);
+    const threadMessageIds = normalizedThreadId
+      ? await getThreadMessageIdsForMove({
+          accountId,
+          threadId: normalizedThreadId,
+          sourceFolderId: sourceFolderId || null,
+          excludedFolderIds
+        })
+      : [];
+    const targetMessageIds = Array.from(new Set([...messageIds, ...threadMessageIds]));
+    if (targetMessageIds.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        queued: false,
+        destinationFolderId,
+        destinationMailbox,
+        moved: 0,
+        movedIds: [],
+        undoTargets: []
+      });
+    }
+    const staged = await stageMessageMoves({
+      accountId,
+      messageIds: targetMessageIds,
+      destinationFolderId,
+      destinationMailboxPath: destinationMailbox
+    });
+    if (staged.length > 0) {
+      enqueueMessageMoveJobs(
+        staged.map((item) => ({
+          ...item,
+          accountId,
+          clientId
+        }))
+      );
+    }
+    const movedIds = staged.map((item) => ({
+      previousId: item.messageId,
+      nextId: item.messageId
+    }));
+    const undoTargets = staged.map((item) => ({
+      messageId: item.messageId,
+      restoreFolderId: item.sourceFolderId
+    }));
+
     return NextResponse.json({
       ok: true,
-      queued: false,
+      queued: staged.length > 0,
       destinationFolderId,
       destinationMailbox,
-      moved: 0,
-      movedIds: [],
-      undoTargets: []
+      moved: movedIds.length,
+      movedIds,
+      undoTargets
     });
-  }
-  const staged = await stageMessageMoves({
-    accountId,
-    messageIds: targetMessageIds,
-    destinationFolderId,
-    destinationMailboxPath: destinationMailbox
-  });
-  if (staged.length > 0) {
-    enqueueMessageMoveJobs(
-      staged.map((item) => ({
-        ...item,
-        accountId,
-        clientId
-      }))
-    );
-  }
-  const movedIds = staged.map((item) => ({
-    previousId: item.messageId,
-    nextId: item.messageId
-  }));
-  const undoTargets = staged.map((item) => ({
-    messageId: item.messageId,
-    restoreFolderId: item.sourceFolderId
-  }));
-
-  return NextResponse.json({
-    ok: true,
-    queued: staged.length > 0,
-    destinationFolderId,
-    destinationMailbox,
-    moved: movedIds.length,
-    movedIds,
-    undoTargets
   });
 }

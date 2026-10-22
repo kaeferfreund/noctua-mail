@@ -17,6 +17,7 @@ import {
   initMasterSchema
 } from "./schema";
 import { ensureTopicLearningRuntimeData } from "./topics";
+import { withDbWriteRetry } from "../dbWriteRetry";
 
 const sqliteModulePromise = () => import("bun:sqlite" /* webpackIgnore: true */);
 let DatabaseCtor: any | null = null;
@@ -62,10 +63,24 @@ async function ensureDatabaseCtor() {
   }
 }
 
-function configureDb(db: any) {
+export function configureDb(db: any, busyTimeoutMs = 15000) {
   db.exec("PRAGMA journal_mode = WAL;");
-  db.exec("PRAGMA busy_timeout = 15000;");
+  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");
+}
+
+let authDbInstance: any | null = null;
+let connectionGeneration = 0;
+export function getDbConnectionGeneration() { return connectionGeneration; }
+
+/** Separate writer: never let Noctua writes join an awaited adapter transaction. */
+export async function getAuthDb() {
+  await getDb();
+  if (!authDbInstance) {
+    authDbInstance = new DatabaseCtor(getMainDbPath());
+    configureDb(authDbInstance, 0);
+  }
+  return authDbInstance;
 }
 
 function ensureDbParentDir(dbPath: string) {
@@ -152,6 +167,11 @@ function scheduleAccountDbIdleClose(dbPath: string) {
 }
 
 export function closeAllDbConnections() {
+  connectionGeneration++;
+  if (authDbInstance) {
+    try { authDbInstance.close(); } catch { /* Already closed during shutdown. */ }
+    authDbInstance = null;
+  }
   const accountPaths = Array.from(accountDbInstances.keys());
   accountPaths.forEach((dbPath) => closeAccountDbConnection(dbPath));
   if (masterDbInstance) {
@@ -177,10 +197,12 @@ export async function getDb() {
   registerDbShutdownHooks();
   if (!masterDbInstance) {
     await ensureDatabaseCtor();
+    // A concurrent startup may have opened the handle during the import.
+    if (masterDbInstance) return masterDbInstance;
     const dbPath = getMainDbPath();
     ensureDbParentDir(dbPath);
     masterDbInstance = new DatabaseCtor(dbPath);
-    configureDb(masterDbInstance);
+    configureDb(masterDbInstance, 0);
     if (!startupStoragePathLogged) {
       console.info("[startup] opened storage", {
         dataDir: getDataDir(),
@@ -212,8 +234,13 @@ async function resolveAccountDbPath(accountId: string) {
   if (row.dbPath && row.dbPath.trim().length > 0) {
     return row.dbPath;
   }
-  master.prepare(`UPDATE accounts SET dbPath = ? WHERE id = ?`).run(defaultPath, accountId);
-  return defaultPath;
+  return withDbWriteRetry("resolveAccountDbPath", () => master.transaction(() => {
+    master.prepare(`UPDATE accounts SET dbPath = ? WHERE id = ? AND (dbPath IS NULL OR trim(dbPath) = '')`)
+      .run(defaultPath, accountId);
+    const current = master.prepare(`SELECT dbPath FROM accounts WHERE id = ?`).get(accountId) as
+      { dbPath?: string | null } | undefined;
+    return current?.dbPath?.trim() ? current.dbPath : defaultPath;
+  }).immediate());
 }
 
 export async function getAccountDb(accountId: string) {

@@ -1,18 +1,13 @@
 import crypto from "crypto";
 
 const SECRET_KEY = process.env.IMAP_SECRET_KEY ?? "";
-const IMAP_CREDENTIALS_STORAGE = (process.env.IMAP_CREDENTIALS_STORAGE ?? "both").toLowerCase();
-const STORE_IN_DB =
-  IMAP_CREDENTIALS_STORAGE === "db" || IMAP_CREDENTIALS_STORAGE === "both";
-const STORE_IN_COOKIE =
-  IMAP_CREDENTIALS_STORAGE === "cookie" || IMAP_CREDENTIALS_STORAGE === "both";
-
 const hasKey = SECRET_KEY.length >= 32;
+const MISSING_KEY_MESSAGE = "IMAP_SECRET_KEY must be at least 32 characters for encrypted database credentials.";
 
-const MISSING_KEY_MESSAGE =
-  "IMAP_SECRET_KEY must be at least 32 characters when IMAP_CREDENTIALS_STORAGE " +
-  "includes database storage ('db' or 'both'). Set a strong key, or set " +
-  "IMAP_CREDENTIALS_STORAGE=cookie to skip DB storage.";
+function assertCredentialMode() {
+  const mode = process.env.IMAP_CREDENTIALS_STORAGE?.trim().toLowerCase() || "db";
+  if (mode !== "db" && mode !== "both") throw new Error("IMAP_CREDENTIALS_STORAGE must be db (both is a deprecated alias); cookie storage is unsupported.");
+}
 
 // Called once from instrumentation.ts when the server boots. Throwing here
 // fails the server start-up so a misconfigured deployment cannot silently
@@ -20,7 +15,8 @@ const MISSING_KEY_MESSAGE =
 // throw-on-use guards as defense-in-depth for any code path that doesn't
 // go through the instrumentation hook (tests, scripts, workers).
 export function assertImapSecretKeyConfigured(): void {
-  if (STORE_IN_DB && !hasKey) {
+  assertCredentialMode();
+  if (!hasKey) {
     throw new Error(MISSING_KEY_MESSAGE);
   }
 }
@@ -32,14 +28,6 @@ function getKey(): Buffer {
       : crypto.createHash("sha256").update(SECRET_KEY).digest("hex"),
     "hex"
   );
-}
-
-export function shouldStorePasswordInDb() {
-  return STORE_IN_DB;
-}
-
-export function shouldIncludeSessionCredentials() {
-  return STORE_IN_COOKIE;
 }
 
 function looksLikeEncryptedPayload(value: string): boolean {
@@ -55,7 +43,7 @@ function looksLikeEncryptedPayload(value: string): boolean {
 
 export function encodeSecret(value: string): string {
   if (!value) return "";
-  if (!STORE_IN_DB) return "";
+  assertCredentialMode();
   if (looksLikeEncryptedPayload(value)) return value;
   if (!hasKey) throw new Error(MISSING_KEY_MESSAGE);
   const iv = crypto.randomBytes(12);
@@ -77,7 +65,7 @@ function decryptPayload(payload: Buffer): string {
 
 export function decodeSecret(value: string | null | undefined): string {
   if (!value) return "";
-  if (!STORE_IN_DB) return "";
+  assertCredentialMode();
   if (!value.startsWith("enc:")) return value;
   if (!hasKey) throw new Error(MISSING_KEY_MESSAGE);
   let decoded: string;

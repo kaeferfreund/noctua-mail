@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -63,6 +65,7 @@ export function resolveCalendarReplyThreadHeaders(sourceMessage?: {
 }
 
 export async function POST(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json().catch(() => null)) as
     | {
         accountId?: string;
@@ -79,151 +82,154 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  const partstat = normalizeCalendarParticipationStatus(payload?.partstat);
-  const scope: CalendarParticipationScope =
-    payload?.scope === "occurrence" ? "occurrence" : "series";
-  const sendReply = payload?.sendReply !== false;
-  const occurrenceStartAtMs = toFiniteNumber(payload?.occurrenceStartAtMs);
-  if (partstat !== "ACCEPTED" && partstat !== "DECLINED" && partstat !== "TENTATIVE") {
-    return NextResponse.json({ ok: false, message: "Invalid RSVP response" }, { status: 400 });
-  }
+    const partstat = normalizeCalendarParticipationStatus(payload?.partstat);
+    const scope: CalendarParticipationScope =
+      payload?.scope === "occurrence" ? "occurrence" : "series";
+    const sendReply = payload?.sendReply !== false;
+    const occurrenceStartAtMs = toFiniteNumber(payload?.occurrenceStartAtMs);
+    if (partstat !== "ACCEPTED" && partstat !== "DECLINED" && partstat !== "TENTATIVE") {
+      return NextResponse.json({ ok: false, message: "Invalid RSVP response" }, { status: 400 });
+    }
 
-  const event = await getCalendarEventById(accountId, eventId);
-  if (!event) {
-    return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
-  }
+    const event = await getCalendarEventById(accountId, eventId);
+    if (!event) {
+      return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+    }
 
-  try {
-    let attendeeEmail = event.myAttendeeEmail;
-    const effectiveScope: CalendarParticipationScope =
-      scope === "occurrence" &&
-      Boolean(event.recurrenceRule?.trim()) &&
-      Number.isFinite(occurrenceStartAtMs)
-        ? "occurrence"
-        : "series";
+    try {
+      let attendeeEmail = event.myAttendeeEmail;
+      const effectiveScope: CalendarParticipationScope =
+        scope === "occurrence" &&
+        Boolean(event.recurrenceRule?.trim()) &&
+        Number.isFinite(occurrenceStartAtMs)
+          ? "occurrence"
+          : "series";
 
-    if (sendReply) {
-      const sourceMessageRowId = resolveCalendarReplySourceMessageRowId({
-        event,
-        scope: effectiveScope,
-        occurrenceStartAtMs: effectiveScope === "occurrence" ? occurrenceStartAtMs : undefined
-      });
-      const sourceMessage = sourceMessageRowId
-        ? await getMessageById(accountId, sourceMessageRowId)
-        : null;
-      const reply = buildCalendarReplyPayload(
-        accountContext.account,
-        event,
-        partstat as CalendarParticipationStatus,
-        {
+      if (sendReply) {
+        const sourceMessageRowId = resolveCalendarReplySourceMessageRowId({
+          event,
           scope: effectiveScope,
-          occurrenceStartAtMs:
-            effectiveScope === "occurrence" ? occurrenceStartAtMs : undefined
-        }
-      );
-      attendeeEmail = reply.attendeeEmail;
-      const threadHeaders = resolveCalendarReplyThreadHeaders(sourceMessage);
-      const result = await sendSmtpMessage(accountContext.account, {
-        to: reply.to,
-        subject: reply.subject,
-        text: reply.text,
-        inReplyTo: threadHeaders.inReplyTo,
-        references: threadHeaders.references,
-        attachments: [
+          occurrenceStartAtMs: effectiveScope === "occurrence" ? occurrenceStartAtMs : undefined
+        });
+        const sourceMessage = sourceMessageRowId
+          ? await getMessageById(accountId, sourceMessageRowId)
+          : null;
+        const reply = buildCalendarReplyPayload(
+          accountContext.account,
+          event,
+          partstat as CalendarParticipationStatus,
           {
-            filename: "invite-reply.ics",
-            contentType: "text/calendar; method=REPLY; charset=UTF-8",
-            content: Buffer.from(reply.ics, "utf8")
+            scope: effectiveScope,
+            occurrenceStartAtMs:
+              effectiveScope === "occurrence" ? occurrenceStartAtMs : undefined
           }
-        ]
-      });
-
-      const folders = await getFolders(accountId);
-      const sentFolder = findSentFolder(folders, accountId);
-      const sentMailbox = sentFolder ? folderMailboxPath(sentFolder, accountId) : null;
-      if (sentMailbox) {
-        try {
-          await appendImapMessage(accountContext.account, sentMailbox, result.raw, ["\\Seen"], accountContext.clientId);
-        } catch {
-          // ignore append failures
-        }
-      }
-    }
-
-    let updatedEvent = event;
-    if (effectiveScope === "series") {
-      updatedEvent = {
-        ...event,
-        myPartstat: partstat,
-        myPartstatUpdatedAtMs: Date.now(),
-        myAttendeeEmail: attendeeEmail,
-        // Write the PARTSTAT back to the user's own CalDAV copy on next sync.
-        pendingRemoteSync:
-          event.sourceType === "caldav" && event.remoteHref ? Date.now() : event.pendingRemoteSync,
-        updatedAtMs: Date.now()
-      };
-      await upsertCalendarEvent(accountId, updatedEvent);
-      if (Number.isFinite(occurrenceStartAtMs)) {
-        await deleteCalendarParticipationOverrideForOccurrence(
-          accountId,
-          event.eventUid,
-          occurrenceStartAtMs
         );
+        attendeeEmail = reply.attendeeEmail;
+        const threadHeaders = resolveCalendarReplyThreadHeaders(sourceMessage);
+        const result = await sendSmtpMessage(accountContext.account, {
+          to: reply.to,
+          subject: reply.subject,
+          text: reply.text,
+          inReplyTo: threadHeaders.inReplyTo,
+          references: threadHeaders.references,
+          attachments: [
+            {
+              filename: "invite-reply.ics",
+              contentType: "text/calendar; method=REPLY; charset=UTF-8",
+              content: Buffer.from(reply.ics, "utf8")
+            }
+          ]
+        });
+
+        const folders = await getFolders(accountId);
+        const sentFolder = findSentFolder(folders, accountId);
+        const sentMailbox = sentFolder ? folderMailboxPath(sentFolder, accountId) : null;
+        if (sentMailbox) {
+          try {
+            await appendImapMessage(accountContext.account, sentMailbox, result.raw, ["\\Seen"], accountContext.clientId);
+          } catch {
+            // ignore append failures
+          }
+        }
       }
-    } else {
-      await upsertCalendarParticipationOverride(accountId, {
-        eventUid: event.eventUid,
-        occurrenceStartAtMs: occurrenceStartAtMs!,
-        partstat,
-        attendeeEmail
-      });
-    }
 
-    const participation = await resolveCalendarParticipation(
-      accountId,
-      event.id,
-      Number.isFinite(occurrenceStartAtMs) ? occurrenceStartAtMs : undefined
-    );
-
-    let inviteProcessing:
-      | {
-          processedAtMs: number;
-          processedAutomatically: false;
+      let updatedEvent = event;
+      if (effectiveScope === "series") {
+        updatedEvent = {
+          ...event,
+          myPartstat: partstat,
+          myPartstatUpdatedAtMs: Date.now(),
+          myAttendeeEmail: attendeeEmail,
+          // Write the PARTSTAT back to the user's own CalDAV copy on next sync.
+          pendingRemoteSync:
+            event.sourceType === "caldav" && event.remoteHref ? Date.now() : event.pendingRemoteSync,
+          updatedAtMs: Date.now()
+        };
+        await upsertCalendarEvent(accountId, updatedEvent);
+        if (Number.isFinite(occurrenceStartAtMs)) {
+          await deleteCalendarParticipationOverrideForOccurrence(
+            accountId,
+            event.eventUid,
+            occurrenceStartAtMs
+          );
         }
-      | undefined;
+      } else {
+        await upsertCalendarParticipationOverride(accountId, {
+          eventUid: event.eventUid,
+          occurrenceStartAtMs: occurrenceStartAtMs!,
+          partstat,
+          attendeeEmail
+        });
+      }
 
-    if (event.messageId?.trim()) {
-      const processedAtMs = Date.now();
-      await markMessageCalendarInviteStatesProcessed(
+      const participation = await resolveCalendarParticipation(
         accountId,
-        event.messageId.trim(),
-        [event.eventUid],
-        {
-          processedAtMs,
-          processedByUserId: accountContext.session.userId,
-          processedAutomatically: false
-        }
+        event.id,
+        Number.isFinite(occurrenceStartAtMs) ? occurrenceStartAtMs : undefined
       );
-      inviteProcessing = { processedAtMs, processedAutomatically: false };
-    }
 
-    return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing });
-  } catch (error) {
-    const upstreamResponse = smtpUpstreamErrorResponse(error, {
-      accountId,
-      op: "send-calendar-response"
-    });
-    if (upstreamResponse) return upstreamResponse;
-    return NextResponse.json(
-      {
-        ok: false,
-        message: error instanceof Error ? error.message : "Failed to send RSVP response"
-      },
-      { status: 400 }
-    );
-  }
+      let inviteProcessing:
+        | {
+            processedAtMs: number;
+            processedAutomatically: false;
+          }
+        | undefined;
+
+      if (event.messageId?.trim()) {
+        const processedAtMs = Date.now();
+        await markMessageCalendarInviteStatesProcessed(
+          accountId,
+          event.messageId.trim(),
+          [event.eventUid],
+          {
+            processedAtMs,
+            processedByUserId: accountContext.session.userId,
+            processedAutomatically: false
+          }
+        );
+        inviteProcessing = { processedAtMs, processedAutomatically: false };
+      }
+
+      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing });
+    } catch (error) {
+      const upstreamResponse = smtpUpstreamErrorResponse(error, {
+        accountId,
+        op: "send-calendar-response"
+      });
+      if (upstreamResponse) return upstreamResponse;
+      return NextResponse.json(
+        {
+          ok: false,
+          message: error instanceof Error ? error.message : "Failed to send RSVP response"
+        },
+        { status: 400 }
+      );
+    }
+  });
 }

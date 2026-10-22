@@ -1,11 +1,15 @@
+import { getRequestClientId } from "./clientId";
 import { NextResponse } from "next/server";
-import { requireSessionAccountOr403, requireSessionOr401, type SessionData } from "@/lib/auth";
-import { getAccountById, getAccountsForUser } from "@/lib/serverDb";
-import type { Account } from "@/lib/data";
+import { forwardAuthHeaders, requireActiveUserSession, type ActiveUserSession } from "@/lib/auth";
+import { getAccountById } from "@/lib/serverDb";
+import { resolveAccountRole, roleAtLeast } from "@/lib/accountAccess";
+import type { Account, AccountRole } from "@/lib/data";
 import { errorResponse } from "./response";
 
 export type AccountContext = {
-  session: SessionData;
+  session: ActiveUserSession;
+  userId: string;
+  role: AccountRole;
   accountId: string;
   account: Account;
   clientId?: string;
@@ -40,49 +44,24 @@ export async function requireAccountContext(
   accountId: string,
   options?: {
     missingAccountMessage?: string;
+    minRole?: AccountRole;
   }
 ): Promise<AccountContext | NextResponse> {
   if (!accountId) {
     return errorResponse(options?.missingAccountMessage ?? "Missing accountId", 400);
   }
-  const session = requireSessionOr401(request);
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const access = await requireSessionAccountOr403(session, accountId);
-  if (access instanceof NextResponse) return access;
+  const role = await resolveAccountRole(session.userId, accountId);
+  if (!role) return forwardAuthHeaders(errorResponse("Forbidden", 403), session.responseHeaders);
+  const requiredRole = options?.minRole ?? "viewer";
+  if (!roleAtLeast(role, requiredRole)) return forwardAuthHeaders(NextResponse.json({ ok: false, message: "Insufficient mailbox role", requiredRole }, { status: 403 }), session.responseHeaders);
   const account = await getAccountById(accountId);
   if (!account) {
-    return errorResponse("Account not found", 404);
+    return forwardAuthHeaders(errorResponse("Account not found", 404), session.responseHeaders);
   }
-  const clientId = request.headers.get("x-noctua-client") ?? undefined;
-  return { session, accountId, account, clientId };
-}
-
-/**
- * Like `requireAccountContext`, but authorizes any account the session user
- * owns — not only the session's single active account. Cross-account features
- * (e.g. copy/move a message into a *different* account of the same user) need
- * to act on an account that `requireSessionAccountOr403` would reject because
- * it isn't the active one.
- */
-export async function requireOwnedAccountContext(
-  request: Request,
-  accountId: string,
-  options?: {
-    missingAccountMessage?: string;
-  }
-): Promise<AccountContext | NextResponse> {
-  if (!accountId) {
-    return errorResponse(options?.missingAccountMessage ?? "Missing accountId", 400);
-  }
-  const session = requireSessionOr401(request);
-  if (session instanceof NextResponse) return session;
-  const ownedAccounts = await getAccountsForUser(session.userId);
-  const account = ownedAccounts.find((item) => item.id === accountId);
-  if (!account) {
-    return errorResponse("Forbidden", 403);
-  }
-  const clientId = request.headers.get("x-noctua-client") ?? undefined;
-  return { session, accountId, account, clientId };
+  const clientId = getRequestClientId(request);
+  return { session, userId: session.userId, role, accountId, account, clientId };
 }
 
 export async function requireAccountContextFromParams(
@@ -90,8 +69,9 @@ export async function requireAccountContextFromParams(
   paramsPromise: Promise<Record<string, AccountRouteParamValue>>,
   options?: {
     missingAccountMessage?: string;
+    minRole?: AccountRole;
   }
 ) {
   const accountId = await getAccountIdFromParams(paramsPromise);
-  return requireAccountContext(request, accountId, options);
+  return await requireAccountContext(request, accountId, options);
 }

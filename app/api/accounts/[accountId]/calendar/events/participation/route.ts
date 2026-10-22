@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -16,23 +17,26 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  try {
-    const participation = await resolveCalendarParticipation(
-      accountId,
-      eventId,
-      Number.isFinite(occurrenceStartAtMs) ? occurrenceStartAtMs : undefined
-    );
-    return NextResponse.json({ ok: true, participation });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: error instanceof Error ? error.message : "Failed to resolve participation"
-      },
-      { status: 500 }
-    );
-  }
+  return withAuthResponse(accountContext, async () => {
+    try {
+      const participation = await resolveCalendarParticipation(
+        accountId,
+        eventId,
+        Number.isFinite(occurrenceStartAtMs) ? occurrenceStartAtMs : undefined
+      );
+      return NextResponse.json({ ok: true, participation });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: error instanceof Error ? error.message : "Failed to resolve participation"
+        },
+        { status: 500 }
+      );
+    }
+  });
 }

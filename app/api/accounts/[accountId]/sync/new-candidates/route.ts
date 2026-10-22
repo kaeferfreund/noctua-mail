@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders } from "@/lib/db";
 import { planImapNewSyncFolders } from "@/lib/mail/imap";
@@ -14,36 +16,40 @@ type NewSyncCandidatesPayload = {
 };
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json()) as NewSyncCandidatesPayload;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  const { accountId: resolvedAccountId, account, clientId } = accountContext;
+  return withAuthResponse(accountContext, async () => {
+    const { accountId: resolvedAccountId, account, clientId } = accountContext;
 
-  const accountFolderIds = new Set(
-    (await getFolders(resolvedAccountId))
-      .filter((folder) => folder.accountId === resolvedAccountId)
-      .map((folder) => folder.id)
-  );
-  const requestedFolderIds = Array.isArray(payload.folderIds)
-    ? payload.folderIds.filter(
-        (folderId): folderId is string =>
-          typeof folderId === "string" && folderId.length > 0 && accountFolderIds.has(folderId)
-      )
-    : [];
-  const folderIds = requestedFolderIds.length > 0 ? requestedFolderIds : Array.from(accountFolderIds);
+    const accountFolderIds = new Set(
+      (await getFolders(resolvedAccountId))
+        .filter((folder) => folder.accountId === resolvedAccountId)
+        .map((folder) => folder.id)
+    );
+    const requestedFolderIds = Array.isArray(payload.folderIds)
+      ? payload.folderIds.filter(
+          (folderId): folderId is string =>
+            typeof folderId === "string" && folderId.length > 0 && accountFolderIds.has(folderId)
+        )
+      : [];
+    const folderIds = requestedFolderIds.length > 0 ? requestedFolderIds : Array.from(accountFolderIds);
 
-  try {
-    const decisions = await planImapNewSyncFolders(account, folderIds, clientId);
-    return NextResponse.json({ ok: true, decisions });
-  } catch (error) {
-    const response = imapUpstreamErrorResponse(error, {
-      accountId: resolvedAccountId,
-      op: "sync.new-candidates"
-    });
-    if (response) return response;
-    throw error;
-  }
+    try {
+      const decisions = await planImapNewSyncFolders(account, folderIds, clientId);
+      return NextResponse.json({ ok: true, decisions });
+    } catch (error) {
+      const response = await imapUpstreamErrorResponse(error, { role: accountContext.role,
+        accountId: resolvedAccountId,
+        op: "sync.new-candidates"
+      });
+      if (response) return response;
+      throw error;
+    }
+  });
 }

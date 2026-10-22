@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   deleteMessagesByIds,
@@ -17,6 +19,7 @@ type BulkDeletePayload = {
 };
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json().catch(() => null)) as BulkDeletePayload | null;
   const accountId = await getAccountIdFromParams(params);
 
@@ -29,72 +32,74 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       { status: 400 }
     );
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
-  const { account, clientId } = accountContext;
+  return withAuthResponse(accountContext, async () => {
+    const { account, clientId } = accountContext;
 
-  const folders = await getFolders(accountId);
-  const trashFolder = findTrashFolder(folders, accountId);
-  if (!trashFolder) {
-    return NextResponse.json({ ok: false, message: "Trash folder not found" }, { status: 400 });
-  }
+    const folders = await getFolders(accountId);
+    const trashFolder = findTrashFolder(folders, accountId);
+    if (!trashFolder) {
+      return NextResponse.json({ ok: false, message: "Trash folder not found" }, { status: 400 });
+    }
 
-  const existingMessages = await getStoredMessagesByIds(accountId, normalizedMessageIds);
-  if (existingMessages.length !== normalizedMessageIds.length) {
-    return NextResponse.json(
-      { ok: false, message: "One or more messages were not found" },
-      { status: 404 }
-    );
-  }
-
-  const deleteTargets: Array<{ mailboxPath: string; uid: number; messageId: string }> = [];
-  for (const message of existingMessages) {
-    const { currentMailbox, isInTrash } = resolveMessageTrashState(
-      { folderId: message.folderId, mailboxPath: message.mailboxPath ?? undefined },
-      trashFolder,
-      accountId
-    );
-    if (!isInTrash) {
+    const existingMessages = await getStoredMessagesByIds(accountId, normalizedMessageIds);
+    if (existingMessages.length !== normalizedMessageIds.length) {
       return NextResponse.json(
-        { ok: false, message: "Bulk delete only supports messages already in Trash" },
-        { status: 400 }
+        { ok: false, message: "One or more messages were not found" },
+        { status: 404 }
       );
     }
-    if (typeof message.imapUid !== "number" || !Number.isFinite(message.imapUid) || !currentMailbox) {
-      return NextResponse.json(
-        { ok: false, message: "One or more messages are missing IMAP metadata" },
-        { status: 400 }
+
+    const deleteTargets: Array<{ mailboxPath: string; uid: number; messageId: string }> = [];
+    for (const message of existingMessages) {
+      const { currentMailbox, isInTrash } = resolveMessageTrashState(
+        { folderId: message.folderId, mailboxPath: message.mailboxPath ?? undefined },
+        trashFolder,
+        accountId
       );
+      if (!isInTrash) {
+        return NextResponse.json(
+          { ok: false, message: "Bulk delete only supports messages already in Trash" },
+          { status: 400 }
+        );
+      }
+      if (typeof message.imapUid !== "number" || !Number.isFinite(message.imapUid) || !currentMailbox) {
+        return NextResponse.json(
+          { ok: false, message: "One or more messages are missing IMAP metadata" },
+          { status: 400 }
+        );
+      }
+      deleteTargets.push({
+        mailboxPath: currentMailbox,
+        uid: message.imapUid,
+        messageId: message.id
+      });
     }
-    deleteTargets.push({
-      mailboxPath: currentMailbox,
-      uid: message.imapUid,
-      messageId: message.id
+
+    await deleteImapMessages(
+      account,
+      deleteTargets.map((item) => ({ mailboxPath: item.mailboxPath, uid: item.uid })),
+      clientId
+    );
+
+    const deletedIds = deleteTargets.map((item) => item.messageId);
+    const fileRefs = await listMessageFileRefsByMessageIds(accountId, deletedIds);
+    await deleteMessagesByIds(accountId, deletedIds);
+    const fileResults = await Promise.allSettled(
+      fileRefs.map((item) => deleteMessageFiles(accountId, item.messageId, item.attachmentIds))
+    );
+    for (const r of fileResults) {
+      if (r.status === "rejected") {
+        console.error("[bulk-delete] file cleanup failed:", r.reason);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action: "deleted",
+      deleted: deletedIds.length,
+      deletedIds
     });
-  }
-
-  await deleteImapMessages(
-    account,
-    deleteTargets.map((item) => ({ mailboxPath: item.mailboxPath, uid: item.uid })),
-    clientId
-  );
-
-  const deletedIds = deleteTargets.map((item) => item.messageId);
-  const fileRefs = await listMessageFileRefsByMessageIds(accountId, deletedIds);
-  await deleteMessagesByIds(accountId, deletedIds);
-  const fileResults = await Promise.allSettled(
-    fileRefs.map((item) => deleteMessageFiles(accountId, item.messageId, item.attachmentIds))
-  );
-  for (const r of fileResults) {
-    if (r.status === "rejected") {
-      console.error("[bulk-delete] file cleanup failed:", r.reason);
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    action: "deleted",
-    deleted: deletedIds.length,
-    deletedIds
   });
 }

@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -12,41 +14,46 @@ import {
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const aliases = await listRecipientAliases(accountId);
-  return NextResponse.json({ ok: true, aliases });
+    const aliases = await listRecipientAliases(accountId);
+    return NextResponse.json({ ok: true, aliases });
+  });
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const body = (await request.json().catch(() => null)) as
-    | {
-        name?: string;
-        recipients?: string;
-      }
-    | null;
-  const name = body?.name?.trim() ?? "";
-  const recipients = body?.recipients?.trim() ?? "";
+    const body = (await request.json().catch(() => null)) as
+      | {
+          name?: string;
+          recipients?: string;
+        }
+      | null;
+    const name = body?.name?.trim() ?? "";
+    const recipients = body?.recipients?.trim() ?? "";
 
-  if (!name) {
-    return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
-  }
-  if (!recipients) {
-    return NextResponse.json({ ok: false, message: "Missing recipients" }, { status: 400 });
-  }
-
-  try {
-    const alias = await createRecipientAlias(accountId, name, recipients);
-    return NextResponse.json({ ok: true, alias }, { status: 201 });
-  } catch (error) {
-    if (error instanceof RecipientAliasConflictError) {
-      return NextResponse.json({ ok: false, message: error.message }, { status: 409 });
+    if (!name) {
+      return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
     }
-    throw error;
-  }
+    if (!recipients) {
+      return NextResponse.json({ ok: false, message: "Missing recipients" }, { status: 400 });
+    }
+
+    try {
+      const alias = await createRecipientAlias(accountId, name, recipients);
+      return NextResponse.json({ ok: true, alias }, { status: 201 });
+    } catch (error) {
+      if (error instanceof RecipientAliasConflictError) {
+        return NextResponse.json({ ok: false, message: error.message }, { status: 409 });
+      }
+      throw error;
+    }
+  });
 }
