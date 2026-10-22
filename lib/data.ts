@@ -460,7 +460,7 @@ export type UserAccountLink = {
 export type UserAccountPrefs = Pick<
   AccountSettings,
   "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId" | "notifications"
->;
+> & { remoteContent?: { allowedSenders?: Record<string, boolean> } };
 
 /**
  * Sparse patch for `UserAccountPrefs`: absent keys are untouched, `null`

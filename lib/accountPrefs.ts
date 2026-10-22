@@ -7,6 +7,7 @@ export const accountPrefsPatchSchema = z.object({
   calendar: nullable(z.object({ weekStartsOn: nullable(z.enum(["monday", "sunday"])) }).strict()),
   threading: nullable(z.object({ includeAcrossFolders: nullable(z.boolean()) }).strict()),
   defaultSignatureId: nullable(z.string().max(256)),
+  remoteContent: nullable(z.object({ allowedSenders: nullable(z.record(z.string().email().transform(value => value.toLowerCase()), z.boolean())) }).strict()),
   notifications: nullable(z.object({ newMail: nullable(z.boolean()) }).strict())
 }).strict();
 export function stripPersonalSettings(settings: AccountSettings | undefined, teamDefaults: boolean): AccountSettings | undefined {
