@@ -1,0 +1,25 @@
+[Unit]
+Description=Noctua Mail dev preview (fork kaeferfreund/noctua-mail, branch deploy/dev; intern 3790, Tailnet-HTTPS 3790)
+ConditionPathExists=/home/monkey/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215/wt-deploy-dev/.next/standalone/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215/wt-deploy-dev/server.js
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Type=simple
+WorkingDirectory=/home/monkey/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215/wt-deploy-dev/.next/standalone/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215/wt-deploy-dev
+EnvironmentFile=/home/monkey/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215/wt-deploy-dev/.env.local
+Environment=HOME=/home/monkey
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PATH=/home/monkey/.local/bin:/home/monkey/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/bun --bun server.js
+Restart=on-failure
+RestartSec=5s
+KillMode=control-group
+TimeoutStopSec=30s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=noctua-dev
+
+[Install]
+WantedBy=default.target

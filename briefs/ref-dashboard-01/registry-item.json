@@ -1,0 +1,42 @@
+{
+ "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+ "name": "dashboard-01",
+ "title": "Dashboard 01",
+ "description": "A dashboard with sidebar, charts and data table.",
+ "dependencies": [
+  "@dnd-kit/core",
+  "@dnd-kit/modifiers",
+  "@dnd-kit/sortable",
+  "@dnd-kit/utilities",
+  "@tanstack/react-table",
+  "zod"
+ ],
+ "registryDependencies": [
+  "sidebar",
+  "breadcrumb",
+  "separator",
+  "label",
+  "chart",
+  "card",
+  "select",
+  "tabs",
+  "table",
+  "toggle-group",
+  "badge",
+  "button",
+  "checkbox",
+  "dropdown-menu",
+  "drawer",
+  "input",
+  "avatar",
+  "sheet",
+  "sonner"
+ ],
+ "meta": {
+  "iframeHeight": "1000px"
+ },
+ "categories": [
+  "dashboard"
+ ],
+ "type": "registry:block"
+}
