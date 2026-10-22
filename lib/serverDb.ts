@@ -132,3 +132,7 @@ export async function getAttachmentIds(
   const db = await loadServerDb();
   return db.getAttachmentIds(...args);
 }
+
+export async function getMailboxSummaries(...args: Parameters<ServerDbModule["getMailboxSummaries"]>) {
+  return (await loadServerDb()).getMailboxSummaries(...args);
+}

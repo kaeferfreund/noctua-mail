@@ -1,3 +1,4 @@
+import { getImapHttpError } from "@/lib/mail/imapError";
 import { drainImapConnectionPool } from "@/lib/mail/imap";
 import {
   runSyncOperation,
@@ -23,6 +24,15 @@ const NON_RETRYABLE_PATTERNS = [
 ];
 
 export async function runSyncJobCli(argv = process.argv) {
+  const leaseJob = process.env.NOCTUA_SYNC_LEASE_JOB_ID;
+  const leaseOwner = process.env.NOCTUA_SYNC_LEASE_OWNER;
+  if (leaseJob || leaseOwner) {
+    const { bindWorkerProcess } = await import("../db/processLeases");
+    if (!leaseJob || !leaseOwner || !await bindWorkerProcess(leaseJob, leaseOwner)) {
+      console.error("Sync worker admission lease is no longer owned.");
+      process.exit(1);
+    }
+  }
   const rawPayload = argv[2];
 
   if (!rawPayload) {
@@ -75,10 +85,13 @@ export async function runSyncJobCli(argv = process.argv) {
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error ?? "unknown error");
-      const isNonRetryable = NON_RETRYABLE_PATTERNS.some((pattern) => message.includes(pattern));
+      const authError = getImapHttpError(error);
+      const isNonRetryable = authError !== null ||
+        NON_RETRYABLE_PATTERNS.some((pattern) => message.includes(pattern));
       const isLastAttempt = attempt === MAX_ATTEMPTS;
 
-      if (isNonRetryable || isLastAttempt) {
+      if (isNonRetryable || isLastAttempt || process.env.NOCTUA_SYNC_WORKER_SOURCE === "watcher") {
+        if (authError) console.error(`IMAP authentication failed (${authError.code}).`);
         if (error instanceof Error) {
           console.error(error.stack ?? error.message);
         } else {

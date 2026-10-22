@@ -583,6 +583,24 @@ function ensureAdminInvite(db: any): InviteCode {
 
 export function initMasterSchema(db: any) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_worker_leases (
+      slot INTEGER PRIMARY KEY, jobId TEXT UNIQUE NOT NULL, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL,
+      ownerPid INTEGER NOT NULL, pid INTEGER, expiresAt INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sync_worker_owners (
+      ownerInstance TEXT PRIMARY KEY, expiresAt INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sync_worker_queue (
+      jobId TEXT PRIMARY KEY, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL, ownerPid INTEGER NOT NULL,
+      priority INTEGER NOT NULL, queuedAt INTEGER NOT NULL, bypasses INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS mailbox_watcher_auth (
+      accountId TEXT PRIMARY KEY, identity TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mailbox_watcher_lease (
+      slot INTEGER PRIMARY KEY CHECK(slot=1), ownerInstance TEXT NOT NULL,
+      pid INTEGER NOT NULL, expiresAt INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -696,6 +714,12 @@ export function initMasterSchema(db: any) {
 
 export function initAccountSchema(db: any) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS mailbox_summary (
+      accountId TEXT PRIMARY KEY,
+      lastSyncAt INTEGER,
+      watcherState TEXT NOT NULL DEFAULT 'disabled'
+    );
+
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -915,6 +939,8 @@ export function initAccountSchema(db: any) {
     CREATE VIRTUAL TABLE IF NOT EXISTS message_fts
     USING fts5(messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview);
 
+    CREATE INDEX IF NOT EXISTS idx_messages_unread_mailbox_summary
+      ON messages(accountId, folderId) WHERE unread = 1 AND COALESCE(deleted, 0) = 0;
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_date
       ON messages(accountId, folderId, dateValue DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_account_date
