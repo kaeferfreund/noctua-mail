@@ -3,7 +3,7 @@ export const SCENARIOS = {
   activatedManagement:"activated shell session revoke and passkey rename wrappers",
   activatedReset:"activated public reset handover redirect and canonical headers",
   shellMailbox:"shell persists mailbox switch and keeps personal security independent",
-  shellBackup:"shell backup recovery, add mailbox dialog and bodyless logout",
+  shellBackup:"shell backup recovery, non-admin mailbox gate and bodyless logout",
   shellReplacement:"shell lost-phone replacement consumes a distinct backup code and preserves enrollment gate",
   shellPasskey:"shell explicit passkey cancels conditional UI and authenticates with UV",
   shellLogin:"shell login renders without a session",

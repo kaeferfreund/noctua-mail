@@ -178,9 +178,8 @@ test(SCENARIOS.shellBackup, async ({ page, seed }) => {
   await page.getByLabel("Backup code", { exact: true }).fill(seed.backupCodes[0]);
   await page.getByRole("button", { name: "Verify", exact: true }).click();
   await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
-  await page.getByRole("button", { name: "Add a mailbox", exact: true }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("dialog").getByLabel("Close", { exact: true }).click();
+  await expect(page.getByText("Ask your admin to give you access to a mailbox.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add a mailbox", exact: true })).toHaveCount(0);
   const logout = page.waitForRequest(request => new URL(request.url()).pathname === "/api/auth/logout");
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   expect((await logout).postData()).toBeNull();

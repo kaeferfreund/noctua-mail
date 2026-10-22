@@ -17,7 +17,7 @@ export type AccountSaveRequest = {
 
 /**
  * Decide the HTTP shape for persisting an account. New accounts post to the
- * collection endpoint with the id stripped so the server mints one; updates
+ * admin collection endpoint with the id stripped so the server mints one; updates
  * put to the scoped endpoint with the full account shape.
  */
 export function buildAccountSaveRequest(
@@ -26,11 +26,11 @@ export function buildAccountSaveRequest(
 ): AccountSaveRequest {
   const isNew = !exists;
   if (isNew) {
-    const { id: _id, ...rest } = account;
+    const { name, email, avatar, imap, smtp } = account;
     return {
-      endpoint: "/api/accounts",
+      endpoint: "/api/admin/accounts",
       method: "POST",
-      body: rest as Record<string, unknown>,
+      body: { name, email, avatar, imap, smtp },
       isNew: true
     };
   }

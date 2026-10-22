@@ -181,3 +181,27 @@ describe("identity and mailbox state transitions", () => {
     expect(result.current.auth).toBe("unauth"); expect(result.current.activeAccountId).toBe(""); expect(result.current.loadedAccounts).toEqual([]);
   });
 });
+
+
+describe("admin-only mailbox creation", () => {
+  const draft: Account = { id: "synthetic-draft", name: "Synthetic mailbox", email: "mailbox@example.test", avatar: "",
+    imap: { host: "imap.example.test", port: 993, secure: true, user: "synthetic", password: "synthetic-password" },
+    smtp: { host: "smtp.example.test", port: 465, secure: true, user: "synthetic", password: "synthetic-password" } };
+  for (const role of ["admin", "user"]) it(`${role} respects creation authority without implicit mailbox access`, async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const { result, errors } = mount(async (input, init) => {
+      const url = String(input); calls.push({ url, init });
+      return json(url === "/api/auth/me" ? { user: { id: "synthetic-user", role }, accounts: [], mailboxState: "none", accountId: null } : { ok: true, account: { ...draft, id: "synthetic-created" } });
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    calls.length = 0;
+    await act(async () => { await result.current.saveAccount(draft); });
+    expect(calls.map(call => call.url)).toEqual(role === "admin" ? ["/api/admin/accounts", "/api/auth/me"] : []);
+    expect(result.current.activeAccountId).toBe("");
+    expect(result.current.mailboxState).toBe("none");
+    if (role === "admin") {
+      expect(calls[0].init?.method).toBe("POST");
+      expect(JSON.parse(String(calls[0].init?.body)).id).toBeUndefined();
+    } else expect(errors).toContain("Ask your admin to create a mailbox.");
+  });
+});

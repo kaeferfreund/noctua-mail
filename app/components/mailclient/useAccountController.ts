@@ -88,7 +88,6 @@ export function useAccountController({
   readErrorMessage,
   reportError,
   refreshFolders,
-  runSyncJob,
   setAccounts,
   setActiveAccountId,
   setFolders,
@@ -123,6 +122,7 @@ export function useAccountController({
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const loadVersion = useRef(0);
+  const instanceAdmin = useRef(false);
   const lastIdentity = useRef<string | null>(null);
   const loadInitialData = useCallback(
     async () => {
@@ -135,7 +135,7 @@ export function useAccountController({
         if (version !== loadVersion.current) return;
         if (!me.ok) {
           if (me.status === 401) {
-            lastIdentity.current = null;
+            lastIdentity.current = null; instanceAdmin.current = false;
             setMessages([]); setViewMessage(null); setActiveMessageId("");
             setAuthState("unauth"); setCurrentUser(null); setAccounts([]);
             setActiveAccountId(""); setFolders([]); setMailboxState(null); setSecurity(null);
@@ -149,6 +149,7 @@ export function useAccountController({
           setHasMoreMessages(true); setTotalMessages(null); setActiveFolderId("");
         }
         lastIdentity.current = data.user?.id ?? null;
+        instanceAdmin.current = data.user?.role === "admin";
         setAuthState("ok"); setCurrentUser(data.user); setSecurity(data.security);
         setSessionTtlSeconds(data.ttlSeconds);
         const restricted = data.mailboxState === "enrollment";
@@ -178,7 +179,7 @@ export function useAccountController({
   const logout = async () => {
     try {
       await createAuthClient(apiFetch).logout();
-      loadVersion.current++; lastIdentity.current = null;
+      loadVersion.current++; lastIdentity.current = null; instanceAdmin.current = false;
       setAuthState("unauth"); setCurrentUser(null); setAccounts([]); setFolders([]);
       setActiveAccountId(""); setMailboxState(null); setSecurity(null);
       setMessages([]); setViewMessage(null); setExceptionEntries([]); setMessageListError(null);
@@ -255,6 +256,7 @@ export function useAccountController({
       return;
     }
     const exists = Boolean(accounts.find((a) => a.id === account.id));
+    if (!exists && !instanceAdmin.current) { reportError("Ask your admin to create a mailbox."); return; }
     const { endpoint, method, body, isNew } = buildAccountSaveRequest(account, exists);
     const saveResult = await apiFetch(endpoint, {
       method,
@@ -265,33 +267,19 @@ export function useAccountController({
       reportError(await readErrorMessage(saveResult));
       return;
     }
-    const newAccountId = isNew
-      ? ((await saveResult.json()) as { id: string }).id
-      : account.id;
+    if (isNew) {
+      // Admin creation grants no implicit ownership/membership or mail access.
+      setManageOpen(false); setEditingAccount(null);
+      await loadInitialData();
+      return;
+    }
     const refreshed = await apiFetch("/api/accounts");
     if (refreshed.ok) {
       const nextAccounts = (await refreshed.json()) as Account[];
       setAccounts(nextAccounts);
       setManageOpen(false);
       setEditingAccount(null);
-      if (isNew) {
-        await switchAccount(newAccountId);
-        await refreshFolders(newAccountId);
-        try {
-          await runSyncJob({
-            accountId: newAccountId,
-            fullSync: true,
-            mode: "full",
-            fullSyncReason: "Initial sync for a newly created account."
-          });
-        } catch (error) {
-          reportError(
-            error instanceof Error
-              ? error.message
-              : "Initial sync for the new account failed."
-          );
-        }
-      }
+
     } else {
       reportError(await readErrorMessage(refreshed));
     }
@@ -345,6 +333,7 @@ export function useAccountController({
   };
 
   const startEditAccount = (account?: Account) => {
+    if (!account && !instanceAdmin.current) { reportError("Ask your admin to create a mailbox."); return; }
     const targetAccount: Account =
       account ?? createBlankEditAccount(() => crypto.randomUUID());
     setEditingAccount(targetAccount);
