@@ -277,7 +277,7 @@ export default function AdminTabContent({
                         <Text size="2" color="gray">
                           Role: {user.role} · Created: {formatTimestamp(user.createdAt, accountDateFormat)}
                         </Text>
-                        <Text size="1" color="gray" style={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                        <Text size="1" color="gray" style={{ fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
                           User ID: {user.id}
                         </Text>
                         {user.accounts.length === 0 ? (
@@ -291,7 +291,7 @@ export default function AdminTabContent({
                                 <Text size="2">
                                   {account.name || account.email} ({account.email})
                                 </Text>
-                                <Text size="1" color="gray" style={{ fontFamily: "monospace", overflowWrap: "anywhere" }}>
+                                <Text size="1" color="gray" style={{ fontFamily: "var(--font-mono)", overflowWrap: "anywhere" }}>
                                   Account ID: {account.id}
                                 </Text>
                               </Flex>

@@ -51,7 +51,7 @@
   font-size: 12px;
   line-height: 1.4;
   color: var(--gray-12);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-mono);
   word-break: break-all;
 }
 
