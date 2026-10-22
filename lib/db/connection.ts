@@ -45,6 +45,11 @@ let masterInitializationPromise: Promise<void> | null = null;
 const accountDbInstances = new Map<string, any>();
 const accountDbInitialized = new Set<string>();
 const accountDbIdleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const accountDbPathByAccountId = new Map<string, string>();
+let accountDbPathMasterChanges = -1;
+// Empty accounts keep probing until their first data has been backfilled.
+// Readiness belongs to an account within a shard, and ends when that shard closes.
+const runtimeProbeReadyKeys = new Set<string>();
 const ACCOUNT_DB_IDLE_MS = (() => {
   const raw = process.env.ACCOUNT_DB_IDLE_MS?.trim();
   if (!raw) return 5 * 60 * 1000; // 5 minutes: releases SQLite page cache sooner after syncs
@@ -117,7 +122,60 @@ function clearAccountDbIdleTimer(dbPath: string) {
   }
 }
 
+function runtimeProbeKey(dbPath: string, accountId: string) {
+  return `${dbPath}\0${accountId}`;
+}
+
+function forgetCachedAccountDbPath(accountId: string) {
+  accountDbPathByAccountId.delete(accountId);
+  const suffix = `\0${accountId}`;
+  for (const key of runtimeProbeReadyKeys) {
+    if (key.endsWith(suffix)) runtimeProbeReadyKeys.delete(key);
+  }
+}
+
+function forgetAccountDbPath(dbPath: string) {
+  for (const [accountId, cachedPath] of accountDbPathByAccountId) {
+    if (cachedPath === dbPath) accountDbPathByAccountId.delete(accountId);
+  }
+  const prefix = `${dbPath}\0`;
+  for (const key of runtimeProbeReadyKeys) {
+    if (key.startsWith(prefix)) runtimeProbeReadyKeys.delete(key);
+  }
+}
+
+/** Writes maintain signals, received dates and learning rows after these backfills settle. */
+function accountRuntimeProbesSettled(db: any, accountId: string) {
+  const hasMessages = db
+    .query(`SELECT 1 AS ok FROM messages WHERE accountId = ? LIMIT 1`)
+    .get(accountId);
+  if (!hasMessages) return false;
+
+  const hasSignals = db
+    .query(`SELECT 1 AS ok FROM thread_signals WHERE accountId = ? LIMIT 1`)
+    .get(accountId);
+  if (!hasSignals) return false;
+
+  const missingReceivedDate = db
+    .query(
+      `SELECT 1 AS ok FROM threads WHERE accountId = ? AND latestReceivedDateValue IS NULL LIMIT 1`
+    )
+    .get(accountId);
+  if (missingReceivedDate) return false;
+
+  const hasThreadTopics = db
+    .query(`SELECT 1 AS ok FROM thread_topics WHERE accountId = ? LIMIT 1`)
+    .get(accountId);
+  if (!hasThreadTopics) return true;
+
+  const hasLearningSignals = db
+    .query(`SELECT 1 AS ok FROM topic_learning_signals WHERE accountId = ? LIMIT 1`)
+    .get(accountId);
+  return Boolean(hasLearningSignals);
+}
+
 export function closeAccountDbConnection(dbPath: string) {
+  forgetAccountDbPath(dbPath);
   clearAccountDbIdleTimer(dbPath);
   const db = accountDbInstances.get(dbPath);
   if (!db) return;
@@ -161,6 +219,8 @@ export async function cleanupAccountLifecycleArtifacts(
   dbPath: string,
   deleteShardFile: boolean
 ) {
+  forgetCachedAccountDbPath(accountId);
+  if (deleteShardFile) forgetAccountDbPath(dbPath);
   await Promise.all([
     fs.rm(getSourcesAccountDir(accountId), { recursive: true, force: true }).catch((error) => {
       console.warn("[account-lifecycle] failed to delete source cache dir", { accountId, error });
@@ -197,6 +257,8 @@ export function closeAllDbConnections() {
   }
   const accountPaths = Array.from(accountDbInstances.keys());
   accountPaths.forEach((dbPath) => closeAccountDbConnection(dbPath));
+  accountDbPathByAccountId.clear();
+  runtimeProbeReadyKeys.clear();
   if (masterDbInstance) {
     try {
       masterDbInstance.close();
@@ -260,6 +322,16 @@ export async function initializeMasterDb() {
 
 async function resolveAccountDbPath(accountId: string) {
   const master = await getDb();
+  // The control plane can reassign shard paths on this live connection.
+  // Checking its write counter avoids stale paths without repeating account lookups.
+  const { changes } = master.query(`SELECT total_changes() AS changes`).get() as { changes: number };
+  if (changes !== accountDbPathMasterChanges) {
+    accountDbPathByAccountId.clear();
+    accountDbPathMasterChanges = changes;
+  }
+  const cached = accountDbPathByAccountId.get(accountId);
+  if (cached) return cached;
+
   const row = master
     .prepare(`SELECT id, dbPath FROM accounts WHERE id = ?`)
     .get(accountId) as { id?: string; dbPath?: string | null } | undefined;
@@ -268,15 +340,18 @@ async function resolveAccountDbPath(accountId: string) {
     return defaultPath;
   }
   if (row.dbPath && row.dbPath.trim().length > 0) {
+    accountDbPathByAccountId.set(accountId, row.dbPath);
     return row.dbPath;
   }
-  return withDbWriteRetry("resolveAccountDbPath", () => master.transaction(() => {
+  const resolved = await withDbWriteRetry("resolveAccountDbPath", () => master.transaction(() => {
     master.prepare(`UPDATE accounts SET dbPath = ? WHERE id = ? AND (dbPath IS NULL OR trim(dbPath) = '')`)
       .run(defaultPath, accountId);
     const current = master.prepare(`SELECT dbPath FROM accounts WHERE id = ?`).get(accountId) as
       { dbPath?: string | null } | undefined;
     return current?.dbPath?.trim() ? current.dbPath : defaultPath;
   }).immediate());
+  accountDbPathByAccountId.set(accountId, resolved);
+  return resolved;
 }
 
 export async function getAccountDb(accountId: string) {
@@ -298,14 +373,20 @@ export async function getAccountDb(accountId: string) {
   ensureMessageCalendarEventRuntimeSchema(accountDb);
   ensureCalendarReminderRuntimeSchema(accountDb);
   await ensureCalendarEventRuntimeData(accountDb, accountId);
-  // `./threads` imports `./accounts`, which imports this module, so its
-  // runtime-data ensure has to be loaded via a deferred import to break
-  // the load-time cycle. `./topics` has no such dependency and is
-  // imported statically at the top.
-  const threadsModule = await loadThreadsModule();
-  await threadsModule.ensureThreadSignalRuntimeData(accountDb, accountId);
-  await threadsModule.ensureThreadLatestReceivedDateValues(accountDb, accountId);
-  ensureTopicLearningRuntimeData(accountDb, accountId);
+  const probeKey = runtimeProbeKey(dbPath, accountId);
+  if (!runtimeProbeReadyKeys.has(probeKey)) {
+    // `./threads` imports `./accounts`, which imports this module, so its
+    // runtime-data ensure has to be loaded via a deferred import to break
+    // the load-time cycle. `./topics` has no such dependency and is
+    // imported statically at the top.
+    const threadsModule = await loadThreadsModule();
+    await threadsModule.ensureThreadSignalRuntimeData(accountDb, accountId);
+    await threadsModule.ensureThreadLatestReceivedDateValues(accountDb, accountId);
+    ensureTopicLearningRuntimeData(accountDb, accountId);
+    if (accountDbInstances.get(dbPath) === accountDb && accountRuntimeProbesSettled(accountDb, accountId)) {
+      runtimeProbeReadyKeys.add(probeKey);
+    }
+  }
   scheduleAccountDbIdleClose(dbPath);
   return accountDb;
 }
