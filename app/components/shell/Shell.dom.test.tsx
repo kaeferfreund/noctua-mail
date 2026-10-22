@@ -11,7 +11,9 @@ import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { ShellAccount } from "./types";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
-import { ThemeToggle } from "./ShellHeader";
+import ShellHeader, { ThemeToggle, type ShellHeaderProps } from "./ShellHeader";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
+import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
 
 const style = document.createElement("style");
 afterEach(() => {
@@ -29,16 +31,22 @@ function account(id: string, name: string, domain = "example.test", shared = fal
   };
 }
 
-function renderSidebar(accounts: ShellAccount[], onSwitch: (id: string) => void, onSync = () => {}, isAdminUser = false) {
+function renderSidebar(
+  accounts: ShellAccount[],
+  onSwitch: (id: string) => void,
+  onSync = () => {},
+  userOverrides: Partial<ShellSidebarProps["user"]> = {}
+) {
   const props: ShellSidebarProps = {
     brand: { buildVersionLabel: "" },
-    mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: isAdminUser ? () => {} : undefined },
+    mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined },
     compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
     sync: { isSyncing: false, onCheckNewMail: onSync },
     user: {
       userEmail: "person@example.test", userName: "Example Person", currentAccount: accounts[0] ?? null,
-      isAdminUser, onOpenSettings: () => {}, onOpenAdmin: () => {},
-      onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {}
+      isAdminUser: false, onOpenSettings: () => {}, onOpenAdmin: () => {},
+      onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {},
+      ...userOverrides
     },
     views: { inbox: null, collab: [], virtual: [] },
     topics: { topics: [], activeTopicId: null, onTopicClick: () => {} },
@@ -58,7 +66,7 @@ function renderSidebar(accounts: ShellAccount[], onSwitch: (id: string) => void,
 
 describe("shell sidebar", () => {
   for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
-    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, admin);
+    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
     expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
   });
 
@@ -88,6 +96,20 @@ describe("shell sidebar", () => {
     const short = renderSidebar(accounts.slice(0, 6), () => {});
     expect(short.queryByText("a.example.test")).toBeNull();
   });
+
+  it("keeps the thread JSON and thread cache developer tools reachable from the user menu", async () => {
+    const calls: string[] = [];
+    const view = renderSidebar([account("a", "Alpha")], () => {}, () => {}, {
+      onShowThreadJson: () => { calls.push("json"); },
+      onEvictThreadCache: () => { calls.push("evict"); }
+    });
+    for (const label of ["Show thread JSON", "Evict thread cache"]) {
+      fireEvent.keyDown(view.getByRole("button", { name: "User menu" }), { key: "Enter" });
+      const item = await view.findByRole("menuitem", { name: label });
+      await act(async () => { fireEvent.click(item); });
+    }
+    expect(calls).toEqual(["json", "evict"]);
+  });
 });
 
 describe("theme menu", () => {
@@ -100,6 +122,51 @@ describe("theme menu", () => {
       await waitFor(() => expect(window.localStorage.getItem("noctua:theme")).toBe(stored));
       if (stored !== "system") expect(document.documentElement.classList.contains(stored)).toBe(true);
     }
+  });
+});
+
+describe("shell header", () => {
+  const noop = () => {};
+  const search: ShellHeaderProps["search"] = {
+    state: {
+      query: "", searchScope: "folder", activeFolderId: "inbox", lastFolderId: "inbox",
+      searchFields: DEFAULT_SEARCH_FIELDS, searchBadges: DEFAULT_SEARCH_BADGES,
+      includeSentInEverywhere: false, sentFolderName: "Sent", isRelatedSearch: false,
+      searchFieldsLabel: "All fields", searchBadgesLabel: "All messages",
+      accountFolders: [{ id: "inbox", name: "INBOX", accountId: "synthetic", count: 0, unreadCount: 0 }]
+    },
+    actions: {
+      setQuery: noop, setSearchScope: noop, setActiveFolderId: noop, setLastFolderId: noop,
+      setSearchFields: noop, setSearchBadges: noop, setIncludeSentInEverywhere: noop, clearSearch: noop
+    }
+  };
+
+  it("puts the list toolbar right after the title, inside a header container", () => {
+    const view = render(
+      <SidebarProvider><TooltipProvider>
+        <ShellHeader title="Synthetic / INBOX" search={search} sync={{ isSyncing: false, onCheckNewMail: noop }}
+          toolbar={<button type="button">View: Threads</button>} />
+      </TooltipProvider></SidebarProvider>
+    );
+    const header = view.container.querySelector<HTMLElement>("[data-slot='shell-header']")!;
+    expect(header.className).toContain("@container/header");
+    const title = within(header).getByRole("heading", { name: "Synthetic / INBOX" });
+    expect(title.nextElementSibling).toBe(within(header).getByRole("button", { name: "View: Threads" }));
+  });
+
+  it("renders mailbox and folder as one heading with a quiet separator", () => {
+    const view = render(
+      <SidebarProvider><TooltipProvider>
+        <ShellHeader title={["Synthetic", "INBOX"]} search={search} sync={{ isSyncing: false, onCheckNewMail: noop }} />
+      </TooltipProvider></SidebarProvider>
+    );
+    const title = within(view.container).getByRole("heading", { name: "Synthetic / INBOX" });
+    expect(title.title).toBe("Synthetic / INBOX");
+    expect(title.className).toContain("font-medium");
+    expect(title.className).not.toContain("tracking-");
+    const separator = title.querySelector("span")!;
+    expect(separator.textContent).toBe(" / ");
+    expect(separator.className).toContain("text-muted-foreground");
   });
 });
 

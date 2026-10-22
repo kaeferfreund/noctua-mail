@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMobile } from "@/app/hooks/use-mobile";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useSyncExternalStore, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
 import { Monitor, Moon, RefreshCw, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -17,12 +17,20 @@ import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 
 export type ShellHeaderProps = {
   indicators?: ReactNode;
-  title: string;
+  /** A plain title, or path segments (mailbox, folder) joined by a quiet "/". */
+  title: string | readonly string[];
+  /**
+   * Controls for the list under the title (count, view and sort menus). The
+   * header is a `@container/header`, so the toolbar can drop secondary parts
+   * with `@…/header:` variants when space runs out.
+   */
+  toolbar?: ReactNode;
   search: ShellSearchProps;
   sync: { isSyncing: boolean; onCheckNewMail: () => void };
 };
 
 const subscribeMounted = () => () => {};
+const TITLE_SEPARATOR = " / ";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -47,15 +55,33 @@ export function ThemeToggle() {
   );
 }
 
-export default function ShellHeader({ title, search, sync, indicators }: ShellHeaderProps) {
+export default function ShellHeader({ title, toolbar, search, sync, indicators }: ShellHeaderProps) {
   const isMobile = useIsMobile();
+  const segments = typeof title === "string" ? [title] : title;
+  const fullTitle = segments.join(TITLE_SEPARATOR);
   const syncLabel = sync.isSyncing ? "Checking for new mail" : "Check for new mail";
   return (
-    <header data-slot="shell-header" className="flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6">
+    <header data-slot="shell-header" className="@container/header flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6">
       <SidebarTrigger className="-ml-1 size-11 md:size-7" aria-label="Toggle sidebar" />
       <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
-      <h1 className="m-0 min-w-0 truncate text-sm font-medium tracking-tight" title={title}>{title}</h1>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
+      {/* On phones the title takes the free space so the toolbar sits with search on the right. */}
+      {/* One weight and the font's own tracking for the whole path; only the
+          separator steps back. The spaces stay in the text so the heading
+          still reads "Mailbox / Folder". Centred like everything else here,
+          the 14px title would sit (14 - 12) * 0.364px below the 12px count
+          and toolbar labels (Inter's (ascender - descender) / 2 is 0.364em);
+          the lift puts them on one baseline. */}
+      <h1 className="relative top-[calc((var(--text-xs)-var(--text-sm))*0.364)] m-0 min-w-0 truncate text-sm font-medium max-md:flex-1" title={fullTitle}>
+        {segments.map((segment, index) => (
+          <Fragment key={index}>
+            {index > 0 ? <span className="font-normal text-muted-foreground">{TITLE_SEPARATOR}</span> : null}
+            {segment}
+          </Fragment>
+        ))}
+      </h1>
+      {toolbar}
+      {/* The search box gives way before the title (shrink-3) and may get narrow; the buttons never shrink. */}
+      <div className="ml-auto flex min-w-0 shrink-3 items-center gap-2">
         {!isMobile ? <div className="hidden w-64 min-w-0 md:block xl:w-80"><ShellSearch {...search} /></div> : null}
         {isMobile ? <div className="md:hidden"><Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label="Search messages"><Search /></Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[calc(100dvw-16px)] max-w-96"><ShellSearch {...search} /></PopoverContent>

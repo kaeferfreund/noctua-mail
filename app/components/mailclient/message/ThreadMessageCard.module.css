@@ -68,6 +68,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  /* Lets the display-options chip truncate before the ⋮ menu leaves the card. */
+  min-width: 0;
 }
 
 .messageActions {
@@ -146,6 +148,8 @@
 .metaSplit {
   width: 100%;
   align-items: flex-start;
+  /* Puts the date at the start of its own line once it wraps below From. */
+  justify-content: space-between;
 }
 
 .metaSegment {
@@ -155,8 +159,11 @@
   min-width: 0;
 }
 
+/* From takes whatever the date leaves. Its min-width only decides when the
+   date wraps: below room for a short sender, the line breaks instead. */
 .metaSegmentFrom {
   flex: 1 1 0;
+  min-width: min(100%, 16em);
 }
 
 .metaSegmentField {
@@ -164,13 +171,33 @@
   min-width: 0;
 }
 
+/* One line: the addresses truncate, the copy button follows the visible text. */
+.metaValueSegment {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.metaValueText {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.metaValueSegment .toCopy {
+  flex: 0 0 auto;
+}
+
 .metaSenderIcon {
   margin-top: 1px;
 }
 
 .metaSegmentDate {
-  margin-left: auto;
   flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .toWrapper {
@@ -256,15 +283,6 @@
   color: var(--green-11);
 }
 
-.tabsBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  width: 100%;
-}
-
 .tabsList {
   display: inline-flex;
   gap: var(--space-2);
@@ -273,55 +291,10 @@
   border-bottom: none !important;
 }
 
+/* Sentence case at the Radix size-1 tab size (12px), matching the
+   Signature/Attach buttons beside the compose tabs. */
 .tabTrigger {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.messageTabsRoot :global(.rt-BaseTabListTriggerInner) {
-  inset: 0;
-  padding: 0;
-  border-radius: 0;
-}
-
-.zoomControls {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.buttonGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-}
-
-.buttonGroup > :global(.rt-Button),
-.buttonGroup > :global(.rt-IconButton) {
-  border-radius: 0;
-}
-
-.buttonGroup > :global(.rt-Button) + :global(.rt-Button),
-.buttonGroup > :global(.rt-Button) + :global(.rt-IconButton),
-.buttonGroup > :global(.rt-IconButton) + :global(.rt-Button),
-.buttonGroup > :global(.rt-IconButton) + :global(.rt-IconButton) {
-  margin-left: -1px;
-}
-
-.buttonGroup > :global(.rt-Button):first-child,
-.buttonGroup > :global(.rt-IconButton):first-child {
-  border-top-left-radius: var(--radius-2);
-  border-bottom-left-radius: var(--radius-2);
-}
-
-.buttonGroup > :global(.rt-Button):last-child,
-.buttonGroup > :global(.rt-IconButton):last-child {
-  border-top-right-radius: var(--radius-2);
-  border-bottom-right-radius: var(--radius-2);
+  font-size: var(--text-xs);
 }
 
 .content {
@@ -352,6 +325,7 @@
 .panel {
   animation: threadTabFade 160ms ease;
   min-width: 0;
+  margin-top: var(--space-3);
 }
 
 .bodyLoading {
@@ -419,8 +393,7 @@
 }
 
 .textView {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
   color: var(--mail-view-fg);
@@ -539,11 +512,24 @@
   flex: 0 0 auto;
 }
 
+/* Text-overflow does not reach bare text in a flex row; this span gives the
+   name its ellipsis. The address beside it gives way first. */
+.compactSenderText {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .compactSenderEmail {
   font-size: 11px;
   font-weight: normal;
   color: var(--gray-10);
   margin-left: var(--space-1);
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .compactRecipientIcon {
@@ -610,6 +596,6 @@
 @media (width < 768px) {
   .metaSplit { flex-direction: column; }
   .metaSegmentFrom { flex: 0 1 auto; width: 100%; }
-  .metaSegmentDate { margin-left: 0; max-width: 100%; }
+  .metaSegmentDate { max-width: 100%; }
   .metaValue { min-width: 0; overflow-wrap: anywhere; }
 }
