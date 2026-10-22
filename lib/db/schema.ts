@@ -1,3 +1,5 @@
+import { getOwnAddresses, ownAddressList, type OwnAddressInput } from "../ownAddresses";
+import { seedSenderIdentityRow } from "./senderIdentities";
 import { randomUUID } from "crypto";
 import type { InviteCode } from "../data";
 import {
@@ -540,11 +542,11 @@ function backfillEmailCalendarEventStatuses(db: any) {
 function backfillEmailCalendarEventParticipation(
   db: any,
   accountId: string,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   const normalizedAccountId = accountId?.trim();
-  const normalizedAccountEmail = accountEmail?.trim();
-  if (!normalizedAccountId || !normalizedAccountEmail) return;
+  const normalizedAccountEmail = ownAddressList(accountEmail);
+  if (!normalizedAccountId || !normalizedAccountEmail.length) return;
   const rows = db
     .prepare(
       `SELECT id, eventUid, attendees, myPartstat, myPartstatUpdatedAtMs, myAttendeeEmail, replyRequested, rawIcs
@@ -643,19 +645,21 @@ function backfillEmailCalendarEventParticipation(
 }
 
 export async function ensureCalendarEventRuntimeData(db: any, accountId: string) {
+  const { getAccountById } = await import("./accounts");
+  const account = await getAccountById(accountId);
+  const ownAddresses = account ? getOwnAddresses(account) : [];
+  const signature = `${CALENDAR_EVENT_RUNTIME_SIGNATURE}:${ownAddresses.join(",")}`;
   const perAccount = calendarEventRuntimeSignatureByDb.get(db);
-  if (perAccount?.get(accountId) === CALENDAR_EVENT_RUNTIME_SIGNATURE) {
+  if (perAccount?.get(accountId) === signature) {
     return;
   }
   ensureCalendarEventOptionalColumns(db);
   backfillEmailCalendarEventStatuses(db);
   // Lazy import of the account lookup to avoid a top-level cycle with
   // lib/db.ts (which re-exports this module).
-  const { getAccountById } = await import("../db");
-  const account = await getAccountById(accountId);
-  backfillEmailCalendarEventParticipation(db, accountId, account?.email);
+  backfillEmailCalendarEventParticipation(db, accountId, ownAddresses);
   const nextPerAccount = perAccount ?? new Map<string, string>();
-  nextPerAccount.set(accountId, CALENDAR_EVENT_RUNTIME_SIGNATURE);
+  nextPerAccount.set(accountId, signature);
   if (!perAccount) calendarEventRuntimeSignatureByDb.set(db, nextPerAccount);
 }
 
@@ -726,6 +730,23 @@ export function initMasterSchema(db: any) {
       smtpPassword TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS sender_identities (
+      id TEXT PRIMARY KEY,
+      accountId TEXT NOT NULL,
+      email TEXT NOT NULL COLLATE NOCASE,
+      displayName TEXT NOT NULL,
+      replyTo TEXT,
+      signatureId TEXT,
+      isDefault INTEGER NOT NULL DEFAULT 0 CHECK(isDefault IN (0,1)),
+      enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+      createdBy TEXT,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      CHECK(isDefault = 0 OR enabled = 1)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sender_identity_address ON sender_identities(accountId,email);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sender_identity_default ON sender_identities(accountId) WHERE isDefault=1;
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
@@ -789,6 +810,9 @@ export function initMasterSchema(db: any) {
      ON admin_audit(createdAt DESC)`
   ).run();
 
+  db.transaction(() => {
+    for (const account of db.prepare("SELECT id,email,name FROM accounts").all()) seedSenderIdentityRow(db, account);
+  }).immediate();
   ensureMasterTeamColumns(db);
   db.prepare(
     `CREATE INDEX IF NOT EXISTS idx_user_accounts_account
@@ -1250,6 +1274,8 @@ export function initAccountSchema(db: any) {
       ON calendar_event_conflicts(accountId);
   `);
 
+  ensureSenderIdentityMessageRuntimeSchema(db);
+
   // Lightweight schema migration for existing account DBs.
   const messageColumns = new Set(
     (db.prepare(`PRAGMA table_info(messages)`).all() as Array<{ name?: string }>).map((row) =>
@@ -1375,4 +1401,14 @@ function backfillCalendarReminderEventUidKeys(db: any) {
     });
   });
   runUpdate(rows);
+}
+
+const senderIdentityMessageSchemaByDb = new WeakSet<object>();
+/** Additive on fresh, legacy, and shared message shards, once per live handle. */
+export function ensureSenderIdentityMessageRuntimeSchema(db: any) {
+  if (senderIdentityMessageSchemaByDb.has(db)) return;
+  db.transaction(() => ensureTableColumns(db, "messages", [
+    ["deliveredTo", "TEXT"], ["originalTo", "TEXT"], ["senderIdentityId", "TEXT"]
+  ])).immediate();
+  senderIdentityMessageSchemaByDb.add(db);
 }

@@ -2,7 +2,9 @@ import { withDbWriteRetry } from "../dbWriteRetry";
 import { collectThreadReferenceIds, resolveThreadingForItems } from "../threading";
 import { collectTopicSignalEntries, type TopicSignalSource } from "../topicSignals";
 import { getAccountDb } from "./connection";
-import { getAccountEmail } from "./accounts";
+import { getAccountOwnAddresses } from "./senderIdentities";
+import { messageAuthorEmailSql } from "./ownAddressSql";
+import { parseAddressEmails, ownAddressList, type OwnAddressInput } from "../ownAddresses";
 import {
   deleteTopicLearningSignals,
   upsertTopicLearningSignalsForThreadIds
@@ -25,7 +27,7 @@ function insertThreadSignalsFromMessageRows(
   accountId: string,
   rows: ThreadSignalSourceRow[],
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ) {
   const insertThreadSignal = db.prepare(
@@ -67,7 +69,7 @@ function rebuildThreadSignalsForThreadIdsInternal(
   db: any,
   accountId: string,
   threadIds: string[],
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   const uniqueThreadIds = normalizeThreadIds(threadIds);
   if (uniqueThreadIds.length === 0) return;
@@ -88,7 +90,7 @@ function rebuildThreadSignalsForThreadIdsInternal(
     const chunk = uniqueThreadIds.slice(start, start + selectBatchSize);
     const rows = db
       .prepare(
-      `SELECT threadId, fromEmail, toAddr, ccAddr, listId, subject, messageId
+      `SELECT threadId, ${messageAuthorEmailSql()} AS fromEmail, toAddr, ccAddr, listId, subject, messageId
          FROM messages
          WHERE accountId = ?
            AND threadId IN (${chunk.map(() => "?").join(",")})
@@ -106,19 +108,19 @@ export async function rebuildThreadSignalsForThreadIds(
   accountId: string,
   threadIds: string[]
 ) {
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   rebuildThreadSignalsForThreadIdsInternal(db, accountId, threadIds, accountEmail);
 }
 
 function rebuildAllThreadSignalsForAccountInternal(
   db: any,
   accountId: string,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   db.prepare(`DELETE FROM thread_signals WHERE accountId = ?`).run(accountId);
   const rows = db
     .prepare(
-      `SELECT threadId, fromEmail, toAddr, ccAddr, listId, subject, messageId
+      `SELECT threadId, ${messageAuthorEmailSql()} AS fromEmail, toAddr, ccAddr, listId, subject, messageId
        FROM messages
        WHERE accountId = ?
        ORDER BY threadId ASC, dateValue ASC, id ASC`
@@ -128,7 +130,7 @@ function rebuildAllThreadSignalsForAccountInternal(
 }
 
 export async function rebuildAllThreadSignalsForAccount(db: any, accountId: string) {
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   rebuildAllThreadSignalsForAccountInternal(db, accountId, accountEmail);
 }
 
@@ -186,26 +188,15 @@ export function pruneThreadTopicsWithoutMessages(
  * pair this fragment with `getThreadLatestReceivedDateArgs(accountEmail)` to
  * bind the two placeholder occurrences.
  */
-export function buildThreadLatestReceivedDateSql(messageAlias: string, accountEmail: string) {
-  if (!accountEmail) {
-    return `MAX(${messageAlias}.dateValue)`;
-  }
-  return `COALESCE(
-    MAX(
-      CASE
-        WHEN lower(COALESCE(${messageAlias}.fromEmail, '')) = ?
-          OR instr(lower(COALESCE(${messageAlias}.fromAddr, '')), ?) > 0
-          THEN NULL
-        ELSE ${messageAlias}.dateValue
-      END
-    ),
-    MAX(${messageAlias}.dateValue)
-  )`;
+export function buildThreadLatestReceivedDateSql(messageAlias: string, accountEmail: OwnAddressInput) {
+  const ownAddresses = ownAddressList(accountEmail);
+  if (!ownAddresses.length) return `MAX(${messageAlias}.dateValue)`;
+  return `COALESCE(MAX(CASE WHEN ${messageAuthorEmailSql(messageAlias)} IN (
+    ${ownAddresses.map(() => "?").join(",")}) THEN NULL ELSE ${messageAlias}.dateValue END), MAX(${messageAlias}.dateValue))`;
 }
 
-export function getThreadLatestReceivedDateArgs(accountEmail: string) {
-  if (!accountEmail) return [];
-  return [accountEmail, accountEmail];
+export function getThreadLatestReceivedDateArgs(accountEmail: OwnAddressInput) {
+  return ownAddressList(accountEmail);
 }
 
 /**
@@ -247,7 +238,7 @@ export async function ensureThreadLatestReceivedDateValues(
           .get(accountId) as { 1?: number } | undefined);
   if (!hasMissingRows) return;
 
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   const latestReceivedDateSql = buildThreadLatestReceivedDateSql("m", accountEmail);
   const latestReceivedDateArgs = getThreadLatestReceivedDateArgs(accountEmail);
   const threadFilterSql =
@@ -278,7 +269,7 @@ export async function ensureThreadLatestReceivedDateValues(
  */
 export async function recomputeThreadsForAccountInternal(accountId: string, threadIds?: string[]) {
   const db = await getAccountDb(accountId);
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   const latestReceivedDateSql = buildThreadLatestReceivedDateSql("m", accountEmail);
   const latestReceivedDateArgs = getThreadLatestReceivedDateArgs(accountEmail);
   if (threadIds && threadIds.length > 0) {
@@ -359,6 +350,15 @@ export async function recomputeThreadsForAccount(accountId: string, threadIds?: 
   return withDbWriteRetry("recomputeThreadsForAccount", async () => {
     await recomputeThreadsForAccountInternal(accountId, threadIds);
     const db = await getAccountDb(accountId);
+  // Repair only missing derived authors when explicitly recomputing this account.
+  const missingAuthors = db.prepare("SELECT id,fromAddr FROM messages WHERE accountId=? AND fromEmail IS NULL").all(accountId) as Array<{ id: string; fromAddr: string }>;
+  if (missingAuthors.length) db.transaction(() => {
+    const update = db.prepare("UPDATE messages SET fromEmail=? WHERE accountId=? AND id=? AND fromEmail IS NULL");
+    for (const row of missingAuthors) {
+      const email = parseAddressEmails(row.fromAddr)[0];
+      if (email) update.run(email, accountId, row.id);
+    }
+  }).immediate();
     if (threadIds && threadIds.length > 0) {
       await rebuildThreadSignalsForThreadIds(db, accountId, threadIds);
       deleteTopicLearningSignals(db, accountId, { threadIds });

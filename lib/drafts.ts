@@ -1,3 +1,4 @@
+import { getOwnAddresses, isOwnAddress } from "./ownAddresses";
 import type { Account, Message } from "@/lib/data";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import { COMPOSE_INVITE_HEADER, encodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
@@ -5,6 +6,7 @@ import {
   deleteMessageById,
   getAttachmentIds,
   getFolders,
+  getAccountOwnAddresses,
   getMessageById,
   recordDraftTombstone,
   resolveThreadingForAccountMessages,
@@ -109,21 +111,8 @@ export type SendDraftResult = {
   messageId: string | null;
 };
 
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function extractEmails(value?: string | null) {
-  if (!value) return [];
-  const matches = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
-  return matches ?? [];
-}
-
-function getReplyRecipient(account: Account, message: Message) {
-  const accountEmail = normalizeEmail(account.email);
-  const sentByCurrentUser = extractEmails(message.from).some(
-    (email) => normalizeEmail(email) === accountEmail
-  );
+function getReplyRecipient(ownAddresses: readonly string[], message: Message) {
+  const sentByCurrentUser = isOwnAddress(message.from, ownAddresses);
   if (!sentByCurrentUser) {
     const replyTo = message.replyTo?.trim();
     if (replyTo) return replyTo;
@@ -131,10 +120,8 @@ function getReplyRecipient(account: Account, message: Message) {
   }
 
   const firstOtherRecipient =
-    splitRecipientEntries(message.to)[0] ??
-    splitRecipientEntries(message.cc)[0] ??
-    splitRecipientEntries(message.bcc)[0] ??
-    "";
+    [message.to, message.cc, message.bcc].flatMap(splitRecipientEntries)
+      .find(recipient => !isOwnAddress(recipient, ownAddresses)) ?? "";
   return firstOtherRecipient.trim();
 }
 
@@ -174,12 +161,13 @@ export async function buildDraftInputForMode(
     throw new DraftSaveError(404, "Message not found");
   }
 
+  const ownAddresses = await getAccountOwnAddresses(accountId);
   const { inReplyTo, references } = buildReplyThreadHeaders(referenceMessage);
 
   return {
     to:
       input.to?.trim() ??
-      (mode === "reply" ? getReplyRecipient(account, referenceMessage) : ""),
+      (mode === "reply" ? getReplyRecipient(ownAddresses.length ? ownAddresses : getOwnAddresses(account), referenceMessage) : ""),
     cc: input.cc?.trim() ?? "",
     bcc: input.bcc?.trim() ?? "",
     subject:

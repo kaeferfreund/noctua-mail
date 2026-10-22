@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     const result = await processStandaloneCalendarInvite({
       accountId,
       icsSource,
-      accountEmail: account.email
+      accountEmail: getOwnAddresses(account)
     });
 
     if (result.eventUids.length === 0) {

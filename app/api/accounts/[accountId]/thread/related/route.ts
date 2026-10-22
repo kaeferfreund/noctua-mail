@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     return NextResponse.json({ items: data.items });

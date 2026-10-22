@@ -1,3 +1,4 @@
+import { seedSenderIdentityRow } from "./senderIdentities";
 import type {
   Account,
   AdminAuditEntry,
@@ -262,7 +263,7 @@ export function resolveAccountDbPathForPersist(accountId: string, dbPath?: strin
   return getDefaultAccountDbPath(accountId);
 }
 
-export function persistAccountRow(db: any, account: Account, dbPath?: string | null, insertOnly = false) {
+export function persistAccountRow(db: any, account: Account, dbPath?: string | null, insertOnly = false, createdBy?: string) {
   const settings = normalizeAccountSettings(account.settings);
   const insert = db.prepare(`
     INSERT ${insertOnly ? "" : "OR REPLACE"} INTO accounts (
@@ -303,4 +304,5 @@ export function persistAccountRow(db: any, account: Account, dbPath?: string | n
     account.deepl?.enabled == null ? null : account.deepl.enabled ? 1 : 0,
     account.deepl?.targetLang?.trim() ? account.deepl.targetLang.trim() : null
   );
+  seedSenderIdentityRow(db, account, createdBy ?? account.ownerUserId ?? null);
 }

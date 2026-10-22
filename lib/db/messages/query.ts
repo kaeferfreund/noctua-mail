@@ -1,3 +1,4 @@
+import { hydrateIdentityMetadata } from "./identityMetadata";
 /**
  * Read-side queries for the messages domain.
  *
@@ -13,7 +14,8 @@
 import { simpleParser } from "mailparser";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
-import { getAccountEmail } from "../accounts";
+import { getAccountOwnAddresses } from "../senderIdentities";
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "../../ownAddresses";
 import {
   CALENDAR_FILENAME_EXTENSIONS,
   CALENDAR_INVITE_FLAG,
@@ -583,7 +585,7 @@ function hasAddressSearchFilters(filters: AddressSearchFilters) {
 function parseSearchInput(
   raw: string | null | undefined,
   fields?: string[] | null,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   const input = raw ?? "";
 
@@ -594,7 +596,7 @@ function parseSearchInput(
     if (cleaned) {
       // Handle "from:me" - replace with current account email
       if (cleaned.toLowerCase() === "me" && accountEmail) {
-        fromTerms.push(accountEmail);
+        fromTerms.push(...ownAddressList(accountEmail));
       } else {
         fromTerms.push(cleaned);
       }
@@ -616,7 +618,7 @@ function parseSearchInput(
     const cleaned = term.replace(/^"|"$/g, "").trim();
     if (cleaned) {
       if (cleaned.toLowerCase() === "me" && accountEmail) {
-        withTerms.push(accountEmail);
+        withTerms.push(...ownAddressList(accountEmail));
       } else {
         withTerms.push(cleaned);
       }
@@ -1003,7 +1005,7 @@ async function getGroupCounts(params: {
   } =
     params;
   const db = await getAccountDb(accountId);
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -1247,7 +1249,7 @@ async function getTotalCount(params: {
     participants
   } =
     params;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -1441,7 +1443,7 @@ export async function listRelatedMessages(params: {
     return { items: [] as Message[], groups: [], total: 0, hasMore: false, baseCount: 0 };
   }
 
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   // Message-Id equality is case-insensitive by RFC-5322 convention, and
   // `getMessageById` already does case-insensitive lookups — match that.
@@ -1481,7 +1483,7 @@ export async function listRelatedMessages(params: {
       ]
     )
   )
-    .filter((email) => email && email !== accountEmail)
+    .filter((email) => email && !isOwnAddress(email, accountEmail))
     .slice(0, 6);
 
   const targetRefs = new Set(
@@ -1591,7 +1593,7 @@ export async function listRelatedMessages(params: {
         m.dateValue,
         m.priority,
         m.hasSource,
-        m.sizeBytes,
+        m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
         m.unread,
         m.flags,
         m.seen,
@@ -1757,7 +1759,8 @@ export async function listRelatedMessages(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -1882,7 +1885,7 @@ export async function listMessages(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -2012,7 +2015,7 @@ export async function listMessages(params: {
         m.dateValue,
         m.priority,
         m.hasSource,
-        m.sizeBytes,
+        m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
         m.unread,
         m.flags,
         m.seen,
@@ -2089,7 +2092,8 @@ export async function listMessages(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -2185,7 +2189,7 @@ export async function listThreads(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
   const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
 
@@ -2535,7 +2539,7 @@ export async function listThreads(params: {
               m.dateValue,
               m.priority,
               m.hasSource,
-              m.sizeBytes,
+              m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
               m.unread,
               m.flags,
               m.seen,
@@ -2613,7 +2617,8 @@ export async function listThreads(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -2833,7 +2838,8 @@ export async function listThreadMessages(params: {
       htmlBody: row.htmlBody ?? undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       attachments: attachmentsByMessage.get(row.id) ?? [],
       unread: Boolean(row.unread),
       flags: safeParseJson<string[]>(row.flags),

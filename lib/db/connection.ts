@@ -12,6 +12,7 @@ import {
   ensureCalendarReminderRuntimeSchema,
   ensureMessageCalendarEventRuntimeSchema,
   ensureThreadRuntimeSchema,
+  ensureSenderIdentityMessageRuntimeSchema,
   ensureTopicRuntimeSchema,
   initAccountSchema,
   initMasterSchema
@@ -212,7 +213,7 @@ export async function getDb() {
     }
   }
   if (!masterInitialized && masterDbInstance) {
-    initMasterSchema(masterDbInstance);
+    await withDbWriteRetry("initMasterSchema", () => initMasterSchema(masterDbInstance));
     masterInitialized = true;
   }
   return masterDbInstance;
@@ -257,6 +258,7 @@ export async function getAccountDb(accountId: string) {
     initAccountSchema(accountDb);
     accountDbInitialized.add(dbPath);
   }
+  ensureSenderIdentityMessageRuntimeSchema(accountDb);
   ensureThreadRuntimeSchema(accountDb);
   ensureTopicRuntimeSchema(accountDb);
   ensureMessageCalendarEventRuntimeSchema(accountDb);

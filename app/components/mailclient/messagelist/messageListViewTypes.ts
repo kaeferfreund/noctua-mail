@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type React from "react";
 import type { AccountDateFormat, Message, RecipientAlias, Topic } from "@/lib/data";
 import type { MessageGroup, ThreadNode, VisibleMessageEntry } from "./listModel";
@@ -57,7 +58,7 @@ export type MessageListViewState = {
   listIsNarrow: boolean;
   preferToDisplay: boolean;
   activeTopic: Topic | null;
-  userEmail?: string;
+  userEmail?: OwnAddressInput;
   findRecipientAlias?: (value?: string | null) => RecipientAlias | null;
   dateFormat?: AccountDateFormat;
   topicColorRows?: boolean;

@@ -1,3 +1,4 @@
+import { isOwnAddress } from "@/lib/ownAddresses";
 import type { AccountDateFormat, Message } from "@/lib/data";
 import { createDefaultComposeInviteDraft } from "@/lib/composeInvite";
 import { formatForwardedMessageDate, formatMessageDate } from "@/lib/dateFormatting";
@@ -143,6 +144,7 @@ export function computeComposeInitState(
   asNew: boolean,
   opts: {
     accountEmail: string;
+    ownAddresses?: readonly string[];
     accountDateFormat: AccountDateFormat;
     preferredComposeTab?: ComposeTab;
     findMessageByMessageId?: (messageId: string) => Message | undefined;
@@ -159,6 +161,7 @@ export function computeComposeInitState(
   const { stripHtml, normalizeHtmlDerivedText } = deps;
   const { accountEmail, accountDateFormat, preferredComposeTab } = opts;
 
+  const ownAddresses = opts.ownAddresses ?? [accountEmail];
   const fromEmails = extractEmails(message.from);
   const fromRecipient = getDisplayRecipient(message.from);
   // Honor RFC 5322 Reply-To: when present on the original message, replies
@@ -168,13 +171,8 @@ export function computeComposeInitState(
   const replyToRaw = message.replyTo?.trim() ?? "";
   const replyToEmails = replyToRaw ? extractEmails(replyToRaw) : [];
   const replyToRecipient = replyToRaw ? getDisplayRecipient(replyToRaw) : "";
-  const toEmails = extractEmails(message.to);
-  const ccEmails = extractEmails(message.cc ?? "");
-  const bccEmails = extractEmails(message.bcc ?? "");
 
-  const isSentByCurrentUser = fromEmails.some(
-    (email) => email.toLowerCase() === accountEmail.toLowerCase()
-  );
+  const isSentByCurrentUser = isOwnAddress(message.from, ownAddresses);
 
   const prefersHtml = hasHtmlContent(message.htmlBody);
   const replyMessageId = message.messageId ?? undefined;
@@ -234,10 +232,8 @@ export function computeComposeInitState(
 
     let to: string;
     if (isSentByCurrentUser) {
-      const firstTo = getDisplayRecipient(splitRecipientEntries(message.to)[0] ?? "");
-      const firstCc = getDisplayRecipient(splitRecipientEntries(message.cc)[0] ?? "");
-      const firstBcc = getDisplayRecipient(splitRecipientEntries(message.bcc)[0] ?? "");
-      to = firstTo || firstCc || firstBcc || "";
+      to = [message.to, message.cc, message.bcc].flatMap(splitRecipientEntries)
+        .filter(recipient => !isOwnAddress(recipient, ownAddresses)).map(getDisplayRecipient)[0] ?? "";
     } else if (replyToRaw) {
       to = replyToRecipient || uniqueEmails(replyToEmails).join(", ");
     } else {
@@ -265,16 +261,10 @@ export function computeComposeInitState(
     let ccList: string[];
 
     if (isSentByCurrentUser) {
-      toList = uniqueRecipients(
-        toEmails
-          .map((email) => {
-            const match = splitRecipientEntries(message.to)
-              .find((r) => r.toLowerCase().includes(email.toLowerCase()));
-            return match ? getDisplayRecipient(match.trim()) : email;
-          })
-          .filter(Boolean)
-      );
-      ccList = uniqueEmails([...ccEmails, ...bccEmails]);
+      toList = uniqueRecipients(splitRecipientEntries(message.to)
+        .filter(recipient => !isOwnAddress(recipient, ownAddresses)).map(getDisplayRecipient));
+      ccList = uniqueEmails([message.cc, message.bcc].flatMap(value => extractEmails(value))
+        .filter(email => !isOwnAddress(email, ownAddresses)));
     } else {
       // When Reply-To is set we deliberately do not add the original From
       // to CC. Reply-To is an explicit redirection by the sender; including
@@ -304,7 +294,7 @@ export function computeComposeInitState(
           .filter((r) => {
             const email = getPrimaryEmail(r) || r;
             return (
-              email.toLowerCase() !== accountEmail.toLowerCase() &&
+              !isOwnAddress(email, ownAddresses) &&
               !toEmailSet.has(email.toLowerCase())
             );
           })

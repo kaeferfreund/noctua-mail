@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 /**
  * Email categorization classifier (linear-model only).
  */
@@ -33,7 +34,7 @@ export type CategoryClassificationInput = LinearFeatureEmailInput & {
 };
 
 export type CategoryClassificationContext = {
-  accountEmail?: string | null;
+  accountEmail?: OwnAddressInput;
   mailboxPath?: string | null;
   folderSpecialUse?: string | null;
   fromAddressHint?: string | null;
@@ -176,8 +177,8 @@ function classifyEmailInput(
   }
 
   const senderEmail = extractEmailAddress(input.from) || extractEmailAddress(context?.fromAddressHint);
-  const accountEmail = normalizeEmail(context?.accountEmail);
-  if (senderEmail && accountEmail && senderEmail === accountEmail) {
+  const ownAddresses = ownAddressList(context?.accountEmail);
+  if (senderEmail && isOwnAddress(senderEmail, ownAddresses)) {
     return {
       category: null,
       confidence: 0,

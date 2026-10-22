@@ -1,3 +1,4 @@
+import { assertIdentitySignaturesAvailable } from "./senderIdentities";
 import { recordAdminAuditRow } from "./db/adminAudit";
 import type { Database } from "bun:sqlite";
 import type { Account } from "./data";
@@ -83,6 +84,7 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
     if (JSON.stringify(liveOwner) !== JSON.stringify(owner)) throw new MailboxCredentialError("Mailbox owner identity changed; retry repair", 409);
     // Network verification may race another repair or account update. Never overwrite the newly stored state.
     if (JSON.stringify(live) !== JSON.stringify(originalRow)) throw new MailboxCredentialError("Mailbox changed; retry repair", 409);
+    assertIdentitySignaturesAvailable(db, accountId, (next.settings?.signatures ?? []).map(signature => signature.id));
     persistAccountRow(db, next, (originalRow as { dbPath?: string }).dbPath);
     const changedFields = changedAccountFields(original, next);
     if (changedFields.length) recordAdminAuditRow(db, { actorUserId: actor.userId, action: "account.update", targetAccountId: accountId, payload: { changedFields } });

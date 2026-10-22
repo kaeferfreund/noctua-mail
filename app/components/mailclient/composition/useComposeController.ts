@@ -197,6 +197,7 @@ export function useComposeController({
       asNew,
       {
         accountEmail: currentAccount?.email ?? "",
+        ownAddresses: currentAccount?.ownAddresses,
         accountDateFormat,
         preferredComposeTab: options?.preferredComposeTab,
         findMessageByMessageId
