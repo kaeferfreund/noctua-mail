@@ -1,0 +1,61 @@
+Working directory: /home/monkey/code/noctua-mail/wt-review-collab
+Environment: TMPDIR="$PWD/.tmp"; heavy commands use nice -n 10.
+
+TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/compose-extra.dom.test.tsx ./.tmp/collab-extra.dom.test.tsx ./.tmp/compose-adversarial.dom.test.tsx ./.tmp/collab-adversarial.dom.test.tsx
+RESULT: exit 1; 14 pass, 1 fail, 78 assertions, 15 tests, 4 files.
+The six adapted previous repros pass. Five new compose tests pass. Three new collaboration/receipt tests pass. One new access-denial test fails.
+
+TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/parent-denial.dom.test.tsx --test-name-pattern 'R2-new:'
+RESULT (abccff9 hook extracted with git show): exit 0; 1 pass, 0 fail, 3 filtered, 9 assertions.
+
+TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml app/components/mailclient/composition app/hooks
+RESULT: exit 0; 214 pass, 0 fail, 703 assertions, 18 files.
+
+TMPDIR="$PWD/.tmp" nice -n 10 bun check --no-pretty --all 2>&1 | tee .tmp/bun-check.log | grep "error TS" | grep -v bun:test | wc -l
+RESULT: 151 (baseline unchanged); bun check exit 1; remaining pipeline stages exit 0.
+
+Mobile: real InAppNoticeStack rendered with react-dom/server, exact notice CSS from app/globals.css (plus browser reset and Arial), synthetic text only; Python static server on 127.0.0.1:3783; T3 preview resized to 390x844.
+RESULT: 452 chars; description client/scroll width 282/282, height 198/198; 11 lines; white-space normal, overflow visible, overflow-wrap anywhere; all lines within text box; recovery sentence present; notice x=12..378, y=564..804; document width 390. Browser tab closed and owned server PID 290090 terminated explicitly.
+
+Failing-test excerpt:
+R2-new observed {
+  readDenied: false,
+  state: "one",
+  denials: [],
+}
+87 |  await waitFor(()=>expect(reads).toBe(3));
+88 |  await act(async()=>{failed.resolve(json({message:'Synthetic transient server failure'},500));});
+89 |  await waitFor(()=>expect(hook.result.current.error).toBe('Synthetic transient server failure'));
+90 |  await act(async()=>{denied.resolve(json({message:'Synthetic mailbox access revoked'},403));});
+91 |  console.log('R2-new observed',{readDenied:hook.result.current.readDenied,state:hook.result.current.state?.threadId,denials});
+92 |  expect(hook.result.current.readDenied).toBe(true);
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/collab-adversarial.dom.test.tsx:92:41)
+(fail) R2-new: a later failed refresh cannot supersede an authoritative access denial [67.05ms]
+
+ 14 pass
+ 1 fail
+ 78 expect() calls
+Ran 15 tests across 4 files. [2.05s]
+
+Parent comparison:
+bun test v1.4.4 (38afee6c8)
+
+.tmp/parent-denial.dom.test.tsx:
+R2-new observed {
+  readDenied: true,
+  state: undefined,
+  denials: [ "a" ],
+}
+(pass) R2-new: a later failed refresh cannot supersede an authoritative access denial [75.50ms]
+
+ 1 pass
+ 3 filtered out
+ 0 fail
+ 9 expect() calls
+Ran 1 test across 1 file. [321.00ms]

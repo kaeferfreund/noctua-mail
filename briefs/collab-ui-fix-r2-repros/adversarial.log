@@ -1,0 +1,203 @@
+bun test v1.4.4 (38afee6c8)
+
+../../../../../tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792685410412-1",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792685410413-2",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+C5 observed {
+  unlocked: true,
+  sends: 3,
+}
+206 |   await act(async () => { first.resolve(new Response('{"message":"Synthetic failure"}', {status:500})); });
+207 |   const unlocked = !(sendButton() as HTMLButtonElement).disabled;
+208 |   await act(async () => { fireEvent.click(sendButton()!); });
+209 |   await act(async () => { second.resolve(jsonResponse({ok:true})); third.resolve(jsonResponse({ok:true})); });
+210 |   console.log("C5 observed", {unlocked, sends:countSmtpSends()});
+211 |   expect(unlocked).toBe(false);
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:211:20)
+(fail) C5: completion of account A must not unlock a pending send in account B [493.35ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792685410516-3",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua] failed to open composer: 223 |   expect(h.countSmtpSends()).toBe(1);
+224 |   let opening:Promise<void>|undefined;
+225 |   act(()=>{opening=h.handleRef.current!.openCompose('forward',{id:'next',accountId:'acc-test',threadId:'t-next',body:'',htmlBody:'',subject:'Next synthetic message'} as Message);});
+226 |   expect(h.sendButton()).toBeUndefined();
+227 |   expect(h.view.getByText('Delivery succeeded. Do not send it again.')).toBeTruthy();
+228 |   await act(async()=>{rejectHydration(new Error('Synthetic hydration failure'));await opening;});
+                                                ^
+error: Synthetic hydration failure
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:228:43)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:228:9)
+
+(pass) C1: inline delivery receipt survives failed replacement hydration [87.92ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792685410649-4",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua] failed to open composer: 223 |   expect(h.countSmtpSends()).toBe(1);
+224 |   let opening:Promise<void>|undefined;
+225 |   act(()=>{opening=h.handleRef.current!.openCompose('forward',{id:'next',accountId:'acc-test',threadId:'t-next',body:'',htmlBody:'',subject:'Next synthetic message'} as Message);});
+226 |   expect(h.sendButton()).toBeUndefined();
+227 |   expect(h.view.getByText('Delivery succeeded. Do not send it again.')).toBeTruthy();
+228 |   await act(async()=>{rejectHydration(new Error('Synthetic hydration failure'));await opening;});
+                                                ^
+error: Synthetic hydration failure
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:228:43)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:228:9)
+
+(pass) C1: mobile delivery receipt survives failed replacement hydration [129.71ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792685410778-5",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+Pending hydration after account switch {
+  subject: "Fwd: Private synthetic A subject",
+  sendUrl: "/api/accounts/account-b/smtp/send",
+  leakedContent: true,
+}
+245 |  const subject=h.view.baseElement.querySelector<HTMLInputElement>('#compose-modal-subject');
+246 |  await act(async()=>{fireEvent.change(h.view.baseElement.querySelector('#compose-modal-to')!,{target:{value:'recipient@example.test'}});});
+247 |  await act(async()=>{fireEvent.click(h.sendButton()!);});
+248 |  const sent=h.calls.find(call=>call.url.includes('/smtp/send'));
+249 |  console.log('Pending hydration after account switch', {subject:subject?.value,sendUrl:sent?.url,leakedContent:JSON.stringify(sent?.body).includes('Private synthetic A')});
+250 |  expect(subject === null).toBe(true);
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/tmp/noctua-collab-review-r1/compose-extra.dom.test.tsx:250:27)
+(fail) New: account switch cancels pending source hydration [128.06ms]
+
+../../../../../tmp/noctua-collab-review-r1/collab-extra.dom.test.tsx:
+C6 observed {
+  readDenied: true,
+  state: undefined,
+}
+20 |  // An earlier read was denied before membership was restored; the next read succeeds.
+21 |  hook.rerender({thread:'two'});
+22 |  await waitFor(()=>expect(hook.result.current.state?.threadId).toBe('two'));
+23 |  await act(async()=>{oldDenied(json({message:'Mailbox access was revoked'},403));});
+24 |  console.log('C6 observed',{readDenied:hook.result.current.readDenied,state:hook.result.current.state});
+25 |  expect(hook.result.current.readDenied).toBe(false);
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/tmp/noctua-collab-review-r1/collab-extra.dom.test.tsx:25:41)
+(fail) C6: an obsolete denied GET must not override a newer successful mailbox read [57.69ms]
+C4 observed [
+  {
+    id: "noctua:detached-compose-warning:2a4656b8-0489-4764-bdcf-bf5d9b6fb864",
+    type: "warning",
+    title: "Email sent · private-mailbox-a",
+    description: "Synthetic SMTP warning for the previous user. Delivery succeeded. Do not send it again.",
+    expiresAt: null,
+  }
+]
+27 | });
+28 | it('C4: a fresh login with no access to A must not see A warning receipts',()=>{
+29 |  notifyDetachedComposeOutcome('handoff-a',{version:1,status:'ready',accountId:'private-mailbox-a',mode:'new',draftId:'draft-a',sourceMessageId:null,createdAtMs:Date.now(),updatedAtMs:Date.now()},'sent',null,['Synthetic SMTP warning for the previous user.']);
+30 |  const hook=renderHook(()=>useDetachedSendWarnings([{id:'b',name:'Other user mailbox'}]));
+31 |  console.log('C4 observed',hook.result.current.notices);
+32 |  expect(hook.result.current.notices).toEqual([]);
+                                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "description": "Synthetic SMTP warning for the previous user. Delivery succeeded. Do not send it again.",
++     "expiresAt": null,
++     "id": "noctua:detached-compose-warning:2a4656b8-0489-4764-bdcf-bf5d9b6fb864",
++     "title": "Email sent · private-mailbox-a",
++     "type": "warning",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 9
+
+      at <anonymous> (/tmp/noctua-collab-review-r1/collab-extra.dom.test.tsx:32:38)
+(fail) C4: a fresh login with no access to A must not see A warning receipts [2.49ms]
+
+ 2 pass
+ 4 fail
+ 22 expect() calls
+Ran 6 tests across 2 files. [1.55s]

@@ -1,0 +1,2287 @@
+Review at 87d1f3243613e0659287ba03f5e1b110e0e95681, parent 551aedf398c38c1ca47ec3843497c014223829c2.
+Working directory: /home/monkey/code/noctua-mail/wt-review-collab
+All runtime scratch under worktree .tmp. Synthetic fixtures only. No app server, browser, real accounts, credentials, commits, or tracked edits.
+
+Predecessor import adaptation: only compose-extra.dom.test.tsx absolute ComposeOrchestrator import changed to @/app/components/mailclient/composition/ComposeOrchestrator in scratch. Other predecessor files copied unchanged.
+
+Preserved new tests use repo @/ imports; copy to .tmp to run. See ../collab-ui-fix-r3-verify.md for full setup and parent-control reproduction.
+
+=== permanent.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml app/hooks app/components/mailclient/composition
+RESULT: exit 0; 219 pass, 0 fail; 762 assertions; 18 files
+bun test v1.4.4 (38afee6c8)
+
+app/hooks/useThreadCollab.dom.test.tsx:
+(pass) ignores an obsolete denied GET after a newer successful thread read [80.48ms]
+(pass) ignores an obsolete denied GET after a newer successful reload [15.58ms]
+(pass) R2-3: a denial after TWO newer successful reads must not erase the latest state or members [123.17ms]
+(pass) R2-3: a latest genuine denial still clears cached state and prevents mutations [61.01ms]
+(pass) R2-new: a later failed refresh cannot supersede an authoritative access denial (HTTP 500) [61.46ms]
+(pass) R2-new: a later failed refresh cannot supersede an authoritative access denial (network) [63.93ms]
+(pass) R3: a denial stays applied while a newer read is pending, then its success restores access [59.62ms]
+
+app/hooks/useDarkMode.dom.test.tsx:
+(pass) useDarkMode > reads the html class on the first client render [11.63ms]
+(pass) useDarkMode > follows class changes made by the theme provider [14.43ms]
+
+app/hooks/useMobileNavigation.dom.test.tsx:
+(pass) derived mobile navigation > pushes one history entry for external selections and keeps both panes mounted [68.95ms]
+(pass) derived mobile navigation > derives thread for initial deep links, and returns to list on popstate [19.24ms]
+(pass) derived mobile navigation > uses browser back for a marked entry and clears a selection without a marker [16.40ms]
+(pass) derived mobile navigation > does not push history for desktop selections [13.58ms]
+(pass) derived mobile navigation > server renders initial thread visibility independently of the media query [9.39ms]
+(pass) derived mobile navigation > reads the media query on first client mount and follows breakpoint changes [3.86ms]
+(pass) mobile overlay navigation history > places an initially open Sheet above an initial deep-linked thread [41.93ms]
+(pass) mobile overlay navigation history > Back dismisses Processes before the thread, and supports nested settings/sidebar Sheets [60.63ms]
+
+app/components/mailclient/composition/detachedSendWarnings.dom.test.tsx:
+(pass) retains mailbox A warnings while mailbox B is selected, across later events and remounts, until acknowledged [196.57ms]
+(pass) a fresh login cannot see another user's receipts, even for a shared accessible mailbox [1.11ms]
+(pass) a fresh login cannot see receipts for an inaccessible mailbox [0.91ms]
+(pass) clears in-memory receipts on logout/login and access revocation and ignores late previous-user events [3.19ms]
+(pass) ignores legacy receipts with no authenticated owner [0.94ms]
+(pass) renders persistent recovery guidance with the wrapping description variant [4.09ms]
+
+app/components/mailclient/composition/composeTabSwitch.test.ts:
+(pass) computeBodyOnSwitchToText – from HTML > fresh HTML reply: shows quoted content with > prefix, user content empty [0.57ms]
+(pass) computeBodyOnSwitchToText – from HTML > includes the forward header table as text lines above the quoted body [0.52ms]
+(pass) computeBodyOnSwitchToText – from HTML > converts the header table of a restored draft the same way [0.16ms]
+(pass) computeBodyOnSwitchToText – from HTML > HTML reply with user content: combines user text and quoted text [0.10ms]
+(pass) computeBodyOnSwitchToText – from HTML > separates user text and quoted text with a blank line [0.06ms]
+(pass) computeBodyOnSwitchToText – from HTML > no quoted parts, no quoted HTML: returns only user text [0.04ms]
+(pass) computeBodyOnSwitchToText – from HTML > falls back to stripHtml(composeHtml) when composeHtmlText is empty [0.06ms]
+(pass) computeBodyOnSwitchToText – from HTML > decodes html entities in quoted header content [0.53ms]
+(pass) computeBodyOnSwitchToText – from HTML > uses composeQuotedHtml when composeQuotedParts is null [0.05ms]
+(pass) computeBodyOnSwitchToText – from HTML > excludes quoted content when composeIncludeOriginal is false [0.03ms]
+(pass) computeBodyOnSwitchToText – from HTML > returns empty string when nothing to show [0.02ms]
+(pass) computeBodyOnSwitchToText – from HTML > toggle-then-switch preserves body and does not duplicate quoted text [0.05ms]
+(pass) computeBodyOnSwitchToText – from Markdown > strips HTML tags from markdown content [0.08ms]
+(pass) computeBodyOnSwitchToText – from Markdown > includes quoted content when coming from markdown and quoted parts present [0.06ms]
+(pass) computeBodyOnSwitchToText – from Markdown > fresh markdown reply (no user content): shows only quoted text [0.06ms]
+(pass) computeBodyOnSwitchToText – from Text (no-op) > returns empty string when lastEdited is already text (caller keeps current body) [0.03ms]
+(pass) computeHtmlOnSwitchToHtml – from Text > wraps plain text in a paragraph [0.10ms]
+(pass) computeHtmlOnSwitchToHtml – from Text > converts newlines to <br> [0.03ms]
+(pass) computeHtmlOnSwitchToHtml – from Text > returns empty html when composeBody is empty [0.02ms]
+(pass) computeHtmlOnSwitchToHtml – from Text > escapes HTML special characters in text [0.03ms]
+(pass) computeHtmlOnSwitchToHtml – from Text > computes htmlText as stripped html [0.02ms]
+(pass) computeHtmlOnSwitchToHtml – from Markdown > converts markdown to html [13.88ms]
+(pass) computeHtmlOnSwitchToHtml – from HTML > returns null (Lexical editor owns content, no update needed) [0.07ms]
+(pass) computeMarkdownOnSwitchToMarkdown – from HTML > converts simple HTML to markdown [3.28ms]
+(pass) computeMarkdownOnSwitchToMarkdown – from HTML > converts bold HTML to markdown bold [0.79ms]
+(pass) computeMarkdownOnSwitchToMarkdown – from HTML > returns empty string for empty HTML [0.05ms]
+(pass) computeMarkdownOnSwitchToMarkdown – from Text > converts plain text to markdown [0.03ms]
+(pass) computeMarkdownOnSwitchToMarkdown – from Markdown > returns null (no conversion needed) [0.02ms]
+
+app/components/mailclient/composition/sendOutcome.test.ts:
+(pass) keeps both delivered warnings for direct, draft and calendar responses [0.12ms]
+
+app/components/mailclient/composition/composeTextNormalization.test.ts:
+(pass) normalizeHtmlDerivedText > preserves trailing t characters [0.08ms]
+(pass) normalizeHtmlDerivedText > removes trailing spaces and tabs without dropping visible characters [0.03ms]
+(pass) normalizeHtmlDerivedText > preserves signature separators at the start of a line [0.01ms]
+
+app/components/mailclient/composition/sendOutcome.dom.test.tsx:
+(pass) renders accepted draft warnings and forbids an optimistic Sent row when the copy failed [9.07ms]
+
+app/components/mailclient/composition/composeThreading.test.ts:
+(pass) shouldThreadComposeForMode > returns true for threadable compose modes [0.05ms]
+(pass) shouldThreadComposeForMode > returns false for new compose [0.03ms]
+
+app/components/mailclient/composition/draftSaveUtils.test.ts:
+(pass) draftSaveUtils > computes a stable hash from recipients, content, and attachment metadata [0.16ms]
+(pass) draftSaveUtils > treats undefined html as blank in hashes [0.05ms]
+(pass) draftSaveUtils > detects whether a draft has any meaningful content [0.21ms]
+(pass) draftSaveUtils > distinguishes autosave eligibility from manual save eligibility [0.15ms]
+(pass) draftSaveUtils > builds draft payloads with normalized html by default [0.11ms]
+(pass) draftSaveUtils > can preserve undefined html for autosave parity [0.03ms]
+
+app/components/mailclient/composition/buildSendPayload.test.ts:
+(pass) buildSendPayload — basic fields > passes through recipients, subject, text and attachments [0.17ms]
+(pass) buildSendPayload — basic fields > passes through html when provided [0.03ms]
+(pass) buildSendPayload — basic fields > passes through invite payload when provided [0.06ms]
+(pass) buildSendPayload — basic fields > passes through markdown compose data for server-side html rendering [0.03ms]
+(pass) buildSendPayload — basic fields > passes undefined html when not provided [0.02ms]
+(pass) buildSendPayload — threading headers > includes inReplyTo and references for reply mode [0.03ms]
+(pass) buildSendPayload — threading headers > includes threading headers for replyAll mode [0.03ms]
+(pass) buildSendPayload — threading headers > includes threading headers for forward mode [0.02ms]
+(pass) buildSendPayload — threading headers > omits threading headers for new mode [0.02ms]
+(pass) buildSendPayload — threading headers > falls back to composeReplyMessage headers when composeReplyHeaders is null [0.04ms]
+(pass) buildSendPayload — xForwardedMessageId > sets xForwardedMessageId for forward mode [0.02ms]
+(pass) buildSendPayload — xForwardedMessageId > omits xForwardedMessageId for non-forward modes [0.03ms]
+(pass) buildSendPayload — Reply-To header > is empty for new compose (no Reply-To needed) [0.01ms]
+(pass) buildSendPayload — Reply-To header > is empty for forward mode [0.01ms]
+(pass) buildSendPayload — Reply-To header > is empty for reply when Reply-To would equal From (standard case) [0.02ms]
+(pass) buildSendPayload — Reply-To header > is empty for replyAll for the same reason [0.02ms]
+
+app/components/mailclient/composition/draftListState.test.ts:
+(pass) reconcileSavedDraftMessages > replaces the previous draft row with the saved draft [0.24ms]
+(pass) reconcileSavedDraftMessages > removes stale draft rows when the saved draft no longer belongs in the current results [0.05ms]
+(pass) reconcileSavedDraftMessages > prunes cross-folder drafts when the active folder has no thread anchor [0.13ms]
+(pass) reconcileSavedDraftMessages > keeps cross-folder drafts in threaded folder views when the active folder still anchors the thread [0.10ms]
+(pass) reconcileSavedDraftMessages > hides cross-folder saved drafts in flat folder views even when the thread anchor exists [0.04ms]
+(pass) reconcileSavedDraftMessages > preserves list identity when the saved draft is not shown in the current results [0.03ms]
+(pass) buildSavedDraftListMessage > preserves the existing received thread sort date for saved drafts [6.62ms]
+(pass) buildSavedDraftListMessage > keeps activity-based grouping when the active sort source is activity [0.12ms]
+
+app/components/mailclient/composition/composeContentBuilder.test.ts:
+(pass) formatQuotedBody > prefixes each line with > and adds a header [0.04ms]
+(pass) formatQuotedBody > trims trailing spaces from quoted lines [0.05ms]
+(pass) formatQuotedBody > handles empty body [0.02ms]
+(pass) buildTextReplyBody > returns the formatted quoted body with two leading empty lines above the header [0.04ms]
+(pass) buildTextReplyBody > handles multi-line original body [0.02ms]
+(pass) buildTextReplyBody > starts with two newlines so the textarea shows two empty rows before the quote [0.03ms]
+(pass) buildComposePayload — text mode > returns plain text body as-is (trimmed) [0.21ms]
+(pass) buildComposePayload — text mode > returns body that already contains quoted text (no separate appending) [0.04ms]
+(pass) buildComposePayload — text mode > trims leading and trailing whitespace from body [0.02ms]
+(pass) buildComposePayload — text mode > handles empty body [0.02ms]
+(pass) buildComposePayload — text mode > falls back to text mode when preferText is true and tab is html [0.03ms]
+(pass) buildComposePayload — html mode > returns html body [1.67ms]
+(pass) buildComposePayload — html mode > appends quoted html when composeIncludeOriginal is true and not edited [1.22ms]
+(pass) buildComposePayload — html mode > excludes quoted html when composeQuotedHtmlEdited is true [0.58ms]
+(pass) buildComposePayload — html mode > excludes quoted html when composeIncludeOriginal is false [0.65ms]
+(pass) buildComposePayload — html mode > strips img tags when composeStripImages is true [0.66ms]
+(pass) buildComposePayload — html mode > uses composeAssembledQuotedHtml in the payload, ignoring stale composeQuotedHtml [1.38ms]
+(pass) buildComposePayload — html mode > uses the assembled HTML the caller provides — quoteHtml flag is the caller's responsibility [1.54ms]
+(pass) buildComposePayload — html mode > falls back to composeQuotedHtml when composeAssembledQuotedHtml is null [0.96ms]
+(pass) buildComposePayload — html mode > excludes the quote when composeQuotedHtmlEdited is true even if assembled HTML is provided [0.72ms]
+(pass) buildComposePayload — html mode > replaces inline attachment data URLs with cid: references [1.97ms]
+(pass) buildComposePayload — markdown mode > returns markdown content [0.06ms]
+(pass) buildComposePayload — markdown mode > strips html tags from markdown for the text/plain part [0.04ms]
+(pass) buildComposePayload — markdown mode > keeps the text/plain part equal to the markdown source so drafts round-trip [3.21ms]
+(pass) buildComposePayload — markdown mode > includes quoted html when composeIncludeOriginal is true and not edited [0.36ms]
+(pass) buildComposePayload — markdown mode > omits quoted html when composeQuotedHtmlEdited is true [0.08ms]
+(pass) buildComposePayload — markdown mode > falls back to text mode when preferText is true [0.04ms]
+
+app/components/mailclient/composition/composeInitState.test.ts:
+(pass) getDisplayRecipient > extracts name and email from full format [0.16ms]
+(pass) getDisplayRecipient > strips surrounding quotes from name [0.04ms]
+(pass) getDisplayRecipient > returns just the email when no name is present [0.08ms]
+(pass) getDisplayRecipient > returns empty string for empty input [0.01ms]
+(pass) normalizeComposeTo > returns empty string for undisclosed recipients [0.09ms]
+(pass) normalizeComposeTo > passes through normal email addresses [0.02ms]
+(pass) normalizeComposeTo > trims whitespace [0.01ms]
+(pass) uniqueEmails > deduplicates case-insensitively [0.07ms]
+(pass) uniqueRecipients > deduplicates by email address regardless of display name [0.05ms]
+(pass) computeComposeInitState — new > returns all blank fields for new compose with no message [0.47ms]
+(pass) computeComposeInitState — reply > sets To from message From when message is from someone else [3.66ms]
+(pass) computeComposeInitState — reply > replies to first To recipient when message is from self [0.25ms]
+(pass) computeComposeInitState — reply > preserves quoted commas in the first recipient when replying to self [0.15ms]
+(pass) computeComposeInitState — reply > prefixes subject with Re: [0.10ms]
+(pass) computeComposeInitState — reply > does not double-prefix subject [0.05ms]
+(pass) computeComposeInitState — reply > sets reply headers [0.06ms]
+(pass) computeComposeInitState — reply > uses text tab and buildTextReplyBody when message has no HTML [0.10ms]
+(pass) computeComposeInitState — reply > uses html tab and quoted html when message has HTML content [0.92ms]
+(pass) computeComposeInitState — reply > keeps markdown compose when replying from markdown view to an html message [0.13ms]
+(pass) computeComposeInitState — reply > uses Reply-To address as To when present on the original message [0.11ms]
+(pass) computeComposeInitState — reply > falls back to From when Reply-To is an empty/whitespace string [0.07ms]
+(pass) computeComposeInitState — reply > ignores Reply-To when replying to a message the user sent themselves [0.07ms]
+(pass) computeComposeInitState — reply > falls back to html-derived text when opening a text reply without a text body [0.11ms]
+(pass) computeComposeInitState — replyAll > excludes own email from Cc [0.18ms]
+(pass) computeComposeInitState — replyAll > puts sender in To and other recipients in Cc [0.17ms]
+(pass) computeComposeInitState — replyAll > does not duplicate recipients between To and Cc [0.19ms]
+(pass) computeComposeInitState — replyAll > puts Reply-To in To and excludes the From sender when Reply-To is set [0.28ms]
+(pass) computeComposeInitState — replyAll > keeps quoted-comma recipient names intact when replying all to a sent message [0.26ms]
+(pass) computeComposeInitState — forward > has empty recipients [0.60ms]
+(pass) computeComposeInitState — forward > prefixes subject with Fwd: [0.27ms]
+(pass) computeComposeInitState — forward > sets xForwardedMessageId in reply headers [0.28ms]
+(pass) computeComposeInitState — forward > puts the Forwarded-message marker in composeHtml and keeps the quoted block original [0.30ms]
+(pass) computeComposeInitState — forward > keeps the sender out of the marker and escapes it in the header table [0.36ms]
+(pass) computeComposeInitState — forward > puts the Forwarded-message marker in composeMarkdown when forwarding from markdown view [0.36ms]
+(pass) computeComposeInitState — forward > keeps the Forwarded-message marker embedded in composeBody for text-only forwards [0.32ms]
+(pass) computeComposeInitState — forward > adds a removable header table with the original's known fields to rich forwards [0.62ms]
+(pass) computeComposeInitState — forward > omits Reply-To when it only repeats the sender [0.32ms]
+(pass) computeComposeInitState — forward > shows display names without the stored quoting [0.38ms]
+(pass) computeComposeInitState — forward > does not treat a header table inside the quoted body as removable [0.80ms]
+(pass) computeComposeInitState — forward > omits header rows whose value is unknown [0.34ms]
+(pass) computeComposeInitState — forward > embeds the header fields as text lines between the prefix and the quoted body in text forwards [0.44ms]
+(pass) computeComposeInitState — forward > does not add the header table to replies [0.16ms]
+(pass) computeComposeInitState — edit > restores a markdown forward draft without leaking the header details into the editor [0.83ms]
+(pass) computeComposeInitState — edit > sets composeDraftId to message id [0.13ms]
+(pass) computeComposeInitState — edit > does not set composeDraftId when asNew is true [0.12ms]
+(pass) computeComposeInitState — edit > populates recipients from message fields [0.14ms]
+(pass) computeComposeInitState — edit > restores markdown source when editing a markdown draft [0.32ms]
+(pass) computeComposeInitState — edit > sets initialDraftHash for dirty tracking [0.10ms]
+(pass) computeComposeInitState — edit > includes attachment metadata in the initial draft hash [0.13ms]
+(pass) computeComposeInitState — edit > restores saved draft invite fields [0.13ms]
+(pass) computeComposeInitState — edit > does not set initialDraftHash when asNew is true [0.13ms]
+(pass) computeComposeInitState — edit > resolves composeReplyMessage via findMessageByMessageId [0.15ms]
+
+app/components/mailclient/composition/useComposeHandlers.test.ts:
+(pass) restoreInlineAttachmentDataUrls > replaces inline attachment URLs with hydrated data URLs [0.46ms]
+(pass) restoreInlineAttachmentDataUrls > ignores non-inline attachments [0.04ms]
+(pass) restoreInlineAttachmentDataUrls > replaces cid references with hydrated data URLs [0.10ms]
+(pass) restoreInlineAttachmentDataUrls > does not corrupt attachment URLs with shared prefixes [0.33ms]
+(pass) restoreComposeMessageAttachmentDataUrls > restores forwarded inline attachment URLs back to data URLs [0.16ms]
+(pass) promoteUnreferencedInlineAttachments > demotes inline attachments of a mail without an html body [0.12ms]
+(pass) promoteUnreferencedInlineAttachments > demotes inline attachments the html body never references [0.05ms]
+(pass) promoteUnreferencedInlineAttachments > keeps inline attachments referenced by attachment url [0.03ms]
+(pass) promoteUnreferencedInlineAttachments > keeps inline attachments referenced via cid [0.03ms]
+(pass) promoteUnreferencedInlineAttachments > leaves regular attachments untouched [0.03ms]
+(pass) pruneUnreferencedInlineAttachments > keeps inline attachments referenced from quoted html [0.10ms]
+(pass) pruneUnreferencedInlineAttachments > drops inline attachments that are no longer referenced [0.04ms]
+(pass) routeDroppedFiles > queues images in pendingImageDrop and does not attach them [0.41ms]
+(pass) routeDroppedFiles > keeps the editor insertion operation with the pending image drop [0.11ms]
+(pass) routeDroppedFiles > attaches non-images immediately without queuing a drop [0.08ms]
+(pass) routeDroppedFiles > splits a mixed drop: attaches non-images and queues images [0.05ms]
+(pass) routeDroppedFiles > does nothing for an empty drop [0.04ms]
+(pass) routeDroppedFiles > attaches non-embeddable image types (e.g. PSD) instead of offering embed [0.05ms]
+(pass) background attachment loading > defers everything but body-referenced inline images, keeping source order [0.24ms]
+(pass) background attachment loading > drops a referenced inline image whose hydration failed [0.08ms]
+(pass) background attachment loading > keeps the draft hash stable across a load, so arriving bytes never look like an edit [0.15ms]
+(pass) background attachment loading > marks a failed load and lets a retry result replace it [0.08ms]
+(pass) background attachment loading > ignores a late result for an attachment that was removed or is already loaded [0.03ms]
+(pass) background attachment loading > reports loading before error, and null once everything settled [0.08ms]
+
+app/components/mailclient/composition/resetComposeSession.test.ts:
+(pass) resetComposeSession > clears compose state and transient draft tracking [1.18ms]
+
+app/components/mailclient/composition/sendMailRace.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687894874-1",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) send while a draft save is still in flight > sends once when Send is clicked repeatedly during the pre-send draft flush [2578.62ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) send while a draft save is still in flight > surfaces an SMTP timeout and re-enables Send after the request fails [139.43ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) detached compose semantics > renders the existing inline compose card without the modal header [65.33ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687895163-2",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) detached compose semantics > retains forward metadata when a saved handoff is reopened [70.20ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) forwarding a mail with a large attachment > opens at once, blocks Send and auto-save until the bytes arrive, then saves them [4617.72ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) forwarding a mail with a large attachment > aborts the download on Cancel and never saves a draft [2574.23ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) forwarding a mail with a large attachment > keeps Send blocked after a failed download until it is retried [79.07ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 537 | describe("compose initialization errors", () => {
+538 |   it("reports hydration failures without rejecting fire-and-forget callers", async () => {
+539 |     const errors: string[] = [];
+540 |     const { view, handleRef } = renderCompose({
+541 |       ensureMessageContent: async () => {
+542 |         throw new Error("hydration failed");
+                        ^
+error: hydration failed
+      at ensureMessageContent (/home/monkey/code/noctua-mail/wt-review-collab/app/components/mailclient/composition/sendMailRace.dom.test.tsx:542:19)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/app/components/mailclient/composition/ComposeOrchestrator.tsx:1201:30)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/app/components/mailclient/composition/ComposeOrchestrator.tsx:1220:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/app/components/mailclient/composition/sendMailRace.dom.test.tsx:561:32)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/app/components/mailclient/composition/sendMailRace.dom.test.tsx:560:11)
+
+(pass) compose initialization errors > reports hydration failures without rejecting fire-and-forget callers [35.19ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) mobile compose > opens full-screen and coerces inline, minimized and functional setters to modal [106.35ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) mobile composer accessibility > restores the sidebar header trigger when its compose opener unmounts [113.33ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) mobile composer accessibility > traps reverse tab, closes with Escape and restores the opener [90.50ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) shell shortcut in composers > keeps Ctrl/Cmd+B in the inline Lexical editor and fields [48.07ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) shell shortcut in composers > keeps Ctrl/Cmd+B in the modal Lexical editor and fields [84.77ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687903006-3",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) accepted send warnings > renders both warnings inline, emits notices and prevents duplicate delivery [90.12ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687903061-4",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) accepted send warnings > forwards warnings before a detached compose closes [54.30ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687903122-5",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) compose session delivery guard > keeps the delivered receipt while forward hydration is pending [76.73ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687903197-6",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) compose session delivery guard > keeps the delivered receipt while edit hydration is pending [73.20ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687903275-7",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) compose session delivery guard > an obsolete send refresh failure leaves the newer composer and its autosave intact [2134.73ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) completion of account A (failed) cannot unlock account B's pending send [158.99ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687905636-8",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) completion of account A (accepted) cannot unlock account B's pending send [139.18ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687905720-9",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) account switch cancels pending forward source hydration [72.05ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687905783-10",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) account switch cancels pending edit source hydration [63.05ms]
+
+app/components/mailclient/composition/draftAutoSaveState.test.ts:
+(pass) getDraftAutoSaveState > initializes the baseline without scheduling a save [0.05ms]
+(pass) getDraftAutoSaveState > seeds the last-saved hash for an unchanged existing draft [0.03ms]
+(pass) getDraftAutoSaveState > clears dirty state when the current hash matches the saved draft [0.03ms]
+(pass) getDraftAutoSaveState > schedules a save for dirty content with unsaved changes [0.02ms]
+(pass) getDraftAutoSaveState > marks the draft dirty again when content changes during a save [0.03ms]
+
+ 219 pass
+ 0 fail
+ 762 expect() calls
+Ran 219 tests across 18 files. [15.29s]
+
+=== predecessor.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/compose-extra.dom.test.tsx ./.tmp/collab-extra.dom.test.tsx ./.tmp/compose-adversarial.dom.test.tsx ./.tmp/collab-adversarial.dom.test.tsx
+RESULT: exit 0; 15 pass, 0 fail; 81 assertions; 4 files
+bun test v1.4.4 (38afee6c8)
+
+.tmp/compose-extra.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687891632-1",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+C5 observed {
+  unlocked: false,
+  sends: 2,
+}
+(pass) C5: completion of account A must not unlock a pending send in account B [439.46ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687891731-2",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua] failed to open composer: 223 |   expect(h.countSmtpSends()).toBe(1);
+224 |   let opening:Promise<void>|undefined;
+225 |   act(()=>{opening=h.handleRef.current!.openCompose('forward',{id:'next',accountId:'acc-test',threadId:'t-next',body:'',htmlBody:'',subject:'Next synthetic message'} as Message);});
+226 |   expect(h.sendButton()).toBeUndefined();
+227 |   expect(h.view.getByText('Delivery succeeded. Do not send it again.')).toBeTruthy();
+228 |   await act(async()=>{rejectHydration(new Error('Synthetic hydration failure'));await opening;});
+                                                ^
+error: Synthetic hydration failure
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/compose-extra.dom.test.tsx:228:43)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/compose-extra.dom.test.tsx:228:9)
+
+(pass) C1: inline delivery receipt survives failed replacement hydration [87.06ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687891867-3",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua] failed to open composer: 223 |   expect(h.countSmtpSends()).toBe(1);
+224 |   let opening:Promise<void>|undefined;
+225 |   act(()=>{opening=h.handleRef.current!.openCompose('forward',{id:'next',accountId:'acc-test',threadId:'t-next',body:'',htmlBody:'',subject:'Next synthetic message'} as Message);});
+226 |   expect(h.sendButton()).toBeUndefined();
+227 |   expect(h.view.getByText('Delivery succeeded. Do not send it again.')).toBeTruthy();
+228 |   await act(async()=>{rejectHydration(new Error('Synthetic hydration failure'));await opening;});
+                                                ^
+error: Synthetic hydration failure
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/compose-extra.dom.test.tsx:228:43)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/compose-extra.dom.test.tsx:228:9)
+
+(pass) C1: mobile delivery receipt survives failed replacement hydration [133.23ms]
+Pending hydration after account switch {
+  subject: undefined,
+  sendUrl: undefined,
+  leakedContent: false,
+}
+(pass) New: account switch cancels pending source hydration [7.05ms]
+
+.tmp/collab-extra.dom.test.tsx:
+C6 observed {
+  readDenied: false,
+  state: {
+    accountId: "a",
+    threadId: "two",
+    status: "open",
+    assigneeUserId: null,
+    assignedByUserId: null,
+    assignedAt: null,
+    statusChangedAt: null,
+    statusChangedByUserId: null,
+    commentCount: 0,
+    lastActivityAt: 1,
+    updatedAt: 1,
+    updatedByUserId: null,
+  },
+}
+(pass) C6: an obsolete denied GET must not override a newer successful mailbox read [57.17ms]
+C4 observed []
+(pass) C4: a fresh login with no access to A must not see A warning receipts [2.14ms]
+
+.tmp/compose-adversarial.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687892133-4",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) R2-1: same-account session replacement keeps the newer send locked when the old send fails [200.99ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687892316-5",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687892322-6",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) R2-1: A-to-B-to-A does not revive ownership of the first A send or its receipt [185.11ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) R2-2: pending body hydration cannot revive a reset session in the same account [63.10ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792687892469-7",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+(pass) R2-2: user change in the same mailbox rejects old body hydration without an explicit reset [72.93ms]
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+(pass) R2-2: late draft metadata cannot overwrite a newer composer session [79.95ms]
+
+.tmp/collab-adversarial.dom.test.tsx:
+(pass) R2-3: a denial after TWO newer successful reads must not erase the latest state or members [107.51ms]
+(pass) R2-3: a latest genuine denial still clears cached state and prevents mutations [54.15ms]
+(pass) R2-4: same owner keeps B receipt while A is revoked, including late A events and access restoration [3.13ms]
+R2-new observed {
+  readDenied: true,
+  state: undefined,
+  denials: [ "a" ],
+}
+(pass) R2-new: a later failed refresh cannot supersede an authoritative access denial [61.16ms]
+
+ 15 pass
+ 0 fail
+ 81 expect() calls
+Ran 15 tests across 4 files. [2.28s]
+
+=== denial-r4.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/denial-r4.dom.test.tsx
+RESULT: exit 0; 9 pass, 0 fail; 106 assertions
+bun test v1.4.4 (38afee6c8)
+
+.tmp/denial-r4.dom.test.tsx:
+(pass) R4-denial: newer pending DIFFERENT thread success restores the denied account scope [38.11ms]
+(pass) R4-denial: account B success cannot lift A denial (denial before B success) [21.18ms]
+(pass) R4-denial: account B success cannot lift A denial (denial after B success) [27.71ms]
+(pass) R4-denial: session change between denial and success rejects old success and retains old-scope denial [20.47ms]
+(pass) R4-denial: a previous session denial arriving after current-session success is ignored [12.36ms]
+(pass) R4-denial: two denials interleaved with accepted success require a second recovery [13.63ms]
+(pass) R4-denial: D1/S2/D3 response order 0-1-2 cannot let older success erase newer denial [20.00ms]
+(pass) R4-denial: D1/S2/D3 response order 2-1-0 cannot let older success erase newer denial [15.52ms]
+(pass) R4-denial: D1/S2/D3 response order 1-0-2 cannot let older success erase newer denial [15.11ms]
+
+ 9 pass
+ 0 fail
+ 106 expect() calls
+Ran 9 tests across 1 file. [534.00ms]
+
+=== mutation-r4.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/mutation-r4.dom.test.tsx
+RESULT: exit 1; 1 pass, 9 fail; 81 assertions; failures are expected-behavior regressions, not harness failures
+bun test v1.4.4 (38afee6c8)
+
+.tmp/mutation-r4.dom.test.tsx:
+R4-race success observed {
+  kind: "status",
+  beforeRefresh: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "closed",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "closed",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018157, 3, 2 ],
+}
+71 |     await waitFor(() => expect(h.reads).toHaveLength(3));
+72 |     const beforeRefresh = h.visible();
+73 |     await act(async () => { h.reads[2].resolve(json({ message: 'Synthetic refresh failure' }, 500)); expect(await h.result).toBe(true); });
+74 |     expect(h.current().pending).toBe(false);
+75 |     console.log('R4-race success observed', { kind, beforeRefresh, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+76 |     expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
+-     "status": "waiting",
++     "lastActivityAt": 2,
++     "status": "closed",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 2,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:76:25)
+(fail) R4-race: late status mutation success must preserve newer GET when post-commit refresh fails [38.38ms]
+R4-race failure observed {
+  kind: "status",
+  failure: "HTTP 500",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018176, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
+-     "status": "waiting",
++     "lastActivityAt": 1,
++     "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late status mutation failure (HTTP 500) must not roll back a newer successful GET [7.53ms]
+R4-race failure observed {
+  kind: "status",
+  failure: "network",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018183, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
+-     "status": "waiting",
++     "lastActivityAt": 1,
++     "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late status mutation failure (network) must not roll back a newer successful GET [6.96ms]
+R4-race success observed {
+  kind: "assignee",
+  beforeRefresh: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: "synthetic-editor",
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: "synthetic-editor",
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018190, 3, 2 ],
+}
+71 |     await waitFor(() => expect(h.reads).toHaveLength(3));
+72 |     const beforeRefresh = h.visible();
+73 |     await act(async () => { h.reads[2].resolve(json({ message: 'Synthetic refresh failure' }, 500)); expect(await h.result).toBe(true); });
+74 |     expect(h.current().pending).toBe(false);
+75 |     console.log('R4-race success observed', { kind, beforeRefresh, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+76 |     expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+-     "assigneeUserId": "synthetic-collaborator",
++     "assigneeUserId": "synthetic-editor",
+      "commentCount": 0,
+-     "lastActivityAt": 3,
++     "lastActivityAt": 2,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 2,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:76:25)
+(fail) R4-race: late assignee mutation success must preserve newer GET when post-commit refresh fails [8.41ms]
+R4-race failure observed {
+  kind: "assignee",
+  failure: "HTTP 500",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018198, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+-     "assigneeUserId": "synthetic-collaborator",
++     "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
++     "lastActivityAt": 1,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late assignee mutation failure (HTTP 500) must not roll back a newer successful GET [7.04ms]
+R4-race failure observed {
+  kind: "assignee",
+  failure: "network",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688018205, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+-     "assigneeUserId": "synthetic-collaborator",
++     "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
++     "lastActivityAt": 1,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late assignee mutation failure (network) must not roll back a newer successful GET [6.32ms]
+R4-race success observed {
+  kind: "comment",
+  beforeRefresh: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 1,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [
+      [Object ...]
+    ],
+  },
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 1,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [
+      [Object ...]
+    ],
+  },
+  publishedVersions: [ 1, 1, 3, 2 ],
+}
+71 |     await waitFor(() => expect(h.reads).toHaveLength(3));
+72 |     const beforeRefresh = h.visible();
+73 |     await act(async () => { h.reads[2].resolve(json({ message: 'Synthetic refresh failure' }, 500)); expect(await h.result).toBe(true); });
+74 |     expect(h.current().pending).toBe(false);
+75 |     console.log('R4-race success observed', { kind, beforeRefresh, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+76 |     expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [
+      {
+        "accountId": "a",
+        "authorUserId": "synthetic-editor",
+        "body": "Synthetic note own-note",
+        "createdAt": 2,
+        "deletedAt": null,
+        "id": "own-note",
+        "threadId": "one",
+        "updatedAt": 2,
+      },
+-     {
+-       "accountId": "a",
+-       "authorUserId": "synthetic-collaborator",
+-       "body": "Synthetic note newer-collaborator-note",
+-       "createdAt": 3,
+-       "deletedAt": null,
+-       "id": "newer-collaborator-note",
+-       "threadId": "one",
+-       "updatedAt": 3,
+-     },
+    ],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+-     "commentCount": 2,
+-     "lastActivityAt": 3,
++     "commentCount": 1,
++     "lastActivityAt": 2,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 2,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 13
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:76:25)
+(fail) R4-race: late comment mutation success must preserve newer GET when post-commit refresh fails [8.78ms]
+R4-race failure observed {
+  kind: "comment",
+  failure: "HTTP 500",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "comments": [
+-     {
+-       "accountId": "a",
+-       "authorUserId": "synthetic-editor",
+-       "body": "Synthetic note own-note",
+-       "createdAt": 2,
+-       "deletedAt": null,
+-       "id": "own-note",
+-       "threadId": "one",
+-       "updatedAt": 2,
+-     },
+-     {
+-       "accountId": "a",
+-       "authorUserId": "synthetic-collaborator",
+-       "body": "Synthetic note newer-collaborator-note",
+-       "createdAt": 3,
+-       "deletedAt": null,
+-       "id": "newer-collaborator-note",
+-       "threadId": "one",
+-       "updatedAt": 3,
+-     },
+-   ],
++   "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+-     "commentCount": 2,
+-     "lastActivityAt": 3,
++     "commentCount": 0,
++     "lastActivityAt": 1,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 25
++ Received  + 4
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late comment mutation failure (HTTP 500) must not roll back a newer successful GET [5.76ms]
+R4-race failure observed {
+  kind: "comment",
+  failure: "network",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "comments": [
+-     {
+-       "accountId": "a",
+-       "authorUserId": "synthetic-editor",
+-       "body": "Synthetic note own-note",
+-       "createdAt": 2,
+-       "deletedAt": null,
+-       "id": "own-note",
+-       "threadId": "one",
+-       "updatedAt": 2,
+-     },
+-     {
+-       "accountId": "a",
+-       "authorUserId": "synthetic-collaborator",
+-       "body": "Synthetic note newer-collaborator-note",
+-       "createdAt": 3,
+-       "deletedAt": null,
+-       "id": "newer-collaborator-note",
+-       "threadId": "one",
+-       "updatedAt": 3,
+-     },
+-   ],
++   "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+-     "commentCount": 2,
+-     "lastActivityAt": 3,
++     "commentCount": 0,
++     "lastActivityAt": 1,
+      "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 25
++ Received  + 4
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late comment mutation failure (network) must not roll back a newer successful GET [5.82ms]
+(pass) R4-race control: successful post-commit GET eventually repairs stale status publication [7.39ms]
+
+ 1 pass
+ 9 fail
+ 81 expect() calls
+Ran 10 tests across 1 file. [360.00ms]
+
+=== parent-mutation.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml ./.tmp/parent-mutation-r4.dom.test.tsx --test-name-pattern 'late status mutation (success|failure \(HTTP 500\))'
+RESULT: exit 1; 0 pass, 2 fail, 8 filtered; 16 assertions; extracted parent 551aedf hook
+bun test v1.4.4 (38afee6c8)
+
+.tmp/parent-mutation-r4.dom.test.tsx:
+R4-race success observed {
+  kind: "status",
+  beforeRefresh: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "closed",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "closed",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 2,
+      updatedAt: 2,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688046844, 3, 2 ],
+}
+71 |     await waitFor(() => expect(h.reads).toHaveLength(3));
+72 |     const beforeRefresh = h.visible();
+73 |     await act(async () => { h.reads[2].resolve(json({ message: 'Synthetic refresh failure' }, 500)); expect(await h.result).toBe(true); });
+74 |     expect(h.current().pending).toBe(false);
+75 |     console.log('R4-race success observed', { kind, beforeRefresh, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+76 |     expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                             ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
+-     "status": "waiting",
++     "lastActivityAt": 2,
++     "status": "closed",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 2,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/parent-mutation-r4.dom.test.tsx:76:25)
+(fail) R4-race: late status mutation success must preserve newer GET when post-commit refresh fails [32.59ms]
+R4-race failure observed {
+  kind: "status",
+  failure: "HTTP 500",
+  final: {
+    state: {
+      accountId: "a",
+      threadId: "one",
+      status: "open",
+      assigneeUserId: null,
+      assignedByUserId: null,
+      assignedAt: null,
+      statusChangedAt: null,
+      statusChangedByUserId: null,
+      commentCount: 0,
+      lastActivityAt: 1,
+      updatedAt: 1,
+      updatedByUserId: null,
+    },
+    comments: [],
+  },
+  publishedVersions: [ 1, 1792688046858, 3, 1 ],
+}
+86 |         expect(await h.result).toBe(false);
+87 |       });
+88 |       expect(h.current().pending).toBe(false);
+89 |       expect(h.reads).toHaveLength(2); // failure path does not schedule recovery
+90 |       console.log('R4-race failure observed', { kind, failure, final: h.visible(), publishedVersions: h.updates.map(s => s.updatedAt) });
+91 |       expect(h.visible()).toEqual({ state: h.newer, comments: h.newerComments });
+                               ^
+error: expect(received).toEqual(expected)
+
+  {
+    "comments": [],
+    "state": {
+      "accountId": "a",
+      "assignedAt": null,
+      "assignedByUserId": null,
+      "assigneeUserId": null,
+      "commentCount": 0,
+-     "lastActivityAt": 3,
+-     "status": "waiting",
++     "lastActivityAt": 1,
++     "status": "open",
+      "statusChangedAt": null,
+      "statusChangedByUserId": null,
+      "threadId": "one",
+-     "updatedAt": 3,
++     "updatedAt": 1,
+      "updatedByUserId": null,
+    },
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-review-collab/.tmp/parent-mutation-r4.dom.test.tsx:91:27)
+(fail) R4-race: late status mutation failure (HTTP 500) must not roll back a newer successful GET [6.96ms]
+
+ 0 pass
+ 8 filtered out
+ 2 fail
+ 16 expect() calls
+Ran 2 tests across 1 file. [288.00ms]
+
+=== collab-components.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun test --config=bunfig.dom.toml app/components/collab
+RESULT: exit 0; 19 pass, 0 fail; 122 assertions; 1 file
+bun test v1.4.4 (38afee6c8)
+
+app/components/collab/Collaboration.dom.test.tsx:
+(pass) ThreadCollaborationBar > assigns Me, Unassigned and a userId member and changes status [302.80ms]
+(pass) ThreadCollaborationBar > viewers read state but cannot mutate [22.12ms]
+(pass) ThreadCollaborationBar > a denied collaboration read disables stale editor controls [19.15ms]
+(pass) InternalNoteComposer > posts Markdown and clears only after success [17.12ms]
+(pass) InternalNoteComposer > keeps text after a failed post [15.71ms]
+(pass) ThreadActivityPanel > renders safe Markdown and author delete permission [56.20ms]
+(pass) ThreadActivityPanel > managers delete all notes and viewers delete none [22.63ms]
+(pass) list chips hide defaults, show status, and use Former member for missing/disabled members [4.85ms]
+(pass) useThreadCollab optimistically publishes a mutation and rolls it back on failure [13.05ms]
+(pass) collaboration sidebar definitions activate their server badge filter and counts exclude folders [212.12ms]
+(pass) retains note drafts through collapse and account/thread navigation and bounds long notes [28.83ms]
+(pass) the notes shortcut moves keyboard focus to the labelled timeline [21.04ms]
+(pass) publishes originating collaboration rollback after thread navigation [107.90ms]
+(pass) publishes originating collaboration commit after thread navigation [106.74ms]
+(pass) publishes originating collaboration rollback after account navigation [106.82ms]
+(pass) publishes originating collaboration commit after account navigation [106.97ms]
+(pass) authoritative list refresh reloads selected collaboration and timeline even at equal timestamps [58.98ms]
+(pass) authoritative row data wins over a cached summary with an equal timestamp [2.62ms]
+(pass) a collaboration GET 403 purges the account cache and disables writes without logging out [107.64ms]
+
+ 19 pass
+ 0 fail
+ 122 expect() calls
+Ran 19 tests across 1 file. [1.79s]
+
+=== bun-check.log ===
+$ TMPDIR="$PWD/.tmp" nice -n 10 bun check --no-pretty --all 2>&1 | tee .tmp/bun-check.log | grep "error TS" | grep -v bun:test | wc -l
+RESULT: 151 (baseline unchanged); PIPESTATUS: 1 0 0 0 0
+app/api/_helpers/enrichMessagesWithThreadCollab.test.ts(1,30): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/enrichMessagesWithThreadTopics.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/message/errorFormatting.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/message/trashUtils.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/response.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/searchQueryLength.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/_helpers/smtpUpstreamError.test.ts(1,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/calendar/conflicts/[eventId]/resolve/route.test.ts(2,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/calendar/events/[eventId]/respond/route.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/calendar/events/[eventId]/route.pendingRemoteSync.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts(2,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/mcp-tokens/route.test.ts(1,27): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/messages/[messageId]/flags/route.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/messages/[messageId]/source/route.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.test.ts(1,46): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(2,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(358,55): error TS7006: Parameter 'args' implicitly has an 'any' type.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(363,35): error TS7006: Parameter 'c' implicitly has an 'any' type.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(364,37): error TS7006: Parameter 'c' implicitly has an 'any' type.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(387,70): error TS7006: Parameter 'c' implicitly has an 'any' type.
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts(477,55): error TS7006: Parameter 'c' implicitly has an 'any' type.
+app/api/accounts/[accountId]/sync/new-candidates/route.test.ts(2,46): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/accounts/[accountId]/translation/compose/route.test.ts(2,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/auth/me/route.test.ts(1,36): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/ba/[...all]/route.test.ts(1,30): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/calendar/import/route.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/api/mcp/route.test.ts(3,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/AttachmentsList.dom.test.tsx(2,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/AttachmentsList.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/ComposeEditor.imageDrop.dom.test.tsx(3,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/ComposeEditor.roundTrip.dom.test.tsx(3,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/LinkifiedText.test.tsx(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/LinkifiedText.test.tsx(14,47): error TS18046: 'anchor.props' is of type 'unknown'.
+app/components/LinkifiedText.test.tsx(29,53): error TS18046: 'anchor.props' is of type 'unknown'.
+app/components/LinkifiedText.test.tsx(40,47): error TS18046: 'anchor.props' is of type 'unknown'.
+app/components/calendar/CalendarEventEmailSnapshot.test.tsx(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/calendar/EventDetailView.test.tsx(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/calendar/EventInviteStatusRow.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/calendar/calendarNowIndicator.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/calendar/calendarPopoverResize.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/calendar/useEventResponseState.dom.test.tsx(1,39): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/collab/Collaboration.dom.test.tsx(1,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/composeEditorAutoLink.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/emailFontRegistry.test.ts(1,67): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/emailFontRegistry.test.ts(91,12): error TS2790: The operand of a 'delete' operator must be optional.
+app/components/emailFontRegistry.test.ts(96,12): error TS2790: The operand of a 'delete' operator must be optional.
+app/components/emailFontRegistry.test.ts(197,5): error TS2322: Type '{ head: { append(style: FakeStyleElement): void; querySelector(selector: string): FakeStyleElement | null; }; createElement(tag: string): FakeStyleElement; }' is not assignable to type 'Document & { head: { append: (style: FakeStyleElement) => void; querySelector: (selector: string) => FakeStyleElement | null; }; createElement: (tag: string) => FakeStyleElement; }'.
+  Type '{ head: { append(style: FakeStyleElement): void; querySelector(selector: string): FakeStyleElement | null; }; createElement(tag: string): FakeStyleElement; }' is missing the following properties from type 'Document': URL, activeViewTransition, alinkColor, all, and 261 more.
+app/components/emailFontRegistry.test.ts(218,5): error TS2322: Type '{ head: { append(style: FakeStyleElement): void; querySelector(selector: string): FakeStyleElement | null; }; createElement(tag: string): FakeStyleElement; }' is not assignable to type 'Document & { head: { append: (style: FakeStyleElement) => void; querySelector: (selector: string) => FakeStyleElement | null; }; createElement: (tag: string) => FakeStyleElement; }'.
+  Type '{ head: { append(style: FakeStyleElement): void; querySelector(selector: string): FakeStyleElement | null; }; createElement(tag: string): FakeStyleElement; }' is missing the following properties from type 'Document': URL, activeViewTransition, alinkColor, all, and 261 more.
+app/components/lexical/ImageNode.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/lexical/imageResize.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/buildSendPayload.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/composeContentBuilder.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/composeContentBuilder.test.ts(230,11): error TS2741: Property 'id' is missing in type '{ filename: string; contentType: string; size: number; inline: true; dataUrl: string; cid: string; }' but required in type 'Attachment'.
+app/components/mailclient/composition/composeInitState.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/composeInitState.test.ts(24,70): error TS2345: Argument of type '"MMM d, yyyy"' is not assignable to parameter of type 'AccountDateFormat | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(35,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(36,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(39,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(42,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(43,5): error TS2322: Type 'null' is not assignable to type 'string[] | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(44,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(45,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(46,5): error TS2322: Type 'null' is not assignable to type 'boolean | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(48,5): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(122,69): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(141,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(156,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(170,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(181,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(192,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(203,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(213,44): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(215,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(228,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(241,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; preferredComposeTab: "markdown"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(258,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(273,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(288,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(299,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; preferredComposeTab: "text"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(322,9): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(325,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(338,9): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(341,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(357,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(375,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(393,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(408,77): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(418,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(429,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(440,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(455,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(468,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; preferredComposeTab: "markdown"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(480,74): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(482,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(505,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(536,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(554,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(569,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(576,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(588,21): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(588,31): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(590,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(609,9): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(612,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(639,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(657,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; preferredComposeTab: "markdown"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(669,66): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(683,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(694,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(703,69): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/components/mailclient/composition/composeInitState.test.ts(705,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(722,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(734,74): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(753,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(775,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(787,73): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeInitState.test.ts(799,7): error TS2345: Argument of type '{ accountEmail: string; accountDateFormat: "MMM d, yyyy"; findMessageByMessageId: (id: string) => Message | undefined; }' is not assignable to parameter of type '{ accountEmail: string; accountDateFormat: AccountDateFormat; preferredComposeTab?: ComposeTab | undefined; findMessageByMessageId?: ((messageId: string) => Message | undefined) | undefined; }'.
+  Types of property 'accountDateFormat' are incompatible.
+    Type '"MMM d, yyyy"' is not assignable to type 'AccountDateFormat'.
+app/components/mailclient/composition/composeTabSwitch.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/composeTextNormalization.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/composeThreading.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/detachedSendWarnings.dom.test.tsx(1,39): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/draftAutoSaveState.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/draftListState.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/draftSaveUtils.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/resetComposeSession.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/resetComposeSession.test.ts(60,7): error TS2322: Type '(next: string | ((prev: string) => string)) => void' is not assignable to type 'Dispatch<SetStateAction<ComposeView>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<ComposeView>' is not assignable to type 'string | ((prev: string) => string)'.
+      Type '(prevState: ComposeView) => ComposeView' is not assignable to type 'string | ((prev: string) => string)'.
+        Type '(prevState: ComposeView) => ComposeView' is not assignable to type '(prev: string) => string'.
+          Types of parameters 'prevState' and 'prev' are incompatible.
+            Type 'string' is not assignable to type 'ComposeView'.
+app/components/mailclient/composition/resetComposeSession.test.ts(61,7): error TS2322: Type '(next: string | ((prev: string) => string)) => void' is not assignable to type 'Dispatch<SetStateAction<string | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<string | null>' is not assignable to type 'string | ((prev: string) => string)'.
+      Type 'null' is not assignable to type 'string | ((prev: string) => string)'.
+app/components/mailclient/composition/resetComposeSession.test.ts(61,106): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+app/components/mailclient/composition/resetComposeSession.test.ts(62,7): error TS2322: Type '(next: string | ((prev: string) => string)) => void' is not assignable to type 'Dispatch<SetStateAction<ComposeMode>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<ComposeMode>' is not assignable to type 'string | ((prev: string) => string)'.
+      Type '(prevState: ComposeMode) => ComposeMode' is not assignable to type 'string | ((prev: string) => string)'.
+        Type '(prevState: ComposeMode) => ComposeMode' is not assignable to type '(prev: string) => string'.
+          Types of parameters 'prevState' and 'prev' are incompatible.
+            Type 'string' is not assignable to type 'ComposeMode'.
+app/components/mailclient/composition/resetComposeSession.test.ts(81,7): error TS2322: Type '(next: ((prev: { id: string; }) => { id: string; }) | { id: string; }) => void' is not assignable to type 'Dispatch<SetStateAction<Message | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<Message | null>' is not assignable to type '((prev: { id: string; }) => { id: string; }) | { id: string; }'.
+      Type 'null' is not assignable to type '((prev: { id: string; }) => { id: string; }) | { id: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(81,116): error TS2322: Type '{ id: string; } | null' is not assignable to type '{ id: string; }'.
+  Type 'null' is not assignable to type '{ id: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(82,7): error TS2322: Type '(next: string | ((prev: string) => string)) => void' is not assignable to type 'Dispatch<SetStateAction<ComposeTab>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<ComposeTab>' is not assignable to type 'string | ((prev: string) => string)'.
+      Type '(prevState: ComposeTab) => ComposeTab' is not assignable to type 'string | ((prev: string) => string)'.
+        Type '(prevState: ComposeTab) => ComposeTab' is not assignable to type '(prev: string) => string'.
+          Types of parameters 'prevState' and 'prev' are incompatible.
+            Type 'string' is not assignable to type 'ComposeTab'.
+app/components/mailclient/composition/resetComposeSession.test.ts(90,7): error TS2322: Type '(next: ((prev: { inReplyTo: string; }) => { inReplyTo: string; }) | { inReplyTo: string; }) => void' is not assignable to type 'Dispatch<SetStateAction<ComposeReplyHeaders | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<ComposeReplyHeaders | null>' is not assignable to type '((prev: { inReplyTo: string; }) => { inReplyTo: string; }) | { inReplyTo: string; }'.
+      Type 'null' is not assignable to type '((prev: { inReplyTo: string; }) => { inReplyTo: string; }) | { inReplyTo: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(90,116): error TS2322: Type '{ inReplyTo: string; } | null' is not assignable to type '{ inReplyTo: string; }'.
+  Type 'null' is not assignable to type '{ inReplyTo: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(91,7): error TS2322: Type '(next: { id: string; }[] | ((prev: { id: string; }[]) => { id: string; }[])) => void' is not assignable to type 'Dispatch<SetStateAction<Attachment[]>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<Attachment[]>' is not assignable to type '{ id: string; }[] | ((prev: { id: string; }[]) => { id: string; }[])'.
+      Type '(prevState: Attachment[]) => Attachment[]' is not assignable to type '{ id: string; }[] | ((prev: { id: string; }[]) => { id: string; }[])'.
+        Type '(prevState: Attachment[]) => Attachment[]' is not assignable to type '(prev: { id: string; }[]) => { id: string; }[]'.
+          Types of parameters 'prevState' and 'prev' are incompatible.
+            Type '{ id: string; }[]' is not assignable to type 'Attachment[]'.
+              Type '{ id: string; }' is missing the following properties from type 'Attachment': filename, contentType, size, inline
+app/components/mailclient/composition/resetComposeSession.test.ts(93,7): error TS2322: Type '(next: ((prev: { files: never[]; x: number; y: number; }) => { files: never[]; x: number; y: number; }) | { files: never[]; x: number; y: number; }) => void' is not assignable to type 'Dispatch<SetStateAction<PendingImageDrop | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<PendingImageDrop | null>' is not assignable to type '((prev: { files: never[]; x: number; y: number; }) => { files: never[]; x: number; y: number; }) | { files: never[]; x: number; y: number; }'.
+      Type 'null' is not assignable to type '((prev: { files: never[]; x: number; y: number; }) => { files: never[]; x: number; y: number; }) | { files: never[]; x: number; y: number; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(93,110): error TS2322: Type '{ files: unknown[]; x: number; y: number; } | null' is not assignable to type '{ files: never[]; x: number; y: number; }'.
+  Type 'null' is not assignable to type '{ files: never[]; x: number; y: number; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(95,7): error TS2322: Type '(next: ((prev: { styles: string; headerHtml: string; bodyHtml: string; }) => { styles: string; headerHtml: string; bodyHtml: string; }) | { styles: string; headerHtml: string; bodyHtml: string; }) => void' is not assignable to type 'Dispatch<SetStateAction<QuotedHtmlParts | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<QuotedHtmlParts | null>' is not assignable to type '((prev: { styles: string; headerHtml: string; bodyHtml: string; }) => { styles: string; headerHtml: string; bodyHtml: string; }) | { styles: string; headerHtml: string; bodyHtml: string; }'.
+      Type 'null' is not assignable to type '((prev: { styles: string; headerHtml: string; bodyHtml: string; }) => { styles: string; headerHtml: string; bodyHtml: string; }) | { styles: string; headerHtml: string; bodyHtml: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(95,114): error TS2322: Type '{ styles: string; headerHtml: string; bodyHtml: string; } | null' is not assignable to type '{ styles: string; headerHtml: string; bodyHtml: string; }'.
+  Type 'null' is not assignable to type '{ styles: string; headerHtml: string; bodyHtml: string; }'.
+app/components/mailclient/composition/resetComposeSession.test.ts(100,7): error TS2322: Type '(next: number | ((prev: number) => number)) => void' is not assignable to type 'Dispatch<SetStateAction<number | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<number | null>' is not assignable to type 'number | ((prev: number) => number)'.
+      Type 'null' is not assignable to type 'number | ((prev: number) => number)'.
+app/components/mailclient/composition/resetComposeSession.test.ts(100,102): error TS2322: Type 'number | null' is not assignable to type 'number'.
+  Type 'null' is not assignable to type 'number'.
+app/components/mailclient/composition/resetComposeSession.test.ts(101,7): error TS2322: Type '(next: string | ((prev: string) => string)) => void' is not assignable to type 'Dispatch<SetStateAction<string | null>>'.
+  Types of parameters 'next' and 'value' are incompatible.
+    Type 'SetStateAction<string | null>' is not assignable to type 'string | ((prev: string) => string)'.
+      Type 'null' is not assignable to type 'string | ((prev: string) => string)'.
+app/components/mailclient/composition/resetComposeSession.test.ts(101,106): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+app/components/mailclient/composition/resetComposeSession.test.ts(104,28): error TS2322: Type 'Timeout' is not assignable to type 'number'.
+app/components/mailclient/composition/sendMailRace.dom.test.tsx(3,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/sendOutcome.dom.test.tsx(1,39): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/sendOutcome.test.ts(1,28): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/useComposeHandlers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/composition/useComposeHandlers.test.ts(409,24): error TS2345: Argument of type '{ to: string; cc: string; bcc: string; subject: string; text: string; attachments: Attachment[]; }' is not assignable to parameter of type 'DraftHashInput'.
+  Property 'html' is missing in type '{ to: string; cc: string; bcc: string; subject: string; text: string; attachments: Attachment[]; }' but required in type '{ text: string; html: string | undefined; attachments: Attachment[]; invite?: ComposeInviteDraft | null | undefined; }'.
+app/components/mailclient/folder/folderBadgePresentation.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/message/normalizeMarkdownBody.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/message/threadViewState.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messageListQueryUrl.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messageListQueryUrl.test.ts(18,3): error TS2322: Type '"latest"' is not assignable to type '"latestDateValue" | "latestReceivedDateValue"'.
+app/components/mailclient/messageListQueryUrl.test.ts(58,7): error TS2322: Type '"first"' is not assignable to type '"latestDateValue" | "latestReceivedDateValue"'.
+app/components/mailclient/messagelist/listBehavior.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/listBehavior.test.ts(46,3): error TS2322: Type '{ displayDateValue?: number | undefined; displayDate?: string | undefined; fromParticipants?: FromParticipant[]; type: "row"; key: string; groupKey: string; isFirstInGroup: boolean; message: Message; ... 16 more ...; ancestorStopsHere: boolean[]; }' is not assignable to type 'ListRowItem'.
+  Types of property 'displayDateValue' are incompatible.
+    Type 'number | undefined' is not assignable to type 'number'.
+      Type 'undefined' is not assignable to type 'number'.
+app/components/mailclient/messagelist/listBehavior.test.ts(348,24): error TS2339: Property 'key' does not exist on type 'never'.
+app/components/mailclient/messagelist/listBehavior.test.ts(349,24): error TS2339: Property 'open' does not exist on type 'never'.
+app/components/mailclient/messagelist/listBehavior.test.ts(350,31): error TS2339: Property 'at' does not exist on type 'never'.
+app/components/mailclient/messagelist/listBehavior.test.ts(351,45): error TS2339: Property 'at' does not exist on type 'never'.
+app/components/mailclient/messagelist/listBehavior.test.ts(374,24): error TS2339: Property 'open' does not exist on type 'never'.
+app/components/mailclient/messagelist/listBehavior.test.ts(375,45): error TS2339: Property 'at' does not exist on type 'never'.
+app/components/mailclient/messagelist/listModel.test.ts(1,44): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/listModel.test.ts(150,13): error TS2741: Property 'threadSize' is missing in type '{ message: Message; children: []; }' but required in type 'ThreadNode'.
+app/components/mailclient/messagelist/listModel.test.ts(203,17): error TS2741: Property 'threadSize' is missing in type '{ message: Message; children: []; }' but required in type 'ThreadNode'.
+app/components/mailclient/messagelist/listState.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/messageListViewTypes.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/sortAndDedupeMessages.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/threadGroupUtils.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/threadTree.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/messagelist/topicSuggestionGroup.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/recentLocalDraftSaves.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/recomputeJobRunner.test.ts(1,52): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/status/upcomingEntries.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/syncFingerprint.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/syncJobProgress.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/syncJobProgress.test.ts(56,7): error TS2322: Type '{ mode: "recent"; updatedAt: number; }' is not assignable to type 'Omit<SyncJobProgress, "jobId" | "updatedAt"> & { updatedAt?: number | undefined; }'.
+  Type '{ mode: "recent"; updatedAt: number; }' is missing the following properties from type 'Omit<SyncJobProgress, "jobId" | "updatedAt">': accountId, mailboxPath, phase, processed
+app/components/mailclient/syncJobProgress.test.ts(65,7): error TS2322: Type '{ mode: "recent"; }' is not assignable to type 'Omit<SyncJobProgress, "jobId" | "updatedAt"> & { updatedAt?: number | undefined; }'.
+  Type '{ mode: "recent"; }' is missing the following properties from type 'Omit<SyncJobProgress, "jobId" | "updatedAt">': accountId, mailboxPath, phase, processed
+app/components/mailclient/syncJobProgress.test.ts(74,7): error TS2322: Type '{ mode: "full"; folderId: string; updatedAt: number; }' is not assignable to type 'Omit<SyncJobProgress, "jobId" | "updatedAt"> & { updatedAt?: number | undefined; }'.
+  Type '{ mode: "full"; folderId: string; updatedAt: number; }' is missing the following properties from type 'Omit<SyncJobProgress, "jobId" | "updatedAt">': accountId, mailboxPath, phase, processed
+app/components/mailclient/syncJobTypes.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/syncNotificationFilter.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/syncReconcileGuards.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/topicPresentation.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/topicSearch.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/topicSuggestionActions.test.ts(1,44): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/useInAppNotices.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/useMessageDeleteActions.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/useMessageMoveActions.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/accountControllerHelpers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/calendarInviteState.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/calendarInviteState.test.ts(9,3): error TS2322: Type '{ collab?: { status: import("../../collab/types").ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; }; threadId?: string | undefined; ... 50 more ...; body: string; }' is not assignable to type 'Message'.
+  Types of property 'threadId' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+app/components/mailclient/utils/calendarReminders.test.ts(1,71): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/clientHelpers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/deleteConfirm.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/folderHelpers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/listCount.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/messageHelpers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/messageMove.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/messageMutation.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/parseAddressList.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/relativeTimeGroups.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/reminderNotificationHelpers.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/reminderNotificationHelpers.test.ts(90,22): error TS2322: Type '{ r99: number; } | { r99?: undefined; }' is not assignable to type 'Record<string, number>'.
+  Type '{ r99?: undefined; }' is not assignable to type 'Record<string, number>'.
+    Property 'r99' is incompatible with index signature.
+      Type 'undefined' is not assignable to type 'number'.
+app/components/mailclient/utils/threadContentCache.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/mailclient/utils/threadContentCache.test.ts(130,87): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string[] | undefined'.
+app/components/mailclient/utils/trashFolder.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/shell/MobileFrames.dom.test.tsx(1,61): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/shell/Shell.dom.test.tsx(2,56): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/shell/ShellSearch.dom.test.tsx(1,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/components/shell/types.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/globals.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/hooks/useDarkMode.dom.test.tsx(2,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/hooks/useMobileNavigation.dom.test.tsx(1,56): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+app/hooks/useThreadCollab.dom.test.tsx(1,39): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/accountSettings.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/appBranding.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/auth.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/betterAuth.test.ts(1,61): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/caldav/client.test.ts(1,46): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/caldav/client.test.ts(73,22): error TS2749: 'CaldavUrlRejectedError' refers to a value, but is being used as a type here. Did you mean 'typeof CaldavUrlRejectedError'?
+lib/caldav/client.test.ts(83,20): error TS2749: 'CaldavUrlRejectedError' refers to a value, but is being used as a type here. Did you mean 'typeof CaldavUrlRejectedError'?
+lib/caldav/client.test.ts(95,20): error TS2749: 'CaldavUrlRejectedError' refers to a value, but is being used as a type here. Did you mean 'typeof CaldavUrlRejectedError'?
+lib/caldav/client.test.ts(103,20): error TS2749: 'CaldavUrlRejectedError' refers to a value, but is being used as a type here. Did you mean 'typeof CaldavUrlRejectedError'?
+lib/caldav/emailEventImporter.test.ts(1,46): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/caldav/icsSerializer.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/caldav/remoteMerge.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/caldav/sync.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendar.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendar.test.ts(21,18): error TS2868: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `bun add -d @types/bun` and then add 'bun' to the types field in your tsconfig.
+lib/calendarEventDeletion.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarEventDiff.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarEventDiffFormat.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarEventEmailSnapshot.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarEventSnapshot.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarEventStatus.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarIcs.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarImportClient.test.ts(1,69): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarInviteProcessing.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarInviteProcessor.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarInviteScope.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarInviteSearch.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarInviteStatePersistence.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarOccurrences.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarParticipation.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarReminderReschedule.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarReply.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarReply.test.ts(6,3): error TS2741: Property 'avatar' is missing in type '{ id: string; name: string; email: string; settings: {}; imap: { host: string; port: number; secure: true; user: string; password: string; }; smtp: { host: string; port: number; secure: true; user: string; password: string; }; }' but required in type 'Account'.
+lib/calendarSeriesReanchor.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarSeriesTruncation.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/calendarTimezones.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/composeInvite.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/composeInviteMetadata.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/crossAccountCopy.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/crossAccountCopy.test.ts(69,59): error TS2322: Type 'string[] | undefined' is not assignable to type 'string[]'.
+  Type 'undefined' is not assignable to type 'string[]'.
+lib/crossAccountCopy.test.ts(174,7): error TS2322: Type '<T extends ResolveThreadingMessage>(_accountId: string, messages: readonly T[]) => Promise<{ collab?: { status: ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; } | undefined; ... 51 more ...; threadId: string; }[]>' is not assignable to type '<T extends ResolveThreadingMessage>(accountId: string, messages: readonly T[]) => Promise<(T & { threadId: string; parentId?: string | undefined; })[]>'.
+  Type 'Promise<{ collab?: { status: ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; } | undefined; id: string; parentId?: string | undefined; messageId?: string | undefined; ... 48 more ...; threadId: string; }[]>' is not assignable to type 'Promise<(T & { threadId: string; parentId?: string | undefined; })[]>'.
+    Type '{ collab?: { status: ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; } | undefined; id: string; parentId?: string | undefined; messageId?: string | undefined; ... 48 more ...; threadId: string; }[]' is not assignable to type '(T & { threadId: string; parentId?: string | undefined; })[]'.
+      Type '{ collab?: { status: import("./threadCollab").ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; }; id: string; parentId?: string; ... 49 more ...; threadId: string; }' is not assignable to type 'T & { threadId: string; parentId?: string | undefined; }'.
+        Type '{ collab?: { status: import("./threadCollab").ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; }; id: string; parentId?: string; ... 49 more ...; threadId: string; }' is not assignable to type 'T'.
+          '{ collab?: { status: import("./threadCollab").ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number; }; id: string; parentId?: string; ... 49 more ...; threadId: string; }' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'ThreadingResolvableItem'.
+lib/crossAccountCopy.test.ts(175,36): error TS4104: The type 'readonly T[]' is 'readonly' and cannot be assigned to the mutable type 'Message[]'.
+lib/crossAccountCopy.test.ts(176,17): error TS4104: The type 'readonly T[]' is 'readonly' and cannot be assigned to the mutable type 'Message[]'.
+lib/crossAccountCopy.test.ts(179,7): error TS2322: Type '(_accountId: string, _folderId: string | null, messages: Message[]) => Promise<void>' is not assignable to type '(accountId: string, folderId: string | null, nextMessages: Message[], replaceExisting?: boolean | undefined, options?: { recomputeThreads?: boolean | undefined; } | undefined) => Promise<...>'.
+  Type 'Promise<void>' is not assignable to type 'Promise<{ affectedThreadIds: string[]; requiresFullRecompute: boolean; messageRowIds: Map<string, string>; }>'.
+    Type 'void' is not assignable to type '{ affectedThreadIds: string[]; requiresFullRecompute: boolean; messageRowIds: Map<string, string>; }'.
+lib/dateFormatting.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/dateFormatting.test.ts(24,18): error TS2868: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `bun add -d @types/bun` and then add 'bun' to the types field in your tsconfig.
+lib/db.accounts.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.addressSearchIndex.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.aiFlags.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.attachmentUrls.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.calendarConflicts.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.calendarEvents.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.collisionVariantInlineImages.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.draftTombstones.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.folders.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.mailboxState.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.messageSizes.test.ts(4,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.messagesCore.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db.sameFolderMessageCopies.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/adminAudit.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/authPolicy.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/connection.auth.test.ts(1,30): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/connection.collab.test.ts(1,30): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/mcpTokens.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/messages/retrieval.orphanedNullUid.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/messages/utility.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/rowParsers.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/schema.master.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/threadCollab.remap.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/threadCollab.test.ts(3,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/userAccountPrefs.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/db/users.test.ts(3,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/deepl.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/deeplAccountConfig.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/draftSendEnvelope.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/drafts.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/fullcalendarRecurrence.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/html.inlineImages.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/html.safeLinks.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/html.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/html/quoteBoundary.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/inviteDeckEventBounds.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/linkify.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/logging/backendConsole.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/attachmentFromSource.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/attachmentFromSource.test.ts(85,7): error TS2322: Type 'undefined' is not assignable to type 'string'.
+lib/mail/attachmentFromSource.test.ts(86,7): error TS2322: Type 'undefined' is not assignable to type 'string'.
+lib/mail/categorization/classifier.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/categorization/classifier.test.ts(38,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(66,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(93,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(120,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(152,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(179,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(204,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(228,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/classifier.test.ts(257,29): error TS2339: Property 'attachments' does not exist on type '{ from: { value: { address: string; }[]; }; to: { value: { address: string; }[]; }; subject: string; text: string; }'.
+lib/mail/categorization/linearModel.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/composePayload.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/embeddableImage.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/imap.structure.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/imap/connectionPool.test.ts(1,69): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/imapClientOptions.test.ts(1,61): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/imapClientOptions.test.ts(94,7): error TS2322: Type 'undefined' is not assignable to type 'Certificate'.
+lib/mail/imapClientOptions.test.ts(113,75): error TS2740: Type '{ subject: { O: string; }; issuer: { CN: string; }; serialNumber: string; }' is missing the following properties from type 'PeerCertificate': ca, raw, valid_from, valid_to, and 3 more.
+lib/mail/imapClientOptions.test.ts(131,75): error TS2740: Type '{ subject: { CN: string; }; subjectaltname: string; issuer: { CN: string; }; }' is missing the following properties from type 'PeerCertificate': ca, raw, valid_from, valid_to, and 4 more.
+lib/mail/imapError.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/mime/removeAttachmentPart.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/mime/removeAttachmentPart.test.ts(78,51): error TS7006: Parameter 'a' implicitly has an 'any' type.
+lib/mail/mime/removeAttachmentPart.test.ts(93,51): error TS7006: Parameter 'a' implicitly has an 'any' type.
+lib/mail/mime/removeAttachmentPart.test.ts(107,44): error TS7006: Parameter 'a' implicitly has an 'any' type.
+lib/mail/mime/removeAttachmentPart.test.ts(187,44): error TS7006: Parameter 'a' implicitly has an 'any' type.
+lib/mail/removeMessageAttachment.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/removeMessageAttachment.test.ts(103,5): error TS2322: Type '() => Promise<Buffer<ArrayBufferLike> | null>' is not assignable to type '(accountId: string, messageId: string) => Promise<NonSharedBuffer | null>'.
+  Type 'Promise<Buffer<ArrayBufferLike> | null>' is not assignable to type 'Promise<NonSharedBuffer | null>'.
+    Type 'Buffer<ArrayBufferLike> | null' is not assignable to type 'NonSharedBuffer | null'.
+      Type 'Buffer<ArrayBufferLike>' is not assignable to type 'Buffer<ArrayBuffer>'.
+        Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+          Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
+            Types of property '[Symbol.toStringTag]' are incompatible.
+              Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+lib/mail/removeMessageAttachment.test.ts(113,25): error TS2322: Type 'string[] | undefined' is not assignable to type 'string[]'.
+  Type 'undefined' is not assignable to type 'string[]'.
+lib/mail/removeMessageAttachment.test.ts(128,5): error TS2322: Type '(_accountId: string, _messageId: string, source: string | Buffer<ArrayBufferLike>) => Promise<void>' is not assignable to type '(accountId: string, messageId: string, source: string | Buffer<ArrayBufferLike>) => Promise<number>'.
+  Type 'Promise<void>' is not assignable to type 'Promise<number>'.
+    Type 'void' is not assignable to type 'number'.
+lib/mail/sentInvite.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/smtpError.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/smtpTimeouts.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/stripBccHeader.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/subjectPrefix.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mail/syncMessageSanitizer.sizes.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/mailto.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/markdownConvert.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/markdownEmail.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/messageGrouping.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/messageIds.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/messageLocalState.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/messageMoveJobs.test.ts(1,58): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/messageMoveJobs.test.ts(132,48): error TS7006: Parameter '_account' implicitly has an 'any' type.
+lib/messageMoveJobs.test.ts(132,58): error TS7006: Parameter '_source' implicitly has an 'any' type.
+lib/messageMoveJobs.test.ts(132,67): error TS7006: Parameter 'uids' implicitly has an 'any' type.
+lib/messageMoveJobs.test.ts(133,32): error TS7006: Parameter 'uid' implicitly has an 'any' type.
+lib/messageMovePersistence.test.ts(2,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/net/urlSafety.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/rateLimit.test.ts(1,67): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/recipientAliases.test.ts(2,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/recipientLists.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/reminderRecurrence.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/reminderRecurrence.test.ts(16,18): error TS2868: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `bun add -d @types/bun` and then add 'bun' to the types field in your tsconfig.
+lib/sameFolderMessageCopies.consistency.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/secret.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/senderIcons.test.ts(1,49): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/senderIdentity.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/specialFolders.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/syncJobs.test.ts(1,63): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/syncMoveReconciliation.test.ts(1,46): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/syncOperation.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/syncOperation/progress.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/syncPolicy.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadCollab.api.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadCollab.filters.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadCollab.send.test.ts(1,30): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadCollab.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadDate.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadLookup.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threadTopicSearch.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/threading.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/topicSuggestions.test.ts(2,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/topics/searchSentinels.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/topicsTransfer.test.ts(2,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/ui/byteSize.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/ui/detachedComposeHandoff.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/ui/messageView.test.ts(1,38): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+lib/url.test.ts(1,40): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+scripts/dev-fixture/fixture.test.ts(1,51): error TS2307: Cannot find module 'bun:test' or its corresponding type declarations.
+note: Bun's type definitions (console, fetch, Bun, bun:test) are not installed. Run: bun add -d @types/bun
+Found 382 errors in 231 files, checked 879 files [583.60ms]
+
+   1  app/api/_helpers/enrichMessagesWithThreadCollab.test.ts:1
+   1  app/api/_helpers/enrichMessagesWithThreadTopics.test.ts:1
+   1  app/api/_helpers/message/errorFormatting.test.ts:1
+   1  app/api/_helpers/message/trashUtils.test.ts:1
+   1  app/api/_helpers/response.test.ts:1
+   1  app/api/_helpers/searchQueryLength.test.ts:1
+   1  app/api/_helpers/smtpUpstreamError.test.ts:1
+   1  app/api/accounts/[accountId]/calendar/conflicts/[eventId]/resolve/route.test.ts:2
+   1  app/api/accounts/[accountId]/calendar/events/[eventId]/respond/route.test.ts:1
+   1  app/api/accounts/[accountId]/calendar/events/[eventId]/route.pendingRemoteSync.test.ts:1
+   1  app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:2
+   1  app/api/accounts/[accountId]/folders/[folderId]/consistency/route.test.ts:1
+   1  app/api/accounts/[accountId]/mcp-tokens/route.test.ts:1
+   1  app/api/accounts/[accountId]/messages/[messageId]/flags/route.test.ts:1
+   1  app/api/accounts/[accountId]/messages/[messageId]/source/route.test.ts:1
+   1  app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.test.ts:1
+   6  app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts:2
+   1  app/api/accounts/[accountId]/sync/new-candidates/route.test.ts:2
+   1  app/api/accounts/[accountId]/translation/compose/route.test.ts:2
+   1  app/api/auth/me/route.test.ts:1
+   1  app/api/ba/[...all]/route.test.ts:1
+   1  app/api/calendar/import/route.test.ts:2
+   1  app/api/mcp/route.test.ts:3
+   1  app/components/AttachmentsList.dom.test.tsx:2
+   1  app/components/AttachmentsList.test.ts:1
+   1  app/components/ComposeEditor.imageDrop.dom.test.tsx:3
+   1  app/components/ComposeEditor.roundTrip.dom.test.tsx:3
+   4  app/components/LinkifiedText.test.tsx:1
+   1  app/components/calendar/CalendarEventEmailSnapshot.test.tsx:1
+   1  app/components/calendar/EventDetailView.test.tsx:1
+   1  app/components/calendar/EventInviteStatusRow.test.ts:1
+   1  app/components/calendar/calendarNowIndicator.test.ts:1
+   1  app/components/calendar/calendarPopoverResize.test.ts:1
+   1  app/components/calendar/useEventResponseState.dom.test.tsx:1
+   1  app/components/collab/Collaboration.dom.test.tsx:1
+   1  app/components/composeEditorAutoLink.test.ts:1
+   5  app/components/emailFontRegistry.test.ts:1
+   1  app/components/lexical/ImageNode.test.ts:1
+   1  app/components/lexical/imageResize.test.ts:1
+   1  app/components/mailclient/composition/buildSendPayload.test.ts:1
+   2  app/components/mailclient/composition/composeContentBuilder.test.ts:1
+  64  app/components/mailclient/composition/composeInitState.test.ts:1
+   1  app/components/mailclient/composition/composeTabSwitch.test.ts:1
+   1  app/components/mailclient/composition/composeTextNormalization.test.ts:1
+   1  app/components/mailclient/composition/composeThreading.test.ts:1
+   1  app/components/mailclient/composition/detachedSendWarnings.dom.test.tsx:1
+   1  app/components/mailclient/composition/draftAutoSaveState.test.ts:1
+   1  app/components/mailclient/composition/draftListState.test.ts:1
+   1  app/components/mailclient/composition/draftSaveUtils.test.ts:1
+  20  app/components/mailclient/composition/resetComposeSession.test.ts:1
+   1  app/components/mailclient/composition/sendMailRace.dom.test.tsx:3
+   1  app/components/mailclient/composition/sendOutcome.dom.test.tsx:1
+   1  app/components/mailclient/composition/sendOutcome.test.ts:1
+   2  app/components/mailclient/composition/useComposeHandlers.test.ts:1
+   1  app/components/mailclient/folder/folderBadgePresentation.test.ts:1
+   1  app/components/mailclient/message/normalizeMarkdownBody.test.ts:1
+   1  app/components/mailclient/message/threadViewState.test.ts:1
+   3  app/components/mailclient/messageListQueryUrl.test.ts:1
+   8  app/components/mailclient/messagelist/listBehavior.test.ts:1
+   3  app/components/mailclient/messagelist/listModel.test.ts:1
+   1  app/components/mailclient/messagelist/listState.test.ts:1
+   1  app/components/mailclient/messagelist/messageListViewTypes.test.ts:1
+   1  app/components/mailclient/messagelist/sortAndDedupeMessages.test.ts:1
+   1  app/components/mailclient/messagelist/threadGroupUtils.test.ts:1
+   1  app/components/mailclient/messagelist/threadTree.test.ts:1
+   1  app/components/mailclient/messagelist/topicSuggestionGroup.test.ts:1
+   1  app/components/mailclient/recentLocalDraftSaves.test.ts:1
+   1  app/components/mailclient/recomputeJobRunner.test.ts:1
+   1  app/components/mailclient/status/upcomingEntries.test.ts:1
+   1  app/components/mailclient/syncFingerprint.test.ts:1
+   4  app/components/mailclient/syncJobProgress.test.ts:1
+   1  app/components/mailclient/syncJobTypes.test.ts:1
+   1  app/components/mailclient/syncNotificationFilter.test.ts:1
+   1  app/components/mailclient/syncReconcileGuards.test.ts:1
+   1  app/components/mailclient/topicPresentation.test.ts:1
+   1  app/components/mailclient/topicSearch.test.ts:1
+   1  app/components/mailclient/topicSuggestionActions.test.ts:1
+   1  app/components/mailclient/useInAppNotices.test.ts:1
+   1  app/components/mailclient/useMessageDeleteActions.test.ts:1
+   1  app/components/mailclient/useMessageMoveActions.test.ts:1
+   1  app/components/mailclient/utils/accountControllerHelpers.test.ts:1
+   2  app/components/mailclient/utils/calendarInviteState.test.ts:1
+   1  app/components/mailclient/utils/calendarReminders.test.ts:1
+   1  app/components/mailclient/utils/clientHelpers.test.ts:1
+   1  app/components/mailclient/utils/deleteConfirm.test.ts:1
+   1  app/components/mailclient/utils/folderHelpers.test.ts:1
+   1  app/components/mailclient/utils/listCount.test.ts:1
+   1  app/components/mailclient/utils/messageHelpers.test.ts:1
+   1  app/components/mailclient/utils/messageMove.test.ts:1
+   1  app/components/mailclient/utils/messageMutation.test.ts:1
+   1  app/components/mailclient/utils/parseAddressList.test.ts:1
+   1  app/components/mailclient/utils/relativeTimeGroups.test.ts:1
+   2  app/components/mailclient/utils/reminderNotificationHelpers.test.ts:1
+   2  app/components/mailclient/utils/threadContentCache.test.ts:1
+   1  app/components/mailclient/utils/trashFolder.test.ts:1
+   1  app/components/shell/MobileFrames.dom.test.tsx:1
+   1  app/components/shell/Shell.dom.test.tsx:2
+   1  app/components/shell/ShellSearch.dom.test.tsx:1
+   1  app/components/shell/types.test.ts:1
+   1  app/globals.test.ts:1
+   1  app/hooks/useDarkMode.dom.test.tsx:2
+   1  app/hooks/useMobileNavigation.dom.test.tsx:1
+   1  app/hooks/useThreadCollab.dom.test.tsx:1
+   1  lib/accountSettings.test.ts:1
+   1  lib/appBranding.test.ts:1
+   1  lib/auth.test.ts:1
+   1  lib/betterAuth.test.ts:1
+   5  lib/caldav/client.test.ts:1
+   1  lib/caldav/emailEventImporter.test.ts:1
+   1  lib/caldav/icsSerializer.test.ts:1
+   1  lib/caldav/remoteMerge.test.ts:1
+   1  lib/caldav/sync.test.ts:1
+   2  lib/calendar.test.ts:1
+   1  lib/calendarEventDeletion.test.ts:1
+   1  lib/calendarEventDiff.test.ts:1
+   1  lib/calendarEventDiffFormat.test.ts:1
+   1  lib/calendarEventEmailSnapshot.test.ts:2
+   1  lib/calendarEventSnapshot.test.ts:1
+   1  lib/calendarEventStatus.test.ts:1
+   1  lib/calendarIcs.test.ts:1
+   1  lib/calendarImportClient.test.ts:1
+   1  lib/calendarInviteProcessing.test.ts:1
+   1  lib/calendarInviteProcessor.test.ts:1
+   1  lib/calendarInviteScope.test.ts:1
+   1  lib/calendarInviteSearch.test.ts:1
+   1  lib/calendarInviteStatePersistence.test.ts:1
+   1  lib/calendarOccurrences.test.ts:1
+   1  lib/calendarParticipation.test.ts:1
+   1  lib/calendarReminderReschedule.test.ts:1
+   2  lib/calendarReply.test.ts:1
+   1  lib/calendarSeriesReanchor.test.ts:1
+   1  lib/calendarSeriesTruncation.test.ts:1
+   1  lib/calendarTimezones.test.ts:1
+   1  lib/composeInvite.test.ts:1
+   1  lib/composeInviteMetadata.test.ts:1
+   6  lib/crossAccountCopy.test.ts:1
+   2  lib/dateFormatting.test.ts:1
+   1  lib/db.accounts.test.ts:2
+   1  lib/db.addressSearchIndex.test.ts:2
+   1  lib/db.aiFlags.test.ts:1
+   1  lib/db.attachmentUrls.test.ts:1
+   1  lib/db.calendarConflicts.test.ts:2
+   1  lib/db.calendarEvents.test.ts:2
+   1  lib/db.collisionVariantInlineImages.test.ts:2
+   1  lib/db.draftTombstones.test.ts:2
+   1  lib/db.folders.test.ts:2
+   1  lib/db.mailboxState.test.ts:2
+   1  lib/db.messageSizes.test.ts:4
+   1  lib/db.messagesCore.test.ts:2
+   1  lib/db.sameFolderMessageCopies.test.ts:2
+   1  lib/db/adminAudit.test.ts:2
+   1  lib/db/authPolicy.test.ts:1
+   1  lib/db/connection.auth.test.ts:1
+   1  lib/db/connection.collab.test.ts:1
+   1  lib/db/mcpTokens.test.ts:2
+   1  lib/db/messages/retrieval.orphanedNullUid.test.ts:2
+   1  lib/db/messages/utility.test.ts:2
+   1  lib/db/rowParsers.test.ts:1
+   1  lib/db/schema.master.test.ts:1
+   1  lib/db/threadCollab.remap.test.ts:1
+   1  lib/db/threadCollab.test.ts:3
+   1  lib/db/userAccountPrefs.test.ts:2
+   1  lib/db/users.test.ts:3
+   1  lib/deepl.test.ts:1
+   1  lib/deeplAccountConfig.test.ts:1
+   1  lib/draftSendEnvelope.test.ts:1
+   1  lib/drafts.test.ts:1
+   1  lib/fullcalendarRecurrence.test.ts:1
+   1  lib/html.inlineImages.test.ts:1
+   1  lib/html.safeLinks.test.ts:1
+   1  lib/html.test.ts:1
+   1  lib/html/quoteBoundary.test.ts:1
+   1  lib/inviteDeckEventBounds.test.ts:1
+   1  lib/linkify.test.ts:1
+   1  lib/logging/backendConsole.test.ts:1
+   3  lib/mail/attachmentFromSource.test.ts:1
+  10  lib/mail/categorization/classifier.test.ts:1
+   1  lib/mail/categorization/linearModel.test.ts:1
+   1  lib/mail/composePayload.test.ts:1
+   1  lib/mail/embeddableImage.test.ts:1
+   1  lib/mail/imap.structure.test.ts:1
+   1  lib/mail/imap/connectionPool.test.ts:1
+   4  lib/mail/imapClientOptions.test.ts:1
+   1  lib/mail/imapError.test.ts:1
+   5  lib/mail/mime/removeAttachmentPart.test.ts:1
+   4  lib/mail/removeMessageAttachment.test.ts:1
+   1  lib/mail/sentInvite.test.ts:1
+   1  lib/mail/smtpError.test.ts:1
+   1  lib/mail/smtpTimeouts.test.ts:1
+   1  lib/mail/stripBccHeader.test.ts:1
+   1  lib/mail/subjectPrefix.test.ts:1
+   1  lib/mail/syncMessageSanitizer.sizes.test.ts:2
+   1  lib/mailto.test.ts:1
+   1  lib/markdownConvert.test.ts:1
+   1  lib/markdownEmail.test.ts:1
+   1  lib/messageGrouping.test.ts:1
+   1  lib/messageIds.test.ts:1
+   1  lib/messageLocalState.test.ts:1
+   5  lib/messageMoveJobs.test.ts:1
+   1  lib/messageMovePersistence.test.ts:2
+   1  lib/net/urlSafety.test.ts:1
+   1  lib/rateLimit.test.ts:1
+   1  lib/recipientAliases.test.ts:2
+   1  lib/recipientLists.test.ts:1
+   2  lib/reminderRecurrence.test.ts:1
+   1  lib/sameFolderMessageCopies.consistency.test.ts:2
+   1  lib/secret.test.ts:1
+   1  lib/senderIcons.test.ts:1
+   1  lib/senderIdentity.test.ts:1
+   1  lib/specialFolders.test.ts:1
+   1  lib/syncJobs.test.ts:1
+   1  lib/syncMoveReconciliation.test.ts:1
+   1  lib/syncOperation.test.ts:1
+   1  lib/syncOperation/progress.test.ts:1
+   1  lib/syncPolicy.test.ts:1
+   1  lib/threadCollab.api.test.ts:1
+   1  lib/threadCollab.filters.test.ts:1
+   1  lib/threadCollab.send.test.ts:1
+   1  lib/threadCollab.test.ts:1
+   1  lib/threadDate.test.ts:1
+   1  lib/threadLookup.test.ts:1
+   1  lib/threadTopicSearch.test.ts:1
+   1  lib/threading.test.ts:1
+   1  lib/topicSuggestions.test.ts:2
+   1  lib/topics/searchSentinels.test.ts:1
+   1  lib/topicsTransfer.test.ts:2
+   1  lib/ui/byteSize.test.ts:1
+   1  lib/ui/detachedComposeHandoff.test.ts:1
+   1  lib/ui/messageView.test.ts:1
+   1  lib/url.test.ts:1
+   1  scripts/dev-fixture/fixture.test.ts:1
+
+Final scope check: git diff and git diff --cached both empty; git status --porcelain empty. Review artifacts are outside the checkout under ROOT/briefs. .tmp removed after preservation (verified in report).
