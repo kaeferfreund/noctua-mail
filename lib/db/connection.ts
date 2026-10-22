@@ -62,10 +62,26 @@ async function ensureDatabaseCtor() {
   }
 }
 
-function configureDb(db: any) {
+export function configureDb(db: any, busyTimeoutMs = 15000) {
   db.exec("PRAGMA journal_mode = WAL;");
-  db.exec("PRAGMA busy_timeout = 15000;");
+  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");
+}
+
+let authDbInstance: any = null;
+
+/** Separate handle, same master file: Noctua writes must not join auth transactions. */
+export async function getAuthDb() {
+  const master = await getDb();
+  if (!authDbInstance) {
+    // Both writers run on this event loop. Waiting synchronously for the
+    // other handle would prevent its async transaction from committing.
+    // Noctua already retries SQLITE_BUSY asynchronously via withDbWriteRetry.
+    master.exec("PRAGMA busy_timeout = 0;");
+    authDbInstance = new DatabaseCtor(getMainDbPath());
+    configureDb(authDbInstance, 0);
+  }
+  return authDbInstance;
 }
 
 function ensureDbParentDir(dbPath: string) {
@@ -152,6 +168,14 @@ function scheduleAccountDbIdleClose(dbPath: string) {
 }
 
 export function closeAllDbConnections() {
+  if (authDbInstance) {
+    try {
+      authDbInstance.close();
+    } catch {
+      // Shutdown may already have closed it.
+    }
+    authDbInstance = null;
+  }
   const accountPaths = Array.from(accountDbInstances.keys());
   accountPaths.forEach((dbPath) => closeAccountDbConnection(dbPath));
   if (masterDbInstance) {
