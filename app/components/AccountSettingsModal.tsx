@@ -1,6 +1,9 @@
+import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import SettingsFrame, { SettingsTitle } from "@/app/components/shell/SettingsFrame";
 import { X } from "lucide-react";
-import { Dialog, Flex, Tabs } from "@radix-ui/themes";
+import { Flex, Tabs } from "@radix-ui/themes";
 import type { Account, AccountSettings, RecipientAlias, Topic } from "@/lib/data";
 import { hasSavableAccountSettingsChanges } from "@/lib/accountSettings";
 import AccountTabContent from "@/app/components/account-settings/tabs/AccountTabContent";
@@ -83,6 +86,7 @@ export default function AccountSettingsModal({
   onUpdateRecipientAlias,
   onDeleteRecipientAlias
 }: Props) {
+  const isMobile = useIsMobile();
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
   const [imapSecurity, setImapSecurity] = useState<"tls" | "starttls" | "none">(() =>
     deriveImapSecurity(initialAccount.imap)
@@ -199,46 +203,29 @@ export default function AccountSettingsModal({
   };
 
   return (
-    <Dialog.Root
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <Dialog.Content
-        className="account-settings-modal"
-        size="4"
-        width="94vw"
-        maxWidth="980px"
-        aria-describedby={undefined}
-        onInteractOutside={(event) => event.preventDefault()}
-        onEscapeKeyDown={(event) => event.preventDefault()}
-        style={{
-          height: "min(86vh, 900px)",
-          overflow: "hidden"
-        }}
-      >
+    <SettingsFrame open={isOpen} onClose={onClose}>
         <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
           <Flex align="center" justify="between" style={{ paddingBottom: "var(--space-2)", flexShrink: 0 }}>
-            <Dialog.Title size="5" weight="bold">
+            <SettingsTitle>
               Account settings
-            </Dialog.Title>
+            </SettingsTitle>
             <TooltipIconButton variant="ghost" tooltip="Close" onClick={onClose}>
               <X size={18} />
             </TooltipIconButton>
           </Flex>
 
           <Tabs.Root
+            orientation={isMobile ? "vertical" : "horizontal"}
             value={manageTab}
             onValueChange={(value) => onTabChange(value as ManageTab)}
-            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}
+            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: isMobile ? "row" : "column", gap: isMobile ? 8 : 0 }}
           >
-            <OverflowTabsList
+            {isMobile ? <Tabs.List className={mobileStyles.settingsTabs}>{tabItems.map((tab) => <Tabs.Trigger key={tab.value} value={tab.value} disabled={tab.disabled}>{tab.label}</Tabs.Trigger>)}</Tabs.List> : <OverflowTabsList
               tabs={tabItems}
               activeValue={manageTab}
               onSelect={(value) => onTabChange(value as ManageTab)}
               overflowLabel="More settings tabs"
-            />
+            />}
 
             <Tabs.Content value="account" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <AccountTabContent
@@ -398,7 +385,6 @@ export default function AccountSettingsModal({
 
           </Tabs.Root>
         </Flex>
-      </Dialog.Content>
-    </Dialog.Root>
+    </SettingsFrame>
   );
 }

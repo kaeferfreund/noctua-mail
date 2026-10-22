@@ -307,7 +307,6 @@ export default function ComposeFields({
       ? "Hide Cc and Bcc"
       : "Clear Cc/Bcc to hide fields"
     : "Show Cc and Bcc";
-  const showFrom = variant === "inline";
   const inReplyToRow = inReplyToMessage ? (
     <InReplyToReferenceRow
       variant="compose"
@@ -334,7 +333,7 @@ export default function ComposeFields({
   );
   const fromRow = (
     <div className={styles.composeGridRow}>
-      <Text size="2" weight="medium" className={styles.label}>
+      <Text as="label" htmlFor={`compose-${variant}-from`} size="2" weight="medium" className={styles.label}>
         From:
       </Text>
       <TextField.Root
@@ -349,7 +348,7 @@ export default function ComposeFields({
 
   return (
     <div className={styles.composeGrid}>
-      {showFrom && fromRow}
+      {fromRow}
       <RecipientField
         variant={variant}
         label="To:"

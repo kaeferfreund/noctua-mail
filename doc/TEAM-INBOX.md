@@ -1375,7 +1375,10 @@ Mobile (below `md`):
 
 - Navigation state is derived, not tapped: the shell derives `view = "thread"` from
   `viewMessage?.id` even during SSR; an effect on mobile pushes `history.state.noctuaMobileView = "thread"`.
-  It derives `view = "list"` when `viewMessage` becomes null or on `popstate`. The in-app back button calls
+  It derives `view = "list"` when `viewMessage` becomes null or Back leaves the thread entry.
+  Each open mobile Sheet (including sidebar and settings) adds an overlay history entry; Back
+  dismisses the top Sheet before leaving the thread. Closing a Sheet also removes its history entry.
+  The in-app back button calls
   `history.back()` when `history.state?.noctuaMobileView` is set, otherwise `setViewMessage(null)`.
   Both panes stay mounted; visibility is CSS (`hidden md:flex`), so `listPaneRef`, `messageRefs`,
   virtualization, and `noticePaneRightOffset` keep working and nothing flips after hydration.
@@ -1385,16 +1388,23 @@ Mobile (below `md`):
 - Compose: `ComposeOrchestrator` gets an `isMobile` input. On mobile `openCompose` and the
   `setComposeView` wrapper coerce `inline`/`minimized` to `modal`; dock, minimize, and
   open-in-window controls are hidden; `.modal-backdrop`/`.composeModal` become `100dvw × 100dvh`
-  below `md` and `composeSize` is ignored. ui-shell also owns ComposeFields.tsx: render the
-  From row in **every** variant (remove inline-only showFrom); add modal DOM regression. The fix
-  already in progress on feat/ui-shell satisfies this ownership; auth agents must not duplicate it.
-  `sendMailRace.dom.test.tsx` is updated for the prop.
-- Message list rows: tap targets at least 44px; a per-row "more" button replaces right-click.
+  below `md` and `composeSize` is ignored. The mobile frame is a labelled modal Dialog with
+  trapped focus, Escape dismissal and focus restoration. ui-shell also owns ComposeFields.tsx:
+  render the From row in **every** variant (remove inline-only showFrom); add modal DOM regression.
+  The fix already in progress on feat/ui-shell satisfies this ownership; auth agents must not
+  duplicate it. `sendMailRace.dom.test.tsx` covers the prop.
+- Message list rows: sender above subject, date aligned right, a reserved "more" button and
+  an 8px unread glyph with an invisible 44px hit area. Thread/table/Compact rows and their virtualizer
+  share a 72px mobile height. Below a 600px list-pane width, desktop thread/table rows
+  also use the two-line layout and 72px spacing; wider panes keep their desktop density.
+  Compact keeps two text lines with separate unread, selection and action hit areas; Table
+  retains its per-row selection checkbox. Reader sender/date metadata stacks.
 - Status bar hidden. Its panels (process status, mail check, reminders, exceptions) and the
   calendar open from the header indicator menu into a `Sheet`; `openBottomStatusPanel` routes
   there on mobile, including the PWA `?openCalendar=1` handler; the calendar sidebar is a
-  full-screen `Sheet` on mobile.
-- Settings open as a full-screen sheet with the tab list rendered vertically.
+  full-screen `Sheet` on mobile. Closing a status Sheet returns focus to the header indicator;
+  calendar "Find related" clears the selected message so the results list is visible.
+- Settings open as a full-screen sheet with a vertical tab list whose long labels wrap.
 
 ### 7.3 Collaboration UI (branch `feat/collab-ui`)
 

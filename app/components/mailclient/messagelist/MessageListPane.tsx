@@ -2,21 +2,22 @@ import type React from "react";
 import styles from "./MessageListPane.module.css";
 
 type MessageListPaneProps = {
-  state: {
-    listWidth: number;
-  };
   refs: {
     listPaneRef: React.RefObject<HTMLDivElement | null>;
   };
   children: React.ReactNode;
 };
 
-export default function MessageListPane({ state, refs, children }: MessageListPaneProps) {
-  const { listWidth } = state;
+/**
+ * Scroll container of the message list. It fills the resizable panel it is
+ * rendered in; MailClient measures its width with a ResizeObserver on
+ * `listPaneRef` to drive the narrow-list modes.
+ */
+export default function MessageListPane({ refs, children }: MessageListPaneProps) {
   const { listPaneRef } = refs;
 
   return (
-    <aside className={styles.pane} style={{ width: listWidth }} ref={listPaneRef}>
+    <aside className={styles.pane} ref={listPaneRef}>
       {children}
     </aside>
   );
