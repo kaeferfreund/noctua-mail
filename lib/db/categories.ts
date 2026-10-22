@@ -455,6 +455,10 @@ export async function recomputeCategoriesForAccount(
     `UPDATE messages SET category = ?, categoryScore = ?, categorySignals = ? WHERE accountId = ? AND id = ?`
   );
 
+  const selectAttachments = db.prepare(
+    `SELECT filename FROM attachments WHERE accountId = ? AND messageId = ?`
+  );
+
   let processed = 0;
   let categorized = 0;
 
@@ -511,9 +515,7 @@ export async function recomputeCategoriesForAccount(
           parsedSources.get(id) ?? null;
 
         if (!classificationInput) {
-          const attachmentRows = db
-            .prepare(`SELECT filename FROM attachments WHERE accountId = ? AND messageId = ?`)
-            .all(accountId, id) as Array<{ filename?: string | null }>;
+          const attachmentRows = selectAttachments.all(accountId, id) as Array<{ filename?: string | null }>;
           const attachmentFilenames = attachmentRows
             .map((item) => (item.filename ?? "").trim())
             .filter(Boolean);
