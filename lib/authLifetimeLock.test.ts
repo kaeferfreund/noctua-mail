@@ -58,3 +58,30 @@ test("database symlink aliases share one lifetime lock",async()=>{
     expect(result.status).toBe(1);expect(result.stderr).toContain("lifetime lock is held");
   }finally{operator.release();}
 });
+
+
+for (const script of ["migrateTeamAuth", "recoverTeamAuth"]) test(`${script} CLI refuses a live application lock before opening the database`, async () => {
+  const data = dataDir(), lock = await lockFor(data, "application");
+  const args = script === "migrateTeamAuth"
+    ? ["--application-stopped", "--confirm-reviewed-identities", "--manifest", "synthetic-missing.json"]
+    : ["--application-stopped", "--confirm-personal-handover", "--bootstrap-invite"];
+  try {
+    const result = child(data, `process.argv=["bun","scripts/${script}.ts",...${JSON.stringify(args)}];await import('./scripts/${script}.ts');`);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("lifetime lock is held");
+    expect(() => readFileSync(path.join(data, "db/main.db"))).toThrow();
+  } finally { lock.release(); }
+});
+
+test("migration CLI audits stale override, passes its operator lock and releases after migration", async () => {
+  const data = dataDir(), first = await lockFor(data, "operator"); first.release();
+  writeFileSync(first.path, "synthetic-ambiguous-owner");
+  const manifest = path.join(data, "reviewed.json");
+  writeFileSync(manifest, JSON.stringify({ version: 1, users: [], memberships: [] }));
+  const result = child(data, `process.argv=["bun","scripts/migrateTeamAuth.ts","--application-stopped","--confirm-reviewed-identities","--manifest",${JSON.stringify(manifest)},"--override-stale-lock"];await import('./scripts/migrateTeamAuth.ts');
+    const {getDb,closeAllDbConnections}=await import('./lib/db/connection');const db=await getDb();
+    if(db.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='operator.lock_override'").get().n!==1)throw new Error('missing audit');closeAllDbConnections();`);
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toContain('"status":"complete"');
+  expect(readFileSync(first.path, "utf8")).toBe("");
+});
