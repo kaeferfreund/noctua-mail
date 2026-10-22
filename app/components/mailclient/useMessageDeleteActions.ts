@@ -756,7 +756,7 @@ export function useMessageDeleteActions({
   );
 
   const handleDeleteMessagesByIds = useCallback(
-    async (messageIds: string[]) => {
+    async (messageIds: string[], options?: { selectedIds: string[] }) => {
       const uniqueIds = Array.from(new Set(messageIds));
       if (uniqueIds.length === 0) return;
       const targets = uniqueIds
@@ -766,11 +766,18 @@ export function useMessageDeleteActions({
             messages.find((item) => item.id === id)
         )
         .filter((message): message is Message => Boolean(message));
+      const selectedIds = new Set(options?.selectedIds ?? uniqueIds);
+      const hiddenTargets = targets.filter((target) => !selectedIds.has(target.id));
       const deleteConfirm = await buildDeleteConfirmState(
         targets,
         targets.length > 1 ? "messages" : "message"
       );
+      if (hiddenTargets.length > 0) {
+        deleteConfirm.hiddenMessageCount = hiddenTargets.length;
+        deleteConfirm.collapsedThreadCount = new Set(hiddenTargets.map(getThreadKey)).size;
+      }
       const requiresDeleteConfirm =
+        hiddenTargets.length > 0 ||
         deleteConfirm.calendarLinkedReminderCount > 0 ||
         deleteConfirm.calendarLinkedEventCount > 0;
       if (requiresDeleteConfirm) {
