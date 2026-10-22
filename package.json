@@ -30,12 +30,12 @@
     "dev:fixture": "bun --env-file=.env.local scripts/dev-fixture/run.ts"
   },
   "dependencies": {
-    "@fullcalendar/core": "^6.1.20",
-    "@fullcalendar/daygrid": "^6.1.20",
-    "@fullcalendar/interaction": "^6.1.20",
-    "@fullcalendar/react": "^6.1.20",
-    "@fullcalendar/rrule": "^6.1.20",
-    "@fullcalendar/timegrid": "^6.1.20",
+    "@fullcalendar/core": "^6.1.22",
+    "@fullcalendar/daygrid": "^6.1.22",
+    "@fullcalendar/interaction": "^6.1.22",
+    "@fullcalendar/react": "^6.1.22",
+    "@fullcalendar/rrule": "^6.1.22",
+    "@fullcalendar/timegrid": "^6.1.22",
     "@lexical/code-core": "^0.43.0",
     "@lexical/history": "^0.43.0",
     "@lexical/html": "^0.43.0",
