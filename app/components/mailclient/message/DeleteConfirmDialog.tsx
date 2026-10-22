@@ -193,6 +193,9 @@ export default function DeleteConfirmDialog({
         </AlertDialog.Title>
         <AlertDialog.Description>
           {deleteConfirm ? getDeleteDescription(deleteConfirm) : "This message will be deleted."}
+          {deleteConfirm?.hiddenMessageCount
+            ? ` This selection includes ${formatCountLabel(deleteConfirm.hiddenMessageCount, "hidden message")} in ${formatCountLabel(deleteConfirm.collapsedThreadCount ?? 1, "collapsed thread")}.`
+            : null}
           {calendarDescription ? ` ${calendarDescription}` : null}
         </AlertDialog.Description>
         {deleteConfirm && deleteConfirm.linkedEvents.length > 0 ? (

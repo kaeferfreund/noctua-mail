@@ -21,6 +21,7 @@ import {
   type MessageViewMode
 } from "./messageListViewTypes";
 import { createSelectionStore, type SelectionStore } from "./selectionStore";
+import { usePruneMessageSelection } from "./usePruneMessageSelection";
 import type { MessageGroupMeta, VisibleMessageEntry } from "./listModel";
 import type { Folder, Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState, NoticeInput } from "../types";
@@ -88,7 +89,7 @@ export type MessageListHandle = {
     message: Message,
     options?: { allowThreadDeletion?: boolean }
   ) => Promise<void>;
-  handleDeleteMessagesByIds: (ids: string[]) => Promise<void>;
+  handleDeleteMessagesByIds: (ids: string[], options?: { selectedIds: string[] }) => Promise<void>;
   handleMoveMessages: (destinationFolderId: string, messageIds?: string[]) => void;
   moveMessagesToFolder: MoveMessagesToFolder;
   handleMarkSpam: (message: Message) => Promise<void>;
@@ -311,6 +312,11 @@ export default function MessageListOrchestrator({
     createSelectionStore(mutationInputs.activeMessageId || null)
   );
   const lastSelectedIdRef = useRef<string | null>(null);
+  usePruneMessageSelection(
+    mutationInputs.threadScopeMessages,
+    selectionStore,
+    lastSelectedIdRef
+  );
 
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
     activeAccountId: mutationInputs.activeAccountId,
