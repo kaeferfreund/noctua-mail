@@ -46,6 +46,23 @@ describe("collaboration REST", () => {
     expect((await POST(f.request("POST", { body: "Synthetic internal note" }), f.route())).status).toBe(role === "viewer" ? 403 : 201);
     expect((await DELETE(f.request("DELETE"), f.route({ commentId: "absent" }))).status).toBe(role === "viewer" ? 403 : 200);
   });
+  test("GET and every REST mutation return the committed per-thread revision", async () => {
+    const f = await fixture("editor");
+    expect((await (await getCollab(f.request(), f.route())).json()).state.revision).toBe(0);
+    const updated = await (await PATCH(f.request("PATCH", { status: "waiting" }), f.route())).json();
+    expect(updated.state.revision).toBe(1);
+    const added = await (await POST(f.request("POST", { body: "Synthetic versioned note" }), f.route())).json();
+    expect(added.state.revision).toBe(2);
+    expect(added.comment.revision).toBe(2);
+    const snapshot = await (await getCollab(f.request(), f.route())).json();
+    expect(snapshot.state).toEqual(added.state);
+    expect(snapshot.comments).toEqual([added.comment]);
+    const deleted = await (await DELETE(f.request("DELETE"), f.route({ commentId: added.comment.id }))).json();
+    expect(deleted.state.revision).toBe(3);
+    const latest = await (await getCollab(f.request(), f.route())).json();
+    expect(latest.state).toEqual(deleted.state);
+    expect(latest.comments).toEqual([]);
+  });
   test("comment DELETE accepts bodyless same-origin, rejects cross-origin and unexpected bodies", async () => {
     const f = await fixture("editor");
     const added = await (await POST(f.request("POST", { body: "Delete regression" }), f.route())).json();

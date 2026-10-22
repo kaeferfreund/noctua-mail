@@ -16,6 +16,7 @@ export type ThreadCollabState = {
   commentCount: number;
   lastActivityAt: number;
   updatedAt: number;
+  revision: number;
   updatedByUserId: string | null;
 };
 export type ThreadComment = {
@@ -26,6 +27,7 @@ export type ThreadComment = {
   body: string;
   createdAt: number;
   updatedAt: number;
+  revision: number;
   deletedAt: number | null;
 };
 export type ThreadActivity = {
@@ -50,7 +52,7 @@ export function defaultThreadCollabState(accountId: string, threadId: string): T
   return {
     accountId, threadId, status: "open", assigneeUserId: null, assignedByUserId: null,
     assignedAt: null, statusChangedAt: null, statusChangedByUserId: null, commentCount: 0,
-    lastActivityAt: 0, updatedAt: 0, updatedByUserId: null
+    lastActivityAt: 0, updatedAt: 0, updatedByUserId: null, revision: 0
   };
 }
 export function threadHasMessages(db: Database, accountId: string, threadId: string) {
@@ -76,13 +78,13 @@ export function getThreadCollabStates(db: Database, accountId: string, threadIds
 export function upsertThreadCollabState(db: Database, state: ThreadCollabState) {
   db.prepare(`INSERT INTO thread_collab_state
     (accountId,threadId,status,assigneeUserId,assignedByUserId,assignedAt,statusChangedAt,
-     statusChangedByUserId,commentCount,lastActivityAt,updatedAt,updatedByUserId)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accountId,threadId) DO UPDATE SET
+     statusChangedByUserId,commentCount,lastActivityAt,updatedAt,updatedByUserId,revision)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accountId,threadId) DO UPDATE SET
     status=excluded.status,assigneeUserId=excluded.assigneeUserId,assignedByUserId=excluded.assignedByUserId,
     assignedAt=excluded.assignedAt,statusChangedAt=excluded.statusChangedAt,
     statusChangedByUserId=excluded.statusChangedByUserId,commentCount=excluded.commentCount,
-    lastActivityAt=excluded.lastActivityAt,updatedAt=excluded.updatedAt,updatedByUserId=excluded.updatedByUserId`)
-    .run(state.accountId, state.threadId, state.status, state.assigneeUserId, state.assignedByUserId, state.assignedAt, state.statusChangedAt, state.statusChangedByUserId, state.commentCount, state.lastActivityAt, state.updatedAt, state.updatedByUserId);
+    lastActivityAt=excluded.lastActivityAt,updatedAt=excluded.updatedAt,updatedByUserId=excluded.updatedByUserId,revision=excluded.revision`)
+    .run(state.accountId, state.threadId, state.status, state.assigneeUserId, state.assignedByUserId, state.assignedAt, state.statusChangedAt, state.statusChangedByUserId, state.commentCount, state.lastActivityAt, state.updatedAt, state.updatedByUserId, state.revision);
 }
 export function appendThreadActivity(db: Database, accountId: string, threadId: string, type: string, actor: CollabActor, payload: Record<string, unknown>, now: number): ThreadActivity {
   const row = {
@@ -95,26 +97,24 @@ export function appendThreadActivity(db: Database, accountId: string, threadId: 
 }
 export function updateThreadCollabState(db: Database, accountId: string, threadId: string, patch: ThreadCollabPatch, actor: CollabActor, now: number) {
   const state = getThreadCollabState(db, accountId, threadId);
-  let changed = false;
   if (patch.status !== undefined && patch.status !== state.status) {
     appendThreadActivity(db, accountId, threadId, "status_changed", actor, { from: state.status, to: patch.status }, now);
     state.status = patch.status;
     state.statusChangedAt = now;
     state.statusChangedByUserId = actor.userId;
-    changed = true;
   }
   if (patch.assigneeUserId !== undefined && patch.assigneeUserId !== state.assigneeUserId) {
     appendThreadActivity(db, accountId, threadId, patch.assigneeUserId === null ? "unassigned" : "assigned", actor, { from: state.assigneeUserId, to: patch.assigneeUserId }, now);
     state.assigneeUserId = patch.assigneeUserId;
     state.assignedByUserId = actor.userId;
     state.assignedAt = patch.assigneeUserId === null ? null : now;
-    changed = true;
   }
-  if (changed)
-    touchThreadCollabState(db, state, actor, now);
+  touchThreadCollabState(db, state, actor, now);
   return state;
 }
 export function touchThreadCollabState(db: Database, state: ThreadCollabState, actor: CollabActor, now: number) {
+  // Called exactly once per mutation inside the immediate transaction.
+  state.revision += 1;
   state.updatedAt = now;
   state.lastActivityAt = now;
   state.updatedByUserId = actor.userId;
@@ -132,36 +132,37 @@ export function getThreadComment(db: Database, accountId: string, threadId: stri
 export function addThreadComment(db: Database, accountId: string, threadId: string, body: string, actor: CollabActor & {
   userId: string;
 }, now: number) {
+  const state = getThreadCollabState(db, accountId, threadId);
   const comment: ThreadComment = {
     id: randomUUID(), accountId, threadId, authorUserId: actor.userId,
-    body, createdAt: now, updatedAt: now, deletedAt: null
+    body, createdAt: now, updatedAt: now, deletedAt: null, revision: state.revision + 1
   };
-  db.prepare(`INSERT INTO thread_comments (id,accountId,threadId,authorUserId,body,createdAt,updatedAt,deletedAt) VALUES (?,?,?,?,?,?,?,NULL)`)
-    .run(comment.id, accountId, threadId, actor.userId, body, now, now);
+  db.prepare(`INSERT INTO thread_comments (id,accountId,threadId,authorUserId,body,createdAt,updatedAt,deletedAt,revision) VALUES (?,?,?,?,?,?,?,NULL,?)`)
+    .run(comment.id, accountId, threadId, actor.userId, body, now, now, comment.revision);
   appendThreadActivity(db, accountId, threadId, "comment_added", actor, { commentId: comment.id }, now);
-  return { comment, state: touchThreadCollabState(db, getThreadCollabState(db, accountId, threadId), actor, now) };
+  return { comment, state: touchThreadCollabState(db, state, actor, now) };
 }
 export function editThreadComment(db: Database, comment: ThreadComment, body: string, actor: CollabActor, now: number) {
   const { accountId, threadId, id } = comment;
+  const state = getThreadCollabState(db, accountId, threadId);
   if (comment.deletedAt === null && comment.body !== body) {
-    db.prepare(`UPDATE thread_comments SET body=?,updatedAt=? WHERE accountId=? AND threadId=? AND id=?`)
-      .run(body, now, accountId, threadId, id);
+    db.prepare(`UPDATE thread_comments SET body=?,updatedAt=?,revision=? WHERE accountId=? AND threadId=? AND id=?`)
+      .run(body, now, state.revision + 1, accountId, threadId, id);
     comment.body = body;
     comment.updatedAt = now;
+    comment.revision = state.revision + 1;
     appendThreadActivity(db, accountId, threadId, "comment_edited", actor, { commentId: id }, now);
-    touchThreadCollabState(db, getThreadCollabState(db, accountId, threadId), actor, now);
   }
-  return { comment, state: getThreadCollabState(db, accountId, threadId) };
+  return { comment, state: touchThreadCollabState(db, state, actor, now) };
 }
 export function deleteThreadComment(db: Database, accountId: string, threadId: string, id: string, actor: CollabActor, now: number) {
-  const deleted = Boolean(db.prepare(`UPDATE thread_comments SET deletedAt=?,updatedAt=?
-    WHERE accountId=? AND threadId=? AND id=? AND deletedAt IS NULL RETURNING id`).get(now, now, accountId, threadId, id));
   const state = getThreadCollabState(db, accountId, threadId);
+  const deleted = Boolean(db.prepare(`UPDATE thread_comments SET deletedAt=?,updatedAt=?,revision=?
+    WHERE accountId=? AND threadId=? AND id=? AND deletedAt IS NULL RETURNING id`).get(now, now, state.revision + 1, accountId, threadId, id));
   if (deleted) {
     appendThreadActivity(db, accountId, threadId, "comment_deleted", actor, { commentId: id }, now);
-    touchThreadCollabState(db, state, actor, now);
   }
-  return { deleted, state };
+  return { deleted, state: touchThreadCollabState(db, state, actor, now) };
 }
 export function listThreadComments(db: Database, accountId: string, threadId: string) {
   return db.prepare(`SELECT * FROM thread_comments WHERE accountId=? AND threadId=? AND deletedAt IS NULL
@@ -257,7 +258,10 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
       }>).map(row => row.id));
   }
   for (const source of moves.keys()) {
-    db.prepare(`DELETE FROM thread_collab_state WHERE accountId=? AND threadId=?`).run(accountId, source);
+    upsertThreadCollabState(db, {
+      ...defaultThreadCollabState(accountId, source),
+      revision: (states.get(source)?.revision ?? 0) + 1,
+    });
     db.prepare(`DELETE FROM thread_topics WHERE accountId=? AND threadId=?`).run(accountId, source);
   }
   for (const [source, target] of moves) {
@@ -299,8 +303,14 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
       WHERE accountId=? AND threadId=? AND deletedAt IS NULL`).get(accountId, target) as {
       count: number;
     }).count;
-    if (rows.length || state.commentCount)
-      upsertThreadCollabState(db, state);
+    // Revision belongs to the target key, independent of source counters and clocks.
+    state.revision = (states.get(target)?.revision ?? 0) + 1;
+    upsertThreadCollabState(db, state);
+    for (const source of sources) {
+      for (const id of commentIds.get(source) ?? [])
+        db.prepare(`UPDATE thread_comments SET revision=? WHERE accountId=? AND threadId=? AND id=?`)
+          .run(state.revision, accountId, target, id);
+    }
     if (sources.length > 1 || (!moves.has(target) && states.has(target))) {
       const now = Date.now();
       appendThreadActivity(db, accountId, target, "threads_merged", { userId: null, clientId: "system" }, { mergedFromThreadIds: [...sources].sort() }, now);
