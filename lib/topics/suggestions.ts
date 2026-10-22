@@ -510,6 +510,166 @@ export async function getTopicSuggestionExplanationForThread(
   );
 }
 
+/**
+ * Two bindings per signal pair, plus the two accountId bindings on the
+ * learning-signal lookup. Stay under SQLite's default 999-variable limit.
+ */
+const TOPIC_SUGGESTION_SIGNAL_PAIR_BATCH = 400;
+
+type TopicLearningMatchRow = {
+  id: string;
+  accountId: string;
+  name: string;
+  shortName?: string | null;
+  color?: string | null;
+  imapKeyword: string;
+  createdAt: number;
+  updatedAt: number;
+  learningThreadId?: string | null;
+  signalType?: string | null;
+  signalValue?: string | null;
+};
+
+function topicSuggestionSignalKey(type: string, value: string) {
+  return `${type}\u0000${value}`;
+}
+
+/** SQLite `ORDER BY name` uses binary UTF-8 collation. */
+function compareSqliteText(left: string, right: string) {
+  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+}
+
+/**
+ * One learning-signal lookup for every signal on the page, then the same
+ * per-thread score as `getTopicSuggestionsForSignals`: SUM(weight) inside
+ * each other thread, suggestionScore = MAX of those sums, matchCount =
+ * number of matching threads, requesting thread excluded.
+ */
+function getTopicSuggestionsForThreadSignalBatch(
+  db: any,
+  accountId: string,
+  signalsByThreadId: Map<string, TopicSuggestionSignals>,
+  threadIds: string[]
+): Map<string, Topic[]> {
+  const signalKeysByThreadId = new Map<string, Set<string>>();
+  const uniquePairs: TopicSignalEntry[] = [];
+  const seenPairs = new Set<string>();
+
+  threadIds.forEach((threadId) => {
+    const signals = signalsByThreadId.get(threadId);
+    if (!signals) return;
+    const keys = new Set<string>();
+    topicSuggestionSignalEntries(signals).forEach((entry) => {
+      const key = topicSuggestionSignalKey(entry.type, entry.value);
+      keys.add(key);
+      if (seenPairs.has(key)) return;
+      seenPairs.add(key);
+      uniquePairs.push(entry);
+    });
+    signalKeysByThreadId.set(threadId, keys);
+  });
+
+  const rowsBySignalKey = new Map<string, TopicLearningMatchRow[]>();
+  for (let start = 0; start < uniquePairs.length; start += TOPIC_SUGGESTION_SIGNAL_PAIR_BATCH) {
+    const chunk = uniquePairs.slice(start, start + TOPIC_SUGGESTION_SIGNAL_PAIR_BATCH);
+    const args: Array<string> = [accountId, accountId];
+    chunk.forEach((entry) => {
+      args.push(entry.type, entry.value);
+    });
+    const rows = db
+      .prepare(
+        `SELECT t.id AS id,
+                t.accountId AS accountId,
+                t.name AS name,
+                t.shortName AS shortName,
+                t.color AS color,
+                t.imapKeyword AS imapKeyword,
+                t.createdAt AS createdAt,
+                t.updatedAt AS updatedAt,
+                tls.threadId AS learningThreadId,
+                tls.signalType AS signalType,
+                tls.signalValue AS signalValue
+         FROM topic_learning_signals tls
+         JOIN topics t
+           ON t.id = tls.topicId
+          AND t.accountId = tls.accountId
+         WHERE tls.accountId = ?
+           AND t.accountId = ?
+           AND (tls.signalType, tls.signalValue) IN (${chunk.map(() => "(?, ?)").join(", ")})`
+      )
+      .all(...args) as TopicLearningMatchRow[];
+    rows.forEach((row) => {
+      const type = (row.signalType ?? "").trim();
+      const value = (row.signalValue ?? "").trim();
+      if (!type || !value) return;
+      const key = topicSuggestionSignalKey(type, value);
+      const bucket = rowsBySignalKey.get(key);
+      if (bucket) {
+        bucket.push(row);
+      } else {
+        rowsBySignalKey.set(key, [row]);
+      }
+    });
+  }
+
+  const result = new Map<string, Topic[]>();
+  threadIds.forEach((threadId) => {
+    const signals = signalsByThreadId.get(threadId);
+    const keys = signalKeysByThreadId.get(threadId);
+    if (!signals || !keys || keys.size === 0) return;
+    const excludeThreadId = (signals.threadId ?? "").trim();
+    const byTopicId = new Map<
+      string,
+      { topic: Topic; threadScores: Map<string, number> }
+    >();
+
+    keys.forEach((key) => {
+      const weight = getTopicSuggestionWeight(key.slice(0, key.indexOf("\u0000")) as TopicSuggestionSignal);
+      (rowsBySignalKey.get(key) ?? []).forEach((row) => {
+        const learningThreadId = (row.learningThreadId ?? "").trim();
+        if (!learningThreadId) return;
+        if (excludeThreadId && learningThreadId === excludeThreadId) return;
+        const state = byTopicId.get(row.id) ?? {
+          topic: rowToTopic(row),
+          threadScores: new Map<string, number>()
+        };
+        state.threadScores.set(
+          learningThreadId,
+          (state.threadScores.get(learningThreadId) ?? 0) + weight
+        );
+        byTopicId.set(row.id, state);
+      });
+    });
+
+    const suggestions: Topic[] = [];
+    byTopicId.forEach((state) => {
+      let suggestionScore = 0;
+      state.threadScores.forEach((score) => {
+        if (score > suggestionScore) suggestionScore = score;
+      });
+      const matchCount = state.threadScores.size;
+      if (matchCount === 0) return;
+      suggestions.push({
+        ...state.topic,
+        suggestionScore,
+        matchCount
+      });
+    });
+    suggestions.sort((left, right) => {
+      const scoreDiff = (right.suggestionScore ?? 0) - (left.suggestionScore ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const countDiff = (right.matchCount ?? 0) - (left.matchCount ?? 0);
+      if (countDiff !== 0) return countDiff;
+      return compareSqliteText(left.name, right.name);
+    });
+    if (suggestions.length > 0) {
+      result.set(threadId, suggestions);
+    }
+  });
+
+  return result;
+}
+
 export async function getTopicSuggestionsForThreads(
   accountId: string,
   threadIds: string[],
@@ -529,18 +689,12 @@ export async function getTopicSuggestionsForThreads(
       normalizedThreadIds,
       options
     );
-    const result = new Map<string, Topic[]>();
-
-    normalizedThreadIds.forEach((threadId) => {
-      const signals = signalsByThreadId.get(threadId);
-      if (!signals) return;
-      const suggestions = getTopicSuggestionsForSignals(db, accountId, signals);
-      if (suggestions.length > 0) {
-        result.set(threadId, suggestions);
-      }
-    });
-
-    return result;
+    return getTopicSuggestionsForThreadSignalBatch(
+      db,
+      accountId,
+      signalsByThreadId,
+      normalizedThreadIds
+    );
   });
 }
 
