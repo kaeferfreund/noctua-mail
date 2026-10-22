@@ -63,8 +63,9 @@ export default function ShellHeader({ title, toolbar, search, sync, indicators }
       {/* On phones the title takes the free space so the toolbar sits with search on the right. */}
       <h1 className="m-0 min-w-0 truncate text-sm font-medium tracking-tight max-md:flex-1" title={title}>{title}</h1>
       {toolbar}
-      <div className="ml-auto flex min-w-0 items-center gap-2">
-        {!isMobile ? <div className="hidden w-64 min-w-48 shrink md:block xl:w-80"><ShellSearch {...search} /></div> : null}
+      {/* The search box gives way before the title (shrink-3) and may get narrow; the buttons never shrink. */}
+      <div className="ml-auto flex min-w-0 shrink-3 items-center gap-2">
+        {!isMobile ? <div className="hidden w-64 min-w-0 md:block xl:w-80"><ShellSearch {...search} /></div> : null}
         {isMobile ? <div className="md:hidden"><Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label="Search messages"><Search /></Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[calc(100dvw-16px)] max-w-96"><ShellSearch {...search} /></PopoverContent>
         </Popover></div> : null}

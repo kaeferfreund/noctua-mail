@@ -8,7 +8,7 @@ export type SortKey = "date" | "from" | "subject" | "size";
 /**
  * The four layouts the message list can render in. This list is the
  * single source of truth for the derived `MessageViewMode` type and for
- * the orchestrator's runtime validator — but adding a new layout also
+ * the runtime validator in `useMessageViewMode` — but adding a new layout also
  * requires updating the rendering call sites (the view menu in
  * `MessageListHeader`, the branch in `MessageListView`, and any settings
  * UI that exposes the choice). The type/validator pair won't compile /
