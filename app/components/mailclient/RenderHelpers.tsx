@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import React from "react";
 import { Inbox, Send, FileText, Trash2, ShieldOff, Archive } from "lucide-react";
 import type { Message, Folder, Topic } from "@/lib/data";
@@ -5,8 +6,11 @@ import type { ComposeMode } from "./composition/composeTypes";
 import MessageQuickActions from "./message/MessageQuickActions";
 import MessageMenu from "./message/MessageMenu";
 import MessageSourcePanel from "./message/MessageSourcePanel";
-import MarkdownPanel from "./message/MarkdownPanel";
 import { getFolderSpecialKind } from "@/lib/specialFolders";
+
+const MarkdownPanel = dynamic(() => import("./message/MarkdownPanel"), {
+  loading: () => <div role="status">Loading Markdown…</div>
+});
 
 export const renderQuickActions = (
   message: Message,

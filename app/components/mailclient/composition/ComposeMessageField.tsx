@@ -27,6 +27,7 @@ import composeStyles from "./Compose.module.css";
 import styles from "./ComposeMessageField.module.css";
 import ComposeInviteSection from "./ComposeInviteSection";
 import ComposeImageDropMenu from "./ComposeImageDropMenu";
+import { ComposeConversionBoundary } from "./ComposeConversionBoundary";
 
 // @lexical/* (~5 MB of packages) only mounts when the user switches to the
 // HTML compose tab — keep it out of the initial MailClient chunk.
@@ -123,7 +124,11 @@ type ComposeMessageFieldProps = {
   ) => void;
 };
 
-export default function ComposeMessageField({
+export default function ComposeMessageField(props: ComposeMessageFieldProps) {
+  return <ComposeConversionBoundary><ReadyComposeMessageField {...props} /></ComposeConversionBoundary>;
+}
+
+function ReadyComposeMessageField({
   darkMode,
   composeMode,
   composeTab,
