@@ -1,3 +1,4 @@
+import type { RowReadAction } from "./messagelist/selectionActions";
 import dynamic from "next/dynamic";
 import React from "react";
 import { Inbox, Send, FileText, Trash2, ShieldOff, Archive } from "lucide-react";
@@ -73,11 +74,13 @@ export const renderMessageMenu = (
   onOpenChange?: (open: boolean) => void,
   hasOtherAccounts?: boolean,
   handleCopyToAccount?: (target: Message) => void,
-  handleMoveToAccount?: (target: Message) => void
+  handleMoveToAccount?: (target: Message) => void,
+  readAction?: RowReadAction
 ) => (
   <MessageMenu
     message={message}
     origin={origin}
+    readAction={readAction}
     isDraft={isDraftItem(message)}
     pendingMessageActions={pendingMessageActions}
     openCompose={openCompose}
