@@ -27,7 +27,7 @@ describe("me state and persisted selection contract",()=>{
   await h.addMembership(user.id,await account("Hidden"));
   const response=await GET(req(f.jar.header())); const body=await response.json();
   expect(response.status).toBe(200);
-  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User"},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:86400,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required"}});
+  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User"},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:86400,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required",hasPassword:true,imapLoginAvailable:false}});
   expect(JSON.stringify(body)).not.toContain("sessionToken");
  });
  test("zero memberships returns none",async()=>{
@@ -109,6 +109,10 @@ describe("shell mutation contracts",()=>{
     f.master.prepare("INSERT INTO auth_reauth_grants(tokenHash,userId,sessionId,purpose,generation,expiresAt) SELECT ?,userId,?,'test',generation,? FROM auth_security_state WHERE userId=?").run(randomUUID(),sessionId,Date.now()+60_000,f.user.id);
    }
   }).immediate());
+  const pendingLogin=randomUUID();
+  await withDbWriteRetry("test.pendingLogin",()=>f.master.prepare(`INSERT INTO auth_pending_challenges(identifier,userId,generation,authenticatedAt,kind,expiresAt)
+   SELECT ?,userId,generation,?,'two_factor',? FROM auth_security_state WHERE userId=?`).run(pendingLogin,Date.now(),Date.now()+60000,f.user.id));
+  const epoch=f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation;
   const response=await logout(req(saved,"POST"));expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true});
   expect(response.headers.getSetCookie().join(";")).toContain("Max-Age=0");f.jar.absorb(response.headers);
   expect(f.jar.names()).not.toContain("noctua.session_token");
@@ -116,6 +120,8 @@ describe("shell mutation contracts",()=>{
   expect(f.master.prepare("SELECT sessionId FROM auth_session_security WHERE sessionId=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare("SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare("SELECT tokenHash FROM auth_reauth_grants WHERE sessionId=?").get(f.session.id)).toBeNull();
+  expect(f.master.prepare(`SELECT 1 FROM auth_pending_challenges WHERE identifier=?`).get(pendingLogin)).toBeNull();
+  expect(f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation).toBeGreaterThan(epoch);
   for (const [table,column] of [["auth_session","id"],["auth_session_security","sessionId"],["auth_pending_challenges","sourceSessionId"],["auth_reauth_grants","sessionId"]]) {
    expect(f.master.prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(controlId)).not.toBeNull();
   }

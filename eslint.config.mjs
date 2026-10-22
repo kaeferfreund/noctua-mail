@@ -174,7 +174,7 @@ const routeNoRoute = {
 
 export default defineConfig([
   ...next,
-  globalIgnores([".next/", "node_modules/", "dist/", ".data/", "src-tauri/"]),
+  globalIgnores([".tmp/", ".next/", "node_modules/", "dist/", ".data/", "src-tauri/"]),
   dbBoundaryNoApp,
   messagesNoCalendar,
   calendarNoMessagesExceptShared,

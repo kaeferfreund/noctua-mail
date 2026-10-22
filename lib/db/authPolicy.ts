@@ -280,13 +280,132 @@ export function importLegacyProfileFields(db: Database, userId: string): boolean
 }
 
 /** Noctua proof cleanup runs on its own master handle after library signOut. */
-export async function deleteSessionProofState(sessionId:string) {
+export async function deleteSessionProofState(sessionId:string, userId?:string, database?:Database) {
   return withDbWriteRetry("deleteSessionProofState", async()=>{
-    const db=await getDb();
+    const db=database ?? await getDb();
     db.transaction(()=>{
+      if (userId) invalidateUserChallenges(db,userId,true);
+      db.prepare(`DELETE FROM auth_verification WHERE identifier IN
+        (SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?)`).run(sessionId);
       db.prepare("DELETE FROM auth_pending_challenges WHERE sourceSessionId=?").run(sessionId);
       db.prepare("DELETE FROM auth_reauth_grants WHERE sessionId=?").run(sessionId);
       db.prepare("DELETE FROM auth_session_security WHERE sessionId=?").run(sessionId);
     }).immediate();
   });
+}
+
+export type SessionSecurity = {
+  sessionId: string; userId: string; generation: number; assurance: "setup" | "mfa";
+  authenticatedAt: number; method: string;
+};
+export type SecurityOperation = { id: string; userId: string; generation: number; action: string };
+
+export class AuthPolicyError extends Error {
+  constructor(public code: string, public status = 403) { super(code); }
+}
+
+export function readGeneration(db: Database, userId: string): number {
+  const row = db.prepare(`SELECT s.generation FROM auth_security_state s
+    JOIN auth_user u ON u.id=s.userId JOIN users p ON p.id=u.id
+    WHERE u.id=? AND (u.banned IS NULL OR u.banned=0 OR julianday(u.banExpires)<julianday('now'))
+    AND NOT EXISTS(SELECT 1 FROM user_provisioning WHERE userId=u.id AND state NOT IN ('complete','cancelled'))`).get(userId);
+  if (!row || !Number.isSafeInteger(row.generation)) throw new AuthPolicyError("Unauthorized", 401);
+  return row.generation;
+}
+
+export function enrollmentState(db: Database, userId: string) {
+  const row = db.prepare(`SELECT u.twoFactorEnabled,
+    (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors,
+    (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id AND f.verified=1 AND length(trim(f.secret))>0) AS verified
+    FROM auth_user u WHERE u.id=?`).get(userId);
+  return { complete: row?.twoFactorEnabled === 1 && row.factors === 1 && row.verified === 1,
+    inconsistent: !!row && ((row.twoFactorEnabled === 1) !== (row.verified === 1) || row.factors > 1) };
+}
+
+export function readSessionSecurity(db: Database, sessionId: string): SessionSecurity {
+  const row = db.prepare(`SELECT p.* FROM auth_session_security p JOIN auth_session s ON s.id=p.sessionId
+    WHERE p.sessionId=? AND p.userId=s.userId AND julianday(s.expiresAt)>julianday('now')`).get(sessionId) as SessionSecurity | null;
+  if (!row || !Number.isSafeInteger(row.authenticatedAt) || !["setup","mfa"].includes(row.assurance) || row.generation !== readGeneration(db, row.userId) || row.authenticatedAt > Date.now() ||
+    row.authenticatedAt + 86400000 <= Date.now()) throw new AuthPolicyError("Unauthorized", 401);
+  return row;
+}
+
+export async function reserveSecurityOperation(db: Database, userId: string, action: string): Promise<SecurityOperation> {
+  return withDbWriteRetry("reserveSecurityOperation", () => db.transaction(() => {
+    const generation = readGeneration(db, userId);
+    if (db.prepare("SELECT 1 FROM admin_lifecycle_operations WHERE slot=?").get(`security:${userId}`)) {
+      throw new AuthPolicyError("security_operation_pending", 409);
+    }
+    const id = crypto.randomUUID();
+    db.prepare(`INSERT INTO admin_lifecycle_operations(id,slot,actorUserId,targetUserId,action,state,createdAt,updatedAt)
+      VALUES(?,?,?,?,?,'reserved',?,?)`).run(id, `security:${userId}`, userId, userId, action, Date.now(), Date.now());
+    return { id, userId, generation, action };
+  }).immediate());
+}
+
+export function assertSecurityOperation(db: Database, op: SecurityOperation) {
+  const row = db.prepare(`SELECT id FROM admin_lifecycle_operations WHERE id=? AND slot=?`).get(op.id, `security:${op.userId}`);
+  if (!row || readGeneration(db, op.userId) !== op.generation) throw new AuthPolicyError("security_state_changed", 409);
+}
+
+export async function finishSecurityOperation(db: Database, op: SecurityOperation) {
+  await withDbWriteRetry("finishSecurityOperation", () => db.prepare(`UPDATE admin_lifecycle_operations SET slot=NULL,state='complete',updatedAt=? WHERE id=?`).run(Date.now(), op.id));
+}
+
+/** Invalidate library and Noctua challenges together. Epoch also cancels anonymous WebAuthn. */
+export function invalidateUserChallenges(db: Database, userId: string, loginsOnly = false) {
+  const scope = loginsOnly ? " AND kind IN ('two_factor','two_factor_imap','passkey_login')" : "";
+  db.prepare(`DELETE FROM auth_verification WHERE identifier IN
+    (SELECT identifier FROM auth_pending_challenges WHERE userId=?${scope}) OR identifier IN
+    (SELECT '2fa-attempts-' || identifier FROM auth_pending_challenges WHERE userId=?${scope})`).run(userId,userId);
+  db.prepare(`DELETE FROM auth_pending_challenges WHERE userId=?${scope}`).run(userId);
+  const result = db.prepare(`UPDATE auth_login_epoch SET generation=generation+1 WHERE id=1`).run();
+  if (!result.changes) throw new Error("Missing auth login epoch");
+}
+
+/** Caller holds the slot and an immediate transaction. Retention never implies assurance. */
+export function advanceSecurityGeneration(db: Database, userId: string, keepSessionId?: string) {
+  const result = db.prepare(`UPDATE auth_security_state SET generation=generation+1 WHERE userId=? RETURNING generation`).get(userId);
+  if (!result) throw new Error("Missing auth security state");
+  invalidateUserChallenges(db, userId);
+  db.prepare(`DELETE FROM auth_reauth_grants WHERE userId=?`).run(userId);
+  db.prepare(`DELETE FROM mcp_tokens WHERE createdByUserId=?`).run(userId);
+  db.prepare(`DELETE FROM auth_session WHERE userId=? AND id IS NOT ?`).run(userId, keepSessionId ?? null);
+  return result.generation as number;
+}
+
+/** Only the live returned session can be finalized, after all library writes commit. */
+export async function finalizeAuthentication(db: Database, op: SecurityOperation, security: SessionSecurity, initialEnrollment = false, challenge?: {identifier:string;kind:string;generation:number|null;loginEpoch:number|null;userId:string|null}) {
+  return withDbWriteRetry("finalizeAuthentication", () => db.transaction(() => {
+    assertSecurityOperation(db, op);
+    if (challenge) {
+      if (!db.prepare(`SELECT 1 FROM auth_pending_challenges WHERE identifier=? AND kind=? AND userId IS ?
+        AND generation IS ? AND loginEpoch IS ? AND expiresAt>?`).get(challenge.identifier,challenge.kind,challenge.userId,challenge.generation,challenge.loginEpoch,Date.now())) throw new AuthPolicyError("invalid_challenge");
+      if (challenge.loginEpoch !== null && db.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get()?.generation !== challenge.loginEpoch) throw new AuthPolicyError("invalid_challenge");
+    }
+    const live = db.prepare(`SELECT userId FROM auth_session WHERE id=? AND julianday(expiresAt)>julianday('now')`).get(security.sessionId);
+    if (live?.userId !== op.userId || security.userId !== op.userId || !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now() || security.authenticatedAt + 86400000 <= Date.now()) {
+      throw new AuthPolicyError("Unauthorized", 401);
+    }
+    if (security.assurance === "mfa" && !enrollmentState(db, op.userId).complete) throw new AuthPolicyError("mfa_state_inconsistent");
+    const generation = initialEnrollment ? advanceSecurityGeneration(db, op.userId, security.sessionId) : op.generation;
+    db.prepare(`INSERT INTO auth_session_security(sessionId,userId,generation,assurance,authenticatedAt,method)
+      VALUES(?,?,?,?,?,?) ON CONFLICT(sessionId) DO UPDATE SET generation=excluded.generation,
+      assurance=excluded.assurance,authenticatedAt=excluded.authenticatedAt,method=excluded.method`)
+      .run(security.sessionId, op.userId, generation, security.assurance, security.authenticatedAt, security.method);
+    if (challenge) db.prepare(`DELETE FROM auth_pending_challenges WHERE identifier=?`).run(challenge.identifier);
+    return generation;
+  }).immediate());
+}
+
+/** Startup reconciliation is deliberately conservative: partial proof is never resumed. */
+export async function reconcileSecurityOperations(db: Database, before = Date.now()) {
+  return withDbWriteRetry("reconcileSecurityOperations", () => db.transaction(() => {
+    const operations = db.prepare(`SELECT id,targetUserId FROM admin_lifecycle_operations WHERE slot LIKE 'security:%' AND createdAt<?`).all(before) as {id:string;targetUserId:string}[];
+    for (const op of operations) {
+      if (db.prepare(`SELECT 1 FROM auth_security_state WHERE userId=?`).get(op.targetUserId)) advanceSecurityGeneration(db, op.targetUserId);
+      db.prepare(`UPDATE admin_lifecycle_operations SET slot=NULL,state='cancelled',updatedAt=? WHERE id=?`).run(Date.now(), op.id);
+    }
+    return operations.map(op => op.targetUserId);
+  }).immediate());
 }

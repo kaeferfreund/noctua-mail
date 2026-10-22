@@ -1,13 +1,14 @@
 import "./testDbHarness";
 // Synthetic Better Auth fixtures. Never ship a test route or sign cookies by hand.
 import { Database } from "bun:sqlite";
-import { createHmac } from "crypto";
+import { totpFromUri } from "../tests/helpers/totp";
+export { totpFromUri } from "../tests/helpers/totp";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { parseSetCookieHeader } from "better-auth/cookies";
 import { withDbWriteRetry } from "./dbWriteRetry";
-import { migrateAuthSchema, noctuaAuthOptions, type NoctuaAuth } from "./betterAuth";
+import { attachAuthPolicyHandler, migrateAuthSchema, noctuaAuthOptions, type NoctuaAuth, type NoctuaAuthConfig } from "./betterAuth";
 import { installAuthControlPlane } from "./db/authPolicy";
 import { configureDb } from "./db/connection";
 import { initMasterSchema } from "./db/schema";
@@ -80,47 +81,6 @@ export class CookieJar {
   }
 }
 
-function base32Decode(input: string) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const clean = input.replace(/=+$/, "").toUpperCase();
-  let bits = 0;
-  let value = 0;
-  const out: number[] = [];
-  for (const char of clean) {
-    const index = alphabet.indexOf(char);
-    if (index < 0) throw new Error(`invalid base32 character ${char}`);
-    value = (value << 5) | index;
-    bits += 5;
-    if (bits >= 8) {
-      out.push((value >>> (bits - 8)) & 0xff);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(out);
-}
-
-/**
- * RFC 6238 TOTP (HMAC-SHA1) computed from an `otpauth://` URI, i.e. exactly
- * what an authenticator app sees. Independent of Better Auth's own helper.
- */
-export function totpFromUri(uri: string, at = Date.now()) {
-  const url = new URL(uri);
-  const secret = url.searchParams.get("secret");
-  if (!secret) throw new Error("otpauth URI without secret");
-  const digits = Number(url.searchParams.get("digits") ?? 6);
-  const period = Number(url.searchParams.get("period") ?? 30);
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / period)));
-  const hmac = createHmac("sha1", base32Decode(secret)).update(counter).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const binary =
-    ((hmac[offset] & 0x7f) << 24) |
-    (hmac[offset + 1] << 16) |
-    (hmac[offset + 2] << 8) |
-    hmac[offset + 3];
-  return String(binary % 10 ** digits).padStart(digits, "0");
-}
-
 /** Resolves to the thrown value (Better Auth's APIError) or fails the test. */
 export async function caught(promise: Promise<unknown>) {
   try {
@@ -132,7 +92,7 @@ export async function caught(promise: Promise<unknown>) {
 }
 
 /** Isolated file, production connection separation and actual library cookies. */
-export async function createTestAuthHarness(options?: (config: ReturnType<typeof noctuaAuthOptions>) => void) {
+export async function createTestAuthHarness(options?: (config: ReturnType<typeof noctuaAuthOptions>) => void, configOverrides: Partial<NoctuaAuthConfig> = {}) {
   let temp: ReturnType<typeof createTempDir> | undefined;
   let master: Database | undefined;
   let database: Database | undefined;
@@ -148,14 +108,17 @@ export async function createTestAuthHarness(options?: (config: ReturnType<typeof
     master = openMasterDb(temp.dbPath);
     database = new Database(temp.dbPath);
     configureDb(database, 0);
-    const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET };
+    const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET, ...configOverrides };
     const authOptions = noctuaAuthOptions(config);
+    // Per-process library burst buckets outlive a fixture, especially under randomized reruns.
+    // Tests that exercise rate limits opt in explicitly; production options remain enabled.
+    Object.assign(authOptions.rateLimit,{enabled:false});
     options?.(authOptions);
     const migration = await migrateAuthSchema(authOptions);
     installAuthControlPlane(database);
     // Construct only after migrations + the transaction-safe control plane.
     const { betterAuth } = await import("better-auth");
-    const auth = betterAuth(authOptions) as NoctuaAuth;
+    const auth = attachAuthPolicyHandler(betterAuth(authOptions), async () => master!) as NoctuaAuth;
     await auth.api.getSession({ headers: new Headers() });
     return {
       temp, master, database, auth, migration,
