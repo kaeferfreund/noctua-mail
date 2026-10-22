@@ -14,6 +14,9 @@ import {
   stripConditionalComments
 } from "@/lib/html";
 import { useMessageLinkPreview } from "@/app/components/mailclient/message/MessageLinkPreviewContext";
+import { Button } from "@/app/components/ui/button";
+import { useRemoteContent } from "@/app/hooks/useRemoteContent";
+import { messageHtmlCsp, type RemoteContentMode } from "@/lib/html/remoteContent";
 import styles from "./HtmlMessage.module.css";
 import {
   extractTrustedFontStylesheetImportsFromHtml,
@@ -358,7 +361,8 @@ function buildPreviewDocument({
   fontScale,
   zoom,
   showViewerFrame,
-  token
+  token,
+  remoteContent
 }: {
   html: string;
   safeHtml: string;
@@ -367,13 +371,14 @@ function buildPreviewDocument({
   zoom: number;
   showViewerFrame: boolean;
   token: string;
+  remoteContent: RemoteContentMode;
 }) {
   const cleanedHtml = stripConditionalComments(html || "");
   const hasExplicitColor = /(^|[^-])color\s*:/i.test(cleanedHtml);
-  const stylesheetLinks = extractStylesheetLinks(cleanedHtml);
+  const stylesheetLinks = remoteContent === "allow" ? extractStylesheetLinks(cleanedHtml) : [];
   const fontStylesheetUrls = Array.from(
     new Set([
-      ...extractTrustedFontStylesheetImportsFromHtml(cleanedHtml),
+      ...(remoteContent === "allow" ? extractTrustedFontStylesheetImportsFromHtml(cleanedHtml) : []),
       ...stylesheetLinks.filter(isTrustedFontStylesheetUrl)
     ])
   );
@@ -415,6 +420,8 @@ function buildPreviewDocument({
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(messageHtmlCsp(remoteContent))}">`,
+    '<meta name="referrer" content="no-referrer">',
     stylesheetTags,
     "<style>",
     APP_FONT_FACE_CSS,
@@ -463,14 +470,20 @@ function HtmlMessage({
   darkMode,
   fontScale = 1,
   zoom = 1,
+  accountId,
+  sender,
+  messageId,
   sanitizeHtml = sanitizeHtmlForDisplay
 }: {
   html: string;
   darkMode: boolean;
   fontScale?: number;
   zoom?: number;
+  accountId?: string;
+  sender?: string;
+  messageId?: string;
   /** Display sanitizer. Dark mode and font scale do not change its output. */
-  sanitizeHtml?: (input: string) => string;
+  sanitizeHtml?: (input: string, mode?: RemoteContentMode) => string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Theme, zoom and font changes rebuild the whole srcdoc, which would silently
@@ -480,9 +493,13 @@ function HtmlMessage({
   const setLinkPreviewUrl = useMessageLinkPreview();
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
-  // sanitizeHtmlForDisplay has no per-call options. The key is the cleaned
-  // HTML plus the sanitizer function. Theme and zoom only change the wrapper.
-  const safeHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
+  const remote = useRemoteContent(accountId, sender, messageId ?? html);
+  const remoteContent = remote.allowed ? "allow" : "block";
+  // Theme and zoom only change the wrapper, not the sanitized message.
+  const blockedHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
+  const allowedHtml = useMemo(() => sanitizeHtmlForDisplay(cleanedHtml, "allow"), [cleanedHtml]);
+  const hasRemoteContent = blockedHtml !== allowedHtml || extractStylesheetLinks(cleanedHtml).length > 0;
+  const safeHtml = remote.allowed ? allowedHtml : blockedHtml;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -500,6 +517,7 @@ function HtmlMessage({
       fontScale,
       zoom,
       showViewerFrame,
+      remoteContent,
       token: previewToken
     });
 
@@ -564,11 +582,18 @@ function HtmlMessage({
 
       const handleClick = (event: Event) => {
         const anchor = getClosestAnchor(event.target);
-        if (anchor && isNoOpHref(anchor.getAttribute("href"))) {
+        if (!anchor) return;
+        const href = anchor.getAttribute("href");
+        if (isNoOpHref(href)) event.preventDefault();
+        else if (!isHashHref(href)) {
           event.preventDefault();
+          // Parent-owned click handling keeps links working without granting
+          // popup or navigation capabilities to the message frame.
+          window.open(anchor.href, "_blank", "noopener,noreferrer");
         }
       };
       doc.addEventListener("click", handleClick);
+      doc.addEventListener("auxclick", handleClick);
 
       const updateLinkPreview = (value: string | null) => {
         setLinkPreviewUrl(value);
@@ -622,6 +647,7 @@ function HtmlMessage({
       removeDocumentListeners = () => {
         updateLinkPreview(null);
         doc.removeEventListener("click", handleClick);
+        doc.removeEventListener("auxclick", handleClick);
         doc.removeEventListener("mouseover", handleMouseOver);
         doc.removeEventListener("mouseout", handleMouseOut);
         doc.removeEventListener("focusin", handleFocusIn);
@@ -712,15 +738,25 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [darkMode, fontScale, html, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
+  }, [darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>
+      {!remote.allowed && hasRemoteContent && (
+        <div role="status" className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <span>Remote content blocked</span>
+          <Button variant="outline" size="sm" onClick={remote.loadOnce}>Load once</Button>
+          {remote.canAlwaysAllow && <Button variant="ghost" size="sm" disabled={remote.saving} onClick={() => void remote.alwaysAllow()}>Always load from this sender</Button>}
+          {remote.error && <span role="alert">{remote.error}</span>}
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         className={styles.frame}
         title="HTML message"
         scrolling="no"
+        sandbox="allow-same-origin"
+        referrerPolicy="no-referrer"
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import type React from "react";
 import {
   startTransition,
@@ -5020,7 +5021,7 @@ export default function MailClient({
   const handleOpenHtmlInNewWindow = (message: Message) => {
     if (typeof window === "undefined") return;
     const opened = openDetachedWindow(
-      buildAccountMessageHtmlPath(message.accountId, message.id),
+      withRemoteContentDecision(buildAccountMessageHtmlPath(message.accountId, message.id), message.accountId, message.id),
       { title: formatMessageHtmlPageTitle(message.subject) }
     );
     if (!opened) {
