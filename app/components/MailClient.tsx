@@ -22,10 +22,9 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import { useTheme } from "next-themes";
 import { AccountDateFormatProvider } from "./AccountDateFormatContext";
+import { useDarkMode } from "@/app/hooks/useDarkMode";
 import LoginOverlay from "./auth/LoginOverlay";
-import FolderSidebarPane from "./mailclient/folder/FolderSidebarPane";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
@@ -192,7 +191,8 @@ import {
   shouldRenderTopicSuggestionGroup,
   type TopicThreadSuggestion
 } from "./mailclient/messagelist/topicSuggestionGroup";
-import TopBar from "./mailclient/TopBar";
+import AppShell from "./shell/AppShell";
+import type { ShellView } from "./shell/types";
 import BottomStatusBar from "./mailclient/status/BottomStatusBar";
 import CalendarSidebarPanel from "./calendar/CalendarSidebarPanel";
 import { type UndoMoveTarget } from "./mailclient/useMessageMoveActions";
@@ -229,7 +229,8 @@ import {
   isTrashFolder as checkIsTrashFolder,
   isSpamFolder as checkIsSpamFolder,
   isSentFolder as checkIsSentFolder,
-  isNotificationSuppressedFolder as checkIsNotificationSuppressedFolder
+  isNotificationSuppressedFolder as checkIsNotificationSuppressedFolder,
+  getFolderSpecialKind
 } from "@/lib/specialFolders";
 import {
   extractEmails,
@@ -344,21 +345,17 @@ export default function MailClient({
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
   const [query, setQuery] = useState("");
   // next-themes owns the theme (class and color-scheme on <html>, persisted
-  // under "noctua:theme"); darkMode mirrors the resolved theme for the kept
-  // renderers. resolvedTheme is undefined until the provider has mounted.
-  const { resolvedTheme, setTheme } = useTheme();
-  const darkMode = resolvedTheme === "dark";
+  // under "noctua:theme"); the kept renderers read the resulting html class,
+  // which is correct on their first render, so the HtmlMessage iframe is
+  // built once. The toggle lives in the shell header.
+  const darkMode = useDarkMode();
   const [manageOpen, setManageOpen] = useState(false);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [reloginAccountId, setReloginAccountId] = useState("");
   const [reloginDescription, setReloginDescription] = useState("");
-  const [leftWidth, setLeftWidth] = useState(270);
   const [listWidth, setListWidth] = useState(840);
-  const [dragging, setDragging] = useState<"left" | "list" | null>(null);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
-  const [calendarSidebarWidth] = useState(400);
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
@@ -4697,7 +4694,7 @@ export default function MailClient({
       if (observer) observer.disconnect();
       window.removeEventListener("resize", scheduleSync);
     };
-  }, [leftWidth, listWidth, syncNoticePaneRightOffset]);
+  }, [listWidth, syncNoticePaneRightOffset]);
 
   const prevAccountIdRef = useRef(activeAccountId);
   useEffect(() => {
@@ -4814,29 +4811,23 @@ export default function MailClient({
     return baseGetGroupLabel(group);
   }, [activeTopic, activeTopicSuggestionsLoading, baseGetGroupLabel]);
 
+  // The list pane is sized by the shell's resizable panel group; listWidth
+  // mirrors its rendered width so listIsNarrow and the header's collapsed
+  // view switcher keep following the pane. The pane mounts together with
+  // the shell, i.e. whenever the auth state leaves "unauth".
   useEffect(() => {
-    if (!dragging) return;
-    const handleMove = (event: PointerEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      if (dragging === "left") {
-        const next = Math.max(140, x);
-        setLeftWidth(next);
-      } else {
-        const resizerOffset = 6;
-        const next = x - leftWidth - resizerOffset;
-        setListWidth(Math.max(200, next));
-      }
+    if (authState === "unauth") return;
+    const pane = listPaneRef.current;
+    if (!pane || typeof ResizeObserver === "undefined") return;
+    const update = () => {
+      const next = Math.round(pane.getBoundingClientRect().width);
+      if (next > 0) setListWidth((prev) => (prev === next ? prev : next));
     };
-    const handleUp = () => setDragging(null);
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
-    return () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-    };
-  }, [dragging, leftWidth]);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [authState]);
 
   const resolveMessageByExternalMessageId = useCallback(
     async (messageId: string, accountId: string) => {
@@ -5145,6 +5136,7 @@ export default function MailClient({
       VIRTUAL_FOLDERS.map((folder) => ({
         ...folder,
         active: activeVirtualFolder?.id === folder.id,
+        onSelect: () => activateVirtualFolder(folder.id),
         count:
           folder.id === "virtual:focused"
             ? focusedUnreadCount
@@ -5194,18 +5186,45 @@ export default function MailClient({
       })),
     [
       actionQueueTodoCount,
+      activateVirtualFolder,
       activeVirtualFolder?.id,
       focusedUnreadCount,
       inviteDeckTotalCount,
       inviteDeckUnreadCount
     ]
   );
+  // "Inbox" heads the sidebar's Views section (design §7.2). Only a real
+  // inbox qualifies; inboxFolder itself falls back to the first folder.
+  const inboxView = useMemo<ShellView | null>(() => {
+    if (!inboxFolder || getFolderSpecialKind(inboxFolder) !== "inbox") return null;
+    const unread = inboxFolder.unreadCount ?? 0;
+    return {
+      id: `folder:${inboxFolder.id}`,
+      name: "Inbox",
+      description: "Incoming mail",
+      active: !activeVirtualFolder && searchScope === "folder" && activeFolderId === inboxFolder.id,
+      count: unread,
+      countAriaLabel: `${unread} unread`,
+      emphasize: unread > 0,
+      icon: <Inbox size={13} />,
+      onSelect: () => {
+        clearSearch();
+        setSearchScope("folder");
+        setActiveFolderId(inboxFolder.id);
+      }
+    };
+  }, [
+    activeFolderId,
+    activeVirtualFolder,
+    clearSearch,
+    inboxFolder,
+    searchScope,
+    setActiveFolderId,
+    setSearchScope
+  ]);
   const isExistingAccount = Boolean(
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
   );
-  const handleToggleDarkMode = () => {
-    setTheme(darkMode ? "light" : "dark");
-  };
 
   if (authState === "unauth") {
     return (
@@ -5268,56 +5287,413 @@ export default function MailClient({
 
   return (
     <AccountDateFormatProvider value={accountDateFormat}>
-    <div className="app-shell">
-      <TopBar
-        buildVersionLabel={buildVersionLabel}
-        state={{
-          query,
-          searchScope,
-          includeSentInEverywhere,
-          sentFolderName: sentFolderBySpecialUse?.name ?? null,
-          searchFields,
-          searchBadges,
-          darkMode,
-          isRelatedSearch,
-          accounts,
-          currentAccount: currentAccount ?? null,
-          draftsFolder,
-          draftsCount,
-          activeFolderId,
-          lastFolderId,
-          accountFolders,
-          isSyncing
-        }}
-        ui={{ searchFieldsLabel, searchBadgesLabel }}
-        actions={{
-          setQuery,
-          setSearchScope,
-          setIncludeSentInEverywhere,
-          setSearchFields,
-          setSearchBadges,
-          clearSearch,
-          toggleDarkMode: handleToggleDarkMode,
-          openCompose,
-          setActiveFolderId,
-          setLastFolderId,
-          startEditAccount,
-          deleteAccount,
-          switchAccount: (accountId: string) => {
-            void switchAccount(accountId);
+    <>
+      <AppShell
+        sidebar={{
+          compose: {
+            onCompose: () => openCompose("new"),
+            draftsCount,
+            onOpenDrafts: draftsFolder
+              ? () => {
+                  clearSearch();
+                  setSearchScope("folder");
+                  setActiveFolderId(draftsFolder.id);
+                }
+              : null
           },
-          syncAccount,
-          logout: async () => {
-            await apiFetch("/api/auth/logout", { method: "POST", credentials: "include" });
-            setAuthState("unauth");
+          sync: {
+            isSyncing,
+            onCheckNewMail: () => syncAccount(undefined, "new")
+          },
+          user: {
+            userEmail: currentUser?.email ?? null,
+            userName: currentUser && "name" in currentUser && typeof currentUser.name === "string" ? currentUser.name : null,
+            currentAccount: currentAccount ?? null,
+            isAdminUser,
+            onOpenSettings: () => {
+              if (currentAccount) startEditAccount(currentAccount);
+            },
+            onOpenAdmin: () => {
+              if (!currentAccount) return;
+              startEditAccount(currentAccount);
+              setManageTab("admin");
+            },
+            onShowThreadJson: () => setShowJson(true),
+            onEvictThreadCache: () => {
+              console.info("[noctua] evict thread cache");
+              resetThreadCache();
+            },
+            onLogout: async () => {
+              await apiFetch("/api/auth/logout", { method: "POST", credentials: "include" });
+              setAuthState("unauth");
+            }
+          },
+          brand: { buildVersionLabel },
+          mailboxes: {
+            accounts,
+            activeAccountId,
+            onSwitch: (accountId: string) => {
+              void switchAccount(accountId);
+            },
+            onAdd: () => startEditAccount()
+          },
+          views: {
+            inbox: inboxView,
+            // feat/collab-ui adds "Assigned to me", "Unassigned" and "Open"
+            // here (see ShellViews in ./shell/types.ts).
+            collab: [],
+            virtual: virtualFoldersForPane
+          },
+          topics: {
+            topics: allTopics,
+            topicMessageCountById,
+            activeTopicId,
+            onTopicClick: (topicId) => {
+              if (activeTopicId === topicId) {
+                setQuery("");
+              } else {
+                setQuery(`topic:${topicId}`);
+                setSearchScope("all");
+              }
+            }
+          },
+          folders: {
+            accountFolderCount: accountFolders.length,
+            isRecomputingThreads,
+            isRecomputingCategories,
+            syncAccount,
+            recomputeThreads,
+            recomputeCategories,
+            rootFolders,
+            folderTree,
+            folderById,
+            searchScope,
+            activeFolderId,
+            setActiveFolderId,
+            setSearchScope,
+            clearSearch,
+            syncingFolders,
+            deletingFolderIds,
+            draggingMessageIds,
+            dragOverFolderId,
+            setDragOverFolderId,
+            handleMoveMessages,
+            handleCreateSubfolder,
+            handleRenameFolderItem,
+            handleDeleteFolderItem,
+            folderSpecialIcon
           }
         }}
-      />
-      <InAppNoticeStack
-        className="inapp-notice-stack-pane"
-        style={{ right: `${noticePaneRightOffset}px` }}
-        state={{ inAppNotices }}
-        actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: handleDismissNotice }}
+        header={{
+          title: [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter(Boolean).join(" / "),
+          search: {
+            state: {
+              query,
+              searchScope,
+              includeSentInEverywhere,
+              sentFolderName: sentFolderBySpecialUse?.name ?? null,
+              searchFields,
+              searchBadges,
+              isRelatedSearch,
+              activeFolderId,
+              lastFolderId,
+              accountFolders,
+              searchFieldsLabel,
+              searchBadgesLabel
+            },
+            actions: {
+              setQuery,
+              setSearchScope,
+              setIncludeSentInEverywhere,
+              setSearchFields,
+              setSearchBadges,
+              clearSearch,
+              setActiveFolderId,
+              setLastFolderId
+            }
+          },
+          sync: {
+            isSyncing,
+            onCheckNewMail: () => syncAccount(undefined, "new")
+          }
+        }}
+        panes={{
+          list: (
+            <MessageListOrchestrator
+              scrollRef={listPaneRef}
+              listHandleRef={listHandleRef}
+              defaultMessageView={currentAccount?.settings?.layout?.defaultView}
+              header={{
+                state: {
+                  listWidth,
+                  searchScope,
+                  activeFolderName,
+                  activeVirtualFolderName: activeVirtualFolder?.name,
+                  loadedMessageCount,
+                  totalMessages,
+                  listLoading,
+                  loadingMessages,
+                  hasMoreMessages,
+                  groupBy,
+                  messageSort,
+                  eventGroupingAvailable: isCalendarGroupByAvailable,
+                  threadDateSource,
+                  threadsMode,
+                  threadsScopeAvailable,
+                  threadsAllowed,
+                  groupedMessages,
+                  collapsedGroups
+                },
+                actions: {
+                  setMessagesPage,
+                  setGroupBy,
+                  setMessageSort: handleMessageSortChange,
+                  setThreadDateSource,
+                  setThreadsMode,
+                  toggleAllGroups
+                }
+              }}
+              searchActive={searchActive}
+              isRelatedSearch={isRelatedSearch}
+              relatedNotice={relatedNotice}
+              searchCriteriaLabel={searchCriteriaLabel}
+              searchCriteriaBadges={searchCriteriaBadges}
+              onClearSearch={clearSearch}
+              listViewState={{
+                groupedMessages,
+                visibleMessages,
+                draggingMessageIds,
+                collapsedGroups,
+                collapsedThreads,
+                pendingMessageActions,
+                supportsThreads,
+                includeThreadAcrossFolders,
+                searchScope,
+                activeFolderId,
+                messageById: listMessageById,
+                messageTopicsById,
+                suggestedThreadIds,
+                pendingSuggestedThreadIds: pendingTopicSuggestionThreadIds,
+                sortDir,
+                showMessageSize: messageSort === "size",
+                listIsNarrow,
+                preferToDisplay,
+                activeTopic,
+                userEmail: currentAccount?.email,
+                findRecipientAlias,
+                dateFormat: accountDateFormat,
+                topicColorRows: currentAccount?.settings?.appearance?.topicColorRows ?? true,
+                senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true
+              }}
+              listViewActions={{
+                setSortKey,
+                setSortDir,
+                setCollapsedGroups,
+                setCollapsedThreads,
+                setLastSelectedIdRef,
+                handleMessageDragStart,
+                handleMessageDragEnd,
+                handleRowClick,
+                handleSelectMessage,
+                toggleMessageSelection,
+                selectRangeTo,
+                selectCollapsedThread,
+                handleAddSuggestedThread: handleAddActiveTopicSuggestion
+              }}
+              listViewHelpers={{
+                buildThreadTree,
+                flattenThread,
+                getThreadLatestDate,
+                getGroupLabel,
+                renderUnreadDot,
+                renderSelectIndicators,
+                renderFolderBadges,
+                renderQuickActions,
+                renderMessageMenu,
+                handleShowRelated,
+                isTrashFolder
+              }}
+              showListLoadingState={showListLoadingState}
+              listLoading={listLoading}
+              sortedMessagesCount={sortedMessages.length}
+              filteredMessagesCount={filteredMessages.length}
+              messageListError={messageListError}
+              emptyListSyncing={emptyListSyncing}
+              activeVirtualFolderName={activeVirtualFolder?.name}
+              searchScope={searchScope}
+              mutationInputs={{
+                activeAccountId,
+                activeMessageId,
+                activeFolderId,
+                searchScope,
+                includeThreadAcrossFoldersForList,
+                supportsThreads,
+                folders,
+                folderById,
+                messages,
+                threadScopeMessages: mutationThreadScopeMessages,
+                visibleMessages,
+                sortedMessages,
+                collapsedThreads,
+                hasFilteredSearchCriteria,
+                viewMessage,
+                isFlaggedMessage,
+                isTrashFolder,
+                shouldKeepMessageInCurrentResults,
+                setFolders,
+                setMessages,
+                setGroupMeta,
+                setActiveMessageId,
+                setViewMessage,
+                setPendingMessageActions,
+                refreshFolders,
+                apiFetch,
+                readErrorMessage,
+                reportError,
+                pushNotice,
+                confirmDelete,
+                confirmUnsubscribe,
+                undoMoveOperation,
+                noticeSuccessTimeout: NOTICE_TIMEOUTS.success,
+                evictMessageCaches,
+                reconcileActiveTopicSuggestionRemovals,
+                setActiveTopicSuggestionMessages,
+                updateMessagesWithCurrentResultPrune,
+                applyMoveReconcileSuppression,
+                applyDeleteReconcileSuppression,
+                markDeleteReconcileSuppression,
+                markMessagesMutated,
+                updateThreadCacheWithFlags,
+                updateThreadCacheWithCategory,
+                queueFilteredSearchRefresh
+              }}
+            />
+          ),
+          reader: (
+            <MessageViewOrchestrator
+              ref={messageViewHandleRef}
+              onShowJson={() => setShowJson(true)}
+              onEvictThreadCache={() => {
+                console.info("[noctua] evict thread cache");
+                resetThreadCache();
+              }}
+              header={{
+                activeMessage: activeMessage ?? null,
+                activeThread,
+                getAssignedThreadTopics,
+                onToggleTopic: handleToggleTopic
+              }}
+              body={{
+                composeHandleRef,
+                inlineComposePlacement,
+                showComposeInline,
+                supportsThreads,
+                threadContentById,
+                threadContentLoading,
+                threadContentErrorById,
+                composeDraftId,
+                composeMode,
+                composeThreadFocusMessageId,
+                pendingSelectionCollapseMessageId,
+                onPendingSelectionCollapseConsumed: handlePendingSelectionCollapseConsumed,
+                activeAccountId,
+                apiFetch,
+                messageByMessageId,
+                messageCardProps: {
+                  messageRefs,
+                  pendingMessageActions,
+                  includeThreadAcrossFolders,
+                  activeFolderId,
+                  threadPathById,
+                  folderById: (folderId: string) => folderById.get(folderId),
+                  setSearchScope,
+                  setActiveFolderId,
+                  getImapFlagBadges,
+                  toggleFlaggedFlag,
+                  toggleTodoFlag,
+                  isDraftMessage,
+                  renderQuickActions,
+                  renderMessageMenu,
+                  handleUnsubscribe,
+                  fetchSource,
+                  ensureMessageContent,
+                  messageContentLoading,
+                  darkMode,
+                  hasHtmlContent,
+                  renderSourcePanel,
+                  handleSelectMessage,
+                  getPrimaryEmail,
+                  findRecipientAlias,
+                  onOpenRecipientAlias: openRecipientAliasDialog,
+                  onFindRelatedByCalendarInviteUid: handleFindRelatedByCalendarInviteUid,
+                  onInviteStateChange: handleInviteStateChange,
+                  onRemoveAttachment: handleRemoveAttachment,
+                  readErrorMessage,
+                  reportError,
+                  dateFormat: accountDateFormat,
+                  userEmail: currentAccount?.email,
+                  senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true,
+                  onSearchByAddress: handleSearchByAddress,
+                  onComposeTo: handleComposeTo,
+                  translationEnabled: Boolean(
+                    currentAccount?.deepl?.enabled && currentAccount?.deepl?.hasApiKey
+                  ),
+                  defaultTranslationTargetLang: currentAccount?.deepl?.targetLang
+                }
+              }}
+            />
+          ),
+          calendar:
+            calendarSidebarOpen && activeAccountId ? (
+              <CalendarSidebarPanel
+                accountId={activeAccountId}
+                firstDay={calendarFirstDay}
+                onClose={() => setCalendarSidebarOpen(false)}
+                onOpenMessage={handleOpenCalendarMessage}
+                onFindRelatedByInviteUid={handleFindRelatedByCalendarInviteUid}
+              />
+            ) : null
+        }}
+        statusBar={
+          <BottomStatusBar
+            isSyncing={isSyncing}
+            isRecomputingThreads={isRecomputingThreads}
+            isRecomputingCategories={isRecomputingCategories}
+            syncingFolders={syncingFolders}
+            syncProgressItems={Object.values(syncProgressByJobId)}
+            accountFolders={accountFolders}
+            mailCheckMode={mailCheckMode}
+            activeAccountId={activeAccountId}
+            pendingCalendarReminders={pendingCalendarReminders}
+            upcomingEvents={upcomingCalendarEvents}
+            onRefreshPendingReminders={refreshPendingCalendarReminders}
+            onOpenReminderMessage={(messageId) => {
+              openMessageByExternalMessageId(messageId, "status-reminder-click");
+            }}
+            onReportError={reportError}
+            exceptionEntries={exceptionEntries}
+            onClearExceptions={() => {
+              setExceptionEntries([]);
+            }}
+            openPanel={openBottomStatusPanel}
+            setOpenPanel={setOpenBottomStatusPanel}
+            formatRelativeTime={formatRelativeTime}
+            onReloginAccount={handleOpenReloginFromException}
+            onOpenCalendarSidebar={() => setCalendarSidebarOpen(true)}
+            onOpenCalendarMessage={handleOpenCalendarMessage}
+            onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}
+            calendarFirstDay={calendarFirstDay}
+            accountDateFormat={accountDateFormat}
+          />
+        }
+        overlays={
+          <InAppNoticeStack
+            className="inapp-notice-stack-pane"
+            style={{ right: `${noticePaneRightOffset}px` }}
+            state={{ inAppNotices }}
+            actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: handleDismissNotice }}
+          />
+        }
       />
       <DialogsHost
         confirm={confirmDialogsView}
@@ -5337,305 +5713,6 @@ export default function MailClient({
           onCreateTopic: handleCreateTopic
         }}
       />
-
-      <section className="content-grid" ref={containerRef}>
-        <FolderSidebarPane
-          leftWidth={leftWidth}
-          accountFolderCount={accountFolders.length}
-          virtualFolders={virtualFoldersForPane}
-          isRecomputingThreads={isRecomputingThreads}
-          isRecomputingCategories={isRecomputingCategories}
-          activateVirtualFolder={activateVirtualFolder}
-          syncAccount={syncAccount}
-          recomputeThreads={recomputeThreads}
-          recomputeCategories={recomputeCategories}
-          allTopics={allTopics}
-          topicMessageCountById={topicMessageCountById}
-          activeTopicId={activeTopicId}
-          onTopicClick={(topicId) => {
-            const current = activeTopicId;
-            if (current === topicId) {
-              setQuery("");
-            } else {
-              setQuery(`topic:${topicId}`);
-              setSearchScope("all");
-            }
-          }}
-          rootFolders={rootFolders}
-          folderTree={folderTree}
-          folderById={folderById}
-          searchScope={searchScope}
-          activeFolderId={activeFolderId}
-          setActiveFolderId={setActiveFolderId}
-          setSearchScope={setSearchScope}
-          clearSearch={clearSearch}
-          syncingFolders={syncingFolders}
-          deletingFolderIds={deletingFolderIds}
-          draggingMessageIds={draggingMessageIds}
-          dragOverFolderId={dragOverFolderId}
-          setDragOverFolderId={setDragOverFolderId}
-          handleMoveMessages={handleMoveMessages}
-          handleCreateSubfolder={handleCreateSubfolder}
-          handleRenameFolderItem={handleRenameFolderItem}
-          handleDeleteFolderItem={handleDeleteFolderItem}
-          folderSpecialIcon={folderSpecialIcon}
-        />
-
-        <div
-          className="resizer"
-          onPointerDown={(event) => {
-            event.preventDefault();
-            setDragging("left");
-          }}
-        />
-
-        <MessageListOrchestrator
-          listWidth={listWidth}
-          scrollRef={listPaneRef}
-          listHandleRef={listHandleRef}
-          defaultMessageView={currentAccount?.settings?.layout?.defaultView}
-          header={{
-            state: {
-              listWidth,
-              searchScope,
-              activeFolderName,
-              activeVirtualFolderName: activeVirtualFolder?.name,
-              loadedMessageCount,
-              totalMessages,
-              listLoading,
-              loadingMessages,
-              hasMoreMessages,
-              groupBy,
-              messageSort,
-              eventGroupingAvailable: isCalendarGroupByAvailable,
-              threadDateSource,
-              threadsMode,
-              threadsScopeAvailable,
-              threadsAllowed,
-              groupedMessages,
-              collapsedGroups
-            },
-            actions: {
-              setMessagesPage,
-              setGroupBy,
-              setMessageSort: handleMessageSortChange,
-              setThreadDateSource,
-              setThreadsMode,
-              toggleAllGroups
-            }
-          }}
-          searchActive={searchActive}
-          isRelatedSearch={isRelatedSearch}
-          relatedNotice={relatedNotice}
-          searchCriteriaLabel={searchCriteriaLabel}
-          searchCriteriaBadges={searchCriteriaBadges}
-          onClearSearch={clearSearch}
-          listViewState={{
-            groupedMessages,
-            visibleMessages,
-            draggingMessageIds,
-            collapsedGroups,
-            collapsedThreads,
-            pendingMessageActions,
-            supportsThreads,
-            includeThreadAcrossFolders,
-            searchScope,
-            activeFolderId,
-            messageById: listMessageById,
-            messageTopicsById,
-            suggestedThreadIds,
-            pendingSuggestedThreadIds: pendingTopicSuggestionThreadIds,
-            sortDir,
-            showMessageSize: messageSort === "size",
-            listIsNarrow,
-            preferToDisplay,
-            activeTopic,
-            userEmail: currentAccount?.email,
-            findRecipientAlias,
-            dateFormat: accountDateFormat,
-            topicColorRows: currentAccount?.settings?.appearance?.topicColorRows ?? true,
-            senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true
-          }}
-          listViewActions={{
-            setSortKey,
-            setSortDir,
-            setCollapsedGroups,
-            setCollapsedThreads,
-            setLastSelectedIdRef,
-            handleMessageDragStart,
-            handleMessageDragEnd,
-            handleRowClick,
-            handleSelectMessage,
-            toggleMessageSelection,
-            selectRangeTo,
-            selectCollapsedThread,
-            handleAddSuggestedThread: handleAddActiveTopicSuggestion
-          }}
-          listViewHelpers={{
-            buildThreadTree,
-            flattenThread,
-            getThreadLatestDate,
-            getGroupLabel,
-            renderUnreadDot,
-            renderSelectIndicators,
-            renderFolderBadges,
-            renderQuickActions,
-            renderMessageMenu,
-            handleShowRelated,
-            isTrashFolder
-          }}
-          showListLoadingState={showListLoadingState}
-          listLoading={listLoading}
-          sortedMessagesCount={sortedMessages.length}
-          filteredMessagesCount={filteredMessages.length}
-          messageListError={messageListError}
-          emptyListSyncing={emptyListSyncing}
-          activeVirtualFolderName={activeVirtualFolder?.name}
-          searchScope={searchScope}
-          mutationInputs={{
-            activeAccountId,
-            activeMessageId,
-            activeFolderId,
-            searchScope,
-            includeThreadAcrossFoldersForList,
-            supportsThreads,
-            folders,
-            folderById,
-            messages,
-            threadScopeMessages: mutationThreadScopeMessages,
-            visibleMessages,
-            sortedMessages,
-            collapsedThreads,
-            hasFilteredSearchCriteria,
-            viewMessage,
-            isFlaggedMessage,
-            isTrashFolder,
-            shouldKeepMessageInCurrentResults,
-            setFolders,
-            setMessages,
-            setGroupMeta,
-            setActiveMessageId,
-            setViewMessage,
-            setPendingMessageActions,
-            refreshFolders,
-            apiFetch,
-            readErrorMessage,
-            reportError,
-            pushNotice,
-            confirmDelete,
-            confirmUnsubscribe,
-            undoMoveOperation,
-            noticeSuccessTimeout: NOTICE_TIMEOUTS.success,
-            evictMessageCaches,
-            reconcileActiveTopicSuggestionRemovals,
-            setActiveTopicSuggestionMessages,
-            updateMessagesWithCurrentResultPrune,
-            applyMoveReconcileSuppression,
-            applyDeleteReconcileSuppression,
-            markDeleteReconcileSuppression,
-            markMessagesMutated,
-            updateThreadCacheWithFlags,
-            updateThreadCacheWithCategory,
-            queueFilteredSearchRefresh
-          }}
-        />
-
-        <div
-          className="resizer"
-          onPointerDown={(event) => {
-            event.preventDefault();
-            setDragging("list");
-          }}
-        />
-
-        <MessageViewOrchestrator
-          ref={messageViewHandleRef}
-          onShowJson={() => setShowJson(true)}
-          onEvictThreadCache={() => {
-            console.info("[noctua] evict thread cache");
-            resetThreadCache();
-          }}
-          header={{
-            activeMessage: activeMessage ?? null,
-            activeThread,
-            getAssignedThreadTopics,
-            onToggleTopic: handleToggleTopic
-          }}
-          body={{
-            composeHandleRef,
-            inlineComposePlacement,
-            showComposeInline,
-            supportsThreads,
-            threadContentById,
-            threadContentLoading,
-            threadContentErrorById,
-            composeDraftId,
-            composeMode,
-            composeThreadFocusMessageId,
-            pendingSelectionCollapseMessageId,
-            onPendingSelectionCollapseConsumed: handlePendingSelectionCollapseConsumed,
-            activeAccountId,
-            apiFetch,
-            messageByMessageId,
-            messageCardProps: {
-              messageRefs,
-              pendingMessageActions,
-              includeThreadAcrossFolders,
-              activeFolderId,
-              threadPathById,
-              folderById: (folderId: string) => folderById.get(folderId),
-              setSearchScope,
-              setActiveFolderId,
-              getImapFlagBadges,
-              toggleFlaggedFlag,
-              toggleTodoFlag,
-              isDraftMessage,
-              renderQuickActions,
-              renderMessageMenu,
-              handleUnsubscribe,
-              fetchSource,
-              ensureMessageContent,
-              messageContentLoading,
-              darkMode,
-              hasHtmlContent,
-              renderSourcePanel,
-              handleSelectMessage,
-              getPrimaryEmail,
-              findRecipientAlias,
-              onOpenRecipientAlias: openRecipientAliasDialog,
-              onFindRelatedByCalendarInviteUid: handleFindRelatedByCalendarInviteUid,
-              onInviteStateChange: handleInviteStateChange,
-              onRemoveAttachment: handleRemoveAttachment,
-              readErrorMessage,
-              reportError,
-              dateFormat: accountDateFormat,
-              userEmail: currentAccount?.email,
-              senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true,
-              onSearchByAddress: handleSearchByAddress,
-              onComposeTo: handleComposeTo,
-              translationEnabled: Boolean(
-                currentAccount?.deepl?.enabled && currentAccount?.deepl?.hasApiKey
-              ),
-              defaultTranslationTargetLang: currentAccount?.deepl?.targetLang
-            }
-          }}
-        />
-
-        {calendarSidebarOpen && activeAccountId && (
-          <>
-            <div className="resizer" style={{ cursor: "default", pointerEvents: "none" }} />
-            <div style={{ width: calendarSidebarWidth, flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-              <CalendarSidebarPanel
-                accountId={activeAccountId}
-                firstDay={calendarFirstDay}
-                onClose={() => setCalendarSidebarOpen(false)}
-                onOpenMessage={handleOpenCalendarMessage}
-                onFindRelatedByInviteUid={handleFindRelatedByCalendarInviteUid}
-              />
-            </div>
-          </>
-        )}
-      </section>
 
       {manageOpen && editingAccount && (
         <AccountSettingsModal
@@ -5923,37 +6000,7 @@ export default function MailClient({
           }
         }}
       />
-      <BottomStatusBar
-        isSyncing={isSyncing}
-        isRecomputingThreads={isRecomputingThreads}
-        isRecomputingCategories={isRecomputingCategories}
-        syncingFolders={syncingFolders}
-        syncProgressItems={Object.values(syncProgressByJobId)}
-        accountFolders={accountFolders}
-        mailCheckMode={mailCheckMode}
-        activeAccountId={activeAccountId}
-        pendingCalendarReminders={pendingCalendarReminders}
-        upcomingEvents={upcomingCalendarEvents}
-        onRefreshPendingReminders={refreshPendingCalendarReminders}
-        onOpenReminderMessage={(messageId) => {
-          openMessageByExternalMessageId(messageId, "status-reminder-click");
-        }}
-        onReportError={reportError}
-        exceptionEntries={exceptionEntries}
-        onClearExceptions={() => {
-          setExceptionEntries([]);
-        }}
-        openPanel={openBottomStatusPanel}
-        setOpenPanel={setOpenBottomStatusPanel}
-        formatRelativeTime={formatRelativeTime}
-        onReloginAccount={handleOpenReloginFromException}
-        onOpenCalendarSidebar={() => setCalendarSidebarOpen(true)}
-        onOpenCalendarMessage={handleOpenCalendarMessage}
-        onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}
-        calendarFirstDay={calendarFirstDay}
-        accountDateFormat={accountDateFormat}
-      />
-    </div>
+    </>
     </AccountDateFormatProvider>
   );
 }

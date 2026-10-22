@@ -35,7 +35,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem>
           {/* Radix surface tokens are bridged to the shadcn tokens by the
               .radix-themes rule in globals.css. */}
-          <Theme accentColor="indigo" grayColor="sand" panelBackground="solid">
+          <Theme accentColor="iris" grayColor="gray" panelBackground="solid">
             <main>{children}</main>
           </Theme>
         </ThemeProvider>

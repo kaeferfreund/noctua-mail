@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/postcss";
 import postcss, { type AtRule, type Node, type Root, type Rule } from "postcss";
+import { APP_THEME_COLOR } from "@/lib/ui/theme";
 import { APP_FONT_FAMILY, APP_FONT_URL } from "@/lib/ui/fonts";
 
 // Compiles app/globals.css the way `next build` does (postcss.config.mjs) and
@@ -240,4 +241,31 @@ describe("legacy token codemod", () => {
     }
     expect(offending).toEqual([]);
   });
+});
+
+describe("shell palette", () => {
+  test("uses neutral surfaces and an accessible iris primary", async () => {
+    const root = await compileGlobals();
+    const tokens = (selector: string) => {
+      const values = new Map<string, string>();
+      for (const rule of rulesWithSelector(root, selector)) {
+        if (enclosingLayer(rule) !== null) continue;
+        rule.walkDecls((decl) => { values.set(decl.prop, decl.value); });
+      }
+      return values;
+    };
+    const light = tokens(":root");
+    expect(light.get("--background")).toBe("#fff");
+    expect(light.get("--card")).toBe("#fff");
+    expect(light.get("--primary")).toBe("var(--iris-9)");
+    expect(light.get("--border")).toBe("var(--gray-6)");
+    expect(light.get("--sidebar")).toBe("var(--gray-2)");
+    expect(tokens(".dark").get("--border")).toBe("rgb(255 255 255 / 10%)");
+    const radixSource = readFileSync(path.join(repoRoot, "node_modules/@radix-ui/themes/styles.css"), "utf8");
+    expect(radixSource.match(/--iris-9: (#[0-9a-f]+);/)?.[1]).toBe(APP_THEME_COLOR);
+    const channels = [1, 3, 5].map((offset) => parseInt(APP_THEME_COLOR.slice(offset, offset + 2), 16) / 255);
+    const luminance = channels.reduce((sum, c, i) => sum + [0.2126, 0.7152, 0.0722][i] *
+      (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4), 0);
+    expect(1.05 / (luminance + 0.05)).toBeGreaterThanOrEqual(4.5);
+  }, COMPILE_TIMEOUT_MS);
 });
