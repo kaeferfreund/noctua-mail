@@ -1,4 +1,5 @@
 import { ACCOUNT_KEY_TABLE_SQL, ensureAccountKeySchema } from "./accountKeys";
+import { prepareAccountShardConnection } from "./shardFormat";
 import { randomUUID } from "crypto";
 import type { InviteCode } from "../data";
 import {
@@ -934,6 +935,7 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
 }
 
 export function initAccountSchema(db: any) {
+  prepareAccountShardConnection(db);
   ensureThreadCollabRuntimeSchema(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS mailbox_summary (
@@ -1061,6 +1063,8 @@ export function initAccountSchema(db: any) {
       deletedAtMs INTEGER
     );
 
+    -- The key/format migration below reserves this legacy name as a read-only
+    -- view and renames the physical FTS table to message_fts_v2 atomically.
     CREATE VIRTUAL TABLE IF NOT EXISTS message_fts
     USING fts5(accountId UNINDEXED, messageId UNINDEXED, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview);
 

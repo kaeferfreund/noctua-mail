@@ -1,3 +1,5 @@
+import { assertSupportedShardFormat, installShardWriterGuards, shardWriterGuardsInstalled } from "./shardFormat";
+
 /**
  * Shard identities include accountId. Row ids remain stable for API URLs and
  * account-scoped source/attachment files; RFC Message-ID stays in messageId.
@@ -151,8 +153,9 @@ function needsRebuild(db: any, table: TableName) {
  * back and restores the connection's original foreign-key setting.
  */
 export function ensureAccountKeySchema(db: any) {
+  assertSupportedShardFormat(db);
   const ftsNeedsRebuild = () => !columns(db, "message_fts").some(column => column.name === "accountId");
-  if (!tableNames.some(table => needsRebuild(db, table)) && !ftsNeedsRebuild()) return;
+  if (!tableNames.some(table => needsRebuild(db, table)) && !ftsNeedsRebuild() && shardWriterGuardsInstalled(db)) return;
   const foreignKeys = Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys);
   db.exec("PRAGMA foreign_keys = OFF");
   try {
@@ -161,6 +164,7 @@ export function ensureAccountKeySchema(db: any) {
     }
     db.transaction(() => {
       // Re-read after taking the writer lock: another process may have migrated.
+      assertSupportedShardFormat(db);
       const tables = tableNames.filter(table => needsRebuild(db, table));
       const rebuildFts = tables.includes("messages") || ftsNeedsRebuild();
       for (const table of tables) {
@@ -197,6 +201,7 @@ export function ensureAccountKeySchema(db: any) {
       if (db.prepare("PRAGMA foreign_key_check").all().length) {
         throw new Error("Account shard migration could not preserve message ownership");
       }
+      installShardWriterGuards(db);
     }).immediate();
   } finally {
     db.exec(`PRAGMA foreign_keys = ${foreignKeys}`);

@@ -1,4 +1,5 @@
 /** Synthetic end-to-end proof, run in its own process to isolate SQLite/env/module mocks. */
+import { SHARD_FTS_TABLE } from "../lib/db/shardFormat";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, connect, type Socket } from "node:net";
@@ -308,8 +309,8 @@ try {
       assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM threads t WHERE t.accountId=?
         AND EXISTS(SELECT 1 FROM messages m WHERE m.accountId=t.accountId AND m.threadId=t.threadId AND m.folderId=?)`)
         .get(owner, `${owner}:INBOX`).n, expectedThreads);
-      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM message_fts WHERE accountId=?
-        AND message_fts MATCH 'Synthetic'`).get(owner).n > 0, true);
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${SHARD_FTS_TABLE} WHERE accountId=?
+        AND ${SHARD_FTS_TABLE} MATCH 'Synthetic'`).get(owner).n > 0, true);
     }
   });
   assert.equal(await count(), originalCount);

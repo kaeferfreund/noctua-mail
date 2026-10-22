@@ -7,6 +7,7 @@ import path from "node:path";
 import { initAccountSchema } from "./schema";
 import { ensureAccountKeySchema } from "./accountKeys";
 import { getShardCollisionReport } from "./shardCollisionReport";
+import { SHARD_FORMAT_VERSION } from "./shardFormat";
 
 const legacySql = readFileSync(new URL("../testFixtures/sharedShardLegacy.sql", import.meta.url), "utf8");
 function legacyDb() {
@@ -24,6 +25,7 @@ function legacyDb() {
   db.prepare("INSERT INTO threads(threadId,accountId,rootMessageId,latestMessageId) VALUES('root','a','a-row','a-row')").run();
   db.prepare("INSERT INTO thread_topics VALUES('root','same-topic','a',1)").run();
   db.exec("CREATE INDEX legacy_subject_index ON messages(subject)");
+  db.exec("CREATE TRIGGER legacy_message_trigger AFTER UPDATE ON messages BEGIN SELECT 1; END");
   return db;
 }
 
@@ -40,10 +42,12 @@ describe("account shard key migration", () => {
       expect(db.prepare("SELECT accountId FROM message_calendar_events").get()?.accountId).toBe("a");
       expect(db.prepare("SELECT rootMessageId FROM threads").get()?.rootMessageId).toBe("a-row");
       expect(db.prepare("SELECT accountId FROM thread_topics").get()?.accountId).toBe("a");
-      expect(db.prepare("SELECT accountId FROM message_fts WHERE message_fts MATCH 'syntheticfirstword'").all()).toEqual([{ accountId: "a" }]);
+      expect(db.prepare("SELECT accountId FROM message_fts_v2 WHERE message_fts_v2 MATCH 'syntheticfirstword'").all()).toEqual([{ accountId: "a" }]);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE name='legacy_subject_index'").get()).not.toBeNull();
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE name='legacy_message_trigger'").get()).not.toBeNull();
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
+      expect(db.prepare("PRAGMA user_version").get().user_version).toBe(SHARD_FORMAT_VERSION);
       const version = db.prepare("PRAGMA schema_version").get().schema_version;
       initAccountSchema(db);
       expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(version);
@@ -108,6 +112,97 @@ describe("account shard key migration", () => {
       expect(db.prepare("SELECT COUNT(*) AS n FROM attachments").get().n).toBe(2);
       expect(db.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
     } finally { db.close(); }
+  });
+
+  for (const failurePoint of ["ALTER TABLE message_fts RENAME", "CREATE TRIGGER IF NOT EXISTS", "PRAGMA user_version ="]) {
+    test(`failure after ${failurePoint} rolls back keys, FTS, guards and format version together`, () => {
+      const db = legacyDb();
+      const before = db.prepare("SELECT * FROM sqlite_master ORDER BY name").all();
+      try {
+        const interrupted = {
+          prepare: db.prepare.bind(db), transaction: db.transaction.bind(db),
+          exec(sql: string) {
+            db.exec(sql);
+            if (sql.startsWith(failurePoint)) throw new Error("Synthetic guard migration interruption");
+          }
+        };
+        expect(() => ensureAccountKeySchema(interrupted)).toThrow("Synthetic guard migration interruption");
+        expect(db.prepare("SELECT * FROM sqlite_master ORDER BY name").all()).toEqual(before);
+        expect(db.prepare("PRAGMA user_version").get().user_version).toBe(0);
+        expect(db.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(1);
+        expect(db.prepare("SELECT COUNT(*) AS n FROM messages").get().n).toBe(2);
+        expect(db.prepare("SELECT filename FROM attachments").get().filename).toBe("A.pdf");
+        initAccountSchema(db);
+        expect(db.prepare("PRAGMA user_version").get().user_version).toBe(SHARD_FORMAT_VERSION);
+      } finally { db.close(); }
+    });
+  }
+
+  test("a legacy connection and DELETE prepared before migration fail closed after migration", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "noctua-preopened-legacy-"));
+    const file = path.join(dir, "shard.db");
+    const legacy = legacyDb();
+    let writer: Database | undefined, old: Database | undefined;
+    try {
+      legacy.prepare("VACUUM INTO ?").run(file);
+      old = new Database(file);
+      const previouslyPreparedDelete = old.prepare("DELETE FROM attachments WHERE messageId='a-row'");
+      writer = new Database(file);
+      initAccountSchema(writer);
+      expect(() => previouslyPreparedDelete.run()).toThrow("no such function: noctua_writer_v2");
+      expect(() => old!.prepare("DELETE FROM message_fts WHERE messageId='a-row'")).toThrow("cannot modify message_fts because it is a view");
+      expect(writer.prepare("SELECT COUNT(*) AS n FROM attachments").get().n).toBe(1);
+      expect(writer.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(2);
+    } finally { old?.close(); writer?.close(); legacy.close(); rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("round-1 composite-key shards gain writer guards without rebuilding or losing FTS", () => {
+    const db = legacyDb();
+    try {
+      initAccountSchema(db);
+      // Synthetic round-1 format: composite keys and account-linked FTS, but
+      // no writer guards, read-only legacy view or declared format version.
+      for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v2_%'").all()) {
+        db.exec(`DROP TRIGGER "${name}"`);
+      }
+      db.exec("DROP VIEW message_fts; ALTER TABLE message_fts_v2 RENAME TO message_fts; PRAGMA user_version=0");
+      const beforeFts = db.prepare("SELECT rowid,* FROM message_fts ORDER BY rowid").all();
+      const messageRootPage = db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage;
+      initAccountSchema(db);
+      expect(db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage).toBe(messageRootPage);
+      expect(db.prepare("SELECT rowid,* FROM message_fts_v2 ORDER BY rowid").all()).toEqual(beforeFts);
+      expect(db.prepare("SELECT type FROM sqlite_master WHERE name='message_fts'").get().type).toBe("view");
+      expect(db.prepare("PRAGMA user_version").get().user_version).toBe(SHARD_FORMAT_VERSION);
+      const schemaVersion = db.prepare("PRAGMA schema_version").get().schema_version;
+      initAccountSchema(db);
+      expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(schemaVersion);
+    } finally { db.close(); }
+  });
+
+  test("50k-message legacy migration preserves every row and FTS entry with idempotent reopen", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "noctua-migration-timing-"));
+    const file = path.join(dir, "shard.db");
+    const db = new Database(file);
+    try {
+      db.exec(legacySql);
+      db.exec(`WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<50000)
+        INSERT INTO messages(id,accountId,folderId,threadId,messageId,subject,fromAddr,toAddr,preview,date,dateValue,body)
+        SELECT 'row-'||i, CASE WHEN i%2=0 THEN 'a' ELSE 'b' END, 'INBOX', 'root',
+          '<duplicate-'||(i/2)||'@example.test>', 'Synthetic', 'sender@example.test', 'team@example.test',
+          'preview', '2026-01-01', i, 'Synthetic migration body' FROM n;`);
+      const start = performance.now();
+      initAccountSchema(db);
+      const migratedMs = performance.now() - start;
+      const version = db.prepare("PRAGMA schema_version").get().schema_version;
+      const reopen = performance.now();
+      initAccountSchema(db);
+      const repeatedMs = performance.now() - reopen;
+      expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(version);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM messages").get().n).toBe(50000);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(50000);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      console.info(`[shard-migration-timing] 50000 messages: migration=${migratedMs.toFixed(2)}ms repeat=${repeatedMs.toFixed(2)}ms`);
+    } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
   test("collision inventory CLI opens an existing shard read-only and deduplicates paths", () => {

@@ -10,6 +10,7 @@
  * returning the connection; those writes, if any, happen inside
  * `getAccountDb`, not in this module's query logic.
  */
+import { SHARD_FTS_TABLE } from "../shardFormat";
 import { simpleParser } from "mailparser";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
@@ -726,7 +727,7 @@ function applySearchQueryFilters(params: {
       const ftsTokenQuery = ftsTokenQueries[index];
       if (ftsTokenQuery) {
         tokenParts.push(
-          `(${messageAlias}.accountId, ${messageAlias}.id) IN (SELECT accountId, messageId FROM message_fts WHERE message_fts MATCH ?)`
+          `(${messageAlias}.accountId, ${messageAlias}.id) IN (SELECT accountId, messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ?)`
         );
         params.args.push(ftsTokenQuery);
       }

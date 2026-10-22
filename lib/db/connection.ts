@@ -18,6 +18,7 @@ import {
 } from "./schema";
 import { ensureTopicLearningRuntimeData } from "./topics";
 import { withDbWriteRetry } from "../dbWriteRetry";
+import { prepareAccountShardConnection } from "./shardFormat";
 
 const sqliteModulePromise = () => import("bun:sqlite" /* webpackIgnore: true */);
 let DatabaseCtor: any | null = null;
@@ -68,6 +69,12 @@ export function configureDb(db: any, busyTimeoutMs = 15000) {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");
+}
+
+/** Every writable shard handle, including handles that skip schema creation. */
+export function configureAccountDb(db: any, busyTimeoutMs = 15000) {
+  prepareAccountShardConnection(db);
+  configureDb(db, busyTimeoutMs);
 }
 
 let authDbInstance: any | null = null;
@@ -264,7 +271,12 @@ export async function getAccountDb(accountId: string) {
     await ensureDatabaseCtor();
     ensureDbParentDir(dbPath);
     const accountDb = new DatabaseCtor(dbPath);
-    configureDb(accountDb);
+    try {
+      configureAccountDb(accountDb);
+    } catch (error) {
+      accountDb.close();
+      throw error;
+    }
     accountDbInstances.set(dbPath, accountDb);
   }
   const accountDb = accountDbInstances.get(dbPath)!;
