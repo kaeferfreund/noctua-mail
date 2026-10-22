@@ -139,18 +139,14 @@ export function getThreadCheckboxState(params: {
 }
 
 export function toggleThreadRootSelection(params: {
-  selectedMessageIds: Set<string>;
   threadSelectionIds: string[];
   isThreadSelectionAllSelected: boolean;
   selectionStore: SelectionStore;
 }) {
-  const {
-    selectedMessageIds,
-    threadSelectionIds,
-    isThreadSelectionAllSelected,
-    selectionStore
-  } = params;
-  const next = new Set(selectedMessageIds);
+  const { threadSelectionIds, isThreadSelectionAllSelected, selectionStore } = params;
+  // Read the store, not the row's render-time selection: memoized rows keep
+  // a stale set, and building on it dropped rows checked since.
+  const next = new Set(selectionStore.getIds());
   if (isThreadSelectionAllSelected) {
     threadSelectionIds.forEach((id) => next.delete(id));
   } else {
@@ -163,7 +159,6 @@ export function handleRowCheckboxChange(params: {
   shiftKey: boolean;
   messageId: string;
   isThreadSelectionRoot: boolean;
-  selectedMessageIds: Set<string>;
   threadSelectionIds: string[];
   isThreadSelectionAllSelected: boolean;
   selectionStore: SelectionStore;
@@ -175,7 +170,6 @@ export function handleRowCheckboxChange(params: {
     shiftKey,
     messageId,
     isThreadSelectionRoot,
-    selectedMessageIds,
     threadSelectionIds,
     isThreadSelectionAllSelected,
     selectionStore,
@@ -185,7 +179,6 @@ export function handleRowCheckboxChange(params: {
   } = params;
   if (isThreadSelectionRoot) {
     toggleThreadRootSelection({
-      selectedMessageIds,
       threadSelectionIds,
       isThreadSelectionAllSelected,
       selectionStore
