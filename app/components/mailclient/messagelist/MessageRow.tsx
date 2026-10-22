@@ -323,8 +323,8 @@ function MessageRow({
       style={{ ...(paddingLeft ? { paddingLeft: `${paddingLeft}px` } : {}), ...topicTintVar }}
       onKeyDown={onRowKeyDown}
     >
-      <div className={headerClassName}>
-        <span className={commonStyles.select}>
+      <div data-message-cell="header" className={headerClassName}>
+        <span data-message-cell="unread" className={commonStyles.select}>
           {renderUnreadDot}
           {renderSelectIndicators}
           <Checkbox
@@ -342,6 +342,7 @@ function MessageRow({
           <Text
             as="span"
             size="1"
+            data-message-cell="from"
             className={`${styles.from} ${!seen ? styles.unreadText : ""}`}
             title={fromLineTooltip}
           >
@@ -365,7 +366,7 @@ function MessageRow({
             </span>
           </Text>
         </FromAddressHoverCard>
-        <div className={actionsClassName}>
+        <div data-message-cell="actions" className={actionsClassName}>
           {showNewBadge && (
             <Badge size="1" variant="soft" color={badgeColors.new} className={badgeStyles.badge}>
               New
@@ -376,7 +377,7 @@ function MessageRow({
               {size.label}
             </Text>
           )}
-          <Text as="span" size="1" className={dateClassName} title={dateDisplay.tooltip}>
+          <Text as="span" size="1" data-message-cell="date" className={dateClassName} title={dateDisplay.tooltip}>
             {dateDisplay.text}
           </Text>
           {isCompactView ? (
@@ -434,8 +435,8 @@ function MessageRow({
           )}
         </div>
       </div>
-      <div className={subjectClassName}>
-        <div className={styles.subject} onClick={onSubjectClick}>
+      <div data-message-cell="subject" className={subjectClassName}>
+        <div data-message-subject className={styles.subject} onClick={onSubjectClick}>
           {showThreadCaret && (
             <span
               data-no-row-select="true"

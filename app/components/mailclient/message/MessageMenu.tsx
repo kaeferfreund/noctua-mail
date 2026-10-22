@@ -31,7 +31,12 @@ import {
   Tags,
   Trash2
 } from "lucide-react";
-import { DropdownMenu } from "@radix-ui/themes";
+import { DropdownMenu as KeptDropdownMenu, Theme } from "@radix-ui/themes";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import * as MobileMenu from "@/app/components/ui/dropdown-menu";
+
+
+import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import type { Message, Topic, Folder } from "@/lib/data";
 import {
   hasTodoFlag,
@@ -43,6 +48,14 @@ import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+
+const mobileMenu = {
+  Root: MobileMenu.DropdownMenu, Trigger: MobileMenu.DropdownMenuTrigger,
+  Content: MobileMenu.DropdownMenuContent, Item: MobileMenu.DropdownMenuItem,
+  Sub: MobileMenu.DropdownMenuSub, SubTrigger: MobileMenu.DropdownMenuSubTrigger,
+  SubContent: MobileMenu.DropdownMenuSubContent, Label: MobileMenu.DropdownMenuLabel,
+  Separator: MobileMenu.DropdownMenuSeparator
+};
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -160,6 +173,8 @@ export default function MessageMenu({
   isSpamFolder,
   onOpenChange
 }: MessageMenuProps) {
+  const isMobile = useIsMobile();
+  const DropdownMenu = isMobile ? mobileMenu : KeptDropdownMenu;
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const showDeleteInMenu = origin !== "table";
   const allowThreadDeletion = origin !== "thread";
@@ -232,21 +247,23 @@ export default function MessageMenu({
 
   return (
     <DropdownMenu.Root onOpenChange={onOpenChange}>
-      <DropdownMenu.Trigger>
+      <DropdownMenu.Trigger asChild>
         <TooltipIconButton
           variant="ghost"
           size="1"
           tooltip="Message actions"
+          aria-label="Message actions"
+          className={isMobile ? mobileStyles.messageMore : undefined}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => event.stopPropagation()}
         >
           <MoreVertical size={14} />
         </TooltipIconButton>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content
+      <Theme asChild><DropdownMenu.Content
         align="end"
         sideOffset={6}
-        className={styles.menuContent}
+        className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
       >
         {[
           [
@@ -350,7 +367,7 @@ export default function MessageMenu({
                       </span>
                       <span className={styles.menuLabel}>Category</span>
                     </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent className={styles.menuContent}>
+                    <Theme asChild><DropdownMenu.SubContent className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}>
                       <DropdownMenu.Item
                         onSelect={(event) => {
                           event.preventDefault();
@@ -384,7 +401,7 @@ export default function MessageMenu({
                       >
                         {menuRadioLabel(selectedCategory === "transactional", "🧾 Transactional")}
                       </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
+                    </DropdownMenu.SubContent></Theme>
                   </DropdownMenu.Sub>
                 )
               : null,
@@ -398,7 +415,7 @@ export default function MessageMenu({
                       <span className={styles.menuIcon}><Tags size={14} /></span>
                       <span className={styles.menuLabel}>Topics</span>
                     </DropdownMenu.SubTrigger>
-                    <DropdownMenu.SubContent className={styles.menuContent}>
+                    <Theme asChild><DropdownMenu.SubContent className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}>
                       {suggestions.length > 0 && (
                         <DropdownMenu.Label>Suggested</DropdownMenu.Label>
                       )}
@@ -455,7 +472,7 @@ export default function MessageMenu({
                         <span className={styles.menuIcon}><Tags size={14} /></span>
                         <span className={styles.menuLabel}>Manage topics...</span>
                       </DropdownMenu.Item>
-                    </DropdownMenu.SubContent>
+                    </DropdownMenu.SubContent></Theme>
                   </DropdownMenu.Sub>
                 )
               : null,
@@ -571,7 +588,7 @@ export default function MessageMenu({
               {idx < all.length - 1 && <DropdownMenu.Separator />}
             </Fragment>
           ))}
-      </DropdownMenu.Content>
+      </DropdownMenu.Content></Theme>
     </DropdownMenu.Root>
   );
 }
