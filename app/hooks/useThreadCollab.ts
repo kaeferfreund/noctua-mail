@@ -13,6 +13,17 @@ type Snapshot = {
   comments: ThreadComment[];
   activity: ThreadActivity[];
 };
+type CachedSnapshot = Snapshot & {
+  // Request order is compared only within this session/account/thread key.
+  owner: number;
+  // Optimistic wall-clock timestamps are never server freshness evidence.
+  serverUpdatedAt: number;
+};
+function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
+  return !current || (
+    next.owner >= current.owner && next.serverUpdatedAt >= current.serverUpdatedAt
+  );
+}
 type Options = {
   apiFetch?: typeof fetch;
   onUpdate?: (state: ThreadCollabState) => void;
@@ -41,7 +52,7 @@ export function useThreadCollab(
   const denied = useRef(new Set<string>());
   const onUpdate = useRef(options.onUpdate);
   onUpdate.current = options.onUpdate;
-  const cache = useRef(new Map<string, Snapshot>());
+  const cache = useRef(new Map<string, CachedSnapshot>());
   const membersCache = useRef(new Map<string, CollabMember[]>());
   const key = JSON.stringify([sessionKey, accountId, threadId]);
   const memberScope = JSON.stringify([sessionKey, accountId]);
@@ -64,15 +75,16 @@ export function useThreadCollab(
   } | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const busy = useRef(new Set<string>());
-  const generation = useRef(0);
+  const snapshotSequence = useRef(0);
   const loadSequence = useRef(0);
   const scopeLoadSequence = useRef(new Map<string, number>());
   const scopeSuccessfulLoadSequence = useRef(new Map<string, number>());
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
-  const accept = useCallback((data: Snapshot, requestKey: string) => {
+  const accept = useCallback((data: CachedSnapshot, requestKey: string) => {
     const [requestSession, requestAccount] = JSON.parse(requestKey);
     if (!mounted.current || requestSession !== (sessionRef.current ?? null) || denied.current.has(JSON.stringify([requestSession, requestAccount]))) return;
+    if (!canAcceptSnapshot(data, cache.current.get(requestKey))) return;
     cache.current.set(requestKey, data);
     onUpdate.current?.(data.state);
     if (currentKey.current === requestKey) setEntry({ key: requestKey, data });
@@ -121,7 +133,7 @@ export function useThreadCollab(
   }, [accountId, memberScope, apiFetch]);
   const reload = useCallback(async () => {
     if (!accountId || !threadId) return;
-    const version = generation.current;
+    const owner = ++snapshotSequence.current;
     const sequence = ++loadSequence.current;
     scopeLoadSequence.current.set(memberScope, sequence);
     const response = await apiFetch(`${path}/collab`, { cache: "no-store" });
@@ -149,17 +161,18 @@ export function useThreadCollab(
       throw new Error(data?.message ?? "Could not load collaboration.");
     if (
       currentKey.current !== key ||
-      generation.current !== version ||
       loadSequence.current !== sequence ||
       !mounted.current
     )
       return;
+    const next: CachedSnapshot = { ...data, owner, serverUpdatedAt: data.state.updatedAt };
+    if (!canAcceptSnapshot(next, cache.current.get(key))) return;
     scopeSuccessfulLoadSequence.current.set(memberScope, sequence);
     denied.current.delete(memberScope);
     setDeniedScopes(new Set(denied.current));
     membersCache.current.set(memberScope, data.members);
     setMemberEntry({ scope: memberScope, members: data.members });
-    accept(data, key);
+    accept(next, key);
     setError(null);
   }, [accountId, threadId, path, apiFetch, key, memberScope, accept, sessionKey]);
   const refreshVersion = options.refreshVersion;
@@ -184,17 +197,19 @@ export function useThreadCollab(
     async (
       suffix: string,
       method: string,
-      body?: unknown,
-      optimistic?: (data: Snapshot) => Snapshot,
+      body: unknown,
+      optimistic: (data: Snapshot) => Snapshot,
+      deletedCommentId?: string,
     ) => {
       if (!threadId || busy.current.has(key) || denied.current.has(memberScope)) return false;
       const previous = cache.current.get(key);
       if (!previous) return false;
       busy.current.add(key);
-      generation.current++;
+      const owner = ++snapshotSequence.current;
       setPendingKey(key);
       setError(null);
-      if (optimistic) accept(optimistic(previous), key);
+      // The operation owns this optimistic snapshot until a newer GET/write wins.
+      accept({ ...optimistic(previous), owner, serverUpdatedAt: previous.serverUpdatedAt }, key);
       try {
         const response = await apiFetch(`${path}/${suffix}`, {
           method,
@@ -209,22 +224,32 @@ export function useThreadCollab(
         if (!response.ok || !data.ok)
           throw new Error(data.message ?? "Could not save collaboration.");
         const next = cache.current.get(key) ?? previous;
-        accept(
-          {
+        // An authoritative read wins ties after taking ownership. A
+        // newer commit still applies, including to its originating thread after navigation.
+        if (next.owner <= owner || data.state.updatedAt > next.serverUpdatedAt) {
+          const comments = new Map(next.comments.map(comment => [comment.id, comment]));
+          if (data.comment) {
+            const existing = comments.get(data.comment.id);
+            if (!existing || data.comment.updatedAt > existing.updatedAt)
+              comments.set(data.comment.id, data.comment);
+          }
+          if (deletedCommentId) comments.delete(deletedCommentId);
+          accept({
             ...next,
+            owner: Math.max(owner, next.owner),
+            serverUpdatedAt: data.state.updatedAt,
             state: data.state,
-            comments: data.comment
-              ? [...previous.comments, data.comment]
-              : next.comments,
-          },
-          key,
-        );
+            comments: [...comments.values()],
+          }, key);
+        }
         // Reload activity after the committed mutation. A read failure must not roll it back.
         if (currentKey.current === key) await reload().catch(() => {});
         if (mounted.current && sessionRef.current === sessionKey) onCommit.current?.(accountId);
         return true;
       } catch (e) {
-        accept(previous, key);
+        // A failed operation may undo only the snapshot it still owns.
+        if (cache.current.get(key)?.owner === owner)
+          accept({ ...previous, owner }, key);
         if (mounted.current && currentKey.current === key)
           setError({
             key,
@@ -282,6 +307,7 @@ export function useThreadCollab(
             commentCount: Math.max(0, previous.state.commentCount - 1),
           },
         }),
+        id,
       ),
   };
 }
