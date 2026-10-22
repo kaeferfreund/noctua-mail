@@ -20,11 +20,13 @@ describe("sender identity service", () => {
     try {
       const created = await createSenderIdentity("a", { email: " ALIAS@example.test ", displayName: "Alias" }, f.actor, db);
       expect(created.email).toBe("alias@example.test");
+      await createSenderIdentity("a", { email: "idn@bücher.example", displayName: "IDN" }, f.actor, db);
+      await expect(createSenderIdentity("a", { email: "IDN@xn--bcher-kva.example", displayName: "Duplicate" }, f.actor, db)).rejects.toMatchObject({ code: "identity_exists" });
       await expect(createSenderIdentity("a", { email: "Alias@example.test", displayName: "Duplicate" }, f.actor, db)).rejects.toMatchObject({ code: "identity_exists", status: 409 });
       await expect(updateSenderIdentity("a", created.id, { email: "changed@example.test" }, f.actor, db)).rejects.toMatchObject({ code: "immutable_identity_field" });
       await expect(updateSenderIdentity("b", created.id, { displayName: "No" }, f.actor, db)).rejects.toMatchObject({ code: "identity_not_found", status: 404 });
       await updateSenderIdentity("a", created.id, { displayName: "Alias" }, f.actor, db);
-      expect(db.prepare("SELECT count(*) n FROM admin_audit WHERE action LIKE 'identity.%'").get()).toEqual({ n: 1 });
+      expect(db.prepare("SELECT count(*) n FROM admin_audit WHERE action LIKE 'identity.%'").get()).toEqual({ n: 2 });
       await expect(updateSenderIdentity("a", created.id, { signatureId: "foreign-signature" }, f.actor, db)).rejects.toMatchObject({ code: "invalid_identity" });
       db.prepare("UPDATE accounts SET settings=? WHERE id='a'").run(JSON.stringify({ signatures: [{ id: "sig", name: "Signature", body: "Synthetic" }] }));
       await updateSenderIdentity("a", created.id, { signatureId: "sig", replyTo: "reply@example.test" }, f.actor, db);

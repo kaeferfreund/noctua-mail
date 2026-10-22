@@ -1,4 +1,4 @@
-import { isOwnAddress } from "@/lib/ownAddresses";
+import { isOwnAddress, parseAddressEmails } from "@/lib/ownAddresses";
 import type { AccountDateFormat, Message } from "@/lib/data";
 import { createDefaultComposeInviteDraft } from "@/lib/composeInvite";
 import { formatForwardedMessageDate, formatMessageDate } from "@/lib/dateFormatting";
@@ -14,7 +14,6 @@ import {
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
 import { splitRecipientEntries } from "@/lib/recipientLists";
 import { hasHtmlContent } from "@/lib/ui/messageView";
-import { extractEmails } from "../utils/clientHelpers";
 import { buildTextReplyBody } from "./composeContentBuilder";
 import { computeDraftHash } from "./draftSaveUtils";
 import type { ComposeMode, ComposeQuotedParts, ComposeReplyHeaders, ComposeTab } from "./composeTypes";
@@ -24,7 +23,7 @@ import type { ComposeMode, ComposeQuotedParts, ComposeReplyHeaders, ComposeTab }
 // ---------------------------------------------------------------------------
 
 function getPrimaryEmail(value?: string) {
-  return extractEmails(value)[0] ?? null;
+  return parseAddressEmails(value)[0] ?? null;
 }
 
 export function getDisplayRecipient(value: string): string {
@@ -162,14 +161,14 @@ export function computeComposeInitState(
   const { accountEmail, accountDateFormat, preferredComposeTab } = opts;
 
   const ownAddresses = opts.ownAddresses ?? [accountEmail];
-  const fromEmails = extractEmails(message.from);
+  const fromEmails = parseAddressEmails(message.from);
   const fromRecipient = getDisplayRecipient(message.from);
   // Honor RFC 5322 Reply-To: when present on the original message, replies
   // (and reply-alls) should go to that address instead of From. Mailing
   // lists and transactional senders rely on this to route replies to a
   // real inbox rather than a no-reply From.
   const replyToRaw = message.replyTo?.trim() ?? "";
-  const replyToEmails = replyToRaw ? extractEmails(replyToRaw) : [];
+  const replyToEmails = replyToRaw ? parseAddressEmails(replyToRaw) : [];
   const replyToRecipient = replyToRaw ? getDisplayRecipient(replyToRaw) : "";
 
   const isSentByCurrentUser = isOwnAddress(message.from, ownAddresses);
@@ -263,7 +262,7 @@ export function computeComposeInitState(
     if (isSentByCurrentUser) {
       toList = uniqueRecipients(splitRecipientEntries(message.to)
         .filter(recipient => !isOwnAddress(recipient, ownAddresses)).map(getDisplayRecipient));
-      ccList = uniqueEmails([message.cc, message.bcc].flatMap(value => extractEmails(value))
+      ccList = uniqueEmails([message.cc, message.bcc].flatMap(value => parseAddressEmails(value))
         .filter(email => !isOwnAddress(email, ownAddresses)));
     } else {
       // When Reply-To is set we deliberately do not add the original From

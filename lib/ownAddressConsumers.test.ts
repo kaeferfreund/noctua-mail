@@ -34,3 +34,17 @@ describe("own-address consumers", () => {
     expect(resolveCalendarParticipationFromPreview({ attendeeDetails: [{ email: "alias@example.test", partstat: "ACCEPTED" }] }, ownAddresses)).toMatchObject({ myAttendeeEmail: "alias@example.test", myPartstat: "ACCEPTED" });
   });
 });
+
+test("address-like display names never change reply-all, classifier or topic decisions", () => {
+  for (const address of ["customer@example.test", "a!tag+part@bücher.example"]) {
+    const entry = `"alias@example.test" <${address}>`;
+    const canonical = address.replace("bücher", "xn--bcher-kva");
+    expect(getCollapsedThreadIconParticipant([{ message: { ...message, from: entry }, depth: 0 }], ownAddresses)?.fromEmail).toBe(canonical);
+    const all = computeComposeInitState("replyAll", { ...message, from: "sender@example.test", to: entry, cc: "" }, false,
+      { accountEmail: "primary@example.test", ownAddresses, accountDateFormat: "locale" },
+      { stripHtml: value => value, normalizeHtmlDerivedText: value => value });
+    expect(all.composeCc).toContain(address);
+    expect(classifyCategoryFromMetadata({ from: entry }, { context: { accountEmail: ownAddresses } }).signals).not.toContain("skip:sender-is-account");
+    expect(collectTopicSignalEntries([{ to: entry }], { excludeAccountEmail: ownAddresses })).toEqual([{ type: "recipient", value: canonical }]);
+  }
+});

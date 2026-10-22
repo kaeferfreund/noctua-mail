@@ -75,7 +75,7 @@ async function mutate(accountId: string, identityId: string | null, input: unkno
 export async function createSenderIdentity(accountId: string, input: unknown, actor: IdentityActor, db?: Database) {
   const identity = await mutate(accountId, null, input, actor, db);
   // Explicit isolated databases are used by offline callers/tests; production uses the account worker.
-  if (!db) startIdentityRecomputeJob(accountId);
+  if (!db) startIdentityRecomputeJob(accountId, true);
   return identity;
 }
 export const updateSenderIdentity = (accountId: string, identityId: string, patch: unknown, actor: IdentityActor, db?: Database) => mutate(accountId, identityId, patch, actor, db);

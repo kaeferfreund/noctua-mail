@@ -6,7 +6,7 @@ import { requireActiveUserSession } from "@/lib/auth";
 type RecomputeJob = {
   id: string;
   accountId: string;
-  status: "running" | "done" | "failed";
+  status: "queued" | "running" | "done" | "failed";
   error?: string;
 };
 

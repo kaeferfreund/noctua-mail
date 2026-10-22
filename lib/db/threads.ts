@@ -348,17 +348,18 @@ export async function recomputeThreadsForAccountInternal(accountId: string, thre
 
 export async function recomputeThreadsForAccount(accountId: string, threadIds?: string[]) {
   return withDbWriteRetry("recomputeThreadsForAccount", async () => {
-    await recomputeThreadsForAccountInternal(accountId, threadIds);
     const db = await getAccountDb(accountId);
-  // Repair only missing derived authors when explicitly recomputing this account.
-  const missingAuthors = db.prepare("SELECT id,fromAddr FROM messages WHERE accountId=? AND fromEmail IS NULL").all(accountId) as Array<{ id: string; fromAddr: string }>;
-  if (missingAuthors.length) db.transaction(() => {
-    const update = db.prepare("UPDATE messages SET fromEmail=? WHERE accountId=? AND id=? AND fromEmail IS NULL");
-    for (const row of missingAuthors) {
-      const email = parseAddressEmails(row.fromAddr)[0];
-      if (email) update.run(email, accountId, row.id);
-    }
-  }).immediate();
+    // Canonicalize legacy derived authors (including populated Unicode domains)
+    // before either summaries or signals observe them. Never rewrite raw From.
+    db.transaction(() => {
+      const authors = db.prepare("SELECT id,fromAddr,fromEmail FROM messages WHERE accountId=?").all(accountId) as Array<{ id: string; fromAddr: string; fromEmail: string | null }>;
+      const update = db.prepare("UPDATE messages SET fromEmail=? WHERE accountId=? AND id=?");
+      for (const row of authors) {
+        const email = parseAddressEmails(row.fromAddr)[0] ?? null;
+        if (email !== row.fromEmail) update.run(email, accountId, row.id);
+      }
+    }).immediate();
+    await recomputeThreadsForAccountInternal(accountId, threadIds);
     if (threadIds && threadIds.length > 0) {
       await rebuildThreadSignalsForThreadIds(db, accountId, threadIds);
       deleteTopicLearningSignals(db, accountId, { threadIds });

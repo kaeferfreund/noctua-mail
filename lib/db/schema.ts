@@ -1407,8 +1407,13 @@ const senderIdentityMessageSchemaByDb = new WeakSet<object>();
 /** Additive on fresh, legacy, and shared message shards, once per live handle. */
 export function ensureSenderIdentityMessageRuntimeSchema(db: any) {
   if (senderIdentityMessageSchemaByDb.has(db)) return;
-  db.transaction(() => ensureTableColumns(db, "messages", [
-    ["deliveredTo", "TEXT"], ["originalTo", "TEXT"], ["senderIdentityId", "TEXT"]
-  ])).immediate();
+  // Cold readers of migrated shards must never acquire a writer lock.
+  const columns = new Set((db.prepare("PRAGMA table_info(messages)").all() as Array<{ name: string }>).map(row => row.name));
+  if (!["deliveredTo", "originalTo", "senderIdentityId"].every(name => columns.has(name))) {
+    // Recheck under the writer lock: another connection may have migrated first.
+    db.transaction(() => ensureTableColumns(db, "messages", [
+      ["deliveredTo", "TEXT"], ["originalTo", "TEXT"], ["senderIdentityId", "TEXT"]
+    ])).immediate();
+  }
   senderIdentityMessageSchemaByDb.add(db);
 }
