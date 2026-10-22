@@ -46,6 +46,26 @@ describe("collaboration thread remap", () => {
     }).immediate();
     expect(store.getThreadCollabState(f.db, f.accountId, target)).toMatchObject({ status: "in_progress", assigneeUserId: "a" });
   });
+  test("equal status and assignment timestamps use source ids despite newer comments", async () => {
+    const f = await createCollabFixture();
+    const target = "target";
+    await f.seed(f.message(target));
+    f.db.transaction(() => {
+      store.updateThreadCollabState(f.db, f.accountId, "a", { status: "in_progress", assigneeUserId: "a" }, { userId: "actor-a", clientId: "web:test" }, 100);
+      store.updateThreadCollabState(f.db, f.accountId, "z", { status: "waiting", assigneeUserId: "z" }, { userId: "actor-z", clientId: "web:test" }, 100);
+      store.addThreadComment(f.db, f.accountId, "a", "Earlier comment", { userId: "commenter-a", clientId: "web:test" }, 200);
+      store.addThreadComment(f.db, f.accountId, "z", "Later comment", { userId: "commenter-z", clientId: "web:test" }, 300);
+      store.remapThreadCollab(f.db, f.accountId, [
+        { id: "z", oldThreadId: "z", newThreadId: target, dateValue: 1 },
+        { id: "a", oldThreadId: "a", newThreadId: target, dateValue: 2 }
+      ]);
+    }).immediate();
+    expect(store.getThreadCollabState(f.db, f.accountId, target)).toMatchObject({
+      status: "in_progress", statusChangedAt: 100, statusChangedByUserId: "actor-a",
+      assigneeUserId: "a", assignedAt: 100, assignedByUserId: "actor-a",
+      updatedAt: 300, updatedByUserId: "commenter-z", commentCount: 2
+    });
+  });
   test("split follows former root even if it is newer; otherwise follows oldest former message", async () => {
     for (const withRoot of [true, false]) {
       const f = await createCollabFixture();

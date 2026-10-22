@@ -850,6 +850,20 @@ export function initMasterSchema(db: any) {
 const threadCollabSchemaByDb = new WeakSet<object>();
 export function ensureThreadCollabRuntimeSchema(db: any) {
   if (threadCollabSchemaByDb.has(db)) return;
+  // A cold reader of an initialized shard must not acquire SQLite's writer
+  // lock. Include indexes so a partially initialized schema is repaired too.
+  const requiredObjects = [
+    "thread_collab_state", "thread_comments", "sent_by", "thread_activity",
+    "idx_thread_collab_state_assignee", "idx_thread_collab_state_status",
+    "idx_thread_comments_thread", "idx_thread_activity_thread"
+  ];
+  const existing = new Set((db.prepare(`SELECT name FROM sqlite_master
+    WHERE type IN ('table', 'index') AND name IN (${requiredObjects.map(() => "?").join(",")})`)
+    .all(...requiredObjects) as Array<{ name: string }>).map(row => row.name));
+  if (requiredObjects.every(name => existing.has(name))) {
+    threadCollabSchemaByDb.add(db);
+    return;
+  }
   db.transaction(() => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS thread_collab_state (
