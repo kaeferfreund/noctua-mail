@@ -285,6 +285,76 @@ describe("saveDraftForAccount", () => {
     expect(result.message?.messageId).toBe(existingDraft.messageId);
     expect(result.message?.threadId).toBe(existingDraft.threadId);
   });
+
+  test("stores an appended draft from its RFC822 without fetching it back", async () => {
+    const accountId = `acc-drafts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const account = buildAccount(accountId);
+    const drafts = buildDraftsFolder(accountId);
+    const raw = [
+      "From: Draft Test <owner@example.test>",
+      "To: peer@example.test",
+      "Subject: Local draft",
+      "Message-ID: <draft-local@example.test>",
+      "In-Reply-To: <original@example.test>",
+      "References: <root@example.test> <original@example.test>",
+      "X-Forwarded-Message-Id: <original@example.test>",
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Draft body"
+    ].join("\r\n");
+
+    buildRawMessage.mockImplementation(async () => raw);
+    try {
+      await upsertAccount(account);
+      await saveFoldersForAccount(accountId, [drafts]);
+
+      const result = await saveDraftForAccount({
+        account,
+        accountId,
+        clientId: "draft-test-client",
+        payload: {
+          to: "peer@example.test",
+          subject: "Local draft",
+          text: "Draft body",
+          inReplyTo: "<original@example.test>",
+          references: ["<root@example.test>", "<original@example.test>"],
+          xForwardedMessageId: "<original@example.test>"
+        }
+      });
+
+      expect(syncImapMessage).not.toHaveBeenCalled();
+      expect(result.message?.messageId).toBe("<draft-local@example.test>");
+      expect(result.message?.inReplyTo).toBe("<original@example.test>");
+      expect(result.message?.references).toEqual([
+        "<root@example.test>",
+        "<original@example.test>"
+      ]);
+      expect(result.message?.xForwardedMessageId).toBe("<original@example.test>");
+      expect(result.message?.imapUid).toBe(9001);
+      expect(result.message?.flags).toEqual(["\\Draft", "\\Seen"]);
+      expect(result.message?.draft).toBe(true);
+      expect(result.message?.seen).toBe(true);
+      expect(result.draftId).toBeTruthy();
+
+      const stored = await getMessageById(accountId, result.draftId!);
+      expect(stored?.messageId).toBe("<draft-local@example.test>");
+      expect(stored?.inReplyTo).toBe("<original@example.test>");
+      expect(stored?.references).toEqual([
+        "<root@example.test>",
+        "<original@example.test>"
+      ]);
+      expect(stored?.imapUid).toBe(9001);
+      expect(stored?.draft).toBe(true);
+      expect(stored?.seen).toBe(true);
+      expect(stored?.hasSource).toBe(true);
+    } finally {
+      buildRawMessage.mockImplementation(async (_account: Account, mail: BuiltDraftMail) => {
+        lastBuiltDraftMail = mail;
+        return `raw:${mail.subject}`;
+      });
+    }
+  });
 });
 
 describe("saveDraftForAccount calendar attachments", () => {
