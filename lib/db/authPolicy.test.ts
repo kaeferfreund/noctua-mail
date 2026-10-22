@@ -131,6 +131,105 @@ describe("transactional mirrors", () => {
     expect(() => installAuthControlPlane(f.database)).toThrow("Missing auth login epoch at startup");
   });
 
+  test.each([
+    "auth_security_state", "auth_login_epoch", "auth_session_security",
+    "auth_pending_challenges", "auth_reauth_grants", "user_provisioning", "admin_lifecycle_operations"
+  ])("startup rejects a deleted installed %s table without recreating it", async (table: string) => {
+    const f = await setup();
+    const user = await f.createUser("missing-table@example.test");
+    f.master.prepare("UPDATE auth_security_state SET generation=7 WHERE userId=?").run(user.id);
+    const beforeEpoch = epoch(f);
+    f.master.exec(`DROP TABLE ${table}`);
+    const reopened = openMasterDb(f.temp.dbPath);
+    try {
+      expect(() => installAuthControlPlane(reopened)).toThrow("Missing installed auth control-plane objects at startup");
+      expect(reopened.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table)).toBeNull();
+      if (table !== "auth_security_state") expect(state(f, user.id)).toBe(7);
+      if (table !== "auth_login_epoch") expect(epoch(f)).toBe(beforeEpoch);
+    } finally { reopened.close(); }
+  });
+
+  test.each([
+    "DROP TABLE auth_control_plane_installation",
+    "DELETE FROM auth_control_plane_installation",
+    "DROP TABLE noctua_auth_migrations",
+    "DELETE FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'"
+  ])("startup rejects a missing installation witness: %s", async (sql: string) => {
+    const f = await setup();
+    f.master.exec(sql);
+    expect(() => installAuthControlPlane(f.database)).toThrow("Missing auth control-plane installation marker or migration record at startup");
+    // A second attempt must not have silently restored either witness.
+    expect(() => installAuthControlPlane(f.database)).toThrow("Missing auth control-plane installation marker or migration record at startup");
+  });
+
+  test("complete pre-marker planes gain both witnesses once without changing counters", async () => {
+    const f = await setup();
+    const user = await f.createUser("pre-marker@example.test");
+    f.master.prepare("UPDATE auth_security_state SET generation=9 WHERE userId=?").run(user.id);
+    const beforeEpoch = epoch(f);
+    f.master.exec(`DROP TABLE auth_control_plane_installation;
+      DELETE FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'`);
+    for (let startup = 0; startup < 2; startup++) {
+      installAuthControlPlane(f.database);
+      expect(state(f, user.id)).toBe(9);
+      expect(epoch(f)).toBe(beforeEpoch);
+      expect(f.master.prepare("SELECT * FROM auth_control_plane_installation").all()).toEqual([{ id: 1, version: 1 }]);
+      expect(f.master.prepare("SELECT id FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'").all())
+        .toEqual([{ id: "auth-control-plane-v1" }]);
+    }
+  });
+
+  test.each(["auth_security_state", "auth_login_epoch"])("pre-marker adoption rejects missing %s without writing witnesses", async (table: string) => {
+    const f = await setup();
+    f.master.exec(`DROP TABLE auth_control_plane_installation;
+      DELETE FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'; DROP TABLE ${table}`);
+    expect(() => installAuthControlPlane(f.database)).toThrow("Missing installed auth control-plane objects at startup");
+    expect(f.master.prepare("SELECT name FROM sqlite_master WHERE name='auth_control_plane_installation'").get()).toBeNull();
+    expect(f.master.prepare("SELECT id FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'").get()).toBeNull();
+  });
+
+  test.each([
+    "CREATE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state IN ('reserved','auth_created','cleanup_required')",
+    "CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(userId) WHERE state IN ('reserved','auth_created','cleanup_required')",
+    "CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state='reserved'",
+    "CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state IN ('RESERVED','AUTH_CREATED','CLEANUP_REQUIRED')",
+    "CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail)"
+  ])("startup repairs malformed provisioning index: %s", async (ddl: string) => {
+    const f = await setup();
+    f.master.exec(`DROP INDEX idx_user_provisioning_active_email; ${ddl}`);
+    installAuthControlPlane(f.database);
+    const reserve = f.master.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt)
+      VALUES(?,?,'reserved@example.test','signup',?,1,1)`);
+    reserve.run("completed", "past-user", "complete");
+    reserve.run("first", "first-user", "reserved");
+    for (const active of ["reserved", "auth_created", "cleanup_required"]) {
+      expect(() => reserve.run(`second-${active}`, "second-user", active)).toThrow("UNIQUE constraint failed");
+    }
+    reserve.run("cancelled", "cancelled-user", "cancelled");
+  });
+
+  test("conflicting active reservations abort index repair and marker adoption atomically", async () => {
+    const f = await setup();
+    f.master.exec(`DROP TABLE auth_control_plane_installation;
+      DELETE FROM noctua_auth_migrations WHERE id='auth-control-plane-v1';
+      DROP INDEX idx_user_provisioning_active_email;
+      CREATE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail)`);
+    const originalIndex = f.master.prepare("SELECT sql FROM sqlite_master WHERE name='idx_user_provisioning_active_email'").get().sql;
+    const reserve = f.master.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt)
+      VALUES(?,?,'duplicate@example.test','signup',?,1,1)`);
+    reserve.run("first", "first-user", "reserved");
+    reserve.run("second", "second-user", "cleanup_required");
+    expect(() => installAuthControlPlane(f.database)).toThrow("Cannot repair auth provisioning uniqueness index at startup");
+    expect(f.master.prepare("SELECT count(*) n FROM user_provisioning").get().n).toBe(2);
+    expect(f.master.prepare("SELECT sql FROM sqlite_master WHERE name='idx_user_provisioning_active_email'").get().sql).toBe(originalIndex);
+    expect(f.master.prepare("SELECT name FROM sqlite_master WHERE name='auth_control_plane_installation'").get()).toBeNull();
+    expect(f.master.prepare("SELECT id FROM noctua_auth_migrations WHERE id='auth-control-plane-v1'").get()).toBeNull();
+    // Operator reconciliation allows the next startup to finish the migration.
+    f.master.exec("UPDATE user_provisioning SET state='cancelled' WHERE id='second'");
+    installAuthControlPlane(f.database);
+    expect(() => reserve.run("third", "third-user", "auth_created")).toThrow("UNIQUE constraint failed");
+  });
+
   test("generated ISO creation dates round exactly to Noctua milliseconds", async () => {
     const f = await setup();
     const user = await f.createUser("date@example.test");
@@ -158,6 +257,36 @@ describe("transactional mirrors", () => {
 });
 
 describe("credential generation barrier", () => {
+  test.each(["credential", "oauth"])("combined %s provider and identity move advances both principals", async (provider: string) => {
+    const f = await setup();
+    const a = await f.createUser("combined-a@example.test");
+    const b = await f.createUser("combined-b@example.test");
+    const account = f.master.prepare("SELECT id FROM auth_account WHERE userId=?").get(a.id);
+    if (provider === "oauth") f.master.prepare("UPDATE auth_account SET providerId='oauth' WHERE id=?").run(account.id);
+    const before = [state(f, a.id), state(f, b.id)];
+    const beforeEpoch = epoch(f);
+    f.master.prepare("UPDATE auth_account SET userId=?,providerId=? WHERE id=?")
+      .run(b.id, provider === "credential" ? "oauth" : "credential", account.id);
+    expect([state(f, a.id), state(f, b.id)]).toEqual(before.map(generation => generation + 1));
+    expect(epoch(f)).toBe(beforeEpoch + 2);
+  });
+
+  test.each(["source", "destination"])("combined provider and identity move aborts atomically with missing %s state", async (missing: string) => {
+    const f = await setup();
+    const a = await f.createUser("combined-missing-a@example.test");
+    const b = await f.createUser("combined-missing-b@example.test");
+    const account = f.master.prepare("SELECT id FROM auth_account WHERE userId=?").get(a.id);
+    f.master.prepare("DELETE FROM auth_security_state WHERE userId=?").run(missing === "source" ? a.id : b.id);
+    const before = [state(f, a.id), state(f, b.id)];
+    const beforeEpoch = epoch(f);
+    expect(() => f.master.prepare("UPDATE auth_account SET userId=?,providerId='oauth' WHERE id=?").run(b.id, account.id))
+      .toThrow("Missing auth security state");
+    expect([state(f, a.id), state(f, b.id)]).toEqual(before);
+    expect(epoch(f)).toBe(beforeEpoch);
+    expect(f.master.prepare("SELECT userId,providerId FROM auth_account WHERE id=?").get(account.id))
+      .toEqual({ userId: a.id, providerId: "credential" });
+  });
+
   test("insert/update/remove password, provider and identity moves invalidate the affected users", async () => {
     const f = await setup();
     const a = await f.createUser("generation-a@example.test");

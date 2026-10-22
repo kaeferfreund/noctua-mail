@@ -32,9 +32,14 @@ export function createTempDir(prefix: string) {
  */
 export function openMasterDb(dbPath: string) {
   const db = new Database(dbPath);
-  configureDb(db, 0);
-  initMasterSchema(db);
-  return db;
+  try {
+    configureDb(db, 0);
+    initMasterSchema(db);
+    return db;
+  } catch (error) {
+    db.close();
+    throw error;
+  }
 }
 
 /** Minimal browser-like cookie jar fed from Set-Cookie response headers. */
@@ -128,14 +133,24 @@ export async function caught(promise: Promise<unknown>) {
 
 /** Isolated file, production connection separation and actual library cookies. */
 export async function createTestAuthHarness(options?: (config: ReturnType<typeof noctuaAuthOptions>) => void) {
-  const temp = createTempDir("noctua-auth-test-");
-  const master = openMasterDb(temp.dbPath);
-  const database = new Database(temp.dbPath);
-  configureDb(database, 0);
-  const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET };
-  const authOptions = noctuaAuthOptions(config);
-  options?.(authOptions);
+  let temp: ReturnType<typeof createTempDir> | undefined;
+  let master: Database | undefined;
+  let database: Database | undefined;
+  const close = () => {
+    try { database?.close(); }
+    finally {
+      try { master?.close(); }
+      finally { temp?.cleanup(); }
+    }
+  };
   try {
+    temp = createTempDir("noctua-auth-test-");
+    master = openMasterDb(temp.dbPath);
+    database = new Database(temp.dbPath);
+    configureDb(database, 0);
+    const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET };
+    const authOptions = noctuaAuthOptions(config);
+    options?.(authOptions);
     const migration = await migrateAuthSchema(authOptions);
     installAuthControlPlane(database);
     // Construct only after migrations + the transaction-safe control plane.
@@ -145,10 +160,11 @@ export async function createTestAuthHarness(options?: (config: ReturnType<typeof
     return {
       temp, master, database, auth, migration,
       ...authFixtures(auth, master),
-      close() { database.close(); master.close(); temp.cleanup(); }
+      close
     };
   } catch (error) {
-    database.close(); master.close(); temp.cleanup(); throw error;
+    close();
+    throw error;
   }
 }
 
