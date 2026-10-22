@@ -1,4 +1,4 @@
-const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+import addressParser from "nodemailer/lib/addressparser/index.js";
 
 const FREE_MAIL_DOMAINS = new Set([
   "gmail.com",
@@ -82,14 +82,10 @@ export function extractDisplayName(value?: string | null) {
 }
 
 export function extractPrimaryEmail(value?: string | null) {
-  const normalized = normalizeWhitespace(value ?? "");
-  if (!normalized) return null;
-  const angleMatch = normalized.match(/<\s*([^>]+)\s*>/);
-  if (angleMatch?.[1]) {
-    return normalizeEmailAddress(angleMatch[1]);
-  }
-  const directMatch = normalized.match(EMAIL_PATTERN);
-  return normalizeEmailAddress(directMatch?.[0]);
+  // Use the mail stack's RFC 5322 parser: quoted display names may themselves
+  // contain angle brackets and addresses, but never identify the mailbox.
+  const mailbox = addressParser(value ?? "", { flatten: true })[0];
+  return normalizeEmailAddress(mailbox?.address);
 }
 
 export function getRootDomain(domain?: string | null) {

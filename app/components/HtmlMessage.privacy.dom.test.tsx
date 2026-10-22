@@ -5,7 +5,8 @@ import HtmlMessage from "./HtmlMessage";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 
 const originalFetch = globalThis.fetch;
-afterEach(() => { cleanup(); globalThis.fetch = originalFetch; });
+const originalOpen = window.open;
+afterEach(() => { cleanup(); globalThis.fetch = originalFetch; window.open = originalOpen; });
 const html = '<img width="200" height="100" src="https://images.example.test/photo"><img src="cid:logo">';
 
 test("notice, load once, message change and persisted sender choice", async () => {
@@ -47,4 +48,46 @@ test("a failed preference save stays blocked and exposes a retry message", async
   fireEvent.click(view.getByRole("button", { name: "Always load from this sender" }));
   await waitFor(() => expect(view.getByRole("alert").textContent).toContain("could not be saved"));
   expect(view.getByText("Remote content blocked")).toBeTruthy();
+});
+
+test("sender permission reads and writes the real mailbox rather than quoted display-name text", async () => {
+  let saved: unknown;
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    if (init?.method === "PUT") saved = JSON.parse(String(init.body));
+    return Response.json({ prefs: { remoteContent: { allowedSenders: { "trusted@example.test": true } } } });
+  }) as typeof fetch;
+  const view = render(<HtmlMessage html={html} darkMode={false} accountId={crypto.randomUUID()} sender={'"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>'} />);
+  await waitFor(() => expect(view.getByText("Remote content blocked")).toBeTruthy());
+  fireEvent.click(view.getByRole("button", { name: "Always load from this sender" }));
+  await waitFor(() => expect(saved).toEqual({ remoteContent: { allowedSenders: { "actual@example.test": true } } }));
+});
+
+test("opt-in never reinserts sender stylesheets or remote CSS", () => {
+  const view = render(<HtmlMessage darkMode={false} html={'<link rel="stylesheet" href="https://styles.example.test/sender.css"><style>@import url("https://fonts.googleapis.com/css2?family=Test");p{background:url("https://styles.example.test/bg")}</style>' + html} />);
+  fireEvent.click(view.getByRole("button", { name: "Load once" }));
+  const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
+  expect(frame.srcdoc).not.toContain("styles.example.test");
+  expect(frame.srcdoc).not.toContain("fonts.googleapis.com");
+  expect(frame.srcdoc).not.toContain('<link rel="stylesheet"');
+  expect(frame.srcdoc).toContain('referrerpolicy="no-referrer"');
+});
+
+test("links open on primary click and middle auxclick, never right auxclick or contextmenu", () => {
+  const opened: unknown[][] = [];
+  window.open = ((...args: unknown[]) => { opened.push(args); return null; }) as typeof window.open;
+  const view = render(<HtmlMessage html={'<a href="https://links.example.test/destination"><span>Destination</span></a>'} darkMode={false} />);
+  const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
+  // happy-dom does not navigate srcdoc. Supply the generated document and fire
+  // load so the production listener binding runs against the matching token.
+  const doc = new DOMParser().parseFromString(frame.srcdoc, "text/html");
+  Object.defineProperty(doc, "readyState", { value: "complete" });
+  Object.defineProperty(frame, "contentDocument", { value: doc });
+  fireEvent.load(frame);
+  const target = doc.querySelector("a")!;
+  fireEvent.click(target, { button: 0 });
+  fireEvent(target, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 }));
+  expect(opened).toEqual(Array.from({ length: 2 }, () => ["https://links.example.test/destination", "_blank", "noopener,noreferrer"]));
+  fireEvent(target, new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 2 }));
+  fireEvent.contextMenu(target, { button: 2 });
+  expect(opened).toHaveLength(2);
 });

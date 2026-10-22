@@ -1,0 +1,4 @@
+# Explicit browser regressions, separate from the primary window-free suite.
+[test]
+preload = ["./lib/testSetupEnv.ts"]
+pathIgnorePatterns = [".tmp/**", ".next/**"]

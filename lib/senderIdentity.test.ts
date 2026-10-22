@@ -33,7 +33,7 @@ describe("senderIdentity", () => {
 
   it("extractPrimaryEmail prefers the angle-bracket address and lowercases the result", () => {
     expect(extractPrimaryEmail("\"Apple NEWS\" <News@Apple.com>")).toBe("news@apple.com");
-    // No angle brackets: falls back to an email regex match anywhere in the string.
+    // No angle brackets: the mail parser still recognises the mailbox.
     expect(extractPrimaryEmail("Contact news@apple.com for details")).toBe("news@apple.com");
     // No recognizable email at all.
     expect(extractPrimaryEmail("Apple News")).toBeNull();

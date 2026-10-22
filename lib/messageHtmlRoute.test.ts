@@ -26,7 +26,10 @@ test("HTML route blocks remote resources and navigation and applies document pol
   expect(blocked.headers.get("content-security-policy")).toContain("frame-ancestors 'self'");
   expect(blocked.headers.get("content-security-policy")).not.toContain("script-src");
   const allowed = await get("?remoteContent=allow");
-  expect(await allowed.text()).toContain('src="https://images.example.test/pixel');
+  const allowedBody = await allowed.text();
+  expect(allowedBody).toContain('src="https://images.example.test/pixel');
+  expect(allowedBody).toContain('referrerpolicy="no-referrer"');
+  expect(allowedBody).not.toContain("@import");
   expect(allowed.headers.get("content-security-policy")).toContain("https: http:");
   const preference = await PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
     method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
@@ -42,4 +45,23 @@ test("HTML route blocks remote resources and navigation and applies document pol
   const missing = await GET(new Request("http://localhost:3000/html", { headers: user.jar.headers() }), { params: Promise.resolve({ accountId: f.accountId, messageId: "missing" }) });
   expect(missing.status).toBe(404);
   expect(missing.headers.get("content-security-policy")).toContain("default-src 'none'");
+});
+
+test("HTML route matches the real From mailbox and rejects a quoted display-name address", async () => {
+  const f = await createCollabFixture();
+  const user = await createAuthenticatedTestSession(f.accountId);
+  const [message] = await f.seed(f.message("<sender-privacy@example.test>", {
+    from: '"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>',
+    htmlBody: '<img src="https://images.example.test/pixel">'
+  }));
+  const params = { params: Promise.resolve({ accountId: f.accountId, messageId: message.id }) };
+  const setAllowed = (email: string) => PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
+    method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
+    body: JSON.stringify({ remoteContent: { allowedSenders: { [email]: true } } })
+  }), { params: Promise.resolve({ accountId: f.accountId }) });
+  const get = () => GET(new Request("http://localhost:3000/html", { headers: user.jar.headers() }), params);
+  expect((await setAllowed("trusted@example.test")).status).toBe(200);
+  expect(await (await get()).text()).not.toMatch(/\ssrc="https:\/\//);
+  expect((await setAllowed("actual@example.test")).status).toBe(200);
+  expect(await (await get()).text()).toContain('src="https://images.example.test/pixel"');
 });
