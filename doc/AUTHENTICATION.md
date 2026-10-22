@@ -175,6 +175,7 @@ Mailbox DELETE additionally requires owner/admin; copy/move checks editor on bot
 | POST | `mcp-tokens` | editor |
 | DELETE | `mcp-tokens/[tokenId]` | editor |
 | GET | `members` | viewer |
+| GET | `members/candidates` | manager |
 | DELETE | `members/[userId]` | manager |
 | PUT | `members/[userId]` | manager |
 | GET | `message-topics` | viewer |
@@ -643,8 +644,9 @@ login/session/MCP boundaries. Manual reconciliation requires the app stopped; ne
 
 All `/api/admin` paths require an active, MFA-assured admin. JSON mutations use same-origin hygiene;
 every successful mutation records secret-free audit. `GET /api/admin/audit?limit=&before=` returns
-`{ok:true,entries:[...]}` with newest-first audit pagination: `limit` defaults to 100 and is
-clamped to 1..500; `before` is a strictly older Unix-ms timestamp.
+`{ok:true,entries:[...],nextCursor:string|null}` with newest-first `(createdAt,id)` pagination.
+`limit` defaults to 100 and is clamped to 1..500; pass `nextCursor` unchanged as `before`.
+The complete read schemas and round-6 migration are below.
 
 `GET /api/admin/users` returns exactly:
 
@@ -652,6 +654,7 @@ clamped to 1..500; `before` is a strictly older Unix-ms timestamp.
 {ok:true, users:Array<{
   id:string; email:string; name:string|null; role:"admin"|"user"; createdAt:number;
   hasPassword:boolean; disabled:boolean; twoFactorEnabled:boolean; passkeyCount:number;
+  passkeys:Array<{id:string; name:string|null; createdAt:number|null}>;
   accounts:Array<{id:string; name:string; email:string; role:"viewer"|"editor"|"manager"; isOwner:boolean}>;
 }>}
 ```
@@ -661,8 +664,9 @@ membership: owners are manager/isOwner:true even without a link; non-owners use 
 membership role and isOwner:false. Unrelated accounts are absent. No connection credentials,
 password hashes, session tokens or viewer-admin role overrides appear in this DTO.
 
-`GET /api/admin/invites` retains `{ok:true,invites:[Invite & {isUsed,usedByUserEmail}]}`;
-`Invite` includes the fields below plus `issuedByUserId`, `provenance`, `revokedAt`.
+`GET /api/admin/invites` returns metadata only:
+`{ok:true,invites:[{id,email,issuedBy,createdAt,expiresAt,status}]}` (full schema below).
+The redeemable `code` appears only in the issuance response, never in history.
 `POST /api/admin/invites` accepts same-origin JSON `{}` (an empty body with the same JSON hygiene
 is also accepted for the existing client). It deliberately issues a generic single-use user invite,
 `email:null,expiresAt:null`, via the same authority/serialization/audit service as targeted issuance.
@@ -896,3 +900,138 @@ worktree-local `.tmp`/TMPDIR and synthetic data; heavy commands used `nice -n 10
 - `timeout 1800 nice -n 10 bun run test:stress`: exit 0, seed 1337, rerun-each=3;
   6,519 passed, zero failed, 19,422 assertions in 228 files (1011.94s).
 - `git diff --check` and `git diff --cached --check`: exit 0. No push, PR or deployment.
+
+## Fix round 6 contract changes
+
+These are the server contracts for the admin and members clients. Common active-session/MFA
+and admin guards remain required; an admin has no implicit membership through manager routes (D6).
+All timestamps in the following read DTOs are Unix milliseconds, unless explicitly nullable.
+
+- G1: no manager user directory → `GET /api/accounts/[accountId]/members/candidates?q=&limit=`
+  requires an actual manager context and returns
+  `{ok:true,candidates:Array<{id:string,name:string|null,email:string}>}`. Only enabled, completely
+  provisioned non-members are included; the implicit owner is excluded even without a membership
+  row. `q` is a case-insensitive literal substring of name or email, trimmed; maximum 128 characters
+  (400 `invalid_request` if exceeded). Empty search is allowed. `limit` defaults to 25, is clamped
+  to 1..100, floors fractions, and uses 25 for non-finite values. Results sort by lowercased
+  name (email when empty), email, then id. This is a capped search, with no paging cursor.
+  Responses carry `Cache-Control:no-store`. Like the existing members GET, no read limiter exists;
+  this route adds neither read audits nor a separate limiter.
+- G2: message-only membership policy errors → `{ok:false,code:string,message:string}` on both
+  `PUT/DELETE /api/accounts/[accountId]/members/[userId]` and
+  `PUT/DELETE /api/admin/accounts/[accountId]/members/[userId]`. Existing messages are preserved.
+  Codes: `owner_immutable` (403), `self_role_change` (403, manager route only), `last_manager`
+  (403), `target_disabled` (400, includes incomplete provisioning), `target_missing` (400),
+  `above_manager` (400, unsupported role), `not_member` (404, DELETE without a membership).
+  Missing userId is 400 `invalid_request`; service authorization/account errors use
+  `insufficient_role`/`account_not_found`. Shared guard failures also gain the code/message
+  envelope: `unauthorized`, `forbidden`, `account_not_found`, `invalid_request` as applicable;
+  existing explicit guard codes (for example `invalid_origin`, `json_required`) are preserved.
+  Refresh headers and additional guard fields are preserved.
+  Admin routes still override self-role restrictions, and still enforce owner and last-manager rules.
+- G3: `passkeyCount` only → additive `passkeys:[{id,name,createdAt}]` in GET users (schema above).
+  `id` is the opaque resource id accepted by
+  `DELETE /api/admin/users/[userId]/passkeys/[passkeyId]`, never a WebAuthn credential id.
+  `name` and `createdAt` may be null when absent in Better Auth storage. `lastUsedAt` is omitted:
+  Better Auth 1.7.12 stores no passkey last-use timestamp. No public key, credential id, counter,
+  transports or backup data is exposed. The fresh `admin.recovery` proof is still required;
+  ownership mismatch returns 404 `passkey_not_found`. The successful `user.passkey_remove` audit
+  now includes `{operationId,passkeyId}` in its payload.
+- G4: `before=<timestamp>` and `{ok:true,entries}` → `before=<opaque nextCursor>` and
+  `{ok:true,entries,nextCursor}`. The HTTP route now rejects timestamps and malformed/oversized
+  cursors with 400 `{ok:false,code:"invalid_cursor",message:"Invalid audit cursor"}`.
+  Ordering and cursor comparison both use `(createdAt DESC,id DESC)`, so equal timestamps cannot
+  skip rows at a boundary. A full page provides a cursor from its last row; a shorter/empty page
+  returns null. A full final page may therefore lead to one empty request. Treat the cursor as
+  opaque and URL-encode it. Numeric `before` remains supported only by the legacy storage API.
+- G5: history included `code`, role/use counts and redeemer details → metadata-only records:
+  `{id,email,issuedBy,createdAt,expiresAt,status}`. This applies to **all** listed invites, including
+  still-issued invites. `id` is a stable SHA-256 history identifier domain-separated from the
+  random code; it cannot redeem an invite. No schema migration is needed. `issuedBy` is the
+  issuer user id or null for operator/legacy invites. Status precedence is redeemed (`uses>0`),
+  revoked (`revokedAt` set), expired (`expiresAt<=now`), then issued. Codes remain shown exactly
+  once in the successful POST issuance response (both generic and targeted issuance).
+
+### Admin read response schemas
+
+GET users is the explicit schema in “Admin lifecycle and personal handover” above, with the added
+passkey resource array. GET users, invites and audit set `Cache-Control:no-store`.
+
+`GET /api/admin/invites`:
+
+```ts
+{ok:true, invites:Array<{
+  id:string; email:string|null; issuedBy:string|null;
+  createdAt:number; expiresAt:number|null;
+  status:"issued"|"redeemed"|"revoked"|"expired";
+}>}
+```
+
+History sorts by createdAt descending, then history id ascending. It never returns `code`,
+`usedByUserId`, `usedByUserEmail`, `uses`, `maxUses`, `role`, `provenance` or `revokedAt`.
+
+`GET /api/admin/audit?limit=&before=`:
+
+```ts
+{ok:true, entries:Array<{
+  id:string; actorUserId:string; action:string;
+  targetUserId:string|null; targetAccountId:string|null;
+  payload:Record<string,unknown>|null; createdAt:number;
+}>, nextCursor:string|null}
+```
+
+Limit defaults to 100 and clamps to 1..500; non-finite values use the default. Payload keys that
+could hold secrets are recursively removed by the audit writer. Action is read as stored so
+older/newer action names remain displayable. Paging is strictly before the composite cursor.
+
+`GET /api/admin/accounts` (mailboxes):
+
+```ts
+import type { AccountSettings } from "../lib/data";
+{ok:true, accounts:Array<{
+  id:string; name:string; email:string; avatar:string; ownerUserId?:string;
+  accessRole:"manager"; isOwner:boolean; shared:boolean;
+  imap:{host:string,port:number,secure:boolean,user:string,password:""};
+  smtp:{host:string,port:number,secure:boolean,user:string,password:""};
+  caldav?:{url:string,user:string,password:"",calendarPath?:string,syncIntervalMs?:number};
+  deepl?:{enabled?:boolean,targetLang?:string,apiKey:"",hasApiKey:boolean};
+  settings?:AccountSettings;
+  members:Array<{userId:string,email:string,name:string|null,
+    role:"viewer"|"editor"|"manager",isOwner:boolean,disabled:boolean}>;
+}>}
+```
+
+Settings follow the existing typed mailbox settings (`lib/data.ts:AccountSettings`): sync,
+threading, layout, appearance, calendar, signatures, defaultSignatureId and notifications.
+The manager presentation includes connection endpoints/usernames with blank secrets.
+`isOwner` describes the viewing admin; `shared` counts distinct members including the owner.
+This management response grants no mail access. Mailboxes sort by display name (email fallback),
+normalized email, then id; members use the same ordering by name/email/id. Disabled members are
+included for admin management. GET members/prefs retain their existing documented contracts.
+
+### Fix round 6 verification (2026-10-22)
+
+Base `ca1fb45`, branch `feat/team-auth`. Heavy commands used `nice -n 10`, with TMPDIR in
+worktree-local `.tmp`; test data was synthetic. The new candidates route is recorded in both the
+route-role fixture and the inventory above, including its generated editor-denial test.
+
+- Focused `bun test --timeout 20000` on `teamAuthContracts`, `accountRouteRoles`,
+  `teamAuthSlice3`, `teamAuthSlice5`, DB users/audit, and admin users/invites route tests:
+  exit 0; 184 passed, zero failed, 939 assertions, eight files (119.19s).
+- `timeout 1500 nice -n 10 bun run test:ci`: exit 0; 2,196 server tests in 229 files
+  (323.65s), then 69 DOM tests in 13 files (18.55s), zero failures.
+- `timeout 1800 nice -n 10 bun run test:stress`: exit 0; seed 1337, rerun-each=3;
+  6,588 passed, zero failed, 19,761 assertions in 229 files (916.97s).
+- `timeout 600 nice -n 10 bun run lint`: exit 1; unchanged calendar effect error at
+  `app/components/calendar/useCalendarConflicts.ts:58` and 27 warnings, zero new findings.
+- `nice -n 10 bun check --no-pretty --all`: exit 1; unchanged 151 non-`bun:test` diagnostics,
+  none in touched files. The requested `grep "error TS" | grep -v bun:test | wc -l` pipeline
+  independently returns 151 (pipeline exit 0).
+- `timeout 1200 nice -n 10 bun run build`: exit 0 (52.96s command wall time).
+- `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64 AUTH_BROWSER_USE_BUILD=1 nice -n 10 bun run test:auth-browser`:
+  exit 0; eight real Chromium/WebAuthn scenarios passed (13.8s), port 3784, isolated storage.
+- `nice -n 10 bash tests/runTeamAuthSecurityControls.sh`: exit 0; all 141 probes in five files
+  passed, zero failures, 778 assertions (72.17s).
+- `git diff --check`: exit 0. No auth-stage activation, signup, policy-handler, schema,
+  harness or script changes; `doc/AUTHENTICATION.md` is the sole overlap in the supplied merge list.
+  No push, PR or deployment.
