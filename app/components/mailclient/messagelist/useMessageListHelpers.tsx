@@ -4,7 +4,6 @@ import type { Folder, Message } from "@/lib/data";
 import { isMessageFlagged } from "../utils/messageHelpers";
 import FolderBadges from "../folder/FolderBadges";
 import MessageSelectIndicators from "./MessageSelectIndicators";
-import UnreadDot from "./UnreadDot";
 
 type UseMessageListHelpersParams = {
   groupBy: string;
@@ -44,13 +43,6 @@ export function useMessageListHelpers({
     [toggleFlaggedFlag]
   );
 
-  const renderUnreadDot = useCallback(
-    (message: Message, options?: { seen?: boolean }) => (
-      <UnreadDot seen={options?.seen ?? Boolean(message.seen)} />
-    ),
-    []
-  );
-
   const renderFolderBadges = useCallback(
     (folderIds: string[]) => (
       <FolderBadges
@@ -79,7 +71,6 @@ export function useMessageListHelpers({
   return {
     threadPathById,
     renderSelectIndicators,
-    renderUnreadDot,
     renderFolderBadges,
     getGroupLabel
   };

@@ -8,19 +8,6 @@
   position: relative;
 }
 
-/* Fixed slot for the unread dot; read rows keep it empty so the columns
-   after it do not shift when a message is marked read or unread. */
-.unreadDotSlot {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 10px;
-}
-
-.unreadDot {
-  border-radius: 999px;
-  background: var(--accent-9);
-}
-
 .selectIcons {
   display: inline-flex;
   align-items: center;
@@ -61,12 +48,4 @@
 
 .selectIconDraft {
   color: var(--gray-10);
-}
-
-@media (width < 768px) {
-  .unreadDotSlot {
-    width: 12px;
-    height: 12px;
-    flex-basis: 12px;
-  }
 }

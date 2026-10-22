@@ -231,8 +231,9 @@
   gap: 6px;
 }
 
+.rowUnread .cellFrom,
 .rowUnread .cellSubject {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .threadCaret {
