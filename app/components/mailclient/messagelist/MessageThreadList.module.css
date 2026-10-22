@@ -182,7 +182,7 @@
 }
 
 .rowUnread {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .rowDragging {
@@ -380,6 +380,3 @@
   opacity: 1;
   transition: opacity 0.12s ease;
 }
-
-/* On desktop the unread control stays in the subject flex flow. */
-.cellUnread { display: contents; }
