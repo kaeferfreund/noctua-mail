@@ -305,14 +305,16 @@
   transform: rotate(90deg);
 }
 
+/* Keeps its 140px column in roomy rows but gives way in tight ones (compose
+   open), so the date and actions keep their width and stay inside the row. */
 .cellFrom {
-  min-width: 140px;
+  min-width: min(140px, 30%);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  flex-shrink: 0;
+  flex-shrink: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -343,6 +345,10 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
+  /* Badges cannot shrink: once the subject text is gone they would spill over
+     the date. Clip them at the cell edge instead (clip, not hidden, so the
+     cell never becomes a scroll container). */
+  overflow-x: clip;
   font-size: 12px;
 }
 
