@@ -45,6 +45,15 @@ function validateBody(body: string) {
 export async function getThreadCollabState(accountId: string, threadId: string) {
   return store.getThreadCollabState(await getAccountDb(accountId), accountId, threadId);
 }
+/** A revision describes one SQLite read snapshot, including comments and activity. */
+export async function getThreadCollabSnapshot(accountId: string, threadId: string) {
+  const db = await getAccountDb(accountId);
+  return db.transaction(() => ({
+    state: store.getThreadCollabState(db, accountId, threadId),
+    comments: store.threadHasMessages(db, accountId, threadId) ? store.listThreadComments(db, accountId, threadId) : [],
+    activity: store.threadHasMessages(db, accountId, threadId) ? store.listThreadActivity(db, accountId, threadId) : [],
+  }))();
+}
 export async function getThreadCollabStates(accountId: string, threadIds: string[]) {
   if (!threadIds.length)
     return new Map<string, store.ThreadCollabState>();
