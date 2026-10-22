@@ -270,6 +270,15 @@ it("list chips hide defaults, show status, and use Former member for missing/dis
   );
   expect(view.getByLabelText("Assignee: Alex Example")).toBeTruthy();
   expect(view.getByText("In progress")).toBeTruthy();
+  for (const name of [null, "", "   "]) {
+    view.rerender(
+      <CollabRowBadges
+        message={{ ...message, collab: { ...state, assigneeUserId: "alex" } }}
+        members={members.map(member => member.userId === "alex" ? { ...member, name } : member)}
+      />,
+    );
+    expect(view.getByLabelText(`Assignee: ${members.find(member => member.userId === "alex")!.email}`)).toBeTruthy();
+  }
   for (const assigneeUserId of ["revoked", "disabled"]) {
     view.rerender(
       <CollabRowBadges
