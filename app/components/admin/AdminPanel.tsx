@@ -14,7 +14,7 @@ import type { AdminUser } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
 const actionTitles: Record<Action["type"], string> = { role: "Change user role", status: "Change user status", delete: "Delete user", recovery: "Initiate recovery", "mfa-reset": "Reset MFA", sessions: "Revoke sessions", passkey: "Remove passkey" };
-function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true || account.ownerUserId === user.id) ?? false; }
+function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
 function securityValue(value: boolean | undefined) { return value === undefined ? "Unknown" : value ? "Yes" : "No"; }
 
 export default function AdminPanel({ isAdminUser, apiFetch = fetch, onClose }: { isAdminUser: boolean; apiFetch?: AdminFetch; onClose: () => void }) {
@@ -92,12 +92,12 @@ function AdminPanelContent({ apiFetch, onClose }: { apiFetch: AdminFetch; onClos
             <td className="p-2"><select aria-label={`Role for ${user.email}`} value={user.role} disabled={busy} onChange={event => begin({ user, type: "role", role: event.target.value as "admin" | "user" })}><option value="user">user</option><option value="admin">admin</option></select></td>
             <td className="p-2">{user.disabled ? "Disabled" : user.disabled === false ? "Enabled" : "Unknown"}</td>
             <td className="p-2">Password: {securityValue(user.hasPassword)}<br />TOTP: {securityValue(user.twoFactorEnabled)}<br />Passkeys: {user.passkeyCount ?? user.passkeys?.length ?? "Unknown"}</td>
-            <td className="p-2">{user.accounts?.map(account => <div key={account.id}>{account.name || account.email} · {account.role ?? "Unknown role"}{(account.isOwner === true || account.ownerUserId === user.id) ? " · Owner" : ""}</div>)}</td>
+            <td className="p-2">{user.accounts?.map(account => <div key={account.id}>{account.name || account.email} · {account.role}{(account.isOwner === true) ? " · Owner" : ""}</div>)}</td>
             <td className="flex flex-wrap gap-2 p-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "status" })}>{user.disabled ? "Enable" : "Disable"}</Button>
               <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "sessions" })}>Revoke sessions</Button>
               <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "recovery" })}>Recovery</Button>
               <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "mfa-reset" })}>Reset MFA</Button>
-              <Button size="sm" variant="outline" disabled={busy || user.passkeyCount === 0} onClick={() => begin({ user, type: "passkey" })}>Remove passkey</Button>
+              <Button size="sm" variant="outline" disabled={busy || !user.passkeys?.length} onClick={() => begin({ user, type: "passkey" })}>Remove passkey</Button>
               <Button size="sm" variant="destructive" disabled={busy} onClick={() => begin({ user, type: "delete" })}>Delete user</Button></td></tr>)}</tbody></table>
       </section>}
       {tab === "invites" && <section className="space-y-4" aria-label="Invites"><h3 className="font-medium">Invite a user</h3><p className="text-sm text-muted-foreground">The email-bound code is single-use and expires in one day. Hand it over personally. The recipient chooses their own password.</p>
@@ -113,7 +113,7 @@ function AdminPanelContent({ apiFetch, onClose }: { apiFetch: AdminFetch; onClos
       onCancel={cancel} onConfirm={() => void submit()}>
       {pending.type === "delete" && <label className="grid gap-1">Reassign owned mailboxes to<select value={owner} onChange={event => setOwner(event.target.value)}><option value="">Choose an enabled user</option>{users.filter(user => user.id !== pending.user.id && user.disabled === false).map(user => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>}
       {(pending.type === "recovery" || pending.type === "mfa-reset") && <label className="flex items-start gap-2"><input type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} />I verified this person&apos;s identity out of band. Recovery links are handed over personally, never emailed.</label>}
-      {pending.type === "passkey" && <label className="grid gap-1">Passkey resource ID<Input value={passkeyId} onChange={event => setPasskeyId(event.target.value)} list="admin-passkeys" /><datalist id="admin-passkeys">{pending.user.passkeys?.map(key => <option key={key.id} value={key.id}>{key.name ?? key.id}</option>)}</datalist><span className="text-sm text-muted-foreground">If the server exposes only a count, obtain the resource ID from the account holder&apos;s security settings.</span></label>}
+      {pending.type === "passkey" && <label className="grid gap-1">Passkey<select aria-label="Passkey" value={passkeyId} onChange={event => setPasskeyId(event.target.value)}><option value="">Choose a passkey</option>{pending.user.passkeys?.map(key => <option key={key.id} value={key.id}>{key.name || "Unnamed passkey"}{key.createdAt == null ? "" : ` · ${new Date(key.createdAt).toLocaleString()}`}</option>)}</select></label>}
       {sensitive && <><label className="grid gap-1">Your app password<Input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label><label className="grid gap-1">Your current TOTP code<Input autoComplete="one-time-code" inputMode="numeric" value={totp} onChange={event => setTotp(event.target.value)} /></label></>}
     </AdminConfirmDialog>}
     {secret && <Dialog open onOpenChange={open => { if (!open) { setSecret(null); setCopied(""); } }}><DialogContent aria-describedby={undefined}><DialogTitle>{secret.title}</DialogTitle><DialogDescription>Shown once. Copy now for personal handover; closing discards this value.</DialogDescription><code className="break-all">{secret.value}</code><Button onClick={() => {
