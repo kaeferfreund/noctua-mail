@@ -119,7 +119,7 @@ function isDuplicateColumnError(error: unknown) {
 // to make the read and the ALTERs one unit. "duplicate column name" is
 // tolerated: a CLI script and a server restart can race on the same file
 // and the loser must not fail its start-up over a column that now exists.
-function ensureTableColumns(
+export function ensureTableColumns(
   db: any,
   tableName: string,
   columns: ReadonlyArray<readonly [name: string, ddl: string]>

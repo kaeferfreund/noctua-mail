@@ -1,0 +1,290 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { betterAuth } from "better-auth";
+import { installAuthControlPlane } from "./authPolicy";
+import { migrateAuthSchema, noctuaAuthOptions } from "../betterAuth";
+import { caught, createTestAuthHarness, openMasterDb, TEST_BASE_URL, TEST_SECRET, type TestAuthHarness } from "../testAuthHarness";
+
+const fixtures: TestAuthHarness[] = [];
+async function setup(options?: Parameters<typeof createTestAuthHarness>[0]) {
+  const fixture = await createTestAuthHarness(options);
+  fixtures.push(fixture);
+  return fixture;
+}
+afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.close(); });
+
+const state = (f: TestAuthHarness, id: string) => f.master.prepare(`SELECT generation FROM auth_security_state WHERE userId=?`).get(id)?.generation as number;
+const epoch = (f: TestAuthHarness) => f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation as number;
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+describe("transactional mirrors", () => {
+  test("real adapter rollback and queued creation commit the matching profiles together", async () => {
+    const f = await setup();
+    const first = await f.createUser("rollback@example.test");
+    const context = await f.auth.$context;
+    const entered = deferred();
+    const release = deferred();
+    const held = context.adapter.transaction(async trx => {
+      await trx.update({ model: "user", where: [{ field: "id", value: first.id }], update: { email: "changed@example.test", role: "admin" } });
+      expect(f.database.prepare(`SELECT email,role FROM users WHERE id=?`).get(first.id)).toEqual({ email: "changed@example.test", role: "admin" });
+      expect(f.master.prepare(`SELECT email FROM users WHERE id=?`).get(first.id).email).toBe(first.email);
+      entered.resolve();
+      await release.promise;
+      throw new Error("abort held transaction");
+    });
+    const failure = caught(held);
+    await entered.promise;
+    const queuedRead = deferred();
+    const findUser = context.internalAdapter.findUserByEmail.bind(context.internalAdapter);
+    context.internalAdapter.findUserByEmail = (...args) => {
+      if (args[0] === "queued@example.test") queuedRead.resolve();
+      return findUser(...args);
+    };
+    const queued = f.createUser("queued@example.test");
+    // Reach the real library adapter while its writer is still held. Merely
+    // starting an async API call before release would not prove queueing.
+    await queuedRead.promise;
+    expect(f.database.prepare(`SELECT id FROM auth_user WHERE email='queued@example.test'`).get()).toBeNull();
+    context.internalAdapter.findUserByEmail = findUser;
+    release.resolve();
+    expect((await failure).message).toBe("abort held transaction");
+    const second = await queued;
+    expect(f.master.prepare(`SELECT email,role FROM users WHERE id=?`).get(first.id)).toEqual({ email: first.email, role: "user" });
+    expect(f.master.prepare(`SELECT email FROM auth_user WHERE id=?`).get(first.id).email).toBe(first.email);
+    expect(f.master.prepare(`SELECT email FROM users WHERE id=?`).get(second.id).email).toBe(second.email);
+    expect(f.master.prepare(`SELECT typeof(createdAt) t FROM users WHERE id=?`).get(second.id).t).toBe("integer");
+  });
+
+  test("mirror constraint aborts the library statement and queued creation still works", async () => {
+    const f = await setup();
+    f.master.exec(`CREATE TRIGGER test_mirror_failure BEFORE INSERT ON users WHEN NEW.email='reject@example.test'
+      BEGIN SELECT RAISE(ABORT,'mirror constraint'); END`);
+    await caught(f.createUser("reject@example.test"));
+    expect(f.master.prepare(`SELECT id FROM auth_user WHERE email='reject@example.test'`).get()).toBeNull();
+    expect(f.master.prepare(`SELECT count(*) n FROM auth_security_state`).get().n).toBe(0);
+    await f.createUser("allowed@example.test");
+    expect(f.master.prepare(`SELECT count(*) n FROM users`).get().n).toBe(1);
+  });
+
+  test("a later after-hook exception cannot split a committed auth/profile pair", async () => {
+    const f = await setup(options => {
+      Object.assign(options, { databaseHooks: { user: { create: { after: async () => { throw new Error("after commit failure"); } } } } });
+    });
+    expect((await caught(f.createUser("after@example.test"))).message).toBe("after commit failure");
+    const user = f.master.prepare(`SELECT id,createdAt FROM auth_user WHERE email='after@example.test'`).get();
+    expect(user).not.toBeNull();
+    expect(f.master.prepare(`SELECT email,typeof(createdAt) t FROM users WHERE id=?`).get(user.id)).toEqual({ email: "after@example.test", t: "integer" });
+    expect(state(f, user.id)).toBe(0);
+  });
+
+  test("backfill preserves explicit IDs and integer profile time; second startup is empty", async () => {
+    const f = await setup();
+    const user = await f.createUser("backfill@example.test");
+    f.master.prepare(`UPDATE users SET createdAt=? WHERE id=?`).run(1700000000123, user.id);
+    const time = new Date("2026-01-02T03:04:05.678Z");
+    f.master.prepare(`UPDATE auth_user SET createdAt=? WHERE id=?`).run(time.toISOString(), user.id);
+    const options = noctuaAuthOptions({ database: f.database, baseURL: TEST_BASE_URL, secret: TEST_SECRET });
+    expect(await migrateAuthSchema(options)).toEqual({ createdTables: [], addedColumns: [], addedIndexes: [] });
+    installAuthControlPlane(f.database);
+    expect(f.master.prepare(`SELECT createdAt FROM users WHERE id=?`).get(user.id).createdAt).toBe(1700000000123);
+    f.master.prepare(`DELETE FROM users WHERE id=?`).run(user.id);
+    installAuthControlPlane(f.database);
+    expect(f.master.prepare(`SELECT createdAt FROM users WHERE id=?`).get(user.id).createdAt).toBe(time.getTime());
+    expect(f.migration.createdTables.sort()).toEqual(["auth_account", "auth_passkey", "auth_session", "auth_two_factor", "auth_user", "auth_verification"]);
+    const observer = openMasterDb(f.temp.dbPath);
+    try {
+      const repeat = noctuaAuthOptions({ database: observer, baseURL: TEST_BASE_URL, secret: TEST_SECRET });
+      expect(await migrateAuthSchema(repeat)).toEqual({ createdTables: [], addedColumns: [], addedIndexes: [] });
+      installAuthControlPlane(observer);
+      const reopened = betterAuth(repeat);
+      expect(await reopened.api.getSession({ headers: new Headers() })).toBeNull();
+    } finally { observer.close(); }
+  });
+
+  test("explicit operator ID insertion preserves the legacy profile and memberships", async () => {
+    const f = await setup();
+    f.master.prepare(`INSERT INTO users(id,email,role,createdAt) VALUES(?,?,?,?)`).run("operator-bound", "operator@example.test", "admin", 1700000000123);
+    await f.addMembership("operator-bound", "legacy-mailbox", "viewer");
+    const context = await f.auth.$context;
+    await context.adapter.create({ model: "user", forceAllowId: true, data: {
+      id: "operator-bound", email: "operator@example.test", name: "Synthetic Operator", role: "admin", emailVerified: false,
+      createdAt: new Date(), updatedAt: new Date()
+    } });
+    expect(f.master.prepare(`SELECT id,role,createdAt FROM users WHERE id='operator-bound'`).get())
+      .toEqual({ id: "operator-bound", role: "admin", createdAt: 1700000000123 });
+    expect(f.master.prepare(`SELECT role FROM user_accounts WHERE userId='operator-bound'`).get().role).toBe("viewer");
+    expect(state(f, "operator-bound")).toBe(0);
+  });
+
+  test("startup never resets an installed missing security generation or epoch", async () => {
+    const f = await setup();
+    const user = await f.createUser("missing-startup@example.test");
+    f.master.prepare(`DELETE FROM auth_security_state WHERE userId=?`).run(user.id);
+    expect(() => installAuthControlPlane(f.database)).toThrow("Missing auth security state at startup");
+    expect(state(f, user.id)).toBeUndefined();
+    f.master.prepare(`INSERT INTO auth_security_state(userId,generation) VALUES(?,7)`).run(user.id);
+    f.master.prepare(`DELETE FROM auth_login_epoch`).run();
+    expect(() => installAuthControlPlane(f.database)).toThrow("Missing auth login epoch at startup");
+  });
+
+  test("generated ISO creation dates round exactly to Noctua milliseconds", async () => {
+    const f = await setup();
+    const user = await f.createUser("date@example.test");
+    const authTime = f.master.prepare(`SELECT createdAt FROM auth_user WHERE id=?`).get(user.id).createdAt;
+    expect(f.master.prepare(`SELECT createdAt FROM users WHERE id=?`).get(user.id).createdAt).toBe(Date.parse(authTime));
+  });
+
+  test("startup repairs changed triggers and rejects malformed policy tables atomically", async () => {
+    const f = await setup();
+    f.master.exec(`DROP TRIGGER noctua_user_update; CREATE TRIGGER noctua_user_update AFTER UPDATE ON auth_user BEGIN SELECT 1; END`);
+    installAuthControlPlane(f.database);
+    expect(f.master.prepare(`SELECT sql FROM sqlite_master WHERE name='noctua_user_update'`).get().sql).toContain("UPDATE users");
+    f.master.exec(`DROP TABLE auth_pending_challenges; CREATE TABLE auth_pending_challenges(identifier TEXT)`);
+    expect(() => installAuthControlPlane(f.database)).toThrow("Malformed auth control-plane table");
+  });
+
+  test("ambiguous normalized legacy identity fails backfill without taking an arbitrary ID", async () => {
+    const f = await setup();
+    const user = await f.createUser("ambiguity@example.test");
+    f.master.exec(`DROP INDEX idx_users_email_lower`);
+    f.master.prepare(`INSERT INTO users(id,email,role,createdAt) VALUES(?,?,?,?)`).run("other-profile", " AMBIGUITY@example.test ", "admin", 1);
+    expect(() => installAuthControlPlane(f.database)).toThrow("Ambiguous auth profile backfill");
+    expect(f.master.prepare(`SELECT email FROM users WHERE id=?`).get(user.id).email).toBe(user.email);
+  });
+});
+
+describe("credential generation barrier", () => {
+  test("insert/update/remove password, provider and identity moves invalidate the affected users", async () => {
+    const f = await setup();
+    const a = await f.createUser("generation-a@example.test");
+    const b = await f.createUser("generation-b@example.test");
+    expect(state(f, a.id)).toBe(1); // credential INSERT
+    const initialEpoch = epoch(f);
+    const credential = f.master.prepare(`SELECT id FROM auth_account WHERE userId=?`).get(a.id).id;
+    const update = (sql: string, ...args: unknown[]) => f.master.prepare(`UPDATE auth_account SET ${sql} WHERE id=?`).run(...args, credential);
+    update("updatedAt=?", new Date().toISOString());
+    expect(state(f, a.id)).toBe(1);
+    update("password=NULL");
+    expect(state(f, a.id)).toBe(2);
+    update("password=?", "synthetic-hash");
+    expect(state(f, a.id)).toBe(3);
+    update("password=?", "synthetic-hash");
+    expect(state(f, a.id)).toBe(3);
+    update("userId=?,accountId=?", b.id, b.id);
+    expect([state(f, a.id), state(f, b.id)]).toEqual([4, 2]);
+    update("providerId='oauth'");
+    expect(state(f, b.id)).toBe(3);
+    update("providerId='credential'");
+    expect(state(f, b.id)).toBe(4);
+    update("accountId='other-credential-identity'");
+    expect(state(f, b.id)).toBe(5);
+    f.master.prepare(`DELETE FROM auth_account WHERE id=?`).run(credential);
+    expect(state(f, b.id)).toBe(6);
+    expect(epoch(f)).toBe(initialEpoch + 8);
+  });
+
+  test("missing state aborts credential insertion, update, move and standalone deletion", async () => {
+    const f = await setup();
+    const a = await f.createUser("missing-a@example.test");
+    const b = await f.createUser("missing-b@example.test");
+    const account = f.master.prepare(`SELECT id,password FROM auth_account WHERE userId=?`).get(a.id);
+    f.master.prepare(`DELETE FROM auth_security_state WHERE userId=?`).run(b.id);
+    expect(() => f.master.prepare(`UPDATE auth_account SET userId=? WHERE id=?`).run(b.id, account.id)).toThrow("Missing auth security state");
+    expect(state(f, a.id)).toBe(1); // old user's tentative increment rolled back too
+    f.master.prepare(`DELETE FROM auth_security_state WHERE userId=?`).run(a.id);
+    expect(() => f.master.prepare(`UPDATE auth_account SET password=NULL WHERE id=?`).run(account.id)).toThrow("Missing auth security state");
+    expect(() => f.master.prepare(`DELETE FROM auth_account WHERE id=?`).run(account.id)).toThrow("Missing auth security state");
+    expect(() => f.master.prepare(`INSERT INTO auth_account(id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES(?,?,'credential',?,?,?,?)`)
+      .run("new-credential", a.id, a.id, "synthetic-hash", new Date().toISOString(), new Date().toISOString())).toThrow("Missing auth security state");
+    expect(f.master.prepare(`SELECT password FROM auth_account WHERE id=?`).get(account.id).password).toBe(account.password);
+  });
+
+  test("credential rollback restores generation and epoch; unrelated provider metadata has no effect", async () => {
+    const f = await setup();
+    const user = await f.createUser("rollback-generation@example.test");
+    const context = await f.auth.$context;
+    const beforeEpoch = epoch(f);
+    const credential = f.master.prepare(`SELECT id FROM auth_account WHERE userId=?`).get(user.id).id;
+    await expect(context.adapter.transaction(async trx => {
+      await trx.update({ model: "account", where: [{ field: "id", value: credential }], update: { password: "uncommitted-hash" } });
+      expect(f.database.prepare(`SELECT generation FROM auth_security_state WHERE userId=?`).get(user.id).generation).toBe(2);
+      throw new Error("abort password write");
+    })).rejects.toThrow("abort password write");
+    expect(state(f, user.id)).toBe(1);
+    expect(epoch(f)).toBe(beforeEpoch);
+    f.master.prepare(`INSERT INTO auth_account(id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES(?,?,'oauth',?,?,?,?)`)
+      .run("oauth-account", user.id, user.id, null, new Date().toISOString(), new Date().toISOString());
+    f.master.prepare(`UPDATE auth_account SET password='provider-metadata' WHERE id='oauth-account'`).run();
+    expect(state(f, user.id)).toBe(1);
+    f.master.prepare(`DELETE FROM auth_security_state WHERE userId=?`).run(user.id);
+    f.master.prepare(`DELETE FROM auth_user WHERE id=?`).run(user.id);
+    expect(f.master.prepare(`SELECT id FROM auth_account WHERE userId=?`).get(user.id)).toBeNull();
+  });
+
+  test("parent delete cascades auth children and sidecars without deleting domain profile", async () => {
+    const f = await setup();
+    const user = await f.createUser("cascade@example.test");
+    const { session } = await f.signIn(user.email);
+    await f.seedSessionSecurity(session!.session.id, user.id, "setup");
+    f.master.prepare(`INSERT INTO auth_reauth_grants(tokenHash,userId,sessionId,purpose,generation,expiresAt) VALUES(?,?,?,?,?,?)`)
+      .run("synthetic-hash", user.id, session!.session.id, "test", 1, Date.now()+1000);
+    f.master.prepare(`DELETE FROM auth_user WHERE id=?`).run(user.id);
+    for (const table of ["auth_account", "auth_session", "auth_security_state", "auth_session_security", "auth_reauth_grants"]) {
+      expect(f.master.prepare(`SELECT count(*) n FROM ${table}`).get().n).toBe(0);
+    }
+    expect(f.master.prepare(`SELECT id FROM users WHERE id=?`).get(user.id)).not.toBeNull();
+  });
+
+  test("explicit fixture factors and session metadata do not promote other sessions", async () => {
+    const f = await setup();
+    const user = await f.createUser("fixture-factors@example.test");
+    const first = await f.signIn(user.email);
+    const second = await f.signIn(user.email);
+    await f.enrollTotp(first.jar, "synthetic-password-123");
+    const live = await f.auth.api.getSession({ headers: first.jar.headers() });
+    expect(live?.user.twoFactorEnabled).toBe(true);
+    expect(f.master.prepare(`SELECT verified FROM auth_two_factor WHERE userId=?`).get(user.id).verified).toBe(1);
+    await f.seedSessionSecurity(live!.session.id, user.id, "mfa", "password_totp", 1700000000123);
+    expect(f.master.prepare(`SELECT assurance,authenticatedAt FROM auth_session_security WHERE sessionId=?`).get(live!.session.id))
+      .toEqual({ assurance: "mfa", authenticatedAt: 1700000000123 });
+    expect(f.master.prepare(`SELECT sessionId FROM auth_session_security WHERE sessionId=?`).get(second.session!.session.id)).toBeNull();
+    await f.addMembership(user.id, "synthetic-mailbox", "viewer");
+    await f.addMembership(user.id, "synthetic-mailbox", "manager");
+    expect(f.master.prepare(`SELECT role FROM user_accounts WHERE userId=?`).get(user.id).role).toBe("viewer");
+  });
+
+  test("ban changes advance generation, ordinary profile edits do not", async () => {
+    const f = await setup();
+    const user = await f.createUser("ban-generation@example.test");
+    f.master.prepare(`UPDATE auth_user SET name=?,role=? WHERE id=?`).run("New Name", "admin", user.id);
+    expect(state(f, user.id)).toBe(1);
+    f.master.prepare(`UPDATE auth_user SET banned=1 WHERE id=?`).run(user.id);
+    expect(state(f, user.id)).toBe(2);
+    f.master.prepare(`UPDATE auth_user SET banReason='reason' WHERE id=?`).run(user.id);
+    expect(state(f, user.id)).toBe(2);
+    f.master.prepare(`UPDATE auth_user SET banExpires=? WHERE id=?`).run(new Date().toISOString(), user.id);
+    expect(state(f, user.id)).toBe(3);
+  });
+
+  test("password reset remains revoked after onPasswordReset throws after commit", async () => {
+    let resetToken = "";
+    const f = await setup(options => Object.assign(options.emailAndPassword, {
+      sendResetPassword: async ({ token }: { token: string }) => { resetToken = token; },
+      onPasswordReset: async () => { throw new Error("reset cleanup failed"); }
+    }));
+    const user = await f.createUser("reset-barrier@example.test");
+    const before = state(f, user.id);
+    const login = await f.signIn(user.email);
+    await f.auth.api.requestPasswordReset({ body: { email: user.email, redirectTo: `${TEST_BASE_URL}/reset-password` } });
+    expect(resetToken).not.toBe("");
+    expect((await caught(f.auth.api.resetPassword({ body: { token: resetToken, newPassword: "replacement-password-123" } }))).message).toBe("reset cleanup failed");
+    expect(state(f, user.id)).toBe(before+1);
+    expect(await f.auth.api.getSession({ headers: login.jar.headers() })).toBeNull();
+    expect((await f.signIn(user.email, "replacement-password-123")).response.token).toBeString();
+    expect((await caught(f.auth.api.resetPassword({ body: { token: resetToken, newPassword: "another-password-123" } }))).body?.code).toBe("INVALID_TOKEN");
+  });
+});
