@@ -870,8 +870,8 @@ export function initMasterSchema(db: any) {
 
   const userCount = db.prepare(`SELECT COUNT(*) as count FROM users`).get() as { count: number };
   if (userCount.count === 0) {
-    const adminInvite = ensureAdminInvite(db);
-    console.info(`[noctua] Admin invite code: ${adminInvite.code}`);
+    ensureAdminInvite(db);
+    console.info("[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).");
   }
 }
 

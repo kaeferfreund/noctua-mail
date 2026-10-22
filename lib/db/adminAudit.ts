@@ -69,31 +69,40 @@ export function recordAdminAuditRow(db: Database, input: AdminAuditInput): Admin
   return mapAdminAuditRow(row);
 }
 
-function clampAuditLimit(limit: number | undefined) {
+export function clampAuditLimit(limit: number | undefined) {
   if (limit === undefined || !Number.isFinite(limit)) return ADMIN_AUDIT_DEFAULT_LIMIT;
   return Math.min(ADMIN_AUDIT_MAX_LIMIT, Math.max(1, Math.floor(limit)));
 }
 
-/**
- * Newest entries first. `before` (unix milliseconds) pages backwards: only
- * entries created strictly before it are returned. `limit` defaults to 100
- * and is clamped to 1..500.
- */
+export function encodeAdminAuditCursor(entry: Pick<AdminAuditEntry, "createdAt" | "id">): string {
+  return Buffer.from(JSON.stringify([entry.createdAt, entry.id])).toString("base64url");
+}
+
+export function decodeAdminAuditCursor(cursor: string): { createdAt: number; id: string } {
+  try {
+    if (cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new Error();
+    const value: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (!Array.isArray(value) || value.length !== 2 || !Number.isSafeInteger(value[0]) || value[0] < 0 || typeof value[1] !== "string" || !value[1] || value[1].length > 128) throw new Error();
+    return { createdAt: value[0], id: value[1] };
+  } catch { throw new RangeError("Invalid audit cursor"); }
+}
+
+/** Newest (createdAt,id) first. Numeric `before` remains a legacy storage API. */
 export async function listAdminAudit(
-  options: { limit?: number; before?: number | null } = {}
+  options: { limit?: number; before?: number | string | null } = {}
 ): Promise<AdminAuditEntry[]> {
   const db = await getDb();
   const limit = clampAuditLimit(options.limit);
-  const before =
-    options.before != null && Number.isFinite(options.before) ? options.before : null;
+  const cursor = typeof options.before === "string" ? decodeAdminAuditCursor(options.before) : null;
+  const before = typeof options.before === "number" && Number.isFinite(options.before) ? options.before : null;
   const rows = db
     .prepare(
       `SELECT id, actorUserId, action, targetUserId, targetAccountId, payload, createdAt
        FROM admin_audit
-       ${before === null ? "" : "WHERE createdAt < ?"}
+       ${cursor ? "WHERE (createdAt < ? OR (createdAt = ? AND id < ?))" : before === null ? "" : "WHERE createdAt < ?"}
        ORDER BY createdAt DESC, id DESC
        LIMIT ?`
     )
-    .all(...(before === null ? [limit] : [before, limit])) as StoredAdminAuditRow[];
+    .all(...(cursor ? [cursor.createdAt, cursor.createdAt, cursor.id, limit] : before === null ? [limit] : [before, limit])) as StoredAdminAuditRow[];
   return rows.map(mapAdminAuditRow);
 }

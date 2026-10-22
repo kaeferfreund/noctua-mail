@@ -10,13 +10,15 @@ import AccountTabContent from "@/app/components/account-settings/tabs/AccountTab
 import SignaturesTabContent from "@/app/components/account-settings/tabs/SignaturesTabContent";
 import PreferencesTabContent from "@/app/components/account-settings/tabs/PreferencesTabContent";
 import CategorizationTabContent from "@/app/components/account-settings/tabs/CategorizationTabContent";
-import AdminTabContent from "@/app/components/account-settings/tabs/AdminTabContent";
+import AdminConfirmDialog from "@/app/components/admin/AdminConfirmDialog";
+import MembersTabContent from "@/app/components/account-settings/tabs/MembersTabContent";
+import { settingsTabVisible } from "@/app/components/account-settings/settingsAccess";
 import CalendarTabContent from "@/app/components/account-settings/tabs/CalendarTabContent";
 import TopicsTabContent from "@/app/components/account-settings/tabs/TopicsTabContent";
 import RecipientAliasesTabContent from "@/app/components/account-settings/tabs/RecipientAliasesTabContent";
 import McpTabContent from "@/app/components/account-settings/tabs/McpTabContent";
 import TranslationTabContent from "@/app/components/account-settings/tabs/TranslationTabContent";
-import OverflowTabsList, { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
+import { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 export type ManageTab =
   | "account"
@@ -28,7 +30,7 @@ export type ManageTab =
   | "translation"
   | "mcp"
   | "recipient-aliases"
-  | "admin";
+  | "members";
 
 function deriveImapSecurity(imap: Account["imap"]): "tls" | "starttls" | "none" {
   if (imap.secure) return "tls";
@@ -87,6 +89,7 @@ export default function AccountSettingsModal({
   onDeleteRecipientAlias
 }: Props) {
   const isMobile = useIsMobile();
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
   const [imapSecurity, setImapSecurity] = useState<"tls" | "starttls" | "none">(() =>
     deriveImapSecurity(initialAccount.imap)
@@ -111,10 +114,6 @@ export default function AccountSettingsModal({
   );
   const canSaveSignaturesTab = useMemo(
     () => hasSavableAccountSettingsChanges(initialAccount, localAccount, "signatures", { isAdminUser }),
-    [initialAccount, isAdminUser, localAccount]
-  );
-  const canSavePreferencesTab = useMemo(
-    () => hasSavableAccountSettingsChanges(initialAccount, localAccount, "preferences", { isAdminUser }),
     [initialAccount, isAdminUser, localAccount]
   );
   const canSaveCalendarTab = useMemo(
@@ -142,9 +141,10 @@ export default function AccountSettingsModal({
       { value: "recipient-aliases", label: "Recipient Aliases", disabled: !isExistingAccount },
       { value: "mcp", label: "MCP", disabled: !isExistingAccount }
     ];
-    if (isAdminUser) items.push({ value: "admin", label: "Admin", disabled: !isExistingAccount });
-    return items;
-  }, [isAdminUser, isExistingAccount]);
+    items.push({ value: "members", label: "Members", disabled: !isExistingAccount });
+    return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
+  }, [initialAccount.accessRole, isExistingAccount]);
+  const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;
 
@@ -215,19 +215,14 @@ export default function AccountSettingsModal({
           </Flex>
 
           <Tabs.Root
-            orientation={isMobile ? "vertical" : "horizontal"}
-            value={manageTab}
+            orientation="vertical"
+            value={activeTab}
             onValueChange={(value) => onTabChange(value as ManageTab)}
-            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: isMobile ? "row" : "column", gap: isMobile ? 8 : 0 }}
+            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "row", gap: 12 }}
           >
-            {isMobile ? <Tabs.List className={mobileStyles.settingsTabs}>{tabItems.map((tab) => <Tabs.Trigger key={tab.value} value={tab.value} disabled={tab.disabled}>{tab.label}</Tabs.Trigger>)}</Tabs.List> : <OverflowTabsList
-              tabs={tabItems}
-              activeValue={manageTab}
-              onSelect={(value) => onTabChange(value as ManageTab)}
-              overflowLabel="More settings tabs"
-            />}
+            <Tabs.List className={isMobile ? mobileStyles.settingsTabs : undefined} style={{ flexDirection: "column", alignItems: "stretch", flexShrink: 0, overflow: "auto" }}>{tabItems.map(tab => <Tabs.Trigger key={tab.value} aria-label={tab.label} value={tab.value} disabled={tab.disabled}>{tab.label}</Tabs.Trigger>)}</Tabs.List>
 
-            <Tabs.Content value="account" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+            {settingsTabVisible("account", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="account" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <AccountTabContent
                 editingAccount={localAccount}
                 isExistingAccount={isExistingAccount}
@@ -241,14 +236,15 @@ export default function AccountSettingsModal({
                 onSmtpSecurityChange={setSmtpSecurity}
                 onClose={onClose}
                 onSave={handleSave}
-                onDelete={onDelete}
+                onDelete={() => setDeleteConfirm(true)}
+                canDelete={initialAccount.isOwner === true || isAdminUser}
                 canSave={canSaveAccountTab}
                 onUpdateAccount={setLocalAccount}
                 onRunProbe={runProbe}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content value="signatures" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+            {settingsTabVisible("signatures", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="signatures" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <SignaturesTabContent
                 editingAccount={localAccount}
                 isExistingAccount={isExistingAccount}
@@ -257,24 +253,16 @@ export default function AccountSettingsModal({
                 onSave={handleSave}
                 canSave={canSaveSignaturesTab}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
             <Tabs.Content value="preferences" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
-              <PreferencesTabContent
-                editingAccount={localAccount}
-                isExistingAccount={isExistingAccount}
-                isAdminUser={isAdminUser}
-                onUpdateSettings={handleUpdateSettings}
-                onClose={onClose}
-                onSave={handleSave}
-                canSave={canSavePreferencesTab}
-              />
+              <PreferencesTabContent key={localAccount.id} editingAccount={localAccount} onClose={onClose} apiFetch={apiFetch} />
             </Tabs.Content>
 
-            <Tabs.Content value="categorization" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+            {settingsTabVisible("categorization", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="categorization" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <CategorizationTabContent
                 accountId={localAccount.id}
-                isActive={manageTab === "categorization"}
+                isActive={activeTab === "categorization"}
                 isExistingAccount={isExistingAccount}
                 accountDateFormat={localAccount.settings?.appearance?.dateFormat}
                 onClose={onClose}
@@ -288,9 +276,9 @@ export default function AccountSettingsModal({
                 apiFetch={apiFetch}
                 readErrorMessage={readErrorMessage}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content value="calendar" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+            {settingsTabVisible("calendar", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="calendar" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <CalendarTabContent
                 editingAccount={localAccount}
                 isExistingAccount={isExistingAccount}
@@ -299,9 +287,9 @@ export default function AccountSettingsModal({
                 onSave={handleSave}
                 canSave={canSaveCalendarTab}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content value="translation" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+            {settingsTabVisible("translation", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="translation" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <TranslationTabContent
                 editingAccount={localAccount}
                 isExistingAccount={isExistingAccount}
@@ -311,12 +299,12 @@ export default function AccountSettingsModal({
                 canSave={canSaveTranslationTab}
                 apiFetch={apiFetch}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content value="topics" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "var(--space-2)" }}>
+            {settingsTabVisible("topics", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="topics" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "var(--space-2)" }}>
               <TopicsTabContent
                 accountId={localAccount.id}
-                isActive={manageTab === "topics"}
+                isActive={activeTab === "topics"}
                 isExistingAccount={isExistingAccount}
                 apiFetch={apiFetch}
                 onTopicsChanged={onTopicsChanged}
@@ -327,23 +315,23 @@ export default function AccountSettingsModal({
                 onSave={handleSave}
                 canSave={canSaveTopicsTab}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content
+            {settingsTabVisible("mcp", initialAccount.accessRole, isExistingAccount) && <Tabs.Content
               value="mcp"
               style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}
             >
               <McpTabContent
                 accountId={localAccount.id}
-                isActive={manageTab === "mcp"}
+                isActive={activeTab === "mcp"}
                 isExistingAccount={isExistingAccount}
                 accountDateFormat={localAccount.settings?.appearance?.dateFormat}
                 apiFetch={apiFetch}
                 onClose={onClose}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content
+            {settingsTabVisible("recipient-aliases", initialAccount.accessRole, isExistingAccount) && <Tabs.Content
               value="recipient-aliases"
               style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "var(--space-2)" }}
             >
@@ -364,26 +352,17 @@ export default function AccountSettingsModal({
                 onAliasesChanged={onRecipientAliasesChanged}
                 onClose={onClose}
               />
-            </Tabs.Content>
+            </Tabs.Content>}
 
-            <Tabs.Content value="admin" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
-              <AdminTabContent
-                isActive={manageTab === "admin"}
-                isAdminUser={isAdminUser}
-                accountDateFormat={localAccount.settings?.appearance?.dateFormat}
-                onClose={onClose}
-                onInviteGenerated={() =>
-                  onNotifySuccess?.(
-                    "Invite code generated",
-                    "A one-time invite code for a new user is ready."
-                  )
-                }
-                apiFetch={apiFetch}
-                readErrorMessage={readErrorMessage}
-              />
-            </Tabs.Content>
+            {initialAccount.accessRole === "manager" && <Tabs.Content value="members" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+              <MembersTabContent key={localAccount.id} accountId={localAccount.id} accessRole={initialAccount.accessRole} apiFetch={apiFetch} />
+            </Tabs.Content>}
 
           </Tabs.Root>
+          {deleteConfirm && (initialAccount.isOwner === true || isAdminUser) && <AdminConfirmDialog
+            title="Delete mailbox" description={`Permanently delete ${localAccount.email} and its local data?`}
+            busy={false} onCancel={() => setDeleteConfirm(false)} onConfirm={() => { setDeleteConfirm(false); onDelete(); }} />}
+
         </Flex>
     </SettingsFrame>
   );

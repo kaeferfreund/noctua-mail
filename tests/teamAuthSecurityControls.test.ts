@@ -93,7 +93,7 @@ test('signup/admin wrappers same-origin JSON, permission distinction, signup lim
  const statuses=[];for(let i=0;i<4;i++)statuses.push((await adminRecovery(req(a.jar,{confirmedTarget:true}),context)).status);expect(statuses).toEqual([403,403,403,429]);const recoveryLimited=await adminRecovery(req(a.jar,{confirmedTarget:true}),context);expect(recoveryLimited.headers.get('retry-after')).toBe('60');
  const unknown=await http(await setup(),'/reset-password',{token:'invalid',newPassword:password});expect(JSON.stringify(await unknown.json())).not.toContain('@');
 });
-test('external BA mount remains 503',async()=>{const r=await publicBA();expect(r.status).toBe(503);expect(await r.json()).toEqual({code:'auth_integration_pending'});});
+test('external BA mount activates the reviewed policy handler',async()=>{const r=await publicBA(new Request('http://localhost:3785/api/ba/ok'));expect(r.status).toBe(200);expect(await r.json()).toEqual({ok:true});});
 test('normal lifecycle/recovery audits have one actor-bound secret-free row each',async()=>{
  const f=await setup(),a=await enrolled(f),b=await enrolled(f,'user');
  await updateUserLifecycle(f.auth,f.master,a.source,req(a.jar),b.user.id,{name:'Synthetic Updated'});

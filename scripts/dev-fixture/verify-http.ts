@@ -3,22 +3,32 @@ import assert from "node:assert/strict";
 import { parseArgs } from "node:util";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { Folder, Message } from "../../lib/data";
-import { demoPass, demoUser } from "./seed";
-const { values } = parseArgs({ args: process.argv.slice(2), options: { "base-url": { type: "string", default: "http://localhost:3786" }, "invite-code": { type: "string" } } });
-let cookie = "";
+import { parseSetCookieHeader } from "better-auth/cookies";
+import { demoUser } from "./seed";
+const { values } = parseArgs({ args: process.argv.slice(2), options: { "base-url": { type: "string", default: "http://localhost:3784" } } });
+// Use an existing synthetic MFA session; this protocol verifier never bypasses enrollment.
+const cookie = process.env.NOCTUA_FIXTURE_COOKIE;
+assert(cookie, "NOCTUA_FIXTURE_COOKIE must contain an authenticated synthetic browser session");
+const cookies = new Map(cookie.split("; ").map(pair => { const at = pair.indexOf("="); return [pair.slice(0, at), pair.slice(at + 1)]; }));
+const base = new URL(values["base-url"]!);
+assert(["localhost", "127.0.0.1", "[::1]"].includes(base.hostname), "Fixture verifier requires loopback");
 async function request(path: string, body?: unknown) {
-  const response = await fetch(`${values["base-url"]}${path}`, { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json", cookie }, body: body === undefined ? undefined : JSON.stringify(body) });
-  assert(response.ok, `${path}: HTTP ${response.status} ${response.ok ? "" : await response.text()}`);
-  const setCookie = response.headers.get("set-cookie");
-  if (setCookie) cookie = setCookie.split(";")[0];
+  const response = await fetch(`${base.origin}${path}`, { method: body === undefined ? "GET" : "POST", headers: {
+    ...(body === undefined ? {} : { "content-type": "application/json", origin: base.origin }),
+    cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join("; ")
+  }, body: body === undefined ? undefined : JSON.stringify(body) });
+  assert(response.ok, `${path}: HTTP ${response.status}`);
+  for (const header of response.headers.getSetCookie()) parseSetCookieHeader(header).forEach((entry, name) => {
+    if (entry.value) cookies.set(name, entry.value); else cookies.delete(name);
+  });
   return response;
 }
-if (values["invite-code"]) {
-  const signup = await (await request("/api/auth/signup", { inviteCode: values["invite-code"], account: { id: "ignored-server-derives-id", name: "MonkeyDent", email: demoUser, avatar: "MD", imap: { host: "127.0.0.1", port: 3789, secure: false, user: demoUser, password: demoPass }, smtp: { host: "127.0.0.1", port: 3787, secure: false, user: demoUser, password: demoPass } } })).json();
-  console.log("signup", JSON.stringify(signup));
-}
-const login = await (await request("/api/auth/login", { email: demoUser, password: demoPass })).json() as { ok: boolean; accountId: string };
-console.log("login", JSON.stringify(login));
+const me = await (await request("/api/auth/me")).json() as { mailboxState: string; accountId: string | null; accounts: { id: string; email: string }[] };
+assert.notEqual(me.mailboxState, "enrollment", "Complete synthetic MFA setup first");
+const mailbox = me.accounts.find(account => account.email === demoUser);
+assert(mailbox, "An admin must create and grant the synthetic fixture mailbox first");
+if (me.accountId !== mailbox.id) await request("/api/auth/switch-account", { accountId: mailbox.id });
+const login = { accountId: mailbox.id };
 const api = `/api/accounts/${login.accountId}`;
 async function sync(path: string) {
   const started = await (await request(`${api}/sync`, { folderId: `${login.accountId}:${path}`, mode: "full" })).json() as { jobId: string };

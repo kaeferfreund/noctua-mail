@@ -4,9 +4,7 @@ import {
   buildAccountSaveRequest,
   createBlankEditAccount,
   normalizeCaldavForSave,
-  normalizeDeeplForSave,
-  resolveActiveAccountId,
-  resolveSwitchedAccountId
+  normalizeDeeplForSave
 } from "./accountControllerHelpers";
 
 function makeAccount(id: string, overrides?: Partial<Account>): Account {
@@ -21,46 +19,11 @@ function makeAccount(id: string, overrides?: Partial<Account>): Account {
   };
 }
 
-describe("resolveActiveAccountId", () => {
-  it("picks the preferred id when present", () => {
-    const list = [makeAccount("a"), makeAccount("b")];
-    expect(resolveActiveAccountId(list, "b", "a")).toBe("b");
-  });
-
-  it("falls back to the current active id when preferred is absent", () => {
-    const list = [makeAccount("a"), makeAccount("b")];
-    expect(resolveActiveAccountId(list, "missing", "b")).toBe("b");
-  });
-
-  it("falls back to the first account when neither preferred nor active are present", () => {
-    const list = [makeAccount("first"), makeAccount("second")];
-    expect(resolveActiveAccountId(list, "", "ghost")).toBe("first");
-  });
-
-  it("returns the empty string when the list is empty", () => {
-    expect(resolveActiveAccountId([], "", "")).toBe("");
-  });
-});
-
-describe("resolveSwitchedAccountId", () => {
-  it("prefers a trimmed accountId from the payload", () => {
-    expect(resolveSwitchedAccountId({ accountId: "  x  " }, "fallback")).toBe("x");
-  });
-
-  it("falls back to the requested id when payload is missing", () => {
-    expect(resolveSwitchedAccountId(null, "requested")).toBe("requested");
-  });
-
-  it("falls back when the payload value is blank", () => {
-    expect(resolveSwitchedAccountId({ accountId: "   " }, "requested")).toBe("requested");
-  });
-});
-
 describe("buildAccountSaveRequest", () => {
-  it("posts to the collection endpoint without an id for new accounts", () => {
+  it("posts to the admin collection endpoint without an id for new accounts", () => {
     const request = buildAccountSaveRequest(makeAccount("temp"), false);
     expect(request.method).toBe("POST");
-    expect(request.endpoint).toBe("/api/accounts");
+    expect(request.endpoint).toBe("/api/admin/accounts");
     expect(request.isNew).toBe(true);
     expect((request.body as Record<string, unknown>).id).toBeUndefined();
   });

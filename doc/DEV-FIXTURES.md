@@ -15,29 +15,34 @@ ENV_FILE=.env.local bun --bun build-scripts/generateRuntimeConfig.ts
 bun --env-file=.env.local --bun next dev -p 3786
 ```
 
-`.env.local` needs `IMAP_CREDENTIALS_STORAGE=db`, distinct 64-hex `IMAP_SECRET_KEY` and `SESSION_SEAL_KEY`, and a dedicated `NOCTUA_DATA_DIR` (this worktree uses `../noctua-data-fixture`). Keep keys and runtime data out of git.
+Use the [authentication environment contract](AUTHENTICATION.md#final-environment): DB-only
+credentials, independent `IMAP_SECRET_KEY` and `BETTER_AUTH_SECRET`, exact `BETTER_AUTH_URL` /
+`PASSKEY_RP_ID` for this isolated local instance, and a dedicated `NOCTUA_DATA_DIR`. No legacy seal key.
+Keep keys and runtime data out of git.
 
-Sign up at http://localhost:3786 with these exact values:
+With the app stopped, retrieve the bootstrap invite using `scripts/recoverTeamAuth.ts
+--application-stopped --confirm-personal-handover --bootstrap-invite`. Start the app, sign up with
+a synthetic personal identity and a separate app password, then complete mandatory TOTP enrollment.
+Bootstrap codes are no longer printed to startup logs. In Admin create the synthetic mailbox:
 
-- Name: `MonkeyDent`; email: `demo@monkeydent.test`
-- IMAP: host `127.0.0.1`, port `3789`, security **None**
-- SMTP: host `127.0.0.1`, port `3787`, security **None**
-- Username for both: `demo@monkeydent.test`; password for both: `demo`
+- Name `MonkeyDent`; email `demo@monkeydent.test`.
+- IMAP `127.0.0.1:3789`, SMTP `127.0.0.1:3787`, security **None**.
+- Both usernames `demo@monkeydent.test`, passwords `demo`.
 
-On a fresh database, the app prints `Admin invite code: <uuid>`. Opening the app or `curl http://localhost:3786/api/auth/me` initializes storage and prints it. If missed, read the local invitations:
+Creation is admin-only and ownerless. Grant the synthetic personal identity manager membership,
+then choose the mailbox. The API derives its ID from email; it grants no access implicitly.
+
+The HTTP proof now uses an already MFA-authenticated synthetic browser session. Supply its Cookie
+header through the local `NOCTUA_FIXTURE_COOKIE` environment variable (never commit or log it), then:
 
 ```sh
-bun --env-file=.env.local -e 'import {getInviteCodes} from "./lib/db"; console.log(await getInviteCodes())'
+bun scripts/dev-fixture/verify-http.ts --base-url http://localhost:3786
 ```
 
-The API derives the account ID from the email; a client-supplied ID is ignored. After signup, use the app's sync control. To populate **every** folder without a browser, run the HTTP proof below; ordinary account sync initially selects INBOX.
-
-```sh
-# New database: signs up, logs in, syncs all folders and checks the real HTTP APIs.
-bun scripts/dev-fixture/verify-http.ts --invite-code <printed-uuid>
-# Existing demo account: logs in and repeats checks.
-bun scripts/dev-fixture/verify-http.ts
-```
+The verifier requires loopback, reads `/api/auth/me`, checks existing fixture membership and persists
+mailbox selection through `/api/auth/switch-account`. It never signs up, logs credentials or bypasses
+MFA. The retired login route is no longer used. Live IMAP browser acceptance remains release work;
+this integration validates the protocol fixture and compiled auth harness separately.
 
 The proof expects the untouched default seed. It asserts folder/message counts, thread IDs and references, flags, both senders in Sent, draft flags, newsletter HTML, and actual PDF/PNG/calendar attachment downloads. The threads API returns flattened messages, including related Sent replies: its `total` is not the conversation count.
 
@@ -64,31 +69,10 @@ bun --env-file=.env.local scripts/dev-fixture/smtp-sink.ts --port 3787 --imap-co
 
 ## Verification record (2026-10-22)
 
-Commands above started the final fixture with `--date 2026-10-22` and the app on 3786. `curl http://localhost:3786/api/auth/me` returned 401 and the app printed `Admin invite code: 42c05ea8-c1b3-4ea9-98b0-ff5fe354d17f` (a consumed, local-only test invitation). Then:
-
-```sh
-bun scripts/dev-fixture/verify-http.ts --invite-code 42c05ea8-c1b3-4ea9-98b0-ff5fe354d17f
-```
-
-Output (exit 0):
-
-```text
-signup {"ok":true,"accountId":"acc-0357e6dc07a93be003c3321b"}
-login {"ok":true,"accountId":"acc-0357e6dc07a93be003c3321b"}
-sync INBOX: done count=60
-sync Sent: done count=15
-sync Drafts: done count=3
-sync Archive: done count=4
-sync Junk: done count=2
-sync Trash: done count=3
-sync Projekte: done count=0
-sync Projekte/Website: done count=3
-folders INBOX (\Inbox), Sent (\Sent), Drafts (\Drafts), Archive (\Archive), Junk (\Junk), Trash (\Trash), Projekte, Projekte/Website
-messages=90; INBOX=60; threads API: 25 conversations / 75 messages (total=60); unread=20; flagged=8; sent team members=2; drafts=3
-attachment downloads verified: application/pdf, image/png, text/calendar; newsletter HTML + inline image verified
-```
-
-The helper POSTs `/api/auth/signup` with `{inviteCode, account:{id,name,email,avatar,imap:{host,port,secure:false,user,password},smtp:{host,port,secure:false,user,password}}}`, POSTs `/api/auth/login` with `{email,password}`, POSTs `/api/accounts/<id>/sync` with `{folderId:"<id>:<path>",mode:"full"}`, polls `/sync/status?jobId=…`, then reads `/folders`, `/messages`, `/threads`, message details and attachment routes. These use Noctua's real credential validation, worker, SQLite storage, MIME parsing and thread recomputation. Both servers were stopped by their own PIDs after verification.
+The earlier pre-Better-Auth HTTP proof passed with 90 messages, 60 in INBOX, 25 conversations,
+all expected folders and PDF/PNG/calendar attachment downloads. Its signup/login commands and printed
+bootstrap codes are obsolete. The current MFA-session verifier has not been rerun against a live
+mailbox in this integration; use the updated procedure above with isolated synthetic storage.
 
 ## Tests and limits
 

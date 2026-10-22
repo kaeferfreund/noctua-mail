@@ -1,3 +1,4 @@
+import { expireLegacyCookie } from "./authCookies";
 import { mailboxErrorResponse } from "./mailboxFailure";
 import type { AccountRole } from "./data";
 import { NextResponse } from "next/server";
@@ -65,6 +66,7 @@ export async function requireActiveUserSession(request?: Request | null, options
   if (!request) return denied(401);
   const auth = await getAuth();
   const { response: result, headers } = await auth.api.getSession({ headers: request.headers, returnHeaders: true });
+  expireLegacyCookie(request, headers);
   if (!result) return denied(401, undefined, headers);
   const db = await getDb();
   const user = await getUserById(result.user.id);

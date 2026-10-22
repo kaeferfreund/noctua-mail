@@ -42,6 +42,31 @@ export async function getUsers() {
   return rows.map(mapUserRow);
 }
 
+/** Bounded manager directory; select only the identity fields needed for membership. */
+export async function listAccountMemberCandidates(accountId: string, query = "", limit = 25) {
+  const db = await getDb();
+  const search = query.trim().toLowerCase();
+  const cap = Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 25;
+  return db.prepare(`SELECT u.id, u.name, u.email FROM auth_user u JOIN users p ON p.id=u.id
+    WHERE NOT (COALESCE(u.banned,0)=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now')))
+      AND NOT EXISTS (SELECT 1 FROM user_provisioning WHERE userId=u.id AND state NOT IN ('complete','cancelled'))
+      AND NOT EXISTS (SELECT 1 FROM user_accounts WHERE userId=u.id AND accountId=?)
+      AND NOT EXISTS (SELECT 1 FROM accounts WHERE id=? AND ownerUserId=u.id)
+      AND (?='' OR instr(lower(COALESCE(u.name,'')),?)>0 OR instr(lower(u.email),?)>0)
+    ORDER BY lower(COALESCE(NULLIF(u.name,''),u.email)), lower(u.email), u.id LIMIT ?`)
+    .all(accountId, accountId, search, search, search, cap) as Array<{id: string; name: string | null; email: string}>;
+}
+
+/** Resource identifiers only. Better Auth 1.7.12 does not store passkey last-use time. */
+export async function listAdminUserPasskeys() {
+  const db = await getDb();
+  return db.prepare(`SELECT userId,id,name,
+    CAST(round((julianday(createdAt)-2440587.5)*86400000) AS INTEGER) AS createdAt
+    FROM auth_passkey ORDER BY createdAt,id`).all() as Array<{
+      userId: string; id: string; name: string | null; createdAt: number | null;
+    }>;
+}
+
 export async function getUserById(userId: string) {
   const db = await getDb();
   return readUserById(db, userId);

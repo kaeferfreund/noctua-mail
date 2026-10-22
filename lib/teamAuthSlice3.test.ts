@@ -400,3 +400,15 @@ test("complete TOTP replacement rejects the old MCP bearer and old seed on next 
   expect((await http("/two-factor/verify-totp",{code:totpFromUri(seed.totpURI)},next)).status).toBe(200);
   expect(await validateMcpToken(bearer.token)).toBeNull();
 });
+
+
+test("account repair returns final 404 for an absent mailbox without credential verification", async () => {
+  const f = await fixture();
+  let verified = false;
+  const response = await handleMailboxCredentialMutation(jsonRequest(f, { id: "synthetic-absent", email: "absent@example.test", imap: { password: "synthetic-password" } }), "post-existing", undefined, {
+    imap: async () => { verified = true; return true; }, smtp: async () => { verified = true; return true; }
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ok:false,code:"account_not_found"});
+  expect(verified).toBe(false);
+});
