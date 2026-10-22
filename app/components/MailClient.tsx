@@ -5883,7 +5883,10 @@ export default function MailClient({
                 ? { right: `${isMobile ? 8 : noticePaneRightOffset}px` }
                 : undefined
             }
-            state={{ inAppNotices: [...inAppNotices, ...detachedWarnings.notices] }}
+            // Persistent detached-send warnings go first: the sidebar card
+            // shows only the newest notices, so appending them would hide
+            // every later notice (including Undo) while they stay open.
+            state={{ inAppNotices: [...detachedWarnings.notices, ...inAppNotices] }}
             actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: id => {
               if (!detachedWarnings.dismiss(id)) handleDismissNotice(id);
             } }}
