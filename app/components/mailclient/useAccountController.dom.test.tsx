@@ -66,7 +66,7 @@ describe("account bootstrap request order", () => {
     const calls: string[] = [];
     const { result, rerender } = mount(async (input) => {
       const url = String(input); calls.push(url);
-      return json(url === "/api/auth/me" ? { accounts, accountId: "account-b" } : []);
+      return json(url === "/api/auth/me" ? { accounts, accountId: "account-b", mailboxState: "selected" } : []);
     });
     await waitFor(() => expect(result.current.ready).toBe(true));
     rerender();
@@ -75,7 +75,7 @@ describe("account bootstrap request order", () => {
     expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
   });
 
-  it("uses the current selection when auth completes, not the mount-time selection", async () => {
+  it("clears stale local selection when the server reports unselected", async () => {
     let resolve!: (res: Response) => void;
     const me = new Promise<Response>((done) => { resolve = done; });
     const calls: string[] = [];
@@ -84,27 +84,31 @@ describe("account bootstrap request order", () => {
       return String(input) === "/api/auth/me" ? me : json([]);
     });
     act(() => result.current.setActiveAccountId("account-b"));
-    await act(async () => { resolve(json({ accounts })); });
+    await act(async () => { resolve(json({ accounts, accountId: null, mailboxState: "unselected" })); });
     await waitFor(() => expect(result.current.ready).toBe(true));
-    expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
+    expect(calls).toEqual(["/api/auth/me"]);
+    expect(result.current.activeAccountId).toBe("");
+    expect(result.current.mailboxState).toBe("unselected");
   });
 
-  it("keeps explicit skip-auth reloads and switches in session -> accounts -> folders order", async () => {
+  it("persists a switch before rereading me and requesting selected folders", async () => {
     const calls: string[] = [];
+    let selected = "account-a";
     const { result } = mount(async (input) => {
       const url = String(input); calls.push(url);
-      if (url === "/api/auth/me") return json({ accounts, accountId: "account-a" });
+      if (url.endsWith("switch-account")) { selected = "account-b"; return json({ accountId: selected }); }
+      if (url === "/api/auth/me") return json({ accounts, accountId: selected, mailboxState: "selected" });
       if (url === "/api/accounts") return json(accounts);
       return json(url.endsWith("switch-account") ? { accountId: "account-b" } : []);
     });
     await waitFor(() => expect(result.current.ready).toBe(true));
     calls.length = 0;
     await act(async () => { await result.current.switchAccount("account-b"); });
-    expect(calls).toEqual(["/api/auth/switch-account", "/api/accounts", "/api/accounts/account-b/folders"]);
+    expect(calls).toEqual(["/api/auth/switch-account", "/api/auth/me", "/api/accounts/account-b/folders"]);
     expect(result.current.activeAccountId).toBe("account-b");
     calls.length = 0;
-    await act(async () => { await result.current.loadInitialData({ skipAuthCheck: true }); });
-    expect(calls).toEqual(["/api/accounts", "/api/accounts/account-b/folders"]);
+    await act(async () => { await result.current.loadInitialData(); });
+    expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
   });
 
   it("does not request accounts or folders after an auth 401", async () => {
@@ -121,10 +125,59 @@ describe("account bootstrap request order", () => {
     const calls: string[] = [];
     const { result } = mount(async (input) => {
       const url = String(input); calls.push(url);
-      return json(url === "/api/auth/me" ? { accounts: [], accountId: "account-b" } : []);
+      return json(url === "/api/auth/me" ? { accounts: [], accountId: "account-b", mailboxState: "selected" } : []);
     });
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.activeAccountId).toBe("");
     expect(calls).toEqual(["/api/auth/me"]);
+  });
+});
+
+
+describe("identity and mailbox state transitions", () => {
+  it("keeps enrollment, none and unselected mailbox-independent, then persists selected before mail", async () => {
+    const calls: string[] = [];
+    let mailboxState = "enrollment";
+    const { result } = mount(async input => {
+      const path = String(input); calls.push(path);
+      if (path.endsWith("switch-account")) { mailboxState = "selected"; return json({ ok: true, accountId: "account-b" }); }
+      return json(path === "/api/auth/me" ? { user: { id: "synthetic-user" }, accounts: mailboxState === "enrollment" || mailboxState === "none" ? [] : accounts,
+        mailboxState, accountId: mailboxState === "selected" ? "account-b" : null, security: { enrollmentRequired: mailboxState === "enrollment" } } : []);
+    });
+    await waitFor(() => expect(result.current.mailboxState).toBe("enrollment"));
+    expect(result.current.activeAccountId).toBe(""); expect(result.current.loadedAccounts).toEqual([]);
+    mailboxState = "none"; await act(async () => { await result.current.loadInitialData(); });
+    expect(result.current.mailboxState).toBe("none"); expect(result.current.auth).toBe("ok");
+    mailboxState = "unselected"; await act(async () => { await result.current.loadInitialData(); });
+    expect(result.current.mailboxState).toBe("unselected"); expect(result.current.activeAccountId).toBe("");
+    expect(calls).toEqual(["/api/auth/me", "/api/auth/me", "/api/auth/me"]);
+    await act(async () => { await result.current.switchAccount("account-b"); });
+    expect(result.current.activeAccountId).toBe("account-b");
+    expect(calls.slice(-3)).toEqual(["/api/auth/switch-account", "/api/auth/me", "/api/accounts/account-b/folders"]);
+  });
+  it("does not log out for bootstrap network/503 errors and exposes retry", async () => {
+    let failed = true;
+    const { result } = mount(async () => failed ? new Response(null, { status: 503 }) : json({ accounts: [], mailboxState: "none", accountId: null }));
+    await waitFor(() => expect(result.current.bootstrapError).toBe("HTTP 503"));
+    expect(result.current.auth).toBe("loading"); failed = false;
+    await act(async () => { await result.current.loadInitialData(); });
+    expect(result.current.auth).toBe("ok"); expect(result.current.bootstrapError).toBeNull();
+  });
+  it("bodyless logout checks success before clearing identity and mailbox state", async () => {
+    let failLogout = true;
+    const { result, errors } = mount(async (input, init) => {
+      if (String(input).endsWith("logout")) {
+        expect(init?.method).toBe("POST"); expect(init?.body).toBeUndefined();
+        expect(new Headers(init?.headers).has("content-type")).toBe(false);
+        return Response.json({ ok: !failLogout }, { status: failLogout ? 503 : 200 });
+      }
+      return json(String(input) === "/api/auth/me" ? { accounts, accountId: "account-a", mailboxState: "selected" } : []);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    await act(async () => { expect(await result.current.logout()).toBe(false); });
+    expect(result.current.auth).toBe("ok"); expect(result.current.activeAccountId).toBe("account-a"); expect(result.current.loadedAccounts).toEqual(accounts);
+    expect(errors.at(-1)).toContain("session is still open"); failLogout = false;
+    await act(async () => { expect(await result.current.logout()).toBe(true); });
+    expect(result.current.auth).toBe("unauth"); expect(result.current.activeAccountId).toBe(""); expect(result.current.loadedAccounts).toEqual([]);
   });
 });

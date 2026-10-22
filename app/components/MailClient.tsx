@@ -24,7 +24,15 @@ import {
 } from "lucide-react";
 import { AccountDateFormatProvider } from "./AccountDateFormatContext";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
-import LoginOverlay from "./auth/LoginOverlay";
+import LoginScreen from "./auth/LoginScreen";
+import EnrollmentScreen from "./auth/EnrollmentScreen";
+import SecuritySettings from "./auth/SecuritySettings";
+import MailboxGate from "./auth/MailboxGate";
+import { AuthFrame } from "./auth/AuthPrimitives";
+import { Button as AuthButton } from "./ui/button";
+import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
+import AdminTabContent from "./account-settings/tabs/AdminTabContent";
+import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
@@ -206,7 +214,6 @@ import type {
   RecipientSuggestion,
   Topic,
   TopicColor,
-  User
 } from "@/lib/data";
 import AccountSettingsModal, { type ManageTab } from "./AccountSettingsModal";
 import {
@@ -266,12 +273,6 @@ import {
 } from "@/lib/recipientLists";
 import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
-type AuthMeResponse = {
-  ok?: boolean;
-  user?: User | null;
-  accountId?: string;
-  ttlSeconds?: number;
-};
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
 const LOCAL_DELETE_RECONCILE_SUPPRESS_MS = 15_000;
@@ -353,6 +354,9 @@ export default function MailClient({
   // built once. The toggle lives in the shell header.
   const darkMode = useDarkMode();
   const [manageOpen, setManageOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [reloginAccountId, setReloginAccountId] = useState("");
@@ -470,28 +474,20 @@ export default function MailClient({
         code?: string;
         accountId?: string;
         reauthRequired?: boolean;
+        repairAllowed?: boolean;
       };
       const resolvedAccountId =
         data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
-      const primaryMessage =
-        [data?.message, data?.error, data?.details].find(
-          (value) => value && typeof value === "string" && value.trim()
-        ) ?? "";
-      if (res.status === 401) {
-        if (data?.reauthRequired && resolvedAccountId) {
-          setReloginAccountId(resolvedAccountId);
-          setReloginDescription("");
-        } else {
-          const normalizedPrimary = primaryMessage.trim().toLowerCase();
-          const looksLikeSessionUnauthorized =
-            responsePath?.startsWith("/api/auth/") ||
-            normalizedPrimary === "unauthorized" ||
-            (!primaryMessage.trim() && !data?.reauthRequired);
-          if (looksLikeSessionUnauthorized) {
-            setAuthState("unauth");
-          }
+      if (data?.code === "mailbox_credentials_invalid") {
+        if (data.repairAllowed && resolvedAccountId) {
+          setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
+          return "Mailbox credentials need repair.";
         }
+        setReloginAccountId("");
+        return "Mailbox unavailable; contact a manager.";
       }
+      // Personal auth 401 is logout. Form proof/permission failures use 403.
+      if (res.status === 401 && !responsePath?.startsWith("/api/ba/")) setAuthState("unauth");
       const parts = [data?.message, data?.error, data?.details, data?.stack].filter(
         (value) => value && typeof value === "string"
       ) as string[];
@@ -618,7 +614,7 @@ export default function MailClient({
   const bulkContextMenuReturnFocusRef = useRef<HTMLElement | null>(null);
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
   const [initialDataReady, setInitialDataReady] = useState(false);
   const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
@@ -1677,6 +1673,7 @@ export default function MailClient({
 
   // useAccountController: manages account/folder CRUD and initial data load
   const {
+    mailboxState, security: authSecurity, bootstrapError, logout,
     loadInitialData,
     switchAccount,
     saveAccount,
@@ -1896,7 +1893,7 @@ export default function MailClient({
   const stripHtml = stripHtmlToText;
 
   const currentAccount = accounts.find((account) => account.id === activeAccountId) ?? null;
-  const reloginAccount = accounts.find((account) => account.id === reloginAccountId) ?? null;
+  const reloginAccount = accounts.find((account) => account.id === reloginAccountId && account.accessRole === "manager") ?? null;
 
   // The mail window is the one window that stays open, so its title names the
   // mailbox it is showing to keep it apart from detached message/compose windows.
@@ -1929,8 +1926,8 @@ export default function MailClient({
         accounts.find((account) => account.id === targetAccountId) ??
         accounts.find((account) => account.id === activeAccountId) ??
         null;
-      if (!targetAccount) {
-        reportError("Unable to determine which account needs new IMAP credentials.");
+      if (!targetAccount || targetAccount.accessRole !== "manager") {
+        reportError("Mailbox unavailable; contact a manager.");
         return;
       }
       setReloginDescription("");
@@ -4094,17 +4091,22 @@ export default function MailClient({
           }
           return;
         }
-        const data = (await res.json()) as AuthMeResponse | null;
+        const data = (await res.json()) as AuthMe | null;
         if (typeof data?.ttlSeconds === "number") {
           setSessionTtlSeconds(data.ttlSeconds);
         }
-        setCurrentUser(data?.user ?? null);
+        if (data && (data.mailboxState !== mailboxState || (data.accountId ?? "") !== activeAccountId ||
+          data.security.enrollmentRequired !== authSecurity?.enrollmentRequired || data.security.reauthRequired !== authSecurity?.reauthRequired)) {
+          await loadInitialData();
+        } else if (data) {
+          setCurrentUser(data.user); setAccounts(data.accounts);
+        }
       } catch {
         // ignore refresh errors
       }
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [authState, sessionTtlSeconds]);
+  }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
 
   // Initial sync on login (once per session per account). For existing accounts,
   // sync only the active folder first so new mail appears before any broader repair work.
@@ -5230,68 +5232,43 @@ export default function MailClient({
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
   );
 
-  if (authState === "unauth") {
-    return (
-      <LoginOverlay
-        onAuthenticated={async () => {
-          setAuthState("loading");
-          setExceptionEntries([]);
-          setMessageListError(null);
-          setMessages([]);
-          setFolders([]);
-          setAccounts([]);
-          setCurrentUser(null);
-          setInitialDataReady(false);
-          setMessagesPage(1);
-          setHasMoreMessages(true);
-          setTotalMessages(null);
-          initialSyncStatusRef.current = {};
-          if (typeof window !== "undefined") {
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < window.sessionStorage.length; i += 1) {
-              const key = window.sessionStorage.key(i);
-              if (key?.startsWith(INITIAL_SYNC_SESSION_KEY_PREFIX)) {
-                keysToRemove.push(key);
-              }
-            }
-            for (const key of keysToRemove) {
-              window.sessionStorage.removeItem(key);
-            }
-          }
-          lastUidNextByFolderRef.current = {};
-          try {
-            const res = await apiFetch("/api/auth/me", {
-              credentials: "include",
-              cache: "no-store"
-            });
-            if (res.ok) {
-              const data = (await res.json()) as AuthMeResponse | null;
-              if (typeof data?.ttlSeconds === "number") {
-                setSessionTtlSeconds(data.ttlSeconds);
-              }
-              setCurrentUser(data?.user ?? null);
-              setAuthState("ok");
-              await loadInitialData({
-                skipAuthCheck: true,
-                preferredAccountId:
-                  typeof data?.accountId === "string" ? data.accountId : null
-              });
-            } else {
-              setCurrentUser(null);
-              setAuthState("unauth");
-            }
-          } catch {
-            setCurrentUser(null);
-            setAuthState("unauth");
-          }
-        }}
-      />
-    );
+  const identityDialogs = <>
+    <AuthDialog open={securityOpen} onOpenChange={setSecurityOpen}>
+      <AuthDialogContent data-shell="" className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <AuthDialogTitle>Profile &amp; security</AuthDialogTitle>
+        <AuthDialogDescription>Manage your personal identity and signed-in devices.</AuthDialogDescription>
+        {securityOpen && <SecuritySettings onUnauthorized={() => { setSecurityOpen(false); setAuthState("unauth"); }} onChanged={loadInitialData} onReplacement={continuation => {
+          setEnrollmentContinuation(continuation); setSecurityOpen(false);
+          setActiveAccountId(""); setFolders([]); setMessages([]); setViewMessage(null);
+          void loadInitialData();
+        }} />}
+      </AuthDialogContent>
+    </AuthDialog>
+    <AuthDialog open={adminOpen} onOpenChange={setAdminOpen}>
+      <AuthDialogContent data-shell="" className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <AuthDialogTitle>Admin</AuthDialogTitle>
+        <AuthDialogDescription>Manage users and invitations.</AuthDialogDescription>
+        {adminOpen && <AdminTabContent isActive isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
+      </AuthDialogContent>
+    </AuthDialog>
+  </>;
+  if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
+  if (mailboxState === "enrollment") {
+    if (authSecurity?.reauthRequired && !authSecurity.enrollmentRequired) return <AuthFrame title="Sign in again" description="Your session needs fresh verification."><AuthButton onClick={() => { void logout(); }}>Return to sign in</AuthButton></AuthFrame>;
+    return <EnrollmentScreen continuation={enrollmentContinuation ?? undefined} onLogout={async () => { if (await logout()) setEnrollmentContinuation(null); }} onComplete={async () => { setEnrollmentContinuation(null); await loadInitialData(); }} />;
   }
+  if (mailboxState !== "selected") return <>
+    <MailboxGate state={mailboxState} accounts={accounts} error={bootstrapError || exceptionEntries[0]?.message} onAdd={() => startEditAccount()}
+      onSwitch={id => { void switchAccount(id); }} onRetry={() => { void loadInitialData(); }} onSecurity={() => setSecurityOpen(true)}
+      onAdmin={isAdminUser ? () => setAdminOpen(true) : undefined} onLogout={() => { void logout(); }} />
+    {identityDialogs}
+    {manageOpen && editingAccount && <AccountSettingsModal editingAccount={editingAccount} isOpen manageTab="account" isExistingAccount={false} onClose={() => setManageOpen(false)} onTabChange={setManageTab} onSave={saveAccount} onDelete={() => {}} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
+  </>;
 
   return (
     <AccountDateFormatProvider value={accountDateFormat}>
     <>
+      {identityDialogs}
       <AppShell
         mobileNavigation={{ messageId: viewMessage?.id ?? null, clearMessage: clearMobileMessage }}
         sidebar={{
@@ -5318,20 +5295,14 @@ export default function MailClient({
             onOpenSettings: () => {
               if (currentAccount) startEditAccount(currentAccount);
             },
-            onOpenAdmin: () => {
-              if (!currentAccount) return;
-              startEditAccount(currentAccount);
-              setManageTab("admin");
-            },
+            onOpenSecurity: () => setSecurityOpen(true),
+            onOpenAdmin: () => setAdminOpen(true),
             onShowThreadJson: () => setShowJson(true),
             onEvictThreadCache: () => {
               console.info("[noctua] evict thread cache");
               resetThreadCache();
             },
-            onLogout: async () => {
-              await apiFetch("/api/auth/logout", { method: "POST", credentials: "include" });
-              setAuthState("unauth");
-            }
+            onLogout: () => { void logout(); }
           },
           brand: { buildVersionLabel },
           mailboxes: {
@@ -5692,7 +5663,7 @@ export default function MailClient({
             openPanel={openBottomStatusPanel}
             setOpenPanel={setOpenBottomStatusPanel}
             formatRelativeTime={formatRelativeTime}
-            onReloginAccount={handleOpenReloginFromException}
+            onReloginAccount={currentAccount?.accessRole === "manager" ? handleOpenReloginFromException : undefined}
             onOpenCalendarSidebar={() => setCalendarSidebarOpen(true)}
             onOpenCalendarMessage={handleOpenCalendarMessage}
             onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}

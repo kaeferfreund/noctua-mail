@@ -1,4 +1,12 @@
 export const SCENARIOS = {
+  activatedSignup:"activated signup → restricted enrollment → verified mailbox-independent identity",
+  activatedManagement:"activated shell session revoke and passkey rename wrappers",
+  activatedReset:"activated public reset handover redirect and canonical headers",
+  shellPasskey:"shell explicit passkey cancels conditional UI and authenticates with UV",
+  shellLogin:"shell login renders without a session",
+  shellChallenge:"shell password and TOTP challenge reach the no-mailbox state",
+  shellSecurity:"shell security is accessible with a harness-minted session and no mailbox",
+  shellReset:"public shell reset clears the token, changes password and preserves MFA",
   registration:"registration, assertion, replay and rotated-session UV grant binding",
   uv:"UV=false registration and assertion are rejected by the server",
   mismatch:"RP/origin mismatch and wrong challenge/grant fail",
