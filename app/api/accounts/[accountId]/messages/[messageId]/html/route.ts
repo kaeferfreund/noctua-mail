@@ -2,7 +2,9 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
-import { getMessageById } from "@/lib/db";
+import { getMessageById, getUserAccountPrefs } from "@/lib/db";
+import { enforceSafeLinks } from "@/lib/html";
+import { messageHtmlCsp, remoteContentSenderKey, type RemoteContentMode } from "@/lib/html/remoteContent";
 import { requireActiveUserSession } from "@/lib/auth";
 import { formatMessageHtmlPageTitle } from "@/lib/appBranding";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
@@ -31,7 +33,8 @@ function postprocessHtml(
     dataUrl?: string;
     contentType?: string;
     filename?: string;
-  }>
+  }>,
+  mode: RemoteContentMode
 ) {
   let nextHtml = html;
   attachments.forEach((attachment) => {
@@ -43,7 +46,7 @@ function postprocessHtml(
   nextHtml = stripRedundantInlineImageFallbacks(nextHtml, attachments);
   nextHtml = appendUnreferencedInlineImages(nextHtml, attachments);
   nextHtml = stripRemovedInlineImages(nextHtml, attachments);
-  return sanitizeHtmlForDisplay(stripConditionalComments(nextHtml)).replace(
+  return enforceSafeLinks(sanitizeHtmlForDisplay(stripConditionalComments(nextHtml), mode)).replace(
     /data:(?!image\/)[^'")\s]+/gi,
     "about:blank"
   );
@@ -63,7 +66,9 @@ function htmlError(status: number, message: string) {
       status,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": messageHtmlCsp(),
+        "Referrer-Policy": "no-referrer"
       }
     }
   );
@@ -92,12 +97,19 @@ export async function GET(request: Request, { params }: Params) {
       return htmlError(404, "Message has no HTML body.");
     }
 
-    const html = postprocessHtml(message.htmlBody, message.attachments ?? []);
+    const decision = new URL(request.url).searchParams.get("remoteContent");
+    const prefs = await getUserAccountPrefs(access.userId, accountId);
+    const senderKey = remoteContentSenderKey(message.from);
+    const mode: RemoteContentMode = decision === "allow" ||
+      (decision !== "block" && !!senderKey && prefs.remoteContent?.allowedSenders?.[senderKey] === true) ? "allow" : "block";
+    const html = postprocessHtml(message.htmlBody, message.attachments ?? [], mode);
     const payload = asHtmlDocument(message.subject ?? "", html);
     return new NextResponse(payload, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": messageHtmlCsp(mode),
+        "Referrer-Policy": "no-referrer"
       }
     });
   });

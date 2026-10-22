@@ -1,5 +1,6 @@
 "use client";
 
+import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import dynamic from "next/dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -253,7 +254,7 @@ export default function MessageWindowPage() {
   );
 
   const handleOpenHtmlInNewWindow = useCallback((target: Message) => {
-    openDetachedWindow(buildAccountMessageHtmlPath(target.accountId, target.id), {
+    openDetachedWindow(withRemoteContentDecision(buildAccountMessageHtmlPath(target.accountId, target.id), target.accountId, target.id), {
       title: formatMessageHtmlPageTitle(target.subject)
     });
   }, []);

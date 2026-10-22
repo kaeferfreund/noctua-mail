@@ -16,12 +16,10 @@ import {
   stripConditionalComments
 } from "@/lib/html";
 import { useMessageLinkPreview } from "@/app/components/mailclient/message/MessageLinkPreviewContext";
+import { Button } from "@/app/components/ui/button";
+import { useRemoteContent } from "@/app/hooks/useRemoteContent";
+import { messageHtmlCsp, type RemoteContentMode } from "@/lib/html/remoteContent";
 import styles from "./HtmlMessage.module.css";
-import {
-  extractTrustedFontStylesheetImportsFromHtml,
-  isTrustedFontStylesheetUrl,
-  stripPromotedFontImports
-} from "@/app/components/emailFontRegistry";
 import { APP_FONT_FACE_CSS, APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const NOCTUA_EMAIL_CONTENT_CLASS = "noctua-email-content";
@@ -63,24 +61,6 @@ function prefixSelectors(css: string, prefix: string) {
       .join(", ");
     return `${brace}\n${next}{`;
   });
-}
-
-function extractStylesheetLinks(input: string) {
-  const links: string[] = [];
-  const re = /<link\b[^>]*>/gi;
-  const relRe = /rel=["']?([^"'\s>]+)["']?/i;
-  const hrefRe = /href=["']([^"']+)["']/i;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(input))) {
-    const tag = match[0];
-    const rel = relRe.exec(tag)?.[1]?.toLowerCase();
-    if (rel !== "stylesheet") continue;
-    const href = hrefRe.exec(tag)?.[1];
-    if (!href) continue;
-    if (!/^https?:\/\//i.test(href)) continue;
-    links.push(href);
-  }
-  return Array.from(new Set(links));
 }
 
 function extractPrefersColorScheme(css: string, theme: "dark" | "light") {
@@ -361,7 +341,8 @@ export function buildPreviewDocument({
   zoom,
   showViewerFrame,
   hostViewportHeight,
-  token
+  token,
+  remoteContent
 }: {
   html: string;
   safeHtml: string;
@@ -371,6 +352,7 @@ export function buildPreviewDocument({
   showViewerFrame: boolean;
   hostViewportHeight?: number;
   token: string;
+  remoteContent: RemoteContentMode;
 }) {
   // Using the host height breaks the cycle between vh and the auto-sized frame.
   const viewportUnit = typeof hostViewportHeight === "number" && Number.isFinite(hostViewportHeight) && hostViewportHeight > 0
@@ -378,18 +360,12 @@ export function buildPreviewDocument({
     : 8;
   const cleanedHtml = stripConditionalComments(html || "");
   const hasExplicitColor = /(^|[^-])color\s*:/i.test(cleanedHtml);
-  const stylesheetLinks = extractStylesheetLinks(cleanedHtml);
-  const fontStylesheetUrls = Array.from(
-    new Set([
-      ...extractTrustedFontStylesheetImportsFromHtml(cleanedHtml),
-      ...stylesheetLinks.filter(isTrustedFontStylesheetUrl)
-    ])
-  );
-  const promotedFontStylesheetUrls = new Set(fontStylesheetUrls);
+  // The sanitizer filters sender CSS in both modes. Never reinsert external
+  // stylesheets or font imports from the unsanitized message after opt-in.
   let injectedCss = "";
   const viewportHtml = rewriteHtmlViewportHeightUnits(safeHtml);
   const withRewrites = viewportHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
-    const scaledCss = scaleFontSizes(stripPromotedFontImports(css, promotedFontStylesheetUrls));
+    const scaledCss = scaleFontSizes(css);
     const rewritten = extractPrefersColorScheme(scaledCss, darkMode ? "dark" : "light");
     if (rewritten.injected) {
       injectedCss += `\n${rewritten.injected}`;
@@ -406,9 +382,6 @@ export function buildPreviewDocument({
   const hostTextColor = hasExplicitColor
     ? ""
     : "color: var(--mail-view-fg, var(--text, #1a1a1a));";
-  const stylesheetTags = stylesheetLinks
-    .map((href) => `<link rel="stylesheet" href="${escapeAttribute(href)}">`)
-    .join("\n");
   const bodyClassName = [NOCTUA_EMAIL_CONTENT_CLASS, "email-body", bodyAttrs.className]
     .filter(Boolean)
     .join(" ");
@@ -424,7 +397,8 @@ export function buildPreviewDocument({
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    stylesheetTags,
+    `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(messageHtmlCsp(remoteContent))}">`,
+    '<meta name="referrer" content="no-referrer">',
     "<style>",
     APP_FONT_FACE_CSS,
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
@@ -475,14 +449,20 @@ function HtmlMessage({
   darkMode,
   fontScale = 1,
   zoom = 1,
+  accountId,
+  sender,
+  messageId,
   sanitizeHtml = sanitizeHtmlForDisplay
 }: {
   html: string;
   darkMode: boolean;
   fontScale?: number;
   zoom?: number;
+  accountId?: string;
+  sender?: string;
+  messageId?: string;
   /** Display sanitizer. Dark mode and font scale do not change its output. */
-  sanitizeHtml?: (input: string) => string;
+  sanitizeHtml?: (input: string, mode?: RemoteContentMode) => string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Theme, zoom and font changes rebuild the whole srcdoc, which would silently
@@ -492,9 +472,13 @@ function HtmlMessage({
   const setLinkPreviewUrl = useMessageLinkPreview();
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
-  // sanitizeHtmlForDisplay has no per-call options. The key is the cleaned
-  // HTML plus the sanitizer function. Theme and zoom only change the wrapper.
-  const safeHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
+  const remote = useRemoteContent(accountId, sender, messageId ?? html);
+  const remoteContent = remote.allowed ? "allow" : "block";
+  // Theme and zoom only change the wrapper, not the sanitized message.
+  const blockedHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
+  const allowedHtml = useMemo(() => sanitizeHtmlForDisplay(cleanedHtml, "allow"), [cleanedHtml]);
+  const hasRemoteContent = blockedHtml !== allowedHtml;
+  const safeHtml = remote.allowed ? allowedHtml : blockedHtml;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -513,6 +497,7 @@ function HtmlMessage({
       zoom,
       showViewerFrame,
       hostViewportHeight: window.innerHeight,
+      remoteContent,
       token: previewToken
     });
 
@@ -576,12 +561,21 @@ function HtmlMessage({
       });
 
       const handleClick = (event: Event) => {
+        const button = (event as MouseEvent).button;
+        if (event.type === "click" ? button !== 0 : event.type !== "auxclick" || button !== 1) return;
         const anchor = getClosestAnchor(event.target);
-        if (anchor && isNoOpHref(anchor.getAttribute("href"))) {
+        if (!anchor) return;
+        const href = anchor.getAttribute("href");
+        if (isNoOpHref(href)) event.preventDefault();
+        else if (!isHashHref(href)) {
           event.preventDefault();
+          // Parent-owned click handling keeps links working without granting
+          // popup or navigation capabilities to the message frame.
+          window.open(anchor.href, "_blank", "noopener,noreferrer");
         }
       };
       doc.addEventListener("click", handleClick);
+      doc.addEventListener("auxclick", handleClick);
 
       const updateLinkPreview = (value: string | null) => {
         setLinkPreviewUrl(value);
@@ -635,6 +629,7 @@ function HtmlMessage({
       removeDocumentListeners = () => {
         updateLinkPreview(null);
         doc.removeEventListener("click", handleClick);
+        doc.removeEventListener("auxclick", handleClick);
         doc.removeEventListener("mouseover", handleMouseOver);
         doc.removeEventListener("mouseout", handleMouseOut);
         doc.removeEventListener("focusin", handleFocusIn);
@@ -725,15 +720,25 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [darkMode, fontScale, html, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
+  }, [darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>
+      {!remote.allowed && hasRemoteContent && (
+        <div role="status" className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <span>Remote content blocked</span>
+          <Button variant="outline" size="sm" onClick={remote.loadOnce}>Load once</Button>
+          {remote.canAlwaysAllow && <Button variant="ghost" size="sm" disabled={remote.saving} onClick={() => void remote.alwaysAllow()}>Always load from this sender</Button>}
+          {remote.error && <span role="alert">{remote.error}</span>}
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         className={styles.frame}
         title="HTML message"
         scrolling="no"
+        sandbox="allow-same-origin"
+        referrerPolicy="no-referrer"
       />
     </div>
   );

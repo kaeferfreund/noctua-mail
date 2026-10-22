@@ -377,7 +377,7 @@ export default function ThreadMessageCard({
 
     return (
       <div>
-        <HtmlMessage html={html} darkMode={darkMode} fontScale={fontScale} zoom={zoomValue} />
+        <HtmlMessage accountId={message.accountId} sender={message.from} messageId={message.id} html={html} darkMode={darkMode} fontScale={fontScale} zoom={zoomValue} />
       </div>
     );
   };
