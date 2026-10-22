@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { loadMarkdownConverters } from "@/lib/markdownConvert";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { assembleQuotedHtml, buildForwardMetaHtml } from "@/lib/html";
 import { buildComposePayload, buildTextReplyBody, formatQuotedBody } from "./composeContentBuilder";
 import type { ComposeContentState } from "./composeContentBuilder";
@@ -325,3 +326,6 @@ describe("buildComposePayload — markdown mode", () => {
     expect(result.composeFormat).toBe("text");
   });
 });
+
+// Production awaits this boundary before exposing compose controls.
+beforeAll(async () => { await loadMarkdownConverters(); });

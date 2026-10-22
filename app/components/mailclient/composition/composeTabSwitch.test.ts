@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { loadMarkdownConverters } from "@/lib/markdownConvert";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { assembleQuotedHtml, buildForwardMetaHtml, stripHtmlToText } from "@/lib/html";
 import {
   computeBodyOnSwitchToText,
@@ -356,4 +357,23 @@ describe("computeMarkdownOnSwitchToMarkdown – from Markdown", () => {
     });
     expect(result).toBeNull();
   });
+});
+
+// Production awaits this boundary before exposing compose controls.
+beforeAll(async () => { await loadMarkdownConverters(); });
+
+it("switches Markdown -> HTML -> Markdown -> text after loading the converters", () => {
+  const html = computeHtmlOnSwitchToHtml({
+    lastEdited: "markdown", composeBody: "", composeMarkdown: "**Synthetic** message"
+  }, { stripHtml: (value) => value.replace(/<[^>]*>/g, "") });
+  expect(html?.html).toContain("<strong>Synthetic</strong>");
+  const markdown = computeMarkdownOnSwitchToMarkdown({
+    lastEdited: "html", composeBody: "", composeHtml: html!.html
+  });
+  expect(markdown).toBe("**Synthetic** message");
+  expect(computeBodyOnSwitchToText({
+    lastEdited: "html", composeHtml: html!.html, composeHtmlText: html!.htmlText,
+    composeMarkdown: markdown!, composeQuotedParts: null, composeQuotedHtml: "",
+    composeIncludeOriginal: false
+  }, { stripHtml: (value) => value.replace(/<[^>]*>/g, "") })).toBe("Synthetic message");
 });
