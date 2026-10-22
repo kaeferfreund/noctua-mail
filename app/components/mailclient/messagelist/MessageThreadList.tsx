@@ -1,3 +1,4 @@
+import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
@@ -362,7 +363,7 @@ export default function MessageThreadList({
                     {renderUnreadDot(message, { seen: displaySeen, threadMessages })}
                   </span>
 
-                  <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (
@@ -441,6 +442,7 @@ export default function MessageThreadList({
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}
+                  <CollabRowBadges message={message} />
                 </span>
 
                 {showMessageSize && (

@@ -1,7 +1,9 @@
+import SendWarnings from "./SendWarnings";
 import { Button, Text } from "@radix-ui/themes";
 import styles from "./Compose.module.css";
 
 type ComposeActionsProps = {
+  deliveredWarnings?: string[];
   composeDraftId: string | null;
   composeOpen: boolean;
   canSaveDraft: boolean;
@@ -20,6 +22,7 @@ type ComposeActionsProps = {
 };
 
 export default function ComposeActions({
+  deliveredWarnings = [],
   composeDraftId,
   composeOpen,
   canSaveDraft,
@@ -36,6 +39,7 @@ export default function ComposeActions({
   handleSendMail,
   formatRelativeTime
 }: ComposeActionsProps) {
+  if (deliveredWarnings.length) return <div className={styles.composeFooter}><SendWarnings warnings={deliveredWarnings} /><Button onClick={handleCancel}>Close</Button></div>;
   return (
     <div className={styles.composeFooter}>
       <div className={styles.composeDraftMeta}>

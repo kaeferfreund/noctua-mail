@@ -1,3 +1,4 @@
+import { getSendWarnings, type SendOutcome } from "@/app/components/mailclient/composition/sendOutcome";
 import { useEffect, useState } from "react";
 import {
   buildAccountCalendarEventRespondPath,
@@ -190,7 +191,7 @@ export function useEventResponseState({
         })
       });
       const payload = (await res.json().catch(() => null)) as
-        | {
+        | (SendOutcome & {
             ok?: boolean;
             message?: string;
             event?: CalendarEvent;
@@ -202,10 +203,19 @@ export function useEventResponseState({
               processedAtMs?: number;
               processedAutomatically?: boolean;
             };
-          }
+          })
         | null;
-      if (!res.ok || payload?.ok !== true || !payload.event || !payload.participation) {
+      if (!res.ok || payload?.ok !== true) {
         onNotice(payload?.message || "Failed to update RSVP response.");
+        return;
+      }
+      const warnings = getSendWarnings(payload);
+      if (!payload.event || !payload.participation) {
+        // SMTP was accepted; local post-processing failure must close the resend path.
+        setCurrentMyPartstat(draftPartstat);
+        setResponseDialogOpen(false);
+        dispatchCalendarEventsUpdatedEvent();
+        onNotice(["Response sent.", ...warnings].join(" "));
         return;
       }
       setCurrentMyPartstat(payload.participation.partstat);
@@ -238,9 +248,9 @@ export function useEventResponseState({
           ? responseOccurrenceLabel.toLowerCase()
           : "whole series";
       onNotice(
-        sendReply
+        (sendReply
           ? `Response sent: ${savedLabel} (${appliedLabel}).`
-          : `Response saved: ${savedLabel} (${appliedLabel}).`
+          : `Response saved: ${savedLabel} (${appliedLabel}).`) + (warnings.length ? ` ${warnings.join(" ")}` : "")
       );
     } catch {
       onNotice("Failed to update RSVP response.");

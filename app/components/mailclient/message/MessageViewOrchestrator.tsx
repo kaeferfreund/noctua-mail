@@ -1,5 +1,10 @@
 "use client";
 
+import ThreadCollaborationBar from "@/app/components/collab/ThreadCollaborationBar";
+import InternalNoteComposer from "@/app/components/collab/InternalNoteComposer";
+import ThreadActivityPanel from "@/app/components/collab/ThreadActivityPanel";
+import type { ThreadCollabController } from "@/app/hooks/useThreadCollab";
+import type { AccountRole } from "@/lib/data";
 import type React from "react";
 import {
   forwardRef,
@@ -138,6 +143,7 @@ export type MessageViewOrchestratorHandle = {
 };
 
 export type MessageViewOrchestratorHeaderInputs = {
+  collab?: { controller: ThreadCollabController; role?: AccountRole };
   // Used to compute thread topics / fallback thread-subject source and
   // also to reset the topic-explanation popover on active-thread change.
   activeMessage: Message | null;
@@ -234,6 +240,9 @@ function MessageViewOrchestratorImpl(
   { onShowJson, onEvictThreadCache, header, body }: MessageViewOrchestratorProps,
   ref: React.ForwardedRef<MessageViewOrchestratorHandle>
 ) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const activityRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setNoteOpen(false); }, [header.activeMessage?.threadId, body.activeAccountId]);
   const [threadViewMode, setThreadViewMode] = useState<"full" | "compact">("compact");
   const [messageFontScale, setMessageFontScale] = useState<Record<string, number>>({});
   const [messageZoom, setMessageZoom] = useState<Record<string, number>>({});
@@ -701,6 +710,12 @@ function MessageViewOrchestratorImpl(
                       ))}
                     </Flex>
                   )}
+                  {header.collab && activeMessage.threadId && <ThreadCollaborationBar
+                    collab={header.collab.controller} role={header.collab.role}
+                    onNote={() => setNoteOpen(value => !value)}
+                    onActivity={() => activityRef.current?.scrollIntoView({ behavior: "smooth" })}
+                  />}
+                  {noteOpen && header.collab && header.collab.role && header.collab.role !== "viewer" && <div key={`${activeAccountId}:${activeMessage.threadId}`} onKeyDown={e => e.stopPropagation()}><InternalNoteComposer disabled={header.collab.controller.pending} onSubmit={header.collab.controller.addNote} /></div>}
                   <ThreadTopicSuggestionsRow
                     threadId={explanationThreadId}
                     hasAssignedTopics={threadTopics.length > 0}
@@ -772,6 +787,11 @@ function MessageViewOrchestratorImpl(
                   onChangeTranslationLang: changeTranslationLang
                 }}
               />
+              {activeMessage?.threadId && header.collab && <div ref={activityRef}><ThreadActivityPanel
+                comments={header.collab.controller.comments} activity={header.collab.controller.activity}
+                members={header.collab.controller.members} me={header.collab.controller.me}
+                role={header.collab.role} pending={header.collab.controller.pending} onDelete={header.collab.controller.deleteNote}
+              /></div>}
             </>
           );
         })()}

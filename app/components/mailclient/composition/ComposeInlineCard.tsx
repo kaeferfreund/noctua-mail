@@ -18,6 +18,7 @@ export default function ComposeInlineCard() {
     composeBcc,
     composeShowBcc,
     activeAccountId,
+    deliveredWarnings,
     composeDraftId,
     composeOpen,
     composeFieldsReset,
@@ -118,7 +119,7 @@ export default function ComposeInlineCard() {
               )}
             </div>
           </div>
-          <div className={`${threadStyles.info} ${styles.info}`}>
+          {!deliveredWarnings?.length && <div className={`${threadStyles.info} ${styles.info}`}>
             <ComposeFields
               key={`inline-fields-${composeFieldsReset}`}
               variant="inline"
@@ -141,10 +142,11 @@ export default function ComposeInlineCard() {
               getComposeToken={getComposeToken}
               markComposeDirty={markComposeDirty}
             />
-          </div>
+          </div>}
         </div>
-        <div className={`${composeStyles.composeBody} ${styles.body}`}>{composeMessageField}</div>
+        {!deliveredWarnings?.length && <div className={`${composeStyles.composeBody} ${styles.body}`}>{composeMessageField}</div>}
         <ComposeActions
+          deliveredWarnings={deliveredWarnings}
           composeDraftId={composeDraftId}
           composeOpen={composeOpen}
           canSaveDraft={canSaveDraft}

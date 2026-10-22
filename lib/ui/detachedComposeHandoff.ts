@@ -39,6 +39,7 @@ export type DetachedComposeEvent = {
   handoffId: string;
   accountId: string;
   outcome: DetachedComposeEventOutcome;
+  warnings?: string[];
   draftId: string | null;
   sourceMessageId: string | null;
   mode: ComposeMode;
@@ -221,6 +222,7 @@ export function parseDetachedComposeEvent(rawValue: string | null): DetachedComp
     ) {
       return null;
     }
+    if (parsed.warnings !== undefined && (!Array.isArray(parsed.warnings) || !parsed.warnings.every((warning: unknown) => typeof warning === "string"))) return null;
     return parsed as DetachedComposeEvent;
   } catch {
     return null;
@@ -231,9 +233,10 @@ export function notifyDetachedComposeOutcome(
   handoffId: string,
   handoff: Extract<DetachedComposeHandoff, { status: "ready" }>,
   outcome: DetachedComposeOutcome,
-  draftId: string | null
+  draftId: string | null,
+  warnings?: string[]
 ) {
-  writeDetachedComposeEvent(handoffId, handoff, outcome, draftId);
+  writeDetachedComposeEvent(handoffId, handoff, outcome, draftId, warnings);
   removeDetachedComposeHandoff(handoffId);
 }
 
@@ -249,7 +252,8 @@ function writeDetachedComposeEvent(
   handoffId: string,
   handoff: Extract<DetachedComposeHandoff, { status: "ready" }>,
   outcome: DetachedComposeEventOutcome,
-  draftId: string | null
+  draftId: string | null,
+  warnings?: string[]
 ) {
   const event: DetachedComposeEvent = {
     version: 1,
@@ -257,6 +261,7 @@ function writeDetachedComposeEvent(
     handoffId,
     accountId: handoff.accountId,
     outcome,
+    ...(warnings?.length ? { warnings } : {}),
     draftId,
     sourceMessageId: handoff.sourceMessageId,
     mode: handoff.mode,
