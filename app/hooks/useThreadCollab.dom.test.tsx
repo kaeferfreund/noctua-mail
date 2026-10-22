@@ -494,7 +494,8 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 type Props = { account: string; thread: string; session: string };
-function harness() {
+function harness({ deferMembers = false } = {}) {
+  const memberReads: Array<ReturnType<typeof deferred<Response>>> = [];
   const reads: Array<ReturnType<typeof deferred<Response>> & { url: string }> = [];
   const writes: Array<ReturnType<typeof deferred<Response>> & { url: string; init?: RequestInit }> = [];
   const updates: ThreadCollabState[] = [];
@@ -504,7 +505,12 @@ function harness() {
   let props: Props = { account: 'a', thread: 'X', session: 's1' };
   const apiFetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     if (String(url).endsWith('/me')) return json({ user: { id: 'synthetic-editor' } });
-    if (String(url).endsWith('/members')) return json({ members });
+    if (String(url).endsWith('/members')) {
+      if (!deferMembers) return json({ members });
+      const read = deferred<Response>();
+      memberReads.push(read);
+      return read.promise;
+    }
     const request = { ...deferred<Response>(), url: String(url), init };
     (init?.method ? writes : reads).push(request);
     return request.promise;
@@ -535,7 +541,7 @@ function harness() {
     return result;
   };
   const visible = () => JSON.parse(view.getByTestId('snapshot').textContent!);
-  return { reads, writes, updates, commits, denials, read, reload, start, navigate, finish, visible, current: () => controller.current! };
+  return { reads, memberReads, writes, updates, commits, denials, read, reload, start, navigate, finish, visible, current: () => controller.current! };
 }
 
 
@@ -954,6 +960,178 @@ it("R6-repair: failed post-commit refresh is repaired by the next successful rea
   await h.reload(); await h.read(2, json({ ok: true, state: committed, comments: [earlier, own], activity, members }));
   expect(h.current().comments).toEqual([earlier, own]);
   expect(h.current().activity).toEqual(activity);
+});
+
+const expandedMembers = [...members, { ...members[0], userId: "synthetic-extra", email: "extra@example.test" }];
+const history = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_added", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: "synthetic-note" }, createdAt: T }];
+const fullSnapshot = (s = state(), comments: ThreadComment[] = [], mailboxMembers = members) =>
+  json({ ok: true, state: s, comments, activity: history, members: mailboxMembers });
+
+for (const laterRead of ["pending", "HTTP 500", "network"] as const) {
+  it(`R7-denial: newer successful read restores denial despite an even newer ${laterRead} read`, async () => {
+    const h = harness(); await h.read(0, snapshot());
+    await h.reload(); await h.reload(); await h.reload();
+    await h.read(1, forbidden());
+    expect(h.current().readDenied).toBe(true);
+    expect(await h.current().update({ status: "closed" })).toBe(false);
+    if (laterRead === "HTTP 500") await h.read(3, failedRead());
+    if (laterRead === "network") await act(async () => { h.reads[3].reject(new Error("Synthetic network failure")); });
+    const recovered = state({ revision: 2, status: "waiting" });
+    await h.read(2, fullSnapshot(recovered));
+    expect(h.current().readDenied).toBe(false);
+    expect(h.current().state).toEqual(recovered);
+    expect(h.current().members).toEqual(members);
+    expect(h.current().activity).toEqual(history);
+    expect(h.current().error).toBeNull();
+    const publications = h.updates.length;
+    if (laterRead === "pending") await h.read(3, failedRead());
+    expect(h.current().readDenied).toBe(false);
+    expect(h.current().state).toEqual(recovered);
+    expect(h.updates).toHaveLength(publications);
+    // Restoration really unblocks transport, rather than only changing the UI.
+    const op = await h.start(c => c.update({ status: "closed" }));
+    expect(h.writes).toHaveLength(1);
+    expect(await h.finish(0, failedRead(), op)).toBe(false);
+  });
+}
+
+it("R7-denial: denial then success then later 403 requires a new successful recovery", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  await h.reload(); await h.reload(); await h.reload();
+  await h.read(1, forbidden());
+  await h.read(2, snapshot(state({ revision: 2 })));
+  expect(h.current().readDenied).toBe(false);
+  await h.read(3, forbidden());
+  expect(h.current().readDenied).toBe(true);
+  expect(h.current().state).toBeUndefined();
+  expect(h.current().members).toEqual([]);
+  expect(await h.current().update({ status: "closed" })).toBe(false);
+  await h.reload(); await h.reload(); // A later pending read must not veto either recovery.
+  const recovered = state({ revision: 3, status: "waiting" });
+  await h.read(4, snapshot(recovered));
+  expect(h.current().readDenied).toBe(false);
+  expect(h.current().state).toEqual(recovered);
+  expect(h.denials).toEqual(["a", "a"]);
+  await h.read(5, failedRead());
+  expect(h.current().readDenied).toBe(false);
+});
+
+it("R7-members: late standalone members GET must not replace newer complete GET membership", async () => {
+  const h = harness({ deferMembers: true });
+  await h.read(0, fullSnapshot(state(), [], expandedMembers));
+  expect(h.current().members).toEqual(expandedMembers);
+  const publications = h.updates.length;
+  await act(async () => { h.memberReads[0].resolve(json({ members })); });
+  expect(h.current().members).toEqual(expandedMembers);
+  expect(h.updates).toHaveLength(publications);
+});
+
+it("R7-members: late complete GET must not replace newer standalone members GET membership", async () => {
+  const h = harness({ deferMembers: true });
+  // Leave/return starts a newer standalone members read in the same account scope.
+  h.navigate({ account: "b" }); h.navigate({ account: "a" });
+  await act(async () => { h.memberReads[2].resolve(json({ members: expandedMembers })); });
+  expect(h.current().members).toEqual(expandedMembers);
+  const higher = state({ revision: 3, status: "waiting" });
+  await h.read(0, fullSnapshot(higher));
+  expect(h.current().state).toEqual(higher);
+  expect(h.current().members).toEqual(expandedMembers);
+  await h.read(1, failedRead()); await h.read(2, failedRead());
+  await act(async () => {
+    h.memberReads[0].resolve(json({ members }));
+    h.memberReads[1].resolve(json({ members }));
+  });
+  expect(h.current().members).toEqual(expandedMembers);
+});
+
+for (const failure of ["HTTP 500", "network"] as const) {
+  it(`R7-members: newer standalone members GET failure keeps accepted membership (${failure})`, async () => {
+    const h = harness({ deferMembers: true });
+    await h.read(0, fullSnapshot(state(), [], expandedMembers));
+    await act(async () => { h.memberReads[0].resolve(json({ members })); });
+    h.navigate({ account: "b" }); h.navigate({ account: "a" });
+    expect(h.current().members).toEqual(expandedMembers);
+    await act(async () => {
+      if (failure === "network") h.memberReads[2].reject(new Error("Synthetic members failure"));
+      else h.memberReads[2].resolve(failedRead());
+      h.memberReads[1].resolve(json({ members }));
+    });
+    await h.read(1, failedRead()); await h.read(2, failedRead());
+    expect(h.current().members).toEqual(expandedMembers);
+    expect(h.current().state).toEqual(state());
+  });
+}
+
+it("R7-members: complete GET membership uses start order independently of snapshot revision", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  await h.reload(); await h.reload();
+  await h.read(2, fullSnapshot(state({ revision: 2 }), [], expandedMembers));
+  const higher = state({ revision: 3, status: "waiting" });
+  await h.read(1, fullSnapshot(higher)); // Higher revision wins state, but its older members lose.
+  expect(h.current().state).toEqual(higher);
+  expect(h.current().members).toEqual(expandedMembers);
+  const publications = h.updates.length;
+  await h.reload(); await h.read(3, snapshot(state({ revision: 2 })));
+  expect(h.current().state).toEqual(higher);
+  expect(h.updates).toHaveLength(publications);
+  expect(h.current().members).toEqual(members); // Newer membership wins even if thread revision loses.
+});
+
+it("R7-members: offscreen thread GET shares the account membership channel", async () => {
+  const h = harness();
+  h.navigate({ thread: "Y" });
+  await h.read(0, fullSnapshot(state(), [], expandedMembers));
+  expect(h.current().state).toBeUndefined();
+  expect(h.current().members).toEqual(expandedMembers);
+  await h.read(1, snapshot(state({ threadId: "Y" })));
+  expect(h.current().members).toEqual(members);
+});
+
+it("R7-members: standalone members success cannot repopulate or lift a denied scope", async () => {
+  const h = harness({ deferMembers: true });
+  await h.read(0, forbidden());
+  await act(async () => { h.memberReads[0].resolve(json({ members: expandedMembers })); });
+  expect(h.current().readDenied).toBe(true);
+  expect(h.current().members).toEqual([]);
+  expect(h.current().state).toBeUndefined();
+  expect(await h.current().update({ status: "closed" })).toBe(false);
+  await h.reload(); await h.read(1, snapshot());
+  expect(h.current().members).toEqual(members);
+  expect(h.current().readDenied).toBe(false);
+});
+
+it("R7-snapshots: earlier-started GET completes partial success with comments and activity", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  await h.reload();
+  const op = await h.start(c => c.addNote("Synthetic own"));
+  const committed = state({ revision: 3, commentCount: 2 });
+  const own = note("Synthetic own", T, 3);
+  const prior = { ...note("Synthetic collaborator", T, 2), id: "synthetic-prior" };
+  expect(await h.finish(0, json({ ok: true, state: committed, comment: own }), op, failedRead())).toBe(true);
+  expect(h.current().comments).toEqual([own]);
+  expect(h.current().activity).toEqual([]);
+  await h.read(1, fullSnapshot(committed, [prior, own]));
+  expect(h.current().state).toEqual(committed);
+  expect(h.current().comments).toEqual([prior, own]);
+  expect(h.current().activity).toEqual(history);
+});
+
+it("R7-order: revisions beat opposing timestamps and request starts", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  await h.reload(); await h.reload();
+  const lower = state({ revision: 2, status: "waiting", updatedAt: T + 1000, lastActivityAt: T + 1000 });
+  const higher = state({ revision: 3, status: "closed", updatedAt: T - 1000, lastActivityAt: T - 1000 });
+  await h.read(2, fullSnapshot(lower, [note("Synthetic lower", T + 1000, 2)]));
+  await h.read(1, snapshot(higher));
+  expect(h.current().state).toEqual(higher);
+  expect(h.current().comments).toEqual([]);
+  expect(h.current().activity).toEqual([]);
+  const publications = h.updates.length;
+  await h.reload(); await h.read(3, fullSnapshot(lower, [note("Synthetic lower", T + 1000, 2)]));
+  expect(h.current().state).toEqual(higher);
+  expect(h.current().comments).toEqual([]);
+  expect(h.current().activity).toEqual([]);
+  expect(h.updates).toHaveLength(publications);
 });
 
 });
