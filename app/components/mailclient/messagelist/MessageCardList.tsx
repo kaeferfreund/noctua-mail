@@ -399,7 +399,7 @@ export default function MessageCardList({
               showFolderBadgesInSubjectMeta
               showFolderBadgesInMeta={false}
               quickActions={renderQuickActions(message)}
-              messageMenu={renderMessageMenu(message, isCompactView ? "table" : "list")}
+              messageMenu={renderMessageMenu(message, isCompactView ? "table" : "list", undefined, isCollapsedThreadRoot ? displaySeen : undefined)}
               showAttachmentIcon={shouldShowAttachmentIcon(message)}
               showCalendarInviteIcon={hasMessageFlag(message.flags, CALENDAR_INVITE_FLAG)}
               showNewBadge={
