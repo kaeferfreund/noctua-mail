@@ -15,7 +15,7 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
     const url = String(input); calls.push({ url, init });
     const custom = override?.(url, init); if (custom) return custom;
     if (url === "/api/admin/users") return response({ ok: true, users: [user] });
-    if (url === "/api/admin/invites") return response({ ok: true, invites: [{ code: "synthetic-history-secret", email: "invited@example.test", role: "user", uses: 0, expiresAt: 1793000000000, createdAt: 1792900000000 }] });
+    if (url === "/api/admin/invites") return response({ ok: true, invites: [{ id: "synthetic-history-id", email: "invited@example.test", issuedBy: "synthetic-issuer", status: "issued", expiresAt: 1793000000000, createdAt: 1792900000000 }] });
     if (url === "/api/auth/reauth") return response({ ok: true, ceremonyRequired: false, grant: "synthetic-proof", purpose: "admin.recovery", expiresAt: 1793000000000 });
     return response({ ok: true });
   };
@@ -43,6 +43,8 @@ describe("AdminPanel", () => {
   it("issues an email-bound invite, copies it and shows the code only until dismissed", async () => {
     const { page, calls } = harness((url, init) => url === "/api/admin/users" && init?.method === "POST" ? response({ ok: true, invite: { code: "synthetic-once-code" } }, 201) : undefined);
     await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Invites" }));
+    await page.findByText(/Issued by synthetic-issuer/);
+    expect(page.getByText(/invited@example.test · issued/)).toBeTruthy();
     fireEvent.change(page.getByLabelText("Name", { exact: true }), { target: { value: "Synthetic Invitee" } });
     fireEvent.change(page.getByLabelText("Email", { exact: true }), { target: { value: "invited@example.test" } });
     fireEvent.click(page.getByRole("button", { name: "Issue targeted invite" }));
@@ -95,13 +97,13 @@ describe("AdminPanel", () => {
     const dialog = await openUserAction(page, "Disable", "Change user status"); fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
     expect((await dialog.findByRole("alert")).textContent).toContain("Retry after 75 seconds");
   });
-  it("pages the audit log with limit and before", async () => {
-    const entries = Array.from({ length: 50 }, (_, index) => ({ id: `synthetic-audit-${index}`, actorUserId: "synthetic-actor", targetUserId: "synthetic-target", targetAccountId: null, action: "user.disable", createdAt: 1792900000000 - index }));
-    const { page, calls } = harness(url => url.startsWith("/api/admin/audit?") ? response({ ok: true, entries: url.includes("before=") ? [{ ...entries[0], id: "synthetic-older", action: "user.enable", createdAt: 1792890000000 }] : entries }) : undefined);
+  it("pages equal-timestamp audit entries with the opaque nextCursor", async () => {
+    const entries = Array.from({ length: 50 }, (_, index) => ({ id: `synthetic-audit-${index}`, actorUserId: "synthetic-actor", targetUserId: "synthetic-target", targetAccountId: null, action: "user.disable", createdAt: 1792900000000 }));
+    const { page, calls } = harness(url => url.startsWith("/api/admin/audit?") ? response({ ok: true, entries: url.includes("before=") ? [{ ...entries[0], id: "synthetic-older", action: "user.enable", createdAt: 1792890000000 }] : entries, nextCursor: url.includes("before=") ? null : "synthetic+/opaque=cursor" }) : undefined);
     await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Audit" }));
     await waitFor(() => expect(page.getAllByText("user.disable")).toHaveLength(50));
     fireEvent.click(page.getByRole("button", { name: "Load older entries" })); await page.findByText("user.enable");
-    expect(calls.some(call => call.url === `/api/admin/audit?limit=50&before=${entries[49].createdAt}`)).toBe(true);
+    expect(calls.some(call => call.url === `/api/admin/audit?limit=50&before=${encodeURIComponent("synthetic+/opaque=cursor")}`)).toBe(true);
     expect((page.getByRole("button", { name: "Load older entries" }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("requires an enabled successor before deleting an owner", async () => {

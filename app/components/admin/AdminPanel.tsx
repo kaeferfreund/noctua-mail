@@ -11,7 +11,7 @@ import ReauthDialog from "@/app/components/auth/ReauthDialog";
 import AdminConfirmDialog from "./AdminConfirmDialog";
 import AdminAuditLog from "./AdminAuditLog";
 import AdminMailboxes from "./AdminMailboxes";
-import type { AdminUser } from "./types";
+import type { AdminUser, AdminInvite } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
 const actionTitles: Record<Action["type"], string> = { role: "Change user role", status: "Change user status", delete: "Delete user", recovery: "Initiate recovery", "mfa-reset": "Reset MFA", sessions: "Revoke sessions", passkey: "Remove passkey" };
@@ -38,6 +38,7 @@ function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch
   const [copied, setCopied] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [inviteRevision, setInviteRevision] = useState(0);
   const [inviteRole, setInviteRole] = useState<"admin" | "user">("user");
   const auth = useMemo(() => client ?? createAuthClient(apiFetch), [client, apiFetch]);
   const load = useCallback(async () => {
@@ -75,7 +76,7 @@ function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch
     event.preventDefault(); setBusy(true); setError("");
     try {
       const data = await adminRequest<{ invite: { code: string } }>(apiFetch, "/api/admin/users", jsonMutation("POST", { email, name, role: inviteRole }));
-      setCopied(""); setSecret({ title: "One-time invite code", value: data.invite.code }); setEmail(""); setName("");
+      setCopied(""); setSecret({ title: "One-time invite code", value: data.invite.code }); setEmail(""); setName(""); setInviteRevision(value => value + 1);
     } catch (error) { setError(errorMessage(error)); }
     finally { setBusy(false); }
   };
@@ -102,7 +103,7 @@ function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch
       {tab === "invites" && <section className="space-y-4" aria-label="Invites"><h3 className="font-medium">Invite a user</h3><p className="text-sm text-muted-foreground">The email-bound code is single-use and expires in one day. Hand it over personally. The recipient chooses their own password.</p>
         <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3"><label className="grid gap-1">Name<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">Email<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
           <label className="grid gap-1">Invite role<select value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">user</option><option value="admin">admin</option></select></label><Button disabled={busy}>Issue targeted invite</Button></form>
-        <InviteHistory apiFetch={apiFetch} />
+        <InviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
       {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} />}
       {tab === "audit" && <AdminAuditLog apiFetch={apiFetch} />}
@@ -121,13 +122,13 @@ function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch
     }}>Copy</Button>{copied && <p role="status">{copied}</p>}<Button variant="outline" onClick={() => { setSecret(null); setCopied(""); }}>Done</Button></DialogContent></Dialog>}
   </div></SettingsFrame>;
 }
-function InviteHistory({ apiFetch }: { apiFetch: AdminFetch }) {
-  const [invites, setInvites] = useState<{ email?: string; role: string; uses: number; expiresAt: number | null; createdAt: number }[]>([]);
+function InviteHistory({ apiFetch, revision }: { apiFetch: AdminFetch; revision: number }) {
+  const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    void adminRequest<{ invites: typeof invites }>(apiFetch, "/api/admin/invites").then(data => { if (active) setInvites(data.invites.map(({ email, role, uses, expiresAt, createdAt }) => ({ email, role, uses, expiresAt, createdAt }))); }).catch(error => { if (active) setError(errorMessage(error)); });
+    void adminRequest<{ invites: typeof invites }>(apiFetch, "/api/admin/invites").then(data => { if (active) setInvites(data.invites.map(({ id, email, issuedBy, createdAt, expiresAt, status }) => ({ id, email, issuedBy, createdAt, expiresAt, status }))); }).catch(error => { if (active) setError(errorMessage(error)); });
     return () => { active = false; };
-  }, [apiFetch]);
-  return <div className="space-y-2"><h3 className="font-medium">Invite history</h3>{error && <p role="alert">{error}</p>}{invites.map((invite, index) => <p key={`${invite.createdAt}-${index}`} className="text-sm">{invite.email || "Legacy invite"} · {invite.role} · {invite.uses ? "Used" : "Unused"} · {invite.expiresAt ? `Expires ${new Date(invite.expiresAt).toLocaleString()}` : "No expiry"}</p>)}</div>;
+  }, [apiFetch, revision]);
+  return <div className="space-y-2"><h3 className="font-medium">Invite history</h3>{error && <p role="alert">{error}</p>}{invites.map(invite => <p key={invite.id} className="text-sm">{invite.email || "Legacy invite"} · {invite.status} · Issued by {invite.issuedBy || "Operator"} · {invite.expiresAt ? `Expires ${new Date(invite.expiresAt).toLocaleString()}` : "No expiry"}</p>)}</div>;
 }
