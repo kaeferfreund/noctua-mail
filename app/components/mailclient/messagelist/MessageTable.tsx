@@ -307,7 +307,7 @@ export default function MessageTable({
             message.id === activeMessageId || showThreadSelectionActive || Boolean(optimistic?.active);
           const isDisabled = pendingMessageActions.has(message.id);
           const showRowDivider = index > 0 && !item.isFirstInGroup;
-          const { isCollapsedThreadRoot, displaySeen, threadMessages } = getThreadRowDisplayMeta({
+          const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
             item
           });
           const rowClassName = [
@@ -401,10 +401,7 @@ export default function MessageTable({
               }}
             >
                 <span data-message-cell="unread" className={styles.cellSelect}>
-                  {renderUnreadDot(message, {
-                    seen: displaySeen,
-                    threadMessages
-                  })}
+                  {renderUnreadDot(message, { seen: displaySeen })}
                   {renderSelectIndicators(message)}
                   <Checkbox
                     size="1"

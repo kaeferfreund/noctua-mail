@@ -460,44 +460,6 @@ export function getDisplaySeenForThreadRow(params: {
   return Boolean(messageSeen);
 }
 
-export function getThreadMessagesForThreadRow(params: {
-  message: Message;
-  messageId?: string;
-  isCollapsed: boolean;
-  threadSize: number;
-  depth: number;
-  threadIndex: number;
-  isNestedCollapsed?: boolean;
-  fullFlat: Array<{ message: Message; depth: number }>;
-}) {
-  const {
-    message,
-    messageId,
-    isCollapsed,
-    threadSize,
-    depth,
-    threadIndex,
-    isNestedCollapsed,
-    fullFlat
-  } = params;
-  const isCollapsedRoot = isCollapsedThreadRootRow({
-    isCollapsed,
-    threadSize,
-    depth,
-    threadIndex
-  });
-  if (isCollapsedRoot) {
-    return fullFlat.map((entry) => entry.message);
-  }
-  if (isNestedCollapsed && messageId) {
-    const subtree = getThreadSubtreeEntries(fullFlat, messageId);
-    if (subtree.length > 0) {
-      return subtree.map((entry) => entry.message);
-    }
-  }
-  return [message];
-}
-
 export function buildThreadGroupEntries(params: {
   group: MessageGroup;
   collapsedThreads: Record<string, boolean>;

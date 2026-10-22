@@ -214,7 +214,7 @@ export default function MessageCardList({
         const showRootActive = showCollapsedActive || showThreadSelectionActive;
         const showCompactDivider =
           isCompactView && index > 0 && !item.isFirstInGroup;
-        const { isCollapsedThreadRoot, displaySeen, threadMessages } = getThreadRowDisplayMeta({
+        const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
           item
         });
         const useCompactThreadContainer = isCompactView && supportsThreads;
@@ -389,10 +389,7 @@ export default function MessageCardList({
                   ? "Delete permanently"
                   : "Move to Trash"
               }
-              renderUnreadDot={renderUnreadDot(message, {
-                seen: displaySeen,
-                threadMessages
-              })}
+              renderUnreadDot={renderUnreadDot(message, { seen: displaySeen })}
               renderSelectIndicators={renderSelectIndicators(message)}
               fromText={item.fromText}
               fromTooltip={item.fromTooltip}
