@@ -7,7 +7,6 @@ import type { SelectionStore } from "./selectionStore";
 import { getCollapsedRootThreadMessageIds as getCollapsedRootThreadMessageIdsFromSelection } from "./listSelection";
 import {
   getDisplaySeenForThreadRow,
-  getThreadMessagesForThreadRow,
   isCollapsedThreadRootRow
 } from "./threadGroupUtils";
 
@@ -290,21 +289,10 @@ export function getThreadRowDisplayMeta(params: { item: ListRowItem }) {
     isNestedCollapsed: item.isNestedCollapsed,
     fullFlat: item.fullFlat
   });
-  const threadMessages = getThreadMessagesForThreadRow({
-    message,
-    messageId: message.id,
-    isCollapsed: item.isCollapsed,
-    threadSize: item.threadSize,
-    depth: item.depth,
-    threadIndex: item.threadIndex,
-    isNestedCollapsed: item.isNestedCollapsed,
-    fullFlat: item.fullFlat
-  });
 
   return {
     isCollapsedThreadRoot,
-    displaySeen,
-    threadMessages
+    displaySeen
   };
 }
 

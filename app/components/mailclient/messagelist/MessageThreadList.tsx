@@ -217,7 +217,7 @@ export default function MessageThreadList({
           item.threadSize > 1 &&
           isActiveThread;
         const showRootActive = showCollapsedActive || showThreadSelectionActive;
-        const { isCollapsedThreadRoot, displaySeen, threadMessages } = getThreadRowDisplayMeta({
+        const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
           item
         });
 
@@ -355,7 +355,7 @@ export default function MessageThreadList({
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
                   <span data-message-cell="unread" className={styles.cellUnread}>
-                    {renderUnreadDot(message, { seen: displaySeen, threadMessages })}
+                    {renderUnreadDot(message, { seen: displaySeen })}
                   </span>
 
                   <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>

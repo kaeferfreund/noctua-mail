@@ -10,13 +10,7 @@ type UseMessageListHelpersParams = {
   groupBy: string;
   activeAccountId: string;
   folders: Folder[];
-  pendingMessageActions: Set<string>;
   toggleFlaggedFlag: (message: Message) => void;
-  updateFlagState: (
-    message: Message,
-    flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
-    value: boolean
-  ) => Promise<void>;
   setSearchScope: React.Dispatch<React.SetStateAction<"folder" | "all">>;
   setActiveFolderId: React.Dispatch<React.SetStateAction<string>>;
 };
@@ -25,9 +19,7 @@ export function useMessageListHelpers({
   groupBy,
   activeAccountId,
   folders,
-  pendingMessageActions,
   toggleFlaggedFlag,
-  updateFlagState,
   setSearchScope,
   setActiveFolderId
 }: UseMessageListHelpersParams) {
@@ -53,29 +45,10 @@ export function useMessageListHelpers({
   );
 
   const renderUnreadDot = useCallback(
-    (message: Message, options?: { seen?: boolean; threadMessages?: Message[] }) => {
-      const displaySeen = options?.seen ?? Boolean(message.seen);
-      const targets = Array.from(
-        new Map(
-          (options?.threadMessages?.length ? options.threadMessages : [message]).map((target) => [
-            target.id,
-            target
-          ])
-        ).values()
-      );
-      const isDisabled = targets.some((target) => pendingMessageActions.has(target.id));
-      return (
-        <UnreadDot
-          seen={displaySeen}
-          disabled={isDisabled}
-          onToggle={() => {
-            const nextSeen = !displaySeen;
-            void Promise.all(targets.map((target) => updateFlagState(target, "seen", nextSeen)));
-          }}
-        />
-      );
-    },
-    [pendingMessageActions, updateFlagState]
+    (message: Message, options?: { seen?: boolean }) => (
+      <UnreadDot seen={options?.seen ?? Boolean(message.seen)} />
+    ),
+    []
   );
 
   const renderFolderBadges = useCallback(
