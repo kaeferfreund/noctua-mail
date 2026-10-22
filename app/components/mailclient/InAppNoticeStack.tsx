@@ -18,6 +18,7 @@ export type InAppNotice = {
   icon?: InAppNoticeIcon;
   title: string;
   description?: string;
+  wrapDescription?: boolean;
   fullDetail?: string;
   messageId?: string;
   ids?: string[];
@@ -146,7 +147,7 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
             <div className="notice-text">
               <strong className="notice-title">{notice.title}</strong>
               {notice.description ? (
-                <span className="notice-description">{notice.description}</span>
+                <span className={`notice-description${notice.wrapDescription ? " notice-description-wrap" : ""}`}>{notice.description}</span>
               ) : null}
             </div>
             <div className="notice-controls">

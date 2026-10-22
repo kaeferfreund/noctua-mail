@@ -537,8 +537,6 @@ export default function MailClient({
     apiFetch
   });
 
-  const detachedWarnings = useDetachedSendWarnings(accounts);
-
   const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
     const targetAccountId = accountIdOverride?.trim() || activeAccountId;
     if (!targetAccountId) {
@@ -629,6 +627,7 @@ export default function MailClient({
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const isAdminUser = currentUser?.role === "admin";
+  const detachedWarnings = useDetachedSendWarnings(accounts, authState === "ok" ? currentUser?.id : null);
   const [initialDataReady, setInitialDataReady] = useState(false);
   const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
   const [sessionTtlSeconds, setSessionTtlSeconds] = useState<number | null>(null);
@@ -5844,6 +5843,7 @@ export default function MailClient({
         onDeleteAlias={deleteRecipientAliasForAccount}
       />
       <ComposeOrchestrator
+        ownerUserId={currentUser?.id}
         isMobile={isMobile}
         ref={composeHandleRef}
         activeAccountId={activeAccountId}
