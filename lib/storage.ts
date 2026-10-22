@@ -301,6 +301,25 @@ export async function getAttachmentData(
   return null;
 }
 
+export async function statAttachmentData(
+  accountId: string,
+  messageId: string,
+  attachmentId: string
+): Promise<{ size: number; mtimeMs: number } | null> {
+  await ensureAttachmentsDir();
+  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  for (const candidateId of candidates) {
+    try {
+      const stat = await fs.stat(attachmentFilePath(accountId, candidateId, attachmentId));
+      if (!stat.isFile()) continue;
+      return { size: stat.size, mtimeMs: stat.mtimeMs };
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
+}
+
 export async function deleteMessageSource(accountId: string, messageId: string) {
   await ensureSourcesDir();
   await Promise.all([
