@@ -20,7 +20,6 @@ import {
   computeMarkdownOnSwitchToMarkdown
 } from "./composeTabSwitch";
 import AttachmentsList from "../../AttachmentsList";
-import ComposeMarkdownEditor from "../../ComposeMarkdownEditor";
 import ComposePlainTextEditor from "../../ComposePlainTextEditor";
 import HtmlMessage from "../../HtmlMessage";
 import threadStyles from "../message/ThreadMessageCard.module.css";
@@ -33,6 +32,14 @@ import ComposeImageDropMenu from "./ComposeImageDropMenu";
 // HTML compose tab — keep it out of the initial MailClient chunk.
 const ComposeEditor = dynamic(() => import("../../ComposeEditor"), {
   ssr: false
+});
+
+// Load the Markdown wrapper, vendor styles and editor together on first mount.
+// Keeping CSS inside this boundary lets the chunk loader wait for the styles
+// before showing the editor on the first Markdown-tab open.
+const ComposeMarkdownEditor = dynamic(() => import("../../ComposeMarkdownEditor"), {
+  ssr: false,
+  loading: () => <div role="status">Loading Markdown editor…</div>
 });
 
 type ComposeTab = "text" | "html" | "markdown";
