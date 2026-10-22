@@ -456,6 +456,87 @@ extra rotation path. Missing predecessor metadata cannot be reconstructed from a
 
 ### 3.2 Account shard DB (`db/accounts/<accountId>.db`)
 
+Shard message identity is the composite `(accountId, id)`. `buildImapMessageRowId`
+returns an account-local id derived from the RFC Message-ID (or fallback metadata);
+`messages.messageId` preserves the external header separately. A copy in another
+folder of the same account can still receive a mailbox/UID collision variant.
+Message ids and account-scoped source/attachment paths do not change on migration.
+All message lookups, joins and mutations include the account. The durable keys are:
+
+- `messages`: `(accountId, id)`; `threads`: `(accountId, threadId)`.
+- `attachments`: `(accountId, messageId, id)`; `message_translations`:
+  `(accountId, messageId, targetLang, format)`; `message_calendar_events`:
+  `(accountId, messageId, eventUid)`. Each has an account-scoped message foreign
+  key with `ON DELETE CASCADE`. Attachment metadata, ids and removal additionally
+  check the owning message before preview, bytes, ETag/304, or cache handling.
+- `message_fts_v2` stores `accountId` and the local row id (both unindexed). Search
+  matches the pair; sync/deletion replaces only that account's FTS entries.
+- `thread_topics`: `(accountId, threadId, topicId)`. Topic filters and remaps
+  include accountId. Collaboration state already uses `(accountId, threadId)`;
+  comments/activity use generated unique ids plus account-scoped thread queries.
+  `sent_by` continues to use `(accountId, messageId)` with the external RFC header.
+
+Message, attachment, thread and translation upserts use `ON CONFLICT` on their
+complete key. Updating a message does not delete its dependent translation cache.
+Watcher, full/repair/resync and cross-account copy ingestion use the same store.
+
+Existing shards are migrated at first open. `CREATE TABLE IF NOT EXISTS` and
+`PRAGMA table_info` identify the layout after additive column migrations. The
+account-key rebuild rechecks under a single immediate transaction, copies rows
+and child ownership from the legacy globally unique message id, preserves indexes
+and triggers, rebuilds FTS from surviving messages, then checks foreign keys
+before commit. SQLite foreign-key enforcement is disabled only around the atomic
+rebuild and restored even on failure; failures roll back all table swaps. Repeated
+opens do not rebuild or acquire a writer lock for the key/format check.
+
+Shard `PRAGMA user_version = 2` is installed in that same transaction, together
+with database-enforced legacy-writer rejection. Every ordinary table containing
+`accountId` has BEFORE INSERT/UPDATE/DELETE triggers requiring the connection-local
+`noctua_writer_v2()` SQL function. `configureAccountDb` registers it immediately
+on open, before schema/data writes, including the separate membership-cleanup
+handle; sync workers, recompute CLIs, watcher ingestion and maintenance scripts
+use the common account connection API. Schema initialization also registers it
+for explicit migration handles. Connections refuse a `user_version` newer than
+the binary supports before configuration/schema writes.
+
+SQLite forbids persistent triggers referencing TEMP tables, and forbids triggers
+on virtual tables and FTS shadow tables. Therefore the guard uses a SQL function
+instead of a TEMP marker, and FTS is physically renamed to `message_fts_v2`.
+The legacy `message_fts` name becomes a read-only view. Legacy ordinary-table
+mutations fail at statement preparation with `no such function:
+noctua_writer_v2`; legacy FTS mutations fail with `cannot modify message_fts
+because it is a view`. This also invalidates statements prepared before the
+migration. Legacy reads may work or fail; an old binary cannot safely resume
+writing this format. Direct shard writers must use `configureAccountDb` and
+the current FTS table name; the marker is a format compatibility boundary, not
+protection against an operator deliberately changing the schema.
+
+Stop all app, watcher, sync and recompute worker processes before upgrading.
+Back up the master DB, each actual physical shard (including WAL state using
+SQLite backup or a clean shutdown), and account-scoped files together. Run the
+collision inventory below before migrating, start only the new binary to migrate
+each shard at first open, then resync all accounts that used a legacy shared file.
+To roll back to an old binary, stop the new processes and restore the coordinated
+pre-upgrade backup; never remove the guards or lower `user_version` in place.
+
+Before opening an existing shared shard with the new version, run this read-only
+inventory once for each actual file (paths are deduplicated by realpath):
+
+```sh
+bun scripts/checkShardMessageCollisions.ts /absolute/path/to/shared-shard.db
+```
+
+The JSON report includes `sharedMessageIdCount` and `sharedMessageRowCount` (rows
+whose normalized Message-ID survives in more than one account), stored account
+count and legacy-key status. It does not open the application's connection layer
+or migrate the file. **A zero count cannot rule out past replacement**: an already
+replaced row is absent. Resync every account that used a shared legacy file even
+when the count is zero. Migration preserves surviving rows and metadata; it cannot
+recover overwritten messages, attachments, FTS entries or missing thread indexes.
+Normal duplicate delivery after migration is supported and is not evidence of
+prior replacement. Account mappings and backups are needed to identify all former
+users of a file; the surviving-row count alone is insufficient.
+
 ```sql
 CREATE TABLE IF NOT EXISTS thread_collab_state (
   accountId TEXT NOT NULL,
@@ -525,11 +606,11 @@ Rules
   4. Moving into a target that already has a state row merges in JS: newest `updatedAt` wins for
      `updatedByUserId`; status is `closed` only if every merged row is `closed`, otherwise the
      most recent non-closed status; assignee = the most recently assigned non-null assignee;
-     write the merged row with `INSERT OR REPLACE`, then `DELETE` the old rows. Comments and
+     write the merged row with `ON CONFLICT(accountId, threadId) DO UPDATE`, then `DELETE` the old rows. Comments and
      activity rows get the new `threadId` via plain `UPDATE` (their PK is `id`). Then recompute
      `commentCount` from `thread_comments`. Write one `threads_merged` activity row with
      `payload.mergedFromThreadIds` and `actorClientId = 'system'`.
-  5. `thread_topics` (PK `threadId, topicId`) is remapped the same way: `INSERT OR IGNORE ... SELECT`
+  5. `thread_topics` (PK `accountId, threadId, topicId`) is remapped the same way: `INSERT OR IGNORE ... SELECT`
      then `DELETE`. This also fixes the upstream gap where topics were lost on recompute.
 - Threads without a Message-ID fall back to row ids (lib/threading.ts); collaboration on those is
   best effort and not remapped on folder moves.
@@ -1741,6 +1822,10 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   both with state rows; split; old id keeps messages), remap on resync, enrichment, badge filters
   with and without viewerUserId (messages and threads), REST routes per role, MCP tools, reply
   hook, two accounts sharing one shard file, concurrent first mutations (stress).
+  Shared-shard regressions also cover identical RFC Message-IDs, common roots,
+  FTS/topic filters, translations, attachments, replacement/deletion, copy
+  ingestion, watcher sync and migration rollback/idempotence. Attachment HTTP
+  tests cover cross-account preview/bytes/304/removal and membership revocation.
 - UI: DOM tests for LoginScreen email/passkey/IMAP forms, TOTP/backup-code challenge, enrollment,
   re-auth and recovery errors, accessible focus/429, /me accountId:null and mandatory gate; no global
   logout on wrong TOTP/password. Browser authenticator acceptance with real UV; phone login/PWA

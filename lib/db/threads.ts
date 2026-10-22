@@ -292,7 +292,7 @@ export async function recomputeThreadsForAccountInternal(accountId: string, thre
     ).run(accountId, ...unique);
     db.prepare(
       `
-      INSERT OR REPLACE INTO threads (
+      INSERT INTO threads (
         threadId,
         accountId,
         rootMessageId,
@@ -319,6 +319,10 @@ export async function recomputeThreadsForAccountInternal(accountId: string, thre
         WHERE accountId = ? AND threadId IN (${placeholders})
       ) m
       GROUP BY m.threadId, m.accountId
+      ON CONFLICT(accountId, threadId) DO UPDATE SET
+        rootMessageId=excluded.rootMessageId, latestMessageId=excluded.latestMessageId,
+        latestDateValue=excluded.latestDateValue, latestReceivedDateValue=excluded.latestReceivedDateValue,
+        messageCount=excluded.messageCount, unreadCount=excluded.unreadCount
     `
     ).run(...latestReceivedDateArgs, accountId, ...unique);
     return;
@@ -326,7 +330,7 @@ export async function recomputeThreadsForAccountInternal(accountId: string, thre
   db.prepare(`DELETE FROM threads WHERE accountId = ?`).run(accountId);
   db.prepare(
     `
-    INSERT OR REPLACE INTO threads (
+    INSERT INTO threads (
       threadId,
       accountId,
       rootMessageId,
@@ -353,6 +357,10 @@ export async function recomputeThreadsForAccountInternal(accountId: string, thre
       WHERE accountId = ?
     ) m
     GROUP BY m.threadId, m.accountId
+      ON CONFLICT(accountId, threadId) DO UPDATE SET
+        rootMessageId=excluded.rootMessageId, latestMessageId=excluded.latestMessageId,
+        latestDateValue=excluded.latestDateValue, latestReceivedDateValue=excluded.latestReceivedDateValue,
+        messageCount=excluded.messageCount, unreadCount=excluded.unreadCount
   `
   ).run(...latestReceivedDateArgs, accountId);
 }
@@ -445,8 +453,8 @@ export async function recomputeThreadIdsForAccount(accountId: string) {
         }
       });
       if (updates.length === 0) return false;
-      const update = db.prepare(`UPDATE messages SET threadId = ?, parentId = ? WHERE id = ?`);
-      updates.forEach((row) => update.run(row.threadId, row.parentId, row.id));
+      const update = db.prepare(`UPDATE messages SET threadId = ?, parentId = ? WHERE accountId = ? AND id = ?`);
+      updates.forEach((row) => update.run(row.threadId, row.parentId, accountId, row.id));
       return remapThreadCollab(db, accountId, remaps);
     }).immediate();
     if (!changed) return;

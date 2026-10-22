@@ -8,7 +8,7 @@ export type CachedTranslation = {
 
 /**
  * Cached DeepL translations live in the per-account shard, keyed by
- * (messageId, targetLang, format). `format` is "text" or "html" so the plain
+ * (accountId, messageId, targetLang, format). `format` is "text" or "html" so the plain
  * and HTML renderings of the same message cache independently. Rows cascade
  * away when the source message is deleted (see initAccountSchema).
  *
@@ -30,9 +30,9 @@ export async function getCachedTranslation(
     .prepare(
       `SELECT translatedText, detectedSourceLang
        FROM message_translations
-       WHERE messageId = ? AND targetLang = ? AND format = ? AND marker = ?`
+       WHERE accountId = ? AND messageId = ? AND targetLang = ? AND format = ? AND marker = ?`
     )
-    .get(messageId, targetLang, format, marker) as
+    .get(accountId, messageId, targetLang, format, marker) as
     | { translatedText?: string; detectedSourceLang?: string | null }
     | undefined;
   if (!row) return null;
@@ -56,10 +56,14 @@ export async function putCachedTranslation(
   await withDbWriteRetry("putCachedTranslation", async () => {
     const db = await getAccountDb(accountId);
     db.prepare(
-      `INSERT OR REPLACE INTO message_translations
-         (messageId, targetLang, format, marker, translatedText, detectedSourceLang, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO message_translations
+         (accountId, messageId, targetLang, format, marker, translatedText, detectedSourceLang, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(accountId, messageId, targetLang, format) DO UPDATE SET
+         marker=excluded.marker, translatedText=excluded.translatedText,
+         detectedSourceLang=excluded.detectedSourceLang, createdAt=excluded.createdAt`
     ).run(
+      accountId,
       params.messageId,
       params.targetLang,
       params.format,

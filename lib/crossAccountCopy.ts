@@ -7,7 +7,7 @@ import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 /**
  * Cross-account copy of a single message.
  *
- * Accounts live in separate IMAP servers and separate SQLite shards, so
+ * Accounts can use different IMAP servers (and can share a SQLite shard), so
  * IMAP's native COPY/MOVE (which the same-account move path uses) cannot
  * reach across them. Instead we mirror the drafts/sent pattern: take the
  * source account's raw RFC-822 bytes, IMAP-APPEND them into the destination

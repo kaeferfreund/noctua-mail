@@ -264,8 +264,8 @@ export async function relocateMovedMessage(params: {
     if (!existing) return null;
 
     const attachmentIds = (db
-      .prepare(`SELECT id FROM attachments WHERE messageId = ?`)
-      .all(normalizedPreviousId) as Array<{ id?: string | null }>)
+      .prepare(`SELECT id FROM attachments WHERE accountId = ? AND messageId = ?`)
+      .all(accountId, normalizedPreviousId) as Array<{ id?: string | null }>)
       .map((row) => (row.id ? String(row.id) : ""))
       .filter(Boolean);
     if (destinationUid === null) {

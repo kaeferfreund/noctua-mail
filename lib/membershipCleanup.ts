@@ -1,7 +1,7 @@
 import { publishThreadCollabEvent } from "./threadCollabEvents";
 import { existsSync } from "fs";
 import { randomUUID } from "crypto";
-import { getDb, configureDb } from "./db/connection";
+import { getDb, configureAccountDb } from "./db/connection";
 import { getDefaultAccountDbPath } from "./runtimePaths";
 import { withDbWriteRetry } from "./dbWriteRetry";
 
@@ -16,7 +16,7 @@ export async function cleanupUserAccountAccess(accountId: string, userId: string
   const { Database } = await import("bun:sqlite");
   const db = new Database(dbPath, { create: false, readwrite: true });
   try {
-    configureDb(db, 0);
+    configureAccountDb(db, 0);
     const result = await withDbWriteRetry("cleanupUserAccountAccess", () => db.transaction(() => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('thread_collab_state','thread_activity')").all();
       if (!tables.length) return { status: "not_installed" as const, unassigned: 0, events: [] };

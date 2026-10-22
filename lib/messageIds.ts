@@ -23,6 +23,9 @@ function normalizeText(value?: string | null) {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+// This is an account-local id. Durable SQLite identity is (accountId, id),
+// and source/attachment paths also include accountId; RFC Message-ID is kept
+// separately. Copies within one account may receive a mailbox/UID variant.
 export function buildImapMessageRowId(messageId?: string | null, fallback?: MessageIdFallback) {
   const normalizedMessageId = normalizeHeaderId(messageId);
   if (normalizedMessageId) {

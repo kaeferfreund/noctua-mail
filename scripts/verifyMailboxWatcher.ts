@@ -1,4 +1,5 @@
 /** Synthetic end-to-end proof, run in its own process to isolate SQLite/env/module mocks. */
+import { SHARD_FTS_TABLE } from "../lib/db/shardFormat";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, connect, type Socket } from "node:net";
@@ -278,8 +279,42 @@ try {
   await patchAccount(accountId, { imap: endpoint });
   await until(async () => (await status()).watcherState === "idling", "credentials recovery");
   const secondId = "synthetic-watcher-added";
+  // Account addition also exercises identical RFC Message-IDs in a shared
+  // physical shard through the actual watcher/worker sync path.
+  await stopMailboxWatcher();
   await upsertAccount({ ...account, id: secondId });
-  await until(async () => (await getMailboxSummaries([secondId]))[0].watcherState === "idling", "account addition");
+  const { getDb } = await import("../lib/db/connection");
+  const master = await getDb();
+  const sharedPath = master.prepare("SELECT dbPath FROM accounts WHERE id=?").get(accountId).dbPath;
+  master.prepare("UPDATE accounts SET dbPath=? WHERE id=?").run(sharedPath, secondId);
+  const originalCount = await count();
+  startMailboxWatcher();
+  await until(async () => {
+    const summary = (await getMailboxSummaries([secondId]))[0];
+    return summary.watcherState === "idling" && summary.lastSyncAt !== null;
+  }, "account addition and completed sync in shared shard");
+  await withAccountDb(accountId, db => {
+    const copied = db.prepare(`SELECT a.id FROM messages a JOIN messages b
+      ON b.messageId=a.messageId AND b.accountId=? AND b.folderId=?
+      WHERE a.accountId=? AND a.folderId=?`).all(secondId, `${secondId}:INBOX`, accountId, `${accountId}:INBOX`);
+    assert.equal(copied.length, originalCount, "both accounts retain the same RFC Message-IDs");
+    // Prior folder copies can give A a collision variant; the 60 fixture
+    // originals exercise identical local ids in addition to shared headers.
+    assert(db.prepare(`SELECT COUNT(*) AS n FROM messages a JOIN messages b
+      ON b.id=a.id AND b.accountId=? WHERE a.accountId=? AND a.folderId=?`)
+      .get(secondId, accountId, `${accountId}:INBOX`).n >= 60);
+    for (const owner of [accountId, secondId]) {
+      const expectedThreads = db.prepare(`SELECT COUNT(DISTINCT threadId) AS n FROM messages
+        WHERE accountId=? AND folderId=?`).get(owner, `${owner}:INBOX`).n;
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM threads t WHERE t.accountId=?
+        AND EXISTS(SELECT 1 FROM messages m WHERE m.accountId=t.accountId AND m.threadId=t.threadId AND m.folderId=?)`)
+        .get(owner, `${owner}:INBOX`).n, expectedThreads);
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${SHARD_FTS_TABLE} WHERE accountId=?
+        AND ${SHARD_FTS_TABLE} MATCH 'Synthetic'`).get(owner).n > 0, true);
+    }
+  });
+  assert.equal(await count(), originalCount);
+  console.info("WATCHER_FIXTURE shared shard: both accounts retain rows, thread indexes and FTS for identical RFC Message-IDs");
   await deleteAccountControlPlane(secondId);
   await new Promise((resolve) => setTimeout(resolve, 300));
   await stopMailboxWatcher();

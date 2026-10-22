@@ -31,6 +31,7 @@
  *     writes escalate to a full-account recompute.
  */
 import { publishThreadCollabEvent } from "../../threadCollabEvents";
+import { SHARD_FTS_TABLE } from "../shardFormat";
 import type { Message } from "../../data";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
@@ -96,6 +97,9 @@ export async function upsertMessages(
 ) {
   return withDbWriteRetry("upsertMessages", async () => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
+    if (nextMessages.some(message => message.accountId !== accountId)) {
+      throw new Error("Message accountId must match the destination account");
+    }
     // Expose the final storage identity to callers that persist source/attachment files.
     const messageRowIds = new Map<string, string>();
     const UPSERT_BATCH_SIZE = 200;
@@ -106,10 +110,10 @@ export async function upsertMessages(
     const deleteArgs = folderId ? [accountId, folderId] : [accountId];
     const deleteAttachmentsByScope = folderId
       ? db.prepare(
-          `DELETE FROM attachments WHERE messageId IN (SELECT id FROM messages WHERE accountId = ? AND folderId = ?)`
+          `DELETE FROM attachments WHERE EXISTS (SELECT 1 FROM messages m WHERE m.accountId = attachments.accountId AND m.id = attachments.messageId AND m.accountId = ? AND m.folderId = ?)`
         )
       : db.prepare(
-          `DELETE FROM attachments WHERE messageId IN (SELECT id FROM messages WHERE accountId = ?)`
+          `DELETE FROM attachments WHERE accountId = ?`
         );
     const deleteCalendarEventsByScope = folderId
       ? db.prepare(
@@ -119,7 +123,7 @@ export async function upsertMessages(
         )
       : db.prepare(`DELETE FROM message_calendar_events WHERE accountId = ?`);
     const deleteAttachmentsForMessage = db.prepare(
-      `DELETE FROM attachments WHERE messageId = ?`
+      `DELETE FROM attachments WHERE accountId = ? AND messageId = ?`
     );
     const deleteCalendarEventsForMessage = db.prepare(
       `DELETE FROM message_calendar_events WHERE accountId = ? AND messageId = ?`
@@ -153,14 +157,17 @@ export async function upsertMessages(
     );
     const deleteFtsByScope = folderId
       ? db.prepare(
-          `DELETE FROM message_fts WHERE messageId IN (SELECT id FROM messages WHERE accountId = ? AND folderId = ?)`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE EXISTS (SELECT 1 FROM messages m WHERE m.accountId = ${SHARD_FTS_TABLE}.accountId AND m.id = ${SHARD_FTS_TABLE}.messageId AND m.accountId = ? AND m.folderId = ?)`
         )
       : db.prepare(
-          `DELETE FROM message_fts WHERE messageId IN (SELECT id FROM messages WHERE accountId = ?)`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ?`
         );
     const insertAttachment = db.prepare(
-      `INSERT OR REPLACE INTO attachments (id, messageId, filename, contentType, size, inline, cid, url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO attachments (accountId, id, messageId, filename, contentType, size, inline, cid, url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(accountId, messageId, id) DO UPDATE SET
+         filename=excluded.filename, contentType=excluded.contentType, size=excluded.size,
+         inline=excluded.inline, cid=excluded.cid, url=excluded.url`
     );
     const insertCalendarEvent = db.prepare(
       `INSERT OR REPLACE INTO message_calendar_events (
@@ -181,18 +188,63 @@ export async function upsertMessages(
     );
 
     const insertMessage = db.prepare(`
-      INSERT OR REPLACE INTO messages (
+      INSERT INTO messages (
         id, accountId, folderId, threadId, parentId, messageId, inReplyTo, "references", xForwardedMessageId, xComposeFormat, quotedHtmlEdited,
         subject, fromAddr, fromEmail, replyToAddr, toAddr, ccAddr, bccAddr, mailboxPath, imapUid, preview, date, dateValue,
         body, htmlBody, priority, hasSource, unread, flags, seen, answered, flagged, deleted, draft, recent,
         category, categoryScore, categorySignals, categoryManualState, listUnsubscribe, listId, sizeBytes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(accountId, id) DO UPDATE SET
+        folderId=excluded.folderId,
+        threadId=excluded.threadId,
+        parentId=excluded.parentId,
+        messageId=excluded.messageId,
+        inReplyTo=excluded.inReplyTo,
+        "references"=excluded."references",
+        xForwardedMessageId=excluded.xForwardedMessageId,
+        xComposeFormat=excluded.xComposeFormat,
+        quotedHtmlEdited=excluded.quotedHtmlEdited,
+        subject=excluded.subject,
+        fromAddr=excluded.fromAddr,
+        fromEmail=excluded.fromEmail,
+        replyToAddr=excluded.replyToAddr,
+        toAddr=excluded.toAddr,
+        ccAddr=excluded.ccAddr,
+        bccAddr=excluded.bccAddr,
+        mailboxPath=excluded.mailboxPath,
+        imapUid=excluded.imapUid,
+        preview=excluded.preview,
+        date=excluded.date,
+        dateValue=excluded.dateValue,
+        body=excluded.body,
+        htmlBody=excluded.htmlBody,
+        priority=excluded.priority,
+        hasSource=excluded.hasSource,
+        unread=excluded.unread,
+        flags=excluded.flags,
+        seen=excluded.seen,
+        answered=excluded.answered,
+        flagged=excluded.flagged,
+        deleted=excluded.deleted,
+        draft=excluded.draft,
+        recent=excluded.recent,
+        category=excluded.category,
+        categoryScore=excluded.categoryScore,
+        categorySignals=excluded.categorySignals,
+        categoryManualState=excluded.categoryManualState,
+        listUnsubscribe=excluded.listUnsubscribe,
+        listId=excluded.listId,
+        sizeBytes=excluded.sizeBytes,
+        pendingMoveSourceFolderId=NULL,
+        pendingMoveSourceMailboxPath=NULL,
+        pendingMoveSourceUid=NULL,
+        pendingMoveStartedAt=NULL
     `);
     const insertFts = db.prepare(`
-      INSERT INTO message_fts (messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ${SHARD_FTS_TABLE} (accountId, messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const deleteFts = db.prepare(`DELETE FROM message_fts WHERE messageId = ?`);
+    const deleteFts = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`);
     const deleteMessages = db.prepare(deleteSql);
     const existingScopeThreadIds =
       replaceExisting && folderId
@@ -338,9 +390,9 @@ export async function upsertMessages(
             if (!isSameMailboxMessageCopy(row, message)) {
               return;
             }
-            deleteAttachmentsForMessage.run(row.id);
+            deleteAttachmentsForMessage.run(accountId, row.id);
             deleteCalendarEventsForMessage.run(accountId, row.id);
-            deleteFts.run(row.id);
+            deleteFts.run(accountId, row.id);
             deleteMessageById.run(accountId, row.id);
             if (row.threadId) {
               dedupedThreadIds.add(row.threadId);
@@ -351,7 +403,7 @@ export async function upsertMessages(
           });
         }
         if (shouldDeleteAttachments) {
-          deleteAttachmentsForMessage.run(rowId);
+          deleteAttachmentsForMessage.run(accountId, rowId);
         }
         const preservedCalendarInviteStateByUid = new Map(
           (
@@ -470,8 +522,8 @@ export async function upsertMessages(
           manualCategoryStateByMessageId.get(rowId) ??
           manualCategoryStateByMessageId.get(message.id) ??
           null;
-        // INSERT OR REPLACE rewrites the whole row, so a source-less upsert
-        // (envelope-only sync fallback) would otherwise drop a size the
+        // A source-less upsert updates the row (envelope-only sync fallback),
+        // so preserve a size the
         // stored .eml still backs.
         const sizeBytes =
           typeof message.sizeBytes === "number" && Number.isFinite(message.sizeBytes)
@@ -511,7 +563,7 @@ export async function upsertMessages(
             : message.htmlBody;
         insertMessage.run(
           rowId,
-          message.accountId,
+          accountId,
           message.folderId,
           message.threadId,
           message.parentId ?? null,
@@ -553,8 +605,9 @@ export async function upsertMessages(
           message.listId ?? null,
           sizeBytes
         );
-        deleteFts.run(rowId);
+        deleteFts.run(accountId, rowId);
         insertFts.run(
+          accountId,
           rowId,
           message.subject,
           message.from,
@@ -586,6 +639,7 @@ export async function upsertMessages(
         });
         (message.attachments ?? []).forEach((att) => {
           insertAttachment.run(
+            accountId,
             att.id,
             rowId,
             att.filename,

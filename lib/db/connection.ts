@@ -18,6 +18,7 @@ import {
 } from "./schema";
 import { ensureTopicLearningRuntimeData } from "./topics";
 import { withDbWriteRetry } from "../dbWriteRetry";
+import { prepareAccountShardConnection } from "./shardFormat";
 
 const sqliteModulePromise = () => import("bun:sqlite" /* webpackIgnore: true */);
 let DatabaseCtor: any | null = null;
@@ -94,6 +95,12 @@ export function configureDb(
     db.exec("PRAGMA wal_autocheckpoint = 4000;");
     db.exec("PRAGMA journal_size_limit = 67108864;");
   }
+}
+
+/** Every writable shard handle, including handles that skip schema creation. */
+export function configureAccountDb(db: any, busyTimeoutMs = 15000) {
+  prepareAccountShardConnection(db);
+  configureDb(db, busyTimeoutMs, { accountShard: true });
 }
 
 let authDbInstance: any | null = null;
@@ -360,7 +367,12 @@ export async function getAccountDb(accountId: string) {
     await ensureDatabaseCtor();
     ensureDbParentDir(dbPath);
     const accountDb = new DatabaseCtor(dbPath);
-    configureDb(accountDb, 15000, { accountShard: true });
+    try {
+      configureAccountDb(accountDb);
+    } catch (error) {
+      accountDb.close();
+      throw error;
+    }
     accountDbInstances.set(dbPath, accountDb);
   }
   const accountDb = accountDbInstances.get(dbPath)!;
