@@ -1,3 +1,6 @@
+import { DurableSyncWorkerSemaphore } from "./durableSyncWorkerSemaphore";
+import { positiveInteger } from "./syncWorkerSemaphore";
+import { UnconfirmedWorkerExitError } from "./db/processLeases";
 import type { Database } from "bun:sqlite";
 import { createRequire } from "module";
 import { createHash, randomUUID } from "crypto";
@@ -43,6 +46,9 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
       return fn(db);
     } finally { db.close(); }
   };
+  const admission = config.sharedWorkerBudget ? new DurableSyncWorkerSemaphore(
+    positiveInteger(process.env.NOCTUA_MAX_SYNC_WORKERS, 2)
+  ) : undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const finish = (id: string, exitCode: number, error: string) => {
     withStore(db => db.transaction(() => {
@@ -70,10 +76,53 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
             .run(now, "Worker process is no longer running.", job.id);
         }
       }
-      const count = (db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status='running'").get() as { n: number }).n;
-      const queued = db.prepare("SELECT * FROM jobs WHERE status='queued' ORDER BY startedAt,id LIMIT ?")
+      // Recover an unspawned claim only after its owning process has exited.
+      db.prepare("SELECT id,ownerPid FROM jobs WHERE status='queued' AND ownerPid IS NOT NULL").all().forEach((job: any) => {
+        if (!liveProcess(job.ownerPid)) db.prepare("UPDATE jobs SET ownerPid=NULL WHERE id=?").run(job.id);
+      });
+      const count = (db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status='running' OR (status='queued' AND ownerPid IS NOT NULL)").get() as { n: number }).n;
+      const queued = db.prepare("SELECT * FROM jobs WHERE status='queued' AND ownerPid IS NULL ORDER BY startedAt,id LIMIT ?")
         .all(Math.max(0, config.maxConcurrentJobs! - count)) as StoredJob[];
       for (const job of queued) {
+        if (admission) {
+          // Claim under the cross-process registry lock, then wait in the same
+          // durable master queue used by sync and watcher jobs.
+          db.prepare("UPDATE jobs SET ownerPid=? WHERE id=?").run(process.pid, job.id);
+          admission.enqueue(job.id, 5, release => {
+            void (async () => {
+              let childExit: Promise<number> | undefined;
+              let stopChild: (() => void) | undefined;
+              let exitConfirmed = false;
+              try {
+                const child = await admission.spawn(job.id, () => Bun.spawn(
+                  [...(config.commandPrefix ?? []), "bun", "run", config.scriptPath, job.accountId,
+                    ...JSON.parse(job.argsJson), "--worker-lease", job.id, admission.owner],
+                  { cwd: process.cwd(), env: { ...process.env }, stdout: config.spawnStdout ?? "ignore", stderr: config.spawnStderr ?? "pipe" }
+                ));
+                childExit = child.exited;
+                stopChild = () => child.kill("SIGKILL");
+                withStore(store => store.prepare("UPDATE jobs SET status='running',pid=? WHERE id=?").run(child.pid, job.id));
+                const stderr = config.readStderrText !== false && child.stderr instanceof ReadableStream ? new Response(child.stderr).text().catch(() => "") : Promise.resolve("");
+                const code = await child.exited;
+                exitConfirmed = true;
+                await release();
+                finish(job.id, code, (await stderr).trim() || `Worker exited with code ${code}`);
+              } catch (error) {
+                // A failed spawn may have created a child; the lease helper
+                // retains its slot unless child exit was positively confirmed.
+                if (childExit && !exitConfirmed) {
+                  try { stopChild?.(); } catch { /* still await positive exit confirmation */ }
+                  try { await childExit; exitConfirmed = true; } catch { /* retain lease */ }
+                }
+                if (!(error instanceof UnconfirmedWorkerExitError) && (!childExit || exitConfirmed)) await release();
+                withStore(store => store.prepare("UPDATE jobs SET status='failed',finishedAt=?,error=? WHERE id=?")
+                  .run(Date.now(), error instanceof Error ? error.message : "Failed to start worker", job.id));
+                pump();
+              }
+            })();
+          }, job.accountId);
+          continue;
+        }
         try {
           const bun = (globalThis as typeof globalThis & { Bun?: any }).Bun;
           if (!bun?.spawn) throw new Error(config.runtimeMissingMessage ?? "Bun runtime is required to spawn a worker.");
@@ -82,7 +131,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
           });
           db.prepare("UPDATE jobs SET status='running',pid=?,ownerPid=? WHERE id=?").run(child.pid, process.pid, job.id);
           // Consume stderr immediately so a full pipe cannot deadlock the worker.
-          const stderr = config.readStderrText !== false && child.stderr ? new Response(child.stderr).text().catch(() => "") : Promise.resolve("");
+          const stderr = config.readStderrText !== false && child.stderr instanceof ReadableStream ? new Response(child.stderr).text().catch(() => "") : Promise.resolve("");
           void child.exited.then(async (code: number) => finish(job.id, code, (await stderr).trim() || `Worker exited with code ${code}`));
         } catch (error) {
           db.prepare("UPDATE jobs SET status='failed',finishedAt=?,error=? WHERE id=?")

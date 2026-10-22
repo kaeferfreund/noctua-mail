@@ -97,10 +97,9 @@ export async function upsertMessages(
   options: { recomputeThreads?: boolean } = {}
 ) {
   return withDbWriteRetry("upsertMessages", async () => {
-    if (nextMessages.some(message => message.accountId !== accountId)) throw new Error("Message belongs to another account");
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     if (nextMessages.some(message => message.accountId !== accountId)) {
-      throw new Error("Message accountId must match the destination account");
+      throw new Error("Message accountId must match the destination account; message belongs to another account");
     }
     // Expose the final storage identity to callers that persist source/attachment files.
     const messageRowIds = new Map<string, string>();
@@ -366,9 +365,6 @@ export async function upsertMessages(
               .find(row => isSameMailboxMessageCopy(row, message))
           : undefined;
         let rowId = priorCopy?.id ?? message.id;
-        // A shared shard may contain the same external Message-ID for two accounts.
-        const foreignRow = db.prepare("SELECT 1 FROM messages WHERE id=? AND accountId<>?").get(rowId, accountId);
-        if (foreignRow) rowId = `${rowId}-${createHash("sha1").update(accountId).digest("hex").slice(0, 12)}`;
         const existingById = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId) ?? priorCopy) as
           | {
               id: string;
@@ -389,7 +385,7 @@ export async function upsertMessages(
         if (existingById && !isSameMailboxMessageCopy(existingById, message)) {
           rowId = buildMessageCollisionVariantId(
             message.id,
-            foreignRow ? `${accountId}|${message.mailboxPath ?? message.folderId}` : message.mailboxPath ?? message.folderId,
+            message.mailboxPath ?? message.folderId,
             message.imapUid ?? null
           );
           // Keep any existing on-disk blobs attached to the base message id.

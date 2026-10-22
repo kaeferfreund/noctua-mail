@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { FileText, Plus, RefreshCw, SquarePen } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
+import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
 import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
 import { Button } from "@/app/components/ui/button";
@@ -46,6 +47,7 @@ export type ShellSidebarProps = {
   };
   mailboxes: {
     accounts: ShellAccount[];
+    summaries?: readonly UserMailboxSummary[];
     activeAccountId: string;
     onSwitch: (accountId: string) => void;
     onAdd?: () => void;
@@ -63,8 +65,9 @@ export type ShellSidebarProps = {
 export function MailboxRows({
   accounts,
   activeAccountId,
-  onSwitch
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "onSwitch">) {
+  onSwitch,
+  summaries
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "onSwitch" | "summaries">) {
   return (
     <div className="space-y-1">
       {groupMailboxes(accounts).map((group) => (
@@ -88,6 +91,11 @@ export function MailboxRows({
                   </Avatar>
                   <span>{mailboxLabel(account)}</span>
                 </SidebarMenuButton>
+                {summaries?.find(mailbox => mailbox.accountId === account.id)?.unread != null && (
+                  <SidebarMenuBadge aria-label={`${summaries.find(mailbox => mailbox.accountId === account.id)!.unread} unread`}>
+                    {summaries.find(mailbox => mailbox.accountId === account.id)!.unread}
+                  </SidebarMenuBadge>
+                )}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -191,6 +199,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                 {mine.length > 0 ? (
                   <MailboxRows
                     accounts={mine}
+                    summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
                   />
@@ -205,6 +214,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                 <SidebarGroupContent>
                   <MailboxRows
                     accounts={shared}
+                    summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
                   />

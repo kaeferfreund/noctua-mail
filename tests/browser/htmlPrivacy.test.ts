@@ -29,15 +29,15 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
   const scratch = await mkdtemp(path.join(process.cwd(), ".tmp/html-privacy-"));
   const requests: { path: string; referer: string | null }[] = [];
   const tracker = createServer((request, response) => {
-    requests.push({ path: new URL(request.url!, "http://127.0.0.1:3825").pathname, referer: request.headers.referer ?? null });
+    requests.push({ path: new URL(request.url!, "http://127.0.0.1:3799").pathname, referer: request.headers.referer ?? null });
     response.writeHead(200, { "Content-Type": "image/gif", "Cache-Control": "no-store" });
     response.end(Buffer.from("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=", "base64"));
   });
   let app: Server | undefined;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
-    await listen(tracker, 3825);
-    const remote = "http://127.0.0.1:3825";
+    await listen(tracker, 3799);
+    const remote = "http://127.0.0.1:3799";
     const html = `<html><head>
       <link rel="stylesheet" href="${remote}/stylesheet">
       <style>@import url("${remote}/import");
@@ -83,7 +83,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
       try {
         const chunks: Buffer[] = [];
         for await (const chunk of request) chunks.push(Buffer.from(chunk));
-        const result = await respond(new URL(request.url!, "http://127.0.0.1:3824"), request.method, Buffer.concat(chunks).toString());
+        const result = await respond(new URL(request.url!, "http://127.0.0.1:3798"), request.method, Buffer.concat(chunks).toString());
         response.statusCode = result.status;
         result.headers.forEach((value, key) => response.setHeader(key, value));
         response.end(Buffer.from(await result.arrayBuffer()));
@@ -92,20 +92,20 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
         response.end(String(error));
       }
     });
-    await listen(app, 3824);
+    await listen(app, 3798);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const waitForReaderImages = () => page.waitForFunction(() => {
       const frame = document.querySelector<HTMLIFrameElement>('iframe[title="HTML message"]');
       const images = Array.from(frame?.contentDocument?.images ?? []);
-      return images.length === 2 && images.every(img => img.complete && img.naturalWidth > 0 && img.currentSrc.startsWith("http://127.0.0.1:3825/"));
+      return images.length === 2 && images.every(img => img.complete && img.naturalWidth > 0 && img.currentSrc.startsWith("http://127.0.0.1:3799/"));
     });
     // All browser traffic is synthetic and local, including dependency mistakes.
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
-      return url.hostname === "127.0.0.1" && ["3824", "3825"].includes(url.port) ? route.continue() : route.abort();
+      return url.hostname === "127.0.0.1" && ["3798", "3799"].includes(url.port) ? route.continue() : route.abort();
     });
-    await page.goto("http://127.0.0.1:3824/");
+    await page.goto("http://127.0.0.1:3798/");
     await page.getByRole("button", { name: "Load once" }).waitFor();
     await page.waitForLoadState("networkidle");
     expect(requests).toEqual([]);
@@ -121,14 +121,14 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
       expect((await savePrefs(JSON.stringify({ remoteContent: null }))).status).toBe(200);
       expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }))).status).toBe(200);
       requests.length = 0;
-      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/?case=${index}`);
       await page.getByRole("button", { name: "Always load from this sender" }).waitFor();
       await page.waitForLoadState("networkidle");
       expect(requests, name).toEqual([]);
-      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/standalone?case=${index}`);
       await page.waitForLoadState("networkidle");
       expect(requests, name).toEqual([]);
-      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/?case=${index}`);
       await page.getByRole("button", { name: "Always load from this sender" }).click();
       await page.getByRole("button", { name: "Always load from this sender" }).waitFor({ state: "hidden" });
       await waitForReaderImages();
@@ -141,16 +141,16 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
       await waitForReaderImages();
       expect(requests.map(request => request.path).sort(), name).toEqual(["/picture", "/pixel"]);
       requests.length = 0;
-      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/standalone?case=${index}`);
       await page.waitForLoadState("networkidle");
       expect(requests.map(request => request.path).sort(), name).toEqual(["/picture", "/pixel"]);
       expect(requests.every(request => request.referer === null), name).toBe(true);
     }
     requests.length = 0;
-    await page.goto("http://127.0.0.1:3824/standalone");
+    await page.goto("http://127.0.0.1:3798/standalone");
     await page.waitForLoadState("networkidle");
     expect(requests).toEqual([]);
-    await page.goto("http://127.0.0.1:3824/standalone?remoteContent=allow");
+    await page.goto("http://127.0.0.1:3798/standalone?remoteContent=allow");
     await page.waitForLoadState("networkidle");
     expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
     expect(requests.every(request => request.referer === null)).toBe(true);
