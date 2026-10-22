@@ -1,51 +1,3 @@
-/* One quiet toolbar row at every list width: the count on the left shrinks
-   and truncates first, the menu cluster on the right stays intact. */
-.header {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-width: 0;
-  margin-bottom: 4px;
-}
-
-.meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.count {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--gray-11);
-  font-size: 12px;
-  line-height: 16px;
-  font-variant-numeric: tabular-nums;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: 0 0 auto;
-}
-
-/* Square ghost icon buttons matching the 24px menu triggers: no optical
-   negative margins, fixed box instead of the ghost variant's fit-content. */
-.iconButton {
-  flex-shrink: 0;
-  width: var(--space-5);
-  height: var(--space-5);
-  margin: 0;
-  padding: 0;
-}
-
 /* Menu content is portalled outside the Radix Themes root, so it uses the
    shell tokens; these unlayered rules override the trigger-width default. */
 .viewMenu {
@@ -63,11 +15,4 @@
   color: var(--muted-foreground);
   font-size: 12px;
   line-height: 16px;
-}
-
-@media (pointer: coarse) {
-  .iconButton {
-    width: var(--space-6);
-    height: var(--space-6);
-  }
 }
