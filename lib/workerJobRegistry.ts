@@ -140,5 +140,5 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
   };
 
   const getLatestJob = (accountId: string) => [...jobs.values()].filter(job => job.accountId === accountId).at(-1) ?? null;
-  return { getJob, startJob, getLatestJob };
+  return { getJob, startJob, getLatestJob, settleJob: async (_id: string) => { void _id; } };
 }

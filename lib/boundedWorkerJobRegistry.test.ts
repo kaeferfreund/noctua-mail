@@ -88,6 +88,7 @@ test("identity workers wait for the shared sync lease budget and release it afte
     const registry = createWorkerJobRegistry({ scriptPath: "synthetic-worker.ts", registryName: crypto.randomUUID(),
       maxConcurrentJobs: 2, sharedWorkerBudget: true });
     const job = registry.startJob(identityAccount, ["--identities"]);
+    await registry.settleJob(job.id);
     expect(registry.startJob(identityAccount).id).toBe(job.id);
     const db = await getDb();
     await waitFor(() => !!db.prepare("SELECT 1 FROM sync_worker_queue WHERE jobId=?").get(job.id));

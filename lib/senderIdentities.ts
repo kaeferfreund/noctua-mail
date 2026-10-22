@@ -1,4 +1,4 @@
-import { startIdentityRecomputeJob, getIdentityRecomputeJob } from "./threadRecomputeJobs";
+import { startIdentityRecomputeJob, getIdentityRecomputeJob, settleIdentityRecomputeAdmission } from "./threadRecomputeJobs";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { SenderIdentity } from "./data";
@@ -86,6 +86,8 @@ export { listSenderIdentities } from "./db/senderIdentities";
 /** Commit configuration first; a failed rebuild is exposed for retry and never undoes it. */
 export async function createSenderIdentityWithRecompute(accountId: string, input: unknown, actor: IdentityActor) {
   const identity = await createSenderIdentity(accountId, input, actor);
+  const pending = getIdentityRecomputeJob(accountId);
+  if (pending) await settleIdentityRecomputeAdmission(pending.id);
   const recomputeJob = getIdentityRecomputeJob(accountId);
   return { identity, recomputeJob };
 }
