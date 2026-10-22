@@ -36,6 +36,7 @@
 @media (width < 768px) {
   .pane { padding: 8px; }
   .pane :global([data-message-list-row="true"]) { min-height: 44px; }
-  .pane :global([data-message-list-row="true"] button) { min-width: 44px; min-height: 44px; }
-  .pane :global([data-message-list-row="true"] button[aria-label="Message actions"]) { display: inline-flex; visibility: visible; opacity: 1; }
+  /* Only the explicit action buttons get the 44px touch target; the unread dot and
+     other glyph buttons keep their size, otherwise they render as large hollow circles. */
+  .pane :global([data-message-list-row="true"] button[aria-label="Message actions"]) { display: inline-flex; visibility: visible; opacity: 1; min-width: 44px; min-height: 44px; }
 }
