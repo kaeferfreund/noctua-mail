@@ -717,15 +717,15 @@ it('R5-denial: older 403 after newer accepted success cannot revoke account', as
   expect(h.denials).toEqual([]);
 });
 
-it("R5-idempotence: equal complete revisions accept identical data and reject conflicting data", async () => {
+it("R6-order: later-started equal-revision GET accepts identical or differing content", async () => {
   const h = harness();
   const baseline = state();
   await h.read(0, snapshot(baseline));
   await h.reload(); await h.read(1, snapshot(baseline));
   expect(h.updates).toHaveLength(2);
   await h.reload(); await h.read(2, snapshot(state({ status: "closed" })));
-  expect(h.visible().state).toEqual(baseline);
-  expect(h.updates).toHaveLength(2);
+  expect(h.visible().state).toEqual(state({ status: "closed" }));
+  expect(h.updates).toHaveLength(3);
 });
 
 it("R5-completion: same-revision GET completes a partial mutation response with earlier collaborator notes", async () => {
@@ -747,8 +747,213 @@ it("R5-idempotence: a late same-revision mutation preserves complete GET authori
   const existing = note("Synthetic existing note", T, 2);
   await h.reload(); await h.read(1, snapshot(committed, [existing]));
   expect(await h.finish(0, json({ ok: true, state: committed }), op, failedRead())).toBe(true);
-  await h.reload(); await h.read(3, snapshot(committed, [{ ...existing, body: "Synthetic conflicting body" }]));
   expect(h.visible().comments).toEqual([existing]);
+  const refreshed = { ...existing, body: "Synthetic refreshed body" };
+  await h.reload(); await h.read(3, snapshot(committed, [refreshed]));
+  expect(h.visible().comments).toEqual([refreshed]);
+});
+
+
+it("R6-partial: later add preserves collaborator edit and deletion already accepted by GET when refresh fails", async () => {
+  const h = harness();
+  const original = { ...note("Synthetic original edit target", T, 1), id: "edit-target" };
+  const removed = { ...note("Synthetic delete target", T, 2), id: "delete-target" };
+  await h.read(0, snapshot(state({ revision: 2, commentCount: 2 }), [original, removed]));
+  const op = await h.start(c => c.addNote("Synthetic added note"));
+  const edited = { ...original, body: "Synthetic collaborator edited", revision: 3 };
+  await h.reload(); await h.read(1, snapshot(state({ revision: 4, commentCount: 1 }), [edited]));
+  const added = { ...note("Synthetic added note", T, 5), id: "own-added" };
+  const committed = state({ revision: 5, commentCount: 2 });
+  expect(await h.finish(0, json({ ok: true, state: committed, comment: added }), op, failedRead())).toBe(true);
+  expect(h.current().comments).toEqual([edited, added]);
+  expect(h.current().state).toEqual(committed);
+  expect(h.current().error).toBeNull();
+  expect(h.current().pending).toBe(false);
+});
+
+// Real service evidence for these lifecycle responses is in lib/threadCollab.revision.test.ts.
+// Message presence controls comment/activity visibility but does not bump revision.
+for (const direction of ["restore", "hide"] as const) it(`R6-lifecycle: equal-revision complete GET must ${direction} comments and activity when message presence changes`, async () => {
+  const h = harness();
+  const historical = state({ revision: 2, commentCount: 1 });
+  const comment = note("Synthetic historical note", T, 2);
+  const activity = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_added", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: comment.id }, createdAt: T }];
+  const full = () => json({ ok: true, state: historical, comments: [comment], activity, members });
+  await h.read(0, direction === "restore" ? snapshot(historical) : full());
+  await h.reload(); await h.read(1, direction === "restore" ? full() : snapshot(historical));
+  expect(h.current().comments).toEqual(direction === "restore" ? [comment] : []);
+  expect(h.current().activity).toEqual(direction === "restore" ? activity : []);
+});
+
+it("R6-lifecycle-activity: equal-revision complete GET must restore activity even without comments", async () => {
+  const h = harness(); const historical = state({ revision: 2, status: "waiting" });
+  const activity = [{ id: "synthetic-status-history", accountId: "a", threadId: "X", type: "status_changed", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { from: "open", to: "waiting" }, createdAt: T }];
+  await h.read(0, snapshot(historical)); // Historical state while message-less.
+  const restored = () => json({ ok: true, state: historical, comments: [], activity, members });
+  await h.reload(); await h.read(1, restored());
+  await h.reload(); await h.read(2, restored()); // A repeated latest-started read also preserves restored activity.
+  expect(h.current().comments).toEqual([]);
+  expect(h.current().activity).toEqual(activity);
+});
+
+
+for (const resolvesLast of ["earlier", "later"] as const) {
+  it(`R6-order: latest-started equal-revision GET wins (${resolvesLast} resolves last)`, async () => {
+    const h = harness(); await h.read(0, snapshot());
+    const historical = state({ revision: 2, commentCount: 1 });
+    const comment = note("Synthetic historical", T, 2);
+    const activity = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_added", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: comment.id }, createdAt: T }];
+    const expanded = [...members, { ...members[0], userId: "synthetic-new", email: "new@example.test" }];
+    await h.reload(); await h.reload();
+    const earlier = () => snapshot(historical); // Message absent when this read ran.
+    const later = () => json({ ok: true, state: historical, comments: [comment], activity, members: expanded });
+    if (resolvesLast === "earlier") {
+      await h.read(2, later());
+      const published = h.updates.length;
+      await h.read(1, earlier());
+      expect(h.updates).toHaveLength(published);
+    } else {
+      await h.read(1, earlier()); await h.read(2, later());
+    }
+    expect(h.current().state).toEqual(historical);
+    expect(h.current().comments).toEqual([comment]);
+    expect(h.current().activity).toEqual(activity);
+    expect(h.current().members).toEqual(expanded);
+  });
+}
+
+it("R6-order: higher revision wins regardless of request start", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  await h.reload(); await h.reload();
+  const olderRevision = state({ revision: 2, status: "waiting" });
+  const higherRevision = state({ revision: 3, status: "closed" });
+  await h.read(2, snapshot(olderRevision));
+  await h.read(1, snapshot(higherRevision)); // Earlier request, higher revision.
+  expect(h.current().state).toEqual(higherRevision);
+  const published = h.updates.length;
+  await h.reload(); await h.read(3, snapshot(olderRevision));
+  expect(h.current().state).toEqual(higherRevision);
+  expect(h.updates).toHaveLength(published);
+});
+
+for (const conflicting of [false, true]) {
+  it(`R6-partial: equal-revision success preserves complete lists and merges its comment (${conflicting ? "conflicting" : "missing"} comment)`, async () => {
+    const h = harness(); await h.read(0, snapshot());
+    const op = await h.start(c => c.addNote("Synthetic own"));
+    const committed = state({ revision: 3, commentCount: 2 });
+    const existing = { ...note("Synthetic collaborator", T, 2), id: "collaborator" };
+    const own = note("Synthetic own", T, 3);
+    const acceptedOwn = { ...own, body: "Synthetic accepted revision-3 body" };
+    const activity = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_added", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: own.id }, createdAt: T }];
+    await h.reload(); // An earlier request must stay obsolete across partial acceptance.
+    await h.reload();
+    await h.read(2, json({ ok: true, state: committed, comments: conflicting ? [existing, acceptedOwn] : [existing], activity, members }));
+    expect(await h.finish(0, json({ ok: true, state: committed, comment: own }), op, failedRead())).toBe(true);
+    const expected = [existing, conflicting ? acceptedOwn : own];
+    expect(h.current().comments).toEqual(expected);
+    expect(h.current().activity).toEqual(activity);
+    expect(h.current().error).toBeNull();
+    const published = h.updates.length;
+    await h.read(1, snapshot(committed));
+    expect(h.current().comments).toEqual(expected);
+    expect(h.current().activity).toEqual(activity);
+    expect(h.updates).toHaveLength(published);
+    // The partial response retained the last complete GET's start, not its own owner.
+    await h.reload(); await h.read(4, snapshot(committed));
+    expect(h.current().comments).toEqual([]);
+    expect(h.current().activity).toEqual([]);
+  });
+}
+
+it("R6-partial: equal-revision deletion keeps complete GET lists", async () => {
+  const h = harness();
+  const existing = note("Synthetic retained note", T, 1);
+  await h.read(0, snapshot(state({ commentCount: 1 }), [existing]));
+  const op = await h.start(c => c.deleteNote(existing.id));
+  const committed = state({ revision: 2 });
+  const activity = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_deleted", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: existing.id }, createdAt: T }];
+  await h.reload(); await h.read(1, json({ ok: true, state: committed, comments: [existing], activity, members }));
+  expect(await h.finish(0, json({ ok: true, state: committed }), op, failedRead())).toBe(true);
+  expect(h.current().comments).toEqual([existing]);
+  expect(h.current().activity).toEqual(activity);
+});
+
+for (const contradiction of ["missing", "different"] as const) {
+  it(`R6-completion: equal-revision GET cannot contradict its written comment (${contradiction})`, async () => {
+    const h = harness(); await h.read(0, snapshot());
+    const op = await h.start(c => c.addNote("Synthetic own"));
+    const committed = state({ revision: 2, commentCount: 1 });
+    const own = note("Synthetic own", T, 2);
+    expect(await h.finish(0, json({ ok: true, state: committed, comment: own }), op,
+      snapshot(committed, contradiction === "missing" ? [] : [{ ...own, body: "Synthetic contradiction" }]))).toBe(true);
+    expect(h.current().comments).toEqual([own]);
+    const earlier = { ...note("Synthetic earlier", T, 1), id: "earlier" };
+    await h.reload(); await h.read(2, snapshot(committed, [earlier, own]));
+    expect(h.current().comments).toEqual([earlier, own]);
+    // Once completed, a later complete GET may reflect message disappearance.
+    await h.reload(); await h.read(3, snapshot(committed));
+    expect(h.current().comments).toEqual([]);
+  });
+}
+
+it("R6-completion: equal-revision GET cannot contradict partial state", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  const op = await h.start(c => c.update({ status: "closed" }));
+  const committed = state({ revision: 2, status: "closed" });
+  expect(await h.finish(0, json({ ok: true, state: committed }), op,
+    snapshot({ ...committed, status: "waiting" }))).toBe(true);
+  expect(h.current().state).toEqual(committed);
+  await h.reload(); await h.read(2, snapshot(committed));
+  expect(h.current().state).toEqual(committed);
+});
+
+for (const readWins of [false, true]) {
+  it(`R6-rollback: only the owning optimistic snapshot rolls back (${readWins ? "GET owns" : "mutation owns"})`, async () => {
+    const h = harness(); await h.read(0, snapshot());
+    await h.reload(); // Read starts BEFORE the mutation and retains a lower owner.
+    const op = await h.start(c => c.update({ status: "closed" }));
+    if (readWins) await h.read(1, snapshot()); // Same revision takes ownership.
+    const published = h.updates.length;
+    expect(await h.finish(0, failedRead(), op)).toBe(false);
+    expect(h.current().state).toEqual(state());
+    expect(h.updates).toHaveLength(published + (readWins ? 0 : 1));
+    expect(h.current().pending).toBe(false);
+    if (!readWins) await h.read(1, snapshot());
+  });
+}
+
+it("R6-scope: session/account/thread isolation", async () => {
+  const h = harness(); await h.read(0, snapshot(state({ status: "closed" })));
+  await h.reload();
+  h.navigate({ thread: "Y" });
+  expect(h.current().state).toBeUndefined();
+  await h.read(2, snapshot(state({ threadId: "Y", status: "waiting" })));
+  h.navigate({ account: "b", thread: "X" });
+  expect(h.current().state).toBeUndefined();
+  await h.read(3, snapshot(state({ accountId: "b", status: "in_progress" })));
+  h.navigate({ account: "a", session: "s2" });
+  expect(h.current().state).toBeUndefined();
+  await h.read(4, snapshot());
+  await h.read(1, snapshot(state({ revision: 9, status: "waiting" })));
+  expect(h.current().state).toEqual(state());
+  h.navigate({ session: "s1" });
+  expect(h.current().state?.status).toBe("closed");
+  await h.read(5, snapshot(state({ status: "closed" })));
+});
+
+it("R6-repair: failed post-commit refresh is repaired by the next successful read", async () => {
+  const h = harness(); await h.read(0, snapshot());
+  const op = await h.start(c => c.addNote("Synthetic own"));
+  const committed = state({ revision: 3, commentCount: 2 });
+  const own = note("Synthetic own", T, 3);
+  const earlier = { ...note("Synthetic earlier", T, 2), id: "earlier" };
+  expect(await h.finish(0, json({ ok: true, state: committed, comment: own }), op, failedRead())).toBe(true);
+  expect(h.current().comments).toEqual([own]);
+  expect(h.current().error).toBeNull();
+  const activity = [{ id: "synthetic-history", accountId: "a", threadId: "X", type: "comment_added", actorUserId: "synthetic-editor", actorClientId: "web:test", payload: { commentId: own.id }, createdAt: T }];
+  await h.reload(); await h.read(2, json({ ok: true, state: committed, comments: [earlier, own], activity, members }));
+  expect(h.current().comments).toEqual([earlier, own]);
+  expect(h.current().activity).toEqual(activity);
 });
 
 });
