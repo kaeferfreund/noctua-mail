@@ -10,6 +10,7 @@ import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 
 import type React from "react";
+import dynamic from "next/dynamic";
 import {
   startTransition,
   useCallback,
@@ -116,6 +117,7 @@ import {
   Card,
   Flex,
   IconButton,
+  Spinner,
   Text
 } from "@radix-ui/themes";
 import MessageViewOrchestrator, {
@@ -233,7 +235,8 @@ import type {
   Topic,
   TopicColor,
 } from "@/lib/data";
-import AccountSettingsModal, { type ManageTab } from "./AccountSettingsModal";
+import type { ManageTab } from "./AccountSettingsModal";
+import { deferUntilIdle } from "./mailclient/deferUntilIdle";
 import {
   buildSentMessageFromDraft,
   computeGroupMeta,
@@ -291,6 +294,20 @@ import {
 } from "@/lib/recipientLists";
 import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
+
+const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40"
+      role="status"
+      aria-label="Settings"
+      aria-busy="true"
+    >
+      <Spinner size="3" />
+    </div>
+  )
+});
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
 const LOCAL_DELETE_RECONCILE_SUPPRESS_MS = 15_000;
@@ -384,6 +401,11 @@ export default function MailClient({
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  useEffect(() => deferUntilIdle(() => {
+    // Speculative warm-up must not surface an unhandled rejection. A cold open
+    // still loads through next/dynamic, including when this request fails.
+    void import("./AccountSettingsModal").catch(() => {});
+  }), []);
   const [reloginAccountId, setReloginAccountId] = useState("");
   const [reloginDescription, setReloginDescription] = useState("");
   const [listWidth, setListWidth] = useState(840);
