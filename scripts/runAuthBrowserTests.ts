@@ -31,7 +31,7 @@ try {
   await requireFreePort();
   if(process.env.AUTH_BROWSER_USE_BUILD!=="1")await run(["run","build"]);
   await run(["scripts/authBrowserSeed.ts"]);
-  server=spawn("bun",["--bun","next","start","--port",String(port),"--hostname","localhost"],{cwd:root,env,stdio:"inherit"});
+  server=spawn("bun",["--bun","next","start","--port",String(port),"--hostname","localhost"],{cwd:root,env,stdio:"inherit",detached:true});
   let ready=false;
   for(let attempt=0;attempt<120;attempt++) {
     if(server.exitCode!==null)throw new Error("Browser harness server exited during startup");
@@ -41,10 +41,16 @@ try {
   if(!ready)throw new Error("Browser harness readiness timed out");
   await run(["x","playwright","test","--config=playwright.auth.config.ts",...process.argv.slice(2)]);
 } finally {
-  if(server&&server.exitCode===null) {
-    server.kill("SIGTERM");
-    await Promise.race([new Promise<void>(resolve=>server!.once("exit",()=>resolve())),delay(5000)]);
-    if(server.exitCode===null)server.kill("SIGKILL");
+  if(server?.pid) {
+    // This private process group also owns mailbox workers spawned by the shell.
+    // Stopping only Next leaves those workers retrying after scratch removal.
+    const signalGroup = (signal: NodeJS.Signals) => {
+      try { process.kill(-server!.pid!, signal); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
+    };
+    signalGroup("SIGTERM");
+    if(server.exitCode===null) await Promise.race([new Promise<void>(resolve=>server!.once("exit",()=>resolve())),delay(5000)]);
+    signalGroup("SIGKILL");
   }
   rmSync(scratch,{recursive:true,force:true});
 }
