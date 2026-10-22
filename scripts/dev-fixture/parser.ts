@@ -1,27 +1,42 @@
 /** Small wire/MIME helpers. Operate on bytes for RFC822 literals, never JS character counts. */
-export function tokens(input: string): string[] {
-  const result: string[] = [];
-  let i = 0;
-  while (i < input.length) {
-    if (/\s/.test(input[i])) { i++; continue; }
-    if ('()'.includes(input[i])) { result.push(input[i++]); continue; }
-    if (input[i] === '"') {
-      let value = "";
-      i++;
-      while (i < input.length && input[i] !== '"') value += input[i] === "\\" ? input[++i] ?? "" : input[i], i++;
-      i++;
-      result.push(value);
+export type LiteralToken = { kind: "literal"; data: Buffer };
+export type CommandPart = string | LiteralToken;
+export function tokens(parts: readonly CommandPart[]): CommandPart[] {
+  const result: CommandPart[] = [];
+  for (const part of parts) {
+    if (typeof part !== "string") {
+      if (part.kind !== "literal" || !Buffer.isBuffer(part.data)) throw new Error("Invalid literal token");
+      result.push(part);
       continue;
     }
-    const start = i;
-    let bracket = 0;
-    while (i < input.length) {
-      if (input[i] === "[") bracket++;
-      if (input[i] === "]") bracket--;
-      if (!bracket && /[\s()]/.test(input[i])) break;
-      i++;
+    let i = 0;
+    while (i < part.length) {
+      if (/\s/.test(part[i])) { i++; continue; }
+      if ('()'.includes(part[i])) { result.push(part[i++]); continue; }
+      if (part[i] === '"') {
+        let value = "";
+        i++;
+        while (i < part.length && part[i] !== '"') {
+          if (part[i] === "\\") {
+            if (++i === part.length) throw new Error("Unclosed quoted string");
+          }
+          value += part[i++];
+        }
+        if (part[i++] !== '"') throw new Error("Unclosed quoted string");
+        result.push(value);
+        continue;
+      }
+      const start = i;
+      let bracket = 0;
+      while (i < part.length) {
+        if (part[i] === "[") bracket++;
+        if (part[i] === "]" && --bracket < 0) throw new Error("Unexpected closing bracket");
+        if (!bracket && /[\s()]/.test(part[i])) break;
+        i++;
+      }
+      if (bracket) throw new Error("Unclosed section bracket");
+      result.push(part.slice(start, i));
     }
-    result.push(input.slice(start, i));
   }
   return result;
 }
@@ -64,6 +79,26 @@ export function parseMime(raw: Buffer): MimeNode {
     }
   }
   return { raw, header, body, headers, type, subtype: subtype ?? "plain", params, children };
+}
+/** Decode transfer bytes before interpreting their declared charset. */
+export function decodeQuotedPrintable(value: string): Buffer {
+  return Buffer.from(value.replace(/=[\t ]*\r?\n/g, "").replace(/=([a-f0-9]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))), "latin1");
+}
+function decodeText(bytes: Buffer, charset = "utf-8"): string {
+  try { return new TextDecoder(charset).decode(bytes); }
+  catch { return bytes.toString("utf8"); }
+}
+export function decodeWords(value: string): string {
+  // Whitespace between adjacent encoded words is folding, not visible text.
+  return value.replace(/(\?=)[ \t\r\n]+(?==\?[^?]+\?[bq]\?)/gi, "$1")
+    .replace(/=\?([^?]+)\?([bq])\?([^?]*)\?=/gi, (_, charset: string, encoding: string, data: string) =>
+      decodeText(encoding.toLowerCase() === "b" ? Buffer.from(data, "base64") : decodeQuotedPrintable(data.replace(/_/g, " ")), charset));
+}
+export function searchableBody(node: MimeNode): string {
+  if (node.children.length) return node.children.map(searchableBody).join(" ");
+  const encoding = node.headers.get("content-transfer-encoding")?.toLowerCase();
+  const bytes = encoding === "base64" ? Buffer.from(node.body.toString(), "base64") : encoding === "quoted-printable" ? decodeQuotedPrintable(node.body.toString("latin1")) : node.body;
+  return decodeText(bytes, node.params.get("charset"));
 }
 const paramList = (params: Map<string, string>) => params.size ? `(${[...params].flatMap(([k, v]) => [quote(k.toUpperCase()), quote(v)]).join(" ")})` : "NIL";
 export function bodyStructure(node: MimeNode): string {
