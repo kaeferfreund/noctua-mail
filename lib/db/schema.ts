@@ -583,6 +583,21 @@ function ensureAdminInvite(db: any): InviteCode {
 
 export function initMasterSchema(db: any) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_worker_leases (
+      slot INTEGER PRIMARY KEY, jobId TEXT UNIQUE NOT NULL, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL,
+      ownerPid INTEGER NOT NULL, pid INTEGER, expiresAt INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sync_worker_queue (
+      jobId TEXT PRIMARY KEY, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL, ownerPid INTEGER NOT NULL,
+      priority INTEGER NOT NULL, queuedAt INTEGER NOT NULL, bypasses INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS mailbox_watcher_auth (
+      accountId TEXT PRIMARY KEY, identity TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mailbox_watcher_lease (
+      slot INTEGER PRIMARY KEY CHECK(slot=1), ownerInstance TEXT NOT NULL,
+      pid INTEGER NOT NULL, expiresAt INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

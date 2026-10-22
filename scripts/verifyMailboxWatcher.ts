@@ -1,6 +1,7 @@
 /** Synthetic end-to-end proof, run in its own process to isolate SQLite/env/module mocks. */
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer, connect, type Socket } from "node:net";
 import { once } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ process.env.IMAP_SECRET_KEY = "synthetic-watcher-integration-secret-32-chars";
 process.env.NOCTUA_MAILBOX_WATCHER = "1";
 process.env.NOCTUA_WATCHER_ACCOUNTS_INTERVAL_MS = "100";
 process.env.NOCTUA_WATCHER_INTERVAL_MS = "300000";
+process.env.NOCTUA_WATCHER_RECONNECT_MIN_MS = "150"; // Observe multiple retry windows without slowing CI.
 const fixturePath = process.argv[2];
 if (!fixturePath) throw new Error("Pass the synthetic dev-fixture imap-server.ts path");
 let fixture: ChildProcess | undefined;
@@ -23,12 +25,33 @@ let mutationClient: ImapFlow | undefined;
 let fixtureLog = "";
 let imapPort = 0;
 let controlUrl = "";
+let authAttempts = 0;
+const proxySockets = new Set<Socket>();
+const proxy = createServer(socket => {
+  const upstream = connect(imapPort, "127.0.0.1");
+  for (const stream of [socket, upstream]) {
+    proxySockets.add(stream);
+    stream.on("close", () => proxySockets.delete(stream));
+    stream.on("error", () => { socket.destroy(); upstream.destroy(); });
+  }
+  let pending = "";
+  socket.on("data", chunk => {
+    pending += chunk.toString();
+    let end: number;
+    while ((end = pending.indexOf("\r\n")) >= 0) {
+      const line = pending.slice(0, end); pending = pending.slice(end + 2);
+      if (/^\S+ (?:AUTHENTICATE|LOGIN)\b/i.test(line)) authAttempts++;
+    }
+  });
+  socket.pipe(upstream).pipe(socket);
+  socket.on("close", () => upstream.destroy());
+  upstream.on("close", () => socket.destroy());
+});
 const accountId = "synthetic-watcher";
 const { upsertAccount, patchAccount, deleteAccountControlPlane, getStoredAccounts,
   withAccountDb, closeAllDbConnections, getMailboxSummaries } = await import("@/lib/db");
 const { startMailboxWatcher, stopMailboxWatcher, watcherRetryDelay } = await import("@/lib/mailboxWatcher");
 const { drainImapConnectionPool } = await import("@/lib/mail/imap/connectionPool");
-const { cacheSessionCredentials } = await import("@/lib/credentials");
 const { subscribeMailboxEvents } = await import("@/lib/mailboxWatcherEvents");
 const events: string[] = [];
 const unsubscribe = subscribeMailboxEvents((event) => { events.push(event.type); });
@@ -51,6 +74,8 @@ function cleanup() {
   return cleanupTask ??= (async () => {
     unsubscribe();
     mutationClient?.close();
+    for (const socket of proxySockets) socket.destroy();
+    if (proxy.listening) await new Promise<void>((resolve, reject) => proxy.close(error => error ? reject(error) : resolve()));
     if (fixture && fixture.exitCode === null) {
       const exited = once(fixture, "exit");
       fixture.kill("SIGKILL");
@@ -81,21 +106,37 @@ try {
     controlUrl = `http://127.0.0.1:${ready[2]}`;
     try { return (await fetch(`${controlUrl}/status`)).ok; } catch { return false; }
   }, "fixture startup");
-  const endpoint = { host: "127.0.0.1", port: imapPort, secure: false, user: "demo@monkeydent.test", password: "demo" };
+  proxy.listen(0, "127.0.0.1");
+  await once(proxy, "listening");
+  const proxyPort = (proxy.address() as { port: number }).port;
+  const endpoint = { host: "127.0.0.1", port: proxyPort, secure: false, user: "demo@monkeydent.test", password: "demo" };
   const account: Account = { id: accountId, name: "Synthetic watcher", email: "demo@monkeydent.test", avatar: "S", imap: endpoint, smtp: endpoint };
   await upsertAccount(account);
-  cacheSessionCredentials({ accountId, imap: { user: endpoint.user, pass: "wrong-cookie-password" } });
   assert.equal((await getStoredAccounts()).find((entry) => entry.id === accountId)?.imap.password, "demo");
   delete process.env.NOCTUA_MAILBOX_WATCHER;
   assert.equal(startMailboxWatcher(), null, "watcher must be off by default");
   process.env.NOCTUA_MAILBOX_WATCHER = "1";
-  assert.equal(watcherRetryDelay(1), 60000);
-  assert.equal(watcherRetryDelay(2), 120000);
+  assert.equal(watcherRetryDelay(1), 150);
+  assert.equal(watcherRetryDelay(2), 300);
   assert.equal(watcherRetryDelay(100), 1800000);
   const watcher = startMailboxWatcher();
   assert(watcher);
   assert.equal(startMailboxWatcher(), watcher, "one instance per process");
   await until(async () => (await count()) === 60 && (await status()).lastSyncAt !== null && events.includes("synced"), "INBOX bootstrap");
+  // A second independently evaluated watcher graph must not open another IDLE.
+  const graphSpecifier = "../lib/mailboxWatcher.ts?independent-fixture-graph";
+  const graph: typeof import("@/lib/mailboxWatcher") = await import(graphSpecifier);
+  const contender = new graph.MailboxWatcher();
+  try {
+    const attemptsBeforeContender = authAttempts;
+    await new Promise(resolve => setTimeout(resolve, 350));
+    assert.equal(authAttempts, attemptsBeforeContender, "only the DB scheduler owner may open IDLE");
+    await stopMailboxWatcher();
+    await until(async () => authAttempts > attemptsBeforeContender && (await status()).watcherState === "idling", "watcher graph takeover");
+  } finally { await contender.stop(); }
+  startMailboxWatcher();
+  await until(async () => (await status()).watcherState === "idling", "watcher restart after handoff");
+  console.info("WATCHER_FIXTURE independent watcher graphs: one IDLE owner, orderly takeover");
   const before = Date.now();
   const response = await fetch(`${controlUrl}/inject`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subject: "Synthetic watcher injected", text: "No browser is open." }) });
@@ -117,11 +158,65 @@ try {
   await mutationClient.logout();
   mutationClient = undefined;
 
-  // Exercise credentials reload and auth backoff without waiting a reconnect minute.
+  // Reset twice: UID 61 first contains OLD, then NEW, with distinct UIDVALIDITY.
+  await stopMailboxWatcher();
+  const { getMailboxState } = await import("@/lib/db");
+  const { startSyncJob, getSyncJob } = await import("@/lib/syncJobs");
+  async function repairInbox() {
+    const repair = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "repair" });
+    await until(async () => { const job = getSyncJob(repair.id); if (job?.status === "failed") throw new Error(job.error); return job?.status === "done"; }, "UIDVALIDITY repair");
+  }
+  async function resetAndInject(subject: string, text: string) {
+    assert((await fetch(`${controlUrl}/reset`, { method: "POST" })).ok);
+    assert((await fetch(`${controlUrl}/inject`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, text }) })).ok);
+  }
+  await resetAndInject("Synthetic OLD namespace", "Synthetic OLD body");
+  await repairInbox();
+  assert.equal(await count("Synthetic OLD namespace"), 1);
+  const oldValidity = (await getMailboxState(accountId, `${accountId}:INBOX`))?.uidValidity;
+  const oldMessageId = await withAccountDb(accountId, db => (db.prepare("SELECT id FROM messages WHERE accountId=? AND folderId=? AND imapUid=61")
+    .get(accountId, `${accountId}:INBOX`) as { id: string }).id);
+  const { stageMessageMoves, getPendingMoveSourceUids } = await import("@/lib/db");
+  await stageMessageMoves({ accountId, messageIds: [oldMessageId], destinationFolderId: `${accountId}:Archive`, destinationMailboxPath: "Archive" });
+  await resetAndInject("Synthetic NEW namespace", "Synthetic NEW body");
+  await repairInbox();
+  assert.notEqual((await getMailboxState(accountId, `${accountId}:INBOX`))?.uidValidity, oldValidity);
+  assert.equal(await count("Synthetic OLD namespace"), 0);
+  assert.equal(await count("Synthetic NEW namespace"), 1);
+  assert.equal((await getPendingMoveSourceUids(accountId, `${accountId}:INBOX`)).has(61), false);
+  assert.equal(await count(), 61);
+  await withAccountDb(accountId, db => {
+    const row = db.prepare("SELECT subject,body FROM messages WHERE accountId=? AND folderId=? AND imapUid=61").get(accountId, `${accountId}:INBOX`) as { subject: string; body: string };
+    assert.equal(row?.subject, "Synthetic NEW namespace");
+    assert(row.body.includes("Synthetic NEW body") && !row.body.includes("Synthetic OLD body"));
+  });
+  console.info("WATCHER_FIXTURE UIDVALIDITY reset re-ingested reused UID=61 with replacement subject/body");
+  await resetAndInject("Synthetic WATCHER namespace", "Synthetic WATCHER body");
+  startMailboxWatcher();
+  await until(async () => (await count("Synthetic WATCHER namespace")) === 1 && (await count("Synthetic NEW namespace")) === 0,
+    "watcher UIDVALIDITY re-ingestion");
+  console.info("WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61");
+
+  // Observe authentication attempts at the wire over multiple reconnect windows.
   await patchAccount(accountId, { imap: { ...endpoint, password: "wrong-synthetic-password" } });
   await until(async () => (await status()).watcherState === "auth_failed", "credentials reload / auth failure");
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  const attemptsAfterFailure = authAttempts;
+  await new Promise((resolve) => setTimeout(resolve, 800));
   assert.equal((await status()).watcherState, "auth_failed");
+  assert.equal(authAttempts, attemptsAfterFailure, "auth_failed must suspend attempts across retry windows");
+  console.info("WATCHER_FIXTURE auth_failed suspended: 0 new authentication attempts over 800ms (minimum reconnect=150ms)");
+  await stopMailboxWatcher();
+  startMailboxWatcher();
+  await until(async () => (await status()).watcherState === "auth_failed", "durable auth suspension after watcher restart");
+  await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(authAttempts, attemptsAfterFailure, "restarting the scheduler must preserve auth suspension");
+  const suspended = startMailboxWatcher();
+  assert(await suspended?.retryAccount(accountId));
+  await until(async () => authAttempts > attemptsAfterFailure && (await status()).watcherState === "auth_failed", "explicit auth retry");
+  const retriedAttempts = authAttempts;
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(authAttempts, retriedAttempts, "explicit retry suspends again after failure");
   await patchAccount(accountId, { imap: endpoint });
   await until(async () => (await status()).watcherState === "idling", "credentials recovery");
   const secondId = "synthetic-watcher-added";

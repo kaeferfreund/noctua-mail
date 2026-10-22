@@ -24,6 +24,15 @@ const NON_RETRYABLE_PATTERNS = [
 ];
 
 export async function runSyncJobCli(argv = process.argv) {
+  const leaseJob = process.env.NOCTUA_SYNC_LEASE_JOB_ID;
+  const leaseOwner = process.env.NOCTUA_SYNC_LEASE_OWNER;
+  if (leaseJob || leaseOwner) {
+    const { bindWorkerProcess } = await import("../db/processLeases");
+    if (!leaseJob || !leaseOwner || !await bindWorkerProcess(leaseJob, leaseOwner)) {
+      console.error("Sync worker admission lease is no longer owned.");
+      process.exit(1);
+    }
+  }
   const rawPayload = argv[2];
 
   if (!rawPayload) {

@@ -114,7 +114,7 @@ export async function getMailboxState(accountId: string, folderId: string) {
   };
 }
 
-export async function saveMailboxState(state: MailboxState) {
+export async function saveMailboxState(state: MailboxState, options: { resetUidNamespace?: boolean } = {}) {
   return withDbWriteRetry("saveMailboxState", async () => {
     const db = await getAccountDb(state.accountId);
     const insert = db.prepare(`
@@ -122,7 +122,7 @@ export async function saveMailboxState(state: MailboxState) {
       (folderId, accountId, mailboxPath, uidValidity, highestModSeq, highestUid, supportsQresync)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    insert.run(
+    const save = () => insert.run(
       state.folderId,
       state.accountId,
       state.mailboxPath,
@@ -131,6 +131,16 @@ export async function saveMailboxState(state: MailboxState) {
       state.highestUid ?? null,
       state.supportsQresync == null ? null : state.supportsQresync ? 1 : 0
     );
+    if (options.resetUidNamespace) {
+      db.transaction(() => {
+        // Staged moves reference the old source UID namespace too. Retain their
+        // destination content, but never suppress replacement messages by UID.
+        db.prepare(`UPDATE messages SET pendingMoveSourceFolderId=NULL,
+          pendingMoveSourceMailboxPath=NULL,pendingMoveSourceUid=NULL,pendingMoveStartedAt=NULL
+          WHERE accountId=? AND pendingMoveSourceFolderId=?`).run(state.accountId, state.folderId);
+        save();
+      })();
+    } else save();
   });
 }
 
