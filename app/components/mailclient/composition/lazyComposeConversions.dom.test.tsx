@@ -1,6 +1,5 @@
 // Runs only under `bun run test:dom`, which preloads lib/testSetupDom.ts to
 // register happy-dom before any component module loads.
-// @ts-expect-error -- Bun supplies this test API at runtime; the project has no bun:test declarations.
 import { afterEach, describe, expect, it } from "bun:test";
 import React from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";

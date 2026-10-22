@@ -141,7 +141,7 @@ test("nodemailer verifies, authenticates, sends dot-stuffed mail, persists and r
     const before = imap.store.get("INBOX").messages.length;
     await transporter.sendMail({ from: '"Toni Muster" <demo@monkeydent.test>', to: demoUser, subject: `Synthetic ${authMethod} reply`, text: "Hello\r\n.Leading dot\r\n..Two dots\r\nGrüße" });
     const mail = smtp.received.at(-1)!;
-    expect(await readFile(mail.file)).toEqual(mail.source);
+    expect<Buffer>(await readFile(mail.file)).toEqual(mail.source);
     expect(mail.source.toString()).toContain(".Leading dot");
     expect(imap.store.get("INBOX").messages.length).toBe(before + 1);
     expect(imap.store.get("INBOX").messages.at(-1)?.mime.raw).toEqual(mail.source);
