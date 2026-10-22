@@ -2,36 +2,16 @@
 
 import type React from "react";
 import { useState } from "react";
-import type { Folder, Topic } from "@/lib/data";
+import type { Folder } from "@/lib/data";
 import FolderPane from "./FolderPane";
 import FolderTree from "./FolderTree";
-import TopicsSidebarSection from "./TopicsSidebarSection";
 import type { SyncTriggerOptions } from "../types";
 
-type VirtualFolder = {
-  id: string;
-  name: string;
-  description: string;
-  active: boolean;
-  count?: number | null;
-  countLabel?: string;
-  countAriaLabel?: string;
-  countTitle?: string;
-  rowTitle?: string;
-  emphasize?: boolean;
-  icon: React.ReactNode;
-};
-
-type Props = {
-  // Layout
-  leftWidth: number;
-
-  // Folder pane header / virtual folders
+export type FolderSidebarPaneProps = {
+  // Folder pane header
   accountFolderCount: number;
-  virtualFolders: VirtualFolder[];
   isRecomputingThreads: boolean;
   isRecomputingCategories: boolean;
-  activateVirtualFolder: (virtualFolderId: string) => void;
   syncAccount: (
     folderId?: string,
     mode?: "new" | "full",
@@ -39,12 +19,6 @@ type Props = {
   ) => void;
   recomputeThreads: () => void;
   recomputeCategories: () => void;
-
-  // Topics section
-  allTopics: Topic[];
-  topicMessageCountById?: ReadonlyMap<string, number>;
-  activeTopicId: string | null;
-  onTopicClick: (topicId: string) => void;
 
   // Folder tree data
   rootFolders: Folder[];
@@ -77,28 +51,20 @@ type Props = {
 };
 
 /**
- * Left sidebar that houses the virtual folders, topic shortcuts, and folder
- * tree. Owns the purely local UI state managed here: the folder search query,
- * the folder collapse map, and whether the topics section is collapsed.
+ * Folder section of the shell sidebar. Owns the purely local UI state: the
+ * folder search query and the folder collapse map.
  *
  * Selection state, sync state, folder data, drag-over highlight state, and
  * handlers that touch the data layer still live in MailClient and arrive as
  * props.
  */
 export default function FolderSidebarPane({
-  leftWidth,
   accountFolderCount,
-  virtualFolders,
   isRecomputingThreads,
   isRecomputingCategories,
-  activateVirtualFolder,
   syncAccount,
   recomputeThreads,
   recomputeCategories,
-  allTopics,
-  topicMessageCountById,
-  activeTopicId,
-  onTopicClick,
   rootFolders,
   folderTree,
   folderById,
@@ -117,38 +83,24 @@ export default function FolderSidebarPane({
   handleRenameFolderItem,
   handleDeleteFolderItem,
   folderSpecialIcon
-}: Props) {
+}: FolderSidebarPaneProps) {
   const [folderQuery, setFolderQuery] = useState("");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
-  const [topicSidebarCollapsed, setTopicSidebarCollapsed] = useState(false);
 
   return (
     <FolderPane
       state={{
-        leftWidth,
         folderQuery,
         accountFolderCount,
-        virtualFolders,
         isRecomputingThreads,
         isRecomputingCategories
       }}
       actions={{
         setFolderQuery,
-        activateVirtualFolder,
         syncAccount,
         recomputeThreads,
         recomputeCategories
       }}
-      topSlot={
-        <TopicsSidebarSection
-          topics={allTopics}
-          topicMessageCountById={topicMessageCountById}
-          activeTopicId={activeTopicId}
-          collapsed={topicSidebarCollapsed}
-          onToggleCollapsed={() => setTopicSidebarCollapsed((v) => !v)}
-          onTopicClick={onTopicClick}
-        />
-      }
     >
       <FolderTree
         state={{

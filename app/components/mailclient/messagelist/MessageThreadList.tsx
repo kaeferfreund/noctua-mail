@@ -1,3 +1,4 @@
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
 import { CalendarDays, GitBranch, MoveRight, Paperclip, Trash2 } from "lucide-react";
@@ -69,7 +70,8 @@ export default function MessageThreadList({
     dateFormat,
     showMessageSize,
     topicColorRows,
-    senderIconsEnabled
+    senderIconsEnabled,
+    listIsNarrow
   } = state;
   const { scrollRef } = refs;
 
@@ -112,7 +114,8 @@ export default function MessageThreadList({
     toggleNested
   } = useThreadListAnimationState();
 
-  const rowHeight = 40;
+  const narrowRows = useIsMobile() || listIsNarrow;
+  const rowHeight = narrowRows ? 72 : 40;
   const groupHeight = 28;
   const { ids: selectedMessageIds, activeId: activeMessageId } =
     useSelectionSnapshot(selectionStore);
@@ -278,6 +281,8 @@ export default function MessageThreadList({
             <div
               className={styles.row}
               data-message-list-row="true"
+              data-message-layout="stacked"
+              data-message-narrow={narrowRows}
               data-message-id={message.id}
               role="button"
               tabIndex={0}
@@ -328,7 +333,7 @@ export default function MessageThreadList({
                   participants={item.fromParticipants}
                   fallbackTooltip={item.fromTooltip}
                 >
-                  <span className={styles.cellFrom} title={item.fromTooltip}>
+                  <span data-message-cell="from" className={styles.cellFrom} title={item.fromTooltip}>
                     {!item.showRecipientIcon && (
                       <SenderIcon
                         accountId={message.accountId}
@@ -352,12 +357,12 @@ export default function MessageThreadList({
                   </span>
                 </FromAddressHoverCard>
 
-                <span className={styles.cellSubject}>
-                  {renderUnreadDot(message, {
-                    seen: displaySeen,
-                    threadMessages
-                  })}
-                  <span className={styles.cellSubjectText}>{message.subject}</span>
+                <span data-message-cell="subject" className={styles.cellSubject}>
+                  <span data-message-cell="unread" className={styles.cellUnread}>
+                    {renderUnreadDot(message, { seen: displaySeen, threadMessages })}
+                  </span>
+
+                  <span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span>
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (
@@ -439,20 +444,20 @@ export default function MessageThreadList({
                 </span>
 
                 {showMessageSize && (
-                  <span className={styles.cellSize}>
+                  <span data-message-cell="size" className={styles.cellSize}>
                     <Text as="span" size="1" title={describeMessageSize(message.sizeBytes).title}>
                       {describeMessageSize(message.sizeBytes).label}
                     </Text>
                   </span>
                 )}
 
-                <span className={styles.cellDate}>
+                <span data-message-cell="date" className={styles.cellDate}>
                   <Text as="span" size="1" title={dateDisplay.tooltip}>
                     {dateDisplay.text}
                   </Text>
                 </span>
 
-                <div className={styles.cellActions}>
+                <div data-message-cell="actions" className={styles.cellActions}>
                   <TooltipIconButton
                     size="1"
                     variant="ghost"

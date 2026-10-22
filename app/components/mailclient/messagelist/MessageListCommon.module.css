@@ -72,3 +72,17 @@
 .selectIconDraft {
   color: var(--gray-10);
 }
+
+@media (width < 768px) {
+  /* The glyph stays 8px; only the invisible pointer area grows. */
+  .unreadDot { position: relative; }
+  .unreadDot::after {
+    content: "";
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
