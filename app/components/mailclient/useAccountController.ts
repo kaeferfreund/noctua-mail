@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   buildAccountApiPath,
   buildAccountFolderDeletePath,
@@ -32,6 +32,7 @@ type AuthMeResponse = {
   ok?: boolean;
   user?: User | null;
   accountId?: string;
+  accounts?: Account[];
   ttlSeconds?: number;
 };
 
@@ -127,6 +128,11 @@ export function useAccountController({
   setEditingAccount,
   setDeletingFolderIds
 }: UseAccountControllerParams) {
+  const activeAccountIdRef = useRef(activeAccountId);
+  useEffect(() => {
+    activeAccountIdRef.current = activeAccountId;
+  }, [activeAccountId]);
+
   const loadInitialData = useCallback(
     async (options?: { skipAuthCheck?: boolean; preferredAccountId?: string | null }) => {
       const skipAuthCheck = options?.skipAuthCheck === true;
@@ -134,6 +140,7 @@ export function useAccountController({
       setInitialDataReady(false);
       setInitialFoldersLoadedAccountId(null);
       try {
+        let nextAccounts: Account[] | undefined;
         if (!skipAuthCheck) {
           const me = await apiFetch("/api/auth/me", {
             credentials: "include",
@@ -145,6 +152,7 @@ export function useAccountController({
             return;
           }
           const meData = (await me.json()) as AuthMeResponse | null;
+          nextAccounts = meData?.accounts;
           setAuthState("ok");
           setCurrentUser(meData?.user ?? null);
           if (typeof meData?.ttlSeconds === "number") {
@@ -154,42 +162,44 @@ export function useAccountController({
             preferredAccountId = meData.accountId.trim();
           }
         }
-        const accountsRes = await apiFetch("/api/accounts");
-        let loadedAccounts = false;
-        let loadedFolders = false;
-        if (accountsRes.ok) {
-          const nextAccounts = (await accountsRes.json()) as Account[];
-          const resolvedAccountId = resolveActiveAccountId(
-            nextAccounts,
-            preferredAccountId,
-            activeAccountId
-          );
-          setAccounts(nextAccounts);
-          setActiveAccountId((prev) => {
-            const next = resolveActiveAccountId(nextAccounts, preferredAccountId, prev);
-            // Preserve the current id when the resolver cannot find any candidate
-            return next || prev;
-          });
-          if (resolvedAccountId) {
-            const foldersRes = await apiFetch(buildAccountFoldersPath(resolvedAccountId));
-            if (foldersRes.ok) {
-              const nextFolders = (await foldersRes.json()) as Folder[];
-              setFolders(nextFolders);
-              setInitialFoldersLoadedAccountId(resolvedAccountId);
-              loadedFolders = true;
-            } else {
-              reportError(await readErrorMessage(foldersRes));
-            }
-          } else {
-            setFolders([]);
-            setInitialFoldersLoadedAccountId("");
-            loadedFolders = true;
+        // Login/account-switch reloads lack an auth payload. Keep their fresh
+        // accounts read, but reuse the already sanitized list on bootstrap.
+        if (!Array.isArray(nextAccounts)) {
+          const accountsRes = await apiFetch("/api/accounts");
+          if (!accountsRes.ok) {
+            reportError(await readErrorMessage(accountsRes));
+            return;
           }
-          loadedAccounts = true;
-        } else {
-          reportError(await readErrorMessage(accountsRes));
+          nextAccounts = (await accountsRes.json()) as Account[];
         }
-        if (loadedAccounts && loadedFolders) {
+        let loadedFolders = false;
+        const resolvedAccountId = resolveActiveAccountId(
+          nextAccounts,
+          preferredAccountId,
+          activeAccountIdRef.current
+        );
+        setAccounts(nextAccounts);
+        setActiveAccountId((prev) => {
+          const next = resolveActiveAccountId(nextAccounts, preferredAccountId, prev);
+          // Preserve the current id when the resolver cannot find any candidate
+          return next || prev;
+        });
+        if (resolvedAccountId) {
+          const foldersRes = await apiFetch(buildAccountFoldersPath(resolvedAccountId));
+          if (foldersRes.ok) {
+            const nextFolders = (await foldersRes.json()) as Folder[];
+            setFolders(nextFolders);
+            setInitialFoldersLoadedAccountId(resolvedAccountId);
+            loadedFolders = true;
+          } else {
+            reportError(await readErrorMessage(foldersRes));
+          }
+        } else {
+          setFolders([]);
+          setInitialFoldersLoadedAccountId("");
+          loadedFolders = true;
+        }
+        if (loadedFolders) {
           setInitialDataReady(true);
         }
       } catch {
@@ -200,7 +210,6 @@ export function useAccountController({
     },
     [
       apiFetch,
-      activeAccountId,
       readErrorMessage,
       reportError,
       setAccounts,
