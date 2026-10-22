@@ -32,3 +32,10 @@
 .emptyError {
   color: var(--red-11);
 }
+
+@media (width < 768px) {
+  .pane { padding: 8px; }
+  .pane :global([data-message-list-row="true"]) { min-height: 44px; }
+  .pane :global([data-message-list-row="true"] button) { min-width: 44px; min-height: 44px; }
+  .pane :global([data-message-list-row="true"] button[aria-label="Message actions"]) { display: inline-flex; visibility: visible; opacity: 1; }
+}

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 import {
   Sidebar,
+  useSidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupAction,
@@ -30,6 +31,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 
 export type ShellSidebarProps = {
+  onNavigate?: () => void;
   compose: {
     onCompose: () => void;
     draftsCount: number;
@@ -122,7 +124,13 @@ function ViewRow({ view }: { view: ShellView }) {
  * Sidebar of the desktop shell (design §7.2): brand, "My mailboxes" /
  * "Shared mailboxes", "Views", "Topics" and the folder tree.
  */
-export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user }: ShellSidebarProps) {
+export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, onNavigate }: ShellSidebarProps) {
+  const { setOpenMobile } = useSidebar();
+  const closeAfter = (action: () => void, navigate = false) => () => {
+    setOpenMobile(false);
+    if (navigate) onNavigate?.();
+    action();
+  };
   const [topicsCollapsed, setTopicsCollapsed] = useState(false);
   const { mine, shared } = partitionMailboxes(mailboxes.accounts);
   const viewRows: ShellView[] = [
@@ -157,7 +165,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
           <SidebarContent>
             <SidebarGroup>
               <div className="flex items-center gap-2">
-                <Button className="flex-1 justify-start" onClick={compose.onCompose} aria-label="New mail">
+                <Button className="flex-1 justify-start" onClick={closeAfter(compose.onCompose)} aria-label="New mail">
                   <SquarePen />Compose
                 </Button>
                 <Button variant="outline" size="icon" aria-label="Check all folders for new mail"
@@ -167,14 +175,14 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               </div>
               {compose.onOpenDrafts && compose.draftsCount > 0 ? (
                 <SidebarMenu className="mt-2"><SidebarMenuItem>
-                  <SidebarMenuButton onClick={compose.onOpenDrafts}><FileText /><span>Drafts</span></SidebarMenuButton>
+                  <SidebarMenuButton onClick={closeAfter(compose.onOpenDrafts, true)}><FileText /><span>Drafts</span></SidebarMenuButton>
                   <SidebarMenuBadge>{compose.draftsCount}</SidebarMenuBadge>
                 </SidebarMenuItem></SidebarMenu>
               ) : null}
             </SidebarGroup>
             <SidebarGroup>
               <SidebarGroupLabel>My mailboxes</SidebarGroupLabel>
-              <SidebarGroupAction title="Add mailbox" aria-label="Add mailbox" onClick={mailboxes.onAdd}>
+              <SidebarGroupAction title="Add mailbox" aria-label="Add mailbox" onClick={closeAfter(mailboxes.onAdd)}>
                 <Plus />
               </SidebarGroupAction>
               <SidebarGroupContent>
@@ -182,7 +190,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                   <MailboxRows
                     accounts={mine}
                     activeAccountId={mailboxes.activeAccountId}
-                    onSwitch={mailboxes.onSwitch}
+                    onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
                   />
                 ) : (
                   <p className="px-2 py-1 text-xs text-muted-foreground">No mailbox yet</p>
@@ -196,7 +204,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                   <MailboxRows
                     accounts={shared}
                     activeAccountId={mailboxes.activeAccountId}
-                    onSwitch={mailboxes.onSwitch}
+                    onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
                   />
                 </SidebarGroupContent>
               </SidebarGroup>
@@ -207,7 +215,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {viewRows.map((view) => (
-                      <ViewRow key={view.id} view={view} />
+                      <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
                     ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
@@ -221,13 +229,13 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                   activeTopicId={topics.activeTopicId}
                   collapsed={topicsCollapsed}
                   onToggleCollapsed={() => setTopicsCollapsed((value) => !value)}
-                  onTopicClick={topics.onTopicClick}
+                  onTopicClick={(id) => { setOpenMobile(false); onNavigate?.(); topics.onTopicClick(id); }}
                 />
               </SidebarGroup>
             ) : null}
-            <FolderSidebarPane {...folders} />
+            <FolderSidebarPane {...folders} setActiveFolderId={(next) => { setOpenMobile(false); onNavigate?.(); folders.setActiveFolderId(next); }} />
           </SidebarContent>
-          <SidebarFooter><ShellUserMenu {...user} /></SidebarFooter>
+          <SidebarFooter><ShellUserMenu {...user} onOpenSettings={closeAfter(user.onOpenSettings)} onOpenAdmin={closeAfter(user.onOpenAdmin)} /></SidebarFooter>
         </div>
       </Theme>
     </Sidebar>

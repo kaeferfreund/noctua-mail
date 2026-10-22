@@ -191,6 +191,7 @@ import {
   shouldRenderTopicSuggestionGroup,
   type TopicThreadSuggestion
 } from "./mailclient/messagelist/topicSuggestionGroup";
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import AppShell from "./shell/AppShell";
 import type { ShellView } from "./shell/types";
 import BottomStatusBar from "./mailclient/status/BottomStatusBar";
@@ -342,6 +343,8 @@ export default function MailClient({
   const [activeAccountId, setActiveAccountId] = useState("");
   const [activeFolderId, setActiveFolderId] = useState("");
   const [activeMessageId, setActiveMessageId] = useState("");
+  const isMobile = useIsMobile();
+  const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
   const [query, setQuery] = useState("");
   // next-themes owns the theme (class and color-scheme on <html>, persisted
@@ -5289,6 +5292,7 @@ export default function MailClient({
     <AccountDateFormatProvider value={accountDateFormat}>
     <>
       <AppShell
+        mobileNavigation={{ messageId: viewMessage?.id ?? null, clearMessage: clearMobileMessage }}
         sidebar={{
           compose: {
             onCompose: () => openCompose("new"),
@@ -5418,6 +5422,7 @@ export default function MailClient({
           }
         }}
         panes={{
+          onCloseCalendar: () => setCalendarSidebarOpen(false),
           list: (
             <MessageListOrchestrator
               scrollRef={listPaneRef}
@@ -5649,13 +5654,20 @@ export default function MailClient({
                 accountId={activeAccountId}
                 firstDay={calendarFirstDay}
                 onClose={() => setCalendarSidebarOpen(false)}
-                onOpenMessage={handleOpenCalendarMessage}
-                onFindRelatedByInviteUid={handleFindRelatedByCalendarInviteUid}
+                onOpenMessage={(id) => {
+                  if (isMobile) setCalendarSidebarOpen(false);
+                  handleOpenCalendarMessage(id);
+                }}
+                onFindRelatedByInviteUid={(uid) => {
+                  if (isMobile) { setCalendarSidebarOpen(false); setViewMessage(null); }
+                  handleFindRelatedByCalendarInviteUid(uid);
+                }}
               />
             ) : null
         }}
         statusBar={
           <BottomStatusBar
+            onCheckNewMail={() => syncAccount(undefined, "new")}
             isSyncing={isSyncing}
             isRecomputingThreads={isRecomputingThreads}
             isRecomputingCategories={isRecomputingCategories}
@@ -5689,7 +5701,7 @@ export default function MailClient({
         overlays={
           <InAppNoticeStack
             className="inapp-notice-stack-pane"
-            style={{ right: `${noticePaneRightOffset}px` }}
+            style={{ right: `${isMobile ? 8 : noticePaneRightOffset}px` }}
             state={{ inAppNotices }}
             actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: handleDismissNotice }}
           />
@@ -5783,6 +5795,7 @@ export default function MailClient({
         onDeleteAlias={deleteRecipientAliasForAccount}
       />
       <ComposeOrchestrator
+        isMobile={isMobile}
         ref={composeHandleRef}
         activeAccountId={activeAccountId}
         currentAccount={currentAccount}

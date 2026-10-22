@@ -2,13 +2,14 @@
 
 import { useMemo } from "react";
 import { X } from "lucide-react";
-import { Badge, Box, Card, Flex, Heading, Popover, Text } from "@radix-ui/themes";
+import { Badge, Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import type { Folder } from "@/lib/data";
 import type { SyncJobProgress } from "../types";
 import {
   BottomStatusTriggerButton,
   type BottomStatusTone
 } from "./BottomStatusSection";
+import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type ProcessStatusPopoverProps = {
@@ -175,20 +176,17 @@ export default function ProcessStatusPopover({
   const processStatusTone: BottomStatusTone = processStatusItems.length > 0 ? "normal" : "muted";
 
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger>
-        <BottomStatusTriggerButton
+    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Processes"
+      trigger={<BottomStatusTriggerButton
           label="Processes"
           value={processStatusValue}
           tone={processStatusTone}
-        />
-      </Popover.Trigger>
-      <Popover.Content
-        className="bottom-popover bottom-popover-process"
-        side="top"
-        align="start"
-        sideOffset={8}
-      >
+        />}
+      contentProps={{ className: "bottom-popover bottom-popover-process",
+        side: "top",
+        align: "start",
+        sideOffset: 8, }}
+    >
         <Flex align="center" justify="between" className="popover-title-row">
           <Flex align="baseline" gap="3">
             <Heading size="3" weight="medium" className="reminder-main-title">
@@ -237,7 +235,6 @@ export default function ProcessStatusPopover({
             </Flex>
           )}
         </Box>
-      </Popover.Content>
-    </Popover.Root>
+    </StatusPanelFrame>
   );
 }

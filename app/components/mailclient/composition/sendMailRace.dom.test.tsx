@@ -10,6 +10,7 @@ import ComposeOrchestrator from "./ComposeOrchestrator";
 type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSignal | null };
 
 type RenderComposeOptions = {
+  isMobile?: boolean;
   smtpResponse?: Response | (() => Response | Promise<Response>);
   reportError?: (message: string) => void;
   readErrorMessage?: (response: Response) => Promise<string>;
@@ -93,6 +94,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
     defaultSignatureId: "",
     accountSignatures: [],
     darkMode: false,
+    isMobile: options.isMobile ?? false,
     activeThread: [],
     messageById: new Map(),
     viewMessage: null,
@@ -539,5 +541,27 @@ describe("compose initialization errors", () => {
 
     expect(errors).toEqual(["Failed to open composer: hydration failed"]);
     cleanup();
+  });
+});
+
+// Exercise the real imperative API and controller, including the setter used
+// by list selection. The modal must remain visible without an inline slot.
+describe("mobile compose", () => {
+  it("opens full-screen and coerces inline, minimized and functional setters to modal", async () => {
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      expect(view.getByText("New message")).toBeTruthy();
+      for (const requested of ["inline", "minimized"] as const) {
+        act(() => handleRef.current?.setComposeView(requested));
+        expect(view.getByText("New message")).toBeTruthy();
+      }
+      act(() => handleRef.current?.setComposeView(() => "inline"));
+      expect(view.getByText("New message")).toBeTruthy();
+      expect(view.queryByRole("button", { name: /Dock in thread view/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /Minimize composer/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /Open composer in new window/ })).toBeNull();
+      expect(view.baseElement.querySelector('.modal-backdrop > div')?.getAttribute("style")).toBeNull();
+    } finally { cleanup(); }
   });
 });

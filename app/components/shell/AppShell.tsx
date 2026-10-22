@@ -3,6 +3,9 @@
 import { useSyncExternalStore, useState, type CSSProperties, type ReactNode } from "react";
 import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import { useMobileNavigation } from "@/app/hooks/useMobileNavigation";
+import { MobileNavigationContext } from "./MobileNavigation";
 import ShellHeader, { type ShellHeaderProps } from "./ShellHeader";
 import ShellPanes, { type ShellPanesProps } from "./ShellPanes";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
@@ -11,6 +14,7 @@ import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 // is server-rendered open and reads the cookie after mount; reading it during
 // render would make the server and client trees disagree.
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const noop = () => {};
 const SIDEBAR_WIDTH = "18rem";
 const subscribeSidebarCookie = () => () => {};
 
@@ -24,6 +28,7 @@ function readSidebarCookie(): boolean {
 }
 
 export type AppShellProps = {
+  mobileNavigation?: { messageId: string | null; clearMessage: () => void };
   sidebar: ShellSidebarProps;
   header: ShellHeaderProps;
   panes: ShellPanesProps;
@@ -43,13 +48,16 @@ export type AppShellProps = {
  * navigation state; all data state and handler bags stay in MailClient and
  * arrive as props.
  */
-export default function AppShell({ sidebar, header, panes, statusBar, overlays }: AppShellProps) {
+export default function AppShell({ sidebar, header, panes, statusBar, overlays, mobileNavigation }: AppShellProps) {
   // Hydrate the saved cookie without a synchronous setState effect. Changes
   // made through SidebarProvider drive local state and update its cookie.
+  const isMobile = useIsMobile();
+  const navigation = useMobileNavigation(isMobile, mobileNavigation?.messageId ?? null, mobileNavigation?.clearMessage ?? noop);
   const savedOpen = useSyncExternalStore(subscribeSidebarCookie, readSidebarCookie, () => true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean | null>(null);
 
   return (
+    <MobileNavigationContext.Provider value={navigation.back}>
     <TooltipProvider>
       <SidebarProvider
         data-shell=""
@@ -68,14 +76,15 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays }
         className="h-dvh min-h-0 overflow-hidden bg-sidebar text-foreground"
         style={{ "--sidebar-width": SIDEBAR_WIDTH, "--header-height": "3rem" } as CSSProperties}
       >
-        <ShellSidebar {...sidebar} />
+        <ShellSidebar {...sidebar} onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined} />
         <SidebarInset className="h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs">
-          <ShellHeader {...header} />
-          <ShellPanes {...panes} />
-          {statusBar}
+          <ShellHeader {...header} indicators={isMobile ? statusBar : undefined} />
+          <ShellPanes {...panes} mobileView={navigation.view} />
+          {!isMobile ? statusBar : null}
         </SidebarInset>
         {overlays}
       </SidebarProvider>
     </TooltipProvider>
+    </MobileNavigationContext.Provider>
   );
 }

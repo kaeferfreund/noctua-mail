@@ -108,3 +108,12 @@
   border-color: color-mix(in srgb, var(--gray-8) 70%, transparent);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
 }
+
+.mobileHeader { display: none; }
+@media (width < 768px) {
+  .mobileHeader { display: flex; align-items: center; min-height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+  .mobileHeader button { min-height: 44px; }
+  .toolbar { display: none; }
+  .threadView { padding: 8px; }
+  .threadHeader { padding: 8px; }
+}

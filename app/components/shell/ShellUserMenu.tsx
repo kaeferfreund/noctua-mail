@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/app/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
+import { DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@/app/components/ui/dropdown-menu";
 import { mailboxInitials } from "./types";
 
 export type ShellUserMenuProps = {
@@ -39,6 +41,7 @@ export default function ShellUserMenu({
   onEvictThreadCache,
   onLogout
 }: ShellUserMenuProps) {
+  const { theme, setTheme } = useTheme();
   const identity = userEmail ?? "";
   const triggerLabel = userName?.trim() || identity.split("@")[0] || "Account";
   const initials = mailboxInitials({ name: triggerLabel, email: identity });
@@ -93,6 +96,13 @@ export default function ShellUserMenu({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <div className="md:hidden"><DropdownMenuLabel>Theme</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
+                <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup><DropdownMenuSeparator />
+            </div>
             <DropdownMenuItem onSelect={onLogout}>
               <LogOut />
               Log out
