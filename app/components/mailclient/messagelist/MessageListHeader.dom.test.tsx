@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
 import MessageListHeader, { type MessageListHeaderProps } from "./MessageListHeader";
 import type { MessageGroup } from "./listModel";
 
@@ -12,7 +13,6 @@ type HeaderState = MessageListHeaderProps["state"];
 const syntheticMessage = { id: "msg-1@example.test" } as MessageGroup["items"][number];
 
 const baseState: HeaderState = {
-  listWidth: 640,
   searchScope: "folder",
   loadedMessageCount: 349,
   totalMessages: 10848,
@@ -47,9 +47,12 @@ function renderHeader(overrides: Partial<HeaderState> = {}) {
       calls.push(["toggleAllGroups", undefined]);
     }
   };
+  // The toolbar renders in the shell header, inside the shell's TooltipProvider.
   const view = render(
     <Theme>
-      <MessageListHeader state={{ ...baseState, ...overrides }} actions={actions} />
+      <TooltipProvider>
+        <MessageListHeader state={{ ...baseState, ...overrides }} actions={actions} />
+      </TooltipProvider>
     </Theme>
   );
   return { view, calls };
@@ -101,10 +104,26 @@ describe("message list toolbar", () => {
     expect(view.getByText("Loading… 1 message").getAttribute("title")).toBe("Loading… 1 message loaded");
   });
 
-  it("drops the sort label on narrow lists but keeps the state in the accessible name", () => {
-    const { view } = renderHeader({ listWidth: 320 });
+  it("lets a narrow header hide the count and sort label but keeps the state in the accessible name", () => {
+    const { view } = renderHeader();
+    const count = new Intl.NumberFormat();
+    const label = `${count.format(349)} of ${count.format(10848)}`;
+    // happy-dom does not evaluate container queries; the classes are the contract.
+    expect(view.getByText(label).className).toContain("@4xl/header:inline");
     const sort = view.getByRole("button", { name: "Sort & group: Date, grouped by Date, threads on" });
-    expect(sort.textContent).toBe("");
+    expect(within(sort).getByText("Date").className).toContain("@3xl/header:inline-block");
+  });
+
+  it("loads the next page and hides the button while a page is loading", () => {
+    const { view, calls } = renderHeader();
+    fireEvent.click(view.getByRole("button", { name: "Load more" }));
+    const [name, update] = calls.find(([call]) => call === "setMessagesPage") ?? [];
+    expect(name).toBe("setMessagesPage");
+    expect((update as (page: number) => number)(1)).toBe(2);
+    cleanup();
+
+    const loading = renderHeader({ loadingMessages: true });
+    expect(loading.view.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 
   it("switches the view from a radio menu and commits after the next frame", async () => {
