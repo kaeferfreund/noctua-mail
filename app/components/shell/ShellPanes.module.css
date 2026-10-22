@@ -1,0 +1,19 @@
+@media (width < 768px) {
+  .panes {
+    padding: 0;
+    gap: 0;
+  }
+  .panes > [data-panel] {
+    flex: 1 1 100% !important;
+    min-width: 0;
+  }
+  .panes > [data-panel] > div {
+    border: 0;
+    border-radius: 0;
+  }
+  .panes > [data-slot="resizable-handle"],
+  .panes[data-mobile-view="thread"] > [id="list"],
+  .panes[data-mobile-view="list"] > [id="reader"] {
+    display: none !important;
+  }
+}

@@ -9,9 +9,10 @@ import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type ComposeModalProps = {
   open: boolean;
+  isMobile?: boolean;
 };
 
-export default function ComposeModal({ open }: ComposeModalProps) {
+export default function ComposeModal({ open, isMobile = false }: ComposeModalProps) {
   const {
     composeMode,
     composeTo,
@@ -84,7 +85,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
 
   return (
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop ${styles.composeBackdrop}`}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           if (detachedWindow) {
@@ -101,9 +102,9 @@ export default function ComposeModal({ open }: ComposeModalProps) {
           composeDragActive ? styles.composeDropActive : ""
         }`}
         ref={composeModalRef}
-        style={{
+        style={isMobile ? undefined : {
           width: composeSize.width,
-          height: composeSize.height ?? "85vh"
+          height: composeSize.height ?? "85dvh"
         }}
         onClick={(event) => event.stopPropagation()}
         onDragEnter={handleComposeDragEnter}
@@ -121,7 +122,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
             </Text>
           </div>
           <div className={styles.composeHeaderActions}>
-            <TooltipIconButton
+            {!isMobile && <TooltipIconButton
               variant="ghost"
               size="2"
               tooltip="Dock in thread view"
@@ -129,8 +130,8 @@ export default function ComposeModal({ open }: ComposeModalProps) {
               disabled={detachingCompose || sendingMail || discardingDraft}
             >
               <Dock size={16} />
-            </TooltipIconButton>
-            {!detachedWindow && (
+            </TooltipIconButton>}
+            {!isMobile && !detachedWindow && (
               <>
                 <TooltipIconButton
                   variant="ghost"
@@ -220,7 +221,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
           handleSendMail={handleSendMail}
           formatRelativeTime={formatRelativeTime}
         />
-        <div
+        {!isMobile && <div
           className={styles.composeResizer}
           onPointerDown={(event) => {
             event.preventDefault();
@@ -241,7 +242,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
             };
             setComposeResizing(true);
           }}
-        />
+        />}
       </div>
     </div>
   );

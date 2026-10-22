@@ -1,0 +1,43 @@
+/* Unlayered pane/frame modules override the generated utility defaults. The
+   shared globals remain layered, with only token declarations unlayered. */
+.fullscreenSheet {
+  width: 100dvw;
+  height: 100dvh;
+  max-width: none;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+}
+.statusSheet { max-height: 90dvh; overflow: hidden; }
+.statusContent {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  max-height: 85dvh;
+  min-height: 0;
+  padding: 16px;
+  box-shadow: none;
+  border: 0;
+  overflow: auto;
+}
+.settingsBody { flex: 1; min-height: 0; padding: 12px; overflow: hidden; }
+.settingsTabs:global(.rt-TabsList) {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 112px;
+  height: auto;
+  overflow-y: auto;
+  box-shadow: none;
+  border-right: 1px solid var(--border);
+}
+.settingsTabs :global(.rt-TabsTrigger) { min-height: 44px; width: 100%; justify-content: flex-start; white-space: normal; padding: 8px; }
+.settingsBody :global(.rt-TabsContent) { min-width: 0; }
+.indicators { display: flex; align-items: center; }
+.activityDot { width: 6px; height: 6px; border-radius: 50%; background: var(--destructive); }
+.messageMore { min-width: 44px; min-height: 44px; }
+.messageMenu :global([data-slot="dropdown-menu-item"]),
+.messageMenu :global([data-slot="dropdown-menu-sub-trigger"]) { min-height: 44px; }
+@media (width < 768px) {
+  .desktopStatusBar { display: none; }
+}

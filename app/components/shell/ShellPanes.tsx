@@ -1,5 +1,10 @@
 "use client";
 
+import mobileStyles from "./MobileFrames.module.css";
+import { Theme } from "@radix-ui/themes";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
+import styles from "./ShellPanes.module.css";
 import type { CSSProperties, ReactNode } from "react";
 import { useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
 import {
@@ -41,14 +46,18 @@ const panelContentStyle: CSSProperties = {
 };
 
 export type ShellPanesProps = {
+  mobileView?: "list" | "thread";
+  onCloseCalendar?: () => void;
   list: ReactNode;
   reader: ReactNode;
   /** Mounted only while the calendar sidebar is open. */
   calendar?: ReactNode | null;
 };
 
-export default function ShellPanes({ list, reader, calendar }: ShellPanesProps) {
-  const panelIds = calendar
+export default function ShellPanes({ list, reader, calendar, mobileView = "list", onCloseCalendar }: ShellPanesProps) {
+  const isMobile = useIsMobile();
+  const desktopCalendar = calendar && !isMobile;
+  const panelIds = desktopCalendar
     ? [LIST_PANEL_ID, READER_PANEL_ID, CALENDAR_PANEL_ID]
     : [LIST_PANEL_ID, READER_PANEL_ID];
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
@@ -58,17 +67,20 @@ export default function ShellPanes({ list, reader, calendar }: ShellPanesProps) 
   });
 
   return (
+    <>
     <ResizablePanelGroup
       id="noctua-panes"
+      data-mobile-view={mobileView}
       orientation="horizontal"
+      disabled={isMobile}
       defaultLayout={defaultLayout}
-      onLayoutChanged={onLayoutChanged}
-      className="min-h-0 min-w-0 flex-1 gap-2 p-4"
+      onLayoutChanged={isMobile ? undefined : onLayoutChanged}
+      className={`${styles.panes} min-h-0 min-w-0 flex-1 gap-2 p-4`}
     >
       <ResizablePanel
         id={LIST_PANEL_ID}
         defaultSize="42%"
-        minSize={240}
+        minSize={isMobile ? 0 : 240}
         className="rounded-lg border bg-card shadow-xs"
         style={panelContentStyle}
       >
@@ -77,19 +89,19 @@ export default function ShellPanes({ list, reader, calendar }: ShellPanesProps) 
       <ResizableHandle className="w-1 bg-transparent" />
       <ResizablePanel
         id={READER_PANEL_ID}
-        minSize={320}
+        minSize={isMobile ? 0 : 320}
         className="rounded-lg border bg-card shadow-xs"
         style={panelContentStyle}
       >
         {reader}
       </ResizablePanel>
-      {calendar ? (
+      {desktopCalendar ? (
         <>
           <ResizableHandle className="w-1 bg-transparent" />
           <ResizablePanel
             id={CALENDAR_PANEL_ID}
             defaultSize={400}
-            minSize={320}
+            minSize={isMobile ? 0 : 320}
             maxSize="50%"
             className="rounded-lg border bg-card shadow-xs"
             style={panelContentStyle}
@@ -99,5 +111,12 @@ export default function ShellPanes({ list, reader, calendar }: ShellPanesProps) 
         </>
       ) : null}
     </ResizablePanelGroup>
+    {isMobile && calendar ? <Sheet open onOpenChange={(open) => { if (!open) onCloseCalendar?.(); }}>
+      <SheetContent aria-describedby={undefined} className={mobileStyles.fullscreenSheet} showCloseButton={false}>
+        <SheetTitle className="sr-only">Calendar</SheetTitle>
+        <Theme asChild><div className="flex min-h-0 flex-1 flex-col">{calendar}</div></Theme>
+      </SheetContent>
+    </Sheet> : null}
+    </>
   );
 }

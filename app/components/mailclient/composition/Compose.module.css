@@ -443,3 +443,10 @@
   outline: 2px dashed var(--link);
   outline-offset: 4px;
 }
+
+@media (width < 768px) {
+  .composeBackdrop { width: 100dvw; height: 100dvh; padding: 0; }
+  .composeModal { padding: 12px; min-height: 0; width: 100dvw !important; height: 100dvh !important; min-width: 0; max-width: none; max-height: none; border-radius: 0; }
+  .composeResizer { display: none; }
+  .composeHeader { padding: 12px; }
+}
