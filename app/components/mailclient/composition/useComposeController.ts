@@ -3,10 +3,12 @@ import { useMemo } from "react";
 import type { Account, AccountDateFormat, Message } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { assembleQuotedHtml, escapeHtml } from "@/lib/html";
+import { areMarkdownConvertersReady, loadMarkdownConverters } from "@/lib/markdownConvert";
 import { buildComposePayload as buildComposePayloadFn } from "./composeContentBuilder";
 import { computeComposeInitState } from "./composeInitState";
 import type { ComposeMode, ComposeTab } from "./composeTypes";
 import type { ComposeState } from "./useComposeState";
+import { useMarkdownConverters } from "./useMarkdownConverters";
 
 type UseComposeControllerParams = {
   compose: ComposeState;
@@ -33,6 +35,8 @@ export function useComposeController({
   setDraftSaveError,
   findMessageByMessageId
 }: UseComposeControllerParams) {
+  // Recompute the orchestrator's render-time draft status after the lazy load.
+  useMarkdownConverters(compose.composeOpen);
   const {
     composeDirtyRef,
     composeSignatureRef,
@@ -121,6 +125,14 @@ export function useComposeController({
   }, [compose.composeQuotedParts, compose.composeQuoteHtml]);
 
   const buildComposePayload = (options?: { preferText?: boolean }) => {
+    if (!areMarkdownConvertersReady()) {
+      // The orchestrator asks for a hash during render, including while closed
+      // or loading. This is an empty status snapshot, never a save/send payload:
+      // autosave waits for readiness, manual/handoff saves await the loader,
+      // and send awaits flushPendingDraftSaves before calling this builder.
+      return { text: "", html: undefined, markdown: undefined, attachments: [],
+        composeFormat: compose.composeTab };
+    }
     return buildComposePayloadFn(
       {
         composeTab: compose.composeTab,
@@ -145,6 +157,10 @@ export function useComposeController({
     asNew = false,
     options?: { preferredComposeTab?: ComposeTab }
   ) => {
+    // Keep initialization synchronous: the caller applies prefill, restored
+    // semantics and attachments immediately after this call. The body field
+    // gates conversion controls; persistence gates conversion independently.
+    void loadMarkdownConverters().catch(() => { /* The field offers retry. */ });
     // Reset refs and async state
     lastDraftHashRef.current = "";
     currentDraftHashRef.current = "";

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { loadMarkdownConverters } from "./markdownConvert";
+import { beforeAll, describe, expect, it } from "bun:test";
 import { buildForwardMetaHtml } from "./html";
 import { htmlToMarkdown, markdownToHtml, textToMarkdown } from "./markdownConvert";
 
@@ -234,3 +235,6 @@ describe("round-trip conversions", () => {
     expect(back).toContain("```");
   });
 });
+
+// Production awaits this boundary before exposing compose controls.
+beforeAll(async () => { await loadMarkdownConverters(); });
