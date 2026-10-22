@@ -68,6 +68,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  /* Lets the display-options chip truncate before the ⋮ menu leaves the card. */
+  min-width: 0;
 }
 
 .messageActions {
@@ -256,15 +258,6 @@
   color: var(--green-11);
 }
 
-.tabsBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  width: 100%;
-}
-
 .tabsList {
   display: inline-flex;
   gap: var(--space-2);
@@ -277,51 +270,6 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.messageTabsRoot :global(.rt-BaseTabListTriggerInner) {
-  inset: 0;
-  padding: 0;
-  border-radius: 0;
-}
-
-.zoomControls {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.buttonGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-}
-
-.buttonGroup > :global(.rt-Button),
-.buttonGroup > :global(.rt-IconButton) {
-  border-radius: 0;
-}
-
-.buttonGroup > :global(.rt-Button) + :global(.rt-Button),
-.buttonGroup > :global(.rt-Button) + :global(.rt-IconButton),
-.buttonGroup > :global(.rt-IconButton) + :global(.rt-Button),
-.buttonGroup > :global(.rt-IconButton) + :global(.rt-IconButton) {
-  margin-left: -1px;
-}
-
-.buttonGroup > :global(.rt-Button):first-child,
-.buttonGroup > :global(.rt-IconButton):first-child {
-  border-top-left-radius: var(--radius-2);
-  border-bottom-left-radius: var(--radius-2);
-}
-
-.buttonGroup > :global(.rt-Button):last-child,
-.buttonGroup > :global(.rt-IconButton):last-child {
-  border-top-right-radius: var(--radius-2);
-  border-bottom-right-radius: var(--radius-2);
 }
 
 .content {
@@ -352,6 +300,7 @@
 .panel {
   animation: threadTabFade 160ms ease;
   min-width: 0;
+  margin-top: var(--space-3);
 }
 
 .bodyLoading {

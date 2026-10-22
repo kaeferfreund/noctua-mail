@@ -615,7 +615,7 @@ Desktop (`md` and up), following the shadcn dashboard-01 inset layout:
   panelIds, storage })` (v4 has no `autoSaveId`/`order`). Stable ids `list`, `reader`, `calendar`
   and fixed render order allow separate persisted layouts with/without the conditional calendar.
   `MessageListPane` fills its panel (`width: 100%`); a `ResizeObserver` on `listPaneRef` feeds
-  `listWidth` in MailClient and still drives `listIsNarrow` and `collapseViewSwitcher`.
+  `listWidth` in MailClient and still drives `listIsNarrow` and the list toolbar's icon-only sort trigger.
   Pane chrome lives in the CSS modules because those unlayered rules beat utilities.
 - Header: SidebarTrigger, vertical Separator, current mailbox name + folder; right-aligned search
   with the existing field/badge filters in a Popover, sync indicator and light/dark/system menu.
@@ -632,7 +632,7 @@ Mobile (below `md`):
   `history.back()` when `history.state?.noctuaMobileView` is set, otherwise `setViewMessage(null)`.
   Both panes stay mounted; visibility is CSS (`hidden md:flex`), so `listPaneRef`, `messageRefs`,
   virtualization, and `noticePaneRightOffset` keep working and nothing flips after hydration.
-- `MessageViewPane` receives `hideToolbar` on mobile and a compact header with the back button.
+- `MessageViewPane` shows a compact header with the back button on mobile.
 - Sidebar opens as a sheet from the header menu button. The mobile header keeps only the
   trigger, title, search and indicator menu; theme choices move into the user menu.
 - Compose: `ComposeOrchestrator` gets an `isMobile` input. On mobile `openCompose` and the

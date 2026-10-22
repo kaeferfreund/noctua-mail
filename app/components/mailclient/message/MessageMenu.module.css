@@ -27,10 +27,6 @@
   letter-spacing: 0.01em;
 }
 
-.menuContent :global(.rt-BaseMenuItemIndicator) {
-  left: var(--space-2);
-}
-
 .menuContent :global(.rt-BaseMenuContent) {
   --base-menu-content-padding: var(--space-2);
 }
