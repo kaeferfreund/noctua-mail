@@ -1,19 +1,13 @@
-import { isDesktop } from "@/lib/desktop";
-
 type OpenDetachedWindowOptions = {
   width?: number;
   height?: number;
   left?: number;
   top?: number;
   /**
-   * Native window title for the desktop shell, which cannot read the page's
-   * own `document.title`. Browsers ignore it — the page titles itself there.
+   * Accepted so existing callers can name the window. Browsers ignore it —
+   * the opened page sets `document.title` itself.
    */
   title?: string;
-};
-
-type TauriInternals = {
-  invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 };
 
 export type DetachedWindowOpenResult = {
@@ -21,15 +15,6 @@ export type DetachedWindowOpenResult = {
   window: Window | null;
   error?: unknown;
 };
-
-/**
- * Returns true for URL schemes that cannot be loaded in a Tauri WebviewWindow
- * (blob:, data:, etc.). These must be handled separately via a browser fallback
- * or by first converting to an app-relative path.
- */
-function isUnsupportedTauriScheme(url: string): boolean {
-  return /^(blob|data):/i.test(url);
-}
 
 function resolveDetachedWindowSize(options: OpenDetachedWindowOptions) {
   const fallbackWidth = Math.min(
@@ -46,36 +31,12 @@ function resolveDetachedWindowSize(options: OpenDetachedWindowOptions) {
   };
 }
 
-function createDetachedWindowLabel() {
-  const unique = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-  return `noctua-popup-${unique.replace(/[^a-zA-Z0-9-]/g, "-")}`;
-}
-
 export function openDetachedWindow(
   url: string,
   options: OpenDetachedWindowOptions = {}
 ) {
   if (typeof window === "undefined") return null;
   const { width, height } = resolveDetachedWindowSize(options);
-
-  // In the Tauri desktop shell window.open is blocked by the WebView.
-  // Use a native Tauri command to create a new WebviewWindow instead.
-  // blob: and data: URLs are not supported by Tauri WebviewWindows, so fall
-  // through to the regular window.open path for those.
-  if (isDesktop() && !isUnsupportedTauriScheme(url)) {
-    const tauri = (window as unknown as { __TAURI_INTERNALS__?: TauriInternals }).__TAURI_INTERNALS__;
-    if (tauri?.invoke) {
-      const label = createDetachedWindowLabel();
-      tauri
-        .invoke("open_detached_window", { label, url, width, height, title: options.title })
-        .catch((err) => {
-          console.error("[noctua] open_detached_window failed:", err);
-        });
-      // Return a non-null truthy value so callers don't show "pop-up blocked"
-      // notices. Callers only check truthiness — no Window methods are called.
-      return {} as Window;
-    }
-  }
 
   const left =
     options.left ?? Math.max(0, Math.floor((window.screen.availWidth - width) / 2));
@@ -105,7 +66,7 @@ export function openDetachedWindow(
 }
 
 /**
- * Opens a detached window while reporting native-shell creation failures.
+ * Opens a detached window while reporting creation failures.
  * Browser `window.open` still runs synchronously before this function returns
  * its promise, preserving the user gesture required by popup blockers.
  */
@@ -115,21 +76,6 @@ export function openDetachedWindowConfirmed(
 ): Promise<DetachedWindowOpenResult> {
   if (typeof window === "undefined") {
     return Promise.resolve({ opened: false, window: null });
-  }
-  const { width, height } = resolveDetachedWindowSize(options);
-
-  if (isDesktop() && !isUnsupportedTauriScheme(url)) {
-    const tauri = (window as unknown as { __TAURI_INTERNALS__?: TauriInternals }).__TAURI_INTERNALS__;
-    if (tauri?.invoke) {
-      const label = createDetachedWindowLabel();
-      return tauri
-        .invoke("open_detached_window", { label, url, width, height, title: options.title })
-        .then(() => ({ opened: true, window: null }))
-        .catch((error) => {
-          console.error("[noctua] open_detached_window failed:", error);
-          return { opened: false, window: null, error };
-        });
-    }
   }
 
   const openedWindow = openDetachedWindow(url, options);
