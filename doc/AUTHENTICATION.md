@@ -1081,3 +1081,74 @@ The first CI attempt correctly exposed four obsolete mount-inventory 503 expecta
 exercise real library media-type rejection and unavailable paths; the focused origin inventory
 passes 94 tests (182 assertions). Operational 503 errors remain where they represent actual
 failures; no readiness 503 or legacy login 410 remains in runtime handlers.
+
+## Final integration verification (2026-10-22)
+
+Started clean at `a17ae88` over `ca1fb45`; merged auth-stage `6e480bf`, then admin-ui `6a21154`.
+Reconciliation covers restricted signup, target admin/passkey resources, shared reauthentication,
+manager candidates/stable membership codes, opaque audit paging, metadata-only invite history,
+admin-only mailbox creation in both shell states, shared operator exclusion and retired callers.
+The source tree includes the reviewed browser process-group cleanup and awaited DOM focus check.
+All commands used `nice -n 10`, worktree-local TMPDIR and synthetic state; no push, PR or deployment.
+
+- `bun install --frozen-lockfile`: exit 0; 1,078 installs / 1,056 packages, no changes;
+  lockfile SHA-256 unchanged. Better Auth/passkey 1.7.12, Next.js 16.2.4, Bun 1.4.4,
+  Playwright 1.58.2 and radix-ui 1.8.1 remain pinned as required; QR dependencies retained.
+- `bun check --no-pretty --all`: exit 1; the requested filtered pipeline returns 151.
+  A clean `a17ae88` source archive has the same 151 diagnostic identities and multiplicities:
+  zero added/removed diagnostics and no new files. Fresh build regenerated retired route types.
+- `timeout 1500 bun run test:ci`: exit 0; 2,206 server/integration tests in 231 files,
+  6,689 assertions, 397.69s; 153 DOM tests in 24 files, 788 assertions, 21.70s; zero failures.
+- `timeout 1800 bun run test:stress`: exit 0; seed 1337, rerun-each=3; 6,618 passed,
+  zero failed, 20,067 assertions, 231 files, 1034.22s. DOM tests run separately by repository design.
+- Focused randomized retry of security controls/admin HTTP files: 144 passed, zero failed,
+  1,059 assertions, two files, 168.87s, with the same 20-second per-test limit and seed.
+- `timeout 600 bun run lint`: exit 1; the pre-existing calendar effect error at
+  `app/components/calendar/useCalendarConflicts.ts:58` and 26 warnings. Normalized comparison to
+  clean `a17ae88` adds no findings and removes one pre-existing MailClient hook warning.
+- `timeout 1200 bun run build`: exit 0; optimized compilation, production type checking and
+  route generation passed (final compilation 23.5s).
+- ARM override + `AUTH_BROWSER_USE_BUILD=1 AUTH_BROWSER_PORT=3784 bun run test:auth-browser`:
+  exit 0; all 19 cases passed (7.4m), zero skipped: 11 actual shell/activation cases plus eight
+  real Chromium/WebAuthn controls. Final server and synthetic sync workers shared the runner's
+  private process group; no owned Bun process remained after exit. The initial complete run
+  also passed 19 cases but revealed orphaned mailbox workers; the final run verifies that fix.
+- `bun scripts/smokeTeamAuth.ts`: exit 0, final `SMOKE PASS`, compiled final bundle on 3785.
+  Migration twice, canonical proxy/cookies/origins, restricted enrollment, MFA, revoke/MCP/ban,
+  operator recovery, reset redemption/reuse, second-start empty schema plan, isolated key/master/
+  auth/shard restore and secret-free startup/request logs passed.
+- `bash tests/runTeamAuthSecurityControls.sh`: exit 0; 144 tests, zero failures, 787 assertions,
+  five files, 79.64s. Includes the activated public mount and both real operator CLI lock probes.
+- `git diff --check`: exit 0. Both reserved ports were bind-checked free after browser cleanup;
+  final scratch/process cleanup and co-author validation accompany the report commit.
+
+### Failure history and resolutions
+
+The first stress attempt was stopped after nine 20-second test timeouts during a host load burst
+(load average 39.35, swap 8,183/8,191 MiB used). Timed-out fixture cleanup produced closed-database
+errors; stopping the already-failed run also produced a shutdown failure. The focused randomized
+retry and complete stress retry above passed without changing auth server code, assertions or
+limits. This records the observed load correlation, not a proof that every future order is safe.
+
+A later full CI run passed all 2,206 server tests but caught one DOM focus assertion reading the
+challenge heading before its passive focus effect settled. The assertion now waits for exact
+heading identity as the active element; no production behavior or deadline was relaxed. LoginScreen
+and ReauthDialog repeated three times passed 36 tests / 117 assertions; the final full CI above
+passed all 153 DOM tests. Sidebar admin/non-admin gating has two explicit DOM cases.
+
+### Integration handoff
+
+Read-only merge preview against integration/stage `5dce0ac` predicts five textual/modify-delete
+conflicts: MailClient.tsx, doc/DEPLOYMENT.md, playwright.auth.config.ts, scripts/authBrowserServer.ts
+and scripts/runAuthBrowserTests.ts. Combine auth/admin gates with the existing collaboration props,
+retain watcher deployment settings alongside the canonical auth environment, and keep the compiled
+browser runner with its port override, private process group and worktree-local scratch. The obsolete
+custom browser server stays deleted. Review the cleanly combined DB/schema/wrapper/role-inventory
+and package-lock changes against the retained integration dry-run map.
+
+Collab-ui slice 2b still owns canonical per-user mailbox summaries/events and cross-account counts;
+those routes are absent in the previewed stage tree. Adoption of collaboration revisions must also
+adapt the raw membershipCleanup unassignment writer and its corruption fixtures. Canonical physical
+phone/PWA, live IMAP browser flows, deployed DNS/TLS/proxy/mailprovider renewal and application-wide restore
+remain later-owner evidence. The updated optional MFA-session fixture verifier was not exercised
+against a live mailbox by this integration.
