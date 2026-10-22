@@ -64,6 +64,7 @@ import SelectionActionsMenu from "./mailclient/messagelist/SelectionActionsMenu"
 import {
   bindSelectionActions,
   resolveSelectionActionTargets,
+  bindRowReadAction,
   type SelectionActions
 } from "./mailclient/messagelist/selectionActions";
 import {
@@ -3692,7 +3693,8 @@ export default function MailClient({
   const renderMessageMenu = (
     message: Message,
     origin: "list" | "thread" | "table" = "list",
-    onOpenChange?: (open: boolean) => void
+    onOpenChange?: (open: boolean) => void,
+    collapsedThreadSeen?: boolean
   ) => renderMessageMenuHelper(
     message,
     pendingMessageActions,
@@ -3728,7 +3730,10 @@ export default function MailClient({
     onOpenChange,
     otherAccounts.length > 0,
     (target) => handleCopyToAccount(target, origin),
-    (target) => handleMoveToAccount(target, origin)
+    (target) => handleMoveToAccount(target, origin),
+    origin !== "thread" && collapsedThreadSeen !== undefined
+      ? bindRowReadAction(message.id, collapsedThreadSeen, selectionActions, getSelectionActionTargets)
+      : undefined
   );
 
   const updateFlagStateRef = useRef(updateFlagState);
