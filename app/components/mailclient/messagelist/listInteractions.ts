@@ -101,6 +101,10 @@ export function handleMessageRowKeyDown(params: {
   toggleMessageSelection: (messageId: string, replace?: boolean, setActive?: boolean) => void;
 }) {
   const { event, messageId, onSelect, selectRangeTo, toggleMessageSelection } = params;
+  if (event.defaultPrevented) return;
+  const target = event.target;
+  if (target instanceof Element && target !== event.currentTarget &&
+    target.closest('button, a, input, select, textarea, [role="menuitem"], [role="checkbox"], [contenteditable="true"]')) return;
   if (event.key === " ") {
     event.preventDefault();
     if (event.shiftKey) {

@@ -5,8 +5,8 @@ import { Theme } from "@radix-ui/themes";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import styles from "./ShellPanes.module.css";
-import type { CSSProperties, ReactNode } from "react";
-import { useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
+import { useEffect, useMemo, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useDefaultLayout, useGroupCallbackRef, type LayoutStorage } from "react-resizable-panels";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -25,9 +25,9 @@ const LIST_PANEL_ID = "list";
 const READER_PANEL_ID = "reader";
 const CALENDAR_PANEL_ID = "calendar";
 
-// The hook defaults to `localStorage`, which does not exist while the shell is
-// server-rendered; the wrapper reports "nothing stored" there and lets the
-// client snapshot take over after hydration.
+// Read storage only after hydration, then restore through the group API.
+// Server markup and the first client snapshot must use the same defaults.
+const subscribeMounted = () => () => {};
 const paneLayoutStorage: LayoutStorage = {
   getItem: (key) => (typeof window === "undefined" ? null : window.localStorage.getItem(key)),
   setItem: (key, value) => {
@@ -56,15 +56,26 @@ export type ShellPanesProps = {
 
 export default function ShellPanes({ list, reader, calendar, mobileView = "list", onCloseCalendar }: ShellPanesProps) {
   const isMobile = useIsMobile();
-  const desktopCalendar = calendar && !isMobile;
-  const panelIds = desktopCalendar
+  const desktopCalendar = Boolean(calendar) && !isMobile;
+  const panelIds = useMemo(() => desktopCalendar
     ? [LIST_PANEL_ID, READER_PANEL_ID, CALENDAR_PANEL_ID]
-    : [LIST_PANEL_ID, READER_PANEL_ID];
+    : [LIST_PANEL_ID, READER_PANEL_ID], [desktopCalendar]);
+  const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
+  const storage = useMemo<LayoutStorage>(() => ({
+    getItem: (key) => mounted ? paneLayoutStorage.getItem(key) : null,
+    setItem: paneLayoutStorage.setItem
+  }), [mounted]);
+  const [group, groupRef] = useGroupCallbackRef();
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: PANE_LAYOUT_STORAGE_ID,
     panelIds,
-    storage: paneLayoutStorage
+    storage,
+    onlySaveAfterUserInteractions: true
   });
+
+  useEffect(() => {
+    if (!isMobile && defaultLayout && group) group.setLayout(defaultLayout);
+  }, [defaultLayout, group, isMobile, panelIds]);
 
   return (
     <>
@@ -73,7 +84,7 @@ export default function ShellPanes({ list, reader, calendar, mobileView = "list"
       data-mobile-view={mobileView}
       orientation="horizontal"
       disabled={isMobile}
-      defaultLayout={defaultLayout}
+      groupRef={groupRef}
       onLayoutChanged={isMobile ? undefined : onLayoutChanged}
       className={`${styles.panes} min-h-0 min-w-0 flex-1 gap-2 p-4`}
     >

@@ -34,9 +34,68 @@
 }
 
 @media (width < 768px) {
-  .pane { padding: 8px; }
-  .pane :global([data-message-list-row="true"]) { min-height: 44px; }
-  /* Only the explicit action buttons get the 44px touch target; the unread dot and
-     other glyph buttons keep their size, otherwise they render as large hollow circles. */
-  .pane :global([data-message-list-row="true"] button[aria-label="Message actions"]) { display: inline-flex; visibility: visible; opacity: 1; min-width: 44px; min-height: 44px; }
+  .pane { padding: 8px; min-width: 0; overflow-x: hidden; }
+  .pane :global([data-message-layout="stacked"]) {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto auto;
+    grid-template-rows: 24px 24px;
+    gap: 4px 6px;
+    padding: 8px 0;
+    height: 100%;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .pane :global([data-message-layout="stacked"] > .rt-Badge) { display: none; }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="from"]) {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    padding-left: 0 !important;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="subject"]) {
+    display: contents;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-subject]) {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="subject"] > :not([data-message-cell="unread"]):not([data-message-subject])) { display: none; }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="unread"]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 44px;
+    height: 100%;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="unread"] > :not(button[title^="Mark as"])) { display: none; }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="date"]) {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 0;
+    white-space: nowrap;
+    text-align: right;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="size"]) { display: none; }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="actions"]) {
+    grid-column: 4;
+    grid-row: 1 / 3;
+    min-width: 44px;
+    gap: 0;
+  }
+  .pane :global([data-message-layout="stacked"] [data-message-cell="actions"] > button:is([aria-label="Delete"], [aria-label="Find related"])) { display: none; }
+  .pane :global([data-message-list-row="true"] button[aria-label="Message actions"]) {
+    display: inline-flex;
+    visibility: visible;
+    opacity: 1;
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

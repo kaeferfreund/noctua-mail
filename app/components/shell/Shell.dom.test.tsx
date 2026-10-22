@@ -1,7 +1,9 @@
 // Uses the existing happy-dom harness through bun run test:dom.
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
 import { Theme, Button as KeptButton } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
@@ -162,5 +164,33 @@ describe("sidebar editable target guard", () => {
     }
     expect(fireEvent.keyDown(window, { key: "b", ctrlKey: true })).toBe(false);
     expect(toggles).toBe(1);
+  });
+});
+
+
+describe("saved shell hydration", () => {
+  it("hydrates a saved pane layout and theme without attribute or tree mismatches", async () => {
+    window.localStorage.setItem("react-resizable-panels:noctua:panes:list:reader", JSON.stringify({ list: 30, reader: 70 }));
+    window.localStorage.setItem("noctua:theme", "light");
+    const errors: unknown[][] = [];
+    const recoveries: unknown[] = [];
+    const error = spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args); });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const shell = <ThemeProvider attribute="class" storageKey="noctua:theme" forcedTheme="light">
+      <ThemeToggle /><ShellPanes list={<div>List</div>} reader={<div>Reader</div>} />
+    </ThemeProvider>;
+    container.innerHTML = renderToString(shell);
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(container, shell, { onRecoverableError: (issue) => recoveries.push(issue) }); });
+      expect(recoveries).toEqual([]);
+      expect(errors.filter((args) => /hydrat|didn't match|did not match/i.test(String(args[0])))).toEqual([]);
+      expect(container.querySelector('button[aria-label="Theme"] svg')?.getAttribute("class")).toContain("sun");
+      expect(window.localStorage.getItem("react-resizable-panels:noctua:panes:list:reader")).toBe('{"list":30,"reader":70}');
+    } finally {
+      act(() => root?.unmount());
+      container.remove(); error.mockRestore();
+    }
   });
 });

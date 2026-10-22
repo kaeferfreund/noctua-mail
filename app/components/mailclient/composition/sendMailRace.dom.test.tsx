@@ -573,11 +573,49 @@ describe("mobile compose", () => {
       expect(view.queryByRole("button", { name: /Dock in thread view/ })).toBeNull();
       expect(view.queryByRole("button", { name: /Minimize composer/ })).toBeNull();
       expect(view.queryByRole("button", { name: /Open composer in new window/ })).toBeNull();
-      expect(view.baseElement.querySelector('.modal-backdrop > div')?.getAttribute("style")).toBeNull();
+      const dialog = view.getByRole("dialog", { name: "New message" });
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      expect(dialog.style.width).toBe("");
+      expect(dialog.closest(".radix-themes")).toBeTruthy();
     } finally { cleanup(); }
   });
 });
 
+
+describe("mobile composer accessibility", () => {
+  it("restores the sidebar header trigger when its compose opener unmounts", async () => {
+    const header = document.createElement("button");
+    header.setAttribute("aria-label", "Toggle sidebar");
+    const opener = document.createElement("button");
+    document.body.append(header, opener);
+    opener.focus();
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      opener.remove();
+      fireEvent.keyDown(view.getByRole("dialog", { name: "New message" }), { key: "Escape" });
+      await waitFor(() => expect(document.activeElement).toBe(header));
+    } finally { cleanup(); opener.remove(); header.remove(); }
+  }, 20000);
+  it("traps reverse tab, closes with Escape and restores the opener", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Synthetic compose opener";
+    document.body.append(opener);
+    opener.focus();
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      const dialog = view.getByRole("dialog", { name: "New message" });
+      const first = view.getByRole("button", { name: "Close composer" });
+      act(() => first.focus());
+      fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      await waitFor(() => expect(view.queryByRole("dialog", { name: "New message" })).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(opener));
+    } finally { cleanup(); opener.remove(); }
+  }, 20000);
+});
 
 describe("shell shortcut in composers", () => {
   for (const variant of ["inline", "modal"] as const) {
