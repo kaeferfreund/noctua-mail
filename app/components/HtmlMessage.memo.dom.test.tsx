@@ -1,4 +1,3 @@
-// @ts-expect-error bun:test is provided by the runner and is absent from this tsconfig.
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, render } from "@testing-library/react";
 import HtmlMessage from "./HtmlMessage";

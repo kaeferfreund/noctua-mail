@@ -76,7 +76,7 @@ const RESYNCED = {
 
 function makeDeps(
   overrides: {
-    storedSource?: Buffer | null;
+    storedSource?: Buffer<ArrayBuffer> | null;
     fetchedSource?: Buffer | null;
     appendResult?: number | null;
     appendThrows?: boolean;
@@ -110,7 +110,7 @@ function makeDeps(
     },
     appendImapMessage: async (_account, _mailbox, _raw, flags, _clientId, internalDate) => {
       calls.push("append");
-      appendArgs.push({ flags, internalDate });
+      appendArgs.push({ flags: flags ?? [], internalDate });
       if (appendThrows) throw new Error("append failed");
       return appendResult;
     },
@@ -128,6 +128,7 @@ function makeDeps(
     saveMessageSource: async (_accountId, _messageId, source) => {
       calls.push("saveSource");
       savedSource.push(source as Buffer);
+      return Buffer.byteLength(source);
     },
     deleteAttachmentData: async (_accountId, _messageId, attachmentId) => {
       calls.push("deleteBlob");
@@ -165,7 +166,7 @@ describe("removeMessageAttachmentEverywhere", () => {
 
     // The response carries the re-synced list + htmlBody (fresh ids), not the
     // pre-rewrite one — this is what keeps a follow-up removal working.
-    expect(result.attachments).toEqual(RESYNCED.attachments);
+    expect<Message["attachments"]>(result.attachments).toEqual(RESYNCED.attachments);
     expect(result.htmlBody).toBe("<p>fresh</p>");
     expect(result.imapUid).toBe(99);
   });

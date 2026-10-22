@@ -1,4 +1,3 @@
-// @ts-expect-error -- Bun supplies this test API at runtime; the project has no bun:test declarations.
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { RecipientAlias } from "@/lib/data";

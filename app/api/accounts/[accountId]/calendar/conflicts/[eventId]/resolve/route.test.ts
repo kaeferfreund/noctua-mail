@@ -4,11 +4,11 @@ import type { Account, CalendarEvent } from "@/lib/data";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { applyConflictResolution, type ResolveConflictDeps } from "./route";
 
-const updateRemoteEvent = mock(async () => ({ etag: "resolved-etag" }));
+const updateRemoteEvent = mock<ResolveConflictDeps["updateRemoteEvent"]>(async () => ({ etag: "resolved-etag" }));
 // Injected, never mock.module'd — keeps the real ./client intact for client.test.ts.
 const deps: ResolveConflictDeps = {
   createCaldavClient: (async () => ({})) as unknown as ResolveConflictDeps["createCaldavClient"],
-  updateRemoteEvent: updateRemoteEvent as unknown as ResolveConflictDeps["updateRemoteEvent"]
+  updateRemoteEvent
 };
 
 const { upsertAccount, upsertCalendarEvent, getCalendarEventById, getCalendarEventConflict } =

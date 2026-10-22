@@ -5,7 +5,7 @@ import type { LookupFn } from "@/lib/net/urlSafety";
 // never tries to reach the network. `assertPublicUrl` catches SSRF-ish URLs
 // before `tsdav` is invoked at all; these tests verify that chokepoint is in
 // place and that a valid URL does get handed through.
-const createDAVClient = mock(async () => ({
+const createDAVClient = mock(async (_options: Parameters<typeof import("tsdav").createDAVClient>[0]) => ({
   fetchCalendars: async () => []
 }));
 mock.module("tsdav", () => ({ createDAVClient }));
@@ -70,7 +70,7 @@ describe("assertSafeCaldavUrl", () => {
         (e: Error) => e
       );
       expect(err).toBeInstanceOf(CaldavUrlRejectedError);
-      expect((err as CaldavUrlRejectedError).reason).toBe("unsupported-protocol");
+      expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("unsupported-protocol");
     }
   });
 
@@ -80,7 +80,7 @@ describe("assertSafeCaldavUrl", () => {
       lookup
     }).catch((e: Error) => e);
     expect(err).toBeInstanceOf(CaldavUrlRejectedError);
-    expect((err as CaldavUrlRejectedError).reason).toBe("private-ip");
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("private-ip");
   });
 
   test("rejects hostnames where *any* resolved record is private (rebinding-style)", async () => {
@@ -92,7 +92,7 @@ describe("assertSafeCaldavUrl", () => {
       lookup
     }).catch((e: Error) => e);
     expect(err).toBeInstanceOf(CaldavUrlRejectedError);
-    expect((err as CaldavUrlRejectedError).reason).toBe("private-ip");
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("private-ip");
   });
 
   test("rejects malformed URLs", async () => {
@@ -100,7 +100,7 @@ describe("assertSafeCaldavUrl", () => {
       (e: Error) => e
     );
     expect(err).toBeInstanceOf(CaldavUrlRejectedError);
-    expect((err as CaldavUrlRejectedError).reason).toBe("invalid-url");
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("invalid-url");
   });
 });
 

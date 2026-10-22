@@ -49,6 +49,8 @@ function makeRow(
     groupKey: "Today",
     isFirstInGroup: false,
     message,
+    displayDate: message.date,
+    displayDateValue: message.dateValue,
     depth,
     threadGroupId: message.threadId ?? message.id,
     threadSize: fullFlat.length,
@@ -254,7 +256,7 @@ describe("list selection behavior", () => {
     });
 
     expect(Array.from(store.getIds()).sort()).toEqual(["a1", "a2", "b1", "b2", "mid"]);
-    expect(lastSelectedId).toBe("b1");
+    expect<string | null>(lastSelectedId).toBe("b1");
   });
 
   it("selects all visible messages the same as a first-to-last range selection", () => {
@@ -284,7 +286,7 @@ describe("list selection behavior", () => {
     });
 
     expect(Array.from(store.getIds()).sort()).toEqual(["a1", "a2", "b1", "b2", "mid"]);
-    expect(lastSelectedId).toBe("b1");
+    expect<string | null>(lastSelectedId).toBe("b1");
   });
 
   it("does not expand thread siblings during range selection when supportsThreads is false", () => {
@@ -326,7 +328,7 @@ describe("list selection behavior", () => {
 
 describe("list toggle animation helpers", () => {
   it("records toggle metadata and flips collapsed state for opened groups", () => {
-    let lastToggle: { key: string; open: boolean; at: number } | null = null;
+    const toggleState: { lastToggle: { key: string; open: boolean; at: number } | null } = { lastToggle: null };
     let animationClock = 0;
     let collapsedState: Record<string, boolean> = { groupA: true };
 
@@ -334,7 +336,7 @@ describe("list toggle animation helpers", () => {
       key: "groupA",
       open: true,
       setLastToggle: (next) => {
-        lastToggle = typeof next === "function" ? next(lastToggle) : next;
+        toggleState.lastToggle = typeof next === "function" ? next(toggleState.lastToggle) : next;
       },
       setAnimationClock: (next) => {
         animationClock = typeof next === "function" ? next(animationClock) : next;
@@ -344,16 +346,16 @@ describe("list toggle animation helpers", () => {
       }
     });
 
-    expect(lastToggle).not.toBeNull();
-    expect(lastToggle?.key).toBe("groupA");
-    expect(lastToggle?.open).toBe(true);
-    expect(typeof lastToggle?.at).toBe("number");
-    expect(animationClock).toBe(lastToggle?.at);
+    expect(toggleState.lastToggle).not.toBeNull();
+    expect(toggleState.lastToggle?.key).toBe("groupA");
+    expect(toggleState.lastToggle?.open).toBe(true);
+    expect(typeof toggleState.lastToggle?.at).toBe("number");
+    expect<number | undefined>(animationClock).toBe(toggleState.lastToggle?.at);
     expect(collapsedState.groupA).toBe(false);
   });
 
   it("marks targets collapsed when the toggle closes", () => {
-    let lastToggle: { key: string; open: boolean; at: number } | null = null;
+    const toggleState: { lastToggle: { key: string; open: boolean; at: number } | null } = { lastToggle: null };
     let animationClock = 0;
     let collapsedState: Record<string, boolean> = { threadA: false };
 
@@ -361,7 +363,7 @@ describe("list toggle animation helpers", () => {
       key: "threadA",
       open: false,
       setLastToggle: (next) => {
-        lastToggle = typeof next === "function" ? next(lastToggle) : next;
+        toggleState.lastToggle = typeof next === "function" ? next(toggleState.lastToggle) : next;
       },
       setAnimationClock: (next) => {
         animationClock = typeof next === "function" ? next(animationClock) : next;
@@ -371,8 +373,8 @@ describe("list toggle animation helpers", () => {
       }
     });
 
-    expect(lastToggle?.open).toBe(false);
-    expect(animationClock).toBe(lastToggle?.at);
+    expect(toggleState.lastToggle?.open).toBe(false);
+    expect<number | undefined>(animationClock).toBe(toggleState.lastToggle?.at);
     expect(collapsedState.threadA).toBe(true);
   });
 });
@@ -434,7 +436,7 @@ describe("thread subtree checkbox behavior", () => {
     });
 
     expect(Array.from(store.getIds()).sort()).toEqual(["sub-child", "sub-root"]);
-    expect(lastSelected).toBe("sub-root");
+    expect<string | null>(lastSelected).toBe("sub-root");
   });
 
   it("adds a thread to rows checked after the thread row last rendered", () => {

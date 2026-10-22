@@ -3,7 +3,9 @@ import {
   DETACHED_COMPOSE_SESSION_MAX_AGE_MS,
   parseDetachedComposeEvent,
   parseDetachedComposeHandoff,
-  shouldProtectDetachedComposeWindow
+  shouldProtectDetachedComposeWindow,
+  type DetachedComposeHandoff,
+  type DetachedComposeEvent
 } from "./detachedComposeHandoff";
 
 const now = 2_000_000_000_000;
@@ -16,7 +18,7 @@ const readySession = {
   sourceMessageId: "message-1",
   createdAtMs: now - 1_000,
   updatedAtMs: now - 500
-};
+} satisfies DetachedComposeHandoff;
 
 describe("detached compose handoff parsing", () => {
   it("keeps a ready session durable for reloads", () => {
@@ -31,7 +33,7 @@ describe("detached compose handoff parsing", () => {
       mode: "new",
       sourceMessageId: null,
       draftId: null
-    };
+    } satisfies DetachedComposeHandoff;
     expect(parseDetachedComposeHandoff(JSON.stringify(preparing), now)).toEqual(preparing);
   });
 
@@ -64,7 +66,7 @@ describe("detached compose event parsing", () => {
       sourceMessageId: "message-1",
       mode: "forward",
       createdAtMs: now
-    };
+    } satisfies DetachedComposeEvent;
     expect(parseDetachedComposeEvent(JSON.stringify(event))).toEqual(event);
   });
 
