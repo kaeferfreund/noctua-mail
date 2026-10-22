@@ -6,7 +6,7 @@ import type { AdminUser } from "./types";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
 
 afterEach(cleanup);
-const user: AdminUser = { id: "synthetic-user", email: "user@example.test", name: "Synthetic User", role: "admin", disabled: false, hasPassword: true, twoFactorEnabled: true, passkeyCount: 2, accounts: [{ id: "synthetic-mailbox", name: "Support", email: "support@example.test", role: "editor", isOwner: false }] };
+const user: AdminUser = { id: "synthetic-user", email: "user@example.test", name: "Synthetic User", role: "admin", disabled: false, hasPassword: true, twoFactorEnabled: true, passkeyCount: 2, passkeys: [{ id: "synthetic-key", name: "Synthetic key", createdAt: 1792900000000 }, { id: "synthetic-key-2", name: null, createdAt: null }], accounts: [{ id: "synthetic-mailbox", name: "Support", email: "support@example.test", role: "editor", isOwner: false }] };
 const response = (data: unknown, status = 200, headers?: HeadersInit) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...headers } });
 function harness(override?: (url: string, init?: RequestInit) => Response | undefined) {
   const calls: { url: string; init?: RequestInit }[] = [];
@@ -35,9 +35,9 @@ describe("AdminPanel", () => {
     expect(page.getByText(/Passkeys: 2/)).toBeTruthy();
     expect(page.getByText("Support · editor")).toBeTruthy();
   });
-  it("tolerates the current full-account list shape without attributing the actor's role to the target", async () => {
-    const { page } = harness(url => url === "/api/admin/users" ? response({ ok: true, users: [{ ...user, accounts: [{ id: "legacy", name: "Legacy", email: "legacy@example.test", accessRole: "manager", ownerUserId: user.id }] }] }) : undefined);
-    expect(await page.findByText("Legacy · Unknown role · Owner")).toBeTruthy();
+  it("uses target ownership from the canonical users DTO", async () => {
+    const { page } = harness(url => url === "/api/admin/users" ? response({ ok: true, users: [{ ...user, accounts: [{ id: "owned", name: "Owned", email: "owned@example.test", role: "manager", isOwner: true }] }] }) : undefined);
+    expect(await page.findByText("Owned · manager · Owner")).toBeTruthy();
   });
   it("issues an email-bound invite, copies it and shows the code only until dismissed", async () => {
     const { page, calls } = harness((url, init) => url === "/api/admin/users" && init?.method === "POST" ? response({ ok: true, invite: { code: "synthetic-once-code" } }, 201) : undefined);
@@ -120,7 +120,7 @@ describe("AdminPanel", () => {
       const { page, calls } = harness();
       const dialog = await openUserAction(page, button, title);
       if (suffix === "/mfa-reset") fireEvent.click(dialog.getByRole("checkbox"));
-      if (suffix.includes("passkeys")) fireEvent.change(dialog.getByLabelText(/Passkey resource ID/), { target: { value: "synthetic-key" } });
+      if (suffix.includes("passkeys")) fireEvent.change(dialog.getByLabelText("Passkey", { exact: true }), { target: { value: "synthetic-key" } });
       fireEvent.change(dialog.getByLabelText("Your app password"), { target: { value: "synthetic-password" } });
       fireEvent.change(dialog.getByLabelText("Your current TOTP code"), { target: { value: "123456" } });
       fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));

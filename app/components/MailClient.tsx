@@ -31,7 +31,7 @@ import MailboxGate from "./auth/MailboxGate";
 import { AuthFrame } from "./auth/AuthPrimitives";
 import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
-import AdminTabContent from "./account-settings/tabs/AdminTabContent";
+import AdminPanel from "./admin/AdminPanel";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
@@ -5244,13 +5244,7 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
-    <AuthDialog open={adminOpen} onOpenChange={setAdminOpen}>
-      <AuthDialogContent data-shell="" className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
-        <AuthDialogTitle>Admin</AuthDialogTitle>
-        <AuthDialogDescription>Manage users and invitations.</AuthDialogDescription>
-        {adminOpen && <AdminTabContent isActive isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} readErrorMessage={readErrorMessage} />}
-      </AuthDialogContent>
-    </AuthDialog>
+    {adminOpen && <AdminPanel isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </>;
   if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
