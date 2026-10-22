@@ -474,6 +474,8 @@ export type SparsePatch<T> = {
 export type UserAccountPrefsPatch = SparsePatch<UserAccountPrefs>;
 
 export type AdminAuditAction =
+  | "invite.revoke"
+  | "operator.lock_override"
   | "user.recovery_issue"
   | "user.mfa_reset"
   | "user.passkey_remove"
@@ -505,6 +507,9 @@ export type AdminAuditEntry = {
 };
 
 export type InviteCode = {
+  issuedByUserId?: string | null;
+  provenance?: "admin" | "operator";
+  revokedAt?: number | null;
   email?: string | null;
   code: string;
   role: "admin" | "user";

@@ -289,4 +289,3 @@ describe("lazy compose conversions", () => {
     expect(calls.filter((call) => call.url.endsWith("/recipient-aliases"))).toHaveLength(1);
   });
 });
-

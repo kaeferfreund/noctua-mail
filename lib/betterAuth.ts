@@ -1,3 +1,4 @@
+import { ensureAuthLifetimeLock, type AuthLifetimeLock } from "./authLifetimeLock";
 import { teamFeaturesSupported } from "./teamFeatures";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { getMigrations } from "better-auth/db/migration";
@@ -256,11 +257,12 @@ let authPromise: Promise<NoctuaAuth> | null = null;
 let authGeneration = -1;
 
 /** Graph-local singleton. Closing DBs invalidates it, including after teardown/reopen. */
-export function getAuth(): Promise<NoctuaAuth> {
+export function getAuth(initialization: {operatorLock?:AuthLifetimeLock} = {}): Promise<NoctuaAuth> {
   const generation = getDbConnectionGeneration();
   if (!authPromise || authGeneration !== generation) {
     authGeneration = generation;
     const pending = (async () => {
+      await ensureAuthLifetimeLock(initialization.operatorLock);
       const env = readAuthEnv();
       if (process.env.IMAP_CREDENTIALS_STORAGE === "both") {
         console.warn("[auth] IMAP_CREDENTIALS_STORAGE=both is deprecated; use db.");

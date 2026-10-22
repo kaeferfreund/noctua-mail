@@ -59,41 +59,28 @@ export async function deleteUserAccountLinksForUser(userId: string) {
   });
 }
 
-/**
- * Deletes a user with their memberships, per-mailbox preferences and MCP
- * tokens in one immediate transaction (§4.5). Mailboxes the user owns move
- * to `reassignOwnerTo`; the caller validates that target. Deleting an owner
- * without a target is refused so no mailbox is left with a dangling owner.
- * Unassigning the user in the account shards is the caller's job. Returns
- * false when the user does not exist.
- */
-export async function deleteUser(
-  userId: string,
-  options: { reassignOwnerTo?: string } = {}
-): Promise<boolean> {
-  return withDbWriteRetry("deleteUser", async () => {
-    const db = await getDb();
-    const deleted: boolean = db
-      .transaction(() => {
-        if (options.reassignOwnerTo) {
-          db.prepare(`UPDATE accounts SET ownerUserId = ? WHERE ownerUserId = ?`).run(
-            options.reassignOwnerTo,
-            userId
-          );
-        }
-        const owned = db
-          .prepare(`SELECT COUNT(*) AS count FROM accounts WHERE ownerUserId = ?`)
-          .get(userId) as { count: number };
-        if (owned.count > 0) {
-          throw new Error(`User ${userId} still owns ${owned.count} mailbox(es)`);
-        }
-        deleteUserAccountLinkRowsForUser(db, userId);
-        deleteUserAccountPrefRowsForUser(db, userId);
-        deleteMcpTokenRowsForUser(db, userId);
-        return changedRows(db.prepare(`DELETE FROM users WHERE id = ?`).run(userId)) > 0;
-      })
-      .immediate();
-    return deleted;
+/** Domain detach phase; caller validates ownership replacement and owns the transaction. */
+export function detachUserDomainRows(db:any,userId:string,reassignOwnerTo?:string) {
+  if (reassignOwnerTo) db.prepare(`UPDATE accounts SET ownerUserId=? WHERE ownerUserId=?`).run(reassignOwnerTo,userId);
+  const owned=db.prepare(`SELECT COUNT(*) AS count FROM accounts WHERE ownerUserId=?`).get(userId) as {count:number};
+  if(owned.count>0)throw new Error(`User ${userId} still owns ${owned.count} mailbox(es)`);
+  deleteUserAccountLinkRowsForUser(db,userId);
+  deleteUserAccountPrefRowsForUser(db,userId);
+  deleteMcpTokenRowsForUser(db,userId);
+}
+
+export function deleteUserProfileRow(db:any,userId:string) {
+  return changedRows(db.prepare(`DELETE FROM users WHERE id=?`).run(userId))>0;
+}
+
+/** @deprecated Domain-only legacy API, retained for storage tests; production must use removeUserLifecycle. */
+export async function deleteUser(userId:string,options:{reassignOwnerTo?:string}={}):Promise<boolean> {
+  return withDbWriteRetry("deleteUser",async()=>{
+    const db=await getDb();
+    return db.transaction(()=>{
+      detachUserDomainRows(db,userId,options.reassignOwnerTo);
+      return deleteUserProfileRow(db,userId);
+    }).immediate();
   });
 }
 

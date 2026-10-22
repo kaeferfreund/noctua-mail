@@ -1,3 +1,4 @@
+import { detachUserDomainRows, deleteUserProfileRow } from "./db/users";
 import type { Database } from "bun:sqlite";
 import type { NoctuaAuth } from "./betterAuth";
 import { AuthPolicyError, consumeReauthGrant } from "./authPolicy";
@@ -22,13 +23,23 @@ export async function issueOnboardingInvite(db:Database,source:SessionSecurity,b
   strictFields(body,["email","name","role"]);
   const parsed=personalEmailSchema.safeParse(body.email),name=parseName(body.name);
   if (!parsed.success || !["admin","user"].includes(body.role as string)) throw new AuthPolicyError("invalid_request",400);
-  const email=parsed.data,op=await reserveLifecycle(db,source,"","user.invite",{});
+  return issueInvite(db,source,{email:parsed.data,name,role:body.role as "admin"|"user"});
+}
+
+export async function issueGenericInvite(db:Database,source:SessionSecurity,body:unknown) {
+  strictFields(body,[]);
+  return issueInvite(db,source,{email:null,role:"user"});
+}
+
+async function issueInvite(db:Database,source:SessionSecurity,input:{email:string|null;name?:string;role:"admin"|"user"}) {
+  const op=await reserveLifecycle(db,source,"","user.invite",{});
   try {
-    return await withDbWriteRetry("issueOnboardingInvite",()=>db.transaction(()=>{
-      assertAdminActor(db,source);assertLifecycle(db,op);assertNewIdentity(db,email);
-      const invite={code:crypto.randomUUID(),email,role:body.role as "admin"|"user",maxUses:1,uses:0,createdAt:Date.now(),expiresAt:Date.now()+86400000,usedByUserId:null};
-      db.prepare(`INSERT INTO invite_codes(code,email,role,maxUses,uses,createdAt,expiresAt) VALUES(?,?,?,1,0,?,?)`).run(invite.code,email,invite.role,invite.createdAt,invite.expiresAt);
-      recordAdminAuditRow(db,{actorUserId:source.userId,action:"user.create",payload:{email,name,role:invite.role,stage:"invited"}});
+    return await withDbWriteRetry("issueInvite",()=>db.transaction(()=>{
+      assertAdminActor(db,source);assertLifecycle(db,op);
+      if(input.email)assertNewIdentity(db,input.email);
+      const invite={code:crypto.randomUUID(),email:input.email,role:input.role,maxUses:1,uses:0,createdAt:Date.now(),expiresAt:input.email?Date.now()+86400000:null,usedByUserId:null,issuedByUserId:source.userId,provenance:"admin" as const,revokedAt:null};
+      db.prepare(`INSERT INTO invite_codes(code,email,role,maxUses,uses,createdAt,expiresAt,issuedByUserId,provenance) VALUES(?,?,?,1,0,?,?,?,'admin')`).run(invite.code,invite.email,invite.role,invite.createdAt,invite.expiresAt,source.userId);
+      recordAdminAuditRow(db,{actorUserId:source.userId,action:"user.create",payload:{...input,stage:"invited"}});
       return {ok:true,invite};
     }).immediate());
   } finally { await finishLifecycle(db,op); }
@@ -125,11 +136,9 @@ async function cleanDeletedUser(db:Database,op:LifecycleOperation,cleanup:Cleanu
     if (payload.reassignOwnerTo) {
       // Recheck the recorded replacement at every retry; never leave a dangling owner.
       try {assertEnabledTarget(db,payload.reassignOwnerTo);} catch {throw new AuthPolicyError("invalid_owner",409);}
-      db.prepare(`UPDATE accounts SET ownerUserId=? WHERE ownerUserId=?`).run(payload.reassignOwnerTo,op.targetUserId);
     }
-    if (db.prepare(`SELECT 1 FROM accounts WHERE ownerUserId=?`).get(op.targetUserId)) throw new AuthPolicyError("owner_reassignment_required",409);
-    db.prepare(`DELETE FROM user_accounts WHERE userId=?`).run(op.targetUserId);
-    db.prepare(`DELETE FROM user_account_prefs WHERE userId=?`).run(op.targetUserId);
+    if (!payload.reassignOwnerTo && db.prepare(`SELECT 1 FROM accounts WHERE ownerUserId=?`).get(op.targetUserId)) throw new AuthPolicyError("owner_reassignment_required",409);
+    detachUserDomainRows(db,op.targetUserId,payload.reassignOwnerTo);
     db.prepare(`UPDATE admin_lifecycle_operations SET state='cleanup_pending',updatedAt=? WHERE id=?`).run(Date.now(),op.id);
   }).immediate());
   revokeAuthStreams({userId:op.targetUserId});
@@ -139,7 +148,7 @@ async function cleanDeletedUser(db:Database,op:LifecycleOperation,cleanup:Cleanu
 async function completeDeletion(db:Database,op:LifecycleOperation) {
   await withDbWriteRetry("completeUserDeletion",()=>db.transaction(()=>{
     if (db.prepare(`SELECT state FROM admin_lifecycle_operations WHERE id=?`).get(op.id)?.state==="deleted") return;
-    db.prepare(`DELETE FROM users WHERE id=?`).run(op.targetUserId);
+    deleteUserProfileRow(db,op.targetUserId);
     recordAdminAuditRow(db,{actorUserId:op.actorUserId,action:"user.delete",targetUserId:op.targetUserId,payload:{operationId:op.id}});
     db.prepare(`UPDATE admin_lifecycle_operations SET state='deleted',updatedAt=? WHERE id=?`).run(Date.now(),op.id);
   }).immediate());

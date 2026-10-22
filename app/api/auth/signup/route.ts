@@ -16,12 +16,16 @@ export async function POST(request:Request) {
     const input:unknown=await request.json();
     const result=await provisionUser(auth,db,input);
     const body=input as {email:string;password:string};
-    const response=await auth.handler(new Request(new URL("/api/ba/sign-in/email",request.url),{
-      method:"POST",headers:{"content-type":"application/json",origin:new URL(request.url).origin},
-      body:JSON.stringify({email:body.email.trim().toLowerCase(),password:body.password})
-    }));
-    if (!response.ok) return NextResponse.json({ok:true,...result,enrollmentRequired:true,loginRequired:true},{status:201,headers});
-    const output=NextResponse.json({ok:true,...result,enrollmentRequired:true,loginRequired:false},{status:201,headers});
+    // Provisioning is committed. A failed setup sign-in must still return the new identity.
+    let response:Response|undefined;
+    try {
+      response=await auth.handler(new Request(new URL("/api/ba/sign-in/email",request.url),{
+        method:"POST",headers:{"content-type":"application/json",origin:new URL(request.url).origin,"x-forwarded-for":getRequestIp(request)},
+        body:JSON.stringify({email:body.email.trim().toLowerCase(),password:body.password})
+      }));
+    } catch { /* The client can sign in separately without replaying signup. */ }
+    const output=NextResponse.json({ok:true,userId:result.userId,accountId:null,security:{enrollmentRequired:true},loginRequired:!response?.ok},{status:201,headers});
+    if (!response?.ok) return output;
     for (const cookie of response.headers.getSetCookie()) output.headers.append("set-cookie",cookie);
     return output;
   } catch (error) {

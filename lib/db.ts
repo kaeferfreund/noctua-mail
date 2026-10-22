@@ -175,7 +175,6 @@ export {
 } from "./db/mcpTokens";
 
 export {
-  claimInviteCode,
   createInviteCode,
   getInviteCodes,
   saveInviteCodes

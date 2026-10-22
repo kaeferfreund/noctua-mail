@@ -222,7 +222,7 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
         proof.grantHash = grant.tokenHash; proof.purpose = grant.purpose as ReauthPurpose;
       }
       await takeSlot(proof, credential.userId, "security.passkey.login");
-      proof.verifiedUserId = credential.userId;
+
       proof.verifiedCredentialId = ctx.body.response.id;
       if (challenge.userId && (challenge.userId !== credential.userId || challenge.generation !== proof.op!.generation)) failure("invalid_challenge");
     }
@@ -300,7 +300,7 @@ export function recordVerifiedPasskey(userId: string | undefined, uv: boolean, r
   if (!expected || (userId && userId !== expected)) failure("invalid_proof");
   proof.verifiedUV = true;
   proof.destructive = true; // A successful callback is followed by library credential/session writes.
-  proof.verifiedUserId = expected;
+
   if (passkeyId) proof.createdPasskeyId = passkeyId;
 }
 
@@ -332,7 +332,7 @@ async function finalizePolicy(proof: AuthProofContext, path: string, response: R
       db.prepare(`UPDATE auth_reauth_grants SET challengeId=? WHERE tokenHash=? AND state='reserved'`).run(identifier, proof.grantHash!);
       db.prepare(`UPDATE admin_lifecycle_operations SET state='totp_seed_issued',updatedAt=? WHERE id=?`).run(Date.now(), op.id);
     }).immediate());
-    proof.retainOperation = true;
+
     return response;
   }
   if (path === "/passkey/verify-registration") {

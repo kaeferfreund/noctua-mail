@@ -9,7 +9,6 @@ import {reauthenticate} from "./authSecurity";
 import {createRateLimiter} from "./rateLimit";
 import {withResetDelivery,redactAuthUrl} from "./authRecoveryContext";
 import {persistAccountRow} from "./db/rowParsers";
-import {AuthPolicyError} from "./authPolicy";
 import {hashMcpToken,validateMcpTokenRow} from "./mcpAuth";
 import {withAuthProof} from "./authPolicyContext";
 
@@ -50,7 +49,7 @@ describe("slice 5 provisioning",()=>{
   for(const mode of ["missing","expired","exhausted","wrong-person","non-admin-bootstrap"])test(`${mode} invite has zero IMAP/SMTP calls and zero reservations`,async()=>{
     const f=await setup(),address=email();let calls=0;
     const code=mode==="missing"?"invalid":invite(f,{role:mode==="non-admin-bootstrap"?"user":"admin",...(mode==="expired"?{expiresAt:0}:mode==="exhausted"?{uses:1}:mode==="wrong-person"?{email:email()}:{})});
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}})).rejects.toThrow();
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}})).rejects.toMatchObject({status:mode==="exhausted"?409:403,code:mode==="exhausted"?"invite_exhausted":mode==="non-admin-bootstrap"?"bootstrap_invite_required":"invalid_invite"});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
   test("all signups require a valid invite; app password has an explicit minimum and no mailbox fallback",async()=>{
@@ -61,12 +60,13 @@ describe("slice 5 provisioning",()=>{
     await expect(f.auth.api.createUser({body:{email:email(),password,name:"Unscoped"}})).rejects.toThrow("provisioning_required");
   });
   test("legacy identity and existing mailbox conflict before reservation/network",async()=>{
-    const f=await setup(),user=await f.createUser(email()),box=mailbox();
+    const f=await setup(),user=await f.createUser(email()),box=mailbox(),legacy=email();
+    f.master.prepare(`INSERT INTO users(id,email,role,createdAt) VALUES(?,?,'user',?)`).run(crypto.randomUUID(),legacy,Date.now());
     persistAccountRow(f.master,{...box,id:"synthetic-existing"});let calls=0;
     const shared=mailbox(),member=await f.createUser(email());
     persistAccountRow(f.master,{...shared,id:"synthetic-owned-shared",ownerUserId:user.id});await f.addMembership(member.id,"synthetic-owned-shared");
     const verify={imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}};
-    for(const body of [input(invite(f),user.email,mailbox()),input(invite(f),email(),box),input(invite(f),shared.email)])await expect(provisionUser(f.auth,f.master,body,verify)).rejects.toBeInstanceOf(AuthPolicyError);
+    for(const [body,code] of [[input(invite(f),user.email,mailbox()),"user_exists"],[input(invite(f),legacy,mailbox()),"user_exists"],[input(invite(f),email(),box),"mailbox_exists"],[input(invite(f),shared.email),"mailbox_exists"]] as const)await expect(provisionUser(f.auth,f.master,body,verify)).rejects.toMatchObject({status:409,code});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
   test("first-admin and last invite use each have one winner across awaits",async()=>{
@@ -81,7 +81,7 @@ describe("slice 5 provisioning",()=>{
   test("reserve rechecks invite and mailbox after network; complete history releases email",async()=>{
     const f=await setup();await f.createUser(email(),password,"admin");
     const code=invite(f),address=email();
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return true;},smtp:async()=>true})).rejects.toThrow();
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
     expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
     const complete=await provisionUser(f.auth,f.master,input(invite(f),address),verified);
     f.master.prepare(`DELETE FROM auth_user WHERE id=?`).run(complete.userId);f.master.prepare(`DELETE FROM users WHERE id=?`).run(complete.userId);
@@ -269,4 +269,97 @@ describe("slice 5 lifecycle and recovery",()=>{
     expect(f.master.prepare(`SELECT count(*) n FROM admin_audit WHERE action='user.password_reset' AND targetUserId=?`).get(target.user.id).n).toBe(1);
     const signed=await http(f,"/sign-in/email",{email:target.user.email,password:nextPassword});expect((await signed.json()).twoFactorRedirect).toBe(true);
   });
+});
+
+for(const boundary of ["preflight-reservation","reservation-finalize"] as const)test(`issuer demotion race at ${boundary} cannot create an identity`,async()=>{
+  const f=await setup(),issuer=await enrolled(f),other=await enrolled(f),address=email();
+  const issued=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:"Synthetic",role:"admin"});
+  const demote=()=>updateUserLifecycle(f.auth,f.master,other.source,request(other.jar),issuer.user.id,{role:"user"});
+  let create:ReturnType<typeof spyOn>|undefined;
+  if(boundary==="reservation-finalize") {
+    const original=f.auth.api.createUser;
+    create=spyOn(f.auth.api,"createUser").mockImplementation(async (args:Parameters<typeof original>[0])=>{const result=await original(args);await demote();return result;});
+  }
+  try {
+    await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
+    expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning WHERE normalizedEmail=? AND state IN ('reserved','auth_created','cleanup_required','complete')`).get(address).n).toBe(0);
+    expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(issued.invite.code).uses).toBe(0);
+  } finally {create?.mockRestore();}
+});
+
+for(const boundary of ["before-reservation","before-finalize"] as const)test(`late mailbox collision ${boundary} returns 409 and compensates exact identity`,async()=>{
+  const f=await setup();await f.createUser(email(),password,"admin");
+  const box=mailbox(),address=email(),body=input(invite(f),address,box);
+  const collide=()=>persistAccountRow(f.master,{...box,id:"synthetic-collision-owner"});
+  let create:ReturnType<typeof spyOn>|undefined;
+  if(boundary==="before-finalize") {
+    const original=f.auth.api.createUser;
+    create=spyOn(f.auth.api,"createUser").mockImplementation(async (args:Parameters<typeof original>[0])=>{const result=await original(args);collide();return result;});
+  }
+  try {
+    await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return true;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});
+    expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
+    expect(f.master.prepare(`SELECT id FROM accounts WHERE email=?`).get(box.email).id).toBe("synthetic-collision-owner");
+    expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(body.inviteCode).uses).toBe(0);
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning WHERE normalizedEmail=? AND state<>'cancelled'`).get(address).n).toBe(0);
+  }finally{create?.mockRestore();}
+});
+
+for(const boundary of ["reserve","mint","audit","complete","release"] as const)test(`recovery issuance ${boundary} fault returns no capability; restart twice is idempotent`,async()=>{
+  const f=await setup(),target=await enrolled(f,"user"),older=await recovery(f,target.user.id);
+  const event=boundary==="reserve"?"BEFORE INSERT ON user_provisioning WHEN NEW.kind='recovery'":boundary==="mint"?"BEFORE INSERT ON auth_verification WHEN NEW.identifier LIKE 'reset-password:%'":boundary==="audit"?"BEFORE INSERT ON admin_audit WHEN NEW.action='user.recovery_issue'":boundary==="complete"?"BEFORE UPDATE ON user_provisioning WHEN NEW.kind='recovery' AND NEW.state='complete'":"BEFORE UPDATE ON admin_lifecycle_operations WHEN OLD.slot='admin-lifecycle' AND NEW.slot IS NULL";
+  f.master.exec(`CREATE TRIGGER synthetic_recovery_fault ${event} BEGIN SELECT RAISE(ABORT,'synthetic recovery fault'); END`);
+  await expect(recovery(f,target.user.id)).rejects.toThrow();
+  f.master.exec(`DROP TRIGGER synthetic_recovery_fault`);
+  await reconcileLifecycle(f.auth,f.master,Date.now()+1);
+  const snapshot=JSON.stringify({journal:f.master.prepare(`SELECT * FROM user_provisioning`).all(),audit:f.master.prepare(`SELECT * FROM admin_audit`).all()});
+  await reconcileLifecycle(f.auth,f.master,Date.now()+1);
+  expect(JSON.stringify({journal:f.master.prepare(`SELECT * FROM user_provisioning`).all(),audit:f.master.prepare(`SELECT * FROM admin_audit`).all()})).toBe(snapshot);
+  expect(f.master.prepare(`SELECT count(*) n FROM auth_verification WHERE identifier LIKE 'reset-password:%' AND value=?`).get(target.user.id).n).toBe(0);
+  expect(f.master.prepare(`SELECT count(*) n FROM admin_lifecycle_operations WHERE slot IS NOT NULL`).get().n).toBe(0);
+  expect((await http(f,"/reset-password",{token:token(older.url),newPassword:nextPassword})).status).toBe(400);
+  expect((await recovery(f,target.user.id)).ok).toBe(true);
+});
+
+for(const action of ["ban","unban","role","delete","disable-audit"] as const)test(`lifecycle ${action} API/audit failure keeps target inaccessible until restart`,async()=>{
+  const f=await setup(),actor=await enrolled(f),target=await enrolled(f,"user");
+  if(action==="unban")f.master.prepare(`UPDATE auth_user SET banned=1 WHERE id=?`).run(target.user.id);
+  const event=action==="delete"?"BEFORE DELETE ON auth_user":action==="role"?"BEFORE UPDATE OF role ON auth_user":action==="disable-audit"?"BEFORE INSERT ON admin_audit WHEN NEW.action='user.disable'":"BEFORE UPDATE OF banned ON auth_user";
+  f.master.exec(`CREATE TRIGGER synthetic_lifecycle_fault ${event} BEGIN SELECT RAISE(ABORT,'synthetic lifecycle fault'); END`);
+  const run=action==="delete"?removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{},async()=>({status:"not_installed",unassigned:0})):updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,action==="role"?{role:"admin"}:{disabled:action!=="unban"});
+  await expect(run).rejects.toThrow();
+  expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${target.user.id}`)).not.toBeNull();
+  expect((await http(f,"/sign-in/email",{email:target.user.email,password})).status).toBe(["unban","delete","disable-audit"].includes(action)?401:409);
+  if(action==="disable-audit")expect(f.master.prepare(`SELECT banned FROM auth_user WHERE id=?`).get(target.user.id).banned).toBe(1);
+  f.master.exec(`DROP TRIGGER synthetic_lifecycle_fault`);
+  await reconcileLifecycle(f.auth,f.master,Date.now()+1,async()=>({status:"not_installed",unassigned:0}));
+  await reconcileLifecycle(f.auth,f.master,Date.now()+1);
+  expect(()=>readSessionSecurity(f.master,target.source.sessionId)).toThrow();
+  expect(f.master.prepare(`SELECT count(*) n FROM admin_lifecycle_operations WHERE slot IS NOT NULL`).get().n).toBe(0);
+});
+
+test("last admin self-demotion and self-disable reject through lifecycle service",async()=>{
+  const f=await setup(),actor=await enrolled(f);
+  for(const body of [{role:"user"},{disabled:true}])await expect(updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),actor.user.id,body)).rejects.toMatchObject({status:403,code:"self_admin_mutation_forbidden"});
+  expect(f.master.prepare(`SELECT role,banned FROM auth_user WHERE id=?`).get(actor.user.id)).toEqual({role:"admin",banned:0});
+});
+
+
+test("provenance adoption revokes historical targeted invites and preserves deliberate generic/operator issuance",async()=>{
+  const {Database}=await import("bun:sqlite"),{ensureInviteIssuerSchema}=await import("./db/schema");
+  const db=new Database(":memory:");
+  try {
+    db.exec(`CREATE TABLE invite_codes(code TEXT PRIMARY KEY,email TEXT); INSERT INTO invite_codes VALUES('synthetic-targeted','synthetic@example.test'),('synthetic-generic',NULL)`);
+    db.exec(`CREATE TRIGGER synthetic_adoption_fault BEFORE UPDATE ON invite_codes BEGIN SELECT RAISE(ABORT,'synthetic adoption fault'); END`);
+    expect(()=>ensureInviteIssuerSchema(db)).toThrow("synthetic adoption fault");
+    expect((db.prepare(`PRAGMA table_info(invite_codes)`).all() as {name:string}[]).some(column=>column.name==="provenance")).toBe(false);
+    db.exec(`DROP TRIGGER synthetic_adoption_fault`);
+    ensureInviteIssuerSchema(db);
+    expect(db.prepare(`SELECT revokedAt FROM invite_codes WHERE code='synthetic-targeted'`).get().revokedAt).not.toBeNull();
+    expect(db.prepare(`SELECT provenance,issuedByUserId,revokedAt FROM invite_codes WHERE code='synthetic-generic'`).get()).toEqual({provenance:"operator",issuedByUserId:null,revokedAt:null});
+    db.exec(`INSERT INTO invite_codes(code,email,provenance) VALUES('synthetic-new-operator','new@example.test','operator')`);
+    ensureInviteIssuerSchema(db);
+    expect(db.prepare(`SELECT revokedAt FROM invite_codes WHERE code='synthetic-new-operator'`).get().revokedAt).toBeNull();
+  }finally{db.close();}
 });
