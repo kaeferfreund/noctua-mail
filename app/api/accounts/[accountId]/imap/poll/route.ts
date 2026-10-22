@@ -1,4 +1,4 @@
-import { formatEnvelopeAddresses } from "@/lib/mail/imap/parser";
+import { formatEnvelopeAddresses, resolveMessageSenderKey } from "@/lib/mail/imap/parser";
 import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -58,6 +58,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           uid: number;
           subject: string;
           from: string;
+          senderKey: string | null;
           date?: string | null;
           messageId?: string | null;
         }> = [];
@@ -73,6 +74,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               uid: message.uid,
               subject: env?.subject ?? "(no subject)",
               from: formatEnvelopeAddresses(env?.from),
+              senderKey: resolveMessageSenderKey(env, new Map()),
               date: env?.date ? env.date.toISOString() : null,
               messageId: env?.messageId ?? null
             });

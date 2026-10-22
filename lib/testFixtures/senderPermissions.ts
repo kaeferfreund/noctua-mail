@@ -1,5 +1,7 @@
 // Shared synthetic From-header matrix for reader/standalone permission parity.
 export const senderPermissionCases = [
+  { name: "SMTPUTF8 local", from: "tést@example.test", key: "tést@example.test" },
+  { name: "SMTPUTF8 with IDN", from: "tést@bücher.example", key: "tést@xn--bcher-kva.example" },
   { name: "comment containing an allowed address", from: "Actual (trusted@example.test) <actual@example.test>", key: "actual@example.test" },
   { name: "trailing comment", from: "actual@example.test (trusted@example.test)", key: "actual@example.test" },
   { name: "group", from: "Synthetic: actual@example.test, trusted@example.test;", key: "actual@example.test" },
@@ -30,4 +32,12 @@ export const senderPermissionLookupCases = [
   { name: "legacy unquoted local part", from: "attacker trusted@example.test", key: "" },
   { name: "nested angles", from: "Attack <trusted@example.test <actual@example.test>>", key: "" },
   { name: "trailing text after mailbox", from: "Attack <trusted@example.test> actual@example.test", key: "" }
+];
+
+// These are old lossy serialized values, not raw wire From headers. No key can
+// safely be derived: each could have come from a different quoted local part.
+export const legacyUnkeyedSenders = [
+  "attacker:trusted@example.test",
+  "trus(foo)ted@example.test",
+  " trusted@example.test"
 ];

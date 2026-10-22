@@ -4,13 +4,14 @@
  * Covers the four list/search entry points (`listMessages`, `listThreads`,
  * `listThreadMessages`, `listRelatedMessages`) and their filter/group
  * machinery. Upsert, flag, move, and delete operations live elsewhere.
- * Every function in this module reads only and does not issue writes
- * itself. `getAccountDb` may still run idempotent runtime-data ensure /
+ * Opening a thread lazily backfills missing sender keys from retained sources.
+ * `getAccountDb` may also run idempotent runtime-data ensure /
  * backfill steps (e.g. `ensureThreadLatestReceivedDateValues`) before
  * returning the connection; those writes, if any, happen inside
  * `getAccountDb`, not in this module's query logic.
  */
 import { simpleParser } from "mailparser";
+import { backfillMessageSenderKey } from "./senderKey";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
 import { getAccountEmail } from "../accounts";
@@ -1601,6 +1602,7 @@ export async function listRelatedMessages(params: {
         m.quotedHtmlEdited,
         m.subject,
         m.fromAddr,
+        m.senderKey,
         m.replyToAddr,
         m.toAddr,
         m.ccAddr,
@@ -1764,6 +1766,7 @@ export async function listRelatedMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -1813,6 +1816,7 @@ export async function listRelatedMessages(params: {
       threadId: row.threadId,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       to: row.toAddr,
       preview: row.preview,
@@ -2024,6 +2028,7 @@ export async function listMessages(params: {
         m.quotedHtmlEdited,
         m.subject,
         m.fromAddr,
+        m.senderKey,
         m.replyToAddr,
         m.toAddr,
         m.ccAddr,
@@ -2098,6 +2103,7 @@ export async function listMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -2552,6 +2558,7 @@ export async function listThreads(params: {
               m.xForwardedMessageId,
               m.subject,
               m.fromAddr,
+              m.senderKey,
               m.replyToAddr,
               m.toAddr,
               m.ccAddr,
@@ -2627,6 +2634,7 @@ export async function listThreads(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -2762,6 +2770,7 @@ export async function listThreadMessages(params: {
   if (uniqueThreads.length > 0) loadRowsBy("threadId", uniqueThreads);
   if (uniqueMessages.length > 0) loadRowsBy("id", uniqueMessages);
   const rows = Array.from(rowsById.values());
+  for (const row of rows) await backfillMessageSenderKey(db, row);
 
   const rowThreadIds = Array.from(
     new Set(
@@ -2848,6 +2857,7 @@ export async function listThreadMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
