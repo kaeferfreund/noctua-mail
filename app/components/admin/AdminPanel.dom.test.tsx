@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import AdminPanel from "./AdminPanel";
+import { clientFixture, proof } from "@/app/components/auth/authTestHelpers";
 import type { AdminUser } from "./types";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
 
@@ -15,7 +16,7 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
     const custom = override?.(url, init); if (custom) return custom;
     if (url === "/api/admin/users") return response({ ok: true, users: [user] });
     if (url === "/api/admin/invites") return response({ ok: true, invites: [{ code: "synthetic-history-secret", email: "invited@example.test", role: "user", uses: 0, expiresAt: 1793000000000, createdAt: 1792900000000 }] });
-    if (url === "/api/auth/reauth") return response({ ok: true, ceremonyRequired: false, grant: "synthetic-proof" });
+    if (url === "/api/auth/reauth") return response({ ok: true, ceremonyRequired: false, grant: "synthetic-proof", purpose: "admin.recovery", expiresAt: 1793000000000 });
     return response({ ok: true });
   };
   const page = render(<Theme><AdminPanel isAdminUser apiFetch={apiFetch} onClose={() => {}} /></Theme>);
@@ -73,9 +74,11 @@ describe("AdminPanel", () => {
     const dialog = await openUserAction(page, "Recovery", "Initiate recovery");
     expect((dialog.getByRole("button", { name: "Confirm" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(dialog.getByRole("checkbox"));
-    fireEvent.change(dialog.getByLabelText("Your app password"), { target: { value: "synthetic-password" } });
-    fireEvent.change(dialog.getByLabelText("Your current TOTP code"), { target: { value: "123456" } });
     fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
+    const reauth = within(await page.findByRole("dialog", { name: "Verify your identity" }));
+    fireEvent.change(reauth.getByLabelText("Current password"), { target: { value: "synthetic-password" } });
+    fireEvent.change(reauth.getByLabelText("Authenticator code"), { target: { value: "123456" } });
+    fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
     const secret = within(await page.findByRole("dialog", { name: "One-time recovery link" }));
     expect(secret.getByText(/synthetic-reset/)).toBeTruthy();
     const proof = calls.find(call => call.url === "/api/auth/reauth");
@@ -121,9 +124,11 @@ describe("AdminPanel", () => {
       const dialog = await openUserAction(page, button, title);
       if (suffix === "/mfa-reset") fireEvent.click(dialog.getByRole("checkbox"));
       if (suffix.includes("passkeys")) fireEvent.change(dialog.getByLabelText("Passkey", { exact: true }), { target: { value: "synthetic-key" } });
-      fireEvent.change(dialog.getByLabelText("Your app password"), { target: { value: "synthetic-password" } });
-      fireEvent.change(dialog.getByLabelText("Your current TOTP code"), { target: { value: "123456" } });
       fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
+    const reauth = within(await page.findByRole("dialog", { name: "Verify your identity" }));
+    fireEvent.change(reauth.getByLabelText("Current password"), { target: { value: "synthetic-password" } });
+      fireEvent.change(reauth.getByLabelText("Authenticator code"), { target: { value: "123456" } });
+      fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
       await waitFor(() => expect(calls.some(call => call.url.endsWith(suffix))).toBe(true));
       const mutation = calls.find(call => call.url.endsWith(suffix))!;
       expect(new Headers(mutation.init?.headers).get("x-noctua-reauth")).toBe("synthetic-proof");
@@ -132,6 +137,26 @@ describe("AdminPanel", () => {
       await waitFor(() => expect(page.queryByRole("dialog", { name: title })).toBeNull());
     });
   }
+  it("uses the final password-plus-UV grant for admin recovery", async () => {
+    const { client, calls: proofCalls } = clientFixture(() => response({ ...proof, purpose: "admin.recovery", ceremonyRequired: true }));
+    client.passkeySignIn = async options => {
+      expect(options?.proof?.purpose).toBe("admin.recovery");
+      return { ...proof, purpose: "admin.recovery", grant: "synthetic-final-admin-grant" };
+    };
+    let used = "";
+    const page = render(<Theme><AdminPanel isAdminUser client={client} onClose={() => {}} apiFetch={async (input, init) => {
+      if (String(input).endsWith("/sessions")) used = new Headers(init?.headers).get("x-noctua-reauth") ?? "";
+      return response({ ok: true, users: [user] });
+    }} /></Theme>);
+    const dialog = await openUserAction(page, "Revoke sessions", "Revoke sessions");
+    fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
+    const reauth = within(await page.findByRole("dialog", { name: "Verify your identity" }));
+    fireEvent.click(reauth.getByText("Verify with a passkey"));
+    fireEvent.change(reauth.getByLabelText("Current password"), { target: { value: "synthetic-password" } });
+    fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
+    await waitFor(() => expect(used).toBe("synthetic-final-admin-grant"));
+    expect(proofCalls[0].body).toEqual({ purpose: "admin.recovery", currentPassword: "synthetic-password", proofMode: "passkey" });
+  });
   it("does not fetch or render for a non-admin", () => {
     let fetched = false;
     const page = render(<AdminPanel isAdminUser={false} apiFetch={async () => { fetched = true; return response({}); }} onClose={() => {}} />);
