@@ -471,7 +471,7 @@ export default function MessageThreadList({
                   >
                     <Trash2 size={14} />
                   </TooltipIconButton>
-                  {renderMessageMenu(message, "table")}
+                  {renderMessageMenu(message, "table", undefined, isCollapsedThreadRoot ? displaySeen : undefined)}
                   {showAddSuggestionAction && (
                     <TopicSuggestionAcceptButton
                       topicColor={activeTopic?.color}
