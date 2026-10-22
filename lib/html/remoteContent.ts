@@ -4,6 +4,7 @@ import { extractPrimaryEmail } from "../senderIdentity";
 export type RemoteContentMode = "block" | "allow";
 
 export function remoteContentSenderKey(sender?: string | null) {
+  // Shared with From/To parsing. Both preference reads and writes use this key.
   return extractPrimaryEmail(sender) ?? "";
 }
 
@@ -22,5 +23,6 @@ export function isLocalMailResource(value: string) {
 
 export function messageHtmlCsp(mode: RemoteContentMode = "block") {
   const remote = mode === "allow" ? " https: http:" : "";
-  return `default-src 'none'; img-src 'self' data: cid: blob:${remote}; style-src 'unsafe-inline'${remote}; font-src 'self' data:${remote}; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`;
+  // Opt-in permits image resources only; sender CSS/fonts never load remotely.
+  return `default-src 'none'; img-src 'self' data: cid: blob:${remote}; style-src 'unsafe-inline'; font-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`;
 }

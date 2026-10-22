@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { sanitizeHtmlForDisplay } from "./sanitize";
-import { messageHtmlCsp, senderAllowsRemoteContent } from "./remoteContent";
+import { messageHtmlCsp, remoteContentSenderKey, senderAllowsRemoteContent } from "./remoteContent";
 
 const remote = "https://images.example.test/photo.png";
 const local = "/api/accounts/demo/messages/newsletter/attachments/logo";
@@ -35,10 +35,12 @@ describe("message HTML privacy", () => {
   ]) {
     it(`filters CSS resource value ${value}`, () => {
       const input = `<style>.photo{background:${value};padding:12px}</style><p style='background:${value.replaceAll("'", "&apos;")};color:red'>Hello</p>`;
-      const out = sanitizeHtmlForDisplay(input);
-      expect(out).not.toContain("background:");
-      expect(out).toContain("padding:12px");
-      expect(out).toContain("color:red");
+      for (const mode of ["block", "allow"] as const) {
+        const out = sanitizeHtmlForDisplay(input, mode);
+        expect(out).not.toContain("background:");
+        expect(out).toContain("padding:12px");
+        expect(out).toContain("color:red");
+      }
     });
   }
 
@@ -48,7 +50,9 @@ describe("message HTML privacy", () => {
     `@import/* comment */url(${remote}) layer(theme);`
   ]) {
     it(`filters CSS directive ${directive}`, () => {
-      expect(sanitizeHtmlForDisplay(`<style>${directive}.ok{color:red}</style>`)).not.toContain("images.example.test");
+      for (const mode of ["block", "allow"] as const) {
+        expect(sanitizeHtmlForDisplay(`<style>${directive}.ok{color:red}</style>`, mode)).not.toContain("images.example.test");
+      }
     });
   }
 
@@ -79,13 +83,35 @@ describe("message HTML privacy", () => {
     }
   });
 
-  it("allows remote content only in the explicit allow mode", () => {
+  it("allows remote images only in the explicit allow mode, with no referrer", () => {
     const input = `<style>@import url('${remote}');.photo{background:url('${remote}')}</style><img src="${remote}" srcset="${remote} 2x">`;
     const out = sanitizeHtmlForDisplay(input, "allow");
-    expect(out).toContain("@import");
+    expect(out).not.toContain("@import");
+    expect(out).not.toContain("background:");
     expect(out).toContain(`src="${remote}"`);
     expect(out).toContain(`srcset="${remote} 2x"`);
     expect(out).not.toContain("data-remote-src");
+    expect(out).toContain('referrerpolicy="no-referrer"');
+  });
+
+  it("overrides image referrer policies and filters remote fonts and stylesheets in both modes", () => {
+    for (const mode of ["block", "allow"] as const) {
+      const out = sanitizeHtmlForDisplay(`<link rel="stylesheet" href="${remote}"><style>@font-face{font-family:Sender;src:url(${remote})}p{font-family:Sender}</style><img src="cid:logo" referrerpolicy="unsafe-url">`, mode);
+      expect(out).not.toContain("images.example.test");
+      expect(out).not.toContain("unsafe-url");
+      expect(out).toContain('referrerpolicy="no-referrer"');
+      expect(messageHtmlCsp(mode)).toContain("style-src 'unsafe-inline'; font-src 'self' data:;");
+    }
+  });
+
+  const deceptiveFrom = '"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>';
+  it("rejects sender permission for an address embedded in a quoted display name", () => {
+    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "trusted@example.test": true } } }, deceptiveFrom)).toBe(false);
+  });
+
+  it("matches sender permission for the real parsed From mailbox", () => {
+    expect(remoteContentSenderKey(`  ${deceptiveFrom}  `)).toBe("actual@example.test");
+    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "actual@example.test": true } } }, deceptiveFrom)).toBe(true);
   });
 
   it("matches sender preferences by lower-cased address and keeps policies restrictive", () => {

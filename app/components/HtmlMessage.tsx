@@ -18,11 +18,6 @@ import { Button } from "@/app/components/ui/button";
 import { useRemoteContent } from "@/app/hooks/useRemoteContent";
 import { messageHtmlCsp, type RemoteContentMode } from "@/lib/html/remoteContent";
 import styles from "./HtmlMessage.module.css";
-import {
-  extractTrustedFontStylesheetImportsFromHtml,
-  isTrustedFontStylesheetUrl,
-  stripPromotedFontImports
-} from "@/app/components/emailFontRegistry";
 import { APP_FONT_FACE_CSS, APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const NOCTUA_EMAIL_CONTENT_CLASS = "noctua-email-content";
@@ -64,24 +59,6 @@ function prefixSelectors(css: string, prefix: string) {
       .join(", ");
     return `${brace}\n${next}{`;
   });
-}
-
-function extractStylesheetLinks(input: string) {
-  const links: string[] = [];
-  const re = /<link\b[^>]*>/gi;
-  const relRe = /rel=["']?([^"'\s>]+)["']?/i;
-  const hrefRe = /href=["']([^"']+)["']/i;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(input))) {
-    const tag = match[0];
-    const rel = relRe.exec(tag)?.[1]?.toLowerCase();
-    if (rel !== "stylesheet") continue;
-    const href = hrefRe.exec(tag)?.[1];
-    if (!href) continue;
-    if (!/^https?:\/\//i.test(href)) continue;
-    links.push(href);
-  }
-  return Array.from(new Set(links));
 }
 
 function extractPrefersColorScheme(css: string, theme: "dark" | "light") {
@@ -375,17 +352,11 @@ function buildPreviewDocument({
 }) {
   const cleanedHtml = stripConditionalComments(html || "");
   const hasExplicitColor = /(^|[^-])color\s*:/i.test(cleanedHtml);
-  const stylesheetLinks = remoteContent === "allow" ? extractStylesheetLinks(cleanedHtml) : [];
-  const fontStylesheetUrls = Array.from(
-    new Set([
-      ...(remoteContent === "allow" ? extractTrustedFontStylesheetImportsFromHtml(cleanedHtml) : []),
-      ...stylesheetLinks.filter(isTrustedFontStylesheetUrl)
-    ])
-  );
-  const promotedFontStylesheetUrls = new Set(fontStylesheetUrls);
+  // The sanitizer filters sender CSS in both modes. Never reinsert external
+  // stylesheets or font imports from the unsanitized message after opt-in.
   let injectedCss = "";
   const withRewrites = safeHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
-    const scaledCss = scaleFontSizes(stripPromotedFontImports(css, promotedFontStylesheetUrls));
+    const scaledCss = scaleFontSizes(css);
     const rewritten = extractPrefersColorScheme(scaledCss, darkMode ? "dark" : "light");
     if (rewritten.injected) {
       injectedCss += `\n${rewritten.injected}`;
@@ -402,9 +373,6 @@ function buildPreviewDocument({
   const hostTextColor = hasExplicitColor
     ? ""
     : "color: var(--mail-view-fg, var(--text, #1a1a1a));";
-  const stylesheetTags = stylesheetLinks
-    .map((href) => `<link rel="stylesheet" href="${escapeAttribute(href)}">`)
-    .join("\n");
   const bodyClassName = [NOCTUA_EMAIL_CONTENT_CLASS, "email-body", bodyAttrs.className]
     .filter(Boolean)
     .join(" ");
@@ -422,7 +390,6 @@ function buildPreviewDocument({
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(messageHtmlCsp(remoteContent))}">`,
     '<meta name="referrer" content="no-referrer">',
-    stylesheetTags,
     "<style>",
     APP_FONT_FACE_CSS,
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; }`,
@@ -498,7 +465,7 @@ function HtmlMessage({
   // Theme and zoom only change the wrapper, not the sanitized message.
   const blockedHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
   const allowedHtml = useMemo(() => sanitizeHtmlForDisplay(cleanedHtml, "allow"), [cleanedHtml]);
-  const hasRemoteContent = blockedHtml !== allowedHtml || extractStylesheetLinks(cleanedHtml).length > 0;
+  const hasRemoteContent = blockedHtml !== allowedHtml;
   const safeHtml = remote.allowed ? allowedHtml : blockedHtml;
 
   useEffect(() => {
@@ -581,6 +548,8 @@ function HtmlMessage({
       });
 
       const handleClick = (event: Event) => {
+        const button = (event as MouseEvent).button;
+        if (event.type === "click" ? button !== 0 : event.type !== "auxclick" || button !== 1) return;
         const anchor = getClosestAnchor(event.target);
         if (!anchor) return;
         const href = anchor.getAttribute("href");

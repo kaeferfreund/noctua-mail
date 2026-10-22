@@ -11,6 +11,8 @@ import { normalizeHtmlStructure } from "./normalize";
 // excluded for the usual XSS/phishing reasons. <meta> is allowed only with
 // the explicitly allowlisted attributes below (charset, name, content).
 // HTTP directives and sender-supplied referrer policies are removed.
+// Remote-content permission applies to images, never CSS: url(), imports and
+// font sources are filtered in both modes to avoid CSS-driven referrer leaks.
 const SANITIZE_HTML_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
     ...sanitizeHtml.defaults.allowedTags,
@@ -59,7 +61,7 @@ const SANITIZE_HTML_OPTIONS: sanitizeHtml.IOptions = {
     ],
     a: ["href", "name", "target", "rel"],
     source: ["srcset", "media", "type", "data-remote-srcset"],
-    img: ["src", "srcset", "data-remote-src", "data-remote-srcset", "alt", "title", "width", "height", "align"],
+    img: ["src", "srcset", "referrerpolicy", "data-remote-src", "data-remote-srcset", "alt", "title", "width", "height", "align"],
     table: ["border", "cellspacing", "cellpadding", "summary"],
     td: ["colspan", "rowspan", "headers", "scope"],
     th: ["colspan", "rowspan", "headers", "scope"],
@@ -143,7 +145,8 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
           delete attribs.name;
           delete attribs.content;
         }
-        if (block && attribs.style) attribs.style = privateCss(attribs.style, true);
+        if (attribs.style) attribs.style = privateCss(attribs.style, true);
+        if (tagName === "img") attribs.referrerpolicy = "no-referrer";
         if (block && (tagName === "img" || tagName === "source")) {
           if (attribs.src && !isLocalMailResource(attribs.src)) {
             attribs["data-remote-src"] = attribs.src;
@@ -162,6 +165,6 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
   });
   // sanitize-html deliberately bypasses textFilter for raw style text. Filter
   // canonical style elements after the HTML allowlist has run instead.
-  return block ? sanitized.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
-    (_match, open, css, close) => `${open}${privateCss(css)}${close}`) : sanitized;
+  return sanitized.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
+    (_match, open, css, close) => `${open}${privateCss(css)}${close}`);
 }

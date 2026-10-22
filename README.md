@@ -78,6 +78,13 @@ Simple, secure authentication using your existing IMAP credentials. No separate 
 - **Calendar reminders** – Schedule notifications for invite events, including recurring meetings
 - **Automatic invite updates** – Apply invite changes/cancellations to existing reminder data
 
+HTML mail blocks remote images by default. “Load once” permits them for the
+current message; “Always load from this sender” saves permission for the parsed
+From mailbox, excluding its display name. Remote images use a no-referrer policy.
+Remote CSS resources (stylesheets, imports, backgrounds and fonts) stay blocked
+even after opt-in, in both the reader and standalone HTML view. CID attachments
+and inline images remain available.
+
 ### 🎨 UI
 - **Three-pane layout** – Folders, message list, and message view
 - **Dark mode** 🌙 – Easy on the eyes
@@ -141,6 +148,14 @@ Run only the message list behavior regression tests:
 
 ```bash
 bun test app/components/mailclient/messagelist/listBehavior.test.ts
+```
+
+Run the Chromium HTML privacy regression (requires installed Playwright Chromium
+and free loopback ports 3824/3825; the test owns and closes both listeners):
+
+```bash
+mkdir -p .tmp
+TMPDIR="$PWD/.tmp" bun test --config=bunfig.browser.toml --timeout 120000 ./tests/browser/htmlPrivacy.test.ts
 ```
 
 ---
