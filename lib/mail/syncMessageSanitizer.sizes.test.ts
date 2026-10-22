@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { describe, expect, test } from "bun:test";
+import { createCollabFixture } from "@/lib/testThreadCollabHarness";
 import type { Message } from "@/lib/data";
 import { listMessageSourceSizes } from "@/lib/storage";
 // Points the storage helpers at a scratch data dir before they are exercised.
@@ -24,17 +25,20 @@ function buildMessage(overrides: Partial<Message> & { id: string }): Message {
 }
 
 describe("sanitizeSyncedMessage size capture", () => {
-  test("records the byte length actually written to disk", async () => {
-    const accountId = `acc-sanitizer-${randomUUID()}`;
+  test("defers file writes until upsert and records the byte length actually written to disk", async () => {
+    const f = await createCollabFixture();
+    const accountId = f.accountId;
     // Multi-byte characters make a naive string-length count differ from bytes.
     const source = "Subject: Grüße\r\n\r\nDas Attachment wiegt schwer… 🎉";
     const sanitized = await sanitizeSyncedMessage(
-      buildMessage({ id: "msg-with-source", accountId, source }),
+      buildMessage({ id: "msg-with-source", accountId, folderId: f.folderId, source }),
       accountId
     );
 
     expect(sanitized.sizeBytes).toBe(Buffer.byteLength(source));
     expect(sanitized.sizeBytes).not.toBe(source.length);
+    expect((await listMessageSourceSizes(accountId)).size).toBe(0);
+    await f.seed(sanitized);
     const stored = await listMessageSourceSizes(accountId);
     expect(stored.get("msg-with-source")).toBe(sanitized.sizeBytes);
     expect(sanitized.hasSource).toBe(true);
