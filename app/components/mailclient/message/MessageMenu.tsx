@@ -1,5 +1,4 @@
 import type React from "react";
-import type { RowReadAction } from "../messagelist/selectionActions";
 import { Fragment, useState } from "react";
 import {
   Archive,
@@ -41,6 +40,7 @@ import {
   getUnsubscribeCapability,
   hasSendableRecipients
 } from "../utils/messageHelpers";
+import type { RowReadAction } from "../messagelist/selectionActions";
 import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
