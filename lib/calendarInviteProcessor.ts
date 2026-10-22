@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type { CalendarEvent } from "@/lib/data";
 import {
   cancelCalendarEventByUid,
@@ -92,7 +93,7 @@ function buildMergedCalendarEventFields(
   messageId: string,
   icsSource: string,
   existingEvent?: CalendarEvent | null,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ): Omit<CalendarEvent, "id" | "accountId" | "createdAtMs" | "updatedAtMs" | "deletedAtMs"> | null {
   const base = group.baseEvent;
   const startAtMs = base?.start?.getTime() ?? existingEvent?.startAtMs ?? Number.NaN;
@@ -179,7 +180,7 @@ async function hydrateExistingEventFromPriorInviteSource(
   accountId: string,
   messageId: string,
   eventUid: string,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   const candidates = await listCalendarInviteSourceMessagesByEventUid(accountId, eventUid, {
     excludeMessageId: messageId
@@ -224,7 +225,7 @@ export type ProcessCalendarInviteForMessageParams = {
   messageId: string;
   icsSource: string;
   process: boolean;
-  accountEmail?: string | null;
+  accountEmail?: OwnAddressInput;
   reminderUserId?: string | null;
   processedByUserId?: string | null;
   processedAutomatically?: boolean | null;
@@ -500,7 +501,7 @@ export async function processCalendarInviteForMessage({
 export type ProcessStandaloneCalendarInviteParams = {
   accountId: string;
   icsSource: string;
-  accountEmail?: string | null;
+  accountEmail?: OwnAddressInput;
 };
 
 export type ProcessStandaloneCalendarInviteFailure = {

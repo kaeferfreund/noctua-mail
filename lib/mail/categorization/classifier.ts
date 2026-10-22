@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "@/lib/ownAddresses";
 /**
  * Email categorization classifier (linear-model only).
  */
@@ -33,7 +34,7 @@ export type CategoryClassificationInput = LinearFeatureEmailInput & {
 };
 
 export type CategoryClassificationContext = {
-  accountEmail?: string | null;
+  accountEmail?: OwnAddressInput;
   mailboxPath?: string | null;
   folderSpecialUse?: string | null;
   fromAddressHint?: string | null;
@@ -88,7 +89,6 @@ const SUPPRESSED_FOLDER_SPECIAL_USES = new Set(["\\sent", "\\trash", "\\junk", "
 const SUPPRESSED_FOLDER_EXACT_HINTS = new Set(["sent", "sent items"]);
 const SUPPRESSED_FOLDER_PARTIAL_HINTS = ["trash", "deleted", "junk", "spam", "papierkorb"];
 const THREAD_SUPPRESSION_FACTOR = 0.2;
-const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function hasHeader(headers: Map<string, unknown>, key: string) {
   const normalized = key.toLowerCase();
@@ -106,8 +106,7 @@ function normalizeEmail(value?: string | null) {
 function extractEmailAddress(value: unknown): string {
   if (!value) return "";
   if (typeof value === "string") {
-    const match = value.match(EMAIL_PATTERN);
-    return normalizeEmail(match?.[0] ?? value);
+    return parseAddressEmails(value)[0] ?? "";
   }
   if (typeof value !== "object") return "";
   const candidate = value as {
@@ -116,19 +115,18 @@ function extractEmailAddress(value: unknown): string {
     text?: unknown;
   };
   if (typeof candidate.address === "string") {
-    return normalizeEmail(candidate.address);
+    return parseAddressEmails(candidate.address)[0] ?? "";
   }
   if (Array.isArray(candidate.value)) {
     for (const entry of candidate.value) {
       if (!entry) continue;
       if (typeof entry.address === "string") {
-        return normalizeEmail(entry.address);
+        return parseAddressEmails(entry.address)[0] ?? "";
       }
     }
   }
   if (typeof candidate.text === "string") {
-    const match = candidate.text.match(EMAIL_PATTERN);
-    return normalizeEmail(match?.[0] ?? "");
+    return parseAddressEmails(candidate.text)[0] ?? "";
   }
   return "";
 }
@@ -176,8 +174,8 @@ function classifyEmailInput(
   }
 
   const senderEmail = extractEmailAddress(input.from) || extractEmailAddress(context?.fromAddressHint);
-  const accountEmail = normalizeEmail(context?.accountEmail);
-  if (senderEmail && accountEmail && senderEmail === accountEmail) {
+  const ownAddresses = ownAddressList(context?.accountEmail);
+  if (senderEmail && isOwnAddress(senderEmail, ownAddresses)) {
     return {
       category: null,
       confidence: 0,

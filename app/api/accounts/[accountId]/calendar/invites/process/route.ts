@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -48,7 +49,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       messageId,
       icsSource,
       process: true,
-      accountEmail: accountContext.account.email,
+      accountEmail: getOwnAddresses(accountContext.account),
       reminderUserId: accountContext.session.userId,
       processedByUserId: accountContext.session.userId,
       processedAutomatically: false

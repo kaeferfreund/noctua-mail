@@ -20,7 +20,7 @@
  * without mocking browser APIs.
  */
 
-import { extractEmails } from "./utils/clientHelpers";
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 
 export type IncomingMailItem = {
   uid: number;
@@ -59,7 +59,7 @@ export type PlanNewMailNotificationsInput = {
   /** True when the user has silenced the folder (e.g. Spam, Trash). */
   isNotificationSuppressedFolder: (folderId: string) => boolean;
   /** The active account's own email; used to avoid alerting on messages we sent ourselves. */
-  accountEmail?: string;
+  accountEmail?: OwnAddressInput;
   /** Size at which to evict the oldest keys. */
   maxNotifiedKeys?: number;
   /** How many keys to evict once `maxNotifiedKeys` is exceeded. */
@@ -161,11 +161,9 @@ export function planNewMailNotifications(
     };
   }
 
-  const normalizedAccountEmail = accountEmail?.toLowerCase() ?? "";
+  const ownAddresses = ownAddressList(accountEmail);
   const notFromMe = eligibleByUid.filter((item) => {
-    if (!normalizedAccountEmail) return true;
-    const fromEmails = extractEmails(item.from);
-    return !fromEmails.some((email) => email.toLowerCase() === normalizedAccountEmail);
+    return !isOwnAddress(item.from, ownAddresses);
   });
   const notNewsletter = notFromMe.filter((item) => item.category !== "newsletter");
 

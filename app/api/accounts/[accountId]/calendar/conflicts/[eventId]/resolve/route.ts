@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -80,7 +81,7 @@ export async function applyConflictResolution(
   } else {
     const merged = mergeRemoteIcsIntoEvent(event, conflict.remoteIcs, {
       accountId,
-      accountEmail: account?.email ?? "",
+      accountEmail: account ? getOwnAddresses(account) : [],
       remoteEtag: conflict.remoteEtag,
       remoteHref: event.remoteHref
     });

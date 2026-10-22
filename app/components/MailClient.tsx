@@ -6,6 +6,8 @@ import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
+import { getOwnAddresses } from "@/lib/ownAddresses";
+
 import type React from "react";
 import {
   startTransition,
@@ -865,7 +867,7 @@ export default function MailClient({
     authState,
     inboxMailboxPath,
     accountFolders,
-    currentAccountEmail: accounts.find((a) => a.id === activeAccountId)?.email,
+    currentAccountEmail: accounts.find((a) => a.id === activeAccountId)?.ownAddresses,
     currentAccountSyncSettings: accounts.find((a) => a.id === activeAccountId)?.settings?.sync,
     apiFetch,
     readErrorMessage,
@@ -2658,7 +2660,7 @@ export default function MailClient({
     buildThreadTree,
     flattenThread,
     getThreadLatestDate,
-    userEmail: currentAccount?.email,
+    userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
     preferToDisplay,
     setCollapsedGroups
   });
@@ -5638,7 +5640,7 @@ export default function MailClient({
                 listIsNarrow,
                 preferToDisplay,
                 activeTopic,
-                userEmail: currentAccount?.email,
+                userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
                 findRecipientAlias,
                 dateFormat: accountDateFormat,
                 topicColorRows: currentAccount?.settings?.appearance?.topicColorRows ?? true,
@@ -5785,7 +5787,7 @@ export default function MailClient({
                   readErrorMessage,
                   reportError,
                   dateFormat: accountDateFormat,
-                  userEmail: currentAccount?.email,
+                  userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
                   senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true,
                   onSearchByAddress: handleSearchByAddress,
                   onComposeTo: handleComposeTo,

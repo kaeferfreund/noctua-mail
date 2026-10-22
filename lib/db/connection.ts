@@ -1,3 +1,4 @@
+import { registerOwnAddressSql } from "./ownAddressSql";
 import path from "path";
 import { mkdirSync, promises as fs } from "fs";
 import {
@@ -12,6 +13,7 @@ import {
   ensureCalendarReminderRuntimeSchema,
   ensureMessageCalendarEventRuntimeSchema,
   ensureThreadRuntimeSchema,
+  ensureSenderIdentityMessageRuntimeSchema,
   ensureTopicRuntimeSchema,
   initAccountSchema,
   initMasterSchema
@@ -82,6 +84,7 @@ export function configureDb(
   busyTimeoutMs = 15000,
   options: { accountShard?: boolean } = {}
 ) {
+  registerOwnAddressSql(db);
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");
@@ -380,6 +383,7 @@ export async function getAccountDb(accountId: string) {
     await withDbWriteRetry("initAccountSchema", () => initAccountSchema(accountDb));
     accountDbInitialized.add(dbPath);
   }
+  ensureSenderIdentityMessageRuntimeSchema(accountDb);
   ensureThreadRuntimeSchema(accountDb);
   ensureTopicRuntimeSchema(accountDb);
   ensureMessageCalendarEventRuntimeSchema(accountDb);

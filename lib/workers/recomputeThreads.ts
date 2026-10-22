@@ -9,7 +9,7 @@ export async function runThreadRecomputeCli(argv = process.argv) {
   }
 
   try {
-    await recomputeThreadIdsForAccount(accountId);
+    if (!argv.includes("--identities")) await recomputeThreadIdsForAccount(accountId);
     await recomputeThreadsForAccount(accountId);
   } catch (error) {
     console.error(

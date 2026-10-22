@@ -1,5 +1,6 @@
 import { getUserMailboxSummary } from "@/lib/mailboxSummary";
 import { listAccessibleAccountsForUser, listAccountMembersForRole } from "@/lib/accountAccess";
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { resolveMcpToolContext } from "@/lib/mcpAuth";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getThreadCollabState, listThreadComments, listThreadActivity,
@@ -272,6 +273,9 @@ const SEARCH_RESULT_TOPIC_SCHEMA = {
 };
 
 const SEARCH_RESULT_MESSAGE_SCHEMA = {
+  deliveredTo: z.array(z.string()).optional(),
+  originalTo: z.array(z.string()).optional(),
+  senderIdentityId: z.string().optional(),
   id: z.string(),
   accountId: z.string(),
   folderId: z.string(),
@@ -692,7 +696,7 @@ async function searchMessages(
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     return {
@@ -728,7 +732,7 @@ async function searchMessages(
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     return {

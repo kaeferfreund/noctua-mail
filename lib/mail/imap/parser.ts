@@ -1,3 +1,4 @@
+import { parseAddressEmails } from "@/lib/ownAddresses";
 // IMAP body-structure and header/envelope parsing helpers.
 //
 // Public surface (re-exported from the barrel index.ts): ImapBodyStructure
@@ -56,7 +57,7 @@ export function parseHeaderMap(raw?: Buffer) {
   const map = new Map<string, string[]>();
   if (!raw || raw.length === 0) return map;
   const unfolded: string[] = [];
-  const lines = raw.toString("utf8").split(/\r?\n/);
+  const lines = raw.toString("utf8").split(/\r?\n\r?\n/, 1)[0].split(/\r?\n/);
   lines.forEach((line) => {
     if (!line) return;
     if (/^\s/.test(line) && unfolded.length > 0) {
@@ -219,4 +220,14 @@ export function extractMessageStructureMetadata(
     plainTextPart: choosePreferredTextPart(plainTextParts),
     htmlPart: choosePreferredTextPart(htmlParts)
   };
+}
+
+/** Undefined means headers were not fetched; [] means inspected and absent. */
+export function parseDeliveryMetadata(raw?: Buffer) {
+  if (!raw?.length) return {};
+  const headers = parseHeaderMap(raw);
+  const addresses = (name: string) => [...new Set(getHeaderValues(headers, name).flatMap(parseAddressEmails))].slice(0, 32);
+  const marker = getHeaderValue(headers, "x-noctua-identity-id");
+  return { deliveredTo: addresses("delivered-to"), originalTo: addresses("x-original-to"),
+    senderIdentityId: marker && marker.length <= 256 && !/[\x00-\x1f\x7f]/.test(marker) ? marker : undefined };
 }

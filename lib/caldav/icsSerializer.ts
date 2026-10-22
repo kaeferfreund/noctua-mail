@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type { CalendarEvent } from "@/lib/data";
 import type { CalendarEventPreview } from "@/lib/calendar";
 import {
@@ -351,7 +352,7 @@ export function calendarPreviewToDbEvent(
     remoteHref?: string;
     rawIcs?: string;
     messageId?: string;
-    accountEmail?: string;
+    accountEmail?: OwnAddressInput;
   }
 ): CalendarEvent {
   function generateId() {

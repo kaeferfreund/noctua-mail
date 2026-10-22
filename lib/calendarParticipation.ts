@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { CalendarAttendeePreview, CalendarEventPreview } from "./calendar";
 import type { CalendarEvent, CalendarParticipationStatus } from "./data";
 
@@ -18,10 +19,6 @@ export function normalizeCalendarParticipationStatus(
   return undefined;
 }
 
-function normalizeEmail(value?: string | null) {
-  return value?.trim().toLowerCase() || "";
-}
-
 export function formatCalendarAttendeeLabel(attendee: CalendarAttendeePreview) {
   const name = attendee.name?.trim();
   const email = attendee.email?.trim();
@@ -38,11 +35,10 @@ export function serializeCalendarAttendeeLabels(attendees?: CalendarAttendeePrev
 
 export function findCalendarAttendeeForEmail(
   attendees: CalendarAttendeePreview[] | undefined,
-  email?: string | null
+  email?: OwnAddressInput
 ) {
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) return undefined;
-  return (attendees ?? []).find((attendee) => normalizeEmail(attendee.email) === normalizedEmail);
+  const ownAddresses = ownAddressList(email);
+  return (attendees ?? []).find((attendee) => isOwnAddress(attendee.email, ownAddresses));
 }
 
 type ParsedParticipation = {
@@ -54,7 +50,7 @@ type ParsedParticipation = {
 
 export function resolveCalendarParticipationFromPreview(
   preview: Pick<CalendarEventPreview, "attendeeDetails">,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ): ParsedParticipation {
   const matchedAttendee = findCalendarAttendeeForEmail(preview.attendeeDetails, accountEmail);
   return {
