@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { DeeplError, deeplUsage, isDeeplFreeKey } from "@/lib/deepl";
 import {
@@ -7,46 +9,50 @@ import {
 } from "@/app/api/_helpers/accountContext";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
 
   const context = await requireAccountContext(request, accountId, {
+    minRole: "manager",
     missingAccountMessage: "Missing accountId"
   });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  // Parse the body only after auth so an unauthenticated caller can't force
-  // request-body parsing work.
-  const payload = (await request.json().catch(() => null)) as { apiKey?: string } | null;
-  // Prefer a key typed into the form; fall back to the stored key so the test
-  // works for an already-saved account (the form field is blank by design).
-  const provided = typeof payload?.apiKey === "string" ? payload.apiKey.trim() : "";
-  const apiKey = provided || (context.account.deepl?.apiKey ?? "").trim();
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, message: "Enter a DeepL API key to test." },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const usage = await deeplUsage(apiKey);
-    return NextResponse.json({
-      ok: true,
-      plan: isDeeplFreeKey(apiKey) ? "free" : "pro",
-      characterCount: usage.characterCount,
-      characterLimit: usage.characterLimit
-    });
-  } catch (error) {
-    if (error instanceof DeeplError) {
-      const status =
-        error.status === 403
-          ? 400
-          : error.status >= 400 && error.status < 600
-            ? error.status
-            : 502;
-      return NextResponse.json({ ok: false, message: error.message }, { status });
+    // Parse the body only after auth so an unauthenticated caller can't force
+    // request-body parsing work.
+    const payload = (await request.json().catch(() => null)) as { apiKey?: string } | null;
+    // Prefer a key typed into the form; fall back to the stored key so the test
+    // works for an already-saved account (the form field is blank by design).
+    const provided = typeof payload?.apiKey === "string" ? payload.apiKey.trim() : "";
+    const apiKey = provided || (context.account.deepl?.apiKey ?? "").trim();
+    if (!apiKey) {
+      return NextResponse.json(
+        { ok: false, message: "Enter a DeepL API key to test." },
+        { status: 400 }
+      );
     }
-    const message = error instanceof Error ? error.message : "Could not verify the DeepL key.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
-  }
+
+    try {
+      const usage = await deeplUsage(apiKey);
+      return NextResponse.json({
+        ok: true,
+        plan: isDeeplFreeKey(apiKey) ? "free" : "pro",
+        characterCount: usage.characterCount,
+        characterLimit: usage.characterLimit
+      });
+    } catch (error) {
+      if (error instanceof DeeplError) {
+        const status =
+          error.status === 403
+            ? 400
+            : error.status >= 400 && error.status < 600
+              ? error.status
+              : 502;
+        return NextResponse.json({ ok: false, message: error.message }, { status });
+      }
+      const message = error instanceof Error ? error.message : "Could not verify the DeepL key.";
+      return NextResponse.json({ ok: false, message }, { status: 500 });
+    }
+  });
 }

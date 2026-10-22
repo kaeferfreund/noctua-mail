@@ -1,329 +1,138 @@
-import crypto from "crypto";
-import { NextResponse, type NextRequest } from "next/server";
-import type { Account } from "./data";
-import { cacheSessionCredentials } from "./credentials";
-import { getAccountById, getMcpTokenByHash, touchMcpTokenLastUsed } from "./serverDb";
-import { shouldIncludeSessionCredentials } from "./secret";
+import { mailboxErrorResponse } from "./mailboxFailure";
+import type { AccountRole } from "./data";
+import { NextResponse } from "next/server";
+import { getAuth, setActiveAccountId } from "./betterAuth";
+import { getDb } from "./db/connection";
+import { getAccountById, getAccountsForUser, getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { isMfaEnrollmentComplete } from "./authPolicy";
 
-const SESSION_KEY = process.env.SESSION_SEAL_KEY ?? "";
-const SESSION_COOKIE = "noctua_session";
-const MCP_TOKEN_PREFIX = "mcp_";
-const NEVER_EXPIRES_AT_SECONDS = 253402300799;
-const SESSION_TTL_SECONDS = (() => {
-  const raw = process.env.SESSION_TTL_SECONDS ?? "86400";
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 60 * 60 * 24;
-  return parsed;
-})();
-
-export function getSessionTtlSeconds() {
-  return SESSION_TTL_SECONDS;
-}
-
-export function refreshSession(session: SessionData): SessionData {
-  return {
-    ...session,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
-  };
-}
-
-export type SessionData = {
+export const SESSION_TTL_SECONDS = 86400;
+export type ActiveUserSession = {
   userId: string;
-  accountId?: string;
-  role?: string;
-  exp: number;
-  imap?: { user: string; pass: string };
-  smtp?: { user: string; pass: string };
+  sessionId: string;
+  sessionToken: string;
+  activeAccountId: string | null;
+  role: "admin" | "user";
+  expiresAt: number;
+  generation: number;
+  assurance: "setup" | "mfa";
+  authenticatedAt: number;
+  method: string;
+  responseHeaders: Headers;
+  enrollmentRequired: boolean;
+  reauthRequired: boolean;
+  securityCode?: string;
 };
 
-export type McpSessionData = SessionData & {
-  kind: "mcp";
-  tokenId: string;
-};
-
-function getKey() {
-  return crypto.createHash("sha256").update(SESSION_KEY || "dev-session-key").digest();
-}
-
-function sealExpiringPayload<T extends { exp: number }>(data: T): string {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", getKey(), iv);
-  const payload = Buffer.from(JSON.stringify(data), "utf8");
-  const encrypted = Buffer.concat([cipher.update(payload), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, encrypted]).toString("base64");
-}
-
-function unsealExpiringPayload<T extends { exp: number }>(value: string | null | undefined): T | null {
-  if (!value) return null;
-  try {
-    const buf = Buffer.from(value, "base64");
-    const iv = buf.subarray(0, 12);
-    const tag = buf.subarray(12, 28);
-    const data = buf.subarray(28);
-    const decipher = crypto.createDecipheriv("aes-256-gcm", getKey(), iv);
-    decipher.setAuthTag(tag);
-    const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-    const parsed = JSON.parse(decrypted.toString("utf8")) as T;
-    if (parsed.exp && parsed.exp * 1000 < Date.now()) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-export function sealSession(data: SessionData): string {
-  return sealExpiringPayload(data);
-}
-
-export function unsealSession(value: string | null | undefined): SessionData | null {
-  return unsealExpiringPayload<SessionData>(value);
-}
-
-export function sealMcpSession(data: McpSessionData): string {
-  return `${MCP_TOKEN_PREFIX}${sealExpiringPayload(data)}`;
-}
-
-export function unsealMcpSession(value: string | null | undefined): McpSessionData | null {
-  if (!value?.startsWith(MCP_TOKEN_PREFIX)) return null;
-  return unsealExpiringPayload<McpSessionData>(value.slice(MCP_TOKEN_PREFIX.length));
-}
-
-export function hashOpaqueToken(token: string) {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-export function setSessionCookie(response: NextResponse, session: SessionData) {
-  const sealed = sealSession(session);
-  response.cookies.set(SESSION_COOKIE, sealed, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_TTL_SECONDS
+/** Append each cookie separately: Headers.set would lose earlier refresh/deletion cookies. */
+export function forwardAuthHeaders<T extends Response>(response: T, headers: Headers): T {
+  headers.forEach((value, key) => {
+    const name = key.toLowerCase();
+    // Entity headers describe the library JSON, not this route's attachment/stream.
+    if (["set-cookie", "content-type", "content-length"].includes(name)) return;
+    // A route that set its own caching policy (private attachment cache, 304 revalidation) keeps it;
+    // the library's no-store only applies where the route stayed silent.
+    if (name === "cache-control" && response.headers.has("cache-control")) return;
+    response.headers.set(key, value);
   });
+  const existing = new Set(response.headers.getSetCookie());
+  for (const cookie of headers.getSetCookie()) if (!existing.has(cookie)) response.headers.append("set-cookie", cookie);
   return response;
 }
 
-export function clearSessionCookie(response: NextResponse) {
-  response.cookies.set(SESSION_COOKIE, "", { httpOnly: true, maxAge: 0, path: "/" });
-  return response;
-}
-
-export function getSessionFromRequest(req: NextRequest): SessionData | null {
-  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
-  return unsealSession(cookie);
-}
-
-export function requireSessionOr401(
-  request?: Request | null
-): SessionData | NextResponse {
-  if (!request) {
-    return new NextResponse(JSON.stringify({ ok: false, message: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-  const clientId = request.headers.get("x-noctua-client");
-  if (clientId) {
-    try {
-      const url = new URL(request.url);
-      console.info(`[client] ${clientId} ${url.pathname}`);
-    } catch {
-      console.info(`[client] ${clientId}`);
-    }
-  }
-  const cookie = request.headers.get("cookie");
-  const session = sessionFromCookie(cookie);
-  if (session) {
-    cacheSessionCredentials(session);
-    return session;
-  }
-  return new NextResponse(JSON.stringify({ ok: false, message: "Unauthorized" }), {
-    status: 401,
-    headers: { "Content-Type": "application/json" }
-  });
-}
-
-export async function listSessionAccountIds(session: SessionData) {
-  const ids = new Set<string>();
-  const accountId = session.accountId?.trim();
-  if (accountId) ids.add(accountId);
-  return ids;
-}
-
-export async function requireAccountAccessOr403(session: SessionData, accountId: string) {
-  return requireSessionAccountOr403(session, accountId);
-}
-
-export function requireSessionAccountOr403(session: SessionData, accountId: string) {
-  const normalizedAccountId = accountId.trim();
-  const sessionAccountId = session.accountId?.trim() ?? "";
-  if (sessionAccountId && sessionAccountId === normalizedAccountId) {
-    return true;
-  }
-  return new NextResponse(JSON.stringify({ ok: false, message: "Forbidden" }), {
-    status: 403,
-    headers: { "Content-Type": "application/json" }
-  });
-}
-
-export function sessionFromCookie(cookieHeader?: string | null): SessionData | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader
-    .split(";")
-    .map((p) => p.trim())
-    .find((p) => p.startsWith(`${SESSION_COOKIE}=`));
-  if (!match) return null;
-  const raw = match.slice(SESSION_COOKIE.length + 1);
-  let decoded = raw;
+/** Route/helper tails explicitly carry the headers obtained by their guard. */
+export async function withAuthResponse<T>(
+  context: ActiveUserSession | { session: ActiveUserSession; accountId?: string; role?: AccountRole }, respond: () => T | Promise<T>
+): Promise<T> {
+  const session = "session" in context ? context.session : context;
   try {
-    decoded = decodeURIComponent(raw);
-  } catch {
-    // ignore decode errors, fall back to raw
-  }
-  return unsealSession(decoded);
-}
-
-export function buildSessionPayload(params: {
-  userId: string;
-  role?: string;
-  account: Account;
-  imapPass: string;
-  smtpPass: string;
-}) {
-  const payload: SessionData = {
-    userId: params.userId,
-    role: params.role,
-    accountId: params.account.id,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
-  };
-  if (shouldIncludeSessionCredentials()) {
-    payload.imap = { user: params.account.imap.user, pass: params.imapPass };
-    payload.smtp = { user: params.account.smtp.user, pass: params.smtpPass };
-  }
-  return payload;
-}
-
-export function buildMcpSessionPayload(params: {
-  tokenId: string;
-  session: SessionData;
-  account: Account;
-  expiresAt: number | null;
-}) {
-  const payload: McpSessionData = {
-    kind: "mcp",
-    tokenId: params.tokenId,
-    userId: params.session.userId,
-    role: params.session.role,
-    accountId: params.account.id,
-    exp:
-      params.expiresAt == null
-        ? NEVER_EXPIRES_AT_SECONDS
-        : Math.max(Math.floor(params.expiresAt / 1000), Math.floor(Date.now() / 1000) + 1)
-  };
-  if (shouldIncludeSessionCredentials()) {
-    const imapUser = params.session.imap?.user?.trim() ?? "";
-    const imapPass = params.session.imap?.pass ?? "";
-    const smtpUser = params.session.smtp?.user?.trim() ?? "";
-    const smtpPass = params.session.smtp?.pass ?? "";
-    if (!imapUser || !imapPass || !smtpUser || !smtpPass) {
-      throw new Error("Current session does not include IMAP/SMTP credentials required for MCP tokens.");
+    const response = await respond();
+    return response instanceof Response ? forwardAuthHeaders(response, session.responseHeaders) : response;
+  } catch (error) {
+    if ("session" in context && context.accountId) {
+      const response = await mailboxErrorResponse(error, context.accountId, context.role);
+      if (response) return forwardAuthHeaders(response, session.responseHeaders) as T;
     }
-    payload.imap = { user: imapUser, pass: imapPass };
-    payload.smtp = { user: smtpUser, pass: smtpPass };
+    throw error;
   }
-  return payload;
 }
 
-export function createMcpAccessToken(params: {
-  tokenId: string;
-  session: SessionData;
-  account: Account;
-  expiresAt: number | null;
-}) {
-  const rawToken = sealMcpSession(buildMcpSessionPayload(params));
-  return {
-    rawToken,
-    tokenHash: hashOpaqueToken(rawToken),
-    tokenSuffix: rawToken.slice(-8)
-  };
+function denied(status: number, code?: string, headers = new Headers()) {
+  return forwardAuthHeaders(NextResponse.json({ ok: false, message: status === 401 ? "Unauthorized" : "MFA required", ...(code ? { code } : {}) }, { status }), headers);
 }
 
-export function mergeAccountCredentials(
-  account: Account,
-  session?: {
-    imap?: { user?: string; pass?: string };
-    smtp?: { user?: string; pass?: string };
-  } | null
-) {
-  if (!session) return account;
-  const next: Account = {
-    ...account,
-    imap: { ...account.imap },
-    smtp: { ...account.smtp }
-  };
-  if (session.imap?.user) next.imap.user = session.imap.user;
-  if (session.imap?.pass) next.imap.password = session.imap.pass;
-  if (session.smtp?.user) next.smtp.user = session.smtp.user;
-  if (session.smtp?.pass) next.smtp.password = session.smtp.pass;
-  return next;
+export async function requireActiveUserSession(request?: Request | null, options: { allowRestricted?: boolean } = {}): Promise<ActiveUserSession | NextResponse> {
+  if (!request) return denied(401);
+  const auth = await getAuth();
+  const { response: result, headers } = await auth.api.getSession({ headers: request.headers, returnHeaders: true });
+  if (!result) return denied(401, undefined, headers);
+  const db = await getDb();
+  const user = await getUserById(result.user.id);
+  if (!user || user.disabled) return denied(401, undefined, headers);
+  if (db.prepare("SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')").get(user.id)) return denied(401, undefined, headers);
+  const security = db.prepare(`SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration
+    FROM auth_session_security s JOIN auth_security_state u ON u.userId=s.userId WHERE s.sessionId=?`).get(result.session.id) as
+    { userId: string; generation: number; currentGeneration: number; assurance: "setup" | "mfa"; authenticatedAt: number; method: string } | undefined;
+  // Even restricted access requires a bound, live sidecar; Slice 4 issues/finalizes it.
+  if (!security || !["setup", "mfa"].includes(security.assurance) || security.userId !== user.id || security.generation !== security.currentGeneration ||
+    !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now()) return denied(401, undefined, headers);
+  const expiresAt = Math.min(new Date(result.session.expiresAt).getTime(), security.authenticatedAt + SESSION_TTL_SECONDS * 1000);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return denied(401, undefined, headers);
+  const mfa = await isMfaEnrollmentComplete(user.id);
+  const pendingSecurity = !!db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?
+    AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')`).get(`security:${user.id}`);
+  const enrollmentRequired = pendingSecurity || !mfa.complete || (user.role === "admin" && !user.hasPassword);
+  const reauthRequired = security.assurance !== "mfa";
+  const securityCode = pendingSecurity ? "security_operation_pending" : mfa.inconsistent ? "mfa_state_inconsistent" : enrollmentRequired ? "mfa_enrollment_required" : "mfa_required";
+  if (!options.allowRestricted && (enrollmentRequired || reauthRequired)) return denied(403, securityCode, headers);
+  return { userId: user.id, sessionId: result.session.id, sessionToken: result.session.token,
+    activeAccountId: result.session.activeAccountId ?? null, role: user.role, expiresAt,
+    generation:security.generation, assurance:security.assurance, authenticatedAt:security.authenticatedAt, method:security.method,
+    responseHeaders: headers, enrollmentRequired, reauthRequired,
+    ...((enrollmentRequired || reauthRequired) ? { securityCode } : {}) };
 }
 
-function getBearerTokenFromRequest(request?: Request | null) {
-  const authorization = request?.headers.get("authorization")?.trim() ?? "";
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() ?? "";
+export async function requireAccountAccessOr403(session: ActiveUserSession, accountId: string) {
+  const { resolveAccountRole } = await import("./accountAccess");
+  if (await resolveAccountRole(session.userId, accountId.trim())) return true;
+  return forwardAuthHeaders(NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 }), session.responseHeaders);
 }
 
-function unauthorizedMcpResponse() {
-  return new NextResponse(JSON.stringify({ ok: false, message: "Unauthorized" }), {
-    status: 401,
-    headers: {
-      "Content-Type": "application/json",
-      "WWW-Authenticate": "Bearer"
+export async function listSessionAccountIds(session: ActiveUserSession) {
+  return new Set(await listAccessibleAccountIdsForUser(session.userId));
+}
+
+export type MailboxSelection = { mailboxState: "selected" | "none" | "unselected"; accountId: string | null; accounts: Awaited<ReturnType<typeof getAccountsForUser>> };
+
+/** Persist a deterministic default, then recheck membership. Retry a revoked choice once. */
+export async function ensureActiveAccountId(session: ActiveUserSession): Promise<MailboxSelection> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const accounts = (await getAccountsForUser(session.userId)).sort((a, b) =>
+      (a.name || a.email).localeCompare(b.name || b.email, "en") ||
+      a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.id.localeCompare(b.id, "en"));
+    if (!accounts.length) {
+      await setActiveAccountId(await getAuth(), session.sessionToken, null);
+      session.activeAccountId = null;
+      return { mailboxState: "none", accountId: null, accounts: [] };
     }
-  });
+    const selected = accounts.find(a => a.id === session.activeAccountId) ?? accounts[0];
+    const updated = await setActiveAccountId(await getAuth(), session.sessionToken, selected.id);
+    const liveIds = await listAccessibleAccountIdsForUser(session.userId);
+    if (updated && liveIds.includes(selected.id) && await getAccountById(selected.id)) {
+      session.activeAccountId = selected.id;
+      return { mailboxState: "selected", accountId: selected.id, accounts: accounts.filter(a => liveIds.includes(a.id)) };
+    }
+    session.activeAccountId = null;
+  }
+  await setActiveAccountId(await getAuth(), session.sessionToken, null);
+  const accounts = await getAccountsForUser(session.userId);
+  return { mailboxState: accounts.length ? "unselected" : "none", accountId: null, accounts };
 }
 
+/** Bearer-only: browser cookies are never an MCP fallback. */
 export async function requireMcpAccountContext(request?: Request | null) {
-  const rawToken = getBearerTokenFromRequest(request);
-  if (!rawToken) {
-    return unauthorizedMcpResponse();
-  }
-
-  const session = unsealMcpSession(rawToken);
-  if (!session?.accountId?.trim() || !session.tokenId?.trim()) {
-    return unauthorizedMcpResponse();
-  }
-
-  const tokenRecord = await getMcpTokenByHash(hashOpaqueToken(rawToken));
-  if (!tokenRecord) {
-    return unauthorizedMcpResponse();
-  }
-  if (tokenRecord.id !== session.tokenId || tokenRecord.accountId !== session.accountId) {
-    return unauthorizedMcpResponse();
-  }
-  if (tokenRecord.expiresAt != null && tokenRecord.expiresAt < Date.now()) {
-    return unauthorizedMcpResponse();
-  }
-
-  cacheSessionCredentials(session);
-  const storedAccount = await getAccountById(session.accountId);
-  if (!storedAccount) {
-    return new NextResponse(JSON.stringify({ ok: false, message: "Account not found" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  void touchMcpTokenLastUsed(tokenRecord.id).catch(() => {});
-
-  return {
-    rawToken,
-    session,
-    tokenRecord,
-    accountId: session.accountId,
-    account: mergeAccountCredentials(storedAccount, session)
-  };
+  const bearer = request?.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
+  const { validateMcpToken } = await import("./mcpAuth");
+  const context = bearer ? await validateMcpToken(bearer) : null;
+  return context ?? NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 }

@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders, saveFoldersForAccount } from "@/lib/db";
 import type { Folder } from "@/lib/data";
@@ -9,23 +11,28 @@ import {
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (accountContext instanceof NextResponse) return accountContext;
-  return NextResponse.json(await getFolders(accountContext.accountId));
+  return withAuthResponse(accountContext, async () => {
+    return NextResponse.json(await getFolders(accountContext.accountId));
+  });
 }
 
 export async function PUT(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (accountContext instanceof NextResponse) return accountContext;
-  const payload = (await request.json()) as Folder[];
-  if (!Array.isArray(payload)) {
-    return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
-  }
-  const invalidFolder = payload.find((folder) => folder.accountId !== accountContext.accountId);
-  if (invalidFolder) {
-    return NextResponse.json({ ok: false, message: "Folder account mismatch" }, { status: 400 });
-  }
-  await saveFoldersForAccount(accountContext.accountId, payload);
-  return NextResponse.json({ ok: true });
+  return withAuthResponse(accountContext, async () => {
+    const payload = (await request.json()) as Folder[];
+    if (!Array.isArray(payload)) {
+      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+    }
+    const invalidFolder = payload.find((folder) => folder.accountId !== accountContext.accountId);
+    if (invalidFolder) {
+      return NextResponse.json({ ok: false, message: "Folder account mismatch" }, { status: 400 });
+    }
+    await saveFoldersForAccount(accountContext.accountId, payload);
+    return NextResponse.json({ ok: true });
+  });
 }

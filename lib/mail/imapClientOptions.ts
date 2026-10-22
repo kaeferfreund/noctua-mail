@@ -288,6 +288,7 @@ function getImapBreakerFastFailError(account: Account, state: ImapConnectCircuit
 export async function connectImapClientWithRetry(params: {
   account: Account;
   createClient: () => ImapFlow;
+  disposeClient?: (client: ImapFlow) => Promise<void>;
   logContext?: ImapClientLogContext;
   connectOp?: string;
   skipBreaker?: boolean;
@@ -295,6 +296,7 @@ export async function connectImapClientWithRetry(params: {
   const {
     account,
     createClient,
+    disposeClient,
     logContext = {},
     connectOp = "connect",
     skipBreaker = false
@@ -344,7 +346,7 @@ export async function connectImapClientWithRetry(params: {
     } catch (error) {
       lastError = error;
       try {
-        await client.logout();
+        await (disposeClient ? disposeClient(client) : client.logout());
       } catch {
         // ignore cleanup failures on failed connect attempts
       }

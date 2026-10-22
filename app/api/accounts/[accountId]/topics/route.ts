@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -10,14 +12,17 @@ import type { TopicColor } from "@/lib/data";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const topics = await listTopics(accountId);
-  return NextResponse.json({ ok: true, topics });
+    const topics = await listTopics(accountId);
+    return NextResponse.json({ ok: true, topics });
+  });
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;
     name?: string;
@@ -26,21 +31,23 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   } | null;
 
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const name = body?.name?.trim();
-  if (!name) {
-    return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
-  }
-  const colorRaw = body?.color;
-  const color: TopicColor | null =
-    colorRaw && (TOPIC_COLORS as readonly string[]).includes(colorRaw)
-      ? (colorRaw as TopicColor)
-      : null;
-  const shortName =
-    typeof body?.shortName === "string" && body.shortName.trim() ? body.shortName.trim() : null;
+    const name = body?.name?.trim();
+    if (!name) {
+      return NextResponse.json({ ok: false, message: "Missing name" }, { status: 400 });
+    }
+    const colorRaw = body?.color;
+    const color: TopicColor | null =
+      colorRaw && (TOPIC_COLORS as readonly string[]).includes(colorRaw)
+        ? (colorRaw as TopicColor)
+        : null;
+    const shortName =
+      typeof body?.shortName === "string" && body.shortName.trim() ? body.shortName.trim() : null;
 
-  const topic = await createTopic(accountId, name, color, shortName);
-  return NextResponse.json({ ok: true, topic }, { status: 201 });
+    const topic = await createTopic(accountId, name, color, shortName);
+    return NextResponse.json({ ok: true, topic }, { status: 201 });
+  });
 }

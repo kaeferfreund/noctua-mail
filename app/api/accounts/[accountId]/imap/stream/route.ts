@@ -1,3 +1,7 @@
+import { mailboxFailureDto } from "@/lib/mailboxFailure";
+import { getImapHttpError } from "@/lib/mail/imapError";
+import { assertStreamAuthorized, registerAuthStream } from "@/lib/authStreams";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 import {
@@ -6,14 +10,16 @@ import {
   getLatestMessageUid,
   getMailboxState,
   saveMailboxState
-} from "@/lib/db";
+} from "@/lib/serverDb";
 import { logImapOp } from "@/lib/mail/imapLogger";
 import {
   bindImapClientError,
   buildImapFlowOptions,
   connectImapClientWithRetry,
-  safeLogoutImapClient
-} from "@/lib/mail/imapClientOptions";
+  safeLogoutImapClient,
+  loadImapFlow,
+  streamTimers
+} from "@/lib/mail/imapStreamRuntime";
 import { registerStream } from "@/lib/mail/imapStreamRegistry";
 import { normalizeImapFlags } from "@/lib/messageFlags";
 import { mailboxPathFromFolderId } from "@/lib/mailboxPaths";
@@ -45,436 +51,449 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountIdParam = await getAccountIdFromParams(params);
   const activeFolderId = searchParams.get("activeFolderId");
   const accountContext = await requireAccountContext(request, accountIdParam, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  const { accountId, account, clientId } = accountContext;
-  const logContext = { accountId, clientId };
+  return withAuthResponse(accountContext, async () => {
+    const { accountId, account, clientId } = accountContext;
+    const logContext = { accountId, clientId };
 
-  const maxIdleSessions =
-    Number(searchParams.get("maxIdleSessions")) ||
-    account?.settings?.sync?.maxIdleSessions ||
-    DEFAULT_MAX_IDLE;
-  const pollIntervalMs =
-    Number(searchParams.get("backgroundPollIntervalMs")) ||
-    Number(searchParams.get("pollIntervalMs")) ||
-    account?.settings?.sync?.backgroundPollIntervalMs ||
-    account?.settings?.sync?.pollIntervalMs ||
-    DEFAULT_BACKGROUND_POLL_INTERVAL;
+    const maxIdleSessions =
+      Number(searchParams.get("maxIdleSessions")) ||
+      account?.settings?.sync?.maxIdleSessions ||
+      DEFAULT_MAX_IDLE;
+    const pollIntervalMs =
+      Number(searchParams.get("backgroundPollIntervalMs")) ||
+      Number(searchParams.get("pollIntervalMs")) ||
+      account?.settings?.sync?.backgroundPollIntervalMs ||
+      account?.settings?.sync?.pollIntervalMs ||
+      DEFAULT_BACKGROUND_POLL_INTERVAL;
 
-  const folders = await getFolders(accountId);
-  const inboxFolder = findInboxFolder(folders, accountId) ?? folders[0];
+    const folders = await getFolders(accountId);
+    const inboxFolder = findInboxFolder(folders, accountId) ?? folders[0];
 
-  const encoder = new TextEncoder();
+    const encoder = new TextEncoder();
 
-  let ImapFlow: typeof import("imapflow").ImapFlow;
-  try {
-    ({ ImapFlow } = await import("imapflow"));
-  } catch {
-    return NextResponse.json(
-      { ok: false, message: "IMAP library is missing. Run `bun install`." },
-      { status: 500 }
-    );
-  }
+    let ImapFlow: typeof import("imapflow").ImapFlow;
+    try {
+      ImapFlow = await loadImapFlow();
+    } catch {
+      return NextResponse.json(
+        { ok: false, message: "IMAP library is missing. Run `bun install`." },
+        { status: 500 }
+      );
+    }
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: string, data: unknown) => {
-        try {
-          controller.enqueue(encoder.encode(`event: ${event}\n`));
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch {
-          // Stream already closed — in-flight watchers/polls may outlive it.
-        }
-      };
-
-      type Session = {
-        mailbox: string;
-        folderId: string;
-        client: import("imapflow").ImapFlow;
-        lastUidNext: number;
-        lastUsed: number;
-        inbox: boolean;
-      };
-
-      const sessions = new Map<string, Session>(); // key: folderId
-      const removedFolderIds = new Set<string>();
-      const unregister = registerStream(accountId, {
-        removeFolder: async (folderId: string) => {
-          removedFolderIds.add(folderId);
-          await closeSession(folderId);
-        }
-      });
-
-      const stopAll = async () => {
-        for (const item of sessions.values()) {
-          await safeLogoutImapClient(
-            item.client,
-            { ...logContext, mailbox: item.mailbox },
-            "imap.logout"
-          );
-        }
-        try {
-          controller.close();
-        } catch {
-          // already closed
-        }
-        unregister();
-      };
-
-      request.signal.addEventListener("abort", () => {
-        void stopAll();
-      });
-
-      const closeSession = async (folderId: string) => {
-        const sess = sessions.get(folderId);
-        if (!sess) return;
-        sessions.delete(folderId);
-        await safeLogoutImapClient(
-          sess.client,
-          { ...logContext, mailbox: sess.mailbox },
-          "imap.logout"
-        );
-      };
-
-      const enforceCapacity = async () => {
-        if (sessions.size <= maxIdleSessions) return;
-        // pick least recently used that is not inbox and not the current active folder
-        let oldest: Session | null = null;
-        for (const sess of sessions.values()) {
-          if (sess.inbox) continue;
-          if (activeFolderId && sess.folderId === activeFolderId) continue;
-          if (!oldest || sess.lastUsed < oldest.lastUsed) {
-            oldest = sess;
-          }
-        }
-        if (oldest) {
-          await closeSession(oldest.folderId);
-        }
-      };
-
-      const openWatcher = async (folderId: string | undefined | null, markUsed = true) => {
-        if (!folderId) return;
-        if (removedFolderIds.has(folderId)) return;
-        const folder = folders.find((f) => f.id === folderId);
-        if (!folder) return;
-        if (sessions.has(folder.id)) {
-          const existing = sessions.get(folder.id)!;
-          if (markUsed) existing.lastUsed = Date.now();
-          return;
-        }
-        const mailbox = mailboxPathFromFolderId(folder.id, accountId);
-
-        const client = await connectImapClientWithRetry({
-          account,
-          logContext: { ...logContext, mailbox },
-          connectOp: "imap.connect",
-          createClient: () => {
-            const nextClient = new ImapFlow(
-              buildImapFlowOptions(account, {
-                maxIdleTime: 10 * 60 * 1000,
-                qresync: true
-              }, { ...logContext, mailbox })
-            );
-            bindImapClientError(nextClient, { ...logContext, mailbox });
-            return nextClient;
-          }
-        });
-        // The newly connected client is not yet tracked in `sessions`. If any
-        // post-connect step below throws before we register it, `stopAll()`
-        // would leave the connection dangling. Flip this flag immediately
-        // after `sessions.set()` and clean up on failure otherwise.
-        let sessionRegistered = false;
-        try {
-        const caps: any =
-          (client as any).enabledCapabilities ||
-          (client as any).serverCapabilities ||
-          (client as any).capabilities ||
-          null;
-        const hasCap = (cap: string) => {
-          if (!caps) return false;
-          if (caps instanceof Set) return caps.has(cap) || caps.has(cap.toLowerCase());
-          if (Array.isArray(caps)) return caps.includes(cap) || caps.includes(cap.toLowerCase());
-          return false;
+    let cancelStream: () => void = () => {};
+    const stream = new ReadableStream<Uint8Array>({
+      cancel() { cancelStream(); },
+      async start(controller) {
+        let stopped = false;
+        let pollTimer: ReturnType<typeof setInterval> | undefined;
+        let keepaliveTimer: ReturnType<typeof setInterval> | undefined;
+        let polling = false;
+        let pollClient: import("imapflow").ImapFlow | null = null;
+        const { userId, sessionId, generation, authenticatedAt, expiresAt } = accountContext.session;
+        const identity = { userId, sessionId, generation, authenticatedAt, expiresAt, accountId, minRole: "viewer" as const };
+        const send = async (event: string, data: unknown) => {
+          if (stopped) return;
+          try {
+            const safeData = event === "error" ? getImapHttpError(data) ? await mailboxFailureDto(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
+            await assertStreamAuthorized(identity, () => {
+              if (stopped) return;
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
+            });
+          } catch { authStream.close(); }
         };
-        const supportsQresync = hasCap("QRESYNC");
 
-        const storedState = await getMailboxState(accountId, folder.id);
+        type Session = {
+          mailbox: string;
+          folderId: string;
+          client: import("imapflow").ImapFlow;
+          lastUidNext: number;
+          lastUsed: number;
+          inbox: boolean;
+        };
 
-        const mailboxOptions: any = { readOnly: true };
-        if (supportsQresync) {
-          mailboxOptions.qresync = true;
-          if (storedState?.uidValidity && storedState?.highestModSeq) {
-            mailboxOptions.uidValidity = storedState.uidValidity;
-            mailboxOptions.changedSince = BigInt(storedState.highestModSeq);
+        // Track clients from construction, including a connection still in flight.
+        const ownedClients = new Set<import("imapflow").ImapFlow>();
+        const disposedClients = new WeakSet<import("imapflow").ImapFlow>();
+        const disposeClient = async (client: import("imapflow").ImapFlow | null) => {
+          if (!client || disposedClients.has(client)) return;
+          disposedClients.add(client);
+          ownedClients.delete(client);
+          await safeLogoutImapClient(client, logContext, "imap.logout");
+        };
+        const sessions = new Map<string, Session>(); // key: folderId
+        const removedFolderIds = new Set<string>();
+        const unregister = registerStream(accountId, {
+          removeFolder: async (folderId: string) => {
+            removedFolderIds.add(folderId);
+            await closeSession(folderId);
           }
-        }
-
-        const mailboxInfo = await logImapOp(
-          "imap.mailboxOpen",
-          { ...logContext, mailbox, readOnly: true },
-          async () => await client.mailboxOpen(mailbox, mailboxOptions)
-        );
-        const lastUidNext = mailboxInfo?.uidNext ?? 0;
-        // Don't update highestUid based on server's uidNext - keep existing value
-        // highestUid should only be updated after successfully storing messages
-        await saveMailboxState({
-          accountId,
-          folderId: folder.id,
-          mailboxPath: mailbox,
-          uidValidity: mailboxInfo?.uidValidity ? mailboxInfo.uidValidity.toString() : null,
-          highestModSeq: (mailboxInfo as any)?.highestModseq
-            ? (mailboxInfo as any).highestModseq.toString()
-            : storedState?.highestModSeq ?? null,
-          highestUid: storedState?.highestUid ?? null,
-          supportsQresync
         });
-        sessions.set(folder.id, {
-          mailbox,
-          folderId: folder.id,
-          client,
-          lastUidNext,
-          lastUsed: Date.now(),
-          inbox: inboxFolder ? folder.id === inboxFolder.id : false
-        });
-        sessionRegistered = true;
-        await enforceCapacity();
-        send("folder:update", [
-          {
-            id: folder.id,
-            uidNext: lastUidNext,
-            unseen: (mailboxInfo as any)?.unseen ?? 0,
-            exists: (mailboxInfo as any)?.exists ?? 0
-          }
-        ]);
 
-        const fetchNew = async () => {
-          const watcher = sessions.get(folder.id);
-          if (!watcher) return;
-          const previousUidNext = watcher.lastUidNext;
-          const status = await logImapOp(
-            "imap.status",
-            { ...logContext, mailbox },
-            async () => await client.status(mailbox, { uidNext: true })
-          );
-          const uidNext = status?.uidNext ?? previousUidNext;
-          if (uidNext <= previousUidNext) return;
-          const range = { uid: `${previousUidNext}:${uidNext - 1}` };
-          const items = await logImapOp(
-            "imap.fetch",
-            { ...logContext, mailbox, range: range.uid },
-            async () => {
-              const list: Array<{
-                uid: number;
-                subject: string;
-                from: string;
-                date?: string | null;
-                messageId?: string | null;
-                folderId: string;
-              }> = [];
-              for await (const message of client.fetch(range, { uid: true, envelope: true })) {
-                const env = message.envelope as Envelope | undefined;
-                list.push({
-                  uid: message.uid,
-                  subject: env?.subject ?? "(no subject)",
-                  from: formatAddress(env?.from),
-                  date: env?.date ? env.date.toISOString() : null,
-                  messageId: env?.messageId ?? null,
-                  folderId: folder.id
-                });
-              }
-              return list;
+        const stopAll = async () => {
+          if (stopped) return;
+          stopped = true;
+          streamTimers.clearInterval(pollTimer); streamTimers.clearInterval(keepaliveTimer);
+          request.signal.removeEventListener("abort", onAbort);
+          unregister();
+          try { controller.close(); } catch { /* Already closed. */ }
+          sessions.clear();
+          await Promise.allSettled([...ownedClients].map(disposeClient));
+        };
+        const authStream = registerAuthStream(identity, stopAll);
+        const onAbort = () => authStream.close();
+        cancelStream = onAbort;
+        request.signal.addEventListener("abort", onAbort, { once: true });
+        if (request.signal.aborted) { onAbort(); return; }
+
+        const closeSession = async (folderId: string) => {
+          const sess = sessions.get(folderId);
+          if (!sess) return;
+          sessions.delete(folderId);
+          await disposeClient(sess.client);
+        };
+
+        const enforceCapacity = async () => {
+          if (sessions.size <= maxIdleSessions) return;
+          // pick least recently used that is not inbox and not the current active folder
+          let oldest: Session | null = null;
+          for (const sess of sessions.values()) {
+            if (sess.inbox) continue;
+            if (activeFolderId && sess.folderId === activeFolderId) continue;
+            if (!oldest || sess.lastUsed < oldest.lastUsed) {
+              oldest = sess;
             }
-          );
-          if (items.length) {
-            send("new", { uidNext, messages: items });
           }
-          const activeWatcher = sessions.get(folder.id);
-          if (activeWatcher) activeWatcher.lastUidNext = uidNext;
-          // Only update highestUid if messages were detected
-          // The actual sync job will update it based on stored messages
-          // Don't blindly trust server's uidNext to prevent gaps
-          const currentHighestUid = await getLatestMessageUid(accountId, mailbox);
+          if (oldest) {
+            await closeSession(oldest.folderId);
+          }
+        };
+
+        const openWatcher = async (folderId: string | undefined | null, markUsed = true) => {
+          if (stopped || !folderId) return;
+          if (removedFolderIds.has(folderId)) return;
+          const folder = folders.find((f) => f.id === folderId);
+          if (!folder) return;
+          if (sessions.has(folder.id)) {
+            const existing = sessions.get(folder.id)!;
+            if (markUsed) existing.lastUsed = Date.now();
+            return;
+          }
+          const mailbox = mailboxPathFromFolderId(folder.id, accountId);
+
+          const client = await connectImapClientWithRetry({
+            account,
+            disposeClient,
+            logContext: { ...logContext, mailbox },
+            connectOp: "imap.connect",
+            createClient: () => {
+              if (stopped) throw new Error("Stream closed");
+              const nextClient = new ImapFlow(
+                buildImapFlowOptions(account, {
+                  maxIdleTime: 10 * 60 * 1000,
+                  qresync: true
+                }, { ...logContext, mailbox })
+              );
+              ownedClients.add(nextClient);
+              bindImapClientError(nextClient, { ...logContext, mailbox });
+              return nextClient;
+            }
+          });
+          // The newly connected client is not yet tracked in `sessions`. If any
+          // post-connect step below throws before we register it, `stopAll()`
+          // would leave the connection dangling. Flip this flag immediately
+          // after `sessions.set()` and clean up on failure otherwise.
+          if (stopped) { await disposeClient(client); return; }
+          let sessionRegistered = false;
+          try {
+          const caps: any =
+            (client as any).enabledCapabilities ||
+            (client as any).serverCapabilities ||
+            (client as any).capabilities ||
+            null;
+          const hasCap = (cap: string) => {
+            if (!caps) return false;
+            if (caps instanceof Set) return caps.has(cap) || caps.has(cap.toLowerCase());
+            if (Array.isArray(caps)) return caps.includes(cap) || caps.includes(cap.toLowerCase());
+            return false;
+          };
+          const supportsQresync = hasCap("QRESYNC");
+
+          const storedState = await getMailboxState(accountId, folder.id);
+
+          const mailboxOptions: any = { readOnly: true };
+          if (supportsQresync) {
+            mailboxOptions.qresync = true;
+            if (storedState?.uidValidity && storedState?.highestModSeq) {
+              mailboxOptions.uidValidity = storedState.uidValidity;
+              mailboxOptions.changedSince = BigInt(storedState.highestModSeq);
+            }
+          }
+
+          const mailboxInfo = await logImapOp(
+            "imap.mailboxOpen",
+            { ...logContext, mailbox, readOnly: true },
+            async () => await client.mailboxOpen(mailbox, mailboxOptions)
+          );
+          const lastUidNext = mailboxInfo?.uidNext ?? 0;
+          // Don't update highestUid based on server's uidNext - keep existing value
+          // highestUid should only be updated after successfully storing messages
           await saveMailboxState({
             accountId,
             folderId: folder.id,
             mailboxPath: mailbox,
-            uidValidity: (mailboxInfo as any)?.uidValidity
-              ? (mailboxInfo as any).uidValidity.toString()
-              : null,
-            highestModSeq: (status as any)?.highestModseq
-              ? (status as any).highestModseq.toString()
-              : null,
-            highestUid: currentHighestUid ?? (storedState?.highestUid ?? null),
+            uidValidity: mailboxInfo?.uidValidity ? mailboxInfo.uidValidity.toString() : null,
+            highestModSeq: (mailboxInfo as any)?.highestModseq
+              ? (mailboxInfo as any).highestModseq.toString()
+              : storedState?.highestModSeq ?? null,
+            highestUid: storedState?.highestUid ?? null,
             supportsQresync
           });
-        };
-
-        // Event listeners are fire-and-forget; a rejection from fetchNew
-        // would otherwise surface as an unhandledRejection.
-        client.on("exists", () => {
-          fetchNew().catch((error: unknown) => {
-            send("error", {
-              folderId: folder.id,
-              message: error instanceof Error ? error.message : String(error)
-            });
-          });
-        });
-        client.on("expunge", (info) => {
-          void (async () => {
-            const payload: any = { folderId: folder.id };
-            if (info?.uid) {
-              payload.uid = info.uid;
-              try {
-                const deleted = await deleteMessageByFolderUid(accountId, folder.id, info.uid);
-                payload.reconciled = deleted !== undefined;
-              } catch {
-                payload.reconciled = false;
-              }
-            }
-            send("message:removed", payload);
-          })();
-        });
-        client.on("flags", (info) => {
-          const uid = info?.uid;
-          if (!uid) return;
-          send("flags:update", {
+          if (stopped) { await disposeClient(client); return; }
+          sessions.set(folder.id, {
+            mailbox,
             folderId: folder.id,
-            uid,
-            flags: normalizeImapFlags(Array.from(info.flags ?? []))
+            client,
+            lastUidNext,
+            lastUsed: Date.now(),
+            inbox: inboxFolder ? folder.id === inboxFolder.id : false
           });
-        });
-
-        const idleLoop = async () => {
-          while (!(client as any).closed) {
-            try {
-              await client.idle();
-            } catch (error) {
-              send("error", { folderId: folder.id, message: (error as Error).message });
-              break;
+          sessionRegistered = true;
+          await enforceCapacity();
+          await send("folder:update", [
+            {
+              id: folder.id,
+              uidNext: lastUidNext,
+              unseen: (mailboxInfo as any)?.unseen ?? 0,
+              exists: (mailboxInfo as any)?.exists ?? 0
             }
-          }
-        };
+          ]);
 
-        void idleLoop();
-        } catch (error) {
-          if (!sessionRegistered) {
-            await safeLogoutImapClient(
-              client,
+          const fetchNew = async () => {
+            const watcher = sessions.get(folder.id);
+            if (stopped || !watcher) return;
+            const previousUidNext = watcher.lastUidNext;
+            const status = await logImapOp(
+              "imap.status",
               { ...logContext, mailbox },
-              "imap.logout"
+              async () => await client.status(mailbox, { uidNext: true })
             );
-          }
-          throw error;
-        }
-      };
-
-      try {
-        if (inboxFolder) {
-          await openWatcher(inboxFolder.id);
-        }
-        const uniqueFolders = new Set<string>();
-        if (activeFolderId) uniqueFolders.add(activeFolderId);
-        for (const fid of uniqueFolders) {
-          if (!inboxFolder || fid !== inboxFolder.id) {
-            await openWatcher(fid);
-          }
-        }
-
-        // Polling loop for remaining folders
-          const pollFolders = async () => {
-            const watchIds = new Set(Array.from(sessions.keys()));
-            const toPoll = folders.filter(
-              (f) => !watchIds.has(f.id) && !removedFolderIds.has(f.id)
-            );
-            if (toPoll.length === 0) return;
-
-          // Runs detached on a timer, so any escaping rejection would be
-          // unhandled — the connect must stay inside the try.
-          let pollClient: import("imapflow").ImapFlow | null = null;
-          try {
-            const connectedClient = await connectImapClientWithRetry({
-              account,
-              logContext: { ...logContext, mailbox: "poll" },
-              connectOp: "imap.connect",
-              createClient: () => {
-                const nextClient = new ImapFlow(
-                  buildImapFlowOptions(account, {}, { ...logContext, mailbox: "poll" })
-                );
-                bindImapClientError(nextClient, { ...logContext, mailbox: "poll" });
-                return nextClient;
+            const uidNext = status?.uidNext ?? previousUidNext;
+            if (uidNext <= previousUidNext) return;
+            const range = { uid: `${previousUidNext}:${uidNext - 1}` };
+            const items = await logImapOp(
+              "imap.fetch",
+              { ...logContext, mailbox, range: range.uid },
+              async () => {
+                const list: Array<{
+                  uid: number;
+                  subject: string;
+                  from: string;
+                  date?: string | null;
+                  messageId?: string | null;
+                  folderId: string;
+                }> = [];
+                for await (const message of client.fetch(range, { uid: true, envelope: true })) {
+                  const env = message.envelope as Envelope | undefined;
+                  list.push({
+                    uid: message.uid,
+                    subject: env?.subject ?? "(no subject)",
+                    from: formatAddress(env?.from),
+                    date: env?.date ? env.date.toISOString() : null,
+                    messageId: env?.messageId ?? null,
+                    folderId: folder.id
+                  });
+                }
+                return list;
               }
+            );
+            if (items.length) {
+              await send("new", { uidNext, messages: items });
+            }
+            const activeWatcher = sessions.get(folder.id);
+            if (activeWatcher) activeWatcher.lastUidNext = uidNext;
+            // Only update highestUid if messages were detected
+            // The actual sync job will update it based on stored messages
+            // Don't blindly trust server's uidNext to prevent gaps
+            const currentHighestUid = await getLatestMessageUid(accountId, mailbox);
+            await saveMailboxState({
+              accountId,
+              folderId: folder.id,
+              mailboxPath: mailbox,
+              uidValidity: (mailboxInfo as any)?.uidValidity
+                ? (mailboxInfo as any).uidValidity.toString()
+                : null,
+              highestModSeq: (status as any)?.highestModseq
+                ? (status as any).highestModseq.toString()
+                : null,
+              highestUid: currentHighestUid ?? (storedState?.highestUid ?? null),
+              supportsQresync
             });
-            pollClient = connectedClient;
-            const updates: Array<{ id: string; uidNext?: number; unseen?: number; exists?: number }>
-              = [];
-            for (const folder of toPoll) {
-              const mailbox = mailboxPathFromFolderId(folder.id, accountId);
+          };
+
+          // Event listeners are fire-and-forget; a rejection from fetchNew
+          // would otherwise surface as an unhandledRejection.
+          client.on("exists", () => {
+            fetchNew().catch((error: unknown) => {
+              void send("error", error);
+            });
+          });
+          client.on("expunge", (info) => {
+            void (async () => {
+              const payload: any = { folderId: folder.id };
+              if (info?.uid) {
+                payload.uid = info.uid;
+                try {
+                  const deleted = await deleteMessageByFolderUid(accountId, folder.id, info.uid);
+                  payload.reconciled = deleted !== undefined;
+                } catch {
+                  payload.reconciled = false;
+                }
+              }
+              send("message:removed", payload);
+            })();
+          });
+          client.on("flags", (info) => {
+            const uid = info?.uid;
+            if (!uid) return;
+            send("flags:update", {
+              folderId: folder.id,
+              uid,
+              flags: normalizeImapFlags(Array.from(info.flags ?? []))
+            });
+          });
+
+          const idleLoop = async () => {
+            while (!stopped && !(client as any).closed) {
               try {
-                const status = await logImapOp(
-                  "imap.status",
-                  { ...logContext, mailbox },
-                  async () =>
-                    await connectedClient.status(mailbox, {
-                      uidNext: true,
-                      messages: true,
-                      unseen: true
-                    })
-                );
-                updates.push({
-                  id: folder.id,
-                  uidNext: status.uidNext,
-                  unseen: status.unseen,
-                  exists: status.messages
-                });
-              } catch {
-                // ignore per-folder status errors
+                await client.idle();
+              } catch (error) {
+                void send("error", error);
+                break;
               }
             }
-            if (updates.length) {
-              send("folder:update", updates);
-            }
+          };
+
+          void idleLoop();
           } catch (error) {
-            send("error", { message: (error as Error).message ?? "Poll failed" });
-          } finally {
-            await safeLogoutImapClient(
-              pollClient,
-              { ...logContext, mailbox: "poll" },
-              "imap.logout"
-            );
+            if (!sessionRegistered) {
+              await disposeClient(client);
+            }
+            throw error;
           }
         };
 
-        const pollTimer = setInterval(pollFolders, pollIntervalMs);
-
-        // Send SSE comment pings to keep the connection alive in environments
-        // (e.g. WKWebView/Tauri) that aggressively time out idle SSE streams.
-        // Without this, frequent reconnects cause repeated IMAP TLS handshakes
-        // which can fail on servers with CN-only certificates (no SAN fields).
-        const keepaliveTimer = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(":ping\n\n"));
-          } catch {
-            // stream already closed
+        try {
+          if (inboxFolder) {
+            await openWatcher(inboxFolder.id);
           }
-        }, 25_000);
+          const uniqueFolders = new Set<string>();
+          if (activeFolderId) uniqueFolders.add(activeFolderId);
+          for (const fid of uniqueFolders) {
+            if (!inboxFolder || fid !== inboxFolder.id) {
+              await openWatcher(fid);
+            }
+          }
 
-        request.signal.addEventListener("abort", () => {
-          clearInterval(pollTimer);
-          clearInterval(keepaliveTimer);
-        });
-      } catch (error) {
-        send("error", { message: (error as Error).message ?? "Stream failed" });
-        await stopAll();
+          // Polling loop for remaining folders
+            const pollFolders = async () => {
+              if (stopped || polling) return;
+              const watchIds = new Set(Array.from(sessions.keys()));
+              const toPoll = folders.filter(
+                (f) => !watchIds.has(f.id) && !removedFolderIds.has(f.id)
+              );
+              if (toPoll.length === 0) return;
+
+            // Runs detached on a timer, so any escaping rejection would be
+            // unhandled — the connect must stay inside the try.
+            polling = true;
+            try {
+              const connectedClient = await connectImapClientWithRetry({
+                account,
+                disposeClient,
+                logContext: { ...logContext, mailbox: "poll" },
+                connectOp: "imap.connect",
+                createClient: () => {
+                  if (stopped) throw new Error("Stream closed");
+                  const nextClient = new ImapFlow(
+                    buildImapFlowOptions(account, {}, { ...logContext, mailbox: "poll" })
+                  );
+                  ownedClients.add(nextClient);
+                  bindImapClientError(nextClient, { ...logContext, mailbox: "poll" });
+                  return nextClient;
+                }
+              });
+              pollClient = connectedClient;
+              if (stopped) return;
+              const updates: Array<{ id: string; uidNext?: number; unseen?: number; exists?: number }>
+                = [];
+              for (const folder of toPoll) {
+                if (stopped) break;
+                const mailbox = mailboxPathFromFolderId(folder.id, accountId);
+                try {
+                  const status = await logImapOp(
+                    "imap.status",
+                    { ...logContext, mailbox },
+                    async () =>
+                      await connectedClient.status(mailbox, {
+                        uidNext: true,
+                        messages: true,
+                        unseen: true
+                      })
+                  );
+                  updates.push({
+                    id: folder.id,
+                    uidNext: status.uidNext,
+                    unseen: status.unseen,
+                    exists: status.messages
+                  });
+                } catch (error) {
+                  if (getImapHttpError(error)) throw error;
+                  // Ignore transient per-folder status errors.
+                }
+              }
+              if (updates.length) {
+                await send("folder:update", updates);
+              }
+            } catch (error) {
+              await send("error", error);
+            } finally {
+              await disposeClient(pollClient);
+              pollClient = null;
+              polling = false;
+            }
+          };
+
+          if (stopped) return;
+          pollTimer = streamTimers.setInterval(pollFolders, pollIntervalMs);
+
+          // Comment pings keep proxies from timing out an otherwise idle stream.
+          keepaliveTimer = streamTimers.setInterval(() => {
+            try {
+              if (!stopped) controller.enqueue(encoder.encode(":ping\n\n"));
+            } catch {
+              authStream.close();
+            }
+          }, 25_000);
+
+
+        } catch (error) {
+          await send("error", error);
+          authStream.close();
+        }
       }
-    }
-  });
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive"
-    }
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive"
+      }
+    });
   });
 }

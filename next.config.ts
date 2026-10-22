@@ -10,6 +10,12 @@ import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles
 const projectDir = path.resolve(import.meta.dirname);
 
 const nextConfig: NextConfig = {
+  logging: { incomingRequests: { ignore: [/\/api\/ba\/reset-password\//, /\/reset-password(?:\?|$)/] } },
+  async headers() {
+    return [{ source: "/reset-password", headers: [
+      {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
+    ] }];
+  },
   output: 'standalone',
   outputFileTracingRoot: projectDir,
   turbopack: {

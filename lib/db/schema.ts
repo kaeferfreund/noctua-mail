@@ -109,6 +109,129 @@ function getDbTableColumns(db: any, tableName: string) {
   );
 }
 
+function isDuplicateColumnError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /duplicate column name/i.test(message);
+}
+
+// Adds every listed column that is missing from `tableName`. Reads PRAGMA
+// table_info at call time, so callers wrap it in an immediate transaction
+// to make the read and the ALTERs one unit. "duplicate column name" is
+// tolerated: a CLI script and a server restart can race on the same file
+// and the loser must not fail its start-up over a column that now exists.
+export function ensureTableColumns(
+  db: any,
+  tableName: string,
+  columns: ReadonlyArray<readonly [name: string, ddl: string]>
+) {
+  const existing = getDbTableColumns(db, tableName);
+  for (const [name, ddl] of columns) {
+    if (!TABLE_NAME_PATTERN.test(name)) {
+      throw new Error(`Invalid SQLite column name: ${name}`);
+    }
+    if (existing.has(name)) continue;
+    try {
+      db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${name} ${ddl}`).run();
+    } catch (error) {
+      if (!isDuplicateColumnError(error)) throw error;
+    }
+  }
+}
+
+// §3.1 team columns on the master tables. One immediate transaction makes
+// the PRAGMA reads and the ALTERs a unit (see `ensureTableColumns`).
+function ensureMasterTeamColumns(db: any) {
+  db.transaction(() => {
+    ensureTableColumns(db, "user_accounts", [
+      // Links that predate roles were self-created, hence the default.
+      ["role", "TEXT NOT NULL DEFAULT 'manager'"],
+      ["grantedByUserId", "TEXT"],
+      ["grantedAt", "INTEGER"]
+    ]);
+    // Reserved, not enforced yet (NULL = legacy behaviour).
+    ensureTableColumns(db, "mcp_tokens", [["scopes", "TEXT"]]);
+  }).immediate();
+}
+
+const USERS_EMAIL_LOWER_INDEX = "idx_users_email_lower";
+
+function getUsersEmailLowerIndexState(db: any): "missing" | "unique" | "non-unique" {
+  const rows = db.prepare(`PRAGMA index_list(users)`).all() as Array<{
+    name?: string;
+    unique?: number;
+  }>;
+  const row = rows.find((entry) => entry.name === USERS_EMAIL_LOWER_INDEX);
+  if (!row) return "missing";
+  return Number(row.unique ?? 0) ? "unique" : "non-unique";
+}
+
+// §3.1 e-mail normalisation. `users.email` is stored lowercased and trimmed
+// and looked up through `lower(email)`. Legacy rows are rewritten one by one;
+// a row whose normalised value collides with another row is left as is, the
+// collision is logged with the ids involved (not the addresses), and the
+// lower(email) index is created non-unique until an admin resolves the
+// duplicates (identity activation must reject ambiguity). Once
+// they are resolved, the next start replaces it with the unique index.
+// Idempotent, runs on every start, and never throws: start-up must not fail
+// because of this step.
+function normalizeUserEmails(db: any) {
+  try {
+    db.transaction(() => {
+      const candidates = db
+        .prepare(`SELECT id FROM users WHERE email <> lower(trim(email))`)
+        .all() as Array<{ id: string }>;
+      const normalise = db.prepare(
+        `UPDATE users SET email = lower(trim(email))
+         WHERE id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM users other
+             WHERE other.id <> users.id
+               AND lower(trim(other.email)) = lower(trim(users.email))
+           )`
+      );
+      candidates.forEach((row) => normalise.run(row.id));
+
+      const duplicates = db
+        .prepare(
+          `SELECT lower(trim(email)) AS k, COUNT(*) AS n, json_group_array(id) AS ids
+           FROM users
+           GROUP BY k
+           HAVING n > 1`
+        )
+        .all() as Array<{ k: string; n: number; ids: string }>;
+      const indexState = getUsersEmailLowerIndexState(db);
+
+      if (duplicates.length === 0) {
+        if (indexState === "non-unique") {
+          db.prepare(`DROP INDEX ${USERS_EMAIL_LOWER_INDEX}`).run();
+        }
+        db.prepare(
+          `CREATE UNIQUE INDEX IF NOT EXISTS ${USERS_EMAIL_LOWER_INDEX} ON users(lower(email))`
+        ).run();
+        return;
+      }
+
+      console.warn(
+        "[noctua] users share an e-mail address that differs only in case or whitespace; " +
+          "the unique e-mail index is deferred until an admin resolves them",
+        {
+          duplicateUserIds: duplicates
+            .map((entry) => (JSON.parse(entry.ids) as string[]).sort())
+            .sort((left, right) => left[0].localeCompare(right[0]))
+        }
+      );
+      if (indexState === "missing") {
+        db.prepare(`CREATE INDEX ${USERS_EMAIL_LOWER_INDEX} ON users(lower(email))`).run();
+      }
+    }).immediate();
+  } catch (error) {
+    console.error(
+      "[noctua] users e-mail normalisation failed; continuing without the lower(email) index",
+      error
+    );
+  }
+}
+
 export function ensureCalendarReminderOptionalColumns(db: any) {
   const reminderColumns = getDbTableColumns(db, "calendar_reminders");
   if (reminderColumns.size === 0) return;
@@ -637,12 +760,41 @@ export function initMasterSchema(db: any) {
       expiresAt INTEGER,
       lastUsedAt INTEGER
     );
+
+    CREATE TABLE IF NOT EXISTS user_account_prefs (
+      userId TEXT NOT NULL,
+      accountId TEXT NOT NULL,
+      prefs TEXT NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      PRIMARY KEY (userId, accountId)
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_audit (
+      id TEXT PRIMARY KEY,
+      actorUserId TEXT NOT NULL,
+      action TEXT NOT NULL,
+      targetUserId TEXT,
+      targetAccountId TEXT,
+      payload TEXT,
+      createdAt INTEGER NOT NULL
+    );
   `);
 
   db.prepare(
     `CREATE INDEX IF NOT EXISTS idx_mcp_tokens_account_created
      ON mcp_tokens(accountId, createdAt DESC)`
   ).run();
+  db.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_admin_audit_created
+     ON admin_audit(createdAt DESC)`
+  ).run();
+
+  ensureMasterTeamColumns(db);
+  db.prepare(
+    `CREATE INDEX IF NOT EXISTS idx_user_accounts_account
+     ON user_accounts(accountId)`
+  ).run();
+  normalizeUserEmails(db);
 
   const inviteColumns = new Set(
     (db.prepare(`PRAGMA table_info(invite_codes)`).all() as Array<{ name?: string }>).map((row) =>
@@ -656,6 +808,7 @@ export function initMasterSchema(db: any) {
   if (!inviteColumns.has("usedByUserId")) {
     db.prepare(`ALTER TABLE invite_codes ADD COLUMN usedByUserId TEXT`).run();
   }
+  if (!inviteColumns.has("email")) db.prepare(`ALTER TABLE invite_codes ADD COLUMN email TEXT`).run();
 
   const accountColumns = new Set(
     (db.prepare(`PRAGMA table_info(accounts)`).all() as Array<{ name?: string }>).map((row) =>

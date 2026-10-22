@@ -1,8 +1,12 @@
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
+import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getAttachmentData, getMessageSource, saveAttachmentData, statAttachmentData } from "@/lib/storage";
 import { getAttachmentMeta } from "@/lib/db";
-import { requireSessionAccountOr403, requireSessionOr401 } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { extractAttachmentBufferFromSource } from "@/lib/mail/attachmentFromSource";
 import { ensureHtmlDocumentTitle, escapeHtml } from "@/lib/html";
 import { formatAttachmentPageTitle } from "@/lib/appBranding";
@@ -48,106 +52,108 @@ type Params = AccountRouteParams & {
 };
 
 export async function GET(request: Request, { params }: Params) {
-  const session = requireSessionOr401(request);
+  const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const accountId = await getAccountIdFromParams(params);
-  const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
-  const { searchParams } = new URL(request.url);
-  const messageId = messageIdParam ?? "";
-  const attachmentId = attachmentIdParam ?? "";
+  return withAuthResponse(session, async () => {
+    const accountId = await getAccountIdFromParams(params);
+    const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
+    const { searchParams } = new URL(request.url);
+    const messageId = messageIdParam ?? "";
+    const attachmentId = attachmentIdParam ?? "";
 
-  if (!accountId || !messageId || !attachmentId) {
-    return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
-  }
-  const access = requireSessionAccountOr403(session, accountId);
-  if (access instanceof NextResponse) return access;
+    if (!accountId || !messageId || !attachmentId) {
+      return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
+    }
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
+    if (access instanceof NextResponse) return access;
 
-  const attachment = await getAttachmentMeta(accountId, messageId, attachmentId);
-  if (!attachment) {
-    return NextResponse.json({ ok: false, message: "Attachment not found" }, { status: 404 });
-  }
-
-  // A directly served attachment is titled by the browser from the URL's last
-  // segment — the opaque attachment id — so a preview window asks for a
-  // titled shell around it instead. The data is not touched here; the frame
-  // fetches it from this same route without the flag.
-  if (searchParams.get("preview") === "1") {
-    const frameUrl = new URL(request.url);
-    frameUrl.searchParams.delete("preview");
-    const shell = [
-      '<!doctype html><html lang="en"><head>',
-      '<meta charset="utf-8">',
-      '<meta name="viewport" content="width=device-width,initial-scale=1">',
-      "<style>html,body{margin:0;height:100%;background:#1f1d1a}",
-      "iframe{border:0;display:block;width:100%;height:100%}</style>",
-      "</head><body>",
-      `<iframe src="${escapeHtml(frameUrl.pathname + frameUrl.search)}"></iframe>`,
-      "</body></html>"
-    ].join("");
-    return new NextResponse(
-      ensureHtmlDocumentTitle(shell, formatAttachmentPageTitle(attachment.filename)),
-      {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store"
-        }
-      }
-    );
-  }
-
-  const notModified = (etag: string) =>
-    new NextResponse(null, { status: 304, headers: attachmentCacheHeaders(etag) });
-
-  let fileStat = await statAttachmentData(accountId, messageId, attachmentId);
-  const currentTag = fileStat ? attachmentEntityTag(fileStat) : null;
-  if (currentTag && ifNoneMatchMatches(request.headers.get("if-none-match"), currentTag)) {
-    return notModified(currentTag);
-  }
-
-  let data = await getAttachmentData(accountId, messageId, attachmentId);
-  if (!data) {
-    const source = await getMessageSource(accountId, messageId);
-    if (!source) {
-      return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
+    const attachment = await getAttachmentMeta(accountId, messageId, attachmentId);
+    if (!attachment) {
+      return NextResponse.json({ ok: false, message: "Attachment not found" }, { status: 404 });
     }
 
-    try {
-      const extractedContent = await extractAttachmentBufferFromSource(source, {
-        id: attachmentId,
-        filename: attachment.filename ?? undefined,
-        contentType: attachment.contentType ?? undefined,
-        cid: attachment.cid ?? undefined
-      });
-      if (!extractedContent) {
+    // A directly served attachment is titled by the browser from the URL's last
+    // segment — the opaque attachment id — so a preview window asks for a
+    // titled shell around it instead. The data is not touched here; the frame
+    // fetches it from this same route without the flag.
+    if (searchParams.get("preview") === "1") {
+      const frameUrl = new URL(request.url);
+      frameUrl.searchParams.delete("preview");
+      const shell = [
+        '<!doctype html><html lang="en"><head>',
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width,initial-scale=1">',
+        "<style>html,body{margin:0;height:100%;background:#1f1d1a}",
+        "iframe{border:0;display:block;width:100%;height:100%}</style>",
+        "</head><body>",
+        `<iframe src="${escapeHtml(frameUrl.pathname + frameUrl.search)}"></iframe>`,
+        "</body></html>"
+      ].join("");
+      return new NextResponse(
+        ensureHtmlDocumentTitle(shell, formatAttachmentPageTitle(attachment.filename)),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store"
+          }
+        }
+      );
+    }
+
+    const notModified = (etag: string) =>
+      new NextResponse(null, { status: 304, headers: attachmentCacheHeaders(etag) });
+
+    let fileStat = await statAttachmentData(accountId, messageId, attachmentId);
+    const currentTag = fileStat ? attachmentEntityTag(fileStat) : null;
+    if (currentTag && ifNoneMatchMatches(request.headers.get("if-none-match"), currentTag)) {
+      return notModified(currentTag);
+    }
+
+    let data = await getAttachmentData(accountId, messageId, attachmentId);
+    if (!data) {
+      const source = await getMessageSource(accountId, messageId);
+      if (!source) {
         return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
       }
-      const normalizedContent = Buffer.from(extractedContent);
-      data = normalizedContent;
-      await saveAttachmentData(accountId, messageId, attachmentId, normalizedContent);
-      fileStat = await statAttachmentData(accountId, messageId, attachmentId);
-    } catch {
-      return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
-    }
-  }
 
-  const rawName = attachment.filename ?? "attachment";
-  const asciiName = rawName.replace(/[^\x20-\x7E]+/g, "_");
-  const encodedName = encodeURIComponent(rawName);
-  const shouldDownload = searchParams.get("download") === "1";
-  const disposition = shouldDownload ? "attachment" : "inline";
-  const etag = fileStat ? attachmentEntityTag(fileStat) : null;
-  if (etag && ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
-    return notModified(etag);
-  }
-
-  return new NextResponse(data, {
-    headers: {
-      "Content-Type": attachment.contentType ?? "application/octet-stream",
-      ...(etag ? attachmentCacheHeaders(etag) : {}),
-      "Content-Disposition": `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'"
+      try {
+        const extractedContent = await extractAttachmentBufferFromSource(source, {
+          id: attachmentId,
+          filename: attachment.filename ?? undefined,
+          contentType: attachment.contentType ?? undefined,
+          cid: attachment.cid ?? undefined
+        });
+        if (!extractedContent) {
+          return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
+        }
+        const normalizedContent = Buffer.from(extractedContent);
+        data = normalizedContent;
+        await saveAttachmentData(accountId, messageId, attachmentId, normalizedContent);
+        fileStat = await statAttachmentData(accountId, messageId, attachmentId);
+      } catch {
+        return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
+      }
     }
+
+    const rawName = attachment.filename ?? "attachment";
+    const asciiName = rawName.replace(/[^\x20-\x7E]+/g, "_");
+    const encodedName = encodeURIComponent(rawName);
+    const shouldDownload = searchParams.get("download") === "1";
+    const disposition = shouldDownload ? "attachment" : "inline";
+    const etag = fileStat ? attachmentEntityTag(fileStat) : null;
+    if (etag && ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
+      return notModified(etag);
+    }
+
+    return new NextResponse(data, {
+      headers: {
+        "Content-Type": attachment.contentType ?? "application/octet-stream",
+        ...(etag ? attachmentCacheHeaders(etag) : {}),
+        "Content-Disposition": `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'"
+      }
+    });
   });
 }
 
@@ -167,6 +173,7 @@ function statusForRemovalError(message: string) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
   const messageId = (messageIdParam ?? "").trim();
@@ -175,7 +182,7 @@ export async function DELETE(request: Request, { params }: Params) {
   const context = await requireAccountAndMessageContext(
     request,
     { accountId, messageId },
-    {
+    { minRole: "editor",
       missingFieldsMessage: "Missing accountId/messageId",
       missingMessageMessage: "Message not found in local cache.",
       requireImapMetadata: true,
@@ -183,20 +190,24 @@ export async function DELETE(request: Request, { params }: Params) {
     }
   );
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  if (!attachmentId) {
-    return NextResponse.json({ ok: false, message: "Missing attachmentId" }, { status: 400 });
-  }
+    if (!attachmentId) {
+      return NextResponse.json({ ok: false, message: "Missing attachmentId" }, { status: 400 });
+    }
 
-  const { account, clientId, message } = context;
-  try {
-    const result = await removeMessageAttachmentEverywhere(account, message, attachmentId, clientId);
-    return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Failed to remove attachment";
-    return NextResponse.json(
-      { ok: false, message: appendMessageIdToError(detail, messageId) },
-      { status: statusForRemovalError(detail) }
-    );
-  }
+    const { account, clientId, message } = context;
+    try {
+      const result = await removeMessageAttachmentEverywhere(account, message, attachmentId, clientId);
+      return NextResponse.json({ ok: true, ...result });
+    } catch (error) {
+      const failure = await mailboxErrorResponse(error, accountId, context.role);
+      if (failure) return failure;
+      const detail = error instanceof Error ? error.message : "Failed to remove attachment";
+      return NextResponse.json(
+        { ok: false, message: appendMessageIdToError(detail, messageId) },
+        { status: statusForRemovalError(detail) }
+      );
+    }
+  });
 }

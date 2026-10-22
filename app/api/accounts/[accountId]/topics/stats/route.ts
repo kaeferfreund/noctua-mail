@@ -1,3 +1,4 @@
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -8,11 +9,13 @@ import { getTopicStats } from "@/lib/topics";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
 
-  const stats = await getTopicStats(accountId, {
-    accountEmail: context.account.email
+    const stats = await getTopicStats(accountId, {
+      accountEmail: context.account.email
+    });
+    return NextResponse.json({ ok: true, stats });
   });
-  return NextResponse.json({ ok: true, stats });
 }

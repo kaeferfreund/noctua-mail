@@ -1,4 +1,6 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { NextResponse } from "next/server";
+import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
 import net from "net";
 import tls from "tls";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
@@ -96,29 +98,34 @@ async function probeSmtpStartTLS(host: string, port: number) {
 }
 
 export async function POST(request: Request) {
-  const ip = getRequestIp(request);
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
+  const session = await requireActiveUserSession(request);
+  if (session instanceof NextResponse) return session;
+  return withAuthResponse(session, async () => {
+    const ip = getRequestIp(request);
 
-  if (probeLimiter.isLimited(ip)) {
-    return NextResponse.json(
-      { ok: false, message: "Too many requests — try again later" },
-      { status: 429 }
-    );
-  }
+    if (probeLimiter.isLimited(ip)) {
+      return NextResponse.json(
+        { ok: false, message: "Too many requests — try again later" },
+        { status: 429 }
+      );
+    }
 
-  const payload = (await request.json()) as {
-    protocol: "imap" | "smtp";
-    host: string;
-    port: number;
-  };
+    const payload = (await request.json()) as {
+      protocol: "imap" | "smtp";
+      host: string;
+      port: number;
+    };
 
-  if (!payload.host || !payload.port) {
-    return NextResponse.json({ ok: false, message: "Host and port required" }, { status: 400 });
-  }
+    if (!payload.host || !payload.port) {
+      return NextResponse.json({ ok: false, message: "Host and port required" }, { status: 400 });
+    }
 
-  const supportsTLS = await probeImplicitTLS(payload.host, payload.port);
-  const supportsStartTLS = payload.protocol === "imap"
-    ? await probeImapStartTLS(payload.host, payload.port)
-    : await probeSmtpStartTLS(payload.host, payload.port);
+    const supportsTLS = await probeImplicitTLS(payload.host, payload.port);
+    const supportsStartTLS = payload.protocol === "imap"
+      ? await probeImapStartTLS(payload.host, payload.port)
+      : await probeSmtpStartTLS(payload.host, payload.port);
 
-  return NextResponse.json({ ok: true, supportsTLS, supportsStartTLS });
+    return NextResponse.json({ ok: true, supportsTLS, supportsStartTLS });
+  });
 }

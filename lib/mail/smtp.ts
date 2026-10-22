@@ -153,3 +153,11 @@ export async function sendRawSmtpMessage(
   }
   return { messageId: (info as any)?.messageId ?? null };
 }
+
+/** Verify the submitted endpoint before any credential write-back. */
+export async function verifySmtpCredentials(account: Account): Promise<boolean> {
+  const transport = createSmtpTransport(account);
+  try { await transport.verify(); return true; }
+  catch { return false; }
+  finally { transport.close(); }
+}

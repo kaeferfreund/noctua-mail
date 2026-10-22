@@ -1,3 +1,5 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAccountIdFromParams,
@@ -24,31 +26,35 @@ function normalizeStringArray(values: unknown) {
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json().catch(() => null)) as DeleteAssociationPayload | null;
   const accountId = await getAccountIdFromParams(params);
   if (!accountId) {
     return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-  try {
-    const messageIds = normalizeStringArray(payload?.messageIds);
-    const eventUids = normalizeStringArray(payload?.eventUids);
-    const result = await listDeleteCalendarAssociations(
-      accountContext.accountId,
-      accountContext.session.userId,
-      messageIds,
-      eventUids
-    );
-    return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    console.error("[message/delete/associations] POST error:", error);
-    return NextResponse.json(
-      { ok: false, message: "Failed to load delete associations" },
-      { status: 500 }
-    );
-  }
+    try {
+      const messageIds = normalizeStringArray(payload?.messageIds);
+      const eventUids = normalizeStringArray(payload?.eventUids);
+      const result = await listDeleteCalendarAssociations(
+        accountContext.accountId,
+        accountContext.session.userId,
+        messageIds,
+        eventUids
+      );
+      return NextResponse.json({ ok: true, ...result });
+    } catch (error) {
+      console.error("[message/delete/associations] POST error:", error);
+      return NextResponse.json(
+        { ok: false, message: "Failed to load delete associations" },
+        { status: 500 }
+      );
+    }
+  });
 }

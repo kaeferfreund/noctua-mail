@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Account, DeeplConfig } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
 
 const { upsertAccount } = await dbModulePromise;
@@ -38,17 +38,9 @@ function buildAccount(accountId: string, deepl?: DeeplConfig): Account {
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-compose-translate-tests",
-    accountId,
-    role: "user",
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
+async function buildCookieHeader(accountId: string | undefined) { return authenticatedTestCookie(accountId); }
 
-function buildRequest(
+async function buildRequest(
   accountId: string,
   body: unknown,
   options?: { omitCookie?: boolean }
@@ -56,8 +48,8 @@ function buildRequest(
   return new Request(`http://localhost/api/accounts/${accountId}/translation/compose`, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
-      ...(options?.omitCookie ? {} : { cookie: buildCookieHeader(accountId) })
+      "content-type": "application/json", origin: "http://localhost:3000",
+      ...(options?.omitCookie ? {} : { cookie: await buildCookieHeader(accountId) })
     },
     body: JSON.stringify(body)
   });
@@ -89,7 +81,7 @@ function mockDeeplFetch(
 function deeplSuccessResponse(text: string, detected = "DE") {
   return new Response(
     JSON.stringify({ translations: [{ detected_source_language: detected, text }] }),
-    { status: 200, headers: { "content-type": "application/json" } }
+    { status: 200, headers: { "content-type": "application/json", origin: "http://localhost:3000" } }
   );
 }
 
@@ -102,7 +94,7 @@ describe("compose translate route", () => {
     const calls = mockDeeplFetch(() => deeplSuccessResponse("Hello colleagues"));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo Kollegen", targetLang: "EN-GB" }),
+      await buildRequest(accountId, { text: "Hallo Kollegen", targetLang: "EN-GB" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(200);
@@ -133,7 +125,7 @@ describe("compose translate route", () => {
 
     const html = '<p>Hallo</p><img src="data:image/png;base64,AAAABBBB">';
     const response = await POST(
-      buildRequest(accountId, { text: html, targetLang: "EN-US", format: "html" }),
+      await buildRequest(accountId, { text: html, targetLang: "EN-US", format: "html" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(200);
@@ -152,7 +144,7 @@ describe("compose translate route", () => {
     const calls = mockDeeplFetch(() => deeplSuccessResponse("Bonjour", "DE"));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }),
+      await buildRequest(accountId, { text: "Hallo" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(200);
@@ -166,7 +158,7 @@ describe("compose translate route", () => {
     const calls = mockDeeplFetch(() => deeplSuccessResponse("nope"));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }),
+      await buildRequest(accountId, { text: "Hallo" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(400);
@@ -179,7 +171,7 @@ describe("compose translate route", () => {
     await upsertAccount(buildAccount(accountId, { enabled: true, apiKey: "  " }));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }),
+      await buildRequest(accountId, { text: "Hallo" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(400);
@@ -193,7 +185,7 @@ describe("compose translate route", () => {
     );
 
     const response = await POST(
-      buildRequest(accountId, { text: "   \n " }),
+      await buildRequest(accountId, { text: "   \n " }),
       routeParams(accountId)
     );
     expect(response.status).toBe(400);
@@ -207,7 +199,7 @@ describe("compose translate route", () => {
     );
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }, { omitCookie: true }),
+      await buildRequest(accountId, { text: "Hallo" }, { omitCookie: true }),
       routeParams(accountId)
     );
     expect(response.status).toBe(401);
@@ -221,7 +213,7 @@ describe("compose translate route", () => {
     mockDeeplFetch(() => new Response("quota exceeded", { status: 456 }));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }),
+      await buildRequest(accountId, { text: "Hallo" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(456);
@@ -236,7 +228,7 @@ describe("compose translate route", () => {
     mockDeeplFetch(() => new Response("forbidden", { status: 403 }));
 
     const response = await POST(
-      buildRequest(accountId, { text: "Hallo" }),
+      await buildRequest(accountId, { text: "Hallo" }),
       routeParams(accountId)
     );
     expect(response.status).toBe(400);

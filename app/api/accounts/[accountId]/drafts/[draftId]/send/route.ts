@@ -1,3 +1,5 @@
+import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { DraftSendError, sendDraftForAccount } from "@/lib/drafts";
 import {
@@ -23,6 +25,7 @@ type Params = AccountRouteParams & {
 };
 
 export async function POST(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { draftId: rawDraftId } = await params;
   const draftId = typeof rawDraftId === "string" ? rawDraftId.trim() : "";
@@ -30,32 +33,35 @@ export async function POST(request: Request, { params }: Params) {
     return errorResponse("Missing accountId or draftId", 400);
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
-  const { account, accountId: resolvedAccountId, clientId } = accountContext;
+  return withAuthResponse(accountContext, async () => {
+    const { account, accountId: resolvedAccountId, clientId } = accountContext;
 
-  try {
-    const result = await sendDraftForAccount({
-      account,
-      accountId: resolvedAccountId,
-      clientId: clientId ?? "",
-      draftId
-    });
-    return okResponse({
-      sentFolderId: result.sentFolderId,
-      sentMessageUid: result.sentMessageUid,
-      messageId: result.messageId
-    });
-  } catch (error) {
-    if (error instanceof DraftSendError) {
-      return errorResponse(error.message, error.status);
+    try {
+      const result = await sendDraftForAccount({
+        account,
+        accountId: resolvedAccountId,
+        clientId: clientId ?? "",
+        draftId
+      });
+      return okResponse({
+        sentFolderId: result.sentFolderId,
+        sentMessageUid: result.sentMessageUid,
+        messageId: result.messageId
+      });
+    } catch (error) {
+      if (error instanceof DraftSendError) {
+        return errorResponse(error.message, error.status);
+      }
+      const upstreamResponse = smtpUpstreamErrorResponse(error, {
+        accountId: resolvedAccountId,
+        op: "send-draft"
+      });
+      if (upstreamResponse) return upstreamResponse;
+      throw error;
     }
-    const upstreamResponse = smtpUpstreamErrorResponse(error, {
-      accountId: resolvedAccountId,
-      op: "send-draft"
-    });
-    if (upstreamResponse) return upstreamResponse;
-    throw error;
-  }
+  });
 }

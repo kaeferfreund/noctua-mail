@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import type { StoredMessageSummary } from "@/lib/db";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { applyFlagMutationsToMessages } from "@/lib/messageFlagMutation";
@@ -68,14 +68,7 @@ function buildAccount(accountId: string): Account {
   };
 }
 
-function buildCookieHeader(accountId: string) {
-  const session: SessionData = {
-    userId: "user-bulk-flags-route",
-    accountId,
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
+async function buildCookieHeader(accountId: string | undefined) { return authenticatedTestCookie(accountId); }
 
 function uniqueAccountId(prefix: string) {
   return `${prefix}-${randomUUID()}`;
@@ -86,8 +79,8 @@ async function postBulkFlags(accountId: string, body: unknown) {
     new Request(`http://localhost/api/accounts/${accountId}/messages/flags/bulk`, {
       method: "POST",
       headers: {
-        "content-type": "application/json",
-        cookie: buildCookieHeader(accountId)
+        "content-type": "application/json", origin: "http://localhost:3000",
+        cookie: await buildCookieHeader(accountId)
       },
       body: JSON.stringify(body)
     }),

@@ -155,6 +155,8 @@ Local data is stored in `.data/` directory:
 
 ### Environment Variables
 
+> Authentication is being migrated to Better Auth; cookie credential mode, sealed sessions, `SESSION_SEAL_KEY`, legacy IMAP login and the Tauri desktop build are no longer available in this fork; see [TEAM-INBOX.md §4](doc/TEAM-INBOX.md#4-authentication) and [TEAM-AUTH-PLAN.md](doc/TEAM-AUTH-PLAN.md). The legacy reference below will be rewritten in slice 6.
+
 #### IMAP Credentials Storage
 Configure how IMAP/SMTP credentials are stored:
 

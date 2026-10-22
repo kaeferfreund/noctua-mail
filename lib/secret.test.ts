@@ -63,7 +63,7 @@ describe("assertImapSecretKeyConfigured", () => {
     expect(result.stdout).toContain("IMAP_SECRET_KEY");
   });
 
-  it("does not throw when cookie-only storage is configured with no key", () => {
+  it("rejects retired cookie storage even with no key", () => {
     const result = spawnSync(
       "bun",
       [
@@ -76,6 +76,6 @@ describe("assertImapSecretKeyConfigured", () => {
       }
     );
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("NO_THROW");
+    expect(result.stdout).toContain("cookie storage is unsupported");
   });
 });

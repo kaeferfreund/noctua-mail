@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { describe, expect, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { sealSession, type SessionData } from "@/lib/auth";
+import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
 
 const { upsertAccount } = await dbModulePromise;
@@ -31,18 +31,9 @@ function buildAccount(accountId: string): Account {
   };
 }
 
-function buildSession(accountId: string | undefined): SessionData {
-  return {
-    userId: "user-calendar-import-tests",
-    accountId,
-    role: "user",
-    exp: Math.floor(Date.now() / 1000) + 60 * 60
-  };
-}
+function buildSession(accountId: string | undefined) { return accountId; }
 
-function cookieFor(session: SessionData) {
-  return `noctua_session=${encodeURIComponent(sealSession(session))}`;
-}
+async function cookieFor(accountId: string | undefined) { return authenticatedTestCookie(accountId); }
 
 function uniqueAccountId(prefix: string) {
   return `${prefix}-${randomUUID()}`;
@@ -66,7 +57,7 @@ function postRequest(body: unknown, cookie: string) {
   return new Request("http://localhost/api/calendar/import", {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/json", origin: "http://localhost:3000",
       cookie
     },
     body: typeof body === "string" ? body : JSON.stringify(body)
@@ -78,7 +69,7 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       new Request("http://localhost/api/calendar/import", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost:3000" },
         body: JSON.stringify({ icsSource: "ignored" })
       })
     );
@@ -88,7 +79,7 @@ describe("POST /api/calendar/import", () => {
   test("returns 400 when the body is not a JSON object", async () => {
     const accountId = uniqueAccountId("acc-import-bad-body");
     await upsertAccount(buildAccount(accountId));
-    const res = await POST(postRequest("\"a string\"", cookieFor(buildSession(accountId))));
+    const res = await POST(postRequest("\"a string\"", await cookieFor(buildSession(accountId))));
     expect(res.status).toBe(400);
     const body = (await res.json()) as { ok?: boolean; message?: string };
     expect(body.ok).toBe(false);
@@ -98,7 +89,7 @@ describe("POST /api/calendar/import", () => {
   test("returns 400 when icsSource is missing or not a string", async () => {
     const accountId = uniqueAccountId("acc-import-bad-ics");
     await upsertAccount(buildAccount(accountId));
-    const cookie = cookieFor(buildSession(accountId));
+    const cookie = await cookieFor(buildSession(accountId));
 
     const missing = await POST(postRequest({}, cookie));
     expect(missing.status).toBe(400);
@@ -118,22 +109,22 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       postRequest(
         { icsSource: makeIcs("any-uid"), accountId: 123 },
-        cookieFor(buildSession(accountId))
+        await cookieFor(buildSession(accountId))
       )
     );
     expect(res.status).toBe(400);
     expect(((await res.json()) as { message?: string }).message).toMatch(/Invalid accountId/i);
   });
 
-  test("returns 400 when the session has no accountId bound", async () => {
+  test("returns selection required for zero memberships", async () => {
     const res = await POST(
       postRequest(
         { icsSource: makeIcs("u1") },
-        cookieFor(buildSession(undefined))
+        await cookieFor(buildSession(undefined))
       )
     );
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { message?: string }).message).toMatch(/Sign in to an account/i);
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code?: string }).code).toBe("mailbox_selection_required");
   });
 
   test("returns 403 when body.accountId does not match the session's account", async () => {
@@ -145,7 +136,7 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       postRequest(
         { icsSource: makeIcs("u1"), accountId: otherAccountId },
-        cookieFor(buildSession(sessionAccountId))
+        await cookieFor(buildSession(sessionAccountId))
       )
     );
     expect(res.status).toBe(403);
@@ -158,7 +149,7 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       postRequest(
         { icsSource: makeIcs(uid, "Happy path event") },
-        cookieFor(buildSession(accountId))
+        await cookieFor(buildSession(accountId))
       )
     );
     expect(res.status).toBe(200);
@@ -188,7 +179,7 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       postRequest(
         { icsSource: "BEGIN:VCALENDAR\r\nEND:VCALENDAR" },
-        cookieFor(buildSession(accountId))
+        await cookieFor(buildSession(accountId))
       )
     );
     expect(res.status).toBe(400);

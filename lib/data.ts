@@ -36,6 +36,9 @@ export type Account = {
   email: string;
   avatar: string;
   ownerUserId?: string;
+  accessRole?: AccountRole;
+  isOwner?: boolean;
+  shared?: boolean;
   settings?: AccountSettings;
   caldav?: CaldavConfig;
   deepl?: DeeplConfig;
@@ -83,6 +86,7 @@ export type AccountSettings = {
     body: string;
   }[];
   defaultSignatureId?: string;
+  notifications?: { newMail?: boolean };
 };
 
 export type MailboxState = {
@@ -410,14 +414,92 @@ export type MessageCalendarInviteState = {
   unprocessedReason?: CalendarInviteUnprocessedReason;
 };
 
+/** Client-facing user. Never carries the password hash (see `mapUserRow`). */
 export type User = {
   id: string;
+  /** Stored lowercased and trimmed. */
   email: string;
+  name: string | null;
   role: "admin" | "user";
+  createdAt: number;
+  hasPassword: boolean;
+  disabled: boolean;
+  twoFactorEnabled: boolean;
+  passkeyCount: number;
+};
+
+/** Membership role on a mailbox, ordered `viewer < editor < manager`. */
+export const ACCOUNT_ROLES = ["viewer", "editor", "manager"] as const;
+export type AccountRole = (typeof ACCOUNT_ROLES)[number];
+
+export function isAccountRole(value: unknown): value is AccountRole {
+  return typeof value === "string" && (ACCOUNT_ROLES as readonly string[]).includes(value);
+}
+
+/** One `user_accounts` row: a user's membership on a mailbox. */
+export type UserAccountLink = {
+  userId: string;
+  accountId: string;
+  role: AccountRole;
+  grantedByUserId: string | null;
+  /** Unix milliseconds; `null` for links created before roles existed. */
+  grantedAt: number | null;
+};
+
+/**
+ * Per-user UI preferences for one mailbox (`user_account_prefs`). Stored
+ * sparse: only keys the user explicitly changed are present. Resolution on
+ * the client is defaults < `account.settings` < user prefs.
+ */
+export type UserAccountPrefs = Pick<
+  AccountSettings,
+  "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId" | "notifications"
+>;
+
+/**
+ * Sparse patch for `UserAccountPrefs`: absent keys are untouched, `null`
+ * deletes a key, nested objects are merged recursively.
+ */
+export type SparsePatch<T> = {
+  [K in keyof T]?: NonNullable<T[K]> extends object
+    ? SparsePatch<NonNullable<T[K]>> | null
+    : T[K] | null;
+};
+export type UserAccountPrefsPatch = SparsePatch<UserAccountPrefs>;
+
+export type AdminAuditAction =
+  | "user.recovery_issue"
+  | "user.mfa_reset"
+  | "user.passkey_remove"
+  | "user.sessions_revoke"
+  | "user.create"
+  | "user.update"
+  | "user.disable"
+  | "user.enable"
+  | "user.delete"
+  | "user.password_reset"
+  | "account.create"
+  | "account.delete"
+  | "account.update"
+  | "member.grant"
+  | "member.update"
+  | "member.revoke";
+
+export type AdminAuditEntry = {
+  id: string;
+  actorUserId: string;
+  /** An `AdminAuditAction` when written by this version; read back as stored. */
+  action: string;
+  targetUserId: string | null;
+  targetAccountId: string | null;
+  /** Never contains secrets; password-like keys are stripped on write. */
+  payload: Record<string, unknown> | null;
+  /** Unix milliseconds. */
   createdAt: number;
 };
 
 export type InviteCode = {
+  email?: string | null;
   code: string;
   role: "admin" | "user";
   maxUses: number | null;

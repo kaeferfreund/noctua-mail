@@ -1,13 +1,17 @@
 import type {
   Account,
+  AdminAuditEntry,
   CaldavConfig,
   DeeplConfig,
   InviteCode,
   McpTokenMetadata,
-  User
+  User,
+  UserAccountLink,
+  UserAccountPrefs
 } from "../data";
+import { isAccountRole } from "../data";
 import { normalizeAccountSettings } from "../accountSettings";
-import { decodeSecret, encodeSecret, shouldStorePasswordInDb } from "../secret";
+import { decodeSecret, encodeSecret } from "../secret";
 import { getDefaultAccountDbPath } from "../runtimePaths";
 
 function safeParseJson<T = unknown>(value: string | null | undefined, fallback?: T): T | undefined {
@@ -27,15 +31,84 @@ export function mapInviteRow(row: any): InviteCode {
     uses: row.uses ?? 0,
     expiresAt: row.expiresAt === null ? null : Number(row.expiresAt),
     createdAt: Number(row.createdAt ?? 0),
-    usedByUserId: row.usedByUserId ?? null
+    usedByUserId: row.usedByUserId ?? null,
+    email: row.email ?? null
   };
 }
 
-export function mapUserRow(row: any): User {
+/**
+ * Column list for every `users` read that is mapped with `mapUserRow`. The
+ * password hash is never selected: `hasPassword` is derived in SQL so the
+ * hash cannot leak through the row or the mapped `User`.
+ */
+export const USER_ROW_SELECT = `p.id, u.email, u.name, u.role, p.createdAt,
+  EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.password IS NOT NULL) AS hasPassword,
+  (u.banned=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now'))) AS disabled,
+  u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_passkey k WHERE k.userId=u.id) AS passkeyCount`;
+
+export type StoredUserRow = {
+  id?: string | null; email?: string | null; name?: string | null; role?: string | null;
+  createdAt?: number | null; hasPassword?: number | null; disabled?: number | null;
+  twoFactorEnabled?: number | null; passkeyCount?: number | null;
+};
+
+export function mapUserRow(row: StoredUserRow): User {
+  const name = row.name == null ? "" : String(row.name).trim();
+  return { id: String(row.id ?? ""), email: String(row.email ?? ""), name: name || null,
+    role: row.role === "admin" ? "admin" : "user", createdAt: Number(row.createdAt ?? 0),
+    hasPassword: Boolean(Number(row.hasPassword ?? 0)), disabled: Boolean(Number(row.disabled ?? 0)),
+    twoFactorEnabled: Boolean(Number(row.twoFactorEnabled ?? 0)), passkeyCount: Number(row.passkeyCount ?? 0) };
+}
+
+export type StoredUserAccountLinkRow = {
+  userId?: string | null;
+  accountId?: string | null;
+  role?: string | null;
+  grantedByUserId?: string | null;
+  grantedAt?: number | null;
+};
+
+export function mapUserAccountLinkRow(row: StoredUserAccountLinkRow): UserAccountLink {
   return {
-    id: row.id,
-    email: row.email,
-    role: row.role === "admin" ? "admin" : "user",
+    userId: String(row.userId ?? ""),
+    accountId: String(row.accountId ?? ""),
+    // Links created before roles existed carry the DDL default ('manager').
+    // Anything unknown (manual edits) degrades to the least privilege.
+    role: isAccountRole(row.role) ? row.role : "viewer",
+    grantedByUserId: row.grantedByUserId == null ? null : String(row.grantedByUserId),
+    grantedAt: row.grantedAt == null ? null : Number(row.grantedAt)
+  };
+}
+
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Parses a stored `user_account_prefs.prefs` value; a missing row is `{}`. */
+export function parseUserAccountPrefs(value: string | null | undefined): UserAccountPrefs {
+  const parsed = safeParseJson<unknown>(value);
+  return isPlainObject(parsed) ? (parsed as UserAccountPrefs) : {};
+}
+
+export type StoredAdminAuditRow = {
+  id?: string | null;
+  actorUserId?: string | null;
+  action?: string | null;
+  targetUserId?: string | null;
+  targetAccountId?: string | null;
+  payload?: string | null;
+  createdAt?: number | null;
+};
+
+export function mapAdminAuditRow(row: StoredAdminAuditRow): AdminAuditEntry {
+  const payload = safeParseJson<unknown>(row.payload);
+  return {
+    id: String(row.id ?? ""),
+    actorUserId: String(row.actorUserId ?? ""),
+    action: String(row.action ?? ""),
+    targetUserId: row.targetUserId == null ? null : String(row.targetUserId),
+    targetAccountId: row.targetAccountId == null ? null : String(row.targetAccountId),
+    payload: isPlainObject(payload) ? payload : null,
     createdAt: Number(row.createdAt ?? 0)
   };
 }
@@ -135,6 +208,34 @@ function mergeDeeplForPatch(
   return merged;
 }
 
+type MailServerConfig = Account["imap"];
+
+function mergeMailServerForPatch(
+  current: MailServerConfig,
+  patch: Partial<MailServerConfig> | undefined
+): MailServerConfig {
+  if (!patch) return current;
+  const next: MailServerConfig = { ...current };
+  if (patch.host !== undefined) next.host = patch.host;
+  if (patch.port !== undefined) next.port = patch.port;
+  if (patch.secure !== undefined) next.secure = patch.secure;
+  if (patch.user !== undefined) next.user = patch.user;
+  // A blank password means "leave the stored one unchanged": clients only
+  // ever hold blanked secrets (sanitizeAccountForClient), so saving unrelated
+  // settings must not wipe the credential. Same rule as the DeepL key above.
+  if (typeof patch.password === "string" && patch.password.trim()) {
+    next.password = patch.password;
+  }
+  return next;
+}
+
+/**
+ * Merges a request-body patch into a stored account. Only whitelisted fields
+ * are taken from the patch: `name`, `avatar`, `settings`, `caldav`, `deepl`,
+ * and the IMAP/SMTP connection fields. `id`, `ownerUserId`, `dbPath` and
+ * `email` always come from the stored row and can never be patched from a
+ * body (§3.1); a blank `imap.password` / `smtp.password` means unchanged.
+ */
 export function mergeAccount(current: Account, payload: Partial<Account>): Account {
   const mergedCaldav =
     payload.caldav !== undefined
@@ -143,15 +244,17 @@ export function mergeAccount(current: Account, payload: Partial<Account>): Accou
         : { ...(current.caldav ?? {}), ...payload.caldav }
       : current.caldav;
   const mergedDeepl = mergeDeeplForPatch(current.deepl, payload.deepl);
-  return {
+  const next: Account = {
     ...current,
-    ...payload,
     caldav: mergedCaldav,
     deepl: mergedDeepl,
-    imap: { ...current.imap, ...(payload.imap ?? {}) },
-    smtp: { ...current.smtp, ...(payload.smtp ?? {}) },
+    imap: mergeMailServerForPatch(current.imap, payload.imap),
+    smtp: mergeMailServerForPatch(current.smtp, payload.smtp),
     settings: { ...(current.settings ?? {}), ...(payload.settings ?? {}) }
-  } as Account;
+  };
+  if (typeof payload.name === "string") next.name = payload.name;
+  if (typeof payload.avatar === "string") next.avatar = payload.avatar;
+  return next;
 }
 
 export function resolveAccountDbPathForPersist(accountId: string, dbPath?: string | null) {
@@ -159,10 +262,10 @@ export function resolveAccountDbPathForPersist(accountId: string, dbPath?: strin
   return getDefaultAccountDbPath(accountId);
 }
 
-export function persistAccountRow(db: any, account: Account, dbPath?: string | null) {
+export function persistAccountRow(db: any, account: Account, dbPath?: string | null, insertOnly = false) {
   const settings = normalizeAccountSettings(account.settings);
   const insert = db.prepare(`
-    INSERT OR REPLACE INTO accounts (
+    INSERT ${insertOnly ? "" : "OR REPLACE"} INTO accounts (
       id, name, email, avatar, ownerUserId, dbPath,
       settings,
       imapHost, imapPort, imapSecure, imapUser, imapPassword,
@@ -183,12 +286,12 @@ export function persistAccountRow(db: any, account: Account, dbPath?: string | n
     account.imap.port,
     account.imap.secure ? 1 : 0,
     account.imap.user,
-    shouldStorePasswordInDb() ? encodeSecret(account.imap.password) : "",
+    encodeSecret(account.imap.password),
     account.smtp.host,
     account.smtp.port,
     account.smtp.secure ? 1 : 0,
     account.smtp.user,
-    shouldStorePasswordInDb() ? encodeSecret(account.smtp.password) : "",
+    encodeSecret(account.smtp.password),
     account.caldav?.url ?? null,
     account.caldav?.user ?? null,
     account.caldav?.password ? encodeSecret(account.caldav.password) : null,

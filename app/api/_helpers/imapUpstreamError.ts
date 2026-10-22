@@ -1,3 +1,5 @@
+import type { AccountRole } from "@/lib/data";
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
 import { NextResponse } from "next/server";
 import { getImapHttpError, isImapConnectFailure } from "@/lib/mail/imapError";
 import { getImapLogger } from "@/lib/mail/imapLogger";
@@ -8,7 +10,7 @@ export const MAIL_SERVER_UNREACHABLE_MESSAGE =
 
 /**
  * Map a failed IMAP operation to a client-safe JSON response. Auth failures
- * keep their reauth semantics (401 + `reauthRequired`); connect failures
+ * return role-aware mailbox repair DTOs; connect failures
  * (tagged by `connectImapClientWithRetry`) become a 503 with a user-facing
  * message so transient outages don't surface as raw 500s — the underlying
  * error is logged server-side since the response body intentionally hides
@@ -16,22 +18,13 @@ export const MAIL_SERVER_UNREACHABLE_MESSAGE =
  * failures (DB reads, bugs) still surface as a 500 instead of being
  * misreported as an upstream outage.
  */
-export function imapUpstreamErrorResponse(
+export async function imapUpstreamErrorResponse(
   error: unknown,
-  context: { accountId: string; op: string }
-): NextResponse | null {
+  context: { accountId: string; op: string; role?: AccountRole }
+): Promise<NextResponse | null> {
   const imapHttpError = getImapHttpError(error);
   if (imapHttpError) {
-    return NextResponse.json(
-      {
-        ok: false,
-        message: imapHttpError.message,
-        code: imapHttpError.code,
-        reauthRequired: imapHttpError.reauthRequired,
-        accountId: context.accountId
-      },
-      { status: imapHttpError.status }
-    );
+    return mailboxErrorResponse(error, context.accountId, context.role);
   }
   if (!isImapConnectFailure(error)) return null;
   const logger = getImapLogger();

@@ -1,3 +1,5 @@
+import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
+import { resolveMcpToolContext } from "@/lib/mcpAuth";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
@@ -15,7 +17,6 @@ import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessage
 import { runNewMailCheck } from "@/app/api/_helpers/newMailCheck";
 import type { Account, Folder, Message, McpTokenMetadata } from "@/lib/data";
 import {
-  getAccountsForUser,
   getFolders,
   getMessageById,
   listMessages,
@@ -50,6 +51,7 @@ const MCP_DEFAULT_PAGE_SIZE = 50;
 const MCP_MAX_PAGE_SIZE = 200;
 
 type McpAccountContext = {
+  role?: import("@/lib/data").AccountRole;
   accountId: string;
   account: Account;
   tokenRecord: McpTokenMetadata;
@@ -221,7 +223,8 @@ const ACCOUNT_SUMMARY_SCHEMA = {
   id: z.string(),
   name: z.string(),
   email: z.string(),
-  avatar: z.string()
+  avatar: z.string(),
+  accessRole: z.enum(["viewer", "editor", "manager"])
 };
 
 const LIST_ACCOUNTS_OUTPUT_SCHEMA = {
@@ -321,22 +324,13 @@ const SEARCH_MESSAGES_OUTPUT_SCHEMA = {
 
 async function resolveAccountContext(
   baseContext: McpAccountContext,
-  requestedAccountId?: string
-): Promise<McpAccountContext> {
-  const id = requestedAccountId?.trim();
-  if (!id || id === baseContext.accountId) {
-    return baseContext;
-  }
-  const userId = baseContext.authInfo?.extra?.["userId"] as string | undefined;
-  if (!userId) {
-    throw new Error("Cannot switch account: user identity not available in token.");
-  }
-  const accounts = await getAccountsForUser(userId);
-  const account = accounts.find((a) => a.id === id);
-  if (!account) {
-    throw new Error(`Account "${id}" not found or not accessible.`);
-  }
-  return { ...baseContext, accountId: account.id, account };
+  requestedAccountId?: string,
+  minRole: import("@/lib/data").AccountRole = "viewer"
+): Promise<McpAccountContext & { role: import("@/lib/data").AccountRole }> {
+  const id = requestedAccountId?.trim() || baseContext.accountId;
+  if (id !== baseContext.accountId) throw new Error("MCP token is bound to another mailbox");
+  const live = await resolveMcpToolContext(baseContext.tokenRecord.id, id, minRole);
+  return { ...baseContext, ...live };
 }
 
 function normalizeStringList(values?: string[] | null) {
@@ -914,13 +908,14 @@ export async function executeMcpHttpRequest(params: {
       inputSchema: ACCOUNT_ID_ARG,
       outputSchema: LIST_ACCOUNTS_OUTPUT_SCHEMA
     },
-    async () => {
+    async ({ accountId }) => {
+      await resolveAccountContext(context, accountId);
       const userId = context.authInfo?.extra?.["userId"] as string | undefined;
       if (!userId) {
         throw new Error("User identity not available in token.");
       }
-      const accounts = await getAccountsForUser(userId);
-      const summaries = accounts.map(({ id, name, email, avatar }) => ({ id, name, email, avatar }));
+      const accounts = await listAccessibleAccountsForUser(userId);
+      const summaries = accounts.map(({ account: { id, name, email, avatar }, role }) => ({ id, name, email, avatar, accessRole: role }));
       return buildToolResult(`Returned ${summaries.length} accounts.`, {
         ok: true,
         accounts: summaries
@@ -1032,7 +1027,7 @@ export async function executeMcpHttpRequest(params: {
     "Assign one or more topics to a thread, resolved by threadId or messageId.",
     TOPIC_MUTATION_SCHEMA,
     async (args: { accountId?: string; threadId?: string; messageId?: string; topics: string[] }) => {
-      const ctx = await resolveAccountContext(context, args.accountId);
+      const ctx = await resolveAccountContext(context, args.accountId, "editor");
       const result = await updateThreadTopics(ctx, args, "assign");
       return buildToolResult(`Assigned ${args.topics.length} topics to thread ${result.threadId}.`, result);
     }
@@ -1043,7 +1038,7 @@ export async function executeMcpHttpRequest(params: {
     "Remove one or more topics from a thread, resolved by threadId or messageId.",
     TOPIC_MUTATION_SCHEMA,
     async (args: { accountId?: string; threadId?: string; messageId?: string; topics: string[] }) => {
-      const ctx = await resolveAccountContext(context, args.accountId);
+      const ctx = await resolveAccountContext(context, args.accountId, "editor");
       const result = await updateThreadTopics(ctx, args, "unassign");
       return buildToolResult(`Removed ${args.topics.length} topics from thread ${result.threadId}.`, result);
     }
@@ -1074,7 +1069,7 @@ export async function executeMcpHttpRequest(params: {
         dataUrl?: string;
       }>;
     }) => {
-      const ctx = await resolveAccountContext(context, args.accountId);
+      const ctx = await resolveAccountContext(context, args.accountId, "editor");
       const result = await createDraftMessage(ctx, args);
       return buildToolResult(
         `Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`,
@@ -1088,7 +1083,7 @@ export async function executeMcpHttpRequest(params: {
     "Add the IMAP flagged marker to one message.",
     MESSAGE_ID_SCHEMA,
     async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId);
+      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const message = await getMessageById(ctx.accountId, messageId);
       if (!message) {
         throw new Error("Message not found");
@@ -1116,7 +1111,7 @@ export async function executeMcpHttpRequest(params: {
     "Remove the IMAP flagged marker from one message.",
     MESSAGE_ID_SCHEMA,
     async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId);
+      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const message = await getMessageById(ctx.accountId, messageId);
       if (!message) {
         throw new Error("Message not found");
@@ -1144,7 +1139,7 @@ export async function executeMcpHttpRequest(params: {
     "Mark a message as To-Do.",
     MESSAGE_ID_SCHEMA,
     async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId);
+      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "todo");
       return buildToolResult(`Marked message ${messageId} as To-Do.`, result);
     }
@@ -1155,7 +1150,7 @@ export async function executeMcpHttpRequest(params: {
     "Mark a message as Done.",
     MESSAGE_ID_SCHEMA,
     async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId);
+      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "done");
       return buildToolResult(`Marked message ${messageId} as Done.`, result);
     }
@@ -1166,7 +1161,7 @@ export async function executeMcpHttpRequest(params: {
     "Clear To-Do and Done state from a message.",
     MESSAGE_ID_SCHEMA,
     async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId);
+      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "clear");
       return buildToolResult(`Cleared To-Do state from message ${messageId}.`, result);
     }

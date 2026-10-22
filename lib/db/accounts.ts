@@ -1,5 +1,6 @@
+import { recordAdminAuditRow } from "./adminAudit";
+import { revokeAuthStreams } from "../authStreams";
 import type { Account } from "../data";
-import { applyCachedCredentials } from "../credentials";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getMainDbPath } from "../runtimePaths";
 import {
@@ -14,6 +15,7 @@ import {
   persistAccountRow,
   resolveAccountDbPathForPersist
 } from "./rowParsers";
+import { deleteUserAccountPrefRowsForAccount } from "./userAccountPrefs";
 
 // Category-linear-model seeding is lazy-imported because `./categories`
 // pulls in `getAccountById` from this module; a top-level import would
@@ -26,7 +28,7 @@ async function ensureCategoryLinearModelForAccount(accountId: string) {
 export async function getAccounts() {
   const db = await getDb();
   const rows = db.prepare(`SELECT * FROM accounts`).all() as any[];
-  return rows.map((row) => applyCachedCredentials(mapAccountRow(row))) as Account[];
+  return rows.map((row) => mapAccountRow(row)) as Account[];
 }
 
 export async function getAccountsForUser(userId: string) {
@@ -40,7 +42,7 @@ export async function getAccountsForUser(userId: string) {
        ORDER BY a.id ASC`
     )
     .all(userId, userId) as any[];
-  return rows.map((row) => applyCachedCredentials(mapAccountRow(row))) as Account[];
+  return rows.map((row) => mapAccountRow(row)) as Account[];
 }
 
 export async function saveAccounts(nextAccounts: Account[]) {
@@ -71,7 +73,7 @@ export async function getAccountById(accountId: string) {
   const db = await getDb();
   const row = db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(accountId) as any;
   if (!row) return null;
-  return applyCachedCredentials(mapAccountRow(row));
+  return mapAccountRow(row);
 }
 
 /**
@@ -101,7 +103,7 @@ export async function upsertAccount(account: Account) {
     if (!existing) {
       await ensureCategoryLinearModelForAccount(account.id);
     }
-    return applyCachedCredentials(account);
+    return account;
   });
 }
 
@@ -115,11 +117,15 @@ export async function patchAccount(accountId: string, payload: Partial<Account>)
     db.transaction(() => {
       persistAccountRow(db, next, row.dbPath ?? null);
     })();
-    return applyCachedCredentials(next);
+    return next;
   });
 }
 
-export async function deleteAccountControlPlane(accountId: string) {
+export class AccountDeletionForbiddenError extends Error {
+  constructor() { super("Only the owner can delete this mailbox"); }
+}
+
+export async function deleteAccountControlPlane(accountId: string, actorUserId?: string) {
   return withDbWriteRetry("deleteAccountControlPlane", async () => {
     const db = await getDb();
     const row = db
@@ -135,14 +141,24 @@ export async function deleteAccountControlPlane(accountId: string) {
     const deleteShardFile =
       (sharedPathRow?.count ?? 0) === 0 && !(await areEquivalentDbPaths(dbPath, mainDbPath));
 
-    closeAccountDbConnection(dbPath);
-
     db.transaction(() => {
+      if (actorUserId) {
+        const allowed = db.prepare(`SELECT 1 FROM accounts a JOIN auth_user u ON u.id=? JOIN users p ON p.id=u.id
+          WHERE a.id=? AND (a.ownerUserId=u.id OR p.role='admin')
+          AND NOT (COALESCE(u.banned,0)=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now')))`)
+          .get(actorUserId, accountId);
+        if (!allowed) throw new AccountDeletionForbiddenError();
+      }
       db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
+      deleteUserAccountPrefRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM mcp_tokens WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
-    })();
+      if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
+    }).immediate();
 
+    closeAccountDbConnection(dbPath);
+
+    revokeAuthStreams({ accountId });
     await cleanupAccountLifecycleArtifacts(accountId, dbPath, deleteShardFile);
     return true;
   });

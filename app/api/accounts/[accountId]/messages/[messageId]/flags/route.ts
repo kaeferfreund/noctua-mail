@@ -1,3 +1,6 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
+import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { applyFlagMutationsToMessage, MESSAGE_FLAG_MAP } from "@/lib/messageFlagMutation";
 import { requireImapMessageMutationContext } from "@/app/api/_helpers/message/routeHelpers";
@@ -8,6 +11,7 @@ type Params = AccountRouteParams & {
 };
 
 export async function POST(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { messageId: rawMessageId } = await params;
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
@@ -26,33 +30,37 @@ export async function POST(request: Request, { params }: Params) {
   }
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
-  const {
-    accountId: resolvedAccountId,
-    account,
-    clientId,
-    message,
-    messageId: resolvedMessageId
-  } = context;
-  try {
-    const nextFlags = await applyFlagMutationsToMessage({
+  return withAuthResponse(context, async () => {
+    const {
       accountId: resolvedAccountId,
       account,
-      messageId: resolvedMessageId,
+      clientId,
       message,
-      flag: payload?.flag,
-      keyword: payload?.keyword,
-      value,
-      clientId
-    });
-    return NextResponse.json({ ok: true, flags: nextFlags });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown flag";
-    // Validation errors thrown by the service layer are client payload issues
-    // (mirrors the bulk route); anything else is an upstream IMAP/DB failure.
-    const status =
-      message === "Unknown flag" || message === "Message is missing IMAP metadata"
-        ? 400
-        : 502;
-    return NextResponse.json({ ok: false, message }, { status });
-  }
+      messageId: resolvedMessageId
+    } = context;
+    try {
+      const nextFlags = await applyFlagMutationsToMessage({
+        accountId: resolvedAccountId,
+        account,
+        messageId: resolvedMessageId,
+        message,
+        flag: payload?.flag,
+        keyword: payload?.keyword,
+        value,
+        clientId
+      });
+      return NextResponse.json({ ok: true, flags: nextFlags });
+    } catch (error) {
+      const mailboxError = await mailboxErrorResponse(error, context.accountId, context.role);
+      if (mailboxError) return mailboxError;
+      const message = error instanceof Error ? error.message : "Unknown flag";
+      // Validation errors thrown by the service layer are client payload issues
+      // (mirrors the bulk route); anything else is an upstream IMAP/DB failure.
+      const status =
+        message === "Unknown flag" || message === "Message is missing IMAP metadata"
+          ? 400
+          : 502;
+      return NextResponse.json({ ok: false, message }, { status });
+    }
+  });
 }
