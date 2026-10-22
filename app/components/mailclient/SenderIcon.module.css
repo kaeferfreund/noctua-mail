@@ -16,6 +16,17 @@
   font-size: 9px;
 }
 
+/* Unread rows: the ring replaces the old list dot. It is drawn inside the
+   icon, above the favicon image, because the list cells clip overflow. */
+.icon[data-unread]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--accent-9);
+  pointer-events: none;
+}
+
 .iconMd {
   width: 22px;
   height: 22px;

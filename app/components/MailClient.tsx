@@ -4783,7 +4783,6 @@ export default function MailClient({
   const {
     threadPathById,
     renderSelectIndicators,
-    renderUnreadDot,
     renderFolderBadges,
     getGroupLabel: baseGetGroupLabel
   } = useMessageListHelpers({
@@ -5509,7 +5508,6 @@ export default function MailClient({
                 flattenThread,
                 getThreadLatestDate,
                 getGroupLabel,
-                renderUnreadDot,
                 renderSelectIndicators,
                 renderFolderBadges,
                 renderQuickActions,

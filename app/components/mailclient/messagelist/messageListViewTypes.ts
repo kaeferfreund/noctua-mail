@@ -108,7 +108,6 @@ export type MessageListViewHelpers = {
   ) => Array<{ message: Message; depth: number }>;
   getThreadLatestDate: (node: ThreadNode) => number;
   getGroupLabel: (group: MessageGroup) => React.ReactNode;
-  renderUnreadDot: (message: Message, options?: { seen?: boolean }) => React.ReactNode;
   renderSelectIndicators: (message: Message) => React.ReactNode;
   renderFolderBadges: (folderIds: string[]) => React.ReactNode;
   renderQuickActions: (message: Message) => React.ReactNode;

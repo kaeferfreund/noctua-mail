@@ -83,7 +83,6 @@ export default function MessageCardList({
     flattenThread,
     getThreadLatestDate,
     getGroupLabel,
-    renderUnreadDot,
     renderSelectIndicators,
     renderFolderBadges,
     renderQuickActions,
@@ -393,7 +392,6 @@ export default function MessageCardList({
                   ? "Delete permanently"
                   : "Move to Trash"
               }
-              renderUnreadDot={renderUnreadDot(message, { seen: displaySeen })}
               renderSelectIndicators={renderSelectIndicators(message)}
               fromText={item.fromText}
               fromTooltip={item.fromTooltip}
