@@ -24,6 +24,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
     composeShowBcc,
     composeOpenedAt,
     activeAccountId,
+    deliveredWarnings,
     composeDraftId,
     composeOpen,
     composeFieldsReset,
@@ -169,7 +170,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             </TooltipIconButton>
           </div>
         </div>
-        <div className={styles.composeBody}>
+        {!deliveredWarnings?.length && <div className={styles.composeBody}>
           <ComposeFields
             key={`modal-fields-${composeFieldsReset}`}
             variant="modal"
@@ -194,8 +195,9 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             markComposeDirty={markComposeDirty}
           />
           {composeMessageField}
-        </div>
+        </div>}
         <ComposeActions
+          deliveredWarnings={deliveredWarnings}
           composeDraftId={composeDraftId}
           composeOpen={composeOpen}
           canSaveDraft={canSaveDraft}
