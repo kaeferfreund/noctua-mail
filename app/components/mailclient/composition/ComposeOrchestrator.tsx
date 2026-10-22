@@ -903,6 +903,8 @@ function ComposeOrchestratorImpl(
     }
     sendingMailRef.current = true;
     setSendingMail(true);
+    let sendSessionVersion = composeSessionVersionRef.current;
+    const isSendSession = () => composeSessionVersionRef.current === sendSessionVersion;
     let delivered = false;
     let acceptedWarnings: string[] = [];
     let acceptedDraftId: string | null = null;
@@ -919,7 +921,9 @@ function ComposeOrchestratorImpl(
         draftSaveTimerRef.current = null;
       }
       await flushPendingDraftSaves();
+      if (!isSendSession()) return;
       cancelDraftAutoSave();
+      sendSessionVersion = composeSessionVersionRef.current;
       const { text, html, markdown, attachments, composeFormat } = buildComposePayload();
       const smtpPayload = buildSendPayload(composeMode, {
         composeTo,
@@ -936,6 +940,7 @@ function ComposeOrchestratorImpl(
         composeReplyMessage,
         accountFromValue: fromValue
       });
+      const sendDraftId = composeDraftIdRef.current;
       const res = await apiFetch(buildAccountSmtpSendPath(activeAccountId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -954,10 +959,10 @@ function ComposeOrchestratorImpl(
             })
           | null;
         delivered = true;
-        deliveredRef.current = true;
+        if (isSendSession()) deliveredRef.current = true;
         acceptedWarnings = getSendWarnings(sendResult);
         if (sendResult?.inviteWarning) acceptedWarnings.push(sendResult.inviteWarning);
-        setDeliveredWarnings(acceptedWarnings);
+        if (isSendSession()) setDeliveredWarnings(acceptedWarnings);
         pushNotice({ type: "success", title: "Email sent.", description: composeSubject.trim().slice(0, 180) || undefined });
         acceptedWarnings.forEach(description => pushNotice({ type: "warning", title: "Email sent with a warning", description }));
         if (composeReplyMessage) {
@@ -967,11 +972,9 @@ function ComposeOrchestratorImpl(
             composeReplyMessage.id;
           evictThreadCache(threadId);
         }
-        // Read the draft id from the ref, not the `composeDraftId` state
-        // captured in this closure: the flush above may have just created or
-        // updated the draft, and the ref reflects that synchronously while
-        // the state value is still stale for this render.
-        const sentDraftId = composeDraftIdRef.current;
+        // Capture after the draft flush, before SMTP: another composer may
+        // replace the shared draft ref while delivery is in flight.
+        const sentDraftId = sendDraftId;
         acceptedDraftId = sentDraftId;
         if (sentDraftId && activeAccountId) {
           suppressDraftDeleteReconcile(sentDraftId);
@@ -987,8 +990,10 @@ function ComposeOrchestratorImpl(
           }
         }
         const sentView = composeView;
-        resetAfterSend();
-        if (acceptedWarnings.length && !detachedWindow) { setComposeView(sentView); setComposeOpen(true); }
+        if (isSendSession()) {
+          resetAfterSend();
+          if (acceptedWarnings.length && !detachedWindow) { setComposeView(sentView); setComposeOpen(true); }
+        }
         // The server owns answered/forwarded flags; refresh its authoritative state.
         const sentFolder =
           accountFolders.find((folder) => folder.id === sendResult?.sentFolderId) ?? findSentFolder();
@@ -1039,8 +1044,10 @@ function ComposeOrchestratorImpl(
       if (delivered) {
         const warning = "Email sent, but mailbox refresh failed. Refresh the mailbox to see the latest state.";
         acceptedWarnings.push(warning);
-        setDeliveredWarnings([...acceptedWarnings]);
-        if (!detachedWindow) { setComposeView(composeView); setComposeOpen(true); }
+        if (isSendSession()) {
+          setDeliveredWarnings([...acceptedWarnings]);
+          if (!detachedWindow) { setComposeView(composeView); setComposeOpen(true); }
+        }
         pushNotice({ type: "warning", title: "Email sent", description: warning });
       } else reportError(
         error instanceof Error && error.message.trim()
@@ -1087,8 +1094,6 @@ function ComposeOrchestratorImpl(
     asNew = false,
     prefill?: ComposeOpenPrefill
   ) => {
-    deliveredRef.current = false;
-    setDeliveredWarnings([]);
     // Opening a forward or draft awaits network fetches. Impatient repeat
     // clicks must not each open their own compose session (every one would
     // auto-save its own draft), and a different open must supersede this one.
@@ -1098,10 +1103,16 @@ function ComposeOrchestratorImpl(
     composeInitRef.current = { token: initToken, key: message ? initKey : null };
     const isStale = () => composeInitRef.current.token !== initToken;
 
+    // Reset the delivery receipt only in the same batch that replaces all fields.
+    const openInitializedCompose = (source?: Message, options?: Parameters<typeof openComposeInternal>[3]) => {
+      openComposeInternal(mode, source, asNew, options);
+      deliveredRef.current = false;
+      setDeliveredWarnings([]);
+    };
     abortComposeAttachmentLoads();
     resetComposeTranslation();
     if (!message) {
-      openComposeInternal(mode, undefined, asNew);
+      openInitializedCompose();
       if (prefill) applyComposePrefill(prefill);
       return;
     }
@@ -1146,14 +1157,14 @@ function ComposeOrchestratorImpl(
           message: hydratedMessage
         } = await loadComposeSourceAttachments(messageWithDraftMetadata);
         if (isStale()) return;
-        openComposeInternal(mode, hydratedMessage, asNew, { preferredComposeTab });
+        openInitializedCompose(hydratedMessage, { preferredComposeTab });
         setComposeAttachments(attachments);
         startComposeAttachmentLoads(messageWithDraftMetadata, deferred);
         return;
       }
 
       if (isStale()) return;
-      openComposeInternal(mode, messageWithDraftMetadata, asNew, { preferredComposeTab });
+      openInitializedCompose(messageWithDraftMetadata, { preferredComposeTab });
     };
 
     try {

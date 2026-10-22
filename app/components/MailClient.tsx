@@ -1,4 +1,5 @@
 "use client";
+import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
@@ -366,7 +367,7 @@ export default function MailClient({
   const dragImageRef = useRef<HTMLDivElement | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
-  const [threadCollabCache, setThreadCollabCache] = useState<{ accountId: string; byId: Map<string, CollabSummary> }>({ accountId: "", byId: new Map() });
+  const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
   const [collabRevision, setCollabRevision] = useState(0);
   const [messageTopicsById, setMessageTopicsById] = useState<Map<string, Topic[]>>(new Map());
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
@@ -535,6 +536,8 @@ export default function MailClient({
     buildVersionLabel,
     apiFetch
   });
+
+  const detachedWarnings = useDetachedSendWarnings(accounts);
 
   const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
     const targetAccountId = accountIdOverride?.trim() || activeAccountId;
@@ -1303,7 +1306,8 @@ export default function MailClient({
     setMessageListError,
     refreshMailboxData,
     queueFilteredSearchRefresh,
-    markMessagesMutated
+    markMessagesMutated,
+    authoritativeRevision,
   } = useMessageData({
     messagesKey,
     activeAccountId,
@@ -2813,12 +2817,12 @@ export default function MailClient({
     if (viewMessage.accountId !== activeAccountId) return undefined;
     return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
   }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
-  const applyThreadCollabUpdates = useCallback((updates: Map<string, CollabSummary>) => {
+  const applyThreadCollabUpdates = useCallback((accountId: string, updates: Map<string, CollabSummary>) => {
     if (!updates.size) return;
-    setThreadCollabCache(prev => ({ accountId: activeAccountId, byId: new Map([...(prev.accountId === activeAccountId ? prev.byId : []), ...updates]) }));
+    setThreadCollabCache(prev => new Map(prev).set(accountId, new Map([...(prev.get(accountId) ?? []), ...updates])));
     const apply = (msg: Message) => {
       const state = updates.get(msg.threadId);
-      return msg.accountId === activeAccountId && state ? { ...msg, collab: state } : msg;
+      return msg.accountId === accountId && state ? { ...msg, collab: state } : msg;
     };
     setMessages(prev => prev.map(apply));
     setViewMessage(prev => prev ? apply(prev) : prev);
@@ -2826,13 +2830,25 @@ export default function MailClient({
       const cached = threadContentByIdRef.current[threadId];
       if (cached) upsertThreadCache(threadId, cached.map(apply));
     }
-  }, [activeAccountId, setMessages, setViewMessage, threadContentByIdRef, upsertThreadCache]);
+  }, [setMessages, setViewMessage, threadContentByIdRef, upsertThreadCache]);
   const handleThreadCollabUpdate = useCallback((state: ThreadCollabState) => {
-    applyThreadCollabUpdates(new Map([[state.threadId, state]]));
+    applyThreadCollabUpdates(state.accountId, new Map([[state.threadId, state]]));
   }, [applyThreadCollabUpdates]);
-  const threadCollabById = useMemo(() => threadCollabCache.accountId === activeAccountId ? threadCollabCache.byId : new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
-  const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, { apiFetch, sessionKey: currentUser?.id, onUpdate: handleThreadCollabUpdate, onCommit: () => { setCollabRevision(value => value + 1); queueFilteredSearchRefresh(hasFilteredSearchCriteria); } });
-  const collabRole = (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
+  const invalidateThreadCollab = useCallback((accountId: string) => {
+    setThreadCollabCache(prev => { const next = new Map(prev); next.delete(accountId); return next; });
+  }, []);
+  useEffect(() => { setThreadCollabCache(new Map()); }, [currentUser?.id]);
+  useEffect(() => { invalidateThreadCollab(activeAccountId); }, [activeAccountId, authoritativeRevision, invalidateThreadCollab]);
+  const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
+  const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
+    apiFetch, sessionKey: currentUser?.id, refreshVersion: authoritativeRevision,
+    onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
+    onCommit: (accountId) => {
+      setCollabRevision(value => value + 1);
+      if (accountId === activeAccountId) queueFilteredSearchRefresh(hasFilteredSearchCriteria);
+    }
+  });
+  const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;
   const activeMessageThreadKey = (() => {
@@ -5092,7 +5108,6 @@ export default function MailClient({
       if (event.key !== DETACHED_COMPOSE_EVENT_STORAGE_KEY) return;
       const payload = parseDetachedComposeEvent(event.newValue);
       if (!payload || payload.accountId !== activeAccountId) return;
-      payload.warnings?.forEach(description => pushNotice({ type: "warning", title: "Email sent with a warning", description }));
       const affectedIds = [payload.draftId, payload.sourceMessageId].filter(
         (messageId): messageId is string => Boolean(messageId)
       );
@@ -5734,8 +5749,10 @@ export default function MailClient({
           <InAppNoticeStack
             className="inapp-notice-stack-pane"
             style={{ right: `${isMobile ? 8 : noticePaneRightOffset}px` }}
-            state={{ inAppNotices }}
-            actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: handleDismissNotice }}
+            state={{ inAppNotices: [...inAppNotices, ...detachedWarnings.notices] }}
+            actions={{ onOpenNotice: handleNoticeOpen, onDismissNotice: id => {
+              if (!detachedWarnings.dismiss(id)) handleDismissNotice(id);
+            } }}
           />
         }
       />

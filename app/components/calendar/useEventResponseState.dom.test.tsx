@@ -89,6 +89,6 @@ it("accepted RSVP with post-send warning closes its dialog and renders a deliver
   await waitFor(() => expect(Boolean(view.queryByRole("dialog"))).toBe(false));
   expect(
     view.getByRole("status", { name: "Delivery notice" }).textContent,
-  ).toBe("Response sent. Sent copy unavailable. Calendar refresh delayed.");
+  ).toBe("Response sent. Sent copy unavailable. Calendar refresh delayed. Check the Sent folder. If the copy is missing, contact a mailbox manager. Do not send it again.");
   expect(view.getByText("ACCEPTED")).toBeTruthy();
 });

@@ -4,6 +4,7 @@ export const DETACHED_COMPOSE_HANDOFF_STORAGE_PREFIX =
   "noctua:detached-compose-handoff:";
 export const DETACHED_COMPOSE_EVENT_STORAGE_KEY =
   "noctua:detached-compose-event";
+export const DETACHED_COMPOSE_WARNING_PREFIX = "noctua:detached-compose-warning:";
 export const DETACHED_COMPOSE_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type DetachedComposeSessionBase = {
@@ -268,8 +269,26 @@ function writeDetachedComposeEvent(
     createdAtMs: Date.now()
   };
   try {
+    if (event.warnings?.length) {
+      window.localStorage.setItem(`${DETACHED_COMPOSE_WARNING_PREFIX}${event.eventId}`, JSON.stringify(event));
+    }
     window.localStorage.setItem(DETACHED_COMPOSE_EVENT_STORAGE_KEY, JSON.stringify(event));
   } catch {
     // The server-side operation already succeeded; storage reconciliation is best effort.
   }
+}
+
+/** Warning receipts survive later events/reloads until explicitly acknowledged. */
+export function readDetachedComposeWarnings(): DetachedComposeEvent[] {
+  const receipts: DetachedComposeEvent[] = [];
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (!key?.startsWith(DETACHED_COMPOSE_WARNING_PREFIX)) continue;
+    const event = parseDetachedComposeEvent(window.localStorage.getItem(key));
+    if (event?.warnings?.length) receipts.push(event);
+  }
+  return receipts.sort((a, b) => a.createdAtMs - b.createdAtMs);
+}
+export function acknowledgeDetachedComposeWarning(eventId: string) {
+  window.localStorage.removeItem(`${DETACHED_COMPOSE_WARNING_PREFIX}${eventId}`);
 }

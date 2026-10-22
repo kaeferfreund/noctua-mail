@@ -689,10 +689,58 @@ describe("accepted send warnings", () => {
     const originalClose = window.close;
     window.close = () => { order.push("close"); };
     try {
-      const { handleRef, sendButton } = renderCompose({ holdDraftSaves: false, detachedWindow: true, smtpResponse: jsonResponse({ ok: true, sentCopy: "failed", sentCopyWarning: "Sent copy unavailable.", postSendWarning: "Local refresh delayed." }), onOutcome: (outcome, _id, warnings) => { expect(outcome).toBe("sent"); expect(warnings).toEqual(["Sent copy unavailable.", "Local refresh delayed."]); order.push("outcome"); } });
+      const { handleRef, sendButton } = renderCompose({ holdDraftSaves: false, detachedWindow: true, smtpResponse: jsonResponse({ ok: true, sentCopy: "failed", sentCopyWarning: "Sent copy unavailable.", postSendWarning: "Local refresh delayed." }), onOutcome: (outcome, _id, warnings) => { expect(outcome).toBe("sent"); expect(warnings).toContain("Sent copy unavailable."); expect(warnings).toContain("Local refresh delayed."); expect(warnings?.some(w => w.includes("Check the Sent folder"))).toBe(true); order.push("outcome"); } });
       await act(async () => { await handleRef.current?.openCompose("new", undefined, false, { to: "recipient@example.test" }); });
       await act(async () => { fireEvent.click(sendButton()!); });
       expect(order).toEqual(["outcome", "close"]);
     } finally { window.close = originalClose; }
   });
+});
+
+describe("compose session delivery guard", () => {
+  const source = { id: "source-next", accountId: "acc-test", folderId: "folder-inbox", threadId: "thread-next", messageId: "<next@example.test>", subject: "Next subject", from: "sender@example.test", to: "me@example.test", preview: "", date: "2026-08-14T10:00:00.000Z", dateValue: 1, body: "", htmlBody: "" } as Message;
+  for (const mode of ["forward", "edit"] as const) {
+    it(`keeps the delivered receipt while ${mode} hydration is pending`, async () => {
+      const hydration = deferred<Message>();
+      const { view, handleRef, sendButton, countSmtpSends } = renderCompose({
+        holdDraftSaves: false,
+        smtpResponse: () => jsonResponse({ ok: true, sentCopy: "failed" }),
+        ensureMessageContent: () => hydration.promise,
+      });
+      await act(async () => { await handleRef.current?.openCompose("new", undefined, false, { to: "recipient@example.test" }); handleRef.current?.setComposeView("modal"); });
+      await act(async () => { fireEvent.click(sendButton()!); });
+      expect(countSmtpSends()).toBe(1);
+      let opening: Promise<void> | undefined;
+      act(() => { opening = handleRef.current?.openCompose(mode, source); });
+      expect(sendButton()).toBeUndefined();
+      expect(view.getByText("Delivery succeeded. Do not send it again.")).toBeTruthy();
+      expect(countSmtpSends()).toBe(1);
+      await act(async () => { hydration.resolve({ ...source, body: "Hydrated next body" }); await opening; });
+      expect(sendButton()).toBeDefined();
+      expect(view.queryByText("Delivery succeeded. Do not send it again.")).toBeNull();
+      expect((view.baseElement.querySelector("#compose-modal-subject") as HTMLInputElement).value).toContain("Next subject");
+    });
+  }
+  it("an obsolete send refresh failure leaves the newer composer and its autosave intact", async () => {
+    let rejectRefresh!: (error: Error) => void;
+    const refresh = new Promise<void>((_, reject) => { rejectRefresh = reject; });
+    const notices: { description?: string }[] = [];
+    const { view, handleRef, sendButton, countDraftSaves } = renderCompose({
+      holdDraftSaves: false,
+      refreshMailboxData: () => refresh,
+      onNotice: notice => notices.push(notice),
+    });
+    await act(async () => { await handleRef.current?.openCompose("reply", { ...source, body: "Original body" }); handleRef.current?.setComposeView("modal"); });
+    await act(async () => { fireEvent.click(sendButton()!); });
+    await waitFor(() => expect(notices.length).toBeGreaterThan(0));
+    await act(async () => { await handleRef.current?.openCompose("new", undefined, false, { to: "new@example.test", subject: "New session" }); handleRef.current?.setComposeView("modal"); });
+    await act(async () => { rejectRefresh(new Error("Synthetic refresh failure")); });
+    expect(notices.some(n => n.description?.includes("mailbox refresh failed"))).toBe(true);
+    expect(view.queryByText("Delivery succeeded. Do not send it again.")).toBeNull();
+    expect((view.baseElement.querySelector("#compose-modal-to") as HTMLInputElement).value).toBe("new@example.test");
+    expect((view.baseElement.querySelector("#compose-modal-subject") as HTMLInputElement).value).toBe("New session");
+    const before = countDraftSaves();
+    fireEvent.change(view.baseElement.querySelector("#compose-modal-subject")!, { target: { value: "New session edited" } });
+    await waitFor(() => expect(countDraftSaves()).toBeGreaterThan(before), { timeout: 5000 });
+  }, 15000);
 });

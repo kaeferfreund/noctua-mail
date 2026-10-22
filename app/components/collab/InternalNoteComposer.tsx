@@ -5,11 +5,16 @@ import { Textarea } from "@/app/components/ui/textarea";
 export default function InternalNoteComposer({
   onSubmit,
   disabled,
+  body,
+  onBodyChange,
+  onSaved,
 }: {
   onSubmit: (body: string) => Promise<boolean>;
   disabled?: boolean;
+  body: string;
+  onBodyChange: (body: string) => void;
+  onSaved: (submittedBody: string) => void;
 }) {
-  const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -21,7 +26,7 @@ export default function InternalNoteComposer({
         setPending(true);
         setError("");
         try {
-          if (await onSubmit(body.trim())) setBody("");
+          if (await onSubmit(body.trim())) onSaved(body);
           else setError("Could not add note. Your text has been kept.");
         } catch {
           setError("Could not add note. Your text has been kept.");
@@ -37,7 +42,8 @@ export default function InternalNoteComposer({
         id="internal-note"
         autoFocus
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => onBodyChange(e.target.value)}
+        style={{ maxHeight: "min(10rem, 25dvh)", overflowY: "auto" }}
         maxLength={20000}
         disabled={disabled || pending}
         rows={3}

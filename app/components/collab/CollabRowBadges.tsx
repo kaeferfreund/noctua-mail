@@ -19,7 +19,7 @@ export default function CollabRowBadges({
   const context = useContext(CollabRowsContext);
   const cached = context.threadCollabById.get(message.threadId);
   const state =
-    cached && (!message.collab || cached.updatedAt >= message.collab.updatedAt)
+    cached && (!message.collab || cached.updatedAt > message.collab.updatedAt)
       ? cached
       : message.collab;
   if (!state || (state.status === "open" && !state.assigneeUserId)) return null;

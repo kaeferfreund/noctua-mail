@@ -73,6 +73,7 @@ export function useMessageData({
   setCollapsedThreads,
   currentKeyRef
 }: UseMessageDataParams) {
+  const [authoritativeRevision, setAuthoritativeRevision] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [groupMeta, setGroupMeta] = useState<MessageGroupMeta[]>([]);
   const [messagesPage, setMessagesPage] = useState(1);
@@ -224,6 +225,7 @@ export function useMessageData({
           } else if (relatedContext) {
             setRelatedContext(null);
           }
+          setAuthoritativeRevision(value => value + 1);
           setMessages((prev) => {
             if (messagesPage === 1) {
               logListReplacement("loadMessages-page1", prev, items);
@@ -325,6 +327,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
+      setAuthoritativeRevision(value => value + 1);
       setMessages((prev) => {
         logListReplacement("refreshMailboxData", prev, nextMessages);
         return nextMessages;
@@ -367,6 +370,7 @@ export function useMessageData({
   }, []);
 
   return {
+    authoritativeRevision,
     messages,
     setMessages,
     groupMeta,
