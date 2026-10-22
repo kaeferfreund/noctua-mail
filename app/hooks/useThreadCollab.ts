@@ -2,13 +2,14 @@
 /**
  * Acceptance specification (named tests in useThreadCollab.dom.test.tsx):
  * Scope: the mounted cache key is (session, account, thread); stale sessions cannot publish. Test: "R6-scope: session/account/thread isolation".
- * Snapshots: GET supplies complete state/comments/activity; mutation success supplies partial state plus at most its written comment. Test: "R5-completion: same-revision GET completes a partial mutation response with earlier collaborator notes".
- * Order: higher server revision always wins; lower always loses, regardless of timestamps or request order. Test: "R6-order: higher revision wins regardless of request start".
+ * Snapshots: GET supplies complete state/comments/activity; mutation success supplies partial state plus at most its written comment. Tests: "R5-completion: same-revision GET completes a partial mutation response with earlier collaborator notes", "R7-snapshots: earlier-started GET completes partial success with comments and activity".
+ * Order: higher server revision always wins; lower always loses, regardless of timestamps or request order. Tests: "R6-order: higher revision wins regardless of request start", "R7-order: revisions beat opposing timestamps and request starts".
  * Equal complete GETs: latest request-start sequence wins regardless of content; earlier starts never regress it. Test: "R6-order: latest-started equal-revision GET wins (earlier resolves last)"; lifecycle tests: "R6-lifecycle: equal-revision complete GET must restore comments and activity when message presence changes", "R6-lifecycle: equal-revision complete GET must hide comments and activity when message presence changes", "R6-lifecycle-activity: equal-revision complete GET must restore activity even without comments".
  * Equal partial success: preserve complete lists and GET start sequence; merge only its written comment by id without contradicting a comment at that revision. Tests: "R6-partial: equal-revision success preserves complete lists and merges its comment (missing comment)", "R6-partial: equal-revision success preserves complete lists and merges its comment (conflicting comment)".
  * Partial completion: equal-revision GET must agree on state and comments written at that revision before completing unknown lists. Tests: "R6-completion: equal-revision GET cannot contradict its written comment (different)", "R6-completion: equal-revision GET cannot contradict partial state".
  * Rollback: failure undoes only its own optimistic snapshot at its base revision; an accepted GET/write takes ownership. Tests: "R6-rollback: only the owning optimistic snapshot rolls back (mutation owns)", "R6-rollback: only the owning optimistic snapshot rolls back (GET owns)".
- * Denial (r3): 403 purges/blocks its session/account until a newer successful read; pending/failed reads and mutations cannot lift it. Tests: "R3: a denial stays applied while a newer read is pending, then its success restores access", "R5-denial: older 403 still purges after newer HTTP 500 while mutation is in flight".
+ * Denial: 403 purges/blocks its session/account; any accepted successful read started after the applied denial immediately restores access, regardless of later pending/failed reads. A later-started 403 is a new denial; mutations cannot lift it. Tests: "R7-denial: newer successful read restores denial despite an even newer pending read", "R7-denial: newer successful read restores denial despite an even newer HTTP 500 read", "R7-denial: newer successful read restores denial despite an even newer network read", "R7-denial: denial then success then later 403 requires a new successful recovery".
+ * Members: one channel per (session, account); complete collaboration GETs and standalone members GETs share read-start sequences, accepting only payloads started later than the accepted membership source; failures preserve membership and denied scopes reject it. Tests: "R7-members: late standalone members GET must not replace newer complete GET membership", "R7-members: late complete GET must not replace newer standalone members GET membership", "R7-members: newer standalone members GET failure keeps accepted membership (HTTP 500)", "R7-members: newer standalone members GET failure keeps accepted membership (network)".
  * Pending: one mutation per scope key; other keys run independently and their finalizers cannot clear this key. Test: "R5-pending: overlapping account mutations keep pending on the originating key after navigation".
  * Limits: post-commit refresh may fail, leaving partial lists; mutation remains committed and the next successful admissible read repairs them. Test: "R6-repair: failed post-commit refresh is repaired by the next successful read".
  */
@@ -39,6 +40,11 @@ function sameRecord(a: object, b: object): boolean {
   return Object.keys(left).length === Object.keys(right).length &&
     Object.keys(left).every(key => JSON.stringify(left[key]) === JSON.stringify(right[key]));
 }
+// All read channels compare source starts, never response completion times.
+function isLaterRead(start: number, accepted: number | null = 0) {
+  return start > (accepted ?? 0);
+}
+type ReadChannel = "access" | "members";
 function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
   if (!current) return true;
   const incoming = next.serverSnapshot, accepted = current.serverSnapshot;
@@ -47,7 +53,7 @@ function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
   // Message presence can change visible lists without a collaboration write.
   // Only complete GET start order breaks revision ties, never rollback ownership.
   if (current.complete && next.complete)
-    return next.completeStart! >= current.completeStart!;
+    return next.completeStart === current.completeStart || isLaterRead(next.completeStart!, current.completeStart);
   if (!sameRecord(incoming.state, accepted.state)) return false;
   // A GET may complete unknown data after a partial mutation, but cannot
   // contradict a comment written by that mutation at this revision.
@@ -115,7 +121,13 @@ export function useThreadCollab(
   const snapshotSequence = useRef(0);
   const loadSequence = useRef(0);
   const scopeLoadSequence = useRef(new Map<string, number>());
-  const scopeSuccessfulLoadSequence = useRef(new Map<string, number>());
+  const acceptedReadStarts = useRef(new Map<string, Partial<Record<ReadChannel, number>>>());
+  const acceptIfLatest = useCallback((scope: string, channel: ReadChannel, start: number) => {
+    const accepted = acceptedReadStarts.current.get(scope) ?? {};
+    if (!isLaterRead(start, accepted[channel])) return false;
+    acceptedReadStarts.current.set(scope, { ...accepted, [channel]: start });
+    return true;
+  }, []);
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
   const publish = useCallback((data: CachedSnapshot, requestKey: string) => {
@@ -128,6 +140,12 @@ export function useThreadCollab(
   const accept = useCallback((data: CachedSnapshot, requestKey: string) => {
     if (canAcceptSnapshot(data, cache.current.get(requestKey))) publish(data, requestKey);
   }, [publish]);
+  const acceptMembers = useCallback((members: CollabMember[], scope: string, sequence: number) => {
+    if (!mounted.current || JSON.parse(scope)[0] !== (sessionRef.current ?? null) ||
+      denied.current.has(scope) || !acceptIfLatest(scope, "members", sequence)) return;
+    membersCache.current.set(scope, members);
+    setMemberEntry({ scope, members });
+  }, [acceptIfLatest]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -154,6 +172,7 @@ export function useThreadCollab(
   }, [apiFetch, accountId, sessionKey]);
   useEffect(() => {
     if (!accountId) return;
+    const sequence = ++loadSequence.current;
     const controller = new AbortController();
     void apiFetch(`/api/accounts/${encodeURIComponent(accountId)}/members`, {
       signal: controller.signal,
@@ -162,14 +181,12 @@ export function useThreadCollab(
       .then(async (r) => {
         if (!r.ok) throw new Error("Could not load mailbox members.");
         const data = await r.json();
-        if (!controller.signal.aborted) {
-          membersCache.current.set(memberScope, data.members);
-          setMemberEntry({ scope: memberScope, members: data.members });
-        }
+        if (!controller.signal.aborted)
+          acceptMembers(data.members, memberScope, sequence);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [accountId, memberScope, apiFetch]);
+  }, [accountId, memberScope, apiFetch, acceptMembers]);
   const reload = useCallback(async () => {
     if (!accountId || !threadId) return;
     const owner = ++snapshotSequence.current;
@@ -179,9 +196,9 @@ export function useThreadCollab(
     const data = await response.json().catch(() => null);
     if (!mounted.current || sessionRef.current !== sessionKey) return;
     if (response.status === 403) {
-      // Only a newer successful read in this login/account can supersede a
-      // denial. A pending or failed refresh has not restored mailbox access.
-      if ((scopeSuccessfulLoadSequence.current.get(memberScope) ?? 0) > sequence) return;
+      // Only accepted access decisions advance this channel. Pending/failed
+      // requests cannot veto recovery, and an older success cannot undo a denial.
+      if (!acceptIfLatest(memberScope, "access", sequence)) return;
       for (const cachedKey of cache.current.keys()) {
         const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
         if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
@@ -195,25 +212,26 @@ export function useThreadCollab(
         onReadDenied.current?.(accountId);
       }
     }
-    if (scopeLoadSequence.current.get(memberScope) !== sequence &&
-      (!response.ok || !data?.ok || denied.current.has(memberScope))) return;
-    if (!response.ok || !data?.ok)
+    if (!response.ok || !data?.ok) {
+      if (scopeLoadSequence.current.get(memberScope) !== sequence) return;
       throw new Error(data?.message ?? "Could not load collaboration.");
-    if (
-      currentKey.current !== key ||
-      !mounted.current
-    )
-      return;
+    }
+    if (denied.current.has(memberScope) &&
+      !isLaterRead(sequence, acceptedReadStarts.current.get(memberScope)?.access)) return;
     const next: CachedSnapshot = { ...data, owner, serverSnapshot: data, complete: true, completeStart: sequence };
-    if (!canAcceptSnapshot(next, cache.current.get(key))) return;
-    scopeSuccessfulLoadSequence.current.set(memberScope, Math.max(sequence, scopeSuccessfulLoadSequence.current.get(memberScope) ?? 0));
-    denied.current.delete(memberScope);
-    setDeniedScopes(new Set(denied.current));
-    membersCache.current.set(memberScope, data.members);
-    setMemberEntry({ scope: memberScope, members: data.members });
+    const acceptsSnapshot = currentKey.current === key && canAcceptSnapshot(next, cache.current.get(key));
+    if (acceptsSnapshot) {
+      acceptIfLatest(memberScope, "access", sequence);
+      denied.current.delete(memberScope);
+      setDeniedScopes(new Set(denied.current));
+    }
+    // Membership has account scope and its own ordering, independent of whether
+    // this thread's snapshot wins revision/start order or is still selected.
+    acceptMembers(data.members, memberScope, sequence);
+    if (!acceptsSnapshot) return;
     accept(next, key);
     setError(null);
-  }, [accountId, threadId, path, apiFetch, key, memberScope, accept, sessionKey]);
+  }, [accountId, threadId, path, apiFetch, key, memberScope, accept, sessionKey, acceptIfLatest, acceptMembers]);
   const refreshVersion = options.refreshVersion;
   useEffect(() => {
     let active = true;
