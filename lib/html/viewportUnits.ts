@@ -32,9 +32,12 @@ export function rewriteViewportHeightUnits(css: string) {
 
 // Preserve markup verbatim: only style blocks and actual style attributes are
 // CSS; text, class names, links and data attributes must keep their contents.
+// Each tag character fits exactly one branch and an unterminated quote or tag
+// runs to the end instead of failing, so a malformed tag cannot backtrack
+// exponentially; the attribute pass below does the actual parsing.
 export function rewriteHtmlViewportHeightUnits(html: string) {
   return html.replace(
-    /<!--[\s\S]*?-->|<style\b[^>]*>[\s\S]*?<\/style\s*>|<[a-z][\w:-]*(?:\s+[^\s=/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*\s*\/?>/gi,
+    /<!--[\s\S]*?-->|<style\b[^>]*>[\s\S]*?<\/style\s*>|<[a-z][\w:-]*(?:"[^"]*(?:"|$)|'[^']*(?:'|$)|[^'">])*(?:>|$)/gi,
     (tag) => {
       if (tag.startsWith("<!--")) return tag;
       if (/^<style\b/i.test(tag)) {
