@@ -234,6 +234,9 @@
   flex-shrink: 0;
   transition: transform 0.15s ease;
   border-radius: 3px;
+  /* Stays on top where the unread dot's hit area overhangs the gutter. */
+  position: relative;
+  z-index: 1;
 }
 
 .threadCaretCompact {
