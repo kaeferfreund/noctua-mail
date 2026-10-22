@@ -55,6 +55,12 @@ import MessageListOrchestrator, {
 import MessageListHeader from "./mailclient/messagelist/MessageListHeader";
 import { useMessageViewMode } from "./mailclient/messagelist/useMessageViewMode";
 import BulkActionContextMenu from "./mailclient/messagelist/BulkActionContextMenu";
+import SelectionActionsMenu from "./mailclient/messagelist/SelectionActionsMenu";
+import {
+  bindSelectionActions,
+  resolveSelectionActionTargets,
+  type SelectionActions
+} from "./mailclient/messagelist/selectionActions";
 import {
   dedupeAccountMessages,
   sortMessages
@@ -65,7 +71,6 @@ import {
   logListDebug,
   summarizeMessageForListDebug
 } from "./mailclient/messagelist/listDebug";
-import { getCollapsedRootThreadMessageIds } from "./mailclient/messagelist/listInteractions";
 import { selectAllVisibleMessages } from "./mailclient/messagelist/listSelection";
 import { useMessageListHelpers } from "./mailclient/messagelist/useMessageListHelpers";
 import { useMessageListSelectionController } from "./mailclient/messagelist/useMessageListSelectionController";
@@ -280,6 +285,12 @@ const LOCAL_DELETE_RECONCILE_SUPPRESS_MS = 15_000;
 const RELATED_NOTICE_SUBJECT_MAX_CHARS = 96;
 const INITIAL_SYNC_SESSION_KEY_PREFIX = "noctua:initial-sync:";
 const FULL_SYNC_CONFIRM_DIALOG_ENABLED = false;
+// The selection shim's snapshot before the list mounts. A constant, because
+// useSyncExternalStore (the header's selection menu) needs a stable snapshot.
+const EMPTY_SELECTION_SNAPSHOT: ReturnType<SelectionStore["getSnapshot"]> = {
+  ids: new Set<string>(),
+  activeId: null
+};
 
 
 type CurrentResultDecision = { keep: true } | { keep: false; reason: string };
@@ -574,10 +585,7 @@ export default function MailClient({
   const selectionStore: SelectionStore = useMemo(
     () => ({
       getSnapshot: () =>
-        listHandleRef.current?.selectionStore.getSnapshot() ?? {
-          ids: new Set<string>(),
-          activeId: null
-        },
+        listHandleRef.current?.selectionStore.getSnapshot() ?? EMPTY_SELECTION_SNAPSHOT,
       subscribe: (listener) =>
         listHandleRef.current?.selectionStore.subscribe(listener) ?? (() => {}),
       setSelection: (ids, activeId) =>
@@ -3686,12 +3694,6 @@ export default function MailClient({
   const updateFlagStateRef = useRef(updateFlagState);
   updateFlagStateRef.current = updateFlagState;
 
-  const updateFlagStateBulkRef = useRef(updateFlagStateBulk);
-  updateFlagStateBulkRef.current = updateFlagStateBulk;
-
-  const updateKeywordFlagBulkRef = useRef(updateKeywordFlagBulk);
-  updateKeywordFlagBulkRef.current = updateKeywordFlagBulk;
-
   const toggleTodoFlagRef = useRef(toggleTodoFlag);
   toggleTodoFlagRef.current = toggleTodoFlag;
 
@@ -3709,6 +3711,243 @@ export default function MailClient({
 
   const folderSpecialIconFn = (folder: Folder) => folderSpecialIcon(folder);
 
+  // One implementation per selection action for the keyboard shortcuts, the
+  // right-click bulk menu and the header's selection menu (see selectionActions).
+  const getSelectionActionTargets = useCallback(
+    (selectedIds: Iterable<string>) =>
+      resolveSelectionActionTargets({
+        selectedIds,
+        activeMessageId: activeMessageId || null,
+        visibleMessages,
+        collapsedThreads,
+        threadScopeMessages,
+        supportsThreads
+      }),
+    [activeMessageId, collapsedThreads, supportsThreads, threadScopeMessages, visibleMessages]
+  );
+
+  const addTopicToMessages = useCallback(
+    (targets: Message[], topicId: string) => {
+      const topic = allTopics.find((t) => t.id === topicId);
+      if (!topic) return;
+      // Topics are per-thread, so dedup by threadId. We then skip
+      // threads that already have the topic per local state as an
+      // optimization to avoid an obviously wasted POST. If local
+      // state is stale (server removed the topic since our last
+      // refresh) we'd silently miss the add for that thread; the
+      // user can re-trigger to recover. The server's `add` action
+      // is idempotent, so removing this skip would be correct but
+      // strictly more expensive.
+      const threadIds = new Set<string>();
+      for (const m of targets) {
+        if (m.threadId) threadIds.add(m.threadId);
+      }
+      if (threadIds.size === 0) return;
+      void (async () => {
+        // Issue POSTs sequentially (so we don't burst the server),
+        // collecting successful per-thread results. The single
+        // local-state apply at the end keeps `setMessages` /
+        // `setViewMessage` to one render regardless of how many
+        // threads changed. Per-thread try/catch so one failure
+        // doesn't strand earlier successes — anything we managed
+        // to persist still flushes to local state below. The
+        // post-update refresh calls are wrapped too so a refresh
+        // failure can't suppress the aggregate error report in
+        // the finally.
+        const collected = new Map<string, Topic[]>();
+        let failed = 0;
+        try {
+          for (const threadId of threadIds) {
+            const current = messageTopicsById.get(threadId) ?? [];
+            if (current.some((t) => t.id === topic.id)) continue;
+            try {
+              await postAddTopicToThread(threadId, topic.id);
+              // Mirror the server's canonical ordering
+              // (lib/topics/core.ts uses `ORDER BY t.name ASC`)
+              // so a subsequent refresh doesn't visibly reorder
+              // the badge we just appended.
+              const nextTopics = [...current, topic].sort(
+                (a, b) => a.name.localeCompare(b.name)
+              );
+              collected.set(threadId, nextTopics);
+            } catch {
+              failed += 1;
+            }
+          }
+          if (collected.size > 0) {
+            applyThreadTopicUpdates(collected);
+            refreshTopicStats(activeAccountId).catch(() => {});
+            if (activeTopicId) {
+              try {
+                await refreshActiveTopicModeResults();
+              } catch {
+                // Best-effort UI refresh; the data is already
+                // persisted server-side and applied locally.
+              }
+            }
+          }
+        } finally {
+          if (failed > 0) {
+            reportError(
+              failed === 1
+                ? "Failed to add topic to one thread."
+                : `Failed to add topic to ${failed} threads.`
+            );
+          }
+        }
+      })();
+    },
+    [
+      activeAccountId,
+      activeTopicId,
+      allTopics,
+      applyThreadTopicUpdates,
+      messageTopicsById,
+      postAddTopicToThread,
+      refreshActiveTopicModeResults,
+      refreshTopicStats,
+      reportError
+    ]
+  );
+
+  const selectionActions = useMemo<SelectionActions>(() => {
+    const setSeen = (ids: string[], value: boolean) => {
+      const targets = resolveMessagesByIds(ids);
+      if (targets.length === 0) return;
+      if (targets.length === 1) {
+        void updateFlagState(targets[0], "seen", value);
+        return;
+      }
+      void updateFlagStateBulk(targets, "seen", value);
+    };
+    // For a multi-selection toggle, set all to the opposite of the majority
+    // state, so a mostly-unflagged selection becomes flagged (rather than
+    // wiping flags off the minority).
+    const isMajority = <T,>(items: T[], predicate: (item: T) => boolean) =>
+      items.filter(predicate).length > items.length / 2;
+    const resolveIds = (ids: string[]) => resolveMessagesByIds(ids).map((m) => m.id);
+    return {
+      markRead: ({ threadIds }) => setSeen(threadIds, true),
+      markUnread: ({ threadIds }) => setSeen(threadIds, false),
+      toggleFlag: ({ ids }) => {
+        const targets = resolveMessagesByIds(ids);
+        if (targets.length === 0) return;
+        if (targets.length === 1) {
+          void updateFlagState(targets[0], "flagged", !isFlaggedMessage(targets[0]));
+          return;
+        }
+        void updateFlagStateBulk(targets, "flagged", !isMajority(targets, isFlaggedMessage));
+      },
+      toggleTodo: ({ ids }) => {
+        const targets = resolveMessagesByIds(ids);
+        if (targets.length === 0) return;
+        if (targets.length === 1) {
+          void toggleTodoFlag(targets[0]);
+          return;
+        }
+        void (async () => {
+          if (!isMajority(targets, hasTodoFlag)) {
+            // $Todo and $Done are mutually exclusive (mirrors single-message
+            // transitionTodoState). Clear $Done first so messages currently
+            // marked done don't end up with both keywords.
+            const doneTargets = targets.filter(hasDoneFlag);
+            if (doneTargets.length > 0) {
+              await updateKeywordFlagBulk(doneTargets, DONE_FLAG, false);
+            }
+            await updateKeywordFlagBulk(targets, TODO_FLAG, true);
+          } else {
+            await updateKeywordFlagBulk(targets, TODO_FLAG, false);
+          }
+        })();
+      },
+      moveToFolder: ({ threadIds }, folderId) => {
+        const messageIds = resolveIds(threadIds);
+        if (messageIds.length === 0) return;
+        recordAndMove(folderId, { messageIds });
+      },
+      moveToOther: ({ threadIds }) => {
+        const targets = resolveMessagesByIds(threadIds);
+        if (targets.length === 0) return;
+        setMoveToDialogState({
+          message: targets[0],
+          request: { messageIds: targets.map((m) => m.id) }
+        });
+      },
+      addTopic: ({ threadIds }, topicId) =>
+        addTopicToMessages(resolveMessagesByIds(threadIds), topicId),
+      archive: ({ threadIds }) => {
+        const targets = resolveMessagesByIds(threadIds);
+        void (async () => {
+          for (const target of targets) {
+            await handleArchiveMessage(target);
+          }
+        })();
+      },
+      remove: ({ ids, threadIds }) => {
+        // A single message takes the per-message path, which asks before
+        // deleting the thread behind a collapsed row.
+        if (ids.length === 1) {
+          const [message] = resolveMessagesByIds(ids);
+          if (message) void handleDeleteMessage(message);
+          return;
+        }
+        void handleDeleteMessagesByIds(threadIds);
+      },
+      copyToAccount: ({ threadIds }) =>
+        handleCopyMessagesToAccount("copy", resolveIds(threadIds)),
+      moveToAccount: ({ threadIds }) =>
+        handleCopyMessagesToAccount("move", resolveIds(threadIds))
+    };
+  }, [
+    addTopicToMessages,
+    handleArchiveMessage,
+    handleCopyMessagesToAccount,
+    handleDeleteMessage,
+    handleDeleteMessagesByIds,
+    recordAndMove,
+    resolveMessagesByIds,
+    toggleTodoFlag,
+    updateFlagState,
+    updateFlagStateBulk,
+    updateKeywordFlagBulk
+  ]);
+
+  const selectAllMessages = useCallback(() => {
+    selectAllVisibleMessages({
+      visibleMessages,
+      collapsedThreads,
+      threadScopeMessages,
+      supportsThreads,
+      selectionStore,
+      setLastSelectedId: (id) => {
+        lastSelectedIdRef.current = id;
+      }
+    });
+  }, [
+    collapsedThreads,
+    lastSelectedIdRef,
+    selectionStore,
+    supportsThreads,
+    threadScopeMessages,
+    visibleMessages
+  ]);
+
+  const bulkContextMenuActions = useMemo(
+    () =>
+      bindSelectionActions(selectionActions, () =>
+        getSelectionActionTargets(bulkContextMenuSelection)
+      ),
+    [bulkContextMenuSelection, getSelectionActionTargets, selectionActions]
+  );
+
+  const headerSelectionActions = useMemo(
+    () =>
+      bindSelectionActions(selectionActions, () =>
+        getSelectionActionTargets(selectionStore.getIds())
+      ),
+    [getSelectionActionTargets, selectionActions, selectionStore]
+  );
+
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
@@ -3722,63 +3961,6 @@ export default function MailClient({
     const isMessageListShortcutTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       Boolean(target.closest('[data-message-list-row="true"]'));
-    const resolveTargets = (messageIds: string[]) =>
-      resolveMessagesByIds(messageIds);
-    const updateFlagStateByIds = async (
-      messageIds: string[],
-      update: { flag: "seen" | "flagged"; value: boolean }
-    ) => {
-      const targets = resolveTargets(messageIds);
-      if (targets.length === 0) return;
-      if (targets.length === 1) {
-        await updateFlagStateRef.current(targets[0], update.flag, update.value);
-        return;
-      }
-      await updateFlagStateBulkRef.current(targets, update.flag, update.value);
-    };
-    // For a multi-selection toggle, set all to the opposite of the majority
-    // state, so a mostly-unflagged selection becomes flagged (rather than
-    // wiping flags off the minority).
-    const isMajority = <T,>(items: T[], predicate: (item: T) => boolean) =>
-      items.filter(predicate).length > items.length / 2;
-    const toggleFlaggedByIds = async (messageIds: string[]) => {
-      const targets = resolveTargets(messageIds);
-      if (targets.length === 0) return;
-      if (targets.length === 1) {
-        await updateFlagStateRef.current(
-          targets[0],
-          "flagged",
-          !isFlaggedMessage(targets[0])
-        );
-        return;
-      }
-      await updateFlagStateBulkRef.current(
-        targets,
-        "flagged",
-        !isMajority(targets, isFlaggedMessage)
-      );
-    };
-    const toggleTodoByIds = async (messageIds: string[]) => {
-      const targets = resolveTargets(messageIds);
-      if (targets.length === 0) return;
-      if (targets.length === 1) {
-        await toggleTodoFlagRef.current(targets[0]);
-        return;
-      }
-      const setTodo = !isMajority(targets, hasTodoFlag);
-      if (setTodo) {
-        // $Todo and $Done are mutually exclusive (mirrors single-message
-        // transitionTodoState). Clear $Done first so messages currently
-        // marked done don't end up with both keywords.
-        const doneTargets = targets.filter(hasDoneFlag);
-        if (doneTargets.length > 0) {
-          await updateKeywordFlagBulkRef.current(doneTargets, DONE_FLAG, false);
-        }
-        await updateKeywordFlagBulkRef.current(targets, TODO_FLAG, true);
-      } else {
-        await updateKeywordFlagBulkRef.current(targets, TODO_FLAG, false);
-      }
-    };
     const handleKeyDown = (event: KeyboardEvent) => {
       const rawKey = typeof event.key === "string" ? event.key : "";
       const key = rawKey.toLowerCase();
@@ -3798,81 +3980,21 @@ export default function MailClient({
       if (isSelectAllKey) {
         if (!isMessageListShortcutTarget(event.target)) return;
         event.preventDefault();
-        selectAllVisibleMessages({
-          visibleMessages,
-          collapsedThreads,
-          threadScopeMessages,
-          supportsThreads,
-          selectionStore,
-          setLastSelectedId: (id) => {
-            lastSelectedIdRef.current = id;
-          }
-        });
+        selectAllMessages();
         return;
       }
-      const selected = selectionStore.getIds();
-      const ids =
-        selected.size > 0
-          ? Array.from(selected)
-          : activeMessageId
-            ? [activeMessageId]
-            : [];
-      if (ids.length === 0) return;
-      if (isActionShortcut) {
-        event.preventDefault();
-        if (isMarkReadKey) {
-          const collapsedRootThreadIds = getCollapsedRootThreadMessageIds({
-            selectedIds: ids,
-            visibleMessages,
-            collapsedThreads,
-            threadScopeMessages,
-            supportsThreads
-          });
-          const targetIds = collapsedRootThreadIds ?? ids;
-          void updateFlagStateByIds(targetIds, { flag: "seen", value: true });
-          return;
-        }
-        if (isMarkUnreadKey) {
-          const collapsedRootThreadIds = getCollapsedRootThreadMessageIds({
-            selectedIds: ids,
-            visibleMessages,
-            collapsedThreads,
-            threadScopeMessages,
-            supportsThreads
-          });
-          const targetIds = collapsedRootThreadIds ?? ids;
-          void updateFlagStateByIds(targetIds, { flag: "seen", value: false });
-          return;
-        }
-        if (isTodoKey) {
-          void toggleTodoByIds(ids);
-          return;
-        }
-        void toggleFlaggedByIds(ids);
-        return;
-      }
+      const targets = getSelectionActionTargets(selectionStore.getIds());
+      if (targets.ids.length === 0) return;
       event.preventDefault();
-      if (ids.length > 1) {
-        void handleDeleteMessagesByIds(ids);
-        return;
-      }
-      const [message] = resolveMessagesByIds(ids);
-      if (!message) return;
-      void handleDeleteMessage(message);
+      if (isMarkReadKey) selectionActions.markRead(targets);
+      else if (isMarkUnreadKey) selectionActions.markUnread(targets);
+      else if (isTodoKey) selectionActions.toggleTodo(targets);
+      else if (isFlagKey) selectionActions.toggleFlag(targets);
+      else selectionActions.remove(targets);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    activeMessageId,
-    collapsedThreads,
-    handleDeleteMessage,
-    handleDeleteMessagesByIds,
-    resolveMessagesByIds,
-    selectionStore,
-    supportsThreads,
-    threadScopeMessages,
-    visibleMessages
-  ]);
+  }, [getSelectionActionTargets, selectAllMessages, selectionActions, selectionStore]);
 
   // Open the bulk-action menu when the user right-clicks a row that's part
   // of a multi-message selection. Single-row clicks (and right-clicks on
@@ -5428,6 +5550,7 @@ export default function MailClient({
             onCheckNewMail: () => syncAccount(undefined, "new")
           },
           toolbar: (
+            <>
             <MessageListHeader
               state={{
                 searchScope,
@@ -5454,6 +5577,17 @@ export default function MailClient({
                 toggleAllGroups
               }}
             />
+            <SelectionActionsMenu
+              selectionStore={selectionStore}
+              hasActiveMessage={Boolean(activeMessageId)}
+              actions={headerSelectionActions}
+              allTopics={allTopics}
+              hasOtherAccounts={otherAccounts.length > 0}
+              onGetRecentFolders={handleGetRecentFolders}
+              onSelectAll={selectAllMessages}
+              onClearSelection={clearSelection}
+            />
+            </>
           )
         }}
         panes={{
@@ -5881,138 +6015,12 @@ export default function MailClient({
         open={bulkContextMenu !== null}
         position={bulkContextMenu}
         selectionCount={bulkContextMenuSelection.length}
-        allTopics={allTopics}
         onOpenChange={(open) => { if (!open) setBulkContextMenu(null); }}
         returnFocusRef={bulkContextMenuReturnFocusRef}
-        actions={{
-          onMarkRead: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            void updateFlagStateBulk(targets, "seen", true);
-          },
-          onMarkUnread: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            void updateFlagStateBulk(targets, "seen", false);
-          },
-          onToggleFlag: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            const flagged = targets.filter(isFlaggedMessage).length;
-            const majorityFlagged = flagged > targets.length / 2;
-            void updateFlagStateBulk(targets, "flagged", !majorityFlagged);
-          },
-          onMoveToFolder: (folderId) => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            recordAndMove(folderId, { messageIds: targets.map((m) => m.id) });
-          },
-          onMoveToOther: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            setMoveToDialogState({
-              message: targets[0],
-              request: { messageIds: targets.map((m) => m.id) }
-            });
-          },
-          onGetRecentFolders: handleGetRecentFolders,
-          onAddTopic: (topicId) => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            const topic = allTopics.find((t) => t.id === topicId);
-            if (!topic) return;
-            // Topics are per-thread, so dedup by threadId. We then skip
-            // threads that already have the topic per local state as an
-            // optimization to avoid an obviously wasted POST. If local
-            // state is stale (server removed the topic since our last
-            // refresh) we'd silently miss the add for that thread; the
-            // user can re-trigger to recover. The server's `add` action
-            // is idempotent, so removing this skip would be correct but
-            // strictly more expensive.
-            const threadIds = new Set<string>();
-            for (const m of targets) {
-              if (m.threadId) threadIds.add(m.threadId);
-            }
-            if (threadIds.size === 0) return;
-            void (async () => {
-              // Issue POSTs sequentially (so we don't burst the server),
-              // collecting successful per-thread results. The single
-              // local-state apply at the end keeps `setMessages` /
-              // `setViewMessage` to one render regardless of how many
-              // threads changed. Per-thread try/catch so one failure
-              // doesn't strand earlier successes — anything we managed
-              // to persist still flushes to local state below. The
-              // post-update refresh calls are wrapped too so a refresh
-              // failure can't suppress the aggregate error report in
-              // the finally.
-              const collected = new Map<string, Topic[]>();
-              let failed = 0;
-              try {
-                for (const threadId of threadIds) {
-                  const current = messageTopicsById.get(threadId) ?? [];
-                  if (current.some((t) => t.id === topic.id)) continue;
-                  try {
-                    await postAddTopicToThread(threadId, topic.id);
-                    // Mirror the server's canonical ordering
-                    // (lib/topics/core.ts uses `ORDER BY t.name ASC`)
-                    // so a subsequent refresh doesn't visibly reorder
-                    // the badge we just appended.
-                    const nextTopics = [...current, topic].sort(
-                      (a, b) => a.name.localeCompare(b.name)
-                    );
-                    collected.set(threadId, nextTopics);
-                  } catch {
-                    failed += 1;
-                  }
-                }
-                if (collected.size > 0) {
-                  applyThreadTopicUpdates(collected);
-                  refreshTopicStats(activeAccountId).catch(() => {});
-                  if (activeTopicId) {
-                    try {
-                      await refreshActiveTopicModeResults();
-                    } catch {
-                      // Best-effort UI refresh; the data is already
-                      // persisted server-side and applied locally.
-                    }
-                  }
-                }
-              } finally {
-                if (failed > 0) {
-                  reportError(
-                    failed === 1
-                      ? "Failed to add topic to one thread."
-                      : `Failed to add topic to ${failed} threads.`
-                  );
-                }
-              }
-            })();
-          },
-          onArchive: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            void (async () => {
-              for (const target of targets) {
-                await handleArchiveMessage(target);
-              }
-            })();
-          },
-          onDelete: () => {
-            if (bulkContextMenuSelection.length === 0) return;
-            void handleDeleteMessagesByIds(bulkContextMenuSelection);
-          },
-          hasOtherAccounts: otherAccounts.length > 0,
-          onCopyToAccount: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            handleCopyMessagesToAccount("copy", targets.map((m) => m.id));
-          },
-          onMoveToAccount: () => {
-            const targets = resolveMessagesByIds(bulkContextMenuSelection);
-            if (targets.length === 0) return;
-            handleCopyMessagesToAccount("move", targets.map((m) => m.id));
-          }
-        }}
+        actions={bulkContextMenuActions}
+        allTopics={allTopics}
+        hasOtherAccounts={otherAccounts.length > 0}
+        onGetRecentFolders={handleGetRecentFolders}
       />
     </>
     </AccountDateFormatProvider>
