@@ -3,9 +3,11 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { expect, test } from "bun:test";
 
-const fixture = process.env.NOCTUA_TEST_IMAP_FIXTURE ?? path.resolve(process.cwd(), "../wt-dev-fixture/scripts/dev-fixture/imap-server.ts");
-// The fixture is maintained on its own branch. CI can opt in by supplying its path.
-(existsSync(fixture) ? test : test.skip)("watcher ingests local synthetic IMAP mail without a browser and shuts down", async () => {
+const fixture = process.env.NOCTUA_TEST_IMAP_FIXTURE ?? ["scripts/dev-fixture/imap-server.ts", "../repo/scripts/dev-fixture/imap-server.ts"]
+  .map(candidate => path.resolve(process.cwd(), candidate)).find(existsSync);
+// Prefer the merged local fixture; this pre-merge worktree uses ../repo. Missing fixture is a failure.
+test("watcher ingests local synthetic IMAP mail without a browser and shuts down", async () => {
+  if (!fixture || !existsSync(fixture)) throw new Error("Synthetic fixture required: scripts/dev-fixture or ../repo/scripts/dev-fixture");
   const child = spawn(process.execPath, ["scripts/verifyMailboxWatcher.ts", fixture], {
     cwd: process.cwd(), env: process.env, stdio: ["ignore", "pipe", "pipe"]
   });

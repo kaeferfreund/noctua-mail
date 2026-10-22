@@ -52,7 +52,12 @@ export async function runImapIdleLoop(client: ImapFlow, signal?: AbortSignal) {
   signal?.addEventListener("abort", onAbort, { once: true });
   try {
     signal?.throwIfAborted();
-    while (!closed && client.usable) await client.idle();
+    while (!closed && client.usable) {
+      if (await client.idle() === false) {
+        client.close();
+        throw new Error("IMAP server rejected IDLE");
+      }
+    }
     if (failure) throw failure;
   } finally {
     client.off("close", onClose);

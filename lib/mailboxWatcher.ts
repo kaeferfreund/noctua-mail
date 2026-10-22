@@ -1,17 +1,18 @@
-import { createHash } from "crypto";
+import { createHmac } from "crypto";
 import type { ImapFlow } from "imapflow";
 import type { Account } from "./data";
 import { getStoredAccounts, getMailboxState, recordMailboxSync, setMailboxWatcherState, type WatcherState } from "./db";
 import { connectIdleImapClient, runImapIdleLoop } from "./mail/imap/idle";
 import { getImapConnectBlockedUntil, resetImapConnectFailureState } from "./mail/imapClientOptions";
 import { getImapHttpError } from "./mail/imapError";
-import { shouldStorePasswordInDb } from "./secret";
+import { teamFeaturesSupported } from "./teamFeatures";
+import { acquireScheduler, releaseScheduler, newLeaseOwner, watcherAuthSuspended, suspendWatcherAuth, retryWatcherAuth } from "./db/processLeases";
 import { getSyncJob, startSyncJob, cancelWatcherSyncJobs, type SyncJob } from "./syncJobs";
 import { positiveInteger } from "./syncWorkerSemaphore";
 import { runNewMailCheck } from "@/app/api/_helpers/newMailCheck";
 import { publishMailboxEvent } from "./mailboxWatcherEvents";
 
-const RECONNECT_MIN_MS = 60_000;
+const RECONNECT_MIN_MS = positiveInteger(process.env.NOCTUA_WATCHER_RECONNECT_MIN_MS, 60_000);
 const RECONNECT_MAX_MS = 30 * 60_000;
 
 type Entry = {
@@ -26,15 +27,16 @@ type Entry = {
   failures: number;
   nextCheckAt: number;
   nextConnectAt: number;
+  authSuspended: boolean;
 };
 
 export function watcherAccountIdentity(account: Account) {
-  // Compare credentials without retaining another plaintext copy or logging a secret.
-  return createHash("sha256").update(JSON.stringify([account.id, account.imap])).digest("hex");
+  // Persist a keyed fingerprint so suspension survives restarts without a password verifier.
+  return createHmac("sha256", process.env.IMAP_SECRET_KEY ?? "").update(JSON.stringify([account.id, account.imap])).digest("hex");
 }
 
 export function watcherRetryDelay(failures: number) {
-  return Math.min(RECONNECT_MAX_MS, RECONNECT_MIN_MS * 2 ** Math.min(10, Math.max(0, failures - 1)));
+  return Math.min(RECONNECT_MAX_MS, RECONNECT_MIN_MS * 2 ** Math.min(24, Math.max(0, failures - 1)));
 }
 
 function pause(ms: number, signal: AbortSignal) {
@@ -54,6 +56,8 @@ export class MailboxWatcher {
   private intervalMs: number;
   private reloadMs: number;
   private stopping?: Promise<void>;
+  private owner = newLeaseOwner();
+  private ownsScheduler = false;
 
   constructor() {
     this.intervalMs = positiveInteger(process.env.NOCTUA_WATCHER_INTERVAL_MS, 300_000);
@@ -70,8 +74,21 @@ export class MailboxWatcher {
   }
 
   private async reloadLoop() {
+    let nextReloadAt = 0;
     while (!this.abort.signal.aborted) {
       try {
+        // Renew/acquire durable ownership before any account can open IDLE.
+        // A live owner is never displaced solely because a heartbeat is late.
+        this.ownsScheduler = await acquireScheduler(this.owner);
+        if (!this.ownsScheduler) {
+          await pause(Math.min(this.reloadMs, 5000), this.abort.signal);
+          continue;
+        }
+        if (Date.now() < nextReloadAt) {
+          await pause(Math.min(nextReloadAt - Date.now(), 5000), this.abort.signal);
+          continue;
+        }
+        nextReloadAt = Date.now() + this.reloadMs;
         const accounts = await getStoredAccounts();
         if (this.abort.signal.aborted) break;
         const desired = new Map(accounts.map((account) => [account.id, account]));
@@ -89,8 +106,9 @@ export class MailboxWatcher {
           if (this.entries.has(account.id)) continue;
           const entry: Entry = {
             account, identity: watcherAccountIdentity(account), abort: new AbortController(),
-            task: Promise.resolve(), dirty: false, failures: 0, nextCheckAt: 0, nextConnectAt: 0
+            task: Promise.resolve(), dirty: false, failures: 0, nextCheckAt: 0, nextConnectAt: 0, authSuspended: false
           };
+          entry.authSuspended = await watcherAuthSuspended(account.id, entry.identity);
           this.entries.set(account.id, entry);
           entry.task = this.watch(entry).catch(() => {
             entry.abort.abort();
@@ -101,9 +119,12 @@ export class MailboxWatcher {
           });
         }
       } catch {
+        // Fail closed if ownership cannot be maintained through the DB boundary.
+        for (const entry of this.entries.values()) await this.stopEntry(entry, false);
+        this.entries.clear();
         console.error("[mailbox-watcher] account reload failed; retrying on the next poll");
       }
-      await pause(this.reloadMs, this.abort.signal);
+      await pause(Math.min(this.reloadMs, 5000), this.abort.signal);
     }
   }
 
@@ -127,9 +148,13 @@ export class MailboxWatcher {
         const folderId = `${entry.account.id}:INBOX`;
         const baseline = await getMailboxState(entry.account.id, folderId);
         entry.abort.signal.throwIfAborted();
+        const mailbox = entry.client?.mailbox;
+        const remoteValidity = mailbox ? mailbox.uidValidity : null;
+        const namespaceChanged = baseline?.uidValidity != null && remoteValidity != null &&
+          String(baseline.uidValidity) !== String(remoteValidity);
         const job = startSyncJob({
           accountId: entry.account.id, folderId,
-          mode: baseline?.highestUid == null ? "full" : "repair"
+          mode: baseline?.highestUid == null || namespaceChanged ? "full" : "repair"
         }, undefined, "watcher");
         await this.waitJob(entry, job);
         entry.abort.signal.throwIfAborted();
@@ -154,7 +179,9 @@ export class MailboxWatcher {
       entry.nextCheckAt = Date.now() + delay;
       entry.nextConnectAt = Math.max(entry.nextConnectAt, entry.nextCheckAt);
       try {
-        await this.state(entry, getImapHttpError(error) || entry.state === "auth_failed" ? "auth_failed" : "backoff");
+        entry.authSuspended ||= Boolean(getImapHttpError(error)) || entry.state === "auth_failed";
+        if (entry.authSuspended) await suspendWatcherAuth(entry.account.id, entry.identity);
+        await this.state(entry, entry.authSuspended ? "auth_failed" : "backoff");
       } catch {
         console.error(`[mailbox-watcher] ${entry.account.id}: failed to persist watcher state`);
       } finally {
@@ -167,6 +194,11 @@ export class MailboxWatcher {
     const signal = entry.abort.signal;
     await this.state(entry, "starting");
     while (!signal.aborted) {
+      if (entry.authSuspended) {
+        await this.state(entry, "auth_failed");
+        await pause(this.reloadMs, signal);
+        continue;
+      }
       const blockedUntil = Math.max(entry.nextConnectAt, getImapConnectBlockedUntil(entry.account));
       if (blockedUntil > Date.now()) {
         await this.state(entry, entry.state === "auth_failed" ? "auth_failed" : "backoff");
@@ -202,7 +234,9 @@ export class MailboxWatcher {
         if (!signal.aborted) {
           entry.failures += 1;
           entry.nextConnectAt = Math.max(entry.nextConnectAt, Date.now() + watcherRetryDelay(entry.failures));
-          await this.state(entry, getImapHttpError(error) || entry.state === "auth_failed" ? "auth_failed" : "backoff");
+          entry.authSuspended ||= Boolean(getImapHttpError(error)) || entry.state === "auth_failed";
+          if (entry.authSuspended) await suspendWatcherAuth(entry.account.id, entry.identity);
+          await this.state(entry, entry.authSuspended ? "auth_failed" : "backoff");
         }
       } finally {
         if (timer) clearInterval(timer);
@@ -218,6 +252,20 @@ export class MailboxWatcher {
     const cancelled = cancelWatcherSyncJobs(entry.account.id);
     await Promise.all([entry.task, entry.check, cancelled]);
     if (persist) await setMailboxWatcherState(entry.account.id, "stopped");
+  }
+
+  /** Explicit operator retry; credential/config changes also replace the entry. */
+  async retryAccount(accountId: string) {
+    const entry = this.entries.get(accountId);
+    if (!entry) return false;
+    await retryWatcherAuth(accountId);
+    entry.authSuspended = false;
+    entry.state = undefined;
+    entry.failures = 0;
+    entry.nextConnectAt = 0;
+    entry.nextCheckAt = 0;
+    resetImapConnectFailureState(entry.account);
+    return true;
   }
 
   stop() {
@@ -239,6 +287,7 @@ export class MailboxWatcher {
       ...[...this.entries.values()].map((entry) => this.stopEntry(entry, true))
     ]);
     this.entries.clear();
+    if (this.ownsScheduler) await releaseScheduler(this.owner);
   }
 }
 
@@ -247,8 +296,7 @@ const runtime = globalThis as typeof globalThis & {
   __noctuaMailboxWatcherShutdown?: () => void;
 };
 export function startMailboxWatcher(): MailboxWatcher | null {
-  // teamFeaturesSupported() from feat/team-auth will use this same credential-storage gate.
-  if (process.env.NOCTUA_MAILBOX_WATCHER !== "1" || !shouldStorePasswordInDb()) return null;
+  if (process.env.NOCTUA_MAILBOX_WATCHER !== "1" || !teamFeaturesSupported()) return null;
   if (runtime.__noctuaMailboxWatcher) return runtime.__noctuaMailboxWatcher;
   const watcher = new MailboxWatcher();
   runtime.__noctuaMailboxWatcher = watcher;

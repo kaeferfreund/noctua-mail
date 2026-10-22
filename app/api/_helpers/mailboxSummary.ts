@@ -1,13 +1,35 @@
 import { NextResponse } from "next/server";
-import { requireSessionOr401 } from "@/lib/auth";
+// feat/team-auth: import requireActiveUserSession directly when its async guard lands.
+import { requireSessionOr401 as requireActiveUserSession } from "@/lib/auth";
 import { getMailboxSummaries } from "@/lib/serverDb";
 
-export function createMailboxSummaryHandler(deps = { requireSessionOr401, getMailboxSummaries }) {
+type SummarySession = {
+  userId: string;
+  accountId?: string | null;
+  activeAccountId?: string | null;
+  responseHeaders?: Headers;
+};
+
+/** feat/team-auth/collab-ui replace this seam with listAccessibleAccountsForUser. */
+export async function summaryAccountIds(session: SummarySession): Promise<string[]> {
+  const accountId = session.activeAccountId ?? session.accountId;
+  return accountId ? [accountId] : [];
+}
+
+type Dependencies = {
+  requireActiveUserSession: (request: Request) => SummarySession | Response | Promise<SummarySession | Response>;
+  getMailboxSummaries: typeof getMailboxSummaries;
+  summaryAccountIds?: typeof summaryAccountIds;
+};
+
+export function createMailboxSummaryHandler(deps: Dependencies = { requireActiveUserSession, getMailboxSummaries }) {
   return async (request: Request) => {
-    const session = deps.requireSessionOr401(request);
-    if (session instanceof NextResponse) return session;
-    // feat/team-auth will replace this with the caller's accessible mailbox ids.
-    const accounts = await deps.getMailboxSummaries(session.accountId ? [session.accountId] : []);
-    return NextResponse.json({ accounts }, { headers: { "Cache-Control": "no-store" } });
+    const session = await deps.requireActiveUserSession(request);
+    if (session instanceof Response) return session;
+    const ids = await (deps.summaryAccountIds ?? summaryAccountIds)(session);
+    const accounts = ids.length ? await deps.getMailboxSummaries(ids) : [];
+    const headers = new Headers(session.responseHeaders);
+    headers.set("Cache-Control", "no-store");
+    return NextResponse.json({ accounts }, { headers });
   };
 }
