@@ -278,7 +278,7 @@ for(const boundary of ["preflight-reservation","reservation-finalize"] as const)
   let create:ReturnType<typeof spyOn>|undefined;
   if(boundary==="reservation-finalize") {
     const original=f.auth.api.createUser;
-    create=spyOn(f.auth.api,"createUser").mockImplementation(async (args:Parameters<typeof original>[0])=>{const result=await original(args);await demote();return result;});
+    create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);await demote();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
     await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
@@ -295,7 +295,7 @@ for(const boundary of ["before-reservation","before-finalize"] as const)test(`la
   let create:ReturnType<typeof spyOn>|undefined;
   if(boundary==="before-finalize") {
     const original=f.auth.api.createUser;
-    create=spyOn(f.auth.api,"createUser").mockImplementation(async (args:Parameters<typeof original>[0])=>{const result=await original(args);collide();return result;});
+    create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);collide();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
     await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return true;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});

@@ -22,7 +22,7 @@ type BuiltDraftMail = {
 };
 
 let lastBuiltDraftMail: BuiltDraftMail | null = null;
-const updateImapFlags = mock(async () => {});
+const updateImapFlags = mock<typeof import("@/lib/serverImap").updateImapFlags>(async () => {});
 const buildRawMessage = mock(async (_account: Account, mail: BuiltDraftMail) => {
   lastBuiltDraftMail = mail;
   return `raw:${mail.subject}`;
