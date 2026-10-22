@@ -11,8 +11,8 @@ export type AuthProofContext = {
   db: Database; request?: Request; internal?: boolean; op?: SecurityOperation; source?: SessionSecurity;
   authenticatedAt: number; method: string; loginEpoch?: number; kind?: string;
   challenge?: PendingChallenge; challengeId?: string; grantHash?: string; purpose?: ReauthPurpose;
-  verifiedCredentialId?: string; verifiedUV?: boolean; verifiedUserId?: string; newSessionId?: string;
-  createdSessionIds: string[]; createdPasskeyId?: string; destructive?: boolean; retainOperation?: boolean;
+  verifiedCredentialId?: string; verifiedUV?: boolean; newSessionId?: string;
+  createdSessionIds: string[]; createdPasskeyId?: string; destructive?: boolean;
   totpBefore?: string;
   creation?: { userId: string; email: string; role: "admin" | "user" };
 };

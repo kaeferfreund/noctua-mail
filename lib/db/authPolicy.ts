@@ -1,7 +1,7 @@
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
 import type { Database } from "bun:sqlite";
-import { ensureTableColumns } from "./schema";
+import { ensureTableColumns, ensureInviteIssuerSchema } from "./schema";
 import { recordAdminAuditRow } from "./adminAudit";
 
 // Better Auth owns its six model tables. These are Noctua's policy metadata;
@@ -67,6 +67,20 @@ function advance(userId: string, when = "1") {
     UPDATE auth_security_state SET generation=generation+1 WHERE userId=${userId} AND (${when});`;
 }
 
+// Runs in the library's authority-changing transaction, including downstream API failures.
+function revokeIssuerInvites(when = "1") { return `
+    INSERT INTO admin_audit(id,actorUserId,action,targetUserId,targetAccountId,payload,createdAt)
+    SELECT lower(hex(randomblob(16))),
+      COALESCE((SELECT actorUserId FROM admin_lifecycle_operations WHERE slot='admin-lifecycle' AND targetUserId=NEW.id),'operator'),
+      'invite.revoke',NEW.id,NULL,json_object('reason','issuer_authority_revoked','count',count(*)),
+      CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)
+    FROM invite_codes WHERE (${when}) AND issuedByUserId=NEW.id AND revokedAt IS NULL
+      AND (expiresAt IS NULL OR expiresAt>CAST((julianday('now')-2440587.5)*86400000 AS INTEGER))
+      AND (maxUses IS NULL OR uses<maxUses) HAVING count(*)>0;
+    UPDATE invite_codes SET revokedAt=CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)
+      WHERE (${when}) AND issuedByUserId=NEW.id AND revokedAt IS NULL;
+`; }
+
 const triggers: Record<string, string> = {
   noctua_user_insert: `CREATE TRIGGER noctua_user_insert AFTER INSERT ON auth_user BEGIN
     INSERT INTO users(id,email,role,createdAt)
@@ -78,6 +92,10 @@ const triggers: Record<string, string> = {
   noctua_user_update: `CREATE TRIGGER noctua_user_update AFTER UPDATE OF email,role ON auth_user BEGIN
     UPDATE users SET email=lower(trim(NEW.email)),
       role=CASE WHEN NEW.role='admin' THEN 'admin' ELSE 'user' END WHERE id=NEW.id;
+  END`,
+  noctua_invite_issuer_role: `CREATE TRIGGER noctua_invite_issuer_role AFTER UPDATE OF role ON auth_user
+    WHEN NEW.role IS NOT 'admin' BEGIN
+    ${revokeIssuerInvites()}
   END`,
   noctua_security_epoch: `CREATE TRIGGER noctua_security_epoch AFTER UPDATE OF generation ON auth_security_state
     WHEN OLD.generation IS NOT NEW.generation BEGIN
@@ -104,6 +122,7 @@ const triggers: Record<string, string> = {
   noctua_user_ban: `CREATE TRIGGER noctua_user_ban AFTER UPDATE OF banned,banExpires ON auth_user
     WHEN OLD.banned IS NOT NEW.banned OR OLD.banExpires IS NOT NEW.banExpires BEGIN
     ${advance("NEW.id")}
+    ${revokeIssuerInvites("COALESCE(NEW.banned,0)=1")}
   END`
 };
 
@@ -170,7 +189,7 @@ function isInstalledControlPlane(db: Database) {
   }
   const expected = [
     ...tables.map(ddl => ["table", ddl.match(/EXISTS (\w+)/)![1]]),
-    ...Object.keys(triggers).map(name => ["trigger", name]),
+    ...Object.keys(triggers).filter(name => name !== "noctua_invite_issuer_role").map(name => ["trigger", name]),
   ];
   const missing = expected.filter(([type, name]) => schemaSql(db, type, name) === undefined);
   const hasSidecars = missing.length !== expected.length || schemaSql(db, "index", provisioningIndexName) !== undefined;
@@ -216,7 +235,7 @@ export function installAuthControlPlane(db: Database) {
     }
     db.exec(`INSERT OR IGNORE INTO auth_login_epoch(id,generation) VALUES(1,0)`);
     ensureTableColumns(db, "mcp_tokens", [["securityGeneration", "INTEGER"]]);
-    ensureTableColumns(db, "invite_codes", [["email", "TEXT"]]);
+    ensureInviteIssuerSchema(db);
     validateProvisioningIndex(db);
 
     // Never choose a legacy ID by email. An explicit operator ID binding is the
