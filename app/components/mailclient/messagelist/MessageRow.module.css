@@ -327,7 +327,7 @@
     flex: 1;
   }
   .rowCompact .header, .rowCompact .actions { display: contents; }
-  .rowCompact :global([data-message-cell="unread"]) { grid-column: 1; grid-row: 1 / 3; justify-content: flex-end; gap: 18px; }
+  .rowCompact :global([data-message-cell="unread"]) { grid-column: 1; grid-row: 1 / 3; justify-content: flex-end; gap: 16px; --unread-dot-hit-touch: -16px; }
   .rowCompact :global([data-message-cell="unread"] > :not(button[title^="Mark as"]):not([aria-label="Select message"])) { display: none; }
   .rowCompact :global([aria-label="Select message"]) { flex: 0 0 44px; width: 44px; height: 44px; }
   .rowCompact .from { grid-column: 2; grid-row: 1; min-width: 0; }

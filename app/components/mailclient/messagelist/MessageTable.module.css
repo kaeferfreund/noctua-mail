@@ -226,7 +226,8 @@
   justify-content: flex-start;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 6px;
+  /* Keeps the dot's 24px hit area clear of the checkbox. */
+  gap: 8px;
 }
 
 .rowUnread .cellSubject {
