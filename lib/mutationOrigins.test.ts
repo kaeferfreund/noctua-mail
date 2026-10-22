@@ -34,11 +34,10 @@ describe("complete API mutation origin inventory", () => {
   test.each(inventory)("foreign Origin plus text/plain rejected by $method $file", async ({ file, method }: { file: string; method: string }) => {
     const route = await import(path.join(root, file));
     const params = { accountId, messageId: "synthetic-message", attachmentId: "synthetic-attachment", folderId: `${accountId}:INBOX`, userId: "synthetic-user", tokenId: "synthetic-token", eventId: "synthetic-event", topicId: "synthetic-topic", aliasId: "synthetic-alias", draftId: "synthetic-draft" };
-    const request = new Request(`http://localhost:3000/api/${file}`, { method, headers: fixture.jar.headers({ origin: "https://foreign.example.test", "content-type": "text/plain" }), body: '{"data":{"replace":true}}' });
+    const request = new Request(file === "ba/[...all]/route.ts" ? `http://localhost:3000/api/ba/${method === "POST" ? "sign-in/email" : "unsupported-"+method}` : `http://localhost:3000/api/${file}`, { method, headers: fixture.jar.headers({ origin: "https://foreign.example.test", "content-type": "text/plain" }), body: '{"data":{"replace":true}}' });
     const response: Response = await route[method](request, { params: Promise.resolve(params) });
-    // Retired/unactivated authentication and bearer-only MCP cannot mutate via cookies.
-    if (file === "auth/login/route.ts") expect(response.status).toBe(410);
-    else if (file === "ba/[...all]/route.ts") expect(response.status).toBe(503);
+    // The library rejects text/plain before origin parsing; unsupported BA paths stay unavailable.
+    if (file === "ba/[...all]/route.ts") expect(response.status).toBe(method === "POST" ? 415 : 404);
     else if (file === "mcp/route.ts") expect(response.status).toBe(method === "DELETE" ? 405 : 401);
     else {
       expect(response.status).toBe(403);

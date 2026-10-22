@@ -34,7 +34,7 @@ export async function handleMailboxCredentialMutation(
     if (mode === "post-existing") {
       if (typeof payload.email !== "string" || !payload.email.trim()) return NextResponse.json({ ok: false, message: "Email address is required" }, { status: 400 });
       accountId = typeof payload.id === "string" ? payload.id : accountIdFromEmail(payload.email);
-      if (!await getAccountById(accountId)) return NextResponse.json({ ok: false, code: "auth_integration_pending" }, { status: 503 });
+      if (!await getAccountById(accountId)) return NextResponse.json({ ok: false, code: "account_not_found" }, { status: 404 });
     } else accountId = params ? await getAccountIdFromParams(params) : "";
     const context = await requireAccountContext(request, accountId, { minRole: "manager" });
     if (context instanceof NextResponse) return context;

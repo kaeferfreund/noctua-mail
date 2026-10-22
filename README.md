@@ -148,84 +148,46 @@ bun test app/components/mailclient/messagelist/listBehavior.test.ts
 ## ⚙️ Configuration
 
 ### Data Storage
-Local data is stored in `.data/` directory:
+Local data uses `NOCTUA_DATA_DIR` (default `../noctua-data` from the working directory;
+the Docker image sets `/app/.data/`):
 - SQLite database
 - Message sources
 - Attachments (stored separately for performance)
 
 ### Environment Variables
 
-> Authentication is being migrated to Better Auth; cookie credential mode, sealed sessions, `SESSION_SEAL_KEY`, legacy IMAP login and the Tauri desktop build are no longer available in this fork; see [TEAM-INBOX.md §4](doc/TEAM-INBOX.md#4-authentication) and [TEAM-AUTH-PLAN.md](doc/TEAM-AUTH-PLAN.md). The legacy reference below will be rewritten in slice 6.
+Better Auth provides personal app passwords, mandatory TOTP enrollment and optional UV passkeys.
+Encrypted database storage is the only mailbox credential mode. See [AUTHENTICATION.md](doc/AUTHENTICATION.md)
+for the backend/client contract and offline migration/recovery commands.
 
-#### IMAP Credentials Storage
-Configure how IMAP/SMTP credentials are stored:
-
-```bash
-IMAP_CREDENTIALS_STORAGE=both  # Options: cookie | db | both (default: both)
+```sh
+BETTER_AUTH_URL=https://mails.monkeymed.de
+PASSKEY_RP_ID=mails.monkeymed.de
+BETTER_AUTH_SECRET=<independent-random-secret-at-least-32-characters>
+IMAP_SECRET_KEY=<retain-existing-independent-encryption-key>
+IMAP_CREDENTIALS_STORAGE=db
+BETTER_AUTH_TELEMETRY=0
+# NOCTUA_TRUSTED_ORIGINS and NOCTUA_IMAP_LOGIN_HOSTS are unset.
 ```
 
-- **`cookie`** – Credentials only in sealed session cookie
-- **`db`** – Credentials only in encrypted database
-- **`both`** – Credentials in both cookie and encrypted database (recommended)
+The canonical service is reachable only inside the tailnet, DNS A `100.92.134.1`,
+with TLS obtained through netcup DNS-01. Recovery links are handed over personally, never SMTP.
+There is no native desktop mode. Install the web PWA if desired. The isolated preview at
+`https://remote-arm.tail31b4a1.ts.net:3790` uses separate data/secrets, preview-only origin/RP ID
+and separately enrolled passkeys; it is never trusted by canonical production.
 
-```bash
-IMAP_SECRET_KEY=<32-byte-hex-key>  # Required for DB encryption
-```
-
-#### Authentication
-Control access to the application:
-
-```bash
-SESSION_SEAL_KEY=<32-byte-hex-key>  # Required for session cookie sealing
-```
-
-#### Reverse Proxy / Rate Limiting
-
-The rate limiter (applied to `/api/auth/login`, `/api/auth/signup`, `/api/probe`) keys
-requests by client IP. Since `Request` doesn't expose the TCP peer, it relies on
-`X-Forwarded-For`, which means the reverse proxy in front of Noctua **must sanitise
-that header** so a client can't spoof their own rate-limit identity.
-
-Noctua assumes one trusted reverse proxy in front by default (no env var needed).
-The recommended Caddy configuration uses the global `trusted_proxies` directive,
-which instructs Caddy to ignore any `X-Forwarded-For` the client tries to send
-and insert the real remote IP instead:
-
-```caddy
-{
-    servers {
-        trusted_proxies static private_ranges
-    }
-}
-
-yourdomain.tld {
-    reverse_proxy localhost:3654
-}
-```
-
-If you need a different topology, use `TRUSTED_PROXY_HOPS` to override the default.
-The value is the number of reverse-proxy hops whose `X-Forwarded-For` entry Noctua
-should trust:
-
-```bash
-TRUSTED_PROXY_HOPS=1   # Default — single reverse proxy in front (no need to set this)
-TRUSTED_PROXY_HOPS=2   # Two chained trusted proxies (e.g. Cloudflare → Caddy → Noctua)
-TRUSTED_PROXY_HOPS=0   # Noctua directly on a public interface; ignore XFF entirely
-```
-
-- **`1` (default)** — rightmost `X-Forwarded-For` entry (the IP the proxy saw) is used.
-- **`N ≥ 2`** — the entry at `XFF[length - N]` is used. Requires at least `N`
-  entries in `XFF`; if fewer are present (topology mismatch), the request falls
-  back to the `"unknown"` global bucket rather than trusting a potentially
-  client-supplied leftmost entry.
-- **`0` / `false`** — forwarded headers are ignored; rate limiting becomes a single
-  global bucket per limiter. Coarse, but safe when Noctua is exposed directly.
+Bind the backend to loopback behind one reverse proxy which overwrites Host and X-Forwarded-*.
+`TRUSTED_PROXY_HOPS` defaults to 1 for Noctua wrapper limits; set 0 for direct traffic (all
+unidentified peers share a bucket). Never expose the backend directly or accept client-supplied
+forwarding headers. See [deployment examples](doc/DEPLOYMENT.md) for reset-log suppression,
+secret storage and stopped-process backups. This branch integrates the Stage 1 backend and auth/admin UI;
+canonical phone/PWA acceptance and go-live remain release work.
 
 ### Data Directory
 Customize the data directory location:
 
 ```bash
-NOCTUA_DATA_DIR=../noctua-data  # Default: .data/
+NOCTUA_DATA_DIR=../noctua-data  # Local runtime default; set an absolute path in production
 ```
 
 ---
@@ -251,7 +213,7 @@ This project is licensed under the [Elastic License 2.0](LICENSE).
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+This fork integrates feature work locally and does not target upstream pull requests.
 
 The code is primarily written by AI agents (Claude, Codex, GitHub Copilot, Antigravity).
 

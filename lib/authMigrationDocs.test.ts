@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-test("legacy auth references carry a Better Auth transition notice before unavailable configuration", () => {
-  for (const [file, section] of [["README.md", "### Environment Variables"], ["doc/AUTHENTICATION.md", "# Authentication"], ["doc/DEPLOYMENT.md", "## Required Environment Variables"]]) {
-    const text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8").split(section)[1];
-    const notice = text.trimStart().split("\n")[0];
-    for (const term of ["Better Auth", "cookie credential mode", "sealed sessions", "SESSION_SEAL_KEY", "legacy IMAP login", "Tauri desktop", "TEAM-INBOX.md", "TEAM-AUTH-PLAN.md"]) expect(notice).toContain(term);
+test("active deployment documents agree on canonical auth, DB credentials and personal recovery", () => {
+  for (const file of ["README.md", "doc/AUTHENTICATION.md", "doc/DEPLOYMENT.md"]) {
+    const text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+    for (const term of ["Better Auth", "BETTER_AUTH_URL", "mails.monkeymed.de", "PASSKEY_RP_ID", "100.92.134.1", "netcup", "DNS-01", "NOCTUA_IMAP_LOGIN_HOSTS", "IMAP_CREDENTIALS_STORAGE", "remote-arm.tail31b4a1.ts.net:3790", "personally"]) expect(text).toContain(term);
+    expect(text).not.toContain("SESSION_SEAL_KEY=<");
+    expect(text).not.toContain("IMAP_CREDENTIALS_STORAGE=both");
   }
 });

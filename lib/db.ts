@@ -140,6 +140,8 @@ export {
   getUserAccounts,
   getUserById,
   getUsers,
+  listAccountMemberCandidates,
+  listAdminUserPasskeys,
   listAccessibleAccountIdsForUser,
   listUserAccountLinks,
   listUserAccountLinksForUser,
@@ -159,6 +161,9 @@ export {
 export {
   ADMIN_AUDIT_DEFAULT_LIMIT,
   ADMIN_AUDIT_MAX_LIMIT,
+  clampAuditLimit,
+  decodeAdminAuditCursor,
+  encodeAdminAuditCursor,
   listAdminAudit,
   recordAdminAudit,
   type AdminAuditInput

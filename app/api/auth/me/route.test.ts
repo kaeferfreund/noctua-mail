@@ -4,7 +4,6 @@ import {GET} from "./route";
 import {POST as logout} from "../logout/route";
 import {POST as switchAccount} from "../switch-account/route";
 import {POST as signup} from "../signup/route";
-import {POST as login} from "../login/route";
 import {createAuthenticatedTestSession,getSharedTestAuthHarness} from "@/lib/testAuthHarness";
 import {dbModulePromise} from "@/lib/testDbHarness";
 import {withDbWriteRetry} from "@/lib/dbWriteRetry";
@@ -134,7 +133,7 @@ describe("shell mutation contracts",()=>{
   expect((await logout(new Request("http://localhost:3000/api/auth/logout",{method:"POST"}))).status).toBe(403);
   expect((await logout(new Request("http://localhost:3000/api/auth/logout",{method:"POST",headers:{referer:"http://localhost:3000/inbox"}}))).status).toBe(200);
  });
- test("signup enforces request hygiene and legacy login stays 410",async()=>{
-  const request=req("","POST");expect((await signup(request)).status).toBe(400);expect((await login(request)).status).toBe(410);
+ test("signup enforces request hygiene",async()=>{
+  const request=req("","POST");expect((await signup(request)).status).toBe(400);
  });
 });

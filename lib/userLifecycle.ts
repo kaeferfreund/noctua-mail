@@ -82,7 +82,7 @@ export async function mutateAdminSecurity(db:Database,source:SessionSecurity,req
         db.prepare(`INSERT OR IGNORE INTO noctua_auth_migrations(id) VALUES(?)`).run(`mfa-enrolled:${userId}`);
       }
       if (action==="passkey-remove") db.prepare(`DELETE FROM auth_passkey WHERE userId=? AND id=?`).run(userId,passkeyId!);
-      recordAdminAuditRow(db,{actorUserId:source.userId,action:action==="mfa-reset"?"user.mfa_reset":action==="passkey-remove"?"user.passkey_remove":"user.sessions_revoke",targetUserId:userId,payload:{operationId:op.id,...(action==="mfa-reset"?{confirmedTarget:true}:{})}});
+      recordAdminAuditRow(db,{actorUserId:source.userId,action:action==="mfa-reset"?"user.mfa_reset":action==="passkey-remove"?"user.passkey_remove":"user.sessions_revoke",targetUserId:userId,payload:{operationId:op.id,...(action==="mfa-reset"?{confirmedTarget:true}:{}),...(action==="passkey-remove"?{passkeyId}:{})}});
     }).immediate());
     revokeAuthStreams({userId});
     await finishLifecycle(db,op);
