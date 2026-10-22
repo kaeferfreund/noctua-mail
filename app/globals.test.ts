@@ -231,6 +231,74 @@ describe("app/globals.css cascade layers", () => {
   );
 });
 
+describe("app chrome typography", () => {
+  test(
+    "routes Radix and native controls through the Inter and mono tokens",
+    async () => {
+      const root = await compileGlobals();
+      const themeVars = new Map<string, string>();
+      root.walkDecls((decl) => {
+        if (decl.prop.startsWith("--") && enclosingLayer(decl) === "theme") themeVars.set(decl.prop, decl.value);
+      });
+      expect(themeVars.get("--font-mono")).toStartWith("ui-monospace,");
+      expect(themeVars.get("--text-2xs")).toBe("0.6875rem");
+      expect(themeVars.get("--tracking-caps")).toBe("0.06em");
+
+      const radix = new Map<string, string>();
+      for (const rule of rulesWithSelector(root, ".radix-themes")) {
+        if (enclosingLayer(rule) === null) rule.walkDecls((decl) => { radix.set(decl.prop, decl.value); });
+      }
+      // Radix defaults: system UI font, Times for <Em>/<Quote>, Menlo for <Code>.
+      expect(radix.get("--default-font-family")).toBe("var(--font-sans)");
+      expect(radix.get("--em-font-family")).toBe("var(--font-sans)");
+      expect(radix.get("--quote-font-family")).toBe("var(--font-sans)");
+      expect(radix.get("--code-font-family")).toBe("var(--font-mono)");
+
+      // Tailwind runs without preflight: native controls must inherit the
+      // family, and the body must not add tracking that only portalled menus
+      // (outside .radix-themes) would inherit.
+      const legacy = (selector: string, prop: string) =>
+        rulesWithSelector(root, selector)
+          .filter((rule) => enclosingLayer(rule) === "legacy")
+          .flatMap((rule) => rule.nodes.filter((node) => node.type === "decl" && node.prop === prop))
+          .map((decl) => (decl as { value: string }).value);
+      for (const control of ["button", "input", "select", "textarea"]) {
+        expect(legacy(control, "font-family")).toContain("inherit");
+      }
+      expect(legacy("body", "font-family")).toEqual(["var(--font-sans)"]);
+      expect(legacy("body", "letter-spacing")).toEqual([]);
+    },
+    COMPILE_TIMEOUT_MS
+  );
+
+  test("app code names fonts only through the tokens", () => {
+    // The e-mail iframe (HtmlMessage) and SVG images rendered outside the
+    // document (logo route, sender icons) cannot load the app's font face.
+    const exempt = new Set([
+      path.join("app", "globals.test.ts"),
+      path.join("app", "components", "HtmlMessage.tsx"),
+      path.join("app", "icons", "logo.svg", "route.ts"),
+      path.join("lib", "senderIcons.ts"),
+      path.join("lib", "ui", "fonts.ts")
+    ]);
+    const allowed = /^(var\(--font-(sans|mono)\)|inherit)(\s*!important)?$/;
+    const offending: string[] = [];
+    for (const file of [...listSourceFiles("app"), ...listSourceFiles("lib")]) {
+      if (exempt.has(file) || file.endsWith(".test.ts") || file.endsWith(".test.tsx")) continue;
+      const source = readFileSync(path.join(repoRoot, file), "utf8");
+      const values = [
+        ...source.matchAll(/(?:font-family|fontFamily)\s*:\s*["'`]?([^;"'`}\n]+)/g)
+      ].map((match) => match[1].trim().replace(/,$/, ""));
+      for (const value of values) {
+        // The @font-face family name itself.
+        if (file === path.join("app", "globals.css") && value === APP_FONT_FAMILY) continue;
+        if (!allowed.test(value)) offending.push(`${file}: ${value}`);
+      }
+    }
+    expect(offending).toEqual([]);
+  });
+});
+
 describe("legacy token codemod", () => {
   // Upstream code reads var(--muted) as a text colour and var(--accent) as the
   // link colour. Both names now carry their shadcn meaning (background fills),
