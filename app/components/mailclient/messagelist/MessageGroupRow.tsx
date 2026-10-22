@@ -1,20 +1,18 @@
 import { memo } from "react";
 import type React from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { CaretRightIcon } from "@radix-ui/react-icons";
-import { Text } from "@radix-ui/themes";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { MessageGroup } from "./listModel";
+import styles from "./MessageGroupRow.module.css";
 
 type MessageGroupRowProps = {
   group: MessageGroup;
   isCollapsed: boolean;
   top?: number;
-  height?: number;
+  height: number;
+  showDivider?: boolean;
   virtualItemClassName?: string;
-  groupTitleClassName: string;
-  groupToggleClassName: string;
-  groupCaretClassName: string;
-  groupTitleFlaggedClassName?: string;
   getGroupLabel: (group: MessageGroup) => React.ReactNode;
   onOpenChange: (open: boolean) => void;
   renderAsVirtualItem?: boolean;
@@ -25,11 +23,8 @@ function MessageGroupRow({
   isCollapsed,
   top = 0,
   height,
+  showDivider = false,
   virtualItemClassName = "",
-  groupTitleClassName,
-  groupToggleClassName,
-  groupCaretClassName,
-  groupTitleFlaggedClassName,
   getGroupLabel,
   onOpenChange,
   renderAsVirtualItem = true
@@ -46,11 +41,11 @@ function MessageGroupRow({
 
   return (
     <Collapsible.Root
-      className={renderAsVirtualItem ? virtualItemClassName : undefined}
+      className={cn(renderAsVirtualItem && virtualItemClassName, showDivider && styles.divider)}
       style={
         renderAsVirtualItem
           ? { transform: `translateY(${top}px)`, height }
-          : undefined
+          : { height }
       }
       open={!isCollapsed}
       onOpenChange={(open) => {
@@ -61,18 +56,21 @@ function MessageGroupRow({
       <Collapsible.Trigger asChild disabled={!canToggle}>
         <button
           type="button"
-          className={`${groupTitleClassName} ${groupToggleClassName} ${
-            isFlagged && groupTitleFlaggedClassName ? groupTitleFlaggedClassName : ""
-          }`}
+          className={cn(styles.header, isFlagged && styles.flagged)}
           data-topic-suggestion-group={isTopicSuggestionGroup ? "true" : undefined}
         >
-          <span className={groupCaretClassName}>
-            {canToggle ? <CaretRightIcon /> : ""}
+          <span className={styles.chevron} aria-hidden="true">
+            {canToggle && <ChevronRight size={14} strokeWidth={2} />}
           </span>
-          <Text as="span" size="1">
-            {getGroupLabel(group)}
-            {showCount ? ` · ${countLabel}` : ""}
-          </Text>
+          <span className={styles.label}>{getGroupLabel(group)}</span>
+          {/* The flex layout drops the space visually; it keeps the
+              accessible name "Today 3" instead of "Today3". */}
+          {showCount && (
+            <>
+              {" "}
+              <span className={styles.count}>{countLabel}</span>
+            </>
+          )}
         </button>
       </Collapsible.Trigger>
     </Collapsible.Root>

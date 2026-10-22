@@ -3713,6 +3713,10 @@ export default function MailClient({
       if (target.isContentEditable) return true;
       return Boolean(target.closest("input, textarea, select"));
     };
+    // Open menus and listboxes use letter keys for typeahead and Delete/
+    // Backspace for nothing; they must not reach the message shortcuts.
+    const isMenuTarget = (target: EventTarget | null) =>
+      target instanceof HTMLElement && Boolean(target.closest('[role="menu"], [role="listbox"]'));
     const isMessageListShortcutTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       Boolean(target.closest('[data-message-list-row="true"]'));
@@ -3788,7 +3792,7 @@ export default function MailClient({
       const isTodoKey = key === "t" && !event.metaKey && !event.ctrlKey && !event.altKey;
       const isActionShortcut = isMarkReadKey || isMarkUnreadKey || isFlagKey || isTodoKey;
       if (!isDeleteKey && !isActionShortcut && !isSelectAllKey) return;
-      if (isTypingTarget(event.target)) return;
+      if (isTypingTarget(event.target) || isMenuTarget(event.target)) return;
       if (isSelectAllKey) {
         if (!isMessageListShortcutTarget(event.target)) return;
         event.preventDefault();
@@ -4816,8 +4820,8 @@ export default function MailClient({
   }, [activeTopic, activeTopicSuggestionsLoading, baseGetGroupLabel]);
 
   // The list pane is sized by the shell's resizable panel group; listWidth
-  // mirrors its rendered width so listIsNarrow and the header's collapsed
-  // view switcher keep following the pane. The pane mounts together with
+  // mirrors its rendered width so listIsNarrow and the list toolbar's
+  // icon-only sort trigger keep following the pane. The pane mounts together with
   // the shell, i.e. whenever the auth state leaves "unauth".
   useEffect(() => {
     if (authState === "unauth") return;
@@ -5433,8 +5437,6 @@ export default function MailClient({
                 state: {
                   listWidth,
                   searchScope,
-                  activeFolderName,
-                  activeVirtualFolderName: activeVirtualFolder?.name,
                   loadedMessageCount,
                   totalMessages,
                   listLoading,
@@ -5578,11 +5580,6 @@ export default function MailClient({
           reader: (
             <MessageViewOrchestrator
               ref={messageViewHandleRef}
-              onShowJson={() => setShowJson(true)}
-              onEvictThreadCache={() => {
-                console.info("[noctua] evict thread cache");
-                resetThreadCache();
-              }}
               header={{
                 activeMessage: activeMessage ?? null,
                 activeThread,

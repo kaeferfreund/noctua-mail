@@ -29,7 +29,12 @@ function account(id: string, name: string, domain = "example.test", shared = fal
   };
 }
 
-function renderSidebar(accounts: ShellAccount[], onSwitch: (id: string) => void, onSync = () => {}) {
+function renderSidebar(
+  accounts: ShellAccount[],
+  onSwitch: (id: string) => void,
+  onSync = () => {},
+  userOverrides: Partial<ShellSidebarProps["user"]> = {}
+) {
   const props: ShellSidebarProps = {
     brand: { buildVersionLabel: "" },
     mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: () => {} },
@@ -38,7 +43,8 @@ function renderSidebar(accounts: ShellAccount[], onSwitch: (id: string) => void,
     user: {
       userEmail: "person@example.test", userName: "Example Person", currentAccount: accounts[0] ?? null,
       isAdminUser: false, onOpenSettings: () => {}, onOpenAdmin: () => {},
-      onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {}
+      onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {},
+      ...userOverrides
     },
     views: { inbox: null, collab: [], virtual: [] },
     topics: { topics: [], activeTopicId: null, onTopicClick: () => {} },
@@ -82,6 +88,20 @@ describe("shell sidebar", () => {
     view.unmount();
     const short = renderSidebar(accounts.slice(0, 6), () => {});
     expect(short.queryByText("a.example.test")).toBeNull();
+  });
+
+  it("keeps the thread JSON and thread cache developer tools reachable from the user menu", async () => {
+    const calls: string[] = [];
+    const view = renderSidebar([account("a", "Alpha")], () => {}, () => {}, {
+      onShowThreadJson: () => { calls.push("json"); },
+      onEvictThreadCache: () => { calls.push("evict"); }
+    });
+    for (const label of ["Show thread JSON", "Evict thread cache"]) {
+      fireEvent.keyDown(view.getByRole("button", { name: "User menu" }), { key: "Enter" });
+      const item = await view.findByRole("menuitem", { name: label });
+      await act(async () => { fireEvent.click(item); });
+    }
+    expect(calls).toEqual(["json", "evict"]);
   });
 });
 
