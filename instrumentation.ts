@@ -10,4 +10,5 @@ export async function register() {
   assertImapSecretKeyConfigured();
   const { initializeMasterDb } = await import("@/lib/db");
   await initializeMasterDb();
+  if (process.env.NOCTUA_MAILBOX_WATCHER === "1") (await import("@/lib/mailboxWatcher")).startMailboxWatcher(); // mailbox-watcher hook (DB-storage gate inside)
 }

@@ -153,3 +153,29 @@ describe("specialFolders — id-based predicates", () => {
     expect(isThreadExcludedFolder(null, folders)).toBe(false);
   });
 });
+
+describe("Sent folder discovery", () => {
+  it("prefers SPECIAL-USE regardless of name, nesting or LIST order", () => {
+    const guessed = folder({ id: "acc-1:Sent", name: "Sent" });
+    const tagged = folder({ id: "acc-1:Custom/Replies", parentId: "acc-1:Custom", specialUse: "\\Sent" });
+    expect(findSentFolder([guessed, tagged], "acc-1")).toBe(tagged);
+    expect(findSentFolder([folder({ accountId: "acc-2", specialUse: "\\Sent" }), guessed], "acc-1")).toBe(guessed);
+  });
+  it("accepts exact top-level and INBOX-child names, including server delimiters", () => {
+    for (const candidate of [
+      folder({ id: "acc-1:Sent", name: "Sent" }),
+      folder({ id: "acc-1:INBOX/Gesendet", name: "Gesendet", parentId: "acc-1:INBOX" }),
+      folder({ id: "acc-1:INBOX.Sent", name: "Sent", delimiter: "." })
+    ]) expect(findSentFolder([candidate], "acc-1")).toBe(candidate);
+  });
+  it("rejects outbox, substring matches and nested user folders", () => {
+    for (const candidate of [
+      folder({ id: "acc-1:Outbox", name: "Outbox" }),
+      folder({ id: "acc-1:Consents", name: "Consents" }),
+      folder({ id: "acc-1:Sent 2025", name: "Sent 2025" }),
+      folder({ id: "acc-1:Projects/Sent", name: "Sent", parentId: "acc-1:Projects" }),
+      folder({ id: "acc-1:Projects/Sent", name: "Sent" }),
+      folder({ id: "acc-1:INBOX/Projects/Sent", name: "Sent" })
+    ]) expect(findSentFolder([candidate], "acc-1")).toBeNull();
+  });
+});

@@ -1,4 +1,5 @@
 import {
+  recordMailboxSync,
   bulkUpdateMessageFlags,
   deleteMessagesByIds,
   deleteMessagesWithFilesByIds,
@@ -234,7 +235,9 @@ export async function runSyncOperation(
 ): Promise<SyncOperationResult> {
   // Use batched version by default for better memory efficiency
   // This reduces peak memory usage by 80-90% for large folders
-  return runSyncOperationBatched(payload, clientId, options);
+  const result = await runSyncOperationBatched(payload, clientId, options);
+  await recordMailboxSync(payload.accountId);
+  return result;
 }
 
 /**

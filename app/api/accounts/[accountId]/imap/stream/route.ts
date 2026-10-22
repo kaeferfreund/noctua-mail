@@ -1,3 +1,4 @@
+import { connectIdleImapClient, runImapIdleLoop } from "@/lib/mail/imap/idle";
 import { NextResponse } from "next/server";
 
 import {
@@ -165,21 +166,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         }
         const mailbox = mailboxPathFromFolderId(folder.id, accountId);
 
-        const client = await connectImapClientWithRetry({
-          account,
-          logContext: { ...logContext, mailbox },
-          connectOp: "imap.connect",
-          createClient: () => {
-            const nextClient = new ImapFlow(
-              buildImapFlowOptions(account, {
-                maxIdleTime: 10 * 60 * 1000,
-                qresync: true
-              }, { ...logContext, mailbox })
-            );
-            bindImapClientError(nextClient, { ...logContext, mailbox });
-            return nextClient;
-          }
-        });
+        const client = await connectIdleImapClient(account, { ...logContext, mailbox });
         // The newly connected client is not yet tracked in `sessions`. If any
         // post-connect step below throws before we register it, `stopAll()`
         // would leave the connection dangling. Flip this flag immediately
@@ -345,18 +332,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           });
         });
 
-        const idleLoop = async () => {
-          while (!(client as any).closed) {
-            try {
-              await client.idle();
-            } catch (error) {
-              send("error", { folderId: folder.id, message: (error as Error).message });
-              break;
-            }
+        void runImapIdleLoop(client, request.signal).catch((error: unknown) => {
+          if (!request.signal.aborted) {
+            send("error", { folderId: folder.id, message: error instanceof Error ? error.message : String(error) });
           }
-        };
-
-        void idleLoop();
+        });
         } catch (error) {
           if (!sessionRegistered) {
             await safeLogoutImapClient(
