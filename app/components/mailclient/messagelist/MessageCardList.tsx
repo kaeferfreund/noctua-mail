@@ -346,7 +346,6 @@ export default function MessageCardList({
                   shiftKey,
                   messageId: message.id,
                   isThreadSelectionRoot,
-                  selectedMessageIds,
                   threadSelectionIds,
                   isThreadSelectionAllSelected,
                   selectionStore,
