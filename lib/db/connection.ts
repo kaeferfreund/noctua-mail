@@ -71,13 +71,17 @@ const ACCOUNT_DB_CACHE_KIB = (() => {
   return parsed;
 })();
 
-export function configureDb(db: any, busyTimeoutMs?: number) {
+export function configureDb(
+  db: any,
+  busyTimeoutMs = 15000,
+  options: { accountShard?: boolean } = {}
+) {
   db.exec("PRAGMA journal_mode = WAL;");
-  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs ?? 15000};`);
+  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");
 
-  // Only account shards omit the timeout; master writers pass an explicit value.
-  if (busyTimeoutMs === undefined) {
+  // Shard-only tuning (briefs/perf-sqlite.md item 4). Master/auth connections keep the defaults.
+  if (options.accountShard) {
     db.exec("PRAGMA synchronous = NORMAL;");
     db.exec(`PRAGMA cache_size = -${ACCOUNT_DB_CACHE_KIB};`);
     db.exec("PRAGMA temp_store = MEMORY;");
@@ -281,7 +285,7 @@ export async function getAccountDb(accountId: string) {
     await ensureDatabaseCtor();
     ensureDbParentDir(dbPath);
     const accountDb = new DatabaseCtor(dbPath);
-    configureDb(accountDb);
+    configureDb(accountDb, 15000, { accountShard: true });
     accountDbInstances.set(dbPath, accountDb);
   }
   const accountDb = accountDbInstances.get(dbPath)!;
