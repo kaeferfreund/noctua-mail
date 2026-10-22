@@ -64,10 +64,27 @@ async function ensureDatabaseCtor() {
   }
 }
 
-export function configureDb(db: any, busyTimeoutMs = 15000) {
+const ACCOUNT_DB_CACHE_KIB = (() => {
+  const raw = process.env.ACCOUNT_DB_CACHE_KIB?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : 32768;
+  if (!Number.isFinite(parsed) || parsed < 2000) return 32768;
+  return parsed;
+})();
+
+export function configureDb(db: any, busyTimeoutMs?: number) {
   db.exec("PRAGMA journal_mode = WAL;");
-  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
+  db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs ?? 15000};`);
   db.exec("PRAGMA foreign_keys = ON;");
+
+  // Only account shards omit the timeout; master writers pass an explicit value.
+  if (busyTimeoutMs === undefined) {
+    db.exec("PRAGMA synchronous = NORMAL;");
+    db.exec(`PRAGMA cache_size = -${ACCOUNT_DB_CACHE_KIB};`);
+    db.exec("PRAGMA temp_store = MEMORY;");
+    db.exec("PRAGMA mmap_size = 134217728;");
+    db.exec("PRAGMA wal_autocheckpoint = 4000;");
+    db.exec("PRAGMA journal_size_limit = 67108864;");
+  }
 }
 
 let authDbInstance: any | null = null;
