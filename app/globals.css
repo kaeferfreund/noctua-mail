@@ -70,10 +70,19 @@
 }
 
 /* `static` emits every variable below on :root even when no utility uses it:
-   CSS modules rely on --font-sans and --radius-sm/md/lg, and Tailwind does not
-   scan CSS files for variable usage. */
+   CSS modules rely on --font-sans/--font-mono, the type tokens and
+   --radius-sm/md/lg, and Tailwind does not scan CSS files for variable usage. */
 @theme inline static {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* The one monospace stack, for deliberate code/raw-source surfaces only. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  /* Type scale for the app chrome, on top of Tailwind's text-xs (12px) and
+     text-sm (14px, body): 11px for dense captions such as the status bar.
+     Uppercase is reserved for small section eyebrows, which all share
+     --tracking-caps; everything else uses the font's own spacing. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --tracking-caps: 0.06em;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -238,12 +247,20 @@
 }
 
 /* Radix Themes reads its own surface tokens; point them at the shadcn ones so
-   kept components and the new shell share one palette and one font. */
+   kept components and the new shell share one palette and one font. Radix
+   defaults <Em>/<Quote> to Times and <Code>/<Kbd> to its own mono stack. */
 .radix-themes {
   --color-background: var(--background);
   --color-panel-solid: var(--card);
   --color-surface: var(--card);
-  --default-font-family: "Inter", system-ui, sans-serif;
+  --default-font-family: var(--font-sans);
+  --code-font-family: var(--font-mono);
+  --em-font-family: var(--font-sans);
+  --em-font-size-adjust: 1;
+  --em-letter-spacing: 0em;
+  --quote-font-family: var(--font-sans);
+  --quote-font-size-adjust: 1;
+  --quote-letter-spacing: 0em;
 }
 
 @layer base {
@@ -307,8 +324,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-sans, "Sora", sans-serif);
-  letter-spacing: -0.01em;
+  font-family: var(--font-sans);
   overflow: hidden;
 }
 
@@ -353,7 +369,12 @@ main {
   padding: 0;
 }
 
-button {
+/* Without Tailwind preflight, native controls default to the OS UI font
+   (and Chrome's 13.33px); inherit the family like the rest of the chrome. */
+button,
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -667,7 +688,7 @@ a {
 
 
 .markdown-view {
-  font-family: var(--font-body, "IBM Plex Sans", system-ui, sans-serif);
+  font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.6;
   color: var(--mail-view-fg);
@@ -703,7 +724,7 @@ a {
 }
 
 .markdown-view code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   background: var(--surface-2);
   padding: 2px 4px;
@@ -962,7 +983,7 @@ a {
   padding: 4px 16px;
   border-top: 1px solid var(--border);
   background: var(--card);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: var(--muted-foreground);
   gap: 12px;
   min-height: 28px;
@@ -1021,10 +1042,11 @@ a {
   white-space: nowrap;
 }
 
+/* Sentence case like the sidebar group labels; weight, not caps, sets the
+   label apart from its value. */
 .bottom-label {
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 10px;
+  font-size: var(--text-2xs);
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
@@ -1041,7 +1063,7 @@ a {
   text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .bottom-center-time:hover {
   color: var(--text);
@@ -1103,8 +1125,9 @@ a {
 }
 
 .bottom-popover-heading {
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-caps);
   color: var(--gray-11);
 }
 
@@ -1133,8 +1156,9 @@ a {
 
 .reminder-group-label {
   margin: 0;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-caps);
   white-space: nowrap;
 }
 

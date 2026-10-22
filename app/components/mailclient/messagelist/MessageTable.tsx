@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import type { CSSProperties } from "react";
 import { GitBranch, MoveRight, Search, Trash2 } from "lucide-react";
-import { Badge, Checkbox, Text } from "@radix-ui/themes";
+import { Badge, Checkbox, Text, VisuallyHidden } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import { describeMessageSize } from "@/lib/ui/byteSize";
@@ -92,7 +92,6 @@ export default function MessageTable({
     flattenThread,
     getThreadLatestDate,
     getGroupLabel,
-    renderUnreadDot,
     renderSelectIndicators,
     renderFolderBadges,
     isTrashFolder,
@@ -257,10 +256,6 @@ export default function MessageTable({
         }}
       classNames={{
         virtualItem: styles.virtualItem,
-        groupTitle: groupStyles.groupTitle,
-        groupToggle: groupStyles.groupToggle,
-        groupTitleFlagged: groupStyles.groupTitleFlagged,
-        groupCaret: groupStyles.groupCaret,
         suggestionSection: groupStyles.suggestionSection,
         suggestionSectionRows: groupStyles.suggestionSectionRows,
         suggestionSectionRow: groupStyles.suggestionSectionRow,
@@ -312,7 +307,7 @@ export default function MessageTable({
             message.id === activeMessageId || showThreadSelectionActive || Boolean(optimistic?.active);
           const isDisabled = pendingMessageActions.has(message.id);
           const showRowDivider = index > 0 && !item.isFirstInGroup;
-          const { isCollapsedThreadRoot, displaySeen, threadMessages } = getThreadRowDisplayMeta({
+          const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
             item
           });
           const rowClassName = [
@@ -406,10 +401,6 @@ export default function MessageTable({
               }}
             >
                 <span data-message-cell="unread" className={styles.cellSelect}>
-                  {renderUnreadDot(message, {
-                    seen: displaySeen,
-                    threadMessages
-                  })}
                   {renderSelectIndicators(message)}
                   <Checkbox
                     size="1"
@@ -422,7 +413,6 @@ export default function MessageTable({
                         shiftKey: event.shiftKey,
                         messageId: message.id,
                         isThreadSelectionRoot,
-                        selectedMessageIds,
                         threadSelectionIds,
                         isThreadSelectionAllSelected,
                         selectionStore,
@@ -473,6 +463,7 @@ export default function MessageTable({
                       <CaretRightIcon />
                     </span>
                   )}
+                  {!displaySeen && <VisuallyHidden>Unread</VisuallyHidden>}
                   {!item.showRecipientIcon && (
                     <SenderIcon
                       accountId={message.accountId}
@@ -481,6 +472,7 @@ export default function MessageTable({
                       enabled={senderIconsEnabled}
                       className={styles.senderIcon}
                       title={item.fromTooltip}
+                      unread={!displaySeen}
                     />
                   )}
                   {item.showRecipientIcon && (

@@ -4,31 +4,8 @@
   justify-content: flex-start;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   position: relative;
-}
-
-.unreadDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--accent-9);
-  border: 1px solid var(--accent-9);
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  flex: 0 0 8px;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-}
-
-.unreadDotRead {
-  background: transparent;
-  opacity: 0.55;
-}
-
-.unreadDotDisabled {
-  cursor: default;
 }
 
 .selectIcons {
@@ -71,18 +48,4 @@
 
 .selectIconDraft {
   color: var(--gray-10);
-}
-
-@media (width < 768px) {
-  /* The glyph stays 8px; only the invisible pointer area grows. */
-  .unreadDot { position: relative; }
-  .unreadDot::after {
-    content: "";
-    position: absolute;
-    width: 44px;
-    height: 44px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FileText, Plus, RefreshCw, SquarePen } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { Topic } from "@/lib/data";
@@ -32,6 +32,8 @@ import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
+  /** In-app notices docked above the account card (AppShell decides when). */
+  notices?: ReactNode;
   compose: {
     onCompose: () => void;
     draftsCount: number;
@@ -124,7 +126,7 @@ function ViewRow({ view }: { view: ShellView }) {
  * Sidebar of the desktop shell (design §7.2): brand, "My mailboxes" /
  * "Shared mailboxes", "Views", "Topics" and the folder tree.
  */
-export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, onNavigate }: ShellSidebarProps) {
+export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, notices, onNavigate }: ShellSidebarProps) {
   const { setOpenMobile } = useSidebar();
   const closeAfter = (action: () => void, navigate = false) => () => {
     setOpenMobile(false);
@@ -154,7 +156,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <span className="truncate text-sm font-semibold">{DEFAULT_APP_TITLE}</span>
               {brand.buildVersionLabel ? (
                 <span
-                  className="truncate font-mono text-[10px] text-muted-foreground"
+                  className="truncate font-mono text-2xs text-muted-foreground"
                   title={`Build ${brand.buildVersionLabel}`}
                 >
                   {brand.buildVersionLabel}
@@ -235,7 +237,10 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
             ) : null}
             <FolderSidebarPane {...folders} setActiveFolderId={(next) => { setOpenMobile(false); onNavigate?.(); folders.setActiveFolderId(next); }} />
           </SidebarContent>
-          <SidebarFooter><ShellUserMenu {...user} onOpenSettings={closeAfter(user.onOpenSettings)} onOpenAdmin={closeAfter(user.onOpenAdmin)} /></SidebarFooter>
+          {/* Notices sit in the footer flow rather than over the folder list:
+              the list's viewport shrinks, so every folder (and drop target)
+              stays reachable by scrolling and nothing above it moves. */}
+          <SidebarFooter>{notices}<ShellUserMenu {...user} onOpenSettings={closeAfter(user.onOpenSettings)} onOpenAdmin={closeAfter(user.onOpenAdmin)} /></SidebarFooter>
         </div>
       </Theme>
     </Sidebar>

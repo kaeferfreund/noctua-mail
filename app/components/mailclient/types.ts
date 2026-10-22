@@ -20,6 +20,8 @@ export type DeleteConfirmAction = "cancel" | "delete_mail_only" | "delete_linked
 export type DeleteConfirmState = {
   kind: "message" | "messages" | "thread";
   messageCount: number;
+  hiddenMessageCount?: number;
+  collapsedThreadCount?: number;
   moveToTrashCount: number;
   permanentDeleteCount: number;
   calendarLinkedMessageCount: number;

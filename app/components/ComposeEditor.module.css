@@ -151,7 +151,7 @@
   border: none;
   outline: none;
   background: transparent;
-  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
   color: var(--input-fg);

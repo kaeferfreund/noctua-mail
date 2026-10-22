@@ -2,8 +2,7 @@
   resize: none;
   height: 100%;
   padding: 10px 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.5;
   background: var(--input-bg);
