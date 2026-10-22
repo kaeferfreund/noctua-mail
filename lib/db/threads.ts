@@ -1,3 +1,4 @@
+import { remapThreadCollab, type ThreadRemapPair } from "./threadCollab";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { collectThreadReferenceIds, resolveThreadingForItems } from "../threading";
 import { collectTopicSignalEntries, type TopicSignalSource } from "../topicSignals";
@@ -399,51 +400,56 @@ function parseReferencesForThreading(value?: string | null): string[] | undefine
 export async function recomputeThreadIdsForAccount(accountId: string) {
   return withDbWriteRetry("recomputeThreadIdsForAccount", async () => {
     const db = await getAccountDb(accountId);
-    const rows = db
-      .prepare(
-        `SELECT id, messageId, inReplyTo, "references", threadId, parentId, dateValue
-         FROM messages
-         WHERE accountId = ?`
-      )
-      .all(accountId) as Array<{
-      id: string;
-      messageId: string | null;
-      inReplyTo: string | null;
-      references: string | null;
-      threadId: string;
-      parentId: string | null;
-      dateValue: number;
-    }>;
-    if (rows.length === 0) return;
-    const normalized = resolveThreadingForItems(
-      rows.map((row) => ({
-        id: row.id,
-        dateValue: row.dateValue,
-        messageId: row.messageId,
-        inReplyTo: row.inReplyTo,
-        references: parseReferencesForThreading(row.references),
-        threadId: row.threadId
-      }))
-    );
-    const normalizedById = new Map(normalized.map((row) => [row.id, row]));
-    const updates: Array<{ id: string; threadId: string; parentId: string | null }> = [];
-    rows.forEach((row) => {
-      const next = normalizedById.get(row.id);
-      if (!next?.threadId) return;
-      const nextParentId = next.parentId ?? null;
-      const nextThreadId = next.threadId;
-      if (
-        (nextThreadId && nextThreadId !== row.threadId) ||
-        (nextParentId ?? null) !== (row.parentId ?? null)
-      ) {
-        updates.push({ id: row.id, threadId: nextThreadId, parentId: nextParentId });
-      }
-    });
-    if (updates.length === 0) return;
-    const update = db.prepare(`UPDATE messages SET threadId = ?, parentId = ? WHERE id = ?`);
-    db.transaction(() => {
+    const changed = db.transaction(() => {
+      const rows = db
+        .prepare(
+          `SELECT id, messageId, inReplyTo, "references", threadId, parentId, dateValue
+           FROM messages
+           WHERE accountId = ?`
+        )
+        .all(accountId) as Array<{
+        id: string;
+        messageId: string | null;
+        inReplyTo: string | null;
+        references: string | null;
+        threadId: string;
+        parentId: string | null;
+        dateValue: number;
+      }>;
+      if (rows.length === 0) return false;
+      const normalized = resolveThreadingForItems(
+        rows.map((row) => ({
+          id: row.id,
+          dateValue: row.dateValue,
+          messageId: row.messageId,
+          inReplyTo: row.inReplyTo,
+          references: parseReferencesForThreading(row.references),
+          threadId: row.threadId
+        }))
+      );
+      const normalizedById = new Map(normalized.map((row) => [row.id, row]));
+      const updates: Array<{ id: string; threadId: string; parentId: string | null }> = [];
+      const remaps: ThreadRemapPair[] = [];
+      rows.forEach((row) => {
+        const next = normalizedById.get(row.id);
+        if (!next?.threadId) return;
+        const nextParentId = next.parentId ?? null;
+        const nextThreadId = next.threadId;
+        if (nextThreadId !== row.threadId) remaps.push({ ...row, oldThreadId: row.threadId, newThreadId: nextThreadId });
+        if (
+          (nextThreadId && nextThreadId !== row.threadId) ||
+          (nextParentId ?? null) !== (row.parentId ?? null)
+        ) {
+          updates.push({ id: row.id, threadId: nextThreadId, parentId: nextParentId });
+        }
+      });
+      if (updates.length === 0) return false;
+      const update = db.prepare(`UPDATE messages SET threadId = ?, parentId = ? WHERE id = ?`);
       updates.forEach((row) => update.run(row.threadId, row.parentId, row.id));
-    })();
+      remapThreadCollab(db, accountId, remaps);
+      return true;
+    }).immediate();
+    if (!changed) return;
     await rebuildAllThreadSignalsForAccount(db, accountId);
   });
 }

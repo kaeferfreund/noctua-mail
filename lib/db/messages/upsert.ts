@@ -31,6 +31,7 @@
  *     writes escalate to a full-account recompute.
  */
 import type { Message } from "../../data";
+import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
 import { withDbWriteRetry } from "../../dbWriteRetry";
 import { normalizeImapFlags, preserveLocalOnlyMessageFlags } from "../../messageFlags";
@@ -95,10 +96,6 @@ export async function upsertMessages(
   return withDbWriteRetry("upsertMessages", async () => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     const UPSERT_BATCH_SIZE = 200;
-    const yieldToEventLoop = () =>
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
-      });
     const db = await getAccountDb(accountId);
     const deleteSql = folderId
       ? `DELETE FROM messages WHERE accountId = ? AND folderId = ?`
@@ -142,12 +139,12 @@ export async function upsertMessages(
     );
     const deleteMessageById = db.prepare(`DELETE FROM messages WHERE accountId = ? AND id = ?`);
     const findMessageById = db.prepare(
-      `SELECT id, folderId, mailboxPath, imapUid, flags, sizeBytes
+      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes
        FROM messages
        WHERE accountId = ? AND id = ?`
     );
     const findFolderMessageDuplicates = db.prepare(
-      `SELECT id, threadId, folderId, mailboxPath, imapUid
+      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid
        FROM messages
        WHERE accountId = ? AND folderId = ? AND messageId = ? AND id <> ?`
     );
@@ -277,13 +274,19 @@ export async function upsertMessages(
       loadManualCategoryStatesForMessageIds(nextMessages.map((message) => message.id));
     }
     const dedupedThreadIds = new Set<string>();
-    const upsertBatch = db.transaction(
-      (batch: Message[], shouldDeleteAttachments: boolean) => {
+    const remaps: ThreadRemapPair[] = [];
+    type ReplacedRow = { id: string; threadId: string; messageId: string | null; dateValue: number };
+    const replacedById = new Map<string, ReplacedRow>();
+    const replacedByHeader = new Map<string, ReplacedRow>();
+    const upsertBatch = (batch: Message[], shouldDeleteAttachments: boolean) => {
       batch.forEach((message) => {
         let rowId = message.id;
         const existingById = findMessageById.get(accountId, rowId) as
           | {
               id: string;
+              threadId: string;
+              messageId: string | null;
+              dateValue: number;
               folderId?: string | null;
               mailboxPath?: string | null;
               imapUid?: number | null;
@@ -308,6 +311,10 @@ export async function upsertMessages(
           // will fetch its own source/attachments on first access.
           existingRow = findMessageById.get(accountId, rowId) as typeof existingById;
         }
+        const previous = existingRow ?? replacedById.get(rowId) ?? (message.messageId ? replacedByHeader.get(message.messageId) : undefined);
+        if (previous?.threadId && previous.threadId !== message.threadId) remaps.push({
+          ...previous, oldThreadId: previous.threadId, newThreadId: message.threadId
+        });
         if (message.messageId) {
           const duplicates = findFolderMessageDuplicates.all(
             accountId,
@@ -317,6 +324,8 @@ export async function upsertMessages(
           ) as Array<{
             id: string;
             threadId: string | null;
+            messageId: string | null;
+            dateValue: number;
             folderId?: string | null;
             mailboxPath?: string | null;
             imapUid?: number | null;
@@ -331,6 +340,9 @@ export async function upsertMessages(
             deleteMessageById.run(accountId, row.id);
             if (row.threadId) {
               dedupedThreadIds.add(row.threadId);
+              if (row.threadId !== message.threadId) {
+                remaps.push({ ...row, oldThreadId: row.threadId, newThreadId: message.threadId });
+              }
             }
           });
         }
@@ -581,30 +593,30 @@ export async function upsertMessages(
           );
         });
       });
-    });
+    };
 
-    if (replaceExisting) {
-      db.transaction(() => {
-        deleteAttachmentsByScope.run(...deleteArgs);
-        if (folderId) {
-          deleteCalendarEventsByScope.run(accountId, accountId, folderId);
-        } else {
-          deleteCalendarEventsByScope.run(accountId);
+    // Message rewrite and metadata remap are a single immediate unit. In
+    // particular, a split spanning batches must see every final message id.
+    db.transaction(() => {
+      if (replaceExisting) {
+        // Capture identities under the same writer lock as delete + remap.
+        const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
+          WHERE accountId=?${folderId ? " AND folderId=?" : ""}`).all(...deleteArgs) as ReplacedRow[];
+        for (const row of replacedRows) {
+          replacedById.set(row.id, row);
+          if (row.messageId) replacedByHeader.set(row.messageId, row);
         }
+        deleteAttachmentsByScope.run(...deleteArgs);
+        if (folderId) deleteCalendarEventsByScope.run(accountId, accountId, folderId);
+        else deleteCalendarEventsByScope.run(accountId);
         deleteFtsByScope.run(...deleteArgs);
         deleteMessages.run(...deleteArgs);
-      })();
-    }
-
-    const shouldDeleteAttachments = !replaceExisting;
-    for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
-      const batch = nextMessages.slice(start, start + UPSERT_BATCH_SIZE);
-      if (batch.length === 0) continue;
-      upsertBatch(batch, shouldDeleteAttachments);
-      if (start + UPSERT_BATCH_SIZE < nextMessages.length) {
-        await yieldToEventLoop();
       }
-    }
+      for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
+        upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
+      }
+      remapThreadCollab(db, accountId, remaps);
+    }).immediate();
 
     let affectedThreadIds: string[] = [];
     let requiresFullRecompute = false;
@@ -613,7 +625,8 @@ export async function upsertMessages(
       if (folderId) {
         const affectedThreadIdSet = new Set<string>([
           ...(existingScopeThreadIds ?? new Set<string>()),
-          ...dedupedThreadIds
+          ...dedupedThreadIds,
+          ...remaps.map(pair => pair.oldThreadId)
         ]);
         nextMessages.forEach((message) => {
           if (message.threadId) {
@@ -647,7 +660,8 @@ export async function upsertMessages(
       const affected = Array.from(
         new Set([
           ...nextMessages.map((message) => message.threadId).filter(Boolean),
-          ...dedupedThreadIds
+          ...dedupedThreadIds,
+          ...remaps.map(pair => pair.oldThreadId)
         ])
       );
       affectedThreadIds = affected;

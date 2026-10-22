@@ -422,6 +422,14 @@ Assigning the same user or setting the same status is a no-op (no activity row, 
 change). Validation of `status` and that `assigneeUserId` is a current enabled member happens in
 the route/tool before the shard transaction.
 
+Slice A details: equal merge timestamps are resolved by lexical source `threadId`
+(ascending), so the result is independent of input order. Status recency uses
+`statusChangedAt` (falling back to `updatedAt`), assignment recency uses `assignedAt`.
+A comment edit emits `comment_edited`; editing the same body is a no-op. Comment
+edit/delete author overrides require a manager and explicit `allowAnyAuthor`.
+An unknown thread returns `null` from mutations for HTTP 404 mapping; list reads
+hide orphan comments/activity. Slice B supplies the reply/send hook.
+
 ### 6.2 Enrichment and filters
 
 - `Message.collab?: { status: ThreadStatus; assigneeUserId: string | null; commentCount: number; updatedAt: number }`

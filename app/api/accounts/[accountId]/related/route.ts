@@ -1,3 +1,4 @@
+import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
@@ -36,6 +37,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       pageSize,
       groupBy,
       badges,
+      viewerUserId: context.session.userId,
       attachmentsOnly,
       excludedFolderIds
     });
@@ -44,6 +46,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       accountEmail: context.account.email,
       includeSuggestions: true
     });
+
+    await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
 
     return NextResponse.json({
       items: data.items,

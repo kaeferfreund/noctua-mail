@@ -1,3 +1,4 @@
+import { getThreadCollabState } from "@/lib/threadCollab";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -33,6 +34,8 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
     if (message.threadId) {
+      const state = await getThreadCollabState(context.accountId,message.threadId);
+      message.collab = {status:state.status,assigneeUserId:state.assigneeUserId,commentCount:state.commentCount,updatedAt:state.updatedAt};
       message.topics = await getTopicsForThread(context.accountId, message.threadId);
       if (message.topics.length === 0) {
         message.topicSuggestions = await getTopicSuggestionsForThread(
