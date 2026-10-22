@@ -28,6 +28,8 @@ import {
   stripBccHeader
 } from "@/lib/mail/stripBccHeader";
 import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
+import { parseMailForCategorization } from "@/lib/mail/categorization/classifier";
+import { buildImapMessageRowId } from "@/lib/messageIds";
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import { splitRecipientEntries } from "@/lib/recipientLists";
 import { buildReplyThreadHeaders } from "@/lib/replyThreadHeaders";
@@ -200,6 +202,169 @@ export async function buildDraftInputForMode(
   };
 }
 
+const APPENDED_DRAFT_FLAGS = ["\\Draft", "\\Seen"];
+
+function normalizeHeaderId(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeHeaderIdList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeHeaderIdList(item));
+  }
+  if (typeof value !== "string") return [];
+  return value
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function addressText(value: unknown): string {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    return value.map((item) => addressText(item)).filter(Boolean).join(", ");
+  }
+  if (typeof value === "object" && value !== null && "text" in value) {
+    const text = (value as { text?: unknown }).text;
+    return typeof text === "string" ? text : "";
+  }
+  return "";
+}
+
+function headerText(headers: { get?: (key: string) => unknown } | undefined, key: string) {
+  const value = headers?.get?.(key);
+  if (typeof value === "string") return value.trim() || undefined;
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string" && item.trim());
+    return typeof first === "string" ? first.trim() : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Build the local draft row from the RFC822 just appended. Returns null when
+ * the parsed Message-ID, In-Reply-To, or References do not match what compose
+ * asked to write, so the caller can still FETCH.
+ */
+async function messageFromAppendedDraft(params: {
+  account: Account;
+  draftsFolderId: string;
+  mailboxPath: string;
+  uid: number;
+  raw: Buffer | string;
+  payload: SaveDraftInput;
+  preservedMessageId?: string;
+}): Promise<Message | null> {
+  let parsed: Awaited<ReturnType<typeof parseMailForCategorization>>;
+  try {
+    parsed = await parseMailForCategorization(params.raw);
+  } catch {
+    return null;
+  }
+
+  const messageId = normalizeHeaderId(parsed.messageId);
+  if (!messageId) return null;
+  const preservedMessageId = normalizeHeaderId(params.preservedMessageId);
+  if (preservedMessageId && preservedMessageId !== messageId) return null;
+
+  const parsedInReplyTo = normalizeHeaderId(parsed.inReplyTo);
+  const payloadInReplyTo = normalizeHeaderId(params.payload.inReplyTo);
+  if (payloadInReplyTo && parsedInReplyTo !== payloadInReplyTo) return null;
+  const inReplyTo = parsedInReplyTo ?? payloadInReplyTo;
+
+  const parsedReferences = normalizeHeaderIdList(parsed.references);
+  const payloadReferences = (params.payload.references ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (payloadReferences.length > 0) {
+    if (parsedReferences.length !== payloadReferences.length) return null;
+    for (let index = 0; index < payloadReferences.length; index += 1) {
+      if (parsedReferences[index] !== payloadReferences[index]) return null;
+    }
+  }
+
+  const from = addressText(parsed.from) || params.account.email;
+  const to = addressText(parsed.to) || params.payload.to || "";
+  const subject = (parsed.subject ?? params.payload.subject ?? "").trim() || "(no subject)";
+  const parsedDate =
+    parsed.date instanceof Date && !Number.isNaN(parsed.date.getTime()) ? parsed.date : new Date();
+  const dateValue = parsedDate.getTime();
+  const body = typeof parsed.text === "string" ? parsed.text : "";
+  const htmlBody = typeof parsed.html === "string" ? parsed.html : undefined;
+  const source = Buffer.isBuffer(params.raw) ? params.raw.toString("utf8") : String(params.raw);
+  const parsedAttachments: Array<{
+    content?: Buffer | Uint8Array | string | null;
+    filename?: string | null;
+    contentType?: string | null;
+    size?: number | null;
+    contentDisposition?: string | null;
+    cid?: string | null;
+  }> = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+  const attachments = parsedAttachments.map((attachment, index) => {
+    const content = attachment.content;
+    const buffer = Buffer.isBuffer(content)
+      ? content
+      : content
+        ? Buffer.from(content)
+        : null;
+    return {
+      id: `att-${params.account.id}-${params.uid}-${index}`,
+      filename: attachment.filename || `attachment-${index + 1}`,
+      contentType: attachment.contentType || "application/octet-stream",
+      size: buffer?.byteLength ?? attachment.size ?? 0,
+      inline: attachment.contentDisposition === "inline" || Boolean(attachment.cid),
+      cid: attachment.cid || undefined,
+      content: buffer
+    };
+  });
+
+  return {
+    id: buildImapMessageRowId(messageId, {
+      dateValue,
+      from,
+      to,
+      subject,
+      inReplyTo
+    }),
+    threadId: inReplyTo ?? messageId,
+    messageId,
+    inReplyTo,
+    references: parsedReferences.length > 0 ? parsedReferences : payloadReferences,
+    xForwardedMessageId:
+      params.payload.xForwardedMessageId ??
+      headerText(parsed.headers, "x-forwarded-message-id"),
+    subject,
+    from,
+    replyTo: addressText(parsed.replyTo) || undefined,
+    to,
+    cc: addressText(parsed.cc) || params.payload.cc || undefined,
+    bcc: addressText(parsed.bcc) || params.payload.bcc || undefined,
+    preview: body.replace(/\s+/g, " ").trim().slice(0, 120),
+    date: parsedDate.toLocaleString(),
+    dateValue,
+    folderId: params.draftsFolderId,
+    accountId: params.account.id,
+    mailboxPath: params.mailboxPath,
+    imapUid: params.uid,
+    body,
+    htmlBody,
+    source,
+    hasSource: true,
+    attachments,
+    flags: APPENDED_DRAFT_FLAGS,
+    seen: true,
+    answered: false,
+    flagged: false,
+    deleted: false,
+    draft: true,
+    recent: false,
+    unread: false,
+    listId: headerText(parsed.headers, "list-id") ?? null
+  };
+}
+
 export async function saveDraftForAccount(params: {
   account: Account;
   accountId: string;
@@ -251,14 +416,23 @@ export async function saveDraftForAccount(params: {
     }
   }
 
-  const uid = await appendImapMessage(account, draftsMailbox, raw, ["\\Draft", "\\Seen"], clientId);
+  const uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId);
   if (!uid) {
     throw new DraftSaveError(502, "Failed to save draft to IMAP server");
   }
 
   let draftId: string | null = null;
   let savedMessage: Message | null = null;
-  const message = await syncImapMessage(account, draftsMailbox, uid, clientId);
+  const localMessage = await messageFromAppendedDraft({
+    account,
+    draftsFolderId: draftsFolder.id,
+    mailboxPath: draftsMailbox,
+    uid,
+    raw,
+    payload,
+    preservedMessageId
+  });
+  const message = localMessage ?? (await syncImapMessage(account, draftsMailbox, uid, clientId));
   if (message) {
     const [resolvedMessage] = await resolveThreadingForAccountMessages(accountId, [message]);
     const sanitized = await sanitizeSyncedMessage(resolvedMessage ?? message, account.id);
