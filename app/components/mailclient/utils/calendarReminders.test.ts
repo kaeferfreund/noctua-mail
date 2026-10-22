@@ -54,7 +54,7 @@ beforeAll(() => {
       status: 200,
       headers: { "Content-Type": "application/json" }
     });
-  }) as typeof fetch;
+  }) as unknown as typeof fetch;
 });
 
 afterAll(() => {

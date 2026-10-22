@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { Account, Message } from "@/lib/data";
 
-const getStoredMessagesByIds = mock(async () => []);
+const getStoredMessagesByIds = mock<typeof import("./db").getStoredMessagesByIds>(async () => []);
 const relocateMovedMessage = mock(async () => null);
 const findMissingStoredMailboxCopies = mock(async () => new Set<string>());
 const actualDb = await import("./db");
@@ -72,7 +72,8 @@ describe("reconcileVerifiedCrossFolderMoves", () => {
         messageId: movedMessage.messageId,
         folderId: `${account.id}:INBOX`,
         mailboxPath: "INBOX",
-        imapUid: 75242
+        imapUid: 75242,
+        flags: []
       }
     ]);
     findMissingStoredMailboxCopies.mockResolvedValue(new Set([movedMessage.id]));
@@ -101,7 +102,8 @@ describe("reconcileVerifiedCrossFolderMoves", () => {
         messageId: movedMessage.messageId,
         folderId: `${account.id}:INBOX`,
         mailboxPath: "INBOX",
-        imapUid: 75242
+        imapUid: 75242,
+        flags: []
       }
     ]);
     findMissingStoredMailboxCopies.mockResolvedValue(new Set());
