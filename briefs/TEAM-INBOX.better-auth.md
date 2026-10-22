@@ -3,12 +3,12 @@
 Design document for the `kaeferfreund/noctua-mail` fork. It is the single source of truth for the
 implementation branches listed in §9. Everything not mentioned here stays as upstream.
 
-Status: design v4 draft, 2026-10-22. Reviewed against Better Auth 1.7.12 at spike commit `98f04ad`. Replaces the auth design in v2 following the user's decision
+Status: design v5, resolved and promoted, 2026-10-22. Reviewed against Better Auth 1.7.12 at spike commit `98f04ad`. Replaces the auth design in v2 following the user's decision
 “halt wir sollten doch better auth nutzen” / “weil dann können wir passkeys und 2fa nutzen”.
 The verified spike is `spike/better-auth`, report `doc/SPIKE-BETTER-AUTH.md`; named tests in that
 report are implementation evidence, while application policy below is work to implement.
 Inputs include the complete fit report (§2 items 1–18, §3 and §5), all three independent
-Better Auth reviews, and `briefs/better-auth-revision-log.md` (S1–S8, F1–F10, I1–I11).
+Better Auth reviews, and `doc/TEAM-AUTH-REVIEW-LOG.md` (S1–S8, F1–F10, I1–I11).
 This is an implementation contract, not a claim that the spike implements production policy.
 
 ### v3 → v4 changelog
@@ -23,33 +23,24 @@ This is an implementation contract, not a claim that the spike implements produc
 - Added all 18 go-live criteria, watcher/worker ownership, Sent reliability and Stage 4 cut-over.
 - Replanned seven buildable slices; assigned browser WebAuthn harness and full phone/PWA acceptance.
 
-The following policy boxes are recommendations pending the user's answer. They are the only policy
-switch points; downstream sections implement their selected values. An alternative requires the
-listed bounded follow-up, not parallel authentication stacks.
+### v4 → v5 changelog
 
-> **Decision D13 — mandatory TOTP.** Recommended: every user enrolls TOTP, including passkey users;
-> a UV passkey can complete login once enrollment is verified. Alternative: require any enrolled MFA
-> method instead. Consequence: change `isMfaEnrollmentComplete` in §4.1 and its tests/UI copy to accept
-> UV-passkey enrollment; per-session assurance, fresh proof and revocation still apply.
+- Applied the user's final decisions of 2026-10-22; rejected alternatives are recorded in Appendix A.
+- Fixed the canonical tailnet HTTPS origin/RP ID and DNS-01 deployment contract (§8).
+- Carried over feat/ui-shell commit `ba9d34a`: radix-nova, gray/iris tokens, inset dashboard layout
+  and frame-only ownership; retained the reviewed Better Auth contracts and seven-slice sequence.
 
-> **Decision D3 — personal IMAP first factor.** Recommended: implement only the strict §4.2 method,
-> off by default and enabled only by `NOCTUA_IMAP_LOGIN_HOSTS`. Alternative: remove this login method.
-> Consequence: omit the plugin/bridge, eligibility UI and IMAP credential-proof path; migrated users
-> use operator-issued password reset links. Mailbox credential storage remains necessary.
+Decided: D13 — TOTP enrollment is mandatory for every user before any mailbox access; UV passkeys provide convenient login and backup codes provide recovery (user, 2026-10-22).
 
-> **Decision D2 — cookie credential mode.** Recommended: require encrypted DB credentials, accept
-> `both` only as a deprecated alias, reject `cookie`. Alternative: support browser-only credentials.
-> Consequence: separate architecture review for workers/shared mailboxes and a credential transport;
-> the current worker/go-live design cannot run without server-accessible credentials.
+Decided: D3 — implement personal-mailbox IMAP first factor, OFF by default, enabled only by `NOCTUA_IMAP_LOGIN_HOSTS`, never for shared mailboxes (user, 2026-10-22).
 
-> **Decision D15 — Tauri.** Recommended: drop desktop mode in this Linux/systemd fork and reject it
-> at startup. Alternative: retain Tauri. Consequence: a separately owned desktop port must define
-> persisted secrets, dynamic loopback origin and WebAuthn behavior before claiming compatibility.
+Decided: D2 — encrypted DB-only mailbox credentials; cookie-only mode is dropped; `both` remains only a deprecated alias for `db` (user, 2026-10-22).
 
-> **Decision D17 — recovery delivery without SMTP.** Recommended: restricted admin/operator handover
-> of a single-use reset link; public reset redemption remains available. Alternative: configure a
-> dedicated SMTP sender and enable generic public reset requests. Consequence: add sender credentials,
-> deliverability/abuse checks and the SMTP-on tests; the redemption and MFA contracts stay identical.
+Decided: D15 — Tauri/desktop mode is dropped and unsupported; startup rejects it and signup has no desktop invite exemption (user, 2026-10-22).
+
+Decided: D17 — admin issues a short-lived single-use reset link and hands it over personally; SMTP recovery delivery is a non-goal for this stage (user, 2026-10-22).
+
+Decided: canonical HTTPS origin is `https://mails.monkeymed.de`, RP ID `mails.monkeymed.de`, DNS A `100.92.134.1`, TLS via netcup API DNS-01; the remote-arm preview stays separate (§8) (user, 2026-10-22).
 
 ## 1. Goals and non-goals
 
@@ -57,8 +48,8 @@ Goals
 
 1. Personal login through Better Auth 1.7.12: e-mail + app password + TOTP (backup codes for
    recovery), or a passkey with authenticator user verification. Both people must complete TOTP
-   enrollment before accessing mail. Optional IMAP-password login proves only the person's eligible
-   login mailbox and uses the same TOTP challenge (§4.2). Shared mailbox credentials never identify
+   enrollment before accessing mail. Optional IMAP-password login is OFF by default, proves only the
+   person's eligible login mailbox and uses the same TOTP challenge (§4.2). Shared mailbox credentials never identify
    a person. IMAP/SMTP credentials remain encrypted mailbox configuration in the master DB.
 2. Mailbox roles. A mailbox (Noctua `Account`) can be shared with several users. Each membership
    carries a role: `viewer`, `editor`, `manager`. Admins manage users and mailboxes.
@@ -75,8 +66,9 @@ Non-goals (for now)
 - OAuth for MCP clients. Bearer tokens stay; token scopes are reserved but not enforced yet.
 - Unified multi-account inbox. One mailbox is active at a time; the sidebar switches between them.
 - Replacing Radix Themes inside the kept components. They keep working under the new tokens.
-- Tauri support in this server fork's first release. Desktop mode fails explicitly at startup
-  (§8); a later dedicated port can use Better Auth, but there is no insecure legacy-auth fallback.
+- Tauri/desktop mode is removed and unsupported. Startup rejects it (§8); no desktop carve-outs remain.
+- SMTP delivery of onboarding or password-reset messages. Admin hands links over personally; mailbox
+  SMTP sending/replying remains part of the mail client and is unaffected by this recovery non-goal.
 - Social/OAuth login, organizations, email/SMS OTP and passwordless invite registration. They are
   unnecessary for this two-person installation. MCP OAuth is also outside this auth change.
 
@@ -118,24 +110,25 @@ folder layout must be measured; the fit report's estimates are not release evide
 |---|----------|-----------|
 | D1 | Better Auth 1.7.12 and @better-auth/passkey 1.7.12, pinned exactly. `lib/betterAuth.ts` configures `emailAndPassword`, `twoFactor`, `admin`, `passkey`, and last `nextCookies()`. Passwords use `Bun.password` argon2id through `emailAndPassword.password.{hash,verify}`; length 10..256 via Better Auth options. | Passkeys, TOTP, backup codes and revocable sessions justify the dependency. The standalone custom password stack is retired. Admin createUser needs an explicit minimum-length check (§4.3), as the spike proves. |
 | D2 | DB mailbox credential storage is required throughout this fork. `db` is the default; `both` is accepted as a deprecated alias for `db`. Startup rejects `cookie`. Sessions and MCP tokens carry no IMAP/SMTP passwords; remove the global credential overlay. | Shared mailboxes and server-side sync require encrypted credentials accessible without a browser. A second sealed credential cookie would preserve the unsafe overlay and cannot feed workers. |
-| D3 | Keep optional IMAP-password first factor at `/api/ba/sign-in/imap`, off unless `NOCTUA_IMAP_LOGIN_HOSTS` is configured. Apply the strict personal login-mailbox rule in §4.2 and the twoFactor after-hook bridge proven by the spike. Every admin must retain an app-password fallback and offline recovery codes. | The spike proves custom endpoint + TOTP, including the HTTP no-session-before-TOTP invariant. Hook reuse is version-coupled, so exact pins and upgrade tests are required. Shared-mailbox login is forbidden. |
+| D3 | Keep optional IMAP-password first factor at `/api/ba/sign-in/imap`, OFF by default, enabled only by a nonempty explicit `NOCTUA_IMAP_LOGIN_HOSTS` allowlist. Never use shared mailboxes. Apply the strict personal login-mailbox rule in §4.2 and the twoFactor after-hook bridge proven by the spike. Every admin must retain an app-password fallback and offline recovery codes. | The spike proves custom endpoint + TOTP, including the HTTP no-session-before-TOTP invariant. Hook reuse is version-coupled, so exact pins and upgrade tests are required. Shared-mailbox login is forbidden. |
 | D4 | Authorization is membership based. `requireAccountContext` obtains the Better Auth user asynchronously, resolves mailbox membership, and enforces a minimum role per route. Active mailbox is only a UI preference on the session. | A user may act on any mailbox they have access to. Switching a mailbox changes the selection without changing authorization. |
 | D5 | Use DB sessions in `auth_session`, signed opaque session-token cookies, `cookieCache.enabled:false`, and explicit revocation. Ban/disable maps to admin-plugin `banUser`, plus MCP-token deletion. Use the reviewed password wrapper, credential-generation triggers and explicit session revocation on changes/resets. All admin mutations are audited. | Ban deletes existing sessions and blocks new ones; the spike tests both. A database read on each guard makes revocation immediate. No timestamp comparison in a custom cookie is needed. |
 | D6 | Better Auth `auth_user.role` is authoritative for `admin`/`user`; `users.role` is its one-way compatibility mirror. Noctua `/api/admin/*` services wrap admin-plugin APIs with last-admin rules, audit and mailbox-independent permissions. Remove impersonation permission and disable its HTTP paths. | Admin manages users/mailboxes but has no implicit access to mail. Raw plugin admin endpoints must not bypass Noctua policy (§4.5). |
 | D7 | Collaboration state lives in the per-account shard DB, keyed by `(accountId, threadId)`. Rows are remapped whenever a message's `threadId` changes (sync upsert, resync, recompute) and are never pruned. All mutations are single immediate SQLite transactions with upserts. | Same key as `thread_topics`, `thread:` search, and MCP thread addressing. `EXISTS` joins on `messages.threadId` work without `ATTACH`. Accounts can share one shard file, so `accountId` is part of every key. |
 | D8 | Collaboration status values: `open`, `in_progress`, `waiting`, `closed`. Never `done`. | Upstream has per-message `$Todo`/`$Done` keywords labelled "Mark as Done". |
 | D9 | Per-user UI preferences per mailbox move to `user_account_prefs` (master DB, sparse deep-merge). Theme stays a device preference (next-themes, localStorage). | `AccountSettings` mixes team config with personal UI prefs; shared mailboxes need the split. One source of truth per preference. |
-| D10 | UI: shadcn/ui (style `new-york`, base `neutral`, CSS variables) + Tailwind v4 without preflight + next-themes. Radix Themes stays loaded for kept components, imported into a CSS cascade layer. | Incremental migration. Preflight would strip list bullets, heading sizes and inline SVG layout from the editor and markdown surfaces. |
+| D10 | UI: shadcn/ui (style `radix-nova`, base `neutral`, CSS variables) + Tailwind v4 without preflight + next-themes. Radix Themes stays loaded for kept components, imported into a CSS cascade layer. | Incremental migration. Preflight would strip list bullets, heading sizes and inline SVG layout from the editor and markdown surfaces. |
 | D11 | Mobile: below `md` the shell shows one pane at a time, derived from `viewMessage` (not from taps), with both panes kept mounted and CSS-hidden. Compose is always a full-screen modal on mobile. | Deep links, notices and reminders also set `viewMessage`; unmounting panes loses the virtualization and scroll refs. |
 | D12 | Every new route and DB module gets adjacent bun tests. Reuse `lib/testDbHarness.ts` and a shared `lib/testAuthHarness.ts` that creates real auth users, sessions and memberships. Mock wrapper seams only. Concurrency cases run with `bun run test:stress`. | Synthetic data and shared helpers follow AGENTS.md. Cookies are issued by Better Auth rather than reimplementing their signing format. |
-| D13 | TOTP enrollment is mandatory for both users (including admins); an app password alone reaches only enrollment. Passkey login is a full login only with `userVerified === true`. Do not offer “trust this device”; reject `trustDevice:true` server-side. | Both people have consistent recovery and a provider-independent fallback. Better Auth has no built-in mandatory-MFA switch; Noctua enforces the gate (§4.1/§4.4). |
+| D13 | TOTP enrollment is mandatory for every user (including admins and passkey users); an app password alone reaches only enrollment. Passkey login is a full login only with `userVerified === true`. Do not offer “trust this device”; reject `trustDevice:true` server-side. | Both people have consistent recovery and a provider-independent fallback. Better Auth has no built-in mandatory-MFA switch; Noctua enforces the gate (§4.1/§4.4). |
 | D14 | Separate `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `auth_two_factor`, `auth_passkey` tables in the master DB; `auth_user.id === users.id`. Mount at `/api/ba`; keep Noctua `/api/auth/me`, `/signup`, `/logout`, `/switch-account` wrappers. | Tests reject direct mapping onto populated `users` and demonstrate ISO-date incompatibility even on an empty table. `/api/auth` already belongs to Noctua routes. |
-| D15 | This fork targets one Linux/systemd Next.js process behind HTTPS, with a stable DNS origin and RP ID. Reject Tauri mode for the first release; reject cookie-only credential mode. | The task's deployment has no desktop requirement. A random loopback port and IP RP ID are incompatible with the proposed passkey experience; a safe desktop port is separate work (§8). |
+| D15 | This fork targets one Linux/systemd Next.js process at `https://mails.monkeymed.de`, RP ID `mails.monkeymed.de`, reachable inside the tailnet only. Tauri/desktop mode is dropped; startup rejects it. | The deployment uses DNS A `100.92.134.1` and netcup API DNS-01 TLS (§8); desktop origin/secret/invite exceptions are removed. |
 | D16 | Dedicated Better Auth SQLite connection to the same master file, with zero synchronous busy timeout on both master writers and Noctua async write retries. | Shared-handle rollback and separate-handle retry tests demonstrate why. Keep auth transaction hooks free of network I/O; never retry an entire non-idempotent auth request automatically (§3.1). |
+| D17 | Admin issues a 15-minute single-use password-reset link and hands it over personally; a local operator command uses the same restricted issuance policy. No SMTP recovery delivery or public reset-request issuance in this stage. | Public token redemption remains available; MFA survives password reset (§4.4). |
 
 Superseded from v2: `lib/passwords.ts` as an independent auth API, `users.passwordHash`,
 `passwordUpdatedAt` / cookie `iat` liveness, `mustChangePassword`, the AES-sealed `noctua_session`
-cookie, and `SESSION_SEAL_KEY` provisioning (including desktop generation). Better Auth owns password
+cookie, and `SESSION_SEAL_KEY` provisioning (including removed desktop generation). Better Auth owns password
 hash storage, signed session cookies and session revocation. Forced temporary-password changes are
 unnecessary because invites/recovery let the person choose their password. The separate MFA
 enrollment/re-authentication gate remains Noctua policy; Better Auth does not provide it automatically.
@@ -658,6 +651,9 @@ Primary methods:
   No route may resolve a session user from `ownerUserId ?? firstLink ?? account.id`.
 
 Optional personal-mailbox method: `POST /api/ba/sign-in/imap` `{email,password,rememberMe?}`.
+It is OFF by default. An unset or empty `NOCTUA_IMAP_LOGIN_HOSTS` disables login and IMAP-based
+credential proof: reject before network work, provisional session creation or password write-back.
+Expose only method availability to the client, never the allowlist; hide the IMAP action when off.
 Normalize e-mail and first load an existing auth_user and its Noctua users row. If there is no user,
 including an empty installation, answer generic 401 without any IMAP connection. Resolve exactly one
 login mailbox by all of these conditions, never by “first linked mailbox”:
@@ -666,13 +662,15 @@ login mailbox by all of these conditions, never by “first linked mailbox”:
 2. `lower(trim(account.email)) === lower(trim(account.imap.user)) === user.email`.
 3. `imap.secure === true`; use the existing TLS-verifying IMAP helper.
 4. The exact normalized IMAP hostname is in operator-configured `NOCTUA_IMAP_LOGIN_HOSTS`; absent
-   allowlist disables the method. Do not accept request-supplied hosts/ports/usernames.
+   or empty allowlist disables the method. Do not accept request-supplied hosts/ports/usernames.
+5. `shared === false` under the §5.3 member-count rule (`memberCount <= 1`). A mailbox shared with
+   another member, even a viewer, is ineligible for IMAP first factor and IMAP-based credential proof.
 
-Zero or multiple candidates fails closed. Member count is irrelevant: granting a second person viewer
-access to a personal mailbox must not lock its owner out. A shared address must never be used as a
-personal user identity. Admin/invite validation forbids assigning an existing shared mailbox's address
-to a new user, and migration rejects shared-address user rows until the operator supplies personal
-identities. A shared mailbox whose address differs from the person's can never satisfy condition 2.
+Zero or multiple candidates fails closed. Shared mailbox credentials never authenticate a person.
+Granting a second membership disables this optional method for that mailbox; app-password/UV-passkey
+login remains available. A shared address must never be used as a personal user identity.
+Admin/invite validation forbids assigning an existing shared mailbox's address to a new user, and
+migration rejects shared-address user rows until the operator supplies personal identities. A shared mailbox whose address differs from the person's can never satisfy condition 2.
 For this installation, confirm that netcup's IMAP username is the full mailbox address; otherwise this
 method stays off until a separately reviewed explicit login-name mapping exists.
 
@@ -712,8 +710,9 @@ server `signUpEmail`, as the spike proves. Use the admin plugin's server-side `c
 `lib/userProvisioning.ts`, never a public no-session creation endpoint. That server API can run
 without headers; this is a privilege boundary to enforce in Noctua, not a bootstrap permission check.
 
-Empty installation: retain the startup admin invite code printed only while users is empty. The
-operator gives it to the first person out of band. A valid first-admin invite plus that person's own
+Every signup requires a valid invite, including bootstrap; the former desktop invite exemption is
+removed. Empty installation: retain the startup admin invite code printed only while users is empty.
+The operator gives it to the first person out of band. A valid first-admin invite plus that person's own
 chosen app password creates the first admin; an existing mailbox password alone never does.
 Serialize the empty-users check and invite reservation so two requests cannot both become first
 admin. Disable startup bootstrap when an enabled admin already exists. Noctua does not ship a shared
@@ -870,21 +869,24 @@ setUserPassword stays unexposed; triggers still protect against internal credent
 
 Password-reset redemption contract (team-auth owns server, ui-shell owns page/client):
 
-- Without SMTP, `POST /api/admin/users/[userId]/recovery` or `scripts/recoverTeamAuth.ts --user-id`
-  verifies operator authority, targets one known user and issues a 15-minute single-use link.
+- `POST /api/admin/users/[userId]/recovery` verifies fresh admin proof and target identity, targets
+  one known user and issues a 15-minute single-use link for personal handover by the admin.
+  `scripts/recoverTeamAuth.ts --user-id` is the audited local operator equivalent for lockout recovery.
   `auth.api.requestPasswordReset({body:{email,redirectTo:BETTER_AUTH_URL+"/reset-password"}})` runs
   with a request-scoped delivery sink in sendResetPassword; show the link once in that authorized
   response/terminal, never a global variable, ordinary logs or audit payload. The operator command
-  requires local data/key access and records actor=operator. With SMTP, the same callback uses the
-  dedicated configured sender and `/api/auth/recovery/request` answers generically for known/unknown
-  e-mails. With SMTP off that request route returns controlled recovery_unavailable; issuance is restricted.
+  requires local data/key access and records actor=operator. The callback is a handover sink only;
+  it never sends SMTP. SMTP recovery delivery is an explicit non-goal for this stage.
+  `/api/auth/recovery/request` is not implemented; issuance is restricted to admin/operator paths.
 - Configure `emailAndPassword.resetPasswordTokenExpiresIn:900`, sendResetPassword and
   revokeSessionsOnPasswordReset:true. Raw `/api/ba/request-password-reset` stays HTTP-disabled in
-  both modes (the Noctua wrapper enforces delivery/limits). Keep **public** GET
+  this stage (the Noctua admin wrapper enforces issuance/limits). Keep **public** GET
   `/api/ba/reset-password/:token?callbackURL=<canonical /reset-password>` and POST
   `/api/ba/reset-password` enabled when the policy handler is enabled. Token possession authorizes
   redemption; no session, MFA gate or reauth grant is required on these two routes. Fix callbackURL
-  to the exact canonical page in the policy hook; general trustedOrigins is not an open callback list.
+  to `https://mails.monkeymed.de/reset-password` in the production policy hook; general trustedOrigins
+  is not an open callback list. Isolated preview/localhost instances use only their own exact
+  BETTER_AUTH_URL + "/reset-password" callback, never cross-origin callbacks.
 - Public `app/reset-password/page.tsx` (ui-shell) consumes `?token=` or `?error=INVALID_TOKEN` from
   the Better Auth callback, copies the token to ephemeral memory, immediately history.replaceState
   to `/reset-password`, and renders new-password+confirmation. Set Referrer-Policy:no-referrer,
@@ -957,8 +959,9 @@ type; reject an unexpected body with 400. Choose the convention per route, never
 logout. Bearer-only `/api/mcp` is exempt and must never accept cookie fallback.
 
 Enable Better Auth `rateLimit.enabled:true`, memory storage for the single process. Sign-in paths
-include custom `/sign-in/imap`: 3 attempts/10 seconds/IP; twoFactor paths 3/10 seconds; reset requests
-3/min. Noctua wraps signup (3/min/IP), credential proof (5/min/user + IP), recovery and admin sensitive
+include custom `/sign-in/imap` when explicitly enabled: 3 attempts/10 seconds/IP; twoFactor paths
+3/10 seconds. Admin reset-link issuance is limited to 3/min in its reviewed server-API wrapper;
+public reset-request issuance remains disabled. Noctua wraps signup (3/min/IP), credential proof (5/min/user + IP), recovery and admin sensitive
 operations. IMAP attempt limiter is additionally 5/min/personal identity immediately before the
 network call. Configure `advanced.ipAddress.ipAddressHeaders` and `trustedProxies` from actual TLS
 proxy addresses; align Noctua TRUSTED_PROXY_HOPS. The proxy must overwrite untrusted forwarded
@@ -1236,12 +1239,14 @@ documents REST and MCP.
 ### 7.1 Stack and setup
 
 Dependencies: `tailwindcss@4`, `@tailwindcss/postcss`, `postcss`, `next-themes`,
-`react-resizable-panels`, `class-variance-authority`, `clsx`, `tailwind-merge`, `cmdk` (via shadcn
+`react-resizable-panels`, `class-variance-authority`, `cn` (the generated registry helper), `cmdk` (via shadcn
 `command`). `radix-ui` primitives are already present through `@radix-ui/themes`.
 
 Setup order (verified on 2026-10-22 in a throwaway worktree with shadcn 4.22.1, tailwindcss 4.3.3,
 next-themes 0.4.6; `bun run build`, `bun run lint`, `bun run test:ci` and the standalone output all
-stayed green):
+stayed green). ui-shell Slice 1 uses the generated `radix-nova` style and pins `radix-ui` to
+1.4.3 so the shell and Radix Themes share one primitive instance; preserve that pin after
+`shadcn add`. These are the accepted implementation details for D10:
 
 1. `bun add tailwindcss @tailwindcss/postcss next-themes`; write `postcss.config.mjs`
    (`export default { plugins: { "@tailwindcss/postcss": {} } }`); put the four-line CSS header
@@ -1268,7 +1273,8 @@ stayed green):
 5. Lint the generated `app/components/ui/**` once and fix warnings so `bun run lint` stays clean.
 6. Local dev needs `.env.local` with `IMAP_CREDENTIALS_STORAGE=db`, a random `IMAP_SECRET_KEY`,
    a separate random `BETTER_AUTH_SECRET` (each >=32 characters), `BETTER_AUTH_URL=http://localhost:3000`
-   (or the actual local port) and `BETTER_AUTH_TELEMETRY=0`. Production uses the canonical HTTPS origin (§8).
+   (or the actual local port) and `BETTER_AUTH_TELEMETRY=0`. Leave `NOCTUA_IMAP_LOGIN_HOSTS` unset.
+   Production uses `https://mails.monkeymed.de`; the remote-arm preview is separate (§8).
 
 `app/globals.css` structure (no preflight):
 
@@ -1281,10 +1287,10 @@ stayed green):
 
 @font-face { font-family: "Inter"; src: url("/fonts/InterVariable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
-@theme inline { /* shadcn colour/radius/font mapping: --color-background: var(--background) ... --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px); --radius-lg: var(--radius); */ }
-:root { /* shadcn tokens from :root-scoped Radix scales: --background: var(--sand-2); --foreground: var(--sand-12); --primary: var(--indigo-9); --muted: var(--sand-3); --muted-foreground: var(--sand-11); --border: var(--sand-6); --ring: var(--indigo-8); --radius: 0.5rem; ... never --gray-N / --accent-N / --space-N here */ }
-.dark { /* same names */ }
-:root { /* legacy aliases: --bg, --surface, --surface-1/2/3, --text, --muted-foreground, --link, --input-bg/fg, --mail-view-bg/fg, --list-row-* (from --indigo-*/--sand-*), --shadow, --quote-2 */ }
+@theme inline static { /* shadcn colour/radius/font mapping: --color-background: var(--background) ... --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px); --radius-lg: var(--radius); */ }
+:root { /* shadcn tokens from :root-scoped Radix scales: --background: #fff; --card: #fff; --popover: #fff; --sidebar: var(--gray-2); --foreground: var(--gray-12); --primary: var(--iris-9); --primary-foreground: #fff; --muted: var(--gray-3); --muted-foreground: var(--gray-11); --border: var(--gray-6); --input: var(--gray-6); --ring: var(--iris-9); --radius: 0.5rem; ... never --accent-N / --space-N here */ }
+.dark { /* same names; --background: oklch(0.145 0 0); --card/--popover/--sidebar: oklch(0.205 0 0); --border/--input/--sidebar-border: rgb(255 255 255 / 10%); other neutral steps from gray-dark */ }
+:root { /* legacy aliases: --bg, --surface, --surface-1/2/3, --text, --muted-foreground, --link, --input-bg/fg, --mail-view-bg/fg, --list-row-* (from --iris-*/--gray-*), --shadow, --quote-2 */ }
 .radix-themes { --color-background: var(--background); --color-panel-solid: var(--card); --color-surface: var(--card); --default-font-family: "Inter", system-ui, sans-serif; }
 
 @layer base {
@@ -1302,13 +1308,19 @@ Rules:
   `\bvar\(--accent\)` → `var(--link)` (never touch `--accent-N`/`--accent-aN`), `--accent-2` →
   `--quote-2`; delete the unused `--accent-2-strong/-bg/-border`. Legacy `--radius-sm/md/lg` are
   redefined from the shadcn radius (4/6/8px); the slight change for md/lg is accepted.
+- Palette: pure neutral gray; white light surfaces and a gray-2 sidebar on the near-white
+  canvas. The single soft accent is iris: primary/sidebar-primary = iris-9 with white text
+  (sRGB `#5b5bd6`, 5.37:1 contrast), ring/sidebar-ring = iris-9 in light / iris-11 in dark, chart-1..5 = iris-6/8/9/10/11,
+  link = iris-11. Limit accent to primary buttons, active sidebar indicators, focus rings, links,
+  unread dots/badges and selected rows. Selected rows use iris-3/4 tints with subtle borders;
+  navigation hovers stay gray. Legacy surface/list/input/quote aliases follow the same palette.
 - Fonts: vendor Inter Variable (OFL) at `public/fonts/InterVariable.woff2` with the licence file next
-  to it. No `next/font` (Docker and Tauri builds must stay hermetic). `HtmlMessage.tsx` injects the
+  to it. No `next/font` (server builds must stay hermetic). `HtmlMessage.tsx` injects the
   same `@font-face` with the absolute `/fonts/...` URL into the srcdoc and uses the family; the
   compose editor uses the family through the token.
-- `<Theme accentColor="indigo" grayColor="sand" panelBackground="solid">` stays in the root layout.
+- `<Theme accentColor="iris" grayColor="gray" panelBackground="solid">` stays in the root layout.
   `<html suppressHydrationWarning>`, `ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem`
-  (users without a stored value now follow the OS theme). `darkMode` for the kept renderers comes
+  (users without a stored value follow the OS theme); the header menu offers light / dark / system. `darkMode` for the kept renderers comes
   from a `useSyncExternalStore` over `document.documentElement.classList` (correct on the first
   client render, so the HtmlMessage iframe is built once). Remove the manual `.dark` toggling in
   MailClient and the detached windows.
@@ -1329,56 +1341,54 @@ in `MailClient.tsx`. MailClient keeps all data state and handler bags; the shell
 theme, and navigation state. The `data-shell` attribute goes on the shell root, the login screen
 root, and the admin panel root.
 
-Desktop (`md` and up):
+Desktop (`md` and up), following the shadcn dashboard-01 inset layout:
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Header: [☰] [search ........ filters] [Compose] [theme] [user]│
-├───────────┬──────────────────────┬───────────────────────────┤
-│ Sidebar   │ Message list         │ Thread / reading pane      │
-│ Mailboxes │ (filters: Open,      │ ThreadCollaborationBar     │
-│  mine     │  Unassigned, Mine,   │ messages (kept components) │
-│  shared   │  All)                │ comments + activity        │
-│ Views     │                      │ reply / internal note      │
-│ Topics    │                      │                            │
-│ Folders   │                      │                            │
-├───────────┴──────────────────────┴───────────────────────────┤
-│ Status bar (compact; hidden on mobile)                         │
-└──────────────────────────────────────────────────────────────┘
-```
-
-- Sidebar: shadcn `Sidebar` with `collapsible="offcanvas"` (icon mode clips the folder tree).
-  Sections: "My mailboxes" (`!shared`), "Shared mailboxes" (`shared`), each row = avatar + name,
-  e-mail secondary line/tooltip, grouped by domain, stable name/e-mail/id order and badge slot;
-  active highlighted; clicking persists `switch-account` before dependent requests. Keep the
-  account-wide “check all folders” action. Stage 3 adds summaries via watcher (§9). Then "Views": Inbox, Assigned to me,
-  Unassigned, Open, Focused, Action queue, Invite deck (counts as today). Then Topics, then the
-  folder tree (the existing `FolderTree`, restyled through tokens; drag-and-drop stays on desktop).
-- List + reading pane: `ResizablePanelGroup` with `autoSaveId="noctua:panes"`; every panel has a
-  stable `id` and `order` (the calendar panel mounts conditionally). `MessageListPane` loses its
-  inline pixel width (`width: 100%`); `listWidth` state in MailClient is fed by a `ResizeObserver`
-  on `listPaneRef` and still drives `listIsNarrow` and `collapseViewSwitcher`. Pane chrome is
-  restyled by editing the CSS modules (unlayered modules beat utilities).
-- Header: search input with the existing field/badge filter menus in a `Popover`; compose button;
-  sync indicator; theme toggle; user menu (profile and password, settings, admin, developer tools
-  "Show thread JSON" / "Evict thread cache", logout). The account switcher lives in the sidebar.
+- `SidebarProvider` defines `--sidebar-width: 18rem` and `--header-height: 3rem` on the
+  `data-shell` root (`100dvh`). `Sidebar variant="inset" collapsible="offcanvas"` sits on a
+  near-white canvas. `SidebarInset` holds the 48px site header, resizable content and compact
+  status bar; it is white, rounded-xl and subtly shadowed in light mode. Content uses an 8px
+  grid with calm `bg-card`, subtle borders and shadow-xs pane frames.
+- Sidebar header: app mark + title from `lib/appBranding.ts`, then a prominent Compose button
+  and a secondary "Check all folders for new mail" icon button calling
+  `syncAccount(undefined, "new")`. Drafts remain reachable. Sections: "My mailboxes" (`!shared`),
+  "Shared mailboxes" (`shared`), each row = avatar + name with e-mail tooltip and badge slot;
+  rows use stable display-name/normalized-e-mail/id order, and sections with more than six mailboxes group by e-mail domain. Optional `accessRole`,
+  `isOwner`, `shared` fields arrive with feat/team-auth; absent `shared` means personal.
+  Clicking a mailbox calls `switchAccount`, persisting `switch-account` before dependent requests.
+  Stage 3 adds watcher-fed summaries (§9). Views: Inbox, Focused, Action queue and Invite deck
+  retain their counts; an explicit empty slot reserves Assigned to me / Unassigned / Open for
+  feat/collab-ui. Then Topics and the existing folder tree (token styling; desktop drag-and-drop).
+- Sidebar footer: NavUser-style avatar, user name and e-mail with Settings, Admin (admin only),
+  "Profile & security" entry (disabled only until the Slice 7 Better Auth client lands), developer
+  tools "Show thread JSON" / "Evict thread cache", and Log out. The person is separate from the active mailbox.
+- List + reading pane: `ResizablePanelGroup` with `useDefaultLayout({ id: "noctua:panes",
+  panelIds, storage })` (v4 has no `autoSaveId`/`order`). Stable ids `list`, `reader`, `calendar`
+  and fixed render order allow separate persisted layouts with/without the conditional calendar.
+  `MessageListPane` fills its panel (`width: 100%`); a `ResizeObserver` on `listPaneRef` feeds
+  `listWidth` in MailClient and still drives `listIsNarrow` and `collapseViewSwitcher`.
+  Pane chrome lives in the CSS modules because those unlayered rules beat utilities.
+- Header: SidebarTrigger, vertical Separator, current mailbox name + folder; right-aligned search
+  with the existing field/badge filters in a Popover, sync indicator and light/dark/system menu.
+  AppShell provides the TooltipProvider (the installed SidebarProvider does not include one).
 
 Mobile (below `md`):
 
-- Navigation state is derived, not tapped: an effect in the shell sets `view = "thread"` when
-  `viewMessage?.id` becomes non-null on mobile (pushing `history.state.noctuaMobileView = "thread"`),
-  and `view = "list"` when `viewMessage` becomes null or on `popstate`. The in-app back button calls
+- Navigation state is derived, not tapped: the shell derives `view = "thread"` from
+  `viewMessage?.id` even during SSR; an effect on mobile pushes `history.state.noctuaMobileView = "thread"`.
+  It derives `view = "list"` when `viewMessage` becomes null or on `popstate`. The in-app back button calls
   `history.back()` when `history.state?.noctuaMobileView` is set, otherwise `setViewMessage(null)`.
   Both panes stay mounted; visibility is CSS (`hidden md:flex`), so `listPaneRef`, `messageRefs`,
   virtualization, and `noticePaneRightOffset` keep working and nothing flips after hydration.
 - `MessageViewPane` receives `hideToolbar` on mobile and a compact header with the back button.
-- Sidebar opens as a sheet from the header menu button.
+- Sidebar opens as a sheet from the header menu button. The mobile header keeps only the
+  trigger, title, search and indicator menu; theme choices move into the user menu.
 - Compose: `ComposeOrchestrator` gets an `isMobile` input. On mobile `openCompose` and the
   `setComposeView` wrapper coerce `inline`/`minimized` to `modal`; dock, minimize, and
   open-in-window controls are hidden; `.modal-backdrop`/`.composeModal` become `100dvw × 100dvh`
   below `md` and `composeSize` is ignored. ui-shell also owns ComposeFields.tsx: render the
   From row in **every** variant (remove inline-only showFrom); add modal DOM regression. The fix
-  already in progress on feat/ui-shell satisfies this ownership; auth agents must not duplicate it. `sendMailRace.dom.test.tsx` is updated for the prop.
+  already in progress on feat/ui-shell satisfies this ownership; auth agents must not duplicate it.
+  `sendMailRace.dom.test.tsx` is updated for the prop.
 - Message list rows: tap targets at least 44px; a per-row "more" button replaces right-click.
 - Status bar hidden. Its panels (process status, mail check, reminders, exceptions) and the
   calendar open from the header indicator menu into a `Sheet`; `openBottomStatusPanel` routes
@@ -1409,7 +1419,7 @@ Mobile (below `md`):
 `app/components/auth/LoginScreen.tsx` replaces LoginOverlay. Visual direction: shadcn `login-01`
 style centered Card, max width about 24rem, quiet neutral-gray background/border and the shell's
 soft iris accent for the primary button/focus ring. This follows feat/ui-shell's current palette;
-the older Radix color mappings in §7.1 are setup examples, not a separate login palette. Reuse shell tokens, Card, Button, Input, Label,
+§7.1 defines the shared gray/iris palette. Reuse shell tokens, Card, Button, Input, Label,
 Alert and InputOTP primitives. No separate brand palette, hero illustration or custom auth theme.
 It must work in light/dark mode and on a narrow phone with the keyboard open.
 
@@ -1422,16 +1432,18 @@ from HTTP 200: inspect `twoFactorRedirect`, then refresh `/api/auth/me`. A chall
   Start conditional UI only when supported, using `authClient.signIn.passkey({autoFill:true})`;
   cancel its pending request before an explicit passkey action or navigation. If unsupported or the
   user cancels, keep the password form usable without treating cancellation as a server error.
-- Optional “Use my personal mailbox password” action selects `/api/ba/sign-in/imap`; label that
-  method clearly and never silently fall back between IMAP and app passwords. The server exposes
-  whether the operator enabled it; a configured method still checks eligibility server-side.
+- Optional “Use my personal mailbox password” action selects `/api/ba/sign-in/imap`; hide it by
+  default and show it only when the server reports that the operator enabled it with a nonempty
+  `NOCTUA_IMAP_LOGIN_HOSTS` allowlist; return availability only, never the allowlist itself.
+  Label the method clearly and never silently fall back between IMAP and app passwords. Server-side
+  eligibility still excludes every shared mailbox (§4.2); client visibility never authorizes login.
 - TOTP challenge Card: single code field (`inputMode=numeric`, `autoComplete="one-time-code"`),
   Verify, “Use a backup code”, Back to sign in. A backup-code view uses a text field. Display wrong
   code inline, distinguish expiry/429 and preserve the challenge. Never set `trustDevice:true`.
 - Invite view: invite code, personal e-mail, name, app password + confirmation (`new-password`).
   Keep IMAP credentials out of this form; optional mailbox setup can follow enrollment. A 409
   mailbox_exists message never suggests takeover. No user choice of admin role.
-- Mandatory enrollment Card after signup/migration/reset: current credential proof → TOTP QR/manual
+- Mandatory enrollment Card after signup/migration or audited MFA reset: current credential proof → TOTP QR/manual
   setup → verification → backup codes saved → optional passkey. Enrollment cannot dismiss into mail.
   Show codes once with accessible copy/download controls; erase them from component state on exit.
 - Only mailboxState=none (zero memberships) after enrollment: render “No mailbox yet”, “Add a mailbox” (reuse AccountTabContent
@@ -1464,7 +1476,7 @@ from HTTP 200: inspect `twoFactorRedirect`, then refresh `/api/auth/me`. A chall
   enable/disable, security summary (password configured, TOTP active, passkey count), revoke sessions,
   initiate recovery and audited MFA/passkey reset. It calls only Noctua management routes (§4.5).
   No raw Better Auth admin client and no impersonation action. Password resets hand over a single-use
-  recovery link, not an admin-chosen password. Confirm destructive changes and show last-admin errors.
+  recovery link for personal handover, not an admin-chosen password or SMTP message. Confirm destructive changes and show last-admin errors.
 - Mailboxes, member roles, Invites and read-only Audit log keep their existing scope. Audit entries
   show security/lifecycle outcomes with actor/target/time and no credentials or recovery URLs.
 
@@ -1496,32 +1508,51 @@ from HTTP 200: inspect `twoFactorRedirect`, then refresh `/api/auth/me`. A chall
   cookie-only install, re-enter and verify mailbox credentials into the encrypted DB before removing
   the old deployment; there is no silent import from arbitrary client cookies. Delete the global
   credential overlay and remove session credential branches from all consumers.
-- Required environment: BETTER_AUTH_SECRET >=32 random characters, path-free BETTER_AUTH_URL equal
-  to the canonical public HTTPS origin, IMAP_SECRET_KEY as before, IMAP_CREDENTIALS_STORAGE=db.
-  PASSKEY_RP_ID defaults to the canonical hostname. NOCTUA_IMAP_LOGIN_HOSTS is an optional exact
-  hostname allowlist; unset means IMAP first factor off. NOCTUA_TRUSTED_ORIGINS, if needed, parses to
-  Better Auth `trustedOrigins` as explicit additional HTTPS origins (no wildcard/Host reflection).
-  `advanced.ipAddress.trustedProxies` is configured for the real proxy; log no secrets.
-  BETTER_AUTH_TELEMETRY=0 plus `telemetry:{enabled:false}`; leave
-  BETTER_AUTH_TELEMETRY_ENDPOINT unset. The env flag can enable telemetry even when options are
-  false, so systemd must not set it to 1. Do not claim the config alone overrides that env flag.
-- HTTPS and a stable DNS name are prerequisites for production passkeys. Select the RP ID before
-  enrollment, normally the exact canonical hostname, without scheme/port/path. Origin includes
-  scheme/port; RP ID does not. A parent-domain RP ID expands the credential scope and is unnecessary
-  here. Changing host/RP ID can require passkey re-enrollment. Back up the Better Auth secret because
-  it also encrypts TOTP/backup codes; use Better Auth's supported versioned-secret rotation procedure
-  only after a restore/rotation test, not a blind single-secret replacement.
-- Tailscale access: prefer the same canonical HTTPS hostname through split DNS/routing. A different
-  .ts.net host or LAN hostname cannot simply reuse a passkey for the original RP ID. An extra trusted
-  origin permits HTTP API access, not arbitrary RP-ID equivalence. Choose one stable HTTPS LAN DNS
-  name with trusted TLS if the public name cannot be used. Do not deploy passkeys over http://IP;
-  localhost development is a separate browser exception, not a LAN deployment plan.
-- Tauri: explicitly unsupported for this fork release. `NOCTUA_DESKTOP_MODE=true` causes startup to
-  fail with a clear supported-mode message, and docs/build scripts must not advertise compatibility.
-  A later desktop port needs persisted Better Auth/IMAP secrets, dynamic loopback origin/trust and
-  `advanced.useSecureCookies:false` for local HTTP, plus a deliberate password+TOTP experience or a
-  stable secure WebAuthn origin. Team UI hidden by useIsDesktop alone is not sufficient. Do not
-  preserve the legacy cookie path or provision a default auth secret as a shortcut.
+
+### 8.1 Environment and canonical HTTPS deployment
+
+| Environment / setting | Required deployment value or policy |
+|---|---|
+| `BETTER_AUTH_SECRET` | Independent random secret, >=32 characters; back up offline; no generated desktop default |
+| `BETTER_AUTH_URL` | `https://mails.monkeymed.de` (path-free canonical origin) |
+| `PASSKEY_RP_ID` / passkey `rpID` | `mails.monkeymed.de`; defaults to the canonical hostname, without scheme/port/path |
+| Better Auth `trustedOrigins` | Explicit canonical origin `https://mails.monkeymed.de`; no wildcard or Host reflection |
+| `NOCTUA_TRUSTED_ORIGINS` | Unset in canonical production; only explicit additional HTTPS origins if separately required, never automatic preview trust |
+| `IMAP_SECRET_KEY` | Retain the existing independent at-rest encryption key |
+| `IMAP_CREDENTIALS_STORAGE` | `db` only; `both` is a deprecated alias for `db`; `cookie` fails startup |
+| `NOCTUA_IMAP_LOGIN_HOSTS` | Unset/empty = OFF (deployment default); only a nonempty explicit exact normalized hostname allowlist enables the optional personal IMAP method; shared mailboxes remain forbidden |
+| `NOCTUA_DESKTOP_MODE` | Unset/false; `true` fails startup because desktop mode is removed |
+| `BETTER_AUTH_TELEMETRY` | `0`, together with `telemetry:{enabled:false}`; keep `BETTER_AUTH_TELEMETRY_ENDPOINT` unset |
+| `advanced.ipAddress.trustedProxies` | Configure the actual reverse proxy chain; never trust arbitrary forwarded headers |
+
+- Canonical hostname `mails.monkeymed.de` has DNS A `100.92.134.1`, the server's Tailscale IP.
+  Service access is inside the tailnet only; a public DNS record does not make it publicly reachable.
+  Terminate HTTPS at the reverse proxy with a trusted certificate obtained and renewed via DNS-01
+  using the netcup API. DNS-01 requires no public HTTP challenge endpoint. Keep DNS API credentials
+  in the deployment secret store, never source control or logs; the deploy owner records actual
+  proxy addresses and certificate-renewal configuration before cut-over.
+- `https://remote-arm.tail31b4a1.ts.net:3790` is a separate, non-canonical development preview origin.
+  Do not add it to canonical production trusted origins or use it as the production RP ID. A preview
+  instance uses its own `BETTER_AUTH_URL`, hostname RP ID `remote-arm.tail31b4a1.ts.net` (no port),
+  explicit preview trusted origin, isolated auth data/secrets and separately enrolled test passkeys.
+  Canonical passkeys are used at `https://mails.monkeymed.de` only; trusting an origin does not make
+  its unrelated hostname equivalent to an RP ID. Localhost test/dev origins (§7.1/§10.1) likewise
+  remain isolated exceptions, not alternative production hostnames.
+- Enroll real passkeys only at the canonical HTTPS origin, including on both phones/PWAs. Changing
+  host/RP ID can require re-enrollment. Back up the Better Auth secret because it also encrypts
+  TOTP/backup codes; use Better Auth's supported versioned-secret rotation procedure only after a
+  restore/rotation test. Systemd must not set BETTER_AUTH_TELEMETRY=1: the env flag can enable
+  telemetry even when the config option is false. Log no secrets.
+
+### 8.2 Supported runtime and migration checks
+
+- Tauri/desktop mode is dropped and unsupported. `NOCTUA_DESKTOP_MODE=true` fails startup with a
+  clear supported-mode message. Remove desktop build claims, generated-secret and loopback-origin
+  carve-outs, `useIsDesktop` authentication exceptions and the signup invite exemption. No silent
+  legacy cookie fallback. Browser windows on a desktop remain part of the supported web UI (§7.2).
+- Recovery uses the §4.4 admin/operator 15-minute single-use link with personal handover; no SMTP
+  recovery sender/configuration or public reset-request route ships in this stage. Public token
+  redemption remains enabled when the completed policy handler is activated.
 - Next 16 bundles instrumentation and route graphs separately: getAuth is memoized per module graph,
   not a promise of one instance per OS process. Startup migrates once; the request graph may open
   its own dedicated handle and runs an empty migration plan. Idempotence is required; multiple
@@ -1547,7 +1578,7 @@ It owns the executable migration/backup/restore runbook (§11) and final househo
 | Branch | Scope | Owns (no other branch touches these) |
 |--------|-------|--------------------------------------|
 | `feat/team-auth` | §3.1, §4, §5, §6.4 server side, `doc/AUTHENTICATION.md` | `lib/auth.ts`, `lib/accountAccess.ts`, `lib/betterAuth.ts`, `lib/betterAuthImapSignIn.ts`, `lib/authPolicy.ts`, `lib/authStreams.ts`, `lib/membershipCleanup.ts`, `lib/userProvisioning.ts`, `lib/userLifecycle.ts`, `lib/db/authPolicy.ts`, `lib/db/userProvisioning.ts`, `lib/db/userLifecycle.ts`, `lib/mailboxCredentials.ts`, `lib/testAuthHarness.ts`, `lib/db/connection.ts` (auth handle), `scripts/{migrateTeamAuth,recoverTeamAuth}.ts`, `lib/credentials.ts`, `lib/secret.ts` (storage-mode enforcement), `instrumentation.ts`, `lib/db/users.ts`, `lib/db/userAccountPrefs.ts`, `lib/db/adminAudit.ts`, `lib/db/schema.ts` (master part), `lib/db/rowParsers.ts`, `lib/db/accounts.ts`, `lib/db/mcpTokens.ts`, `lib/accountPresentation.ts`, `app/api/auth/**`, `app/api/ba/**`, `app/api/admin/**`, `app/api/_helpers/accountContext.ts`, `app/api/_helpers/requestOrigin.ts`, `app/api/_helpers/syncJobs.ts`, `app/api/_helpers/recomputeJobs.ts`, `app/api/messages/listMessagesHandler.ts` (guard only), `app/api/accounts/route.ts`, `app/api/accounts/[accountId]/{route.ts,settings,relogin,mcp-tokens,members,prefs,compose/recipients,sender-icon,destination-folders,messages/copy-to-account}/**`, the guard lines of every other route in §5.2, `lib/data.ts` (`User`, `Account.accessRole/isOwner/shared`), auth dependency pins in `package.json`/`bun.lock`, test auth preload and affected route fixtures |
-| `feat/ui-shell` | §7.1, §7.2, §7.4, theming, mobile, settings frame, client handling of `accountId: null`, MFA challenge/enrollment and re-authentication | `package.json` shell deps (coordinate with auth pins), `postcss.config.mjs`, `components.json`, `app/globals.css`, `app/layout.tsx`, `public/fonts/**`, `app/components/ui/**`, `app/components/shell/**`, `app/components/auth/**`, `lib/authClient.ts`, `app/reset-password/**`, `app/hooks/**`, `lib/utils.ts`, `MailClient.tsx` (layout, theme, width state, me/no-account handling, render tree), `useAccountController.ts`, `TopBar.tsx` (replaced), `FolderSidebarPane.tsx`/`FolderPane.tsx`/`FolderTree*.css`, `AccountSettingsModal.tsx` (frame), `mailclient/composition/{ComposeOrchestrator,ComposeModal,ComposeMinimized,ComposeFields}.tsx`, `Compose.module.css`, `useComposeController.ts`, `messagelist/{MessageListPane,MessageListOrchestrator,MessageListHeader}.tsx` + css, `message/MessageViewPane.tsx` + css, `status/BottomStatusBar.tsx`, `InAppNoticeStack.tsx`, `HtmlMessage.tsx`, the token codemod across CSS modules, `app/{compose,message,calendar}/window/**` theme hookup |
+| `feat/ui-shell` | §7.1, §7.2, §7.4, theming, mobile, settings frame, client handling of `accountId: null`, MFA challenge/enrollment and re-authentication | `package.json` shell deps (coordinate with auth pins), `postcss.config.mjs`, `components.json`, `app/globals.css`, `app/layout.tsx`, `public/fonts/**`, `app/components/ui/**`, `app/components/shell/**`, `app/components/auth/**`, `lib/authClient.ts`, `app/reset-password/**`, `app/hooks/**`, `lib/utils.ts`, `MailClient.tsx` (layout, theme, width state, me/no-account handling, render tree), `useAccountController.ts`, `TopBar.tsx` (replaced), `FolderSidebarPane.tsx`/`FolderPane.tsx`/`FolderTree*.css`, `AccountSettingsModal.tsx` (frame), `mailclient/composition/{ComposeOrchestrator,ComposeModal,ComposeMinimized,ComposeFields}.tsx`, `Compose.module.css`, `useComposeController.ts`, `messagelist/{MessageListPane,MessageListOrchestrator,MessageListHeader}.tsx` + css, `message/MessageViewPane.tsx` + css, `status/BottomStatusBar.tsx`, `message/MessageMenu.tsx` (frame only), `status/{ProcessStatusPopover,UpcomingStatusPopover,ExceptionStatusPopover}.tsx` (frame only), `InAppNoticeStack.tsx`, `HtmlMessage.tsx`, the token codemod across CSS modules, `app/{compose,message,calendar}/window/**` theme hookup |
 | `feat/thread-collaboration` | §3.2, §6.1–6.3, §6.5, `doc/API.md` | `lib/threadCollab.ts`, `lib/db/threadCollab.ts`, `lib/db/schema.ts` (shard part), `lib/db/threads.ts` (remap), `lib/db/messages/upsert.ts` (remap hook), `lib/db/messages/query.ts`, `app/api/_helpers/enrichMessagesWithThreadCollab.ts`, `app/api/accounts/[accountId]/threads/[threadId]/**`, `lib/mcpServer.ts`, `lib/data.ts` (`Message.collab`), `listMessagesHandler.ts` (viewer id), `threads/route.ts`, `related/`, `thread/related/`, `messages/[messageId]/route.ts`, `smtp/send/route.ts`, `lib/drafts.ts` (full send path), `lib/specialFolders.ts`, `drafts/save/route.ts`, `calendar/events/[eventId]/respond/route.ts`, `lib/crossAccountCopy.ts` (preserve internalDate) |
 | `feat/collab-ui` | §7.3, §7.5, mailbox summaries/SSE, default signatures, virtual folders, prefs, role-aware UI | `app/components/collab/**`, `app/components/admin/**`, `app/hooks/useThreadCollab.ts`, `useSearchState.ts`, list row components, `MessageViewOrchestrator.tsx` header, Preferences/Admin/Members tab contents, the `collab` prop bag in MailClient, `app/api/me/{mailboxes/summary,events}/**`, `lib/mailboxSummary.ts`, `DetachedComposeWindowClient.tsx` and `useComposeController.ts` signature behavior after ui-shell handoff |
 | `feat/mailbox-watcher` | §1.1 fit 11; bounded sync and background freshness | `lib/mailboxWatcher.ts`, `lib/syncWorkerSemaphore.ts`, `lib/syncJobs.ts` worker admission, `instrumentation.ts` watcher hook after team-auth handoff, extraction of INBOX IDLE/poll core from `imap/stream/route.ts`; reuse authStreams for browser delivery |
@@ -1555,7 +1586,7 @@ It owns the executable migration/backup/restore runbook (§11) and final househo
 | `chore/mailplus-cutover` | §1.1 fit 9,17,18; §11 | `doc/MAILPLUS-CUTOVER.md`, `scripts/backupTeamInbox.ts`, restore acceptance script, systemd example/timer, measured provider inventory and signed acceptance checklist; never another branch's live worktree |
 
 `spike/better-auth` owns the isolated evidence/report, not production integration. feat/team-auth
-ports reviewed pieces on top of 6fee1b8 according to `briefs/team-auth-replan.md`; do not cherry-pick
+ports reviewed pieces on top of 6fee1b8 according to `doc/TEAM-AUTH-PLAN.md`; do not cherry-pick
 the spike as a finished auth replacement (the old stack still runs there). feat/ui-shell owns the
 login/security client (§7.4); feat/collab-ui owns the admin security UI (§7.5). feat/team-auth owns
 MCP token validation/minting in lib/auth.ts and the authInfo/account-binding lines in lib/mcpServer.ts;
@@ -1639,13 +1670,21 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   forwarding, HTTPS Secure cookie prefix, missing/foreign Origin and non-JSON rejection, malicious
   forwarded headers, production rate limits and server-call wrapper limits. Telemetry config + env
   off, missing secret/invalid URL/storage/desktop mode fail startup. Baseline type comparison.
-- IMAP first factor: negative control without bridge bypasses MFA; bridge positive flow over HTTP
+- IMAP first factor: unset/empty allowlist (the default) denies login and IMAP-based proof without
+  network calls, provisional sessions or write-back; UI action is hidden. Explicit allowlisting
+  enables only eligible personal mailboxes. Negative control without bridge bypasses MFA;
+  bridge positive flow over HTTP
   returns challenge with NO token/cookie/DB session before TOTP and backup-code completion. Pin hook
   count/matcher on upgrade. Existing personal identity only, no IMAP call when users empty/unknown,
-  owner+address+TLS+allowlist, zero/multiple candidates, personal mailbox shared with viewer still
-  eligible; shared-address/member/owner-less mailboxes never authenticate. Generic errors, network
+  owner+address+TLS+allowlist+shared=false, zero/multiple candidates; adding a viewer makes the
+  mailbox ineligible. Shared-address/multi-member/member-only/owner-less mailboxes never authenticate.
+  Generic errors, network
   limiter and no write-back on invalid credentials; changed password revokes old sessions/tokens;
   stored SMTP follows only the §5.3 rule. Use synthetic credentials and injected IMAP verification.
+- Deployment acceptance: canonical BETTER_AUTH_URL/trusted origin and rpID match §8.1; tailnet DNS
+  resolves mails.monkeymed.de to 100.92.134.1, the TLS chain/hostname is trusted on both phones, and
+  netcup API DNS-01 issuance/renewal succeeds. The separate remote-arm preview is not trusted by
+  canonical production and cannot reuse canonical passkeys. Localhost harness settings stay isolated.
 - MFA/security: mandatory gate blocks mail/admin/MCP and direct raw BA calls until TOTP verified,
   backup-code one-use, wrong/expired/locked challenges, reject trustDevice=true; passkey registration
   options, real registration/assertion with UV true accepted and UV false rejected server-side.
@@ -1657,7 +1696,9 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   user 409, first-admin invite only, concurrent first signup and invite maxUses, no bootstrap from
   a stored mailbox; crash/fault injection after every reservation/create/finalize step and idempotent
   compensation. Migration preserves IDs/roles and excludes ambiguous/shared identities. Recovery
-  single-use/expiry, SMTP-off restricted handover, generic SMTP-on requests, MFA preserved across
+  15-minute single-use/expiry and personal admin/operator handover with zero SMTP delivery,
+  public issuance absent/raw issuance blocked, canonical callback allowlist, no desktop invite
+  exemption, MFA preserved across
   password reset; sessions/MCP revoked. Raw plugin admin endpoints cannot skip audit, last-admin or
   cleanup; concurrent last-admin operations; disable/delete partial failures remain fail-closed.
 - MCP: opaque random token/hash only, no credential payload, old tokens rejected at cutover, creator
@@ -1680,7 +1721,7 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
 - UI: DOM tests for LoginScreen email/passkey/IMAP forms, TOTP/backup-code challenge, enrollment,
   re-auth and recovery errors, accessible focus/429, /me accountId:null and mandatory gate; no global
   logout on wrong TOTP/password. Browser authenticator acceptance with real UV; phone login/PWA
-  on the agreed canonical HTTPS origin: install both PWAs, login, switch mailbox, read, reply and attach a camera photo. DOM tests for `ThreadCollaborationBar`, mobile nav, compose
+  on `https://mails.monkeymed.de`: install both PWAs, login, switch mailbox, read, reply and attach a camera photo. DOM tests for `ThreadCollaborationBar`, mobile nav, compose
   coercion on mobile, a kept component inside a shadcn Sheet keeping `--space-2`, and the CSS
   layer build test.
 - Run `bun run test:ci`, `bun run test:stress`, `bun run lint`, `bun run build` before merging.
@@ -1706,10 +1747,15 @@ Never run an import against household mail as part of implementation-agent tests
    Drafts folder, concurrency/login limits and other phone clients. Measure rather than assuming
    published estimates. Configure spam to move into Spam; recreate server rules/autoresponders and
    check ManageSieve availability if needed.
-4. Prepare Linux/systemd + TLS proxy: fixed origin/RP ID, supported db mode and independent keys,
-   real trusted proxy chain, enough disk (fit estimate >=2.5x mail size must be checked), attachment
+4. Prepare Linux/systemd + TLS proxy: `BETTER_AUTH_URL=https://mails.monkeymed.de`,
+   `PASSKEY_RP_ID=mails.monkeymed.de`, canonical trusted origin only, DNS A `100.92.134.1` inside the
+   tailnet and certificate renewal via netcup API DNS-01 (§8.1). Keep the remote-arm preview separate.
+   Use DB-only credential storage and independent keys; leave `NOCTUA_IMAP_LOGIN_HOSTS` unset by
+   default and enable it only with an explicit reviewed host allowlist for eligible unshared personal
+   mailboxes; retain the admin's app-password fallback. Configure the real trusted proxy chain, enough disk (fit estimate >=2.5x mail size must be checked), attachment
    body limit >=40 MB for base64 JSON (verify actual target behavior), watcher flag and worker cap.
-   No Docker deployment dependency. Run startup, recovery and phone TLS/passkey acceptance.
+   No Docker deployment dependency. Run startup, personal reset-link handover (no SMTP) and canonical
+   phone TLS/passkey acceptance.
 5. Import LAN MailPlus→netcup with a reviewed imapsync template: folder dry-run first, owner-login
    shared copies and shared-prefix exclusion on personal runs; preserve internal dates and map Sent/
    Drafts explicitly, never --delete*. Validate exact installed flags for Message-ID handling,
@@ -1718,7 +1764,8 @@ Never run an import against household mail as part of implementation-agent tests
 6. First person redeems first-admin invite, chooses app password, verifies TOTP and saves codes;
    issues targeted invite for second person, who chooses her password/factors. Add personal and
    eight shared mailboxes with reviewed roles/DB credentials, preserving personal ownership where
-   IMAP first factor is desired. Test both people independently and manager/editor/viewer restrictions.
+   IMAP first factor is explicitly enabled; never enable it for shared mailboxes. Test both people
+   independently and manager/editor/viewer restrictions.
 7. With browsers/watcher/import writers paused, run full per-folder server sync (not initial UI's
    INBOX-full/other-folders-30-days policy):
    `bun scripts/runSyncJob.ts '{"accountId":"synthetic-id","folderId":"synthetic-id:INBOX","mode":"full","fullSync":true}'`
@@ -1742,3 +1789,17 @@ Never run an import against household mail as part of implementation-agent tests
     off each §1.1 row before disabling MailPlus permanently. Keep mail archive + key/app backups.
     Rollback keeps MailPlus history; re-enable POP3 only after removing imported netcup INBOX copies
     or deliberate keep-copy mode. Preserve Noctua-only shard state and keys through any rollback.
+
+
+## Appendix A. Rejected alternatives
+
+Rejected by the user on 2026-10-22; these are historical rationale, not configuration switches.
+
+| Rejected alternative | Rationale for the selected policy |
+|---|---|
+| Any enrolled MFA method instead of mandatory TOTP (D13) | Every user needs the same verified TOTP enrollment and backup-code recovery baseline; UV passkeys remain convenient login after enrollment. |
+| Remove personal IMAP first factor entirely (D3) | Retain the implementation as an explicitly allowlisted convenience, OFF by default, with no shared-mailbox authentication. |
+| Browser-only/cookie mailbox credentials (D2) | Shared inboxes and background workers require server-accessible encrypted DB credentials; the global credential overlay is removed. |
+| Retain Tauri/desktop mode or its invite/secret/origin exemptions (D15) | This is a Linux/systemd web fork; desktop support and its separate security architecture are dropped. |
+| SMTP reset sender and generic public recovery requests (D17) | This stage uses personal admin/operator handover of a 15-minute single-use link; SMTP recovery delivery is a non-goal. |
+| Preview hostname, LAN IP or a separately selected hostname as canonical RP ID | The user fixed `mails.monkeymed.de` over tailnet DNS A `100.92.134.1` with netcup DNS-01 TLS; the remote-arm preview is a separate origin. |

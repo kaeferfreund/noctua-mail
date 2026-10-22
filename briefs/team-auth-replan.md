@@ -1,20 +1,35 @@
 # feat/team-auth replan for Better Auth
 
-Status: replan v2 draft, 2026-10-22. Base: `6fee1b89b93785333ae113736bfa2dbc6e2c1b46`
-on feat/team-auth. Target: `briefs/TEAM-INBOX.better-auth.md` **design v4**, especially the five
-explicit Decision boxes D13/D3/D2/D15/D17. Better Auth is settled; these policy recommendations
-remain subject to the user's parallel answers. Evidence: spike/better-auth commit `98f04ad`,
-installed better-auth/@better-auth/passkey 1.7.12 and `doc/SPIKE-BETTER-AUTH.md`.
-Review IDs S1–S8/F1–F10/I1–I11 and evidence are in `briefs/better-auth-revision-log.md`.
+Status: replan v3, resolved and promoted, 2026-10-22. Base: `6fee1b89b93785333ae113736bfa2dbc6e2c1b46`
+on feat/team-auth. Target: `doc/TEAM-INBOX.md` **design v5**, resolved by the user on 2026-10-22.
+Better Auth 1.7.12 is pinned; evidence is spike/better-auth commit `98f04ad` and its
+`doc/SPIKE-BETTER-AUTH.md`. Review IDs S1–S8/F1–F10/I1–I11 are recorded in
+`doc/TEAM-AUTH-REVIEW-LOG.md`.
+
+Decided: mandatory TOTP before any mailbox access; UV passkeys for convenient login and backup codes for recovery (user, 2026-10-22).
+
+Decided: optional personal IMAP first factor is OFF by default, enabled only by `NOCTUA_IMAP_LOGIN_HOSTS`, never for shared mailboxes (user, 2026-10-22).
+
+Decided: encrypted DB-only credentials; cookie-only mode and Tauri/desktop mode are dropped, including desktop invite exemptions (user, 2026-10-22).
+
+Decided: admin personally hands over a 15-minute single-use reset link; SMTP recovery delivery is a non-goal (user, 2026-10-22).
+
+Decided: canonical origin `https://mails.monkeymed.de`, RP ID `mails.monkeymed.de`, DNS A `100.92.134.1` inside the tailnet, TLS via netcup API DNS-01; remote-arm preview remains separate (user, 2026-10-22).
+
+v2→v3: resolve the five user decisions and canonical deployment, promote repo paths, and preserve
+Slice 1 verbatim. Rejected alternatives and rationale are in design Appendix A; this plan implements
+only the selected policies. Unqualified section and D-number references below point to
+`doc/TEAM-INBOX.md`; Slice numbers point to this plan.
 
 v1→v2: preserve the disposition; split core from retirement; disable signup in the same slice as
 its imported helpers disappear; implement the generation/assurance boundary before HTTP activation;
 assign reset redemption/UI and WebAuthn commands; separate backend activation from final UI acceptance.
-No cherry-pick of the whole spike (its old auth still runs). This planning task edits no worktree.
+No cherry-pick of the whole spike (its old auth still runs). This plan authorizes only each assigned
+implementation slice; promotion changes documents, not application behavior.
 
 ## 1. Disposition of 6fee1b8, checked against git show
 
-Read `git -C wt-team-auth show 6fee1b8`: 19 files, 2511 additions, 67 deletions. The inventory's
+Read `git show 6fee1b8` in the assigned feat/team-auth checkout: 19 files, 2511 additions, 67 deletions. The inventory's
 keep/revise/revert classification is correct with the following precise choices. Do not revert
 the whole commit; most of it is still needed for mailbox authorization and collaboration.
 
@@ -111,7 +126,8 @@ Any import of a removed symbol must be fixed now, including MCP/admin tests and 
 Unsupported unfinished routes return explicit 503 until their owner slice replaces them.
 
 Remove cookie credential overlays/lib/credentials.ts and all session/MCP credential payload branches;
-db default, both alias, cookie/desktop rejected. Preserve membership/prefs/audit/safe merges from
+encrypted DB-only storage (db default, both deprecated alias); cookie/desktop rejected, including
+all desktop signup invite exemptions. Preserve membership/prefs/audit/safe merges from
 6fee1b8. Joined DTOs read authoritative auth_user; initialization uses narrow profile-only readers
 before auth schema exists. Migrate every hand-sealed-cookie fixture to testAuthHarness.
 
@@ -141,7 +157,7 @@ Implement accountAccess/accountPresentation, role matrix per handler (including 
 checks), owner/admin boundaries, member routes and sparse per-user prefs. Reuse retained membership
 DB helpers. shared=memberCount>1; stable name/e-mail/id sorting and secret-free role-specific payloads.
 lib/mailboxCredentials.ts is the only repair/write-back path for relogin/PUT/POST-existing-id and
-later IMAP login: endpoint verification, immutable fields, blank-secret unchanged, exact SMTP-follow
+later explicitly enabled personal IMAP login (never a shared mailbox): endpoint verification, immutable fields, blank-secret unchanged, exact SMTP-follow
 rule. Changing a login mailbox's credential/identity advances the owner's generation in the same
 master transaction, revokes sessions/tokens/challenges and closes streams. Restrict identity changes
 to owner/admin. Do not silently make ownerless shared mailboxes personal login identities.
@@ -193,7 +209,9 @@ never reuse the login's consumed code as the replacement grant.
 
 Passkey registration/authentication verify UV server-side; keep registration.requireSession:true,
 deny registration createSession:true and trustDevice:true. Port only the version-coupled IMAP bridge
-from the spike with strict eligibility/limiter/write-back; unset NOCTUA_IMAP_LOGIN_HOSTS keeps it off.
+from the spike with strict eligibility/limiter/write-back; unset/empty NOCTUA_IMAP_LOGIN_HOSTS keeps
+it OFF by default. Only a nonempty exact host allowlist enables it; shared=false is required and adding
+a viewer makes that mailbox ineligible. Use the same gate for IMAP-based credential proof.
 No user means no network; no provisional session before MFA. Preserve positive/negative canaries.
 Publish /me and proof/factor DTOs for ui-shell in doc/AUTHENTICATION.md.
 
@@ -201,7 +219,9 @@ Deliver §10.1's pinned Playwright config/spec/fixture and scripts/runAuthBrowse
 command test:auth-browser. Use a minimal in-memory fixture page supplied by the harness to exercise
 real WebAuthn against the handler before the production client exists; no shipped test route.
 
-**Checks:** common checks + core/policy/IMAP HTTP tests, test:stress and
+**Checks:** unset/empty IMAP allowlist rejects before network/session/write-back and hides the UI
+action; an explicit allowlist enables only eligible personal mailboxes, never shared ones. Common
+checks + core/policy/IMAP HTTP tests, test:stress and
 `bunx playwright install chromium && bun run test:auth-browser` on localhost:3784. Include UV=false
 server rejection, real registration/assertion, RP/origin mismatch, anonymous options invalidation by reset/revoke, and grant binding; options-only
 unit tests are insufficient. Two sessions before enrollment, stolen passwordless session seed/code
@@ -210,7 +230,7 @@ backup-code proofs (one winner), interrupted replacement and full lost-phone/new
 
 **Acceptance:** user-wide factor enrollment cannot authorize an unproved session, credential knowledge
 is required per matrix, no raw endpoint bypass exists, and lost-device recovery can complete. IMAP
-stays off if its canaries fail. Public /api/ba remains 503 until lifecycle/reset controls land.
+stays OFF unless explicitly allowlisted and all canaries pass; mandatory TOTP gates every user. Public /api/ba remains 503 until lifecycle/reset controls land.
 
 ### Slice 5 — provisioning, lifecycle and password-reset backend
 
@@ -222,7 +242,8 @@ binding BEFORE IMAP/SMTP, plus existing user/mailbox 409 before network/reservat
 and reserve first-admin/invite capacity + intended ID; scoped createUser, trigger mirror, finalize
 new mailbox/membership/claim. Use active-only journal uniqueness; keep complete/cancelled history by
 operation ID. Idempotent compensation/restart reconciliation; reject incomplete users at login.
-Min-length validation is explicit before admin createUser; no mailbox password first-admin fallback.
+Min-length validation is explicit before admin createUser; no mailbox password first-admin fallback
+or desktop invite exemption. Every signup requires a valid invite.
 
 Implement lifecycle journals/last-admin serialization, targeted invites, correct adminUpdateUser
 for target name; updateUser is for self, ban/unban/setRole/removeUser with audit and cleanup seam.
@@ -230,15 +251,19 @@ Keep raw HTTP admin paths blocked; no-header server createUser is private to pro
 Password-change wrapper and triggers enforce other-session/MCP/challenge revocation independent of
 caller flags. onPasswordReset is cleanup only; fault after commit must not revive an old bearer.
 
-Implement restricted admin/operator recovery and optional generic SMTP-on request wrapper. Configure
-sendResetPassword via request-scoped sink, 900s reset TTL and revokeSessionsOnPasswordReset:true.
+Implement restricted admin-issued recovery with personal handover and the audited local operator
+lockout equivalent. SMTP recovery delivery is an explicit non-goal; no public recovery-request
+wrapper or SMTP sender configuration. Configure sendResetPassword via request-scoped sink, 900s reset TTL and revokeSessionsOnPasswordReset:true.
 Expose unauthenticated token-authorized GET /api/ba/reset-password/:token and POST /api/ba/reset-password
 in the internal handler policy, while raw issuance stays blocked. Require canonical /reset-password
-callback, JSON {token,newPassword}, no-store/no-referrer and URL/log redaction. Issue no auth session
-on success and preserve existing MFA. Deliver reset contract to ui-shell; its page lands in Slice 7.
+callback `https://mails.monkeymed.de/reset-password` in production (isolated test/preview instances
+use their own exact origin), JSON {token,newPassword}, no-store/no-referrer and URL/log redaction.
+Issue no auth session on success and preserve existing MFA. Deliver reset contract to ui-shell; its page lands in Slice 7.
 The handler still returns 503 externally until Slice 6.
 
-**Checks:** common checks + signup/admin/reset/recovery tests and stress. Invalid/expired/exhausted/
+**Checks:** recovery issuance requires admin/operator authority, links expire after 15 minutes and
+are single-use, no SMTP delivery or public issuance, no desktop invite exemption. Common checks +
+signup/admin/reset/recovery tests and stress. Invalid/expired/exhausted/
 wrong-person invites assert zero IMAP/SMTP calls; first-admin/invite contention; crash boundaries;
 complete-user delete/reinvite and repeat recovery; actor≠target name update. Test callback destination,
 unauthenticated valid-token reset, expiry/reuse/parallel redemption, preserved MFA, pre-reset challenge
@@ -258,12 +283,19 @@ Implement scripts/migrateTeamAuth.ts and recoverTeamAuth.ts: explicit stable ID 
 shared-address rejection, safe slice-1 chosen-password hash import, disabled→ban, name import, no
 shared temporary password, old cookie/MCP invalidation and idempotent second run. Review startup
 bootstrap logs/secret redaction. Remove transitional old login/crypto dead code; rg all callers.
-Document final env/systemd/TLS/RP ID/recovery in AUTHENTICATION, README and deployment examples.
+Document final env/systemd/TLS/RP ID/recovery in doc/AUTHENTICATION.md, README and deployment examples:
+BETTER_AUTH_URL=https://mails.monkeymed.de, PASSKEY_RP_ID=mails.monkeymed.de, canonical trusted origin
+only, DNS A 100.92.134.1 inside the tailnet, TLS certificate/renewal via netcup API DNS-01. Leave
+NOCTUA_IMAP_LOGIN_HOSTS unset by default, DB-only storage and no desktop mode; recovery links are
+handed over personally, never sent by SMTP. The preview https://remote-arm.tail31b4a1.ts.net:3790
+is separate, with isolated auth data/secrets and preview-only origin/RP ID; never add it to canonical
+production trust or claim canonical passkey reuse (design §8.1).
 
 Enable the /api/ba mounted handler and completed Noctua wrappers only now; no runtime “unsafe auth”
 flag remains. A direct API smoke can test reset even before the page merges; advertise the actual
 recovery links to users only with Slice 7 installed. Integration owner merges UI and backend before
-any deployment. User decisions alter their Decision box and bounded implementation/tests first.
+any deployment. Implement the resolved decisions in doc/TEAM-INBOX.md; no pending policy switch
+blocks the assigned slices.
 
 **Checks:** common checks + all auth/migration tests, production build/start at 3785, second startup,
 /api/ba/ok, cookie refresh, real proxy-origin simulation, factor/challenge/gate flows, ban/revoke/MCP,
@@ -284,7 +316,8 @@ worktree. Design: §4.1/§4.4/§4.6 client contracts, §7.2/§7.4, §10–§10.1
 Implement/finish lib/authClient.ts and app/components/auth/{LoginScreen,TwoFactorChallenge,
 EnrollmentScreen,SecuritySettings,ReauthDialog,ResetPasswordForm}.tsx. Reuse shell shadcn primitives
 and tokens. Main password form, explicit UV passkey action/conditional UI cancellation, optional
-explicit IMAP method, TOTP/backup challenge, reload-safe restricted enrollment and mailbox-independent
+explicit IMAP method (hidden unless server availability says the allowlist enables it; never expose
+the allowlist itself), mandatory TOTP/backup challenge, reload-safe restricted enrollment and mailbox-independent
 security menu. The proof header is in-memory on both passkey options+verification. Matrix-specific
 password prompts remain even with UV where the library requires a password. Lost-phone form asks
 for the newly consumed replacement code; no “disable mandatory MFA” UI.
@@ -302,7 +335,8 @@ slots. Extend browser harness fixtures to actual client flows against enabled Sl
 
 **Checks:** auth/reset/selection/logout/role-error/ComposeFields DOM tests; common checks;
 `bun run test:auth-browser` against actual shell. Install PWA on both household phones at canonical
-HTTPS: password+TOTP, UV passkey, backup-code/replacement recovery, mailbox switch, read, reply and
+HTTPS https://mails.monkeymed.de (never the remote-arm preview): password+TOTP, UV passkey,
+backup-code/replacement recovery, mailbox switch, read, reply and
 camera-photo attachment. Record manual gaps explicitly; simulator/virtual-authenticator checks alone
 do not mark phone acceptance passed. No real personal data in fixtures/screenshots.
 
@@ -323,7 +357,6 @@ Canonical new route inventory (Noctua paths are not aliases of raw BA endpoints)
 | POST /api/auth/security/backup-codes | 4 | ui-shell / 7 |
 | POST /api/auth/signup | disabled 2; provision 5 | ui-shell / 7 |
 | POST /api/admin/users/[userId]/recovery | 5 | admin collab-ui / 3rd stage; operator first |
-| POST /api/auth/recovery/request | 5, SMTP-on only | ui-shell / 7 |
 | GET /api/ba/reset-password/:token; POST /api/ba/reset-password | 5, activation 6 | ui-shell / 7 |
 | GET /reset-password | backend headers 5; page 7 | ui-shell |
 | /api/ba/[...all] sign-in, TOTP verification, passkey options/verification | policy 4–5; activation 6 | ui-shell / 7 |
@@ -348,8 +381,9 @@ to collab-ui, not these auth slices.
   session.{expiresIn,updateAge,freshAge,cookieCache,additionalFields}, twoFactor allowPasswordless,
   passkey authenticatorSelection/registration.requireSession/registration.afterVerification/
   authentication.afterVerification. Do not invent authentication.userVerification or mandatoryMFA.
-- Policy decisions are the five v4 boxes, never duplicated alternatives implemented concurrently.
-  No doc/TEAM-INBOX.md promotion in this task: the orchestrator promotes after confirmation.
+- Policy decisions are resolved in doc/TEAM-INBOX.md v5 (§2/§4/§8 and Appendix A). Canonical plan:
+  doc/TEAM-AUTH-PLAN.md; review history: doc/TEAM-AUTH-REVIEW-LOG.md. No alternative auth stack,
+  SMTP recovery sender, desktop mode or cookie credential mode is part of these slices.
 - Stage 2 thread-collaboration and mailbox-watcher, Stage 3 collab-ui and conditional sender-identities,
   Stage 4 chore/mailplus-cutover are required follow-on owners in design §9. team-auth does not implement
   them by implication and cannot claim overall go-live. The cleanup/stream/semaphore handoff seams
