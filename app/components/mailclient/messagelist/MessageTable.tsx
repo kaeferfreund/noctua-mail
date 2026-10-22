@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import type { CSSProperties } from "react";
 import { GitBranch, MoveRight, Search, Trash2 } from "lucide-react";
-import { Badge, Checkbox, Text } from "@radix-ui/themes";
+import { Badge, Checkbox, Text, VisuallyHidden } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import { describeMessageSize } from "@/lib/ui/byteSize";
@@ -91,7 +91,6 @@ export default function MessageTable({
     flattenThread,
     getThreadLatestDate,
     getGroupLabel,
-    renderUnreadDot,
     renderSelectIndicators,
     renderFolderBadges,
     isTrashFolder,
@@ -405,7 +404,6 @@ export default function MessageTable({
               }}
             >
                 <span data-message-cell="unread" className={styles.cellSelect}>
-                  {renderUnreadDot(message, { seen: displaySeen })}
                   {renderSelectIndicators(message)}
                   <Checkbox
                     size="1"
@@ -469,6 +467,7 @@ export default function MessageTable({
                       <CaretRightIcon />
                     </span>
                   )}
+                  {!displaySeen && <VisuallyHidden>Unread</VisuallyHidden>}
                   {!item.showRecipientIcon && (
                     <SenderIcon
                       accountId={message.accountId}
@@ -477,6 +476,7 @@ export default function MessageTable({
                       enabled={senderIconsEnabled}
                       className={styles.senderIcon}
                       title={item.fromTooltip}
+                      unread={!displaySeen}
                     />
                   )}
                   {item.showRecipientIcon && (
