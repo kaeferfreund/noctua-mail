@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/postcss";
 import postcss, { type AtRule, type Node, type Root, type Rule } from "postcss";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
-import { APP_FONT_FAMILY, APP_FONT_URL } from "@/lib/ui/fonts";
+import { APP_FONT_FACE_CSS, APP_FONT_FAMILY, APP_FONT_SUBSETS } from "@/lib/ui/fonts";
 
 // Compiles app/globals.css the way `next build` does (postcss.config.mjs) and
 // checks the cascade-layer contract from doc/TEAM-INBOX.md §7.1.
@@ -207,13 +207,25 @@ describe("app/globals.css cascade layers", () => {
         });
         faces.push(face);
       });
-      // Radix Themes brings its own local() faces; the app declares one.
+      // Radix Themes brings its own local() faces; the app declares subsets.
       const appFaces = faces.filter((face) => face["font-family"] === `"${APP_FONT_FAMILY}"`);
-      expect(appFaces).toHaveLength(1);
-      expect(appFaces[0].src).toBe(`url("${APP_FONT_URL}") format("woff2")`);
-
-      const font = readFileSync(path.join(repoRoot, "public", APP_FONT_URL));
-      expect(font.subarray(0, 4).toString("latin1")).toBe("wOF2");
+      expect(appFaces).toHaveLength(APP_FONT_SUBSETS.length);
+      const iframeFaces = postcss.parse(APP_FONT_FACE_CSS);
+      const injectedFaces: Array<Record<string, string>> = [];
+      iframeFaces.walkAtRules("font-face", (atRule) => {
+        const face: Record<string, string> = {};
+        atRule.walkDecls((decl) => { face[decl.prop] = decl.value; });
+        injectedFaces.push(face);
+      });
+      expect(appFaces).toEqual(injectedFaces);
+      for (const [index, { url, unicodeRange }] of APP_FONT_SUBSETS.entries()) {
+        expect(appFaces[index].src).toBe(`url("${url}") format("woff2")`);
+        expect(appFaces[index]["unicode-range"]).toBe(unicodeRange);
+        expect(appFaces[index]["font-weight"]).toBe("100 900");
+        expect(appFaces[index]["font-display"]).toBe("swap");
+        const font = readFileSync(path.join(repoRoot, "public", url));
+        expect(font.subarray(0, 4).toString("latin1")).toBe("wOF2");
+      }
     },
     COMPILE_TIMEOUT_MS
   );
