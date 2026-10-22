@@ -423,7 +423,6 @@ describe("thread subtree checkbox behavior", () => {
       shiftKey: false,
       messageId: "sub-root",
       isThreadSelectionRoot: true,
-      selectedMessageIds: new Set(["sub-child"]),
       threadSelectionIds: ["sub-root", "sub-child"],
       isThreadSelectionAllSelected: false,
       selectionStore: store,
@@ -436,6 +435,26 @@ describe("thread subtree checkbox behavior", () => {
 
     expect(Array.from(store.getIds()).sort()).toEqual(["sub-child", "sub-root"]);
     expect(lastSelected).toBe("sub-root");
+  });
+
+  it("adds a thread to rows checked after the thread row last rendered", () => {
+    // Memoized rows keep the selection from their last render; checking a
+    // thread root must build on the store, not on that stale set.
+    const store = createSelectionStore(null);
+    store.setSelection(new Set(["other-1", "other-2"]));
+
+    handleRowCheckboxChange({
+      shiftKey: false,
+      messageId: "root",
+      isThreadSelectionRoot: true,
+      threadSelectionIds: ["root", "child"],
+      isThreadSelectionAllSelected: false,
+      selectionStore: store,
+      selectRangeTo: () => {},
+      toggleMessageSelection: () => {}
+    });
+
+    expect(Array.from(store.getIds()).sort()).toEqual(["child", "other-1", "other-2", "root"]);
   });
 
   it("keeps partial row highlight for collapsed root thread rows", () => {

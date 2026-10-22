@@ -414,7 +414,6 @@ export default function MessageTable({
                         shiftKey: event.shiftKey,
                         messageId: message.id,
                         isThreadSelectionRoot,
-                        selectedMessageIds,
                         threadSelectionIds,
                         isThreadSelectionAllSelected,
                         selectionStore,
