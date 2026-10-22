@@ -317,27 +317,27 @@ mail and leave room for Bun/Next and SQLite caches. Twelve mailboxes do not impl
 
 ### Summary and event integration
 
-`GET /api/accounts/summary` returns `{ accounts: [{ accountId, unreadInbox, lastSyncAt,
-watcherState }] }` with `Cache-Control: no-store`. It requires the existing session helper and
-currently returns only the session's active account, or an empty list without a selected account.
-The async-compatible guard is awaited and its response headers (including renewed cookies) are
-propagated. Account enumeration goes through the single `summaryAccountIds` seam. `lastSyncAt` is Unix milliseconds (null until
-a successful sync); unread counts exclude deleted rows and use a partial index in each shard.
+`GET /api/me/mailboxes/summary` returns unread and collaboration counts for all mailboxes
+accessible to the MFA session, including non-active mailboxes, with `Cache-Control: no-store`.
+The transitional `/api/accounts/summary` route was removed. Session refresh cookies are
+propagated. The canonical shapes and count definitions are documented in [API.md](API.md#mailbox-summaries-and-user-events).
+`watcher.lastEventAt` is Unix milliseconds (omitted until a successful sync); unread counts
+are null until a successful sync, exclude deleted rows and use a partial index in each shard.
 `watcherState` is `disabled`, `starting`, `idling`, `backoff`, `auth_failed` or `stopped`.
 The last sync time and watcher state survive process restarts in `mailbox_summary`; startup
 refreshes live states. After an unclean crash, the stored state may describe the last process
 until the server restarts. With the watcher disabled, summaries always report `disabled`.
 
 `getMailboxSummaries(accountIds)` never enumerates mailboxes: callers must pass authorized ids.
-feat/team-auth will replace the guard import with `requireActiveUserSession` and the supported
-runtime gate. feat/collab-ui owns the canonical `/api/me/mailboxes/summary` route using
-`listAccessibleAccountsForUser`, plus assigned-to-me and unassigned-open counts; this transitional
-route does **not** complete v5 go-live fit item 14. `subscribeMailboxEvents(listener)` in `lib/mailboxWatcherEvents.ts` returns
+`getUserMailboxSummary` enumerates through `listAccessibleAccountsForUser` and narrows that
+scope for mailbox-bound MCP reads. `subscribeMailboxEvents(listener)` in `lib/mailboxWatcherEvents.ts` returns
 an unsubscribe function and emits `{ accountId, type: "state", watcherState }` or
 `{ accountId, type: "synced" }` after a successful check. It is a process-local invalidation feed,
-not a per-user SSE endpoint or message notification payload. The future collaboration event
-route must authorize account membership before forwarding it, then re-read summaries/messages.
-No browser UI or per-user counts are added here.
+not a message notification payload. `/api/me/events` subscribes to these invalidations and
+committed collaboration changes, rereads canonical counts, and authorizes each enqueue through
+authStreams. Membership revocation drops the affected mailbox; session revocation closes the
+stream. This channel is process-local, so run watcher and web delivery in the same server
+process; reconnecting clients refetch full state. No unified inbox is introduced.
 
 ### Synthetic integration proof
 

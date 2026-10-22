@@ -1,3 +1,4 @@
+import { publishThreadCollabEvent } from "../threadCollabEvents";
 import { remapThreadCollab, type ThreadRemapPair } from "./threadCollab";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { collectThreadReferenceIds, resolveThreadingForItems } from "../threading";
@@ -446,10 +447,10 @@ export async function recomputeThreadIdsForAccount(accountId: string) {
       if (updates.length === 0) return false;
       const update = db.prepare(`UPDATE messages SET threadId = ?, parentId = ? WHERE id = ?`);
       updates.forEach((row) => update.run(row.threadId, row.parentId, row.id));
-      remapThreadCollab(db, accountId, remaps);
-      return true;
+      return remapThreadCollab(db, accountId, remaps);
     }).immediate();
     if (!changed) return;
+    for (const event of changed) publishThreadCollabEvent(event);
     await rebuildAllThreadSignalsForAccount(db, accountId);
   });
 }
