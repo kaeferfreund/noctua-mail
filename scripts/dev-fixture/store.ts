@@ -1,3 +1,6 @@
+import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { EventEmitter } from "node:events";
 import { createSeed } from "./seed";
 import { parseMime, type MimeNode } from "./parser";
@@ -5,11 +8,23 @@ export type FixtureMessage = { uid: number; flags: Set<string>; date: Date; mime
 export type Mailbox = { path: string; special?: string; uidValidity: number; uidNext: number; subscribed: boolean; messages: FixtureMessage[] };
 export class MailStore extends EventEmitter {
   readonly boxes = new Map<string, Mailbox>();
-  private generation = 1700000000;
-  constructor(readonly seed = "monkeydent", readonly anchor = new Date()) { super(); this.reset(); }
+  constructor(readonly seed = "monkeydent", readonly anchor = new Date(), readonly uidValidityPath = join(process.env.NOCTUA_DATA_DIR ?? ".data", "fixture-uidvalidity.sqlite")) { super(); this.reset(); }
+  private nextUidValidity(): number {
+    // Persist only this high-water mark, never mailbox contents. SQLite serializes
+    // allocations across fixture processes, including restarts in the same second.
+    mkdirSync(dirname(this.uidValidityPath), { recursive: true });
+    const db = new Database(this.uidValidityPath);
+    try {
+      db.exec("PRAGMA busy_timeout = 5000");
+      db.exec("CREATE TABLE IF NOT EXISTS uid_validity (id INTEGER PRIMARY KEY CHECK (id = 1), value INTEGER NOT NULL CHECK (value BETWEEN 1 AND 4294967295))");
+      const row = db.query("INSERT INTO uid_validity (id, value) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET value = MAX(excluded.value, uid_validity.value + 1) RETURNING value").get(Math.floor(Date.now() / 1000)) as { value: number } | null;
+      if (!row) throw new Error("Cannot allocate UIDVALIDITY");
+      return row.value;
+    } finally { db.close(); }
+  }
   create(path: string, special?: string) {
     if (this.boxes.has(path)) throw new Error("Mailbox already exists");
-    const box: Mailbox = { path, special, uidValidity: this.generation++, uidNext: 1, subscribed: true, messages: [] };
+    const box: Mailbox = { path, special, uidValidity: this.nextUidValidity(), uidNext: 1, subscribed: true, messages: [] };
     this.boxes.set(path, box);
     return box;
   }

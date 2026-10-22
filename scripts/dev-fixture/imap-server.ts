@@ -2,7 +2,7 @@ import { createServer, type Socket } from "node:net";
 import { once } from "node:events";
 import { createServer as createHttpServer } from "node:http";
 import { options } from "./cli";
-import { bodyStructure, decodeMailbox, encodeMailbox, envelope, inSet, quote, section, tokens } from "./parser";
+import { bodyStructure, decodeWords, decodeMailbox, encodeMailbox, envelope, inSet, quote, searchableBody, section, tokens, type CommandPart } from "./parser";
 import { makeMessage, demoPass, demoUser } from "./seed";
 import { MailStore, type FixtureMessage, type Mailbox } from "./store";
 
@@ -51,16 +51,12 @@ function searchPredicate(args: string[], box: Mailbox) {
     if (key === "KEYWORD" || key === "UNKEYWORD") { const flag = next(); return m => hasFlag(m, flag) !== (key === "UNKEYWORD"); }
     if (["HEADER", "FROM", "TO", "CC", "BCC", "SUBJECT", "TEXT", "BODY"].includes(key)) {
       const field = key === "HEADER" ? next().toLowerCase() : key.toLowerCase();
-      const value = next().toLowerCase();
+      const value = next().toUpperCase();
       return m => {
-        let haystack = field === "text" ? m.mime.raw.toString() : field === "body" ? m.mime.body.toString() : m.mime.headers.get(field) ?? "";
-        // Decode encoded-word subjects and base64 text for useful synthetic searches.
-        haystack = haystack.replace(/=\?utf-8\?b\?([^?]+)\?=/gi, (_, data: string) => Buffer.from(data, "base64").toString());
-        if (field === "text" || field === "body") {
-          const walk = (node: typeof m.mime): string => node.children.length ? node.children.map(walk).join(" ") : node.headers.get("content-transfer-encoding")?.toLowerCase() === "base64" ? Buffer.from(node.body.toString(), "base64").toString() : node.body.toString();
-          haystack += ` ${walk(m.mime)}`;
-        }
-        return haystack.toLowerCase().includes(value);
+        const haystack = field === "body" ? searchableBody(m.mime) : field === "text"
+          ? `${[...m.mime.headers].map(([name, value]) => `${name}: ${decodeWords(value)}`).join("\n")}\n${searchableBody(m.mime)}`
+          : decodeWords(m.mime.headers.get(field) ?? "");
+        return haystack.toUpperCase().includes(value);
       };
     }
     if (key === "LARGER" || key === "SMALLER") { const size = Number(next()); return m => key === "LARGER" ? m.mime.raw.length > size : m.mime.raw.length < size; }
@@ -81,9 +77,8 @@ export async function startImapServer(config: ImapOptions = {}) {
   const server = createServer(socket => {
     sockets.add(socket);
     let buffer = Buffer.alloc(0);
-    let command = "";
+    let command: CommandPart[] = [];
     let literalSize: number | undefined;
-    let literals: Buffer[] = [];
     let authenticated = false;
     let selected: Mailbox | undefined;
     let readOnly = false;
@@ -106,7 +101,8 @@ export async function startImapServer(config: ImapOptions = {}) {
       authenticated = username === user && password === pass;
       send(authenticated ? `${tag} OK [CAPABILITY ${capabilities}] Authenticated` : `${tag} NO [AUTHENTICATIONFAILED] Invalid fixture credentials`);
     };
-    function execute(line: string, blobs: Buffer[]) {
+    function execute(parts: CommandPart[]) {
+      const line = parts.length === 1 && typeof parts[0] === "string" ? parts[0] : "";
       if (idleTag) {
         if (line.toUpperCase() === "DONE") { send(`${idleTag} OK IDLE completed`); idleTag = undefined; }
         else send("* BAD Expected DONE");
@@ -119,7 +115,14 @@ export async function startImapServer(config: ImapOptions = {}) {
         authenticate(tag, parts.at(-2) ?? "", parts.at(-1) ?? "");
         return;
       }
-      const args = tokens(line).map(token => /^~L\d+~$/.test(token) ? blobs[Number(token.slice(2, -1))].toString() : token);
+      let parsed: CommandPart[];
+      try { parsed = tokens(parts); }
+      catch (error) {
+        const tag = typeof parts[0] === "string" ? parts[0].match(/^[^\s()"{}]+/)?.[0] ?? "*" : "*";
+        send(`${tag} BAD ${String((error as Error).message).replace(/[\r\n]/g, " ")}`);
+        return;
+      }
+      const args = parsed.map(token => typeof token === "string" ? token : token.data.toString());
       const tag = args.shift() ?? "*";
       let cmd = (args.shift() ?? "").toUpperCase();
       const uidMode = cmd === "UID";
@@ -178,17 +181,20 @@ export async function startImapServer(config: ImapOptions = {}) {
         }
         if (cmd === "RENAME") {
           const box = store.get(decodeMailbox(args[0]));
-          if (box.path === "INBOX" || store.boxes.has(decodeMailbox(args[1]))) throw new Error("Cannot rename mailbox");
+          const destination = decodeMailbox(args[1]);
+          if (box.path === "INBOX") throw new Error("Cannot rename mailbox");
           const children = [...store.boxes.values()].filter(item => item === box || item.path.startsWith(box.path + "/"));
-          const oldPath = box.path;
-          for (const child of children) { store.boxes.delete(child.path); child.path = decodeMailbox(args[1]) + child.path.slice(oldPath.length); store.boxes.set(child.path, child); }
+          const moves = children.map(child => ({ child, path: destination + child.path.slice(box.path.length) }));
+          if (moves.some(move => store.boxes.has(move.path))) throw new Error("Destination mailbox already exists");
+          for (const { child } of moves) store.boxes.delete(child.path);
+          for (const { child, path } of moves) { child.path = path; store.boxes.set(path, child); }
           ok(); return;
         }
         if (cmd === "SUBSCRIBE" || cmd === "UNSUBSCRIBE") { store.get(decodeMailbox(args[0])).subscribed = cmd === "SUBSCRIBE"; ok(); return; }
         if (cmd === "APPEND") {
           const box = store.get(decodeMailbox(args[0]));
-          const marker = tokens(line).at(-1) ?? "";
-          const raw = blobs[Number(marker.slice(2, -1))];
+          const literal = parsed.at(-1);
+          const raw = typeof literal === "object" && literal.kind === "literal" ? literal.data : undefined;
           if (!raw) throw new Error("APPEND requires literal");
           const endFlags = args.indexOf(")");
           const flags = args[1] === "(" ? args.slice(2, endFlags).map(normalizeFlag) : [];
@@ -273,9 +279,8 @@ export async function startImapServer(config: ImapOptions = {}) {
       while (buffer.length) {
         if (literalSize !== undefined) {
           if (buffer.length < literalSize) return;
-          literals.push(buffer.subarray(0, literalSize));
+          command.push({ kind: "literal", data: buffer.subarray(0, literalSize) });
           buffer = buffer.subarray(literalSize);
-          command += `~L${literals.length - 1}~`;
           literalSize = undefined;
         }
         const end = buffer.indexOf("\r\n");
@@ -284,13 +289,20 @@ export async function startImapServer(config: ImapOptions = {}) {
         buffer = buffer.subarray(end + 2);
         const literal = line.match(/\{(\d+)(\+)?\}$/);
         if (literal) {
-          command += line.slice(0, literal.index);
+          command.push(line.slice(0, literal.index));
           literalSize = Number(literal[1]);
+          if (!Number.isSafeInteger(literalSize)) {
+            send("* BAD Invalid literal size");
+            command = []; literalSize = undefined;
+            continue;
+          }
           if (!literal[2]) send("+ Ready for literal");
           continue;
         }
-        execute(command + line, literals);
-        command = ""; literals = [];
+        const parts = [...command, line];
+        command = [];
+        try { execute(parts); }
+        catch { send("* BAD Malformed command"); }
       }
     });
     send(`* OK [CAPABILITY ${capabilities}] MonkeyDent synthetic mailbox`);
