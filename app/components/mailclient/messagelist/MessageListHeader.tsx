@@ -2,10 +2,10 @@ import { startTransition, useEffect, useId, useRef, useState } from "react";
 import type React from "react";
 import {
   ArrowDownWideNarrow,
+  ChevronsDown,
   ListChevronsDownUp,
   ListChevronsUpDown,
   MessagesSquare,
-  RefreshCw,
   Rows3,
   StretchHorizontal,
   Table2,
@@ -22,15 +22,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/app/components/ui/dropdown-menu";
-import TooltipIconButton from "@/app/components/TooltipIconButton";
-import ToolbarMenuTrigger from "@/app/components/ToolbarMenuTrigger";
+import { Separator } from "@/app/components/ui/separator";
+import ToolbarButton from "@/app/components/ToolbarButton";
 import type { MessageGroup } from "./listModel";
 import type { MessageListGroupBy, MessageViewMode, ThreadsMode } from "./messageListViewTypes";
 import styles from "./MessageListHeader.module.css";
 
+/**
+ * The message list's toolbar, rendered in the shell header next to the folder
+ * title: count, view menu, sort & group menu and expand/collapse all. The
+ * header is a `@container/header`, so the count and the sort label drop out
+ * when it gets narrow; phones keep only the two menus.
+ */
 export type MessageListHeaderProps = {
   state: {
-    listWidth: number;
     searchScope: "folder" | "all";
     loadedMessageCount: number;
     totalMessages: number | null;
@@ -94,10 +99,6 @@ const THREAD_DATE_OPTIONS: ReadonlyArray<MenuOption<ThreadDateSource>> = [
   { value: "latestDateValue", label: "Last activity" }
 ];
 
-// Below this list width the sort trigger drops its text label and shows the
-// icon only, so the one-row toolbar keeps room for the count.
-const SORT_LABEL_MIN_LIST_WIDTH = 400;
-
 const countFormat = new Intl.NumberFormat();
 
 function MenuRadioSection<T extends string>({
@@ -153,7 +154,6 @@ function MenuRadioSection<T extends string>({
 
 export default function MessageListHeader({ state, actions }: MessageListHeaderProps) {
   const {
-    listWidth,
     searchScope,
     loadedMessageCount,
     totalMessages,
@@ -311,100 +311,101 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
   );
 
   return (
-    <div className={styles.header}>
-      <div className={styles.meta}>
-        <span className={styles.count} title={countTitle}>
-          {countText}
-        </span>
-        {hasMoreMessages && !loadingMessages && (
-          <TooltipIconButton
-            size="1"
-            variant="ghost"
-            color="gray"
-            className={styles.iconButton}
-            onClick={() => setMessagesPage((prev) => prev + 1)}
-            tooltip="Load more"
-          >
-            <RefreshCw size={14} />
-          </TooltipIconButton>
-        )}
-      </div>
-      <div className={styles.actions}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <ToolbarMenuTrigger
-              tooltip={`View: ${currentView.label}`}
-              icon={<CurrentViewIcon size={14} />}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className={styles.viewMenu}>
-            <MenuRadioSection
-              label="View"
-              value={localView}
-              options={VIEW_OPTIONS}
-              onValueChange={handleViewChange}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <ToolbarMenuTrigger
-              tooltip={sortTooltip}
-              icon={<ArrowDownWideNarrow size={14} />}
-              label={listWidth >= SORT_LABEL_MIN_LIST_WIDTH ? sortTriggerLabel : undefined}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className={styles.sortMenu}>
-            <MenuRadioSection
-              label="Sort by"
-              value={localSort}
-              options={SORT_OPTIONS}
-              onValueChange={handleSortChange}
-            />
-            <DropdownMenuSeparator />
-            <MenuRadioSection
-              label="Group by"
-              hint={groupingDisabled ? "Off while sorting by size" : undefined}
-              value={effectiveGroupBy}
-              options={groupOptions}
-              disabled={groupingDisabled}
-              onValueChange={handleGroupChange}
-            />
-            {showThreadDate && (
-              <>
-                <DropdownMenuSeparator />
-                <MenuRadioSection
-                  label="Thread date"
-                  value={localThreadDateSource}
-                  options={THREAD_DATE_OPTIONS}
-                  onValueChange={handleThreadDateSourceChange}
-                />
-              </>
-            )}
-            <DropdownMenuSeparator />
-            <MenuRadioSection
-              label="Threads"
-              hint={threadsHint}
-              value={threadsAllowed ? threadsMode : "off"}
-              options={threadsOptions}
-              disabled={!threadsAllowed}
-              onValueChange={handleThreadsModeChange}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {hasToggleableGroup && (
-          <TooltipIconButton
-            size="1"
-            variant="ghost"
-            color="gray"
-            className={styles.iconButton}
-            onClick={handleToggleGroups}
-            tooltip={hasExpandedGroup ? "Collapse all groups" : "Expand all groups"}
-          >
-            {hasExpandedGroup ? <ListChevronsDownUp size={14} /> : <ListChevronsUpDown size={14} />}
-          </TooltipIconButton>
-        )}
-      </div>
+    <div className="flex shrink-0 items-center gap-1">
+      <span
+        className="ml-1 hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums @4xl/header:inline"
+        title={countTitle}
+      >
+        {countText}
+      </span>
+      {hasMoreMessages && !loadingMessages && (
+        <ToolbarButton
+          tooltip="Load more"
+          icon={<ChevronsDown className="size-4" />}
+          className="hidden @4xl/header:inline-flex"
+          onClick={() => setMessagesPage((prev) => prev + 1)}
+        />
+      )}
+      <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <ToolbarButton
+            menu
+            tooltip={`View: ${currentView.label}`}
+            icon={<CurrentViewIcon className="size-4" />}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className={styles.viewMenu}>
+          <MenuRadioSection
+            label="View"
+            value={localView}
+            options={VIEW_OPTIONS}
+            onValueChange={handleViewChange}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <ToolbarButton
+            menu
+            tooltip={sortTooltip}
+            icon={<ArrowDownWideNarrow className="size-4" />}
+            label={sortTriggerLabel}
+            labelClassName="hidden @3xl/header:inline-block"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className={styles.sortMenu}>
+          <MenuRadioSection
+            label="Sort by"
+            value={localSort}
+            options={SORT_OPTIONS}
+            onValueChange={handleSortChange}
+          />
+          <DropdownMenuSeparator />
+          <MenuRadioSection
+            label="Group by"
+            hint={groupingDisabled ? "Off while sorting by size" : undefined}
+            value={effectiveGroupBy}
+            options={groupOptions}
+            disabled={groupingDisabled}
+            onValueChange={handleGroupChange}
+          />
+          {showThreadDate && (
+            <>
+              <DropdownMenuSeparator />
+              <MenuRadioSection
+                label="Thread date"
+                value={localThreadDateSource}
+                options={THREAD_DATE_OPTIONS}
+                onValueChange={handleThreadDateSourceChange}
+              />
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <MenuRadioSection
+            label="Threads"
+            hint={threadsHint}
+            value={threadsAllowed ? threadsMode : "off"}
+            options={threadsOptions}
+            disabled={!threadsAllowed}
+            onValueChange={handleThreadsModeChange}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {hasToggleableGroup && (
+        <ToolbarButton
+          tooltip={hasExpandedGroup ? "Collapse all groups" : "Expand all groups"}
+          icon={
+            hasExpandedGroup ? (
+              <ListChevronsDownUp className="size-4" />
+            ) : (
+              <ListChevronsUpDown className="size-4" />
+            )
+          }
+          className="hidden md:inline-flex"
+          onClick={handleToggleGroups}
+        />
+      )}
     </div>
   );
 }

@@ -11,7 +11,9 @@ import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { ShellAccount } from "./types";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
-import { ThemeToggle } from "./ShellHeader";
+import ShellHeader, { ThemeToggle, type ShellHeaderProps } from "./ShellHeader";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
+import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
 
 const style = document.createElement("style");
 afterEach(() => {
@@ -115,6 +117,36 @@ describe("theme menu", () => {
       await waitFor(() => expect(window.localStorage.getItem("noctua:theme")).toBe(stored));
       if (stored !== "system") expect(document.documentElement.classList.contains(stored)).toBe(true);
     }
+  });
+});
+
+describe("shell header", () => {
+  const noop = () => {};
+  const search: ShellHeaderProps["search"] = {
+    state: {
+      query: "", searchScope: "folder", activeFolderId: "inbox", lastFolderId: "inbox",
+      searchFields: DEFAULT_SEARCH_FIELDS, searchBadges: DEFAULT_SEARCH_BADGES,
+      includeSentInEverywhere: false, sentFolderName: "Sent", isRelatedSearch: false,
+      searchFieldsLabel: "All fields", searchBadgesLabel: "All messages",
+      accountFolders: [{ id: "inbox", name: "INBOX", accountId: "synthetic", count: 0, unreadCount: 0 }]
+    },
+    actions: {
+      setQuery: noop, setSearchScope: noop, setActiveFolderId: noop, setLastFolderId: noop,
+      setSearchFields: noop, setSearchBadges: noop, setIncludeSentInEverywhere: noop, clearSearch: noop
+    }
+  };
+
+  it("puts the list toolbar right after the title, inside a header container", () => {
+    const view = render(
+      <SidebarProvider><TooltipProvider>
+        <ShellHeader title="Synthetic / INBOX" search={search} sync={{ isSyncing: false, onCheckNewMail: noop }}
+          toolbar={<button type="button">View: Threads</button>} />
+      </TooltipProvider></SidebarProvider>
+    );
+    const header = view.container.querySelector<HTMLElement>("[data-slot='shell-header']")!;
+    expect(header.className).toContain("@container/header");
+    const title = within(header).getByRole("heading", { name: "Synthetic / INBOX" });
+    expect(title.nextElementSibling).toBe(within(header).getByRole("button", { name: "View: Threads" }));
   });
 });
 
