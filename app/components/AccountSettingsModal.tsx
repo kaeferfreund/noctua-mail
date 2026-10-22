@@ -51,6 +51,8 @@ type Props = {
   onSave: (account: Account) => void;
   onDelete: () => void;
   isAdminUser?: boolean;
+  saveError?: string | null;
+  saving?: boolean;
   onNotifySuccess?: (title: string, description: string) => void;
   apiFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   readErrorMessage?: (res: Response) => Promise<string>;
@@ -76,6 +78,8 @@ export default function AccountSettingsModal({
   onSave,
   onDelete,
   isAdminUser = false,
+  saveError,
+  saving = false,
   onNotifySuccess,
   apiFetch,
   readErrorMessage,
@@ -101,7 +105,8 @@ export default function AccountSettingsModal({
 
   const fetchFn = apiFetch ?? fetch;
 
-  const handleSave = () => onSave(localAccount);
+  const canCreate = isExistingAccount || isAdminUser;
+  const handleSave = () => { if (canCreate && !saving) onSave(localAccount); };
 
   const canSaveAccountTab = useMemo(
     () =>
@@ -214,6 +219,8 @@ export default function AccountSettingsModal({
             </TooltipIconButton>
           </Flex>
 
+          {saveError && <p role="alert">{saveError}</p>}
+          {!canCreate && <p role="alert">Only an admin can add mailboxes</p>}
           <Tabs.Root
             orientation={isMobile ? "vertical" : "horizontal"}
             value={manageTab}
@@ -242,7 +249,7 @@ export default function AccountSettingsModal({
                 onClose={onClose}
                 onSave={handleSave}
                 onDelete={onDelete}
-                canSave={canSaveAccountTab}
+                canSave={canSaveAccountTab && canCreate && !saving}
                 onUpdateAccount={setLocalAccount}
                 onRunProbe={runProbe}
               />

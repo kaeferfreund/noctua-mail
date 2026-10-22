@@ -9,7 +9,7 @@ export default function MailboxGate({ state, accounts, error, onAdd, onSwitch, o
   state: MailboxState | null;
   accounts: Account[];
   error?: string | null;
-  onAdd: () => void;
+  onAdd?: () => void;
   onSwitch: (id: string) => void;
   onRetry: () => void;
   onSecurity: () => void;
@@ -17,7 +17,7 @@ export default function MailboxGate({ state, accounts, error, onAdd, onSwitch, o
   onLogout: () => void;
 }) {
   return <AuthFrame title={state === "none" ? "No mailbox yet" : state === "unselected" ? "Choose a mailbox" : "Loading your account"}>
-    {state === "none" && <><p>Add a mailbox, or ask your admin to give you access to a team mailbox.</p><Button onClick={onAdd}>Add a mailbox</Button><p className="text-sm text-muted-foreground">Ask your admin if you need an invitation to an existing mailbox.</p></>}
+    {state === "none" && <><p>Add a mailbox, or ask your admin to give you access to a team mailbox.</p>{onAdd ? <Button onClick={onAdd}>Add a mailbox</Button> : <p className="text-sm text-muted-foreground">Only an admin can add mailboxes</p>}<p className="text-sm text-muted-foreground">Ask your admin if you need an invitation to an existing mailbox.</p></>}
     {state === "unselected" && <ul className="space-y-2">{accounts.map(account => <li key={account.id}><Button variant="outline" onClick={() => onSwitch(account.id)}>{account.name || account.email} · {account.email}</Button></li>)}</ul>}
     <AuthError error={error} />
     <div className="flex flex-wrap gap-2">

@@ -37,14 +37,15 @@ function renderSidebar(
   onSync = () => {},
   userOverrides: Partial<ShellSidebarProps["user"]> = {}
 ) {
+  const isAdminUser = userOverrides.isAdminUser ?? false;
   const props: ShellSidebarProps = {
     brand: { buildVersionLabel: "" },
-    mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: () => {} },
+    mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: isAdminUser ? () => {} : undefined },
     compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
     sync: { isSyncing: false, onCheckNewMail: onSync },
     user: {
       userEmail: "person@example.test", userName: "Example Person", currentAccount: accounts[0] ?? null,
-      isAdminUser: false, onOpenSettings: () => {}, onOpenAdmin: () => {},
+      isAdminUser, onOpenSettings: () => {}, onOpenAdmin: () => {},
       onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {},
       ...userOverrides
     },
@@ -65,6 +66,11 @@ function renderSidebar(
 }
 
 describe("shell sidebar", () => {
+  for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
+    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
+    expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
+  });
+
   it("sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable", () => {
     const switched: string[] = [];
     let syncs = 0;

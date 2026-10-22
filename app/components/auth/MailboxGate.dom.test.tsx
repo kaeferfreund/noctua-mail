@@ -6,6 +6,12 @@ import MailboxGate from "./MailboxGate";
 afterEach(cleanup);
 const noop = () => {};
 describe("MailboxGate", () => {
+  it("hides creation and explains the admin requirement without an add callback", () => {
+    const view = render(<MailboxGate state="none" accounts={[]} onSwitch={noop} onRetry={noop} onSecurity={noop} onLogout={noop} />);
+    expect(view.queryByRole("button", { name: "Add a mailbox" })).toBeNull();
+    expect(view.getByText("Only an admin can add mailboxes")).toBeTruthy();
+  });
+
   it("offers add-mailbox, admin and security without a mailbox", () => {
     const actions: string[] = [];
     const view = render(<MailboxGate state="none" accounts={[]} onAdd={() => actions.push("add")} onSwitch={noop} onRetry={noop} onSecurity={() => actions.push("security")} onAdmin={() => actions.push("admin")} onLogout={noop} />);
