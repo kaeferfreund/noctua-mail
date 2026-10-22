@@ -281,14 +281,14 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
     rows.sort(newest);
     const state = { ...(rows[0] ?? defaultThreadCollabState(accountId, target)), threadId: target };
     const statusRow = rows.filter(row => row.status !== "closed")
-      .sort((a, b) => (b.statusChangedAt ?? b.updatedAt) - (a.statusChangedAt ?? a.updatedAt) || newest(a, b))[0] ?? rows[0];
+      .sort((a, b) => (b.statusChangedAt ?? b.updatedAt) - (a.statusChangedAt ?? a.updatedAt) || a.threadId.localeCompare(b.threadId))[0] ?? rows[0];
     if (statusRow) {
       state.status = statusRow.status;
       state.statusChangedAt = statusRow.statusChangedAt;
       state.statusChangedByUserId = statusRow.statusChangedByUserId;
     }
     const assigned = rows.filter(row => row.assigneeUserId !== null)
-      .sort((a, b) => (b.assignedAt ?? 0) - (a.assignedAt ?? 0) || newest(a, b))[0];
+      .sort((a, b) => (b.assignedAt ?? 0) - (a.assignedAt ?? 0) || a.threadId.localeCompare(b.threadId))[0];
     if (assigned) {
       state.assigneeUserId = assigned.assigneeUserId;
       state.assignedAt = assigned.assignedAt;

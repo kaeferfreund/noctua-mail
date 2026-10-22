@@ -85,7 +85,10 @@ test("independent SQLite writers racing their first mutation keep exact counts",
     import { withDbWriteRetry } from ${JSON.stringify(retryPath)};
     const db = new Database(process.env.COLLAB_TEST_DB);
     db.exec('PRAGMA busy_timeout=0');
-    await new Promise(resolve => setTimeout(resolve,Math.max(0,Number(process.env.COLLAB_START)-Date.now())));
+    const start = new Promise(resolve => process.stdin.once('end', resolve));
+    process.stdin.resume();
+    console.log('ready');
+    await start;
     for (let i=0;i<12;i++) await withDbWriteRetry('synthetic-collab-writer',() => db.transaction(() => {
       addThreadComment(db,process.env.COLLAB_ACCOUNT,process.env.COLLAB_THREAD,'Synthetic concurrent note',
         {userId:'synthetic-worker',clientId:'system'},Date.now());
@@ -93,16 +96,40 @@ test("independent SQLite writers racing their first mutation keep exact counts",
     db.close();
   `;
   const processes = Array.from({ length: 4 }, () => spawn(process.execPath, ["--eval", script], {
-    env: { ...process.env, COLLAB_TEST_DB: dbPath, COLLAB_ACCOUNT: f.accountId, COLLAB_THREAD: thread, COLLAB_START: String(Date.now() + 500) },
-    stdio: ["ignore", "ignore", "pipe"]
+    env: { ...process.env, COLLAB_TEST_DB: dbPath, COLLAB_ACCOUNT: f.accountId, COLLAB_THREAD: thread },
+    stdio: ["pipe", "pipe", "pipe"]
   }));
-  const results = await Promise.all(processes.map(async child => {
+  const workers = processes.map(child => {
     let stderr = "";
     child.stderr!.setEncoding("utf8");
     child.stderr!.on("data", (chunk: string) => { stderr += chunk; });
-    const [exit] = await once(child, "exit");
-    return { exit, stderr };
-  }));
+    const ready = new Promise<void>((resolve, reject) => {
+      let stdout = "";
+      child.stdout!.setEncoding("utf8");
+      child.stdout!.on("data", (chunk: string) => {
+        stdout += chunk;
+        if (stdout.includes("ready\n")) resolve();
+      });
+      child.once("error", reject);
+      child.once("exit", code => reject(new Error(`Writer exited before ready (${code}): ${stderr}`)));
+    });
+    const result = once(child, "close").then(([exit]) => ({ exit, stderr }));
+    return { ready, result };
+  });
+  let results;
+  try {
+    const [, completed] = await Promise.all([
+      Promise.all(workers.map(worker => worker.ready)).then(() => {
+        for (const child of processes) child.stdin!.end();
+      }),
+      Promise.all(workers.map(worker => worker.result))
+    ]);
+    results = completed;
+  } finally {
+    for (const child of processes) {
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+    }
+  }
   for (const result of results) {
     if (result.exit !== 0)
       throw new Error(result.stderr);
