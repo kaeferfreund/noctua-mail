@@ -1,17 +1,3 @@
-.pane {
-  background: var(--gray-1);
-}
-
-:global(.dark) .pane {
-  background: var(--gray-2);
-}
-
-.folderPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .treeRail {
   border: none;
   border-radius: 0;
@@ -20,29 +6,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.virtualSection {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--gray-a4);
-}
-
-.virtualRow {
-  background: linear-gradient(90deg, var(--accent-a2), transparent 70%);
-  border-color: var(--accent-a5);
-}
-
-.virtualRow:hover {
-  background: linear-gradient(90deg, var(--accent-a3), transparent 74%);
-  border-color: var(--accent-a7);
-}
-
-.virtualIcon {
-  color: var(--accent-11);
 }
 
 .treeHeader {
@@ -59,14 +22,16 @@
   gap: 6px;
 }
 
+/* Matches the shadcn SidebarGroupLabel the other sidebar sections use. */
 .panelTitle {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
 
 .panelMeta {
   font-size: 11px;
-  color: var(--gray-11);
+  color: var(--muted-foreground);
   margin-left: auto;
 }
 
@@ -93,7 +58,7 @@
 }
 
 .treeNodeDropTarget .treeRow {
-  border-color: var(--accent-9);
+  border-color: var(--iris-11);
   background: var(--accent-a2);
 }
 
@@ -105,8 +70,9 @@
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: transparent;
+  color: var(--sidebar-foreground);
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
   width: 100%;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   cursor: pointer;
@@ -114,8 +80,10 @@
 }
 
 .treeRowActive {
-  background: var(--gray-a3);
-  border-color: var(--gray-a4);
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-accent-foreground);
+  font-weight: 500;
 }
 
 .treeRowDisabled {
@@ -125,9 +93,9 @@
 }
 
 .treeRow:hover {
-  background: var(--gray-a2);
-  border-color: var(--gray-a4);
-  transform: translateX(1px);
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-border);
+
 }
 
 .treeCaret {
@@ -190,7 +158,7 @@
 }
 
 .treeAction:hover {
-  color: var(--accent-9);
+  color: var(--iris-11);
 }
 
 .treeRow:hover .treeActions,
@@ -232,7 +200,7 @@
   flex: 0 0 auto;
   border-radius: 999px;
   border: 2px solid var(--gray-a6);
-  border-top-color: var(--accent-9);
+  border-top-color: var(--iris-11);
   opacity: 0.55;
   animation: spin 1s linear infinite;
 }

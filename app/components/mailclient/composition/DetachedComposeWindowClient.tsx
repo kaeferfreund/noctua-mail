@@ -30,6 +30,7 @@ import ComposeOrchestrator, {
   type ComposeMirror,
   type ComposeOrchestratorHandle
 } from "./ComposeOrchestrator";
+import { useDarkMode } from "@/app/hooks/useDarkMode";
 
 type ReadyHandoff = Extract<DetachedComposeHandoff, { status: "ready" }>;
 
@@ -92,9 +93,9 @@ export default function DetachedComposeWindowClient({
     discardingDraft: false
   });
   const composeMirrorRef = useRef(composeMirror);
-  const [darkMode] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("noctua:theme") === "dark"
-  );
+  // next-themes applies the stored or system theme to this window's <html>;
+  // the editor follows that class instead of re-reading storage.
+  const darkMode = useDarkMode();
   const clientId = useMemo(() => {
     if (typeof window === "undefined") return "";
     const key = "noctuaClientId";

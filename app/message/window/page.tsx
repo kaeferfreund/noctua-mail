@@ -15,6 +15,7 @@ import { normalizeAccountDateFormat } from "@/lib/dateFormatting";
 import type { Account, AccountDateFormat, Folder, Message } from "@/lib/data";
 import { formatMessageHtmlPageTitle, formatMessagePageTitle } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
+import { useDarkMode } from "@/app/hooks/useDarkMode";
 import { notifyDetachedMessageDeleted } from "@/lib/ui/detachedMessageEvents";
 import { getImapFlagBadges, hasHtmlContent } from "@/lib/ui/messageView";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
@@ -60,9 +61,9 @@ export default function MessageWindowPage() {
   const [collapsedMessages, setCollapsedMessages] = useState<Record<string, boolean>>({});
   const [messageFontScale, setMessageFontScale] = useState<Record<string, number>>({});
   const [messageZoom, setMessageZoom] = useState<Record<string, number>>({});
-  const [darkMode] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("noctua:theme") === "dark"
-  );
+  // next-themes applies the stored or system theme to this window's <html>;
+  // the e-mail renderer follows that class instead of re-reading storage.
+  const darkMode = useDarkMode();
   const messageRefs = useRef<Map<string, HTMLElement>>(new Map());
   const sourceFetchRef = useRef<Map<string, Promise<string | null>>>(new Map());
   const missingParams = !accountId || !messageId;
