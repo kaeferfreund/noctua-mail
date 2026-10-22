@@ -35,7 +35,7 @@ export type ProofPurpose = "totp.enroll" | "totp.replace" | "passkey.enroll" | "
 export type Proof = { ok: true; grant: string; purpose: ProofPurpose; expiresAt: number; ceremonyRequired?: boolean };
 export type ProofInput = { purpose: ProofPurpose; currentPassword?: string; totpCode?: string; backupCode?: string; proofMode?: "passkey" };
 export type SignupInput = { inviteCode: string; email: string; name: string; password: string };
-export type SignupResult = { ok: true; userId: string; accountId: string | null; enrollmentRequired: true; loginRequired: boolean };
+export type SignupResult = { ok: true; userId: string; accountId: null; security: { enrollmentRequired: true }; loginRequired: boolean };
 export type TotpSetup = { method: "totp"; totpURI: string; backupCodes: string[] };
 export type AuthFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 

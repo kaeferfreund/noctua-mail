@@ -42,7 +42,7 @@ describe("LoginScreen", () => {
     expect(calls.at(-1)?.path).toBe("/api/ba/sign-in/imap");
   });
   it("validates signup, sends no mailbox credentials and honors 201 loginRequired", async () => {
-    const { client, calls } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, enrollmentRequired: true, loginRequired: true }, { status: 201 }));
+    const { client, calls } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, security: { enrollmentRequired: true }, loginRequired: true }, { status: 201 }));
     const view = render(<LoginScreen client={client} onAuthenticated={() => { throw new Error("Must sign in first"); }} />);
     fireEvent.click(view.getByText("Sign up with an invite code"));
     fill(view, "Invite code", "synthetic-invite"); fill(view, "Email", "person@example.test"); fill(view, "Name", "Synthetic Person");
@@ -55,7 +55,7 @@ describe("LoginScreen", () => {
   });
   it("refreshes me for a setup-only 201 instead of treating signup as mailbox access", async () => {
     let refreshed = 0;
-    const { client } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, enrollmentRequired: true, loginRequired: false }, { status: 201 }));
+    const { client } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, security: { enrollmentRequired: true }, loginRequired: false }, { status: 201 }));
     const view = render(<LoginScreen client={client} onAuthenticated={() => { refreshed++; }} />);
     fireEvent.click(view.getByText("Sign up with an invite code"));
     fill(view, "Invite code", "synthetic-invite"); fill(view, "Email", "person@example.test"); fill(view, "Name", "Synthetic Person");
