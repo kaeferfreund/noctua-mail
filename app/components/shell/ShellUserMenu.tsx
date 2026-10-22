@@ -24,6 +24,7 @@ export type ShellUserMenuProps = {
   currentAccount: Account | null;
   isAdminUser: boolean;
   onOpenSettings: () => void;
+  onOpenSecurity?: () => void;
   onOpenAdmin: () => void;
   onShowThreadJson: () => void;
   onEvictThreadCache: () => void;
@@ -36,6 +37,7 @@ export default function ShellUserMenu({
   currentAccount,
   isAdminUser,
   onOpenSettings,
+  onOpenSecurity,
   onOpenAdmin,
   onShowThreadJson,
   onEvictThreadCache,
@@ -66,9 +68,7 @@ export default function ShellUserMenu({
             <DropdownMenuLabel className="truncate">{identity || "Signed in"}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              {/* Passkeys and two-factor settings open here once the Better Auth
-                  branch lands; until then the entry only names the destination. */}
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem onSelect={onOpenSecurity}>
                 <UserRound />
                 Profile &amp; security
               </DropdownMenuItem>
@@ -77,7 +77,7 @@ export default function ShellUserMenu({
                 Settings
               </DropdownMenuItem>
               {isAdminUser ? (
-                <DropdownMenuItem disabled={!currentAccount} onSelect={onOpenAdmin}>
+                <DropdownMenuItem onSelect={onOpenAdmin}>
                   <ShieldCheck />
                   Admin
                 </DropdownMenuItem>

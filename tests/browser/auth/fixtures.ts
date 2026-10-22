@@ -103,3 +103,9 @@ export function faultState(seed:Seed) {
   const result=execFileSync("bun",["scripts/authBrowserFault.ts","inspect",seed.userId],{env:process.env,encoding:"utf8",stdio:["ignore","pipe","pipe"]});
   return JSON.parse(result.trim().split("\n").at(-1)!);
 }
+
+/** Mint only a synthetic, isolated, one-use reset capability; never log the URL. */
+export function resetToken(seed: Seed): string {
+  const output = execFileSync("bun", ["tests/browser/auth/resetLink.ts", seed.userId], { env: process.env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return JSON.parse(output.trim().split("\n").at(-1)!).token;
+}
