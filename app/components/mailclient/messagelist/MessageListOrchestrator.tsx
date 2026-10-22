@@ -259,9 +259,6 @@ export type MessageListOrchestratorMutationInputs = {
 };
 
 export type MessageListOrchestratorProps = {
-  // Pane width; drives the fixed width on the pane container.
-  listWidth: number;
-
   // Scroll container ref. Attached to the pane's scrolling `<aside>` AND
   // passed to the list view as its `scrollRef` — the virtualization logic
   // reads scroll offsets from the same element the pane rendered. These
@@ -326,7 +323,6 @@ export type MessageListOrchestratorProps = {
 };
 
 export default function MessageListOrchestrator({
-  listWidth,
   scrollRef,
   defaultMessageView,
   listHandleRef,
@@ -550,7 +546,7 @@ export default function MessageListOrchestrator({
   );
 
   return (
-    <MessageListPane state={{ listWidth }} refs={{ listPaneRef: scrollRef }}>
+    <MessageListPane refs={{ listPaneRef: scrollRef }}>
       <div
         className={`${listPaneStyles.list} ${isCompactView ? listPaneStyles.listCompact : ""}`}
       >

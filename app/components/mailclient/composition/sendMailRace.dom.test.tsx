@@ -1,15 +1,26 @@
 // Runs only under `bun run test:dom`, which preloads lib/testSetupDom.ts to
 // register happy-dom before any component module loads.
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import React from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
+import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { Message } from "@/lib/data";
 import ComposeOrchestrator from "./ComposeOrchestrator";
+
+// FocusScope restores focus and removes itself from Radix's shared stack in a
+// zero-delay timer on unmount. Flush that task inside act before the next test
+// focuses an opener; otherwise the previous dialog can steal that focus.
+afterEach(async () => {
+  cleanup();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+});
 
 type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSignal | null };
 
 type RenderComposeOptions = {
+  isMobile?: boolean;
+  onSidebarToggle?: (open: boolean) => void;
   smtpResponse?: Response | (() => Response | Promise<Response>);
   reportError?: (message: string) => void;
   readErrorMessage?: (response: Response) => Promise<string>;
@@ -93,6 +104,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
     defaultSignatureId: "",
     accountSignatures: [],
     darkMode: false,
+    isMobile: options.isMobile ?? false,
     activeThread: [],
     messageById: new Map(),
     viewMessage: null,
@@ -133,11 +145,19 @@ function renderCompose(options: RenderComposeOptions = {}) {
     detachedWindow: options.detachedWindow ?? false
   } as unknown as React.ComponentProps<typeof ComposeOrchestrator>;
 
-  const view = render(
+  // The orchestrator is a sibling of the shell; its inline portal must
+  // not rely on a React keydown handler on the shell to guard Bold.
+  const renderTree = (inlineCard: React.ReactNode = null) => (
     <Theme>
+      {options.onSidebarToggle && <SidebarProvider onOpenChange={options.onSidebarToggle}>
+        <SidebarInset>{inlineCard}</SidebarInset>
+      </SidebarProvider>}
       <ComposeOrchestrator ref={handleRef} {...props} />
     </Theme>
   );
+  const view = render(options.onSidebarToggle ? renderTree() : <Theme>
+    <ComposeOrchestrator ref={handleRef} {...props} />
+  </Theme>);
 
   const sendButton = () =>
     [...view.baseElement.querySelectorAll("button")].find((button) =>
@@ -149,6 +169,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
 
   return {
     view,
+    mountInlineCard: () => view.rerender(renderTree(handleRef.current?.renderInlineCard())),
     props,
     handleRef,
     calls,
@@ -540,4 +561,103 @@ describe("compose initialization errors", () => {
     expect(errors).toEqual(["Failed to open composer: hydration failed"]);
     cleanup();
   });
+});
+
+// Exercise the real imperative API and controller, including the setter used
+// by list selection. The modal must remain visible without an inline slot.
+describe("mobile compose", () => {
+  it("opens full-screen and coerces inline, minimized and functional setters to modal", async () => {
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      expect(view.getByText("New message")).toBeTruthy();
+      expect((view.getByRole("textbox", { name: "From:" }) as HTMLInputElement).value).toBe("me@example.test");
+      for (const requested of ["inline", "minimized"] as const) {
+        act(() => handleRef.current?.setComposeView(requested));
+        expect(view.getByText("New message")).toBeTruthy();
+      }
+      act(() => handleRef.current?.setComposeView(() => "inline"));
+      expect(view.getByText("New message")).toBeTruthy();
+      expect(view.queryByRole("button", { name: /Dock in thread view/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /Minimize composer/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /Open composer in new window/ })).toBeNull();
+      const dialog = view.getByRole("dialog", { name: "New message" });
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      expect(dialog.style.width).toBe("");
+      expect(dialog.closest(".radix-themes")).toBeTruthy();
+    } finally { cleanup(); }
+  });
+});
+
+
+describe("mobile composer accessibility", () => {
+  it("restores the sidebar header trigger when its compose opener unmounts", async () => {
+    const header = document.createElement("button");
+    header.setAttribute("aria-label", "Toggle sidebar");
+    const opener = document.createElement("button");
+    document.body.append(header, opener);
+    opener.focus();
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      opener.remove();
+      fireEvent.keyDown(view.getByRole("dialog", { name: "New message" }), { key: "Escape" });
+      await waitFor(() => expect(document.activeElement === header).toBe(true));
+    } finally { cleanup(); opener.remove(); header.remove(); }
+  }, 20000);
+  it("traps reverse tab, closes with Escape and restores the opener", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Synthetic compose opener";
+    document.body.append(opener);
+    opener.focus();
+    const { view, handleRef } = renderCompose({ isMobile: true, showComposeModal: false });
+    try {
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      const dialog = view.getByRole("dialog", { name: "New message" });
+      const first = view.getByRole("button", { name: "Close composer" });
+      act(() => first.focus());
+      fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      await waitFor(() => expect(view.queryByRole("dialog", { name: "New message" }) === null).toBe(true));
+      await waitFor(() => expect(document.activeElement === opener).toBe(true));
+    } finally { cleanup(); opener.remove(); }
+  }, 20000);
+});
+
+describe("shell shortcut in composers", () => {
+  for (const variant of ["inline", "modal"] as const) {
+    it(`keeps Ctrl/Cmd+B in the ${variant} Lexical editor and fields`, async () => {
+      let toggles = 0;
+      const { view, handleRef, mountInlineCard } = renderCompose({
+        onSidebarToggle: () => { toggles++; },
+        showComposeInline: variant === "inline", showComposeModal: variant === "modal"
+      });
+      try {
+        await act(async () => { handleRef.current?.openCompose("new"); });
+        if (variant === "inline") act(mountInlineCard);
+        const editor = await waitFor(() => {
+          const element = view.baseElement.querySelector<HTMLElement>('[data-lexical-editor="true"]');
+          expect(element).not.toBeNull();
+          return element!;
+        });
+        const from = view.getByRole("textbox", { name: "From:" }) as HTMLInputElement;
+        expect(from.value).toBe("me@example.test");
+        expect(from.readOnly).toBe(true);
+        const recipient = view.baseElement.querySelector<HTMLInputElement>(`#compose-${variant}-to`)!;
+        for (const target of [editor, recipient]) {
+          act(() => target.focus());
+          for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+            fireEvent.keyDown(target, { key: "b", ...modifier });
+            expect(toggles).toBe(0);
+          }
+        }
+        // The shortcut still works outside an editable target.
+        fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+        expect(toggles).toBe(1);
+      } finally {
+        cleanup();
+      }
+    });
+  }
 });

@@ -9,6 +9,7 @@ import {
   useRef,
   useState
 } from "react";
+import { useMobileComposeView } from "@/app/hooks/useMobileComposeView";
 import { createPortal } from "react-dom";
 import type React from "react";
 import type { Account, AccountDateFormat, Attachment, Folder, Message, RecipientSuggestion } from "@/lib/data";
@@ -143,6 +144,7 @@ export type ComposeOrchestratorProps = {
   defaultSignatureId: string;
   accountSignatures: Signature[];
   darkMode: boolean;
+  isMobile?: boolean;
 
   // External data
   activeThread: Message[];
@@ -266,6 +268,7 @@ function ComposeOrchestratorImpl(
     defaultSignatureId,
     accountSignatures,
     darkMode,
+    isMobile = false,
     activeThread,
     messageById,
     viewMessage,
@@ -310,7 +313,9 @@ function ComposeOrchestratorImpl(
   }: ComposeOrchestratorProps,
   ref: React.ForwardedRef<ComposeOrchestratorHandle>
 ) {
-  const compose = useComposeState();
+  const composeState = useComposeState();
+  const mobileView = useMobileComposeView(isMobile, composeState.composeView, composeState.setComposeView);
+  const compose = { ...composeState, ...mobileView };
   const [detachingCompose, setDetachingCompose] = useState(false);
   const detachingComposeRef = useRef(false);
   const closingDetachedComposeRef = useRef(false);
@@ -1473,9 +1478,9 @@ function ComposeOrchestratorImpl(
 
   return (
     <ComposeContextProvider value={contextValue}>
-      <ComposeModal open={showComposeModal} />
-      <ComposeMinimized open={showComposeMinimized} />
-      {inlineSlotEl &&
+      <ComposeModal isMobile={isMobile} open={isMobile ? composeOpen : showComposeModal} />
+      <ComposeMinimized open={!isMobile && showComposeMinimized} />
+      {!isMobile && inlineSlotEl &&
         createPortal(
           <ComposeContextProvider value={inlineContextValue}>
             <ComposeInlineCard />
