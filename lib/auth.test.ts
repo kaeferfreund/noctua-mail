@@ -96,3 +96,18 @@ describe("live session assurance gate", () => {
     expect(response.headers.getSetCookie()).toEqual(["one=1; Path=/","two=2; Path=/"]);
   });
 });
+
+test("keeps a route's own Cache-Control while forwarding auth headers", () => {
+  const headers = new Headers({ "Cache-Control": "no-store", "Content-Type": "application/json", "Content-Length": "123" });
+  headers.append("Set-Cookie", "synthetic=1; Path=/");
+  for (const status of [200, 304]) {
+    const response = new Response(null, { status, headers: { "Cache-Control": "private, max-age=86400", ETag: '"synthetic"', "Content-Type": "application/octet-stream" } });
+    forwardAuthHeaders(response, headers);
+    expect(response.headers.get("cache-control")).toBe("private, max-age=86400");
+    expect(response.headers.get("etag")).toBe('"synthetic"');
+    expect(response.headers.get("content-type")).toBe("application/octet-stream");
+    expect(response.headers.has("content-length")).toBe(false);
+    expect(response.headers.getSetCookie()).toEqual(["synthetic=1; Path=/"]);
+  }
+  expect(forwardAuthHeaders(new Response(), headers).headers.get("cache-control")).toBe("no-store");
+});

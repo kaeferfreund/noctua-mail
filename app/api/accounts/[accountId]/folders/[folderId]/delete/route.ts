@@ -1,3 +1,4 @@
+import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -25,6 +26,7 @@ type Params = AccountRouteParams & {
 };
 
 export async function POST(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const startedAt = Date.now();
   const accountId = await getAccountIdFromParams(params);
   const { folderId: rawFolderId } = await params;

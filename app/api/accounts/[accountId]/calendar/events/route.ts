@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -56,6 +57,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
     accountId?: string;
   } | null;
@@ -145,6 +147,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 }
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;
     eventId?: string;

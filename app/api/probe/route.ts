@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
 import net from "net";
@@ -97,6 +98,7 @@ async function probeSmtpStartTLS(host: string, port: number) {
 }
 
 export async function POST(request: Request) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {

@@ -1,9 +1,11 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession } from "@/lib/auth";
 import { testCaldavConnection } from "@/lib/caldav/client";
 
 export async function POST(request: Request) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {

@@ -273,7 +273,7 @@ test("copy destination independently requires editor while viewers can read fold
   await f.db.addUserAccountLink(f.user.id, destination, "viewer");
   const { POST } = await import("@/app/api/accounts/[accountId]/messages/copy-to-account/route");
   const response = await POST(new Request(`http://localhost:3000/api/accounts/${f.id}/messages/copy-to-account`, {
-    method: "POST", headers: f.jar.headers({ "content-type": "application/json" }),
+    method: "POST", headers: f.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
     body: JSON.stringify({ messageIds: ["synthetic-message"], destinationAccountId: destination, destinationFolderId: "synthetic-folder" })
   }), parameters(f.id));
   expect(response.status).toBe(403); expect((await response.json()).requiredRole).toBe("editor");
@@ -292,4 +292,79 @@ test("relogin verifies even an unchanged submitted password; setup assurance can
   expect(response.status).toBe(400); expect(attempts).toBe(1);
   f.master.prepare("UPDATE auth_session_security SET assurance='setup' WHERE sessionId=?").run(f.context.sessionId);
   await expect(mintMcpToken(f.context, f.id, "must fail", 3600)).rejects.toThrow("MFA session");
+});
+
+test.each(["put", "relogin", "post-existing", "settings"])("%s commits secret-free changed-field audit with mailbox updates", async (entry: string) => {
+  const f = await fixture();
+  const payload = entry === "settings" ? { settings: { sync: { maxIdleSessions: 7 } } }
+    : entry === "relogin" ? { password: "synthetic-new-secret" }
+    : { imap: { password: "synthetic-new-secret" }, ...(entry === "post-existing" ? { id: f.id, email: f.account.email } : {}) };
+  const response = entry === "settings"
+    ? await (await import("@/app/api/accounts/[accountId]/settings/route")).PUT(jsonRequest(f, payload), parameters(f.id))
+    : await handleMailboxCredentialMutation(jsonRequest(f, payload), entry as "put" | "relogin" | "post-existing", parameters(f.id).params, verified);
+  expect(response.status).toBe(200);
+  const audit = f.master.prepare("SELECT * FROM admin_audit WHERE action='account.update' AND targetAccountId=?").all(f.id);
+  expect(audit).toHaveLength(1);
+  expect(audit[0].actorUserId).toBe(f.user.id);
+  expect(JSON.parse(audit[0].payload)).toEqual({ changedFields: entry === "settings" ? ["settings.sync.maxIdleSessions"] : ["imap.password", "smtp.password"] });
+  const stored = (await f.db.getAccountById(f.id))!;
+  if (entry !== "settings") expect(stored.smtp.password).toBe("synthetic-new-secret");
+  expect(audit[0].payload).not.toContain("synthetic-new-secret");
+  expect(audit[0].payload).not.toContain("old-imap");
+});
+
+test("audit failure rolls back credential, generation and settings updates", async () => {
+  const f = await fixture();
+  await f.db.upsertAccount({ ...f.account, email: f.user.email, ownerUserId: f.user.id, imap: { ...f.account.imap, user: f.user.email } });
+  const before = await f.db.getAccountById(f.id);
+  const generation = f.master.prepare("SELECT generation FROM auth_security_state WHERE userId=?").get(f.user.id).generation;
+  f.master.exec(`CREATE TRIGGER synthetic_audit_failure BEFORE INSERT ON admin_audit WHEN NEW.targetAccountId='${f.id}' BEGIN SELECT RAISE(ABORT,'Synthetic audit failure'); END`);
+  try {
+    for (const patch of [{ imap: { password: "synthetic-new-secret" } }, { settings: { sync: { maxIdleSessions: 7 } } }]) {
+      await expect(updateMailboxCredentials(f.id, patch, { userId: f.user.id }, verified)).rejects.toThrow("Synthetic audit failure");
+      expect(await f.db.getAccountById(f.id)).toEqual(before);
+      expect(f.master.prepare("SELECT generation FROM auth_security_state WHERE userId=?").get(f.user.id).generation).toBe(generation);
+      expect(await requireActiveUserSession(new Request("http://localhost:3000", { headers: f.jar.headers() }))).not.toBeInstanceOf(Response);
+    }
+  } finally { f.master.exec("DROP TRIGGER synthetic_audit_failure"); }
+});
+
+test.each(["owner", "admin"])("%s deletion audit failure preserves account, links, prefs, tokens and shard", async (entry: string) => {
+  const f = await fixture();
+  await f.db.upsertAccount({ ...f.account, ownerUserId: f.user.id });
+  await f.db.mergeUserAccountPrefs(f.user.id, f.id, { appearance: { senderIcons: true } });
+  const minted = await mintMcpToken(f.context, f.id, "Synthetic deletion", 3600);
+  await f.db.saveFoldersForAccount(f.id, [{ id: `${f.id}:INBOX`, name: "Inbox", accountId: f.id, count: 0 }]);
+  const auth = entry === "owner" ? f : await createAuthenticatedTestSession(undefined, "admin");
+  const route = entry === "owner" ? await import("@/app/api/accounts/[accountId]/route") : await import("@/app/api/admin/accounts/[accountId]/route");
+  const request = () => new Request(`http://localhost:3000/api/accounts/${f.id}`, { method: "DELETE", headers: auth.jar.headers({ origin: "http://localhost:3000" }) });
+  f.master.exec(`CREATE TRIGGER synthetic_delete_audit_failure BEFORE INSERT ON admin_audit WHEN NEW.targetAccountId='${f.id}' BEGIN SELECT RAISE(ABORT,'Synthetic delete audit failure'); END`);
+  try {
+    await expect(route.DELETE(request(), parameters(f.id))).rejects.toThrow("Synthetic delete audit failure");
+    expect(await f.db.getAccountById(f.id)).not.toBeNull();
+    expect(await resolveAccountRole(f.user.id, f.id)).toBe("manager");
+    expect(await f.db.getUserAccountPrefs(f.user.id, f.id)).toEqual({ appearance: { senderIcons: true } });
+    expect(await validateMcpToken(minted.token)).not.toBeNull();
+    expect(await f.db.getFolders(f.id)).toHaveLength(1);
+  } finally { f.master.exec("DROP TRIGGER synthetic_delete_audit_failure"); }
+  expect((await route.DELETE(request(), parameters(f.id))).status).toBe(200);
+  const audit = f.master.prepare("SELECT actorUserId FROM admin_audit WHERE action='account.delete' AND targetAccountId=?").all(f.id);
+  expect(audit).toEqual([{ actorUserId: auth.user.id }]);
+});
+
+test("installed malformed activity schema with zero assignments remains cleanup_pending", async () => {
+  const f = await fixture();
+  const shardPath = getDefaultAccountDbPath(f.id); mkdirSync(path.dirname(shardPath), { recursive: true });
+  const shard = new Database(shardPath);
+  try {
+    shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER)");
+    shard.exec("CREATE TABLE thread_activity(id TEXT PRIMARY KEY)");
+    const target = await f.createUser(`zero-assignment-${crypto.randomUUID()}@example.test`);
+    await f.db.addUserAccountLink(target.id, f.id, "editor");
+    await expect(cleanupUserAccountAccess(f.id, target.id, { userId: f.user.id, clientId: "system" })).rejects.toThrow();
+    expect((await changeAccountMember(f.id, target.id, f.user.id, null)).cleanupPending).toBe(true);
+    const op = f.master.prepare("SELECT id,state FROM admin_lifecycle_operations WHERE targetUserId=? AND action='member.revoke'").get(target.id);
+    expect(op.state).toBe("cleanup_pending");
+    expect(await retryMembershipCleanup(op.id)).toBe(false);
+  } finally { shard.close(); }
 });

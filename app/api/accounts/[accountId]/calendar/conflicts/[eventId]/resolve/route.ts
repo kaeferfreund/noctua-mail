@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -95,6 +96,7 @@ export async function applyConflictResolution(
 }
 
 export async function POST(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as { resolution?: string } | null;
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;

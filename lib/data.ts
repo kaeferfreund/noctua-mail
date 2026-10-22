@@ -476,6 +476,7 @@ export type AdminAuditAction =
   | "user.password_reset"
   | "account.create"
   | "account.delete"
+  | "account.update"
   | "member.grant"
   | "member.update"
   | "member.revoke";

@@ -1,4 +1,4 @@
-import { mailboxFailure } from "@/lib/mailboxFailure";
+import { mailboxFailureDto } from "@/lib/mailboxFailure";
 import { getImapHttpError } from "@/lib/mail/imapError";
 import { assertStreamAuthorized, registerAuthStream } from "@/lib/authStreams";
 import { withAuthResponse } from "@/lib/auth";
@@ -10,14 +10,16 @@ import {
   getLatestMessageUid,
   getMailboxState,
   saveMailboxState
-} from "@/lib/db";
+} from "@/lib/serverDb";
 import { logImapOp } from "@/lib/mail/imapLogger";
 import {
   bindImapClientError,
   buildImapFlowOptions,
   connectImapClientWithRetry,
-  safeLogoutImapClient
-} from "@/lib/mail/imapClientOptions";
+  safeLogoutImapClient,
+  loadImapFlow,
+  streamTimers
+} from "@/lib/mail/imapStreamRuntime";
 import { registerStream } from "@/lib/mail/imapStreamRegistry";
 import { normalizeImapFlags } from "@/lib/messageFlags";
 import { mailboxPathFromFolderId } from "@/lib/mailboxPaths";
@@ -75,7 +77,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
     let ImapFlow: typeof import("imapflow").ImapFlow;
     try {
-      ({ ImapFlow } = await import("imapflow"));
+      ImapFlow = await loadImapFlow();
     } catch {
       return NextResponse.json(
         { ok: false, message: "IMAP library is missing. Run `bun install`." },
@@ -97,9 +99,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         const send = async (event: string, data: unknown) => {
           if (stopped) return;
           try {
+            const safeData = event === "error" ? getImapHttpError(data) ? await mailboxFailureDto(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
             await assertStreamAuthorized(identity);
             if (stopped) return;
-            const safeData = event === "error" ? getImapHttpError(data) ? mailboxFailure(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
             controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
           } catch { authStream.close(); }
         };
@@ -113,6 +115,15 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           inbox: boolean;
         };
 
+        // Track clients from construction, including a connection still in flight.
+        const ownedClients = new Set<import("imapflow").ImapFlow>();
+        const disposedClients = new WeakSet<import("imapflow").ImapFlow>();
+        const disposeClient = async (client: import("imapflow").ImapFlow | null) => {
+          if (!client || disposedClients.has(client)) return;
+          disposedClients.add(client);
+          ownedClients.delete(client);
+          await safeLogoutImapClient(client, logContext, "imap.logout");
+        };
         const sessions = new Map<string, Session>(); // key: folderId
         const removedFolderIds = new Set<string>();
         const unregister = registerStream(accountId, {
@@ -125,16 +136,12 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         const stopAll = async () => {
           if (stopped) return;
           stopped = true;
-          clearInterval(pollTimer); clearInterval(keepaliveTimer);
+          streamTimers.clearInterval(pollTimer); streamTimers.clearInterval(keepaliveTimer);
           request.signal.removeEventListener("abort", onAbort);
           unregister();
           try { controller.close(); } catch { /* Already closed. */ }
-          const clients = [...sessions.values()];
           sessions.clear();
-          await Promise.allSettled([
-            ...clients.map(item => safeLogoutImapClient(item.client, { ...logContext, mailbox: item.mailbox }, "imap.logout")),
-            safeLogoutImapClient(pollClient, { ...logContext, mailbox: "poll" }, "imap.logout")
-          ]);
+          await Promise.allSettled([...ownedClients].map(disposeClient));
         };
         const authStream = registerAuthStream(identity, stopAll);
         const onAbort = () => authStream.close();
@@ -146,11 +153,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           const sess = sessions.get(folderId);
           if (!sess) return;
           sessions.delete(folderId);
-          await safeLogoutImapClient(
-            sess.client,
-            { ...logContext, mailbox: sess.mailbox },
-            "imap.logout"
-          );
+          await disposeClient(sess.client);
         };
 
         const enforceCapacity = async () => {
@@ -183,15 +186,18 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
           const client = await connectImapClientWithRetry({
             account,
+            disposeClient,
             logContext: { ...logContext, mailbox },
             connectOp: "imap.connect",
             createClient: () => {
+              if (stopped) throw new Error("Stream closed");
               const nextClient = new ImapFlow(
                 buildImapFlowOptions(account, {
                   maxIdleTime: 10 * 60 * 1000,
                   qresync: true
                 }, { ...logContext, mailbox })
               );
+              ownedClients.add(nextClient);
               bindImapClientError(nextClient, { ...logContext, mailbox });
               return nextClient;
             }
@@ -200,7 +206,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           // post-connect step below throws before we register it, `stopAll()`
           // would leave the connection dangling. Flip this flag immediately
           // after `sessions.set()` and clean up on failure otherwise.
-          if (stopped) { await safeLogoutImapClient(client, logContext); return; }
+          if (stopped) { await disposeClient(client); return; }
           let sessionRegistered = false;
           try {
           const caps: any =
@@ -246,7 +252,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             highestUid: storedState?.highestUid ?? null,
             supportsQresync
           });
-          if (stopped) { await safeLogoutImapClient(client, logContext); return; }
+          if (stopped) { await disposeClient(client); return; }
           sessions.set(folder.id, {
             mailbox,
             folderId: folder.id,
@@ -332,10 +338,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           // would otherwise surface as an unhandledRejection.
           client.on("exists", () => {
             fetchNew().catch((error: unknown) => {
-              send("error", {
-                folderId: folder.id,
-                message: error instanceof Error ? error.message : String(error)
-              });
+              void send("error", error);
             });
           });
           client.on("expunge", (info) => {
@@ -368,7 +371,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               try {
                 await client.idle();
               } catch (error) {
-                send("error", { folderId: folder.id, message: (error as Error).message });
+                void send("error", error);
                 break;
               }
             }
@@ -377,11 +380,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           void idleLoop();
           } catch (error) {
             if (!sessionRegistered) {
-              await safeLogoutImapClient(
-                client,
-                { ...logContext, mailbox },
-                "imap.logout"
-              );
+              await disposeClient(client);
             }
             throw error;
           }
@@ -414,12 +413,15 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             try {
               const connectedClient = await connectImapClientWithRetry({
                 account,
+                disposeClient,
                 logContext: { ...logContext, mailbox: "poll" },
                 connectOp: "imap.connect",
                 createClient: () => {
+                  if (stopped) throw new Error("Stream closed");
                   const nextClient = new ImapFlow(
                     buildImapFlowOptions(account, {}, { ...logContext, mailbox: "poll" })
                   );
+                  ownedClients.add(nextClient);
                   bindImapClientError(nextClient, { ...logContext, mailbox: "poll" });
                   return nextClient;
                 }
@@ -448,31 +450,28 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                     unseen: status.unseen,
                     exists: status.messages
                   });
-                } catch {
-                  // ignore per-folder status errors
+                } catch (error) {
+                  if (getImapHttpError(error)) throw error;
+                  // Ignore transient per-folder status errors.
                 }
               }
               if (updates.length) {
                 await send("folder:update", updates);
               }
             } catch (error) {
-              send("error", { message: (error as Error).message ?? "Poll failed" });
+              await send("error", error);
             } finally {
-              await safeLogoutImapClient(
-                pollClient,
-                { ...logContext, mailbox: "poll" },
-                "imap.logout"
-              );
+              await disposeClient(pollClient);
               pollClient = null;
               polling = false;
             }
           };
 
           if (stopped) return;
-          pollTimer = setInterval(pollFolders, pollIntervalMs);
+          pollTimer = streamTimers.setInterval(pollFolders, pollIntervalMs);
 
           // Comment pings keep proxies from timing out an otherwise idle stream.
-          keepaliveTimer = setInterval(() => {
+          keepaliveTimer = streamTimers.setInterval(() => {
             try {
               if (!stopped) controller.enqueue(encoder.encode(":ping\n\n"));
             } catch {
@@ -482,7 +481,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 
         } catch (error) {
-          await send("error", { message: (error as Error).message ?? "Stream failed" });
+          await send("error", error);
           authStream.close();
         }
       }

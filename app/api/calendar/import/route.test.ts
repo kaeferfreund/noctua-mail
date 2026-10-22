@@ -57,7 +57,7 @@ function postRequest(body: unknown, cookie: string) {
   return new Request("http://localhost/api/calendar/import", {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/json", origin: "http://localhost:3000",
       cookie
     },
     body: typeof body === "string" ? body : JSON.stringify(body)
@@ -69,7 +69,7 @@ describe("POST /api/calendar/import", () => {
     const res = await POST(
       new Request("http://localhost/api/calendar/import", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", origin: "http://localhost:3000" },
         body: JSON.stringify({ icsSource: "ignored" })
       })
     );

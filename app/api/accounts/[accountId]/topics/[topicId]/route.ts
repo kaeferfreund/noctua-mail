@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin, requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -14,6 +15,7 @@ type Params = AccountRouteParams & {
 };
 
 export async function PUT(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;
     name?: string;
@@ -50,6 +52,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { topicId: rawTopicId } = await params;
   const topicId = typeof rawTopicId === "string" ? rawTopicId.trim() : "";

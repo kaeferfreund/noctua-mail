@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import type { Topic } from "@/lib/data";
@@ -38,6 +39,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 // POST /api/accounts/[accountId]/message-topics — set (replace all), add, or remove a topic from a thread
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const body = (await request.json().catch(() => null)) as {
     accountId?: string;

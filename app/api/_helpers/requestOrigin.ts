@@ -31,3 +31,8 @@ export async function requireBodylessSameOrigin(request: Request) {
   }
   return null;
 }
+
+/** Bodyless commands accept no payload; commands carrying JSON share the JSON guard. */
+export function requireMutationSameOrigin(request: Request) {
+  return request.body === null ? requireSameOrigin(request) : requireJsonSameOrigin(request);
+}

@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders, saveFoldersForAccount } from "@/lib/db";
@@ -10,6 +11,7 @@ import {
 } from "@/app/api/_helpers/accountContext";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json()) as {
     accountId?: string;
     name: string;

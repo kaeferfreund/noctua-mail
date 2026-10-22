@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -15,6 +16,7 @@ import { processStandaloneCalendarInvite } from "@/lib/calendarInviteProcessor";
  * launches don't know it ahead of time.
  */
 export async function POST(request: Request) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {

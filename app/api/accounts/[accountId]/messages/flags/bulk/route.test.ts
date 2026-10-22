@@ -79,7 +79,7 @@ async function postBulkFlags(accountId: string, body: unknown) {
     new Request(`http://localhost/api/accounts/${accountId}/messages/flags/bulk`, {
       method: "POST",
       headers: {
-        "content-type": "application/json",
+        "content-type": "application/json", origin: "http://localhost:3000",
         cookie: await buildCookieHeader(accountId)
       },
       body: JSON.stringify(body)

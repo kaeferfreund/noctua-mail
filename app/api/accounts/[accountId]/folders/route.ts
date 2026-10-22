@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders, saveFoldersForAccount } from "@/lib/db";
@@ -18,6 +19,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 }
 
 export async function PUT(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (accountContext instanceof NextResponse) return accountContext;
