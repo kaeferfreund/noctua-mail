@@ -1,9 +1,9 @@
-import type { RowReadAction } from "./messagelist/selectionActions";
 import dynamic from "next/dynamic";
 import React from "react";
 import { Inbox, Send, FileText, Trash2, ShieldOff, Archive } from "lucide-react";
 import type { Message, Folder, Topic } from "@/lib/data";
 import type { ComposeMode } from "./composition/composeTypes";
+import type { RowReadAction } from "./messagelist/selectionActions";
 import MessageQuickActions from "./message/MessageQuickActions";
 import MessageMenu from "./message/MessageMenu";
 import MessageSourcePanel from "./message/MessageSourcePanel";
