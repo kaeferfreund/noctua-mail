@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   if (overlong) return overlong;
 
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const page = Number(searchParams.get("page") ?? "1") || 1;

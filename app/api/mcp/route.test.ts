@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
-import { executeMcpHttpRequest } from "@/lib/mcpServer";
+import { mintMcpToken, validateMcpToken } from "@/lib/mcpAuth";
+import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
+import { requireActiveUserSession } from "@/lib/auth";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { createTopic, setThreadTopics } from "@/lib/topics";
 import { createRecipientAlias } from "@/lib/recipientAliases";
@@ -165,20 +167,14 @@ function buildMessage(params: {
 }
 
 function uniqueAccountId(prefix: string) { return `${prefix}-${randomUUID()}`; }
-const fixtureContexts = new Map<string, {account:Account; tokenId:string}>();
 async function createStoredToken(params: {account:Account;accountId:string;tokenId:string;expiresAt:number|null}) {
-  fixtureContexts.set(params.tokenId, params);
-  return params.tokenId;
+  const fixture = await createAuthenticatedTestSession(params.accountId);
+  const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: fixture.jar.headers() }));
+  if (session instanceof Response) throw new Error("Fixture session missing");
+  return (await mintMcpToken(session, params.accountId, "Synthetic", 86400)).token;
 }
-// Domain tests call the MCP executor directly; HTTP activation is independently denied below.
-async function postMcp(body:unknown, tokenId?:string) {
-  const context = fixtureContexts.get(tokenId ?? "");
-  if(!context) throw new Error("Missing synthetic MCP executor context");
-  const result = await executeMcpHttpRequest({body,accountId:context.account.id,account:context.account,
-    tokenRecord:{id:context.tokenId,accountId:context.account.id,createdByUserId:"synthetic-executor",label:"Synthetic",tokenSuffix:"test",createdAt:Date.now(),expiresAt:null,lastUsedAt:null},
-    authInfo:{token:context.tokenId,clientId:"synthetic",scopes:[],extra:{accountId:context.account.id,userId:"synthetic-executor"}},
-    requestInfo:{headers:{}}});
-  return result.responses.length ? Response.json(result.responses.length===1?result.responses[0]:result.responses) : new Response(null,{status:202});
+async function postMcp(body:unknown, token?:string) {
+  return POST(new Request("http://localhost:3000/api/mcp", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }));
 }
 
 async function seedMailbox(accountId: string) {
@@ -284,11 +280,11 @@ describe("/api/mcp", () => {
     updateImapFlags.mockResolvedValue(undefined);
   });
 
-  test("HTTP stays closed for cookie, legacy bearer and absent authentication", async()=>{
+  test("HTTP rejects cookie, legacy bearer and absent authentication", async()=>{
     for(const authorization of ["", "Bearer mcp_legacy", "Bearer plain-token"]) {
       const response=await POST(new Request("http://localhost/api/mcp",{method:"POST",headers:{authorization}}));
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ok:false,code:"auth_integration_pending"});
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ok:false,message:"Unauthorized"});
     }
   });
 
@@ -708,7 +704,7 @@ describe("/api/mcp", () => {
     expect(flagUid).toBe(101);
     expect(flagName).toBe("\\Flagged");
     expect(flagValue).toBe(true);
-    expect(flagClientId).toBe(`mcp:${accountId}-token`);
+    expect(flagClientId).toBe(`mcp:${(await validateMcpToken(rawToken))!.tokenRecord.id}`);
     const flaggedMessage = await getMessageById(accountId, `${accountId}-msg-1`);
     expect(flaggedMessage?.flagged).toBe(true);
     expect(flaggedMessage?.flags).toContain("\\Flagged");
@@ -737,7 +733,7 @@ describe("/api/mcp", () => {
     expect(unflagUid).toBe(101);
     expect(unflagName).toBe("\\Flagged");
     expect(unflagValue).toBe(false);
-    expect(unflagClientId).toBe(`mcp:${accountId}-token`);
+    expect(unflagClientId).toBe(`mcp:${(await validateMcpToken(rawToken))!.tokenRecord.id}`);
     const unflaggedMessage = await getMessageById(accountId, `${accountId}-msg-1`);
     expect(unflaggedMessage?.flagged).toBe(false);
     expect(unflaggedMessage?.flags).not.toContain("\\Flagged");
@@ -972,4 +968,28 @@ describe("/api/mcp", () => {
     expect(body.result?.isError).toBe(true);
     expect(body.result?.content?.[0]?.text).toContain('Topic selector "shared" is ambiguous');
   });
+});
+
+
+test("HTTP MCP immediately enforces viewer downgrade, mailbox binding, stale generation and creator ban", async () => {
+  const accountId = uniqueAccountId("mcp-live-role");
+  const { account } = await seedMailbox(accountId);
+  const token = await createStoredToken({ account, accountId, tokenId: "synthetic-live", expiresAt: null });
+  const context = (await validateMcpToken(token))!;
+  const db = await dbModulePromise;
+  await db.setUserAccountRole(context.tokenRecord.createdByUserId, accountId, "viewer", null);
+  const call = (name: string, args: Record<string, unknown>) => postMcp({ jsonrpc: "2.0", id: 100, method: "tools/call", params: { name, arguments: args } }, token);
+  const denied = await call("flag_message", { messageId: `${accountId}-msg-1` });
+  const deniedBody = await denied.json();
+  expect(deniedBody.result.isError).toBe(true); expect(deniedBody.result.content[0].text).toContain("Insufficient mailbox role");
+  const foreign = await call("list_folders", { accountId: "foreign-mailbox" });
+  expect((await foreign.json()).result.content[0].text).toContain("bound to another mailbox");
+  const read = await call("list_accounts", {});
+  expect((await read.json()).result.structuredContent.accounts.find((a: {id:string}) => a.id === accountId).accessRole).toBe("viewer");
+  const { master } = await (await import("@/lib/testAuthHarness")).getSharedTestAuthHarness();
+  master.prepare("UPDATE mcp_tokens SET securityGeneration=securityGeneration-1 WHERE id=?").run(context.tokenRecord.id);
+  expect((await call("list_folders", {})).status).toBe(401);
+  master.prepare("UPDATE mcp_tokens SET securityGeneration=securityGeneration+1 WHERE id=?").run(context.tokenRecord.id);
+  master.prepare("UPDATE auth_user SET banned=1 WHERE id=?").run(context.tokenRecord.createdByUserId);
+  expect((await call("list_folders", {})).status).toBe(401);
 });

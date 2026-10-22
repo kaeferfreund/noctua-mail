@@ -1,7 +1,8 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { getRequestClientId } from "./clientId";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { getSyncJob, startSyncJob } from "@/lib/syncJobs";
 import type { SyncPayload } from "@/lib/syncOperation";
 
@@ -24,7 +25,7 @@ export async function handleSyncStartRequest(
     if (!accountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
 
     const payload: SyncPayload = {
@@ -93,7 +94,7 @@ export async function handleSyncStatusRequest(
       logStatus("missing-account-id");
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, routeAccountId);
+    const access = await requireAccountContext(request, routeAccountId, { minRole: "viewer" });
     if (access instanceof NextResponse) {
       logStatus("forbidden", { accountId: routeAccountId });
       return NextResponse.json({ ok: false, message: "Job not found" }, { status: 404 });

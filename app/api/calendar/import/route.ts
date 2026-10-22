@@ -1,6 +1,7 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { ensureActiveAccountId, requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { ensureActiveAccountId, requireActiveUserSession } from "@/lib/auth";
 import { getAccountById } from "@/lib/serverDb";
 import { processStandaloneCalendarInvite } from "@/lib/calendarInviteProcessor";
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     const requestedAccountId = requestedAccountIdRaw?.trim() ?? "";
     if (requestedAccountId && requestedAccountId !== sessionAccountId) return NextResponse.json({ok:false,message:"Forbidden"},{status:403});
     const accountId = sessionAccountId;
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "editor" });
     if (access instanceof NextResponse) return access;
 
     const account = await getAccountById(accountId);

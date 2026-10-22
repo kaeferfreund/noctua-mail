@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const selection = restricted ? { mailboxState: "enrollment", accountId: null, accounts: [] } : await ensureActiveAccountId(session);
     return NextResponse.json({ ok: true,
       user: restricted ? { id: user.id, email: user.email, name:user.name } : user,
-      accountId: selection.accountId, accounts: sanitizeAccountsForClient(selection.accounts),
+      accountId: selection.accountId, accounts: restricted ? [] : await sanitizeAccountsForClient(session.userId),
       exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_TTL_SECONDS,
       mailboxState: selection.mailboxState,
       security: { enrollmentRequired: session.enrollmentRequired, reauthRequired: session.reauthRequired,

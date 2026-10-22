@@ -1,3 +1,4 @@
+import { revokeAuthStreams } from "../authStreams";
 import type { Account } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getMainDbPath } from "../runtimePaths";
@@ -119,7 +120,11 @@ export async function patchAccount(accountId: string, payload: Partial<Account>)
   });
 }
 
-export async function deleteAccountControlPlane(accountId: string) {
+export class AccountDeletionForbiddenError extends Error {
+  constructor() { super("Only the owner can delete this mailbox"); }
+}
+
+export async function deleteAccountControlPlane(accountId: string, actorUserId?: string) {
   return withDbWriteRetry("deleteAccountControlPlane", async () => {
     const db = await getDb();
     const row = db
@@ -138,12 +143,20 @@ export async function deleteAccountControlPlane(accountId: string) {
     closeAccountDbConnection(dbPath);
 
     db.transaction(() => {
+      if (actorUserId) {
+        const allowed = db.prepare(`SELECT 1 FROM accounts a JOIN auth_user u ON u.id=? JOIN users p ON p.id=u.id
+          WHERE a.id=? AND (a.ownerUserId=u.id OR p.role='admin')
+          AND NOT (COALESCE(u.banned,0)=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now')))`)
+          .get(actorUserId, accountId);
+        if (!allowed) throw new AccountDeletionForbiddenError();
+      }
       db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
       deleteUserAccountPrefRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM mcp_tokens WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
     })();
 
+    revokeAuthStreams({ accountId });
     await cleanupAccountLifecycleArtifacts(accountId, dbPath, deleteShardFile);
     return true;
   });

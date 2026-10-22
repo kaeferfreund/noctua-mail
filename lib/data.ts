@@ -36,6 +36,9 @@ export type Account = {
   email: string;
   avatar: string;
   ownerUserId?: string;
+  accessRole?: AccountRole;
+  isOwner?: boolean;
+  shared?: boolean;
   settings?: AccountSettings;
   caldav?: CaldavConfig;
   deepl?: DeeplConfig;
@@ -83,6 +86,7 @@ export type AccountSettings = {
     body: string;
   }[];
   defaultSignatureId?: string;
+  notifications?: { newMail?: boolean };
 };
 
 export type MailboxState = {
@@ -449,7 +453,7 @@ export type UserAccountLink = {
  */
 export type UserAccountPrefs = Pick<
   AccountSettings,
-  "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId"
+  "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId" | "notifications"
 >;
 
 /**

@@ -1,3 +1,6 @@
+import { mailboxFailure } from "@/lib/mailboxFailure";
+import { getImapHttpError } from "@/lib/mail/imapError";
+import { assertStreamAuthorized, registerAuthStream } from "@/lib/authStreams";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
@@ -46,6 +49,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountIdParam = await getAccountIdFromParams(params);
   const activeFolderId = searchParams.get("activeFolderId");
   const accountContext = await requireAccountContext(request, accountIdParam, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -79,15 +83,25 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       );
     }
 
+    let cancelStream: () => void = () => {};
     const stream = new ReadableStream<Uint8Array>({
+      cancel() { cancelStream(); },
       async start(controller) {
-        const send = (event: string, data: unknown) => {
+        let stopped = false;
+        let pollTimer: ReturnType<typeof setInterval> | undefined;
+        let keepaliveTimer: ReturnType<typeof setInterval> | undefined;
+        let polling = false;
+        let pollClient: import("imapflow").ImapFlow | null = null;
+        const { userId, sessionId, generation, authenticatedAt, expiresAt } = accountContext.session;
+        const identity = { userId, sessionId, generation, authenticatedAt, expiresAt, accountId, minRole: "viewer" as const };
+        const send = async (event: string, data: unknown) => {
+          if (stopped) return;
           try {
-            controller.enqueue(encoder.encode(`event: ${event}\n`));
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-          } catch {
-            // Stream already closed — in-flight watchers/polls may outlive it.
-          }
+            await assertStreamAuthorized(identity);
+            if (stopped) return;
+            const safeData = event === "error" ? getImapHttpError(data) ? mailboxFailure(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
+          } catch { authStream.close(); }
         };
 
         type Session = {
@@ -109,24 +123,24 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         });
 
         const stopAll = async () => {
-          for (const item of sessions.values()) {
-            await safeLogoutImapClient(
-              item.client,
-              { ...logContext, mailbox: item.mailbox },
-              "imap.logout"
-            );
-          }
-          try {
-            controller.close();
-          } catch {
-            // already closed
-          }
+          if (stopped) return;
+          stopped = true;
+          clearInterval(pollTimer); clearInterval(keepaliveTimer);
+          request.signal.removeEventListener("abort", onAbort);
           unregister();
+          try { controller.close(); } catch { /* Already closed. */ }
+          const clients = [...sessions.values()];
+          sessions.clear();
+          await Promise.allSettled([
+            ...clients.map(item => safeLogoutImapClient(item.client, { ...logContext, mailbox: item.mailbox }, "imap.logout")),
+            safeLogoutImapClient(pollClient, { ...logContext, mailbox: "poll" }, "imap.logout")
+          ]);
         };
-
-        request.signal.addEventListener("abort", () => {
-          void stopAll();
-        });
+        const authStream = registerAuthStream(identity, stopAll);
+        const onAbort = () => authStream.close();
+        cancelStream = onAbort;
+        request.signal.addEventListener("abort", onAbort, { once: true });
+        if (request.signal.aborted) { onAbort(); return; }
 
         const closeSession = async (folderId: string) => {
           const sess = sessions.get(folderId);
@@ -156,7 +170,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         };
 
         const openWatcher = async (folderId: string | undefined | null, markUsed = true) => {
-          if (!folderId) return;
+          if (stopped || !folderId) return;
           if (removedFolderIds.has(folderId)) return;
           const folder = folders.find((f) => f.id === folderId);
           if (!folder) return;
@@ -186,6 +200,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           // post-connect step below throws before we register it, `stopAll()`
           // would leave the connection dangling. Flip this flag immediately
           // after `sessions.set()` and clean up on failure otherwise.
+          if (stopped) { await safeLogoutImapClient(client, logContext); return; }
           let sessionRegistered = false;
           try {
           const caps: any =
@@ -231,6 +246,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             highestUid: storedState?.highestUid ?? null,
             supportsQresync
           });
+          if (stopped) { await safeLogoutImapClient(client, logContext); return; }
           sessions.set(folder.id, {
             mailbox,
             folderId: folder.id,
@@ -241,7 +257,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           });
           sessionRegistered = true;
           await enforceCapacity();
-          send("folder:update", [
+          await send("folder:update", [
             {
               id: folder.id,
               uidNext: lastUidNext,
@@ -252,7 +268,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
           const fetchNew = async () => {
             const watcher = sessions.get(folder.id);
-            if (!watcher) return;
+            if (stopped || !watcher) return;
             const previousUidNext = watcher.lastUidNext;
             const status = await logImapOp(
               "imap.status",
@@ -289,7 +305,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               }
             );
             if (items.length) {
-              send("new", { uidNext, messages: items });
+              await send("new", { uidNext, messages: items });
             }
             const activeWatcher = sessions.get(folder.id);
             if (activeWatcher) activeWatcher.lastUidNext = uidNext;
@@ -348,7 +364,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           });
 
           const idleLoop = async () => {
-            while (!(client as any).closed) {
+            while (!stopped && !(client as any).closed) {
               try {
                 await client.idle();
               } catch (error) {
@@ -385,6 +401,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
           // Polling loop for remaining folders
             const pollFolders = async () => {
+              if (stopped || polling) return;
               const watchIds = new Set(Array.from(sessions.keys()));
               const toPoll = folders.filter(
                 (f) => !watchIds.has(f.id) && !removedFolderIds.has(f.id)
@@ -393,7 +410,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
             // Runs detached on a timer, so any escaping rejection would be
             // unhandled — the connect must stay inside the try.
-            let pollClient: import("imapflow").ImapFlow | null = null;
+            polling = true;
             try {
               const connectedClient = await connectImapClientWithRetry({
                 account,
@@ -408,9 +425,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                 }
               });
               pollClient = connectedClient;
+              if (stopped) return;
               const updates: Array<{ id: string; uidNext?: number; unseen?: number; exists?: number }>
                 = [];
               for (const folder of toPoll) {
+                if (stopped) break;
                 const mailbox = mailboxPathFromFolderId(folder.id, accountId);
                 try {
                   const status = await logImapOp(
@@ -434,7 +453,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                 }
               }
               if (updates.length) {
-                send("folder:update", updates);
+                await send("folder:update", updates);
               }
             } catch (error) {
               send("error", { message: (error as Error).message ?? "Poll failed" });
@@ -444,30 +463,27 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                 { ...logContext, mailbox: "poll" },
                 "imap.logout"
               );
+              pollClient = null;
+              polling = false;
             }
           };
 
-          const pollTimer = setInterval(pollFolders, pollIntervalMs);
+          if (stopped) return;
+          pollTimer = setInterval(pollFolders, pollIntervalMs);
 
-          // Send SSE comment pings to keep the connection alive in environments
-          // (e.g. WKWebView/Tauri) that aggressively time out idle SSE streams.
-          // Without this, frequent reconnects cause repeated IMAP TLS handshakes
-          // which can fail on servers with CN-only certificates (no SAN fields).
-          const keepaliveTimer = setInterval(() => {
+          // Comment pings keep proxies from timing out an otherwise idle stream.
+          keepaliveTimer = setInterval(() => {
             try {
-              controller.enqueue(encoder.encode(":ping\n\n"));
+              if (!stopped) controller.enqueue(encoder.encode(":ping\n\n"));
             } catch {
-              // stream already closed
+              authStream.close();
             }
           }, 25_000);
 
-          request.signal.addEventListener("abort", () => {
-            clearInterval(pollTimer);
-            clearInterval(keepaliveTimer);
-          });
+
         } catch (error) {
-          send("error", { message: (error as Error).message ?? "Stream failed" });
-          await stopAll();
+          await send("error", { message: (error as Error).message ?? "Stream failed" });
+          authStream.close();
         }
       }
     });

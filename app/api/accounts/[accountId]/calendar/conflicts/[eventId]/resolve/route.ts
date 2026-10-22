@@ -107,6 +107,7 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Invalid resolution" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

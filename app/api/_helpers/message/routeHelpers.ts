@@ -43,6 +43,7 @@ type AccountMessageContextWithImapMetadata = AccountContext & {
 };
 
 type AccountMessageContextOptions = {
+  minRole?: import("@/lib/data").AccountRole;
   missingFieldsMessage?: string;
   missingMessageMessage?: string;
   requireImapMetadata?: boolean;
@@ -88,7 +89,7 @@ export async function requireAccountAndMessageContext(
       { status: 400 }
     );
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: options?.minRole ?? "viewer" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const message = await getMessageById(accountId, messageId);
@@ -140,6 +141,7 @@ export async function requireImapMessageMutationContext(
   return await requireAccountAndMessageContext(request, payload, {
     missingFieldsMessage: options?.missingFieldsMessage ?? "Missing accountId or messageId",
     missingMessageMessage: options?.missingMessageMessage,
+    minRole: "editor",
     requireImapMetadata: true,
     missingImapMetadataMessage:
       options?.missingImapMetadataMessage ?? "Message is missing IMAP metadata"

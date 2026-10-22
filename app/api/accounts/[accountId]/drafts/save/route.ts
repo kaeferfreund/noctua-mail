@@ -13,6 +13,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   };
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

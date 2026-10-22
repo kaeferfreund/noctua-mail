@@ -117,6 +117,7 @@ export {
 
 export {
   deleteAccountControlPlane,
+  AccountDeletionForbiddenError,
   getAccountById,
   getAccounts,
   getAccountsForUser,

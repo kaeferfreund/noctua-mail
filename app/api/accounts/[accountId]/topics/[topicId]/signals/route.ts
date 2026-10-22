@@ -12,7 +12,7 @@ export async function DELETE(request: Request, { params }: Params) {
   const accountId = await getAccountIdFromParams(params);
   const { topicId: rawTopicId } = await params;
   const topicId = typeof rawTopicId === "string" ? rawTopicId.trim() : "";
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 

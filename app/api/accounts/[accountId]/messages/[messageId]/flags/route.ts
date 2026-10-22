@@ -1,3 +1,4 @@
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { applyFlagMutationsToMessage, MESSAGE_FLAG_MAP } from "@/lib/messageFlagMutation";
@@ -48,6 +49,8 @@ export async function POST(request: Request, { params }: Params) {
       });
       return NextResponse.json({ ok: true, flags: nextFlags });
     } catch (error) {
+      const mailboxError = await mailboxErrorResponse(error, context.accountId, context.role);
+      if (mailboxError) return mailboxError;
       const message = error instanceof Error ? error.message : "Unknown flag";
       // Validation errors thrown by the service layer are client payload issues
       // (mirrors the bulk route); anything else is an upstream IMAP/DB failure.

@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       { status: 400 }
     );
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;

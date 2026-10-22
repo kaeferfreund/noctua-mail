@@ -24,6 +24,7 @@ export async function handleFolderConsistencyRequest(
     request,
     options?.accountId ?? "",
     {
+      minRole: "viewer",
       missingAccountMessage: "Missing accountId"
     }
   );
@@ -76,7 +77,7 @@ export async function handleFolderConsistencyRequest(
     try {
       remote = await getImapMailboxStatus(account, mailboxPath, clientId);
     } catch (error) {
-      const response = imapUpstreamErrorResponse(error, {
+      const response = await imapUpstreamErrorResponse(error, { role: accountContext.role,
         accountId,
         op: "folder.consistency"
       });

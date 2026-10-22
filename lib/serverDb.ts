@@ -144,3 +144,18 @@ export async function listAccessibleAccountIdsForUser(...args: Parameters<Server
 export async function deleteSessionProofState(...args: Parameters<ServerDbModule["deleteSessionProofState"]>) {
   return (await loadServerDb()).deleteSessionProofState(...args);
 }
+
+export async function getUserAccountPrefs(...args: Parameters<ServerDbModule["getUserAccountPrefs"]>) {
+  return (await loadServerDb()).getUserAccountPrefs(...args);
+}
+export async function mergeUserAccountPrefs(...args: Parameters<ServerDbModule["mergeUserAccountPrefs"]>) {
+  return (await loadServerDb()).mergeUserAccountPrefs(...args);
+}
+export async function recordAdminAudit(...args: Parameters<ServerDbModule["recordAdminAudit"]>) {
+  return (await loadServerDb()).recordAdminAudit(...args);
+}
+
+export { AccountDeletionForbiddenError } from "./db/accounts";
+export async function deleteAccountControlPlane(...args: Parameters<ServerDbModule["deleteAccountControlPlane"]>) {
+  return (await loadServerDb()).deleteAccountControlPlane(...args);
+}

@@ -1,6 +1,7 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 
 type RecomputeJob = {
   id: string;
@@ -26,7 +27,7 @@ export async function handleRecomputeStartRequest(
     if (!accountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(auth, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
     const job = startJob(accountId);
     if (job.status === "failed") {
@@ -60,7 +61,7 @@ export async function handleRecomputeStatusRequest(
     if (!routeAccountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, routeAccountId);
+    const access = await requireAccountContext(request, routeAccountId, { minRole: "viewer" });
     if (access instanceof NextResponse) {
       return NextResponse.json({ ok: false, message: "Job not found" }, { status: 404 });
     }

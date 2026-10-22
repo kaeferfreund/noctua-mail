@@ -9,7 +9,7 @@ import { getTopicStats } from "@/lib/topics";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 

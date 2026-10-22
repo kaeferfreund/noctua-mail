@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const { searchParams } = new URL(request.url);
-  const context = await requireAccountContext(request, accountId);
+  const context = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 

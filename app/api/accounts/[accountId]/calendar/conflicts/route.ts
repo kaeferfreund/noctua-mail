@@ -18,6 +18,7 @@ import { diffCalendarEventSnapshots } from "@/lib/calendarEventDiff";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

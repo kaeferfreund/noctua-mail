@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!accountId || !folderId) {
     return NextResponse.json({ ok: false, message: "Missing accountId or folderId" }, { status: 400 });
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;

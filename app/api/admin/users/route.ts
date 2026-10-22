@@ -1,3 +1,4 @@
+import { listAccountMembers } from "@/lib/accountAccess";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { sanitizeAccountForClient } from "@/lib/accountPresentation";
@@ -11,10 +12,10 @@ export async function GET(request: Request) {
 
     const [users, accounts, links] = await Promise.all([getUsers(), getAccounts(), getUserAccounts()]);
     const accountById = new Map(
-      accounts.map((account) => {
-        const sanitized = sanitizeAccountForClient(account);
+      await Promise.all(accounts.map(async (account) => {
+        const sanitized = sanitizeAccountForClient(account, { role: "manager", viewerUserId: auth.userId, memberCount: (await listAccountMembers(account.id)).length });
         return [sanitized.id, sanitized] as const;
-      })
+      }))
     );
     const accountIdsByUserId = new Map<string, Set<string>>();
 

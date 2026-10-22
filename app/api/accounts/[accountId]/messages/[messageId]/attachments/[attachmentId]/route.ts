@@ -1,9 +1,10 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getAttachmentData, getMessageSource, saveAttachmentData } from "@/lib/storage";
 import { getAttachmentMeta } from "@/lib/db";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { extractAttachmentBufferFromSource } from "@/lib/mail/attachmentFromSource";
 import { ensureHtmlDocumentTitle, escapeHtml } from "@/lib/html";
 import { formatAttachmentPageTitle } from "@/lib/appBranding";
@@ -33,7 +34,7 @@ export async function GET(request: Request, { params }: Params) {
     if (!accountId || !messageId || !attachmentId) {
       return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
 
     const attachment = await getAttachmentMeta(accountId, messageId, attachmentId);
@@ -130,7 +131,7 @@ export async function DELETE(request: Request, { params }: Params) {
   const context = await requireAccountAndMessageContext(
     request,
     { accountId, messageId },
-    {
+    { minRole: "editor",
       missingFieldsMessage: "Missing accountId/messageId",
       missingMessageMessage: "Message not found in local cache.",
       requireImapMetadata: true,

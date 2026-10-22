@@ -1,3 +1,5 @@
+import { mailboxErrorResponse } from "./mailboxFailure";
+import type { AccountRole } from "./data";
 import { NextResponse } from "next/server";
 import { getAuth, setActiveAccountId } from "./betterAuth";
 import { getDb } from "./db/connection";
@@ -35,11 +37,19 @@ export function forwardAuthHeaders<T extends Response>(response: T, headers: Hea
 
 /** Route/helper tails explicitly carry the headers obtained by their guard. */
 export async function withAuthResponse<T>(
-  context: ActiveUserSession | { session: ActiveUserSession }, respond: () => T | Promise<T>
+  context: ActiveUserSession | { session: ActiveUserSession; accountId?: string; role?: AccountRole }, respond: () => T | Promise<T>
 ): Promise<T> {
   const session = "session" in context ? context.session : context;
-  const response = await respond();
-  return response instanceof Response ? forwardAuthHeaders(response, session.responseHeaders) : response;
+  try {
+    const response = await respond();
+    return response instanceof Response ? forwardAuthHeaders(response, session.responseHeaders) : response;
+  } catch (error) {
+    if ("session" in context && context.accountId) {
+      const response = await mailboxErrorResponse(error, context.accountId, context.role);
+      if (response) return forwardAuthHeaders(response, session.responseHeaders) as T;
+    }
+    throw error;
+  }
 }
 
 function denied(status: number, code?: string, headers = new Headers()) {
@@ -76,7 +86,8 @@ export async function requireActiveUserSession(request?: Request | null, options
 }
 
 export async function requireAccountAccessOr403(session: ActiveUserSession, accountId: string) {
-  if ((await listAccessibleAccountIdsForUser(session.userId)).includes(accountId.trim())) return true;
+  const { resolveAccountRole } = await import("./accountAccess");
+  if (await resolveAccountRole(session.userId, accountId.trim())) return true;
   return forwardAuthHeaders(NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 }), session.responseHeaders);
 }
 
@@ -111,8 +122,10 @@ export async function ensureActiveAccountId(session: ActiveUserSession): Promise
   return { mailboxState: accounts.length ? "unselected" : "none", accountId: null, accounts };
 }
 
-/** MCP activation and the opaque generation-bound format belong to Slice 3. */
-export async function requireMcpAccountContext(_request?: Request | null) {
-  void _request;
-  return NextResponse.json({ ok: false, code: "auth_integration_pending" }, { status: 503 });
+/** Bearer-only: browser cookies are never an MCP fallback. */
+export async function requireMcpAccountContext(request?: Request | null) {
+  const bearer = request?.headers.get("authorization")?.match(/^Bearer (\S+)$/i)?.[1];
+  const { validateMcpToken } = await import("./mcpAuth");
+  const context = bearer ? await validateMcpToken(bearer) : null;
+  return context ?? NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
 }

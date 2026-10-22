@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   ) {
     return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
   }
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { clientId } = accountContext;

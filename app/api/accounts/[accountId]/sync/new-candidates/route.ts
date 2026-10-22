@@ -18,6 +18,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const payload = (await request.json()) as NewSyncCandidatesPayload;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -41,7 +42,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       const decisions = await planImapNewSyncFolders(account, folderIds, clientId);
       return NextResponse.json({ ok: true, decisions });
     } catch (error) {
-      const response = imapUpstreamErrorResponse(error, {
+      const response = await imapUpstreamErrorResponse(error, { role: accountContext.role,
         accountId: resolvedAccountId,
         op: "sync.new-candidates"
       });

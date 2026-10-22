@@ -17,6 +17,7 @@ import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/number
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -46,6 +47,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   };
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -109,6 +111,7 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
   };
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

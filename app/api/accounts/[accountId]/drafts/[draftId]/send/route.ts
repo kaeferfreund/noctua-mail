@@ -31,6 +31,7 @@ export async function POST(request: Request, { params }: Params) {
     return errorResponse("Missing accountId or draftId", 400);
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

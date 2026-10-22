@@ -40,6 +40,7 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -68,6 +69,7 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -156,6 +158,7 @@ export async function DELETE(request: Request, { params }: Params) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

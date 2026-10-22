@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: Params) {
   const { messageId: rawMessageId } = await params;
   const messageId = typeof rawMessageId === "string" ? rawMessageId : "";
   const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId or messageId"
   });
   if (context instanceof NextResponse) return context;

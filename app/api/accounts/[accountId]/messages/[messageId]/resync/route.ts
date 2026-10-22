@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: Params) {
   const context = await requireAccountAndMessageContext(
     request,
     { accountId, messageId },
-    {
+    { minRole: "viewer",
       missingFieldsMessage: "Missing accountId/messageId",
       missingMessageMessage:
         "Message not found in local cache. If a sync is in progress, retry later."

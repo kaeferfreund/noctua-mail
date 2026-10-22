@@ -1,10 +1,11 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { rejectOverlongSearchQuery } from "@/app/api/_helpers/searchQueryLength";
 import { ensureMessageSourceSizes, listMessages } from "@/lib/db";
 import { normalizeMessageListSortBy } from "@/lib/messageListSort";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 
 type ListMessagesHandlerOptions = {
   defaultQuery?: string | null;
@@ -42,7 +43,7 @@ export async function handleListMessagesRequest(
     if (!accountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
     // Rows synced before `sizeBytes` existed have no size and would sink to the
     // bottom of a size-ordered page, so fill them in before the first such query.

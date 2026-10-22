@@ -10,7 +10,7 @@ import {
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "viewer" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     return NextResponse.json(await getFolders(accountContext.accountId));
@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function PUT(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const payload = (await request.json()) as Folder[];

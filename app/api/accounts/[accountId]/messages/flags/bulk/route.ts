@@ -1,3 +1,4 @@
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     );
   }
 
-  const accountContext = await requireAccountContext(request, accountId);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;
@@ -106,6 +107,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       });
       return NextResponse.json({ ok: true, results, skipped });
     } catch (error) {
+      const mailboxError = await mailboxErrorResponse(error, accountContext.accountId, accountContext.role);
+      if (mailboxError) return mailboxError;
       const message = error instanceof Error ? error.message : "Bulk flag update failed";
       // Validation errors thrown by the service layer are client payload issues
       // (mirrors the single-message route); anything else is an upstream

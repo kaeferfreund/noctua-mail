@@ -15,6 +15,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     );
   }
   const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId or relatedId"
   });
   if (context instanceof NextResponse) return context;
