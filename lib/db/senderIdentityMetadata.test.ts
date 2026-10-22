@@ -73,7 +73,7 @@ describe("sender identity message metadata", () => {
     expect(shard.prepare("SELECT 1 FROM thread_signals WHERE accountId=? AND signalValue='alias@example.test'").get(f.accountId)).not.toBeNull();
     await createSenderIdentity(f.accountId, { email: "alias@example.test", displayName: "Alias" }, { userId: auth.user.id });
     const deadline = Date.now() + 10000;
-    while (getIdentityRecomputeJob(f.accountId)?.status === "running" && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+    while (["queued", "running"].includes(getIdentityRecomputeJob(f.accountId)?.status ?? "") && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
     expect(getIdentityRecomputeJob(f.accountId)?.status).toBe("done");
     expect(shard.prepare("SELECT 1 FROM thread_signals WHERE accountId=? AND signalValue='alias@example.test'").get(f.accountId)).toBeNull();
     expect(shard.prepare("SELECT latestReceivedDateValue FROM threads WHERE accountId=? AND threadId=?").get(f.accountId, f.message.threadId)).toEqual({ latestReceivedDateValue: 1000 });

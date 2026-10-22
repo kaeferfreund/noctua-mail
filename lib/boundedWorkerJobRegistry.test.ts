@@ -67,3 +67,44 @@ test("independent server processes share one account slot and a global two-worke
     expect(trace.prepare("SELECT active,peak,started FROM admission").get()).toEqual({ active: 0, peak: 2, started: 5 });
   } finally { trace.close(); }
 }, 20000);
+
+test("identity workers wait for the shared sync lease budget and release it after confirmed exit", async () => {
+  const { queueWorker, reserveWorker, removeWorker, newLeaseOwner } = await import("./db/processLeases");
+  const { getDb } = await import("./db/connection");
+  const owner = newLeaseOwner(), blocker = crypto.randomUUID(), identityAccount = crypto.randomUUID();
+  const configured = process.env.NOCTUA_MAX_SYNC_WORKERS;
+  process.env.NOCTUA_MAX_SYNC_WORKERS = "1";
+  let exit!: (code: number) => void;
+  const spawn = spyOn(Bun, "spawn").mockImplementation(() => ({ pid: process.pid,
+    exited: new Promise<number>(resolve => { exit = resolve; }), stderr: null, kill: () => {} }) as never);
+  const waitFor = async (predicate: () => boolean | Promise<boolean>) => {
+    const deadline = Date.now() + 4000;
+    while (!await predicate() && Date.now() < deadline) await tick();
+    expect(await predicate()).toBe(true);
+  };
+  try {
+    await queueWorker(blocker, owner, 1, "synthetic-sync-blocker");
+    expect(await reserveWorker(blocker, owner, 1)).toBe(true);
+    const registry = createWorkerJobRegistry({ scriptPath: "synthetic-worker.ts", registryName: crypto.randomUUID(),
+      maxConcurrentJobs: 2, sharedWorkerBudget: true });
+    const job = registry.startJob(identityAccount, ["--identities"]);
+    expect(registry.startJob(identityAccount).id).toBe(job.id);
+    const db = await getDb();
+    await waitFor(() => !!db.prepare("SELECT 1 FROM sync_worker_queue WHERE jobId=?").get(job.id));
+    expect(registry.getJob(job.id)?.status).toBe("queued");
+    expect(spawn).not.toHaveBeenCalled();
+    await removeWorker(blocker, owner, true);
+    await waitFor(() => registry.getJob(job.id)?.status === "running");
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(db.prepare("SELECT accountId,pid FROM sync_worker_leases WHERE jobId=?").get(job.id)).toEqual({ accountId: identityAccount, pid: process.pid });
+    exit(0);
+    await waitFor(() => registry.getJob(job.id)?.status === "done");
+    expect(db.prepare("SELECT 1 FROM sync_worker_leases WHERE jobId=?").get(job.id)).toBeNull();
+  } finally {
+    exit?.(0);
+    await removeWorker(blocker, owner, true);
+    spawn.mockRestore();
+    if (configured === undefined) delete process.env.NOCTUA_MAX_SYNC_WORKERS;
+    else process.env.NOCTUA_MAX_SYNC_WORKERS = configured;
+  }
+});

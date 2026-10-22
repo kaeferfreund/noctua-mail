@@ -15,6 +15,7 @@ export type WorkerJobRecord = {
 
 export type WorkerJobRegistryConfig = {
   maxConcurrentJobs?: number;
+  sharedWorkerBudget?: boolean;
   registryName?: string;
   scriptPath: string;
   jobTtlMs?: number;

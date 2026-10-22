@@ -78,7 +78,7 @@ export async function reserveWorker(jobId: string, owner: string, capacity: numb
 }
 
 /** Spawn and record PID synchronously under the write lock. No retry can spawn twice. */
-export async function spawnLeasedWorker<T extends { pid: number; kill: (signal: string) => void; exited: Promise<number> }>(
+export async function spawnLeasedWorker<T extends { pid: number; kill: (signal: NodeJS.Signals) => void; exited: Promise<number> }>(
   jobId: string, owner: string, spawn: () => T
 ): Promise<T> {
   const db = await getDb();

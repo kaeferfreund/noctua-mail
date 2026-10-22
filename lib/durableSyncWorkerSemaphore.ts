@@ -32,7 +32,7 @@ export class DurableSyncWorkerSemaphore {
     const entry = this.waiting.get(id);
     if (entry) entry.priority = Math.min(entry.priority, priority);
   }
-  spawn<T extends { pid: number; kill: (signal: string) => void; exited: Promise<number> }>(id: string, spawn: () => T) {
+  spawn<T extends { pid: number; kill: (signal: NodeJS.Signals) => void; exited: Promise<number> }>(id: string, spawn: () => T) {
     return spawnLeasedWorker(id, this.owner, spawn);
   }
 

@@ -2,6 +2,7 @@
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
+import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import type { ShellAccount } from "./shell/types";
@@ -2854,13 +2855,25 @@ export default function MailClient({
   useEffect(() => { invalidateThreadCollab(activeAccountId); }, [activeAccountId, authoritativeRevision, invalidateThreadCollab]);
   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
   const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
-    apiFetch, sessionKey: currentUser?.id, refreshVersion: authoritativeRevision,
+    apiFetch, sessionKey: currentUser?.id, refreshVersion: authoritativeRevision + collabRevision,
     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
     onCommit: (accountId) => {
       setCollabRevision(value => value + 1);
       if (accountId === activeAccountId) queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     }
   });
+  const mailboxSummaries = useMailboxSummaries({
+    sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
+    apiFetch,
+    onMailboxesChanged: () => { void loadInitialData(); },
+    onThreadChanged: accountId => {
+      if (accountId !== activeAccountId) return;
+      invalidateThreadCollab(accountId);
+      setCollabRevision(value => value + 1);
+      queueFilteredSearchRefresh(true);
+    }
+  });
+  const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
   const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;
@@ -5477,6 +5490,7 @@ export default function MailClient({
           brand: { buildVersionLabel },
           mailboxes: {
             accounts,
+            summaries: mailboxSummaries,
             activeAccountId,
             onSwitch: (accountId: string) => {
               void switchAccount(accountId);
@@ -5489,7 +5503,10 @@ export default function MailClient({
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
               ...folder, active: activeVirtualFolder?.id === folder.id,
-              count: collabCounts[folder.id] ?? null, countAriaLabel: `${collabCounts[folder.id] ?? 0} messages`, icon: <ListTodo size={13} />,
+              count: folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? null
+                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? null : collabCounts[folder.id] ?? null,
+              countAriaLabel: `${folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? 0
+                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? 0 : collabCounts[folder.id] ?? 0} threads`, icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane

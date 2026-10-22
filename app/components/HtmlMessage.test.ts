@@ -4,7 +4,7 @@ import { extractBodyContent } from "@/lib/html";
 
 const build = (html: string, hostViewportHeight?: number) => buildPreviewDocument({
   html, safeHtml: html, darkMode: false, fontScale: 1, zoom: 1,
-  showViewerFrame: false, hostViewportHeight, token: "test-preview"
+  showViewerFrame: false, hostViewportHeight, remoteContent: "block", token: "test-preview"
 });
 
 describe("HTML preview document heights", () => {

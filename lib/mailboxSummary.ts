@@ -26,10 +26,10 @@ export function authorizeMailboxSummary(db: Database, userId: string, summary: M
 export const COLLAB_SUMMARY_SQL = `SELECT
   (SELECT COUNT(*) FROM thread_collab_state tc
     WHERE tc.accountId = ?1 AND tc.assigneeUserId = ?2
-      AND EXISTS (SELECT 1 FROM messages m WHERE m.accountId = tc.accountId
+      AND EXISTS (SELECT 1 FROM messages m INDEXED BY idx_messages_live_thread_summary WHERE m.accountId = tc.accountId
         AND m.threadId = tc.threadId AND COALESCE(m.deleted, 0) = 0)) AS assignedToMe,
   (SELECT COUNT(*) FROM
-    (SELECT DISTINCT threadId FROM messages WHERE accountId = ?1 AND COALESCE(deleted, 0) = 0) live
+    (SELECT DISTINCT threadId FROM messages INDEXED BY idx_messages_live_thread_summary WHERE accountId = ?1 AND COALESCE(deleted, 0) = 0) live
     LEFT JOIN thread_collab_state tc ON tc.accountId = ?1 AND tc.threadId = live.threadId
     WHERE tc.assigneeUserId IS NULL AND (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting'))
   ) AS unassignedOpen`;

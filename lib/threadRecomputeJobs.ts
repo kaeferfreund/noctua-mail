@@ -13,7 +13,7 @@ const workerConfig = {
 };
 const threadRecomputeJobs = createWorkerJobRegistry(workerConfig);
 const identityRecomputeJobs = createWorkerJobRegistry({
-  ...workerConfig, registryName: "sender-identity-recompute", maxConcurrentJobs: 2
+  ...workerConfig, registryName: "sender-identity-recompute", maxConcurrentJobs: 2, sharedWorkerBudget: true
 });
 
 export const getThreadRecomputeJob = (id: string) => threadRecomputeJobs.getJob(id) ?? identityRecomputeJobs.getJob(id);

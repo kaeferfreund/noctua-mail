@@ -36,7 +36,9 @@ shared across server processes in a runtime SQLite registry, and retained for
 30 minutes after completion (cleanup runs on registry access). Null means no
 retained job, not proof that a rebuild succeeded. Losing runtime storage loses
 job history, not configuration. At most one identity job is active per mailbox
-and two identity workers globally; other mailboxes queue. Retries coalesce into
+and two identity jobs admitted globally; their workers also share the durable
+`NOCTUA_MAX_SYNC_WORKERS` budget and per-account leases with sync/watcher work.
+Other mailboxes queue. Retries coalesce into
 the active job and terminal retries have a one-second cooldown. A create during
 an active scan requests one trailing scan in that slot, so new configuration is
 not lost. A failed rebuild leaves the identity committed; a manager can retry.
@@ -159,9 +161,8 @@ default. Draft reopening preserves a saved unavailable selection.
 The identity rebuild repairs canonical derived authors before summaries/signals,
 keeps thread IDs and existing topic links, and never remaps threads. Calendar
 participation refreshes lazily on an own-address-set change. Stored classifications
-need the separate existing categories recompute action. This checkout cannot prove
-collaboration assignment/comment/activity/sent_by/read-state preservation until
-its changes are ported onto the integration result.
+need the separate existing categories recompute action. Integration round 4 carries these changes with the collaboration snapshots and
+shard-v2 writer guards; the combined regression gates verify the port.
 
 ## Handoff to slices 2/3
 
