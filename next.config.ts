@@ -18,9 +18,14 @@ const nextConfig: NextConfig = {
       "./node_modules/parse-srcset/**",
       "./node_modules/escape-string-regexp/**",
       "./node_modules/entities/**",
-      // parse5 resolves its own entities major from a nested node_modules,
-      // which the glob covers.
-      "./node_modules/parse5/**"
+      // parse5 8.0.1 depends on entities ^8 and resolves the hoisted copy above.
+      // parse5 8.0.0 nested entities ^6, so package.json starts the range at 8.0.1.
+      "./node_modules/parse5/**",
+      // sanitize-html 2.17 and html-to-text 10 use htmlparser2 10, which still
+      // depends on entities ^7. That copy lives at
+      // node_modules/htmlparser2/node_modules/entities. The hoisted entities 8
+      // package is ESM-only, so the worker must keep this nested CJS copy.
+      "./node_modules/htmlparser2/**"
     ],
     "/api/accounts/*/threads/recompute": workerRuntimeTraceFiles,
     "/api/accounts/*/categories/recompute": workerRuntimeTraceFiles
