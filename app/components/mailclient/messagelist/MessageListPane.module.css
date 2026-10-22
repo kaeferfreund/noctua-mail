@@ -35,7 +35,7 @@
 
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]) {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px;
+  grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr) 28px;
   grid-template-rows: 24px 24px;
   gap: 4px 6px;
   padding: 8px 0;
@@ -70,7 +70,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 24px;
+  width: 20px;
   height: 100%;
 }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"] > :not(button[title^="Mark as"]):not([aria-label="Select message"])) { display: none; }
@@ -100,21 +100,22 @@
   min-height: 28px;
 }
 
-/* Preserve Table selection in narrow desktop panes as well. */
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([aria-label="Select message"])) { grid-template-columns: 50px minmax(0, 1fr) minmax(0, 1fr) 28px; }
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([aria-label="Select message"])) { width: 50px; gap: 8px; }
+/* Preserve Table selection in narrow desktop panes as well; the 7px gap keeps
+   the dot's 24px hit area clear of the checkbox. */
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([aria-label="Select message"])) { grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) 28px; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([aria-label="Select message"])) { width: 40px; gap: 7px; }
 
 @media (width < 768px) {
   .pane { padding: 8px; min-width: 0; overflow-x: hidden; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]) {
-    grid-template-columns: 44px minmax(0, 1fr) auto 44px;
+    grid-template-columns: 32px minmax(0, 1fr) auto 44px;
   }
   /* Table has two distinct touch targets; their hit areas must not overlap. */
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([aria-label="Select message"])) {
     grid-template-columns: 88px minmax(0, 1fr) auto 44px;
   }
-  .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]) { width: 44px; }
-  .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([aria-label="Select message"])) { width: 88px; gap: 18px; justify-content: flex-end; }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]) { width: 32px; }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([aria-label="Select message"])) { width: 88px; gap: 16px; justify-content: flex-end; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"] > [aria-label="Select message"]) {
     display: inline-flex;
     flex: 0 0 44px;

@@ -4,27 +4,57 @@
   justify-content: flex-start;
   flex-direction: row;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   position: relative;
+  /* The dot's hit area overhangs into the row padding on the left but stops
+     short of the checkbox, so the header column stays as narrow as before. */
+  --unread-dot-hit: -7px -4px -7px -10px;
+  --unread-dot-hit-touch: -16px -4px -16px -14px;
 }
 
 .unreadDot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   background: var(--accent-9);
-  border: 1px solid var(--accent-9);
+  /* Ring as inset shadow, not a border, so the hit-area insets below are
+     measured from the visible edge. */
+  --unread-dot-ring: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--unread-dot-ring);
+  border: 0;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-  flex: 0 0 8px;
+  flex: 0 0 10px;
+  position: relative;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Invisible pointer area: it overhangs the gutter instead of taking layout
+   space. Containers narrow it via --unread-dot-hit where a neighbour sits close. */
+.unreadDot::before {
+  content: "";
+  position: absolute;
+  inset: var(--unread-dot-hit, -7px);
+}
+
+.unreadDot:focus-visible {
+  outline: 2px solid var(--accent-8);
+  outline-offset: 3px;
+}
+
+/* Read is a hollow neutral ring, so it differs from unread by fill and hue,
+   not just by opacity; hover previews the accent it toggles to. */
 .unreadDotRead {
   background: transparent;
-  opacity: 0.55;
+  --unread-dot-ring: var(--gray-9);
+}
+
+/* Hover-capable pointers only, so the halo does not stick after a tap. */
+@media (hover: hover) {
+  .unreadDot:hover:not(:disabled) { box-shadow: inset 0 0 0 1.5px var(--unread-dot-ring), 0 0 0 5px var(--gray-a4); }
+  .unreadDotRead:hover:not(:disabled) { --unread-dot-ring: var(--accent-9); }
 }
 
 .unreadDotDisabled {
@@ -74,15 +104,11 @@
 }
 
 @media (width < 768px) {
-  /* The glyph stays 8px; only the invisible pointer area grows. */
-  .unreadDot { position: relative; }
-  .unreadDot::after {
-    content: "";
-    position: absolute;
-    width: 44px;
-    height: 44px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+  /* Touch keeps a 44px target around a slightly larger glyph. */
+  .unreadDot {
+    width: 12px;
+    height: 12px;
+    flex-basis: 12px;
   }
+  .unreadDot::before { inset: var(--unread-dot-hit-touch, -16px); }
 }
