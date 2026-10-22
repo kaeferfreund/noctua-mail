@@ -1,9 +1,10 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getMessageSource } from "@/lib/storage";
 import { getMessageById } from "@/lib/db";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 
 type Params = AccountRouteParams & {
@@ -26,7 +27,7 @@ export async function handleGetMessageSourceRequest(
     if (!accountId || !messageId) {
       return NextResponse.json({ ok: false, message: "Missing parameters" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
 
     const message = await getMessageById(accountId, messageId);

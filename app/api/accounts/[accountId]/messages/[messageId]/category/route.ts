@@ -24,7 +24,7 @@ export async function POST(request: Request, { params }: Params) {
   const context = await requireAccountAndMessageContext(
     request,
     { accountId, messageId },
-    { missingFieldsMessage: "Missing accountId or messageId" }
+    { minRole: "editor", missingFieldsMessage: "Missing accountId or messageId" }
   );
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {

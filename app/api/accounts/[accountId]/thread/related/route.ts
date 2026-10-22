@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     ? payload.messageIds.map((value) => value.trim()).filter(Boolean)
     : [];
   const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId or threadIds/messageIds"
   });
   if (context instanceof NextResponse) return context;

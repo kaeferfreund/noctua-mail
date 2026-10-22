@@ -10,6 +10,7 @@ import { resetCategoryLinearModel } from "@/lib/db";
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const access = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (access instanceof NextResponse) return access;

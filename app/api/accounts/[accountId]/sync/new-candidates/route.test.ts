@@ -108,7 +108,7 @@ describe("sync new-candidates route", () => {
     ).rejects.toThrow("db is locked");
   });
 
-  test("keeps reauth semantics for IMAP auth failures", async () => {
+  test("offers managers mailbox repair without personal-auth logout", async () => {
     const accountId = await setUpAccount();
     planImapNewSyncFolders.mockRejectedValueOnce(
       Object.assign(new Error("Command failed"), { authenticationFailed: true })
@@ -118,7 +118,7 @@ describe("sync new-candidates route", () => {
       params: Promise.resolve({ accountId })
     });
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(503);
     const body = (await response.json()) as {
       ok?: boolean;
       code?: string;
@@ -126,7 +126,7 @@ describe("sync new-candidates route", () => {
       accountId?: string;
     };
     expect(body.ok).toBe(false);
-    expect(body.code).toBe("imap_auth_failed");
+    expect(body.code).toBe("mailbox_credentials_invalid");
     expect(body.reauthRequired).toBe(true);
     expect(body.accountId).toBe(accountId);
   });

@@ -1,8 +1,9 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { rejectOverlongSearchQuery } from "@/app/api/_helpers/searchQueryLength";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { listRecipientAutocompleteSuggestions } from "@/lib/recipientAliases";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
@@ -19,7 +20,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     if (!accountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Number(limitParam) : 200;

@@ -17,6 +17,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const paramValues = await params;
   const topicId = normalizeTopicIdParam(paramValues.topicId);
   const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId or topicId"
   });
   if (context instanceof NextResponse) return context;

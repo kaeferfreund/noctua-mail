@@ -1,37 +1,28 @@
-import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { deleteAccountControlPlane, patchAccount } from "@/lib/db";
-import type { Account } from "@/lib/data";
-import {
-  requireAccountContextFromParams,
-  type AccountRouteParams
-} from "@/app/api/_helpers/accountContext";
+import { withAuthResponse } from "@/lib/auth";
+import { deleteAccountControlPlane, AccountDeletionForbiddenError } from "@/lib/serverDb";
+import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { requireBodylessSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { handleMailboxCredentialMutation } from "@/app/api/_helpers/mailboxPatch";
 import { errorResponse, okResponse } from "@/app/api/_helpers/response";
-import { sanitizeAccountForClient } from "@/lib/accountPresentation";
-
+import { revokeAuthStreams } from "@/lib/authStreams";
+import { recordAdminAudit } from "@/lib/serverDb";
 export async function PUT(request: Request, { params }: AccountRouteParams) {
-  const accountContext = await requireAccountContextFromParams(request, params);
-  if (accountContext instanceof NextResponse) return accountContext;
-  return withAuthResponse(accountContext, async () => {
-    const { accountId } = accountContext;
-    const payload = (await request.json()) as Partial<Account>;
-    const updated = await patchAccount(accountId, payload);
-    if (!updated) {
-      return errorResponse("Account not found", 404);
-    }
-    return NextResponse.json(sanitizeAccountForClient(updated));
-  });
+  return handleMailboxCredentialMutation(request, "put", params);
 }
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
-  const accountContext = await requireAccountContextFromParams(request, params);
-  if (accountContext instanceof NextResponse) return accountContext;
-  return withAuthResponse(accountContext, async () => {
-    const { accountId } = accountContext;
-    const deleted = await deleteAccountControlPlane(accountId);
-    if (!deleted) {
-      return errorResponse("Account not found", 404);
-    }
+  const context = await requireAccountContextFromParams(request, params, { minRole: "manager" });
+  if (context instanceof NextResponse) return context;
+  return withAuthResponse(context, async () => {
+    if (context.account.ownerUserId !== context.userId && context.session.role !== "admin") return errorResponse("Only the owner can delete this mailbox", 403);
+    const origin = await requireBodylessSameOrigin(request); if (origin) return origin;
+    let deleted: boolean;
+    try { deleted = await deleteAccountControlPlane(context.accountId, context.userId); }
+    catch (error) { if (error instanceof AccountDeletionForbiddenError) return errorResponse(error.message, 403); throw error; }
+    if (!deleted) return errorResponse("Account not found", 404);
+    revokeAuthStreams({ accountId: context.accountId });
+    await recordAdminAudit({ actorUserId: context.userId, action: "account.delete", targetAccountId: context.accountId });
     return okResponse();
   });
 }

@@ -14,7 +14,6 @@ import { trashMessageInAccount } from "@/app/api/_helpers/message/routeHelpers";
 import {
   getAccountIdFromParams,
   requireAccountContext,
-  requireOwnedAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 
@@ -65,12 +64,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     );
   }
 
-  // Source must be the session's active account; destination only needs to be
-  // owned by the same user (it isn't the active account).
-  const sourceContext = await requireAccountContext(request, sourceAccountId);
+  // Source and destination each require current editor access.
+  const sourceContext = await requireAccountContext(request, sourceAccountId, { minRole: "editor" });
   if (sourceContext instanceof NextResponse) return sourceContext;
   return withAuthResponse(sourceContext, async () => {
-    const destinationContext = await requireOwnedAccountContext(request, destinationAccountId);
+    const destinationContext = await requireAccountContext(request, destinationAccountId, { minRole: "editor" });
     if (destinationContext instanceof NextResponse) return destinationContext;
 
     const { account: sourceAccount, clientId } = sourceContext;

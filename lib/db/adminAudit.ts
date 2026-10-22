@@ -19,7 +19,7 @@ export const ADMIN_AUDIT_MAX_LIMIT = 500;
 // case-insensitively at every nesting level. Callers are expected to pass
 // secret-free payloads; this is the defensive second line.
 const SECRET_KEY_PATTERN =
-  /^(pass|pwd)$|password|passwd|passphrase|secret|token|hash|api[-_]?key|credential/i;
+  /^(pass|pwd)$|password|passwd|passphrase|secret|token|hash|api[-_]?key|credential|uri|url|code/i;
 
 function stripSecretValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripSecretValue);

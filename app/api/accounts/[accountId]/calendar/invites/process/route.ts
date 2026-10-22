@@ -21,6 +21,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const messageId = payload?.messageId?.trim() ?? "";
   const icsSource = payload?.icsSource ?? "";
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

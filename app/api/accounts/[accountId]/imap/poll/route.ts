@@ -33,6 +33,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const sinceUidNextParam = searchParams.get("sinceUidNext");
   const sinceUidNext = sinceUidNextParam ? Number(sinceUidNextParam) : null;
   const accountContext = await requireAccountContext(request, accountIdParam, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
@@ -108,7 +109,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         releasePooledImapClient(account, client, logContext, { evict: !pooledClientOk });
       }
     } catch (error) {
-      const response = imapUpstreamErrorResponse(error, { accountId, op: "imap.poll" });
+      const response = await imapUpstreamErrorResponse(error, { role: accountContext.role, accountId, op: "imap.poll" });
       if (response) return response;
       throw error;
     }

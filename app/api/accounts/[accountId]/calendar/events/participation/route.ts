@@ -17,6 +17,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;

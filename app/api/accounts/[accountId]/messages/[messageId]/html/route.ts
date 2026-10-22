@@ -1,8 +1,9 @@
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getMessageById } from "@/lib/db";
-import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
+import { requireActiveUserSession } from "@/lib/auth";
 import { formatMessageHtmlPageTitle } from "@/lib/appBranding";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import {
@@ -79,7 +80,7 @@ export async function GET(request: Request, { params }: Params) {
     if (!accountId || !messageId) {
       return htmlError(400, "Missing accountId or messageId.");
     }
-    const access = await requireAccountAccessOr403(session, accountId);
+    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return htmlError(403, "Forbidden.");
 
     const message = await getMessageById(accountId, messageId);

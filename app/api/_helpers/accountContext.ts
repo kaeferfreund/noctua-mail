@@ -1,12 +1,15 @@
 import { getRequestClientId } from "./clientId";
 import { NextResponse } from "next/server";
-import { forwardAuthHeaders, requireAccountAccessOr403, requireActiveUserSession, type ActiveUserSession } from "@/lib/auth";
+import { forwardAuthHeaders, requireActiveUserSession, type ActiveUserSession } from "@/lib/auth";
 import { getAccountById } from "@/lib/serverDb";
-import type { Account } from "@/lib/data";
+import { resolveAccountRole, roleAtLeast } from "@/lib/accountAccess";
+import type { Account, AccountRole } from "@/lib/data";
 import { errorResponse } from "./response";
 
 export type AccountContext = {
   session: ActiveUserSession;
+  userId: string;
+  role: AccountRole;
   accountId: string;
   account: Account;
   clientId?: string;
@@ -41,6 +44,7 @@ export async function requireAccountContext(
   accountId: string,
   options?: {
     missingAccountMessage?: string;
+    minRole?: AccountRole;
   }
 ): Promise<AccountContext | NextResponse> {
   if (!accountId) {
@@ -48,37 +52,16 @@ export async function requireAccountContext(
   }
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
-  const access = await requireAccountAccessOr403(session, accountId);
-  if (access instanceof NextResponse) return access;
+  const role = await resolveAccountRole(session.userId, accountId);
+  if (!role) return forwardAuthHeaders(errorResponse("Forbidden", 403), session.responseHeaders);
+  const requiredRole = options?.minRole ?? "viewer";
+  if (!roleAtLeast(role, requiredRole)) return forwardAuthHeaders(NextResponse.json({ ok: false, message: "Insufficient mailbox role", requiredRole }, { status: 403 }), session.responseHeaders);
   const account = await getAccountById(accountId);
   if (!account) {
     return forwardAuthHeaders(errorResponse("Account not found", 404), session.responseHeaders);
   }
   const clientId = getRequestClientId(request);
-  return { session, accountId, account, clientId };
-}
-
-/**
- * Resolves a destination mailbox through the same live membership guard.
- */
-export async function requireOwnedAccountContext(
-  request: Request,
-  accountId: string,
-  options?: {
-    missingAccountMessage?: string;
-  }
-): Promise<AccountContext | NextResponse> {
-  if (!accountId) {
-    return errorResponse(options?.missingAccountMessage ?? "Missing accountId", 400);
-  }
-  const session = await requireActiveUserSession(request);
-  if (session instanceof NextResponse) return session;
-  const access = await requireAccountAccessOr403(session, accountId);
-  if (access instanceof NextResponse) return access;
-  const account = await getAccountById(accountId);
-  if (!account) return forwardAuthHeaders(errorResponse("Forbidden", 403), session.responseHeaders);
-  const clientId = getRequestClientId(request);
-  return { session, accountId, account, clientId };
+  return { session, userId: session.userId, role, accountId, account, clientId };
 }
 
 export async function requireAccountContextFromParams(
@@ -86,6 +69,7 @@ export async function requireAccountContextFromParams(
   paramsPromise: Promise<Record<string, AccountRouteParamValue>>,
   options?: {
     missingAccountMessage?: string;
+    minRole?: AccountRole;
   }
 ) {
   const accountId = await getAccountIdFromParams(paramsPromise);

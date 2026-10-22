@@ -11,6 +11,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
   const accountId = await getAccountIdFromParams(params);
   const access = await requireAccountContext(request, accountId, {
+    minRole: "manager",
     missingAccountMessage: "Missing accountId"
   });
   if (access instanceof NextResponse) return access;

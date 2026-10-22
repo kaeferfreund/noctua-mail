@@ -2,7 +2,7 @@ import { expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { getRequestClientId } from "./clientId";
 import { handleSyncStartRequest, handleSyncStatusRequest } from "./syncJobs";
-import { requireAccountContext, requireOwnedAccountContext } from "./accountContext";
+import { requireAccountContext } from "./accountContext";
 import * as syncJobs from "@/lib/syncJobs";
 import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
@@ -37,7 +37,7 @@ test("215-character client IDs never reach unauthorized status logs, account con
     smtp: { host: "smtp.example.test", port: 465, secure: true, user: email, password: "synthetic-smtp" }
   } as Account);
   const f = await createAuthenticatedTestSession(id);
-  for (const resolve of [requireAccountContext, requireOwnedAccountContext]) {
+  for (const resolve of [requireAccountContext]) {
     const context = await resolve(request(f.jar.header()), id);
     expect(context).toHaveProperty("clientId", undefined);
   }
