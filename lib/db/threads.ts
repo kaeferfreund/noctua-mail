@@ -362,11 +362,28 @@ export async function recomputeThreadsForAccount(accountId: string, threadIds?: 
     // Canonicalize legacy derived authors (including populated Unicode domains)
     // before either summaries or signals observe them. Never rewrite raw From.
     db.transaction(() => {
-      const authors = db.prepare("SELECT id,fromAddr,fromEmail FROM messages WHERE accountId=?").all(accountId) as Array<{ id: string; fromAddr: string; fromEmail: string | null }>;
       const update = db.prepare("UPDATE messages SET fromEmail=? WHERE accountId=? AND id=?");
-      for (const row of authors) {
-        const email = parseAddressEmails(row.fromAddr)[0] ?? null;
-        if (email !== row.fromEmail) update.run(email, accountId, row.id);
+      const normalizeAuthors = (authors: Array<{ id: string; fromAddr: string; fromEmail: string | null }>) => {
+        for (const row of authors) {
+          const email = parseAddressEmails(row.fromAddr)[0] ?? null;
+          if (email !== row.fromEmail) update.run(email, accountId, row.id);
+        }
+      };
+      if (threadIds && threadIds.length > 0) {
+        const uniqueThreadIds = normalizeThreadIds(threadIds);
+        const batchSize = 400;
+        for (let start = 0; start < uniqueThreadIds.length; start += batchSize) {
+          const chunk = uniqueThreadIds.slice(start, start + batchSize);
+          normalizeAuthors(db.prepare(
+            `SELECT id,fromAddr,fromEmail FROM messages WHERE accountId=?
+             AND threadId IN (${chunk.map(() => "?").join(",")})`
+          ).all(accountId, ...chunk));
+        }
+      } else {
+        // An omitted or empty list retains the full-rebuild contract.
+        normalizeAuthors(db.prepare(
+          "SELECT id,fromAddr,fromEmail FROM messages WHERE accountId=?"
+        ).all(accountId));
       }
     }).immediate();
     await recomputeThreadsForAccountInternal(accountId, threadIds);
