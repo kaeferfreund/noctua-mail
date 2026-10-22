@@ -20,7 +20,7 @@ describe("LoginScreen", () => {
     expect(authenticated).toBe(0);
     expect(calls.find(call => call.path.endsWith("/sign-in/email"))?.body).toEqual({ email: "person@example.test", password: "synthetic-password" });
     expect(view.queryByText("Use my personal mailbox password")).toBeNull();
-    expect(document.activeElement?.textContent).toBe("Verify your sign-in");
+    await waitFor(() => expect(document.activeElement).toBe(view.getByRole("heading", { name: "Verify your sign-in" })));
   });
   for (const status of [401, 429]) it(`keeps ${status} errors inline without leaking server text`, async () => {
     const { client } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ code: "INVALID_EMAIL_OR_PASSWORD", message: "private upstream details" }, { status, headers: { "Retry-After": "90" } }));
