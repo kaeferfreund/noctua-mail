@@ -5,8 +5,13 @@ import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
 import { defaultAc, userAc } from "better-auth/plugins/admin/access";
 import { passkey } from "@better-auth/passkey";
-import { getAuthDb, getDbConnectionGeneration } from "./db/connection";
-import { installAuthControlPlane } from "./db/authPolicy";
+import { getAuthDb, getDb, getDbConnectionGeneration } from "./db/connection";
+import { installAuthControlPlane, reconcileSecurityOperations, readGeneration } from "./db/authPolicy";
+import { authPolicyPlugin, authPolicyDatabaseHooks, RAW_DISABLED_PATHS, recordVerifiedPasskey, wrapAuthPolicyHandler } from "./authPolicyHandler";
+import { imapSignIn } from "./betterAuthImapSignIn";
+import { verifyEligibleImap } from "./imapLoginPolicy";
+import { currentAuthProof } from "./authPolicyContext";
+import { revokeAuthStreams } from "./authStreams";
 
 export const AUTH_BASE_PATH = "/api/ba";
 export const AUTH_COOKIE_PREFIX = "noctua";
@@ -25,6 +30,8 @@ export type NoctuaAuthConfig = {
   database: SqliteHandle;
   baseURL: string;
   secret: string;
+  imapVerification?: typeof import("./mail/imapAuth").verifyImapCredentials;
+  policyDatabase?: typeof getDb;
   passkeyRpID?: string;
   trustedOrigins?: string[];
 };
@@ -71,6 +78,10 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
     allowPasswordless: true,
     schema: { twoFactor: { modelName: "auth_two_factor" } }
   });
+  const bridge = twoFactorPlugin.hooks.after;
+  if (bridge.length !== 1 || !bridge[0].matcher({path:"/sign-in/email"} as never) || bridge[0].matcher({path:"/sign-in/imap"} as never)) {
+    throw new Error("Pinned Better Auth twoFactor bridge changed; IMAP login disabled pending review");
+  }
   return {
     appName: "Noctua",
     baseURL: config.baseURL,
@@ -113,11 +124,26 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
     },
     // Belt and braces next to the role definition above: the HTTP router
     // answers 404 for these. (auth.api.* server calls are not routed.)
-    disabledPaths: ["/admin/impersonate-user", "/admin/stop-impersonating"],
+    disabledPaths: RAW_DISABLED_PATHS,
+    rateLimit: { enabled: true, storage: "memory", customRules: {
+      "/sign-in/*": { window: 10, max: 3 }, "/two-factor/*": { window: 10, max: 3 }
+    } },
+    databaseHooks: authPolicyDatabaseHooks(),
     plugins: [
       // `ac` is only read by the admin client plugin; the server checks `roles`.
       admin({ roles: { admin: adminWithoutImpersonation, user: userAc } }),
       twoFactorPlugin,
+      imapSignIn({ secondFactorHooks: bridge, verifyImap: async (_email, password) => {
+        const proof = currentAuthProof();
+        if (!proof?.op || !proof.request) return false;
+        try {
+          await verifyEligibleImap(proof.db, proof.op.userId, password, proof.request, true, config.imapVerification);
+          // A changed login mailbox deliberately revoked the old generation. Capture AFTER write-back.
+          proof.op.generation = readGeneration(proof.db, proof.op.userId);
+          proof.authenticatedAt = Date.now();
+          return true;
+        } catch { return false; }
+      } }),
       passkey({
         rpID: config.passkeyRpID ?? new URL(config.baseURL).hostname,
         rpName: "Noctua",
@@ -125,27 +151,33 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
         authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
         registration: {
           requireSession: true,
-          afterVerification: async ({ verification }) => {
-            if (verification.registrationInfo?.userVerified !== true) throw new Error("Passkey user verification required");
+          afterVerification: async ({ verification, user, clientData }) => {
+            recordVerifiedPasskey(user.id, verification.registrationInfo?.userVerified === true, true, clientData.id);
           }
         },
         authentication: {
           afterVerification: async ({ verification }) => {
-            if (verification.authenticationInfo.userVerified !== true) throw new Error("Passkey user verification required");
+            recordVerifiedPasskey(undefined, verification.authenticationInfo.userVerified === true, false);
           }
         },
         schema: { passkey: { modelName: "auth_passkey" } }
       }),
+      authPolicyPlugin(),
       nextCookies()
     ]
   } satisfies BetterAuthOptions;
 }
 
 export function createNoctuaAuth(config: NoctuaAuthConfig) {
-  return betterAuth(noctuaAuthOptions(config));
+  return attachAuthPolicyHandler(betterAuth(noctuaAuthOptions(config)), config.policyDatabase);
 }
 
-export type NoctuaAuth = ReturnType<typeof createNoctuaAuth>;
+export type NoctuaAuth = ReturnType<typeof betterAuth<ReturnType<typeof noctuaAuthOptions>>>;
+
+export function attachAuthPolicyHandler<T extends {handler:(request:Request)=>Promise<Response>}>(auth: T, database = getDb): T {
+  auth.handler = wrapAuthPolicyHandler(auth.handler, database);
+  return auth;
+}
 
 export type AuthMigrationSummary = {
   createdTables: string[];
@@ -223,7 +255,9 @@ export function getAuth(): Promise<NoctuaAuth> {
       await migrateAuthSchema(options);
       installAuthControlPlane(database);
       if (getDbConnectionGeneration() !== generation) throw new Error("Auth storage closed during initialization.");
-      return betterAuth(options);
+      const interrupted = await reconcileSecurityOperations(await getDb(), Date.now() - process.uptime() * 1000);
+      for (const userId of interrupted) revokeAuthStreams({userId});
+      return attachAuthPolicyHandler(betterAuth(options));
     })();
     authPromise = pending;
     void pending.catch(() => { if (authPromise === pending) authPromise = null; });

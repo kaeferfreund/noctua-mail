@@ -74,9 +74,11 @@ export async function requireActiveUserSession(request?: Request | null, options
   const expiresAt = Math.min(new Date(result.session.expiresAt).getTime(), security.authenticatedAt + SESSION_TTL_SECONDS * 1000);
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return denied(401, undefined, headers);
   const mfa = await isMfaEnrollmentComplete(user.id);
-  const enrollmentRequired = !mfa.complete || (user.role === "admin" && !user.hasPassword);
+  const pendingSecurity = !!db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?
+    AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')`).get(`security:${user.id}`);
+  const enrollmentRequired = pendingSecurity || !mfa.complete || (user.role === "admin" && !user.hasPassword);
   const reauthRequired = security.assurance !== "mfa";
-  const securityCode = mfa.inconsistent ? "mfa_state_inconsistent" : enrollmentRequired ? "mfa_enrollment_required" : "mfa_required";
+  const securityCode = pendingSecurity ? "security_operation_pending" : mfa.inconsistent ? "mfa_state_inconsistent" : enrollmentRequired ? "mfa_enrollment_required" : "mfa_required";
   if (!options.allowRestricted && (enrollmentRequired || reauthRequired)) return denied(403, securityCode, headers);
   return { userId: user.id, sessionId: result.session.id, sessionToken: result.session.token,
     activeAccountId: result.session.activeAccountId ?? null, role: user.role, expiresAt,

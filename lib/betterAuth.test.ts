@@ -327,6 +327,7 @@ describe("HTTP handler: base path, cookies, origin/CSRF", () => {
     const secure = createNoctuaAuth({
       database: db,
       baseURL: "https://mail.example.test",
+      policyDatabase: async () => fixture.master,
       secret: TEST_SECRET
     });
     const res = await secure.handler(
@@ -362,7 +363,8 @@ describe("startup configuration", () => {
   test("explicit origin, exact RP ID and telemetry off", () => {
     expect(readAuthEnv(valid)).toMatchObject({ baseURL: valid.BETTER_AUTH_URL, passkeyRpID: "mail.example.test" });
     expect(auth.options.telemetry).toEqual({ enabled: false });
-    expect("databaseHooks" in auth.options).toBe(false);
+    expect(noctuaAuthOptions({database:db,secret:TEST_SECRET,baseURL:TEST_BASE_URL}).rateLimit).toMatchObject({enabled:true,storage:"memory",customRules:{"/sign-in/*":{window:10,max:3},"/two-factor/*":{window:10,max:3}}});
+    expect(auth.options.databaseHooks.verification?.create?.before).toBeFunction();
     expect(auth.options.session?.cookieCache?.enabled).toBe(false);
   });
   test("rejects missing secrets/origin, unsafe origins, telemetry, unsupported modes and RP mismatch", () => {

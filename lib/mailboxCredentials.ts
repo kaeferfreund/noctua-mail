@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import type { Account } from "./data";
 import { getDb } from "./db/connection";
 import { mapAccountRow, mergeAccount, persistAccountRow } from "./db/rowParsers";
@@ -7,6 +8,8 @@ import { verifyImapCredentials } from "./mail/imapAuth";
 import { verifySmtpCredentials } from "./mail/smtp";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
+import { currentAuthProof } from "./authPolicyContext";
+import { reserveSecurityOperation, assertSecurityOperation, finishSecurityOperation } from "./db/authPolicy";
 import { stripPersonalSettings } from "./accountPrefs";
 
 export class MailboxCredentialError extends Error {
@@ -16,22 +19,22 @@ export type MailboxPatch = Omit<Partial<Account>, "imap" | "smtp"> & {
   imap?: Partial<Account["imap"]>; smtp?: Partial<Account["smtp"]>; teamDefaults?: boolean;
 };
 export type CredentialActor = { userId: string; clientId?: string };
-export type CredentialVerification = { imap: typeof verifyImapCredentials; smtp: typeof verifySmtpCredentials };
+export type CredentialVerification = { imap: typeof verifyImapCredentials; smtp: typeof verifySmtpCredentials; authorize?: () => void };
 const defaultVerification: CredentialVerification = { imap: verifyImapCredentials, smtp: verifySmtpCredentials };
 const endpointKeys = ["host", "port", "secure", "user"] as const;
 const normalized = (value: string) => value.trim().toLowerCase();
 
 /** Sole repair/write-back service: relogin, PUT, POST-existing and optional IMAP login. */
 export async function updateMailboxCredentials(accountId: string, patch: MailboxPatch, actor: CredentialActor,
-  verification: CredentialVerification = defaultVerification): Promise<Account> {
-  const db = await getDb();
+  verification: CredentialVerification = defaultVerification, database?: Database): Promise<Account> {
+  const db = database ?? await getDb();
   const originalRow = db.prepare("SELECT * FROM accounts WHERE id=?").get(accountId);
   if (!originalRow) throw new MailboxCredentialError("Account not found", 404);
   const original = mapAccountRow(originalRow);
   const assertActor = () => {
     if (!roleAtLeast(resolveAccountRoleRow(db, actor.userId, accountId), "manager")) throw new MailboxCredentialError("Insufficient mailbox role", 403);
   };
-  assertActor();
+  assertActor(); verification.authorize?.();
   for (const key of ["id", "email", "dbPath", "ownerUserId"] as const) {
     if (key in patch && (patch as Record<string, unknown>)[key] !== (originalRow as Record<string, unknown>)[key]) throw new MailboxCredentialError(`${key} is immutable`);
   }
@@ -65,11 +68,15 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
     if (loginOwner && identityChanged && loginOwner !== actor.userId && user?.role !== "admin") throw new MailboxCredentialError("Only the owner or admin can change the login mailbox identity", 403);
   };
   assertIdentity();
+  const credentialChanged = imapChanged || JSON.stringify(next.smtp) !== JSON.stringify(original.smtp);
+  const inherited = currentAuthProof()?.op;
+  const operation = loginOwner && credentialChanged ? (inherited?.userId === loginOwner ? inherited : await reserveSecurityOperation(db, loginOwner, "security.mailbox.credentials")) : undefined;
+  try {
   if ((imapChanged || !!patch.imap?.password?.trim()) && !await verification.imap(next, next.imap.password, actor.clientId)) throw new MailboxCredentialError("Invalid IMAP credentials");
   if ((explicitSmtp || !!patch.smtp?.password?.trim()) && !await verification.smtp(next)) throw new MailboxCredentialError("Invalid SMTP credentials");
-  const credentialChanged = imapChanged || JSON.stringify(next.smtp) !== JSON.stringify(original.smtp);
   await withDbWriteRetry("updateMailboxCredentials", () => db.transaction(() => {
-    assertActor(); assertIdentity();
+    assertActor(); assertIdentity(); verification.authorize?.();
+    if (operation) assertSecurityOperation(db, operation);
     const live = db.prepare("SELECT * FROM accounts WHERE id=?").get(accountId);
     const liveOwner = original.ownerUserId ? db.prepare("SELECT id,email FROM auth_user WHERE id=?").get(original.ownerUserId) : undefined;
     if (JSON.stringify(liveOwner) !== JSON.stringify(owner)) throw new MailboxCredentialError("Mailbox owner identity changed; retry repair", 409);
@@ -87,4 +94,7 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
   }).immediate());
   if (loginOwner && credentialChanged) revokeAuthStreams({ userId: loginOwner });
   return next;
+  } finally {
+    if (operation && operation !== inherited) await finishSecurityOperation(db, operation);
+  }
 }

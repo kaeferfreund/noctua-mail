@@ -2,10 +2,10 @@
 
 > Better Auth migration: cookie credential mode, sealed sessions, SESSION_SEAL_KEY, legacy IMAP login and Tauri desktop are retired; see [TEAM-INBOX.md](TEAM-INBOX.md) and [TEAM-AUTH-PLAN.md](TEAM-AUTH-PLAN.md).
 
-This branch implements Team-Auth through Slice 3. Better Auth is pinned at 1.7.12.
+This branch implements Team-Auth through Slice 4. Better Auth is pinned at 1.7.12.
 `/api/ba/**` still returns 503 `auth_integration_pending`; backend activation belongs to Slice 6.
-Legacy sealed cookies, credential overlays, cookie-only storage, signup and IMAP login are retired or
-unavailable. Nothing in this slice enables public sign-in or deploys the integration branch.
+Legacy sealed cookies, credential overlays and cookie-only storage are retired. Signup is pending
+Slice 5; optional IMAP login stays OFF unless an explicit host allowlist enables it. Nothing in this slice enables public sign-in or deploys the integration branch.
 Design v5 wins over plan shorthand: member GET is viewer-accessible; sync, recompute,
 calendar sync and related-thread lookup are viewer capabilities even when their HTTP method is POST.
 
@@ -246,8 +246,8 @@ Admin GET/POST /api/admin/accounts, DELETE /api/admin/accounts/[accountId], and 
 
 ## Remaining slice boundaries
 
-Slice 4 owns challenge/assurance finalization, fresh proof/factor operations, strict optional IMAP
-login, and the real WebAuthn browser harness. Slice 5 owns user provisioning/lifecycle/reset sagas.
+Slice 4 now supplies challenge/assurance finalization, fresh proof/factor operations, strict optional
+IMAP login, and the real WebAuthn browser harness described below. Slice 5 owns user provisioning/lifecycle/reset sagas.
 Slice 6 owns migration (reuse importLegacyProfileFields), canonical deployment documentation and
 activation. Slice 7 owns actual auth/reset UI and phone/PWA acceptance. This slice does not activate
 /api/ba or the incomplete auth/admin-user mutations, deploy, or claim end-to-end login acceptance.
@@ -279,3 +279,217 @@ The remaining lint/type baseline is intentionally unchanged. Real WebAuthn, publ
 login, user lifecycle/reset, production activation and UI/phone acceptance remain in their assigned
 later slices. Factor/lifecycle owners must publish post-commit stream notifications through the seam;
 live DB checks already reject revoked state independently of those notifications.
+
+
+## Slice 4: assurance and security operations
+
+The source of truth is design v5 in the integration checkout (`repo/doc/TEAM-INBOX.md`),
+§3.1.2, §4.1–4.4 and §10.1. Design wins over the plan's shorthand. The branch's older
+TEAM-INBOX document is not an alternative policy. `/api/ba/**` remains externally 503;
+Slice 6 alone activates the completed backend. No UI-shell files or deployment were changed.
+
+`lib/authPolicyContext.ts` isolates immutable proof snapshots and verified metadata with
+AsyncLocalStorage. HTTP headers cannot create an internal server-API scope. The policy plugin
+in `lib/authPolicyHandler.ts` guards requests; its outer handler finalizes only after the library
+returns, outside adapter transactions. UV callbacks validate UV and the same user, and only record
+request metadata. Never finalize on the library connection or infer assurance from a user flag.
+
+`lib/db/authPolicy.ts` reserves `admin_lifecycle_operations.slot=security:<userId>` before verification,
+keeps no writer transaction open across awaits, and returns 409 `security_operation_pending` for
+contention. Noctua writes retry whole synchronous immediate transactions on the master connection.
+Initial TOTP finalization checks both records, advances generation and revokes other setup sessions,
+grants, challenges and MCP tokens atomically. Only the returned live session receives MFA assurance.
+Faults retain a durable intent and no newly assured bearer. Active destructive intents block mail,
+MCP and streams. Startup cancels interrupted intents, advances generation and revokes their sessions;
+current-process operations are not reconciled by later Next module-graph initialization. A stopped
+replacement requires fresh login/proof after reconciliation or audited operator recovery, never a
+session-only resume. Factor/password finalizers publish `revokeAuthStreams` after commits.
+
+Known-user challenges bind generation and first-factor time. Anonymous passkey options snapshot
+`auth_login_epoch` before the library call; credential/reset/revoke generation advances cancel them.
+Missing, expired, mismatched or removed registry entries fail before verification and again atomically
+at finalization. The registry uses `two_factor_imap` as a distinct two-factor kind to preserve the
+first factor's `imap_totp` method without storing a mailbox password. IMAP write-back captures its
+new generation/time after the credential service's revocation. Refresh, password changes, factor
+rotations and UV reauth preserve `authenticatedAt`; only a complete new login restarts the 24h clock.
+
+### Fresh-proof matrix and requests
+
+`POST /api/auth/reauth` accepts only:
+`{purpose,currentPassword?,totpCode?,backupCode?,proofMode?:"passkey"}`.
+It enforces JSON same-origin hygiene and limits proof attempts to five/minute per user and IP.
+Password means the app password if one exists; otherwise the eligible login-mailbox password,
+which is unavailable while the IMAP allowlist is unset/empty. TOTP means a new verification, not the
+session's original factor. A backup code is accepted only for `totp.replace`.
+
+| Purpose | Required fresh proof |
+|---|---|
+| `totp.enroll` | Password and a restricted initial setup session |
+| `totp.replace` | Password + current TOTP/UV, or password + a newly consumed backup code |
+| `passkey.enroll` | Password + current TOTP, or same-user UV |
+| `password.set` | Eligible IMAP password + TOTP/UV; extra factor waived only in restricted first onboarding |
+| `password.change` | Current app password + TOTP/UV |
+| `backup.regenerate` | Password + TOTP/UV |
+| `passkey.remove` | Password + TOTP, or another same-user UV passkey |
+| `admin.recovery` | Admin app password + TOTP/UV; Slice 5 additionally verifies the target out of band |
+
+Password+UV uses `proofMode:"passkey"` with `currentPassword` for purposes that require password.
+Only passkey enrollment/removal permit UV without a password. The initial response is
+`{ok:true,ceremonyRequired:true,grant,purpose,expiresAt}`: this is a ceremony intent, not a usable
+operation grant. Send it as `x-noctua-reauth` on both installed passkey authentication options and
+verification requests. Verification returns a replacement cookie and
+`{...,ok:true,grant,purpose,expiresAt}` together. That final grant belongs to the resulting rotated
+session; the old session is retired. Its absolute age/assurance ceiling is preserved. A UV removal
+grant records the proving credential and cannot remove that same key.
+
+For password/TOTP/backup proof, success is
+`{ok:true,ceremonyRequired:false,grant,purpose,expiresAt}`. Times are Unix milliseconds; TTL is at
+most 300000 ms. Keep capabilities only in memory and send them in `x-noctua-reauth`, never URLs.
+Only SHA-256 hashes are stored. User/session/generation/purpose/state/expiry must match. A conditional
+consume permits one winner; failed downstream work spends proof and requires fresh proof.
+
+All Noctua mutation bodies reject unknown fields and require same-origin application/json.
+`x-noctua-client` follows the shared 64-character allowlist convention. No passwords, codes, seeds,
+reset URLs or full bearer tokens appear in journal/audit metadata.
+
+| Endpoint | Body and result |
+|---|---|
+| `POST /api/auth/security/password` | `{currentPassword?,newPassword}` → `{ok:true}` + replacement cookie when changed; consumes `password.change` or `password.set`; 10..256 characters; server forces other-session revocation |
+| `POST /api/auth/security/backup-codes` | `{currentPassword?}` → `{ok:true,backupCodes:string[]}` shown once; consumes `backup.regenerate`; advances generation, retains only proved current session and its age |
+| `POST /api/auth/totp/replace` | `{currentPassword?}` → `{ok:true,grant,purpose:"totp.enroll",expiresAt,enrollmentRequired:true}` + rotated restricted cookie; consumes `totp.replace` |
+| `POST /api/auth/security/passkeys/remove` | `{passkeyId}` → `{ok:true}`; consumes `passkey.remove`, checks ownership, revokes other sessions/tokens/challenges |
+| `POST /api/ba/two-factor/enable` (internal until Slice 6) | `{password?,method?:"totp"}` + `totp.enroll` header → stock `{method:"totp",totpURI,backupCodes}` once; proof reserved for this seed |
+| `POST /api/ba/two-factor/verify-totp` | `{code}` + same enrollment header for seed activation; ordinary login uses its signed first-factor challenge without an enrollment header |
+| `GET /api/ba/passkey/generate-register-options` | `passkey.enroll` header; reserves the grant and binds it to the exact generated challenge |
+| `POST /api/ba/passkey/verify-registration` | `{response,name?}` + same grant header; consumes on real UV success; `createSession:true` is rejected |
+
+The stock library still checks body.password for enable/disable/backup regeneration when an app
+password exists. UV never waives that requirement. `trustDevice:true` and public `disableSession`
+are rejected. Registration has `requireSession:true`, library freshAge and server UV verification.
+Raw enrolled-seed export, backup regeneration, disable, change-password, update-user/change-email,
+delete-user, passkey mutation and mutating admin HTTP paths are disabled. Application code never
+calls getTOTPURI/viewBackupCodes. Raw self-revoke routes also stay disabled for reviewed cleanup.
+
+Lost-phone sequence: password login → stock backup-code verification consumes code A → assured
+session → reauth with password and unused code B for `totp.replace` → replace → retain the returned
+restricted cookie and `totp.enroll` continuation → enable with password and that header → verify a
+real new TOTP with the same header → save new codes → next password/new-TOTP login. The login's
+code A is never replacement proof. Stock `verifyBackupCode({disableSession:true})` uses the installed
+encrypted CAS; two simultaneous proofs have at most one winner. Interrupted consumption cannot be
+replayed. Old seed/codes, sessions and MCP generations fail after replacement.
+
+Errors are local form responses `{ok:false,code}`. Missing/invalid sessions use 401 Unauthorized;
+proof/policy failures use 403; contention uses 409; limits use 429. Stable policy codes include
+`reauth_required`, `invalid_proof`, `invalid_credentials`, `factor_proof_required`,
+`backup_proof_not_allowed`, `another_passkey_required`, `passkey_uv_required`,
+`invalid_challenge`, `security_state_changed`, `security_operation_pending` and
+`mfa_state_inconsistent`. Library codes remain local to their form. Do not globally log out on
+an incorrect password/TOTP/code. `SESSION_NOT_FRESH` requires full login, never changing createdAt.
+
+### DTOs for ui-shell
+
+`GET /api/auth/methods` is public, no-store, and returns
+`{ok:true,methods:{password:true,passkey:true,imap:boolean}}`. Render the IMAP action only if imap
+is true. No hostname/allowlist is exposed. Availability does not imply a particular user/mailbox
+is eligible; failures remain generic. The production allowlist stays unset.
+
+`GET /api/auth/me` retains the Slice 3 shape, with two additional security fields:
+`security:{enrollmentRequired,reauthRequired,hasPassword,imapLoginAvailable,code?}`. Restricted
+responses have minimal `{id,email,name}` identity, `accounts:[]`, `accountId:null` and
+`mailboxState:"enrollment"`. Fully assured users retain selected/none/unselected states. `exp` is
+Unix seconds of the smaller library/absolute expiry; no session token is returned.
+
+`GET /api/auth/security` works without a mailbox and returns
+`{ok:true,hasPassword,totpEnrolled,mfaStateInconsistent,enrollmentRequired,reauthRequired,
+passkeys:[{id,name:string|null,createdAt:string,deviceType:string,backedUp:boolean}]}`.
+Restricted sessions get `passkeys:[]`. It never returns seed, stored backup codes, password hash,
+credential public keys or a session token. New codes appear only in enable/regenerate responses.
+An operation-pending code means recovery/reconciliation is required, not permission to skip proof.
+
+### Executable browser harness
+
+Pinned `@playwright/test@1.58.2`; run `bunx playwright install chromium` followed by
+`bun run test:auth-browser`. The runner creates synthetic isolated storage/secrets, builds Next,
+starts a harness-only custom Bun Next server on **localhost:3784**, waits for readiness, runs
+`playwright.auth.config.ts` and stops only its own child PID in finally. An occupied port fails;
+there is no reuseExistingServer. `AUTH_BROWSER_USE_BUILD=1` reuses a freshly built bundle. The
+shipped `/api/ba` route remains 503: `scripts/authBrowserServer.ts` supplies the internal handler
+only in its own custom server. No application seed/test route or unsafe activation environment
+flag exists. Seeds are created in process before listening. Local harness reset/revoke control is
+`scripts/authBrowserInvalidate.ts`, never an HTTP endpoint. Production data/mailboxes are untouched.
+
+`tests/browser/auth/fixtures.ts` intercepts a minimal page at the same localhost origin with
+page.route; it drives real navigator.credentials.create/get using CDP virtual CTAP2 authenticators.
+Tests cover real registration/assertion, server UV=false rejection, RP/origin mismatch, options/grant
+binding, replay/wrong session, rotated UV grant binding, /me assurance and anonymous options invalidated
+by actual reset-password redemption or explicit revoke. Chromium refuses preferred UV locally when
+a UV-capable device reports failure: the negative fixture calls setUserVerified(false), then moves
+its virtual keys to a non-UV authenticator so a preferred-UV ceremony reaches the server. Registration
+also clears client-side excludeCredentials for that synthetic negative ceremony; production hints
+stay required. A specific allowCredential selects the registered key for the negative assertion.
+No callback or signature is mocked. Harness burst limits are disabled in its in-process library
+context; server policy limiters are tested independently. HAR, screenshots, traces and video are off.
+
+On this Ubuntu 26.04 ARM64 host, the plain Chromium install fails because Playwright 1.58.2 has no
+ubuntu26.04-arm64 platform entry. The compatible Ubuntu 24.04 ARM64 build installs successfully:
+`PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64 bunx playwright install chromium`.
+Use the same override when running the harness. `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 bun install`
+is available for environments that install a compatible Chromium in a separate preparation step;
+it does not skip browser verification and does not supply a browser by itself. This harness does
+not replace canonical HTTPS acceptance on both household phones (Slice 7).
+
+### Slice 5 handoff
+
+Acquire the global admin-lifecycle slot before any target `security:<userId>` slot. Reuse the
+request-scoped operation for nested services, not a client operation ID. Keep sensitive server API
+calls in reviewed scopes; disabledPaths alone does not restrict server APIs. Both Noctua bodyless
+logout and internal raw sign-out reserve the user slot, revoke sidecars/source proofs and pending
+logins before the library cookie write, and preserve another session's settings ceremonies.
+A security-operation conflict returns 409; the client must not clear local identity on failure.
+
+Use `advanceSecurityGeneration`, `invalidateUserChallenges`, `readSessionSecurity` and
+`finalizeAuthentication` on the Noctua handle with immediate transactions and publish stream
+revocations after commits. `invalidateUserChallenges(...,true)` is the revoke-one/login-only form;
+user-wide lifecycle revocation uses the full form. Reconciliation takes an optional cutoff; startup
+passes process start so another Next module graph cannot cancel current-process work. Manual
+operator reconciliation must run with the application stopped. Missing/partial factors remain
+restricted; do not synthesize verified records or copy assurance from another session.
+
+Slice 5 still owns provisioning, admin target lifecycle/last-admin serialization, reset issuance,
+request-scoped handover delivery sink and public token-redemption policy exceptions. The internal
+handler currently rejects reset HTTP paths; add the exact canonical callback/body contract there,
+without a session/factor requirement for redemption. Credential triggers already invalidate every
+old generation and anonymous WebAuthn epoch; callbacks are cleanup only. Browser reset invalidation
+already exercises the real server API redemption against isolated storage. Keep MFA intact on
+password reset, reuse membership cleanup for deletion, and do not expose raw admin APIs or activate
+`/api/ba` before Slice 6. Actual UI and canonical phone/PWA acceptance remain Slice 7.
+
+### Slice 4 verification (2026-10-22)
+
+Parent baseline: f9e8c73. Bun 1.4.4; Better Auth and passkey 1.7.12; Next 16.2.4.
+All commands ran in wt-team-auth with TMPDIR=$PWD/.tmp and synthetic data.
+
+- `timeout 900 bun run test:ci`: exit 0; 1,893 server tests (216 files),
+  4,910 assertions, 152.20s; then 12 DOM tests (3 files), 141 assertions, 10.46s.
+- `timeout 1800 bun run test:stress`: exit 0; seed 1337, rerun-each=3;
+  5,679 passed, zero failed, 14,730 assertions, 216 files, 417.07s.
+- Focused final policy and /me regression pass: 24 passed, zero failed, 174 assertions,
+  2 files, 27.76s. Full CI/stress also include all six strict IMAP canaries and HTTP wrapper tests.
+  Coverage includes two setup sessions, stolen passwordless seed/code attempts, each activation
+  write/finalizer fault, challenge removal/generation invalidation, real 23h session age through
+  password rotation, simultaneous proof and direct library CAS consumers, interrupted replacement,
+  complete lost-phone/new-factor login, grant expiry/session/purpose/replay and old-code rejection.
+- `timeout 600 bun run lint`: exit 1 at exactly the existing useCalendarConflicts.ts:58
+  set-state-in-effect error plus 27 existing warnings; zero new findings.
+- `bunx tsc --noEmit 2>&1 | grep -v 'bun:test'`: unchanged 151 existing TypeScript errors,
+  compared with a separate `git archive HEAD` tree at f9e8c73; zero new errors.
+- `timeout 1200 bun run build`: exit 0; production build includes the new guarded routes.
+- Plain `bunx playwright install chromium`: exit 1, unsupported ubuntu26.04-arm64.
+  `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64 bunx playwright install chromium`:
+  exit 0; Chromium/Headless Shell 145.0.7632.6, revision 1208 installed in the Playwright cache.
+  With that override and `AUTH_BROWSER_USE_BUILD=1`, `timeout 900 bun run test:auth-browser`:
+  exit 0; all five real WebAuthn scenarios passed in 8.9s against the freshly built custom Next
+  harness at localhost:3784. No phone/canonical-production acceptance is claimed.
+
+No Slice 4 implementation issue remains open. Public activation, provisioning/admin reset controls,
+production origin/RP rollout and actual UI/phone acceptance remain the explicitly assigned later slices.

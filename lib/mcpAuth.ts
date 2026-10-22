@@ -20,6 +20,8 @@ function liveToken(db: any, where: string, value: string): McpAccountContext | n
       AND (SELECT COUNT(*) FROM auth_two_factor WHERE userId=u.id)=1
       AND EXISTS (SELECT 1 FROM auth_two_factor WHERE userId=u.id AND verified=1 AND length(trim(secret))>0)
       AND (p.role<>'admin' OR EXISTS (SELECT 1 FROM auth_account WHERE userId=u.id AND providerId='credential' AND password IS NOT NULL))
+      AND NOT EXISTS (SELECT 1 FROM admin_lifecycle_operations WHERE slot='security:' || u.id
+        AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login'))
       AND NOT EXISTS (SELECT 1 FROM user_provisioning WHERE userId=u.id AND state NOT IN ('complete','cancelled'))`).get(value, Date.now()) as
     { accountId: string; createdByUserId: string } | undefined;
   if (!row) return null;
