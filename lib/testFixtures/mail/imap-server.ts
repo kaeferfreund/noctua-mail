@@ -67,13 +67,14 @@ function searchPredicate(args: string[], box: Mailbox) {
   while (i < args.length) predicates.push(expression());
   return (m: FixtureMessage, seq: number) => predicates.every(test => test(m, seq));
 }
-export type ImapOptions = { onConnection?: () => void; appendUid?: boolean; host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date };
+export type ImapOptions = { onConnection?: () => void; onAppend?: (mailbox: string) => void; stallCommand?: (command: string, mailbox?: string) => boolean; appendResponse?: (mailbox: string) => "drop" | "stall" | undefined; appendUid?: boolean; host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date };
 export async function startImapServer(config: ImapOptions = {}) {
   const host = config.host ?? "127.0.0.1";
   const user = config.user ?? demoUser;
   const pass = config.pass ?? demoPass;
   const store = config.store ?? new MailStore(config.seed, config.date);
   const sockets = new Set<Socket>();
+  const stalledSockets = new Set<Socket>();
   const server = createServer(socket => {
     config.onConnection?.();
     sockets.add(socket);
@@ -85,7 +86,13 @@ export async function startImapServer(config: ImapOptions = {}) {
     let readOnly = false;
     let idleTag: string | undefined;
     let authTag: string | undefined;
+    let appendKeepalive: ReturnType<typeof setInterval> | undefined;
     const send = (line: string) => socket.write(line + "\r\n");
+    const stall = (command: string) => {
+      // Deliberate protocol fault: socket activity without a tagged completion.
+      stalledSockets.add(socket);
+      appendKeepalive = setInterval(() => send(`* OK Still processing ${command}`), 50);
+    };
     const exists = (box: Mailbox) => { if (selected === box) send(`* ${box.messages.length} EXISTS`); };
     const expunged = (box: Mailbox, seq: number, silentFor?: object) => { if (selected === box && socket !== silentFor) send(`* ${seq} EXPUNGE`); };
     const flagsChanged = (box: Mailbox, message: FixtureMessage, origin: Socket) => {
@@ -95,6 +102,8 @@ export async function startImapServer(config: ImapOptions = {}) {
     store.on("exists", exists).on("expunge", expunged).on("flags", flagsChanged).on("reset", reset);
     socket.on("error", () => {});
     socket.on("close", () => {
+      clearInterval(appendKeepalive);
+      stalledSockets.delete(socket);
       sockets.delete(socket);
       store.off("exists", exists).off("expunge", expunged).off("flags", flagsChanged).off("reset", reset);
     });
@@ -142,6 +151,7 @@ export async function startImapServer(config: ImapOptions = {}) {
           return;
         }
         if (!authenticated) { send(`${tag} NO Authenticate first`); return; }
+        if (config.stallCommand?.(cmd, selected?.path)) { stall(cmd); return; }
         if (cmd === "NAMESPACE") { send('* NAMESPACE (("" "/")) NIL NIL'); ok(); return; }
         if (cmd === "ENABLE") { send("* ENABLED"); ok(); return; }
         if (cmd === "LIST" || cmd === "LSUB") {
@@ -193,7 +203,9 @@ export async function startImapServer(config: ImapOptions = {}) {
         }
         if (cmd === "SUBSCRIBE" || cmd === "UNSUBSCRIBE") { store.get(decodeMailbox(args[0])).subscribed = cmd === "SUBSCRIBE"; ok(); return; }
         if (cmd === "APPEND") {
-          const box = store.get(decodeMailbox(args[0]));
+          const mailbox = decodeMailbox(args[0]);
+          config.onAppend?.(mailbox);
+          const box = store.get(mailbox);
           const literal = parsed.at(-1);
           const raw = typeof literal === "object" && literal.kind === "literal" ? literal.data : undefined;
           if (!raw) throw new Error("APPEND requires literal");
@@ -202,6 +214,12 @@ export async function startImapServer(config: ImapOptions = {}) {
           const dateArg = args[args[1] === "(" ? endFlags + 1 : 1];
           const parsedDate = new Date(dateArg);
           const message = store.append(box.path, raw, flags, Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate);
+          const response = config.appendResponse?.(mailbox);
+          if (response === "drop") { socket.destroy(); return; }
+          if (response === "stall") {
+            stall("APPEND");
+            return;
+          }
           ok(config.appendUid === false ? "APPEND completed" : `[APPENDUID ${box.uidValidity} ${message.uid}] APPEND completed`); return;
         }
         if (!selected) { send(`${tag} NO Select a mailbox first`); return; }
@@ -337,7 +355,7 @@ export async function startImapServer(config: ImapOptions = {}) {
   }
   const controlAddress = control?.address();
   const controlPort = typeof controlAddress === "object" && controlAddress ? controlAddress.port : undefined;
-  return { port, store, controlPort, async stop() {
+  return { port, store, controlPort, get stalledConnections() { return stalledSockets.size; }, async stop() {
     if (control) { control.closeAllConnections(); await new Promise<void>(resolve => control.close(() => resolve())); }
     for (const socket of sockets) socket.destroy();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

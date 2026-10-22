@@ -111,15 +111,22 @@ export async function listThreadActivity(accountId: string, threadId: string, op
 /** Internal post-revocation seam: access is already revoked in the master DB. */
 export const unassignUserInAccount = store.unassignUserInAccount;
 
-/** Sanitized, enabled membership DTO; keep role resolution on the Slice 3 seam. */
-export async function listCollabMembers(accountId: string) {
+// feat/team-auth slice 3: replaced at merge
+export async function listAccountMembers(accountId: string): Promise<Array<{
+  userId: string; name: string | null; email: string; role: AccountRole; isOwner: boolean; disabled: boolean;
+}>> {
   const db = await getDb();
-  const users = db.prepare(`SELECT DISTINCT u.id,u.name,u.email FROM auth_user u
-    JOIN accounts a ON a.id=? LEFT JOIN user_accounts ua ON ua.accountId=a.id AND ua.userId=u.id
-    WHERE a.ownerUserId=u.id OR ua.userId IS NOT NULL ORDER BY u.name,u.email,u.id`)
-    .all(accountId) as Array<{ id: string; name: string | null; email: string }>;
-  const members = await Promise.all(users.map(async user => ({ ...user, role: await resolveAccountRole(user.id, accountId) })));
-  return members.filter((member): member is typeof member & { role: AccountRole } => member.role !== null);
+  const rows = db.prepare(`SELECT u.id AS userId,u.name,u.email,
+    CASE WHEN a.ownerUserId=u.id THEN 'manager' ELSE ua.role END AS role,
+    a.ownerUserId=u.id AS isOwner,
+    (u.banned=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now'))) AS disabled
+    FROM auth_user u JOIN accounts a ON a.id=?
+    LEFT JOIN user_accounts ua ON ua.accountId=a.id AND ua.userId=u.id
+    WHERE a.ownerUserId=u.id OR ua.userId IS NOT NULL`)
+    .all(accountId) as Array<{ userId: string; name: string | null; email: string; role: AccountRole; isOwner: number | null; disabled: number | null }>;
+  return rows.map(row => ({ ...row, isOwner: Boolean(row.isOwner), disabled: Boolean(row.disabled) }))
+    .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email, "en") ||
+      a.email.toLowerCase().localeCompare(b.email.toLowerCase(), "en") || a.userId.localeCompare(b.userId, "en"));
 }
 
 export const recordReplySent = store.recordReplySent;
