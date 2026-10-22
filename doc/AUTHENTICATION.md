@@ -1138,7 +1138,7 @@ passed all 153 DOM tests. Sidebar admin/non-admin gating has two explicit DOM ca
 
 ### Integration handoff
 
-Read-only merge preview against integration/stage `5dce0ac` predicts five textual/modify-delete
+Read-only merge preview against integration/stage `40cf8b6` predicts five textual/modify-delete
 conflicts: MailClient.tsx, doc/DEPLOYMENT.md, playwright.auth.config.ts, scripts/authBrowserServer.ts
 and scripts/runAuthBrowserTests.ts. Combine auth/admin gates with the existing collaboration props,
 retain watcher deployment settings alongside the canonical auth environment, and keep the compiled
@@ -1147,8 +1147,9 @@ custom browser server stays deleted. Review the cleanly combined DB/schema/wrapp
 and package-lock changes against the retained integration dry-run map.
 
 Collab-ui slice 2b still owns canonical per-user mailbox summaries/events and cross-account counts;
-those routes are absent in the previewed stage tree. Adoption of collaboration revisions must also
-adapt the raw membershipCleanup unassignment writer and its corruption fixtures. Canonical physical
+those routes are absent in the previewed stage tree. Stage commit `40cf8b6` already increments
+membership-cleanup revisions and updates the corruption fixtures; preserve that fix during this
+merge. The earlier `5dce0ac` preview lacked it. Canonical physical
 phone/PWA, live IMAP browser flows, deployed DNS/TLS/proxy/netcup renewal and application-wide restore
 remain later-owner evidence. The updated optional MFA-session fixture verifier was not exercised
 against a live mailbox by this integration.
