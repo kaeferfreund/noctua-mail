@@ -6,6 +6,7 @@ import { getDraftAutoSaveState } from "./draftAutoSaveState";
 import { buildDraftSavePayload, getDraftChangeState } from "./draftSaveUtils";
 import { getComposeAttachmentLoadState } from "./useComposeHandlers";
 import type { ComposeReplyHeaders, ComposeTab, DraftSavePayload } from "./composeTypes";
+import { useMarkdownConverters } from "./useMarkdownConverters";
 
 export type UseComposeDraftAutoSaveParams = {
   composeOpen: boolean;
@@ -70,6 +71,7 @@ export function useComposeDraftAutoSave({
   buildComposePayload,
   saveDraft
 }: UseComposeDraftAutoSaveParams) {
+  const { ready: convertersReady } = useMarkdownConverters(composeOpen);
   // Keep a stable ref to saveDraft so the setTimeout callback never goes stale.
   const saveDraftRef = useRef(saveDraft);
   useEffect(() => {
@@ -88,7 +90,7 @@ export function useComposeDraftAutoSave({
     const previousDraftSaving = previousDraftSavingRef.current;
     previousDraftSavingRef.current = draftSaving;
 
-    if (!composeOpen || sendingMail) return;
+    if (!composeOpen || sendingMail || !convertersReady) return;
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayloadRef.current({ preferText });
     const { text, html, attachments } = composePayload;
@@ -106,6 +108,12 @@ export function useComposeDraftAutoSave({
     });
     currentDraftHashRef.current = draftChangeState.hash;
 
+    // Recipient fields remain interactive while the body tools load. If the
+    // user edited them before the first hash, initialize the baseline without
+    // consuming that edit: it must still schedule a save once content is ready.
+    if (composeBaselineHashRef.current === null && composeDirtyRef.current) {
+      composeBaselineHashRef.current = draftChangeState.hash;
+    }
     const autoSaveState = getDraftAutoSaveState({
       baselineHash: composeBaselineHashRef.current,
       composeDraftId,
@@ -184,6 +192,7 @@ export function useComposeDraftAutoSave({
     };
   }, [
     composeOpen,
+    convertersReady,
     sendingMail,
     draftSaving,
     composeTo,

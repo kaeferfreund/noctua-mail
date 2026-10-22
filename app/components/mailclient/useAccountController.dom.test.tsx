@@ -1,0 +1,130 @@
+// @ts-expect-error -- Bun supplies this test API at runtime; the project has no bun:test declarations.
+import { afterEach, describe, expect, it } from "bun:test";
+import { useState } from "react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import type { Account } from "@/lib/data";
+import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "./useSearchState";
+import { useAccountController, type UseAccountControllerParams } from "./useAccountController";
+
+afterEach(cleanup);
+
+const accounts = [{ id: "account-a" }, { id: "account-b" }] as Account[];
+const noop = () => {};
+
+function mount(apiFetch: UseAccountControllerParams["apiFetch"]) {
+  const errors: string[] = [];
+  const defaults: UseAccountControllerParams = {
+    activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
+    deletingFolderIds: new Set(), refreshFolders: async () => null, runSyncJob: async () => ({ count: 0 }),
+    defaultSearchFields: DEFAULT_SEARCH_FIELDS, defaultSearchBadges: DEFAULT_SEARCH_BADGES,
+    apiFetch, reportError: (error: string) => errors.push(error),
+    readErrorMessage: async (res: Response) => `HTTP ${res.status}`,
+    setAccounts: noop,
+    setActiveAccountId: noop,
+    setFolders: noop,
+    setAuthState: noop,
+    setCurrentUser: noop,
+    setInitialDataReady: noop,
+    setInitialFoldersLoadedAccountId: noop,
+    setSessionTtlSeconds: noop,
+    setMessages: noop,
+    setMessagesPage: noop,
+    setHasMoreMessages: noop,
+    setTotalMessages: noop,
+    setActiveMessageId: noop,
+    setViewMessage: noop,
+    setActiveFolderId: noop,
+    setQuery: noop,
+    setSearchScope: noop,
+    setSearchFields: noop,
+    setSearchBadges: noop,
+    setActiveVirtualFolderId: noop,
+    setLastFolderId: noop,
+    setMessageListError: noop,
+    setExceptionEntries: noop,
+    setManageOpen: noop,
+    setManageTab: noop,
+    setEditingAccount: noop,
+    setDeletingFolderIds: noop,
+  };
+  const hook = renderHook(() => {
+    const [activeAccountId, setActiveAccountId] = useState("");
+    const [ready, setInitialDataReady] = useState(false);
+    const [loadedAccounts, setAccounts] = useState<Account[]>([]);
+    const [auth, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
+    const controller = useAccountController({ ...defaults, activeAccountId, setActiveAccountId,
+      accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState });
+    return { ...controller, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts };
+  });
+  return { ...hook, errors };
+}
+
+const json = (value: unknown) => Response.json(value);
+
+describe("account bootstrap request order", () => {
+  it("cold loads once: auth/me -> folders, even after publishing the selected account", async () => {
+    const calls: string[] = [];
+    const { result, rerender } = mount(async (input) => {
+      const url = String(input); calls.push(url);
+      return json(url === "/api/auth/me" ? { accounts, accountId: "account-b" } : []);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    rerender();
+    expect(result.current.activeAccountId).toBe("account-b");
+    expect(result.current.loadedAccounts).toEqual(accounts);
+    expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
+  });
+
+  it("uses the current selection when auth completes, not the mount-time selection", async () => {
+    let resolve!: (res: Response) => void;
+    const me = new Promise<Response>((done) => { resolve = done; });
+    const calls: string[] = [];
+    const { result } = mount(async (input) => {
+      calls.push(String(input));
+      return String(input) === "/api/auth/me" ? me : json([]);
+    });
+    act(() => result.current.setActiveAccountId("account-b"));
+    await act(async () => { resolve(json({ accounts })); });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
+  });
+
+  it("keeps explicit skip-auth reloads and switches in session -> accounts -> folders order", async () => {
+    const calls: string[] = [];
+    const { result } = mount(async (input) => {
+      const url = String(input); calls.push(url);
+      if (url === "/api/auth/me") return json({ accounts, accountId: "account-a" });
+      if (url === "/api/accounts") return json(accounts);
+      return json(url.endsWith("switch-account") ? { accountId: "account-b" } : []);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    calls.length = 0;
+    await act(async () => { await result.current.switchAccount("account-b"); });
+    expect(calls).toEqual(["/api/auth/switch-account", "/api/accounts", "/api/accounts/account-b/folders"]);
+    expect(result.current.activeAccountId).toBe("account-b");
+    calls.length = 0;
+    await act(async () => { await result.current.loadInitialData({ skipAuthCheck: true }); });
+    expect(calls).toEqual(["/api/accounts", "/api/accounts/account-b/folders"]);
+  });
+
+  it("does not request accounts or folders after an auth 401", async () => {
+    const calls: string[] = [];
+    const { result } = mount(async (input) => {
+      calls.push(String(input)); return new Response(null, { status: 401 });
+    });
+    await waitFor(() => expect(result.current.auth).toBe("unauth"));
+    expect(result.current.ready).toBe(false);
+    expect(calls).toEqual(["/api/auth/me"]);
+  });
+
+  it("never loads folders for a preferred account absent from fresh account access", async () => {
+    const calls: string[] = [];
+    const { result } = mount(async (input) => {
+      const url = String(input); calls.push(url);
+      return json(url === "/api/auth/me" ? { accounts: [], accountId: "account-b" } : []);
+    });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.activeAccountId).toBe("");
+    expect(calls).toEqual(["/api/auth/me"]);
+  });
+});
