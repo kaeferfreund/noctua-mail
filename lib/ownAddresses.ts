@@ -1,5 +1,5 @@
 import type { Account, SenderIdentity } from "./data";
-import { splitRecipientEntries } from "./recipientLists";
+import addressParser from "nodemailer/lib/addressparser/index.js";
 
 /** Canonical single addr-spec. Plus tags and dots are significant. */
 export function normalizeIdentityEmail(value: string): string | null {
@@ -21,9 +21,29 @@ export function normalizeIdentityEmail(value: string): string | null {
 
 /** Parse complete address entries, never substring-match another mailbox. */
 export function parseAddressEmails(value?: string | null): string[] {
-  return splitRecipientEntries(value ?? "").flatMap(entry => {
-    const angle = entry.match(/^[^<>]*<([^<>]+)>\s*$/);
-    const email = normalizeIdentityEmail(angle ? angle[1] : entry);
+  // HTAB is legal observed folding whitespace; configuration remains strict.
+  if (!value || /[\x00-\x08\x0a-\x1f\x7f]/.test(value)) return [];
+  // This dependency-free Nodemailer submodule also runs in the browser. Its
+  // mailbox parser separates comments, quoted names and groups from addr-specs.
+  // Remove CFWS comments (including nested comments) and quoted display text
+  // first. The parser's permissive name-only fallback must not invent mailboxes
+  // from a comment or a quoted display name without an actual address.
+  let mailboxSyntax = "";
+  let commentDepth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (const char of value) {
+    if (escaped) { escaped = false; continue; }
+    if ((quoted || commentDepth > 0) && char === "\\") { escaped = true; continue; }
+    if (!commentDepth && char === '"') { quoted = !quoted; continue; }
+    if (quoted) continue;
+    if (char === "(") { commentDepth++; continue; }
+    if (char === ")" && commentDepth) { commentDepth--; continue; }
+    if (!commentDepth) mailboxSyntax += char;
+  }
+  if (commentDepth || quoted) return [];
+  return addressParser(mailboxSyntax, { flatten: true }).flatMap(entry => {
+    const email = normalizeIdentityEmail(entry.address);
     return email ? [email] : [];
   });
 }

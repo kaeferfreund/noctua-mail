@@ -4,7 +4,7 @@ import { getOwnAddresses, isOwnAddress, normalizeIdentityEmail, parseAddressEmai
 describe("own addresses", () => {
   test("canonical IDNA, plus tags and dots; reject lists, display syntax and controls", () => {
     expect(normalizeIdentityEmail(" A.B+Tag@BÜCHER.example ")).toBe("a.b+tag@xn--bcher-kva.example");
-    for (const value of ["a@example.test,b@example.test", "A <a@example.test>", "a@example.test\r\nBcc: b@example.test", "a@bad..test", "a@-bad.test", "a@example.test/path", "a..b@example.test"]) {
+    for (const value of ["a@example.test,b@example.test", "A <a@example.test>", "a@example.test\r\nBcc: b@example.test", "a@bad..test", "a@-bad.test", "a@example.test/path", "a..b@example.test", "a@example.test\t"]) {
       expect(normalizeIdentityEmail(value)).toBeNull();
     }
     expect(parseAddressEmails('"Example, Person" <ALIAS@example.test>, invalid, other@example.test')).toEqual(["alias@example.test", "other@example.test"]);
@@ -19,4 +19,13 @@ describe("own addresses", () => {
       expect(isOwnAddress(address, own)).toBe(false);
     }
   });
+});
+
+test("RFC recipient comments, quoted names and groups preserve only actual mailbox evidence", () => {
+  expect(parseAddressEmails('Team: "alias@example.test" <customer@example.test> (customer), alias@example.test\t(original (recipient)), "Comma, Name" <idn@bücher.example>;')).toEqual([
+    "customer@example.test", "alias@example.test", "idn@xn--bcher-kva.example"
+  ]);
+  for (const value of ['"alias@example.test"', '(alias@example.test)', 'alias@example.test\r\nBcc: other@example.test']) {
+    expect(parseAddressEmails(value)).toEqual([]);
+  }
 });

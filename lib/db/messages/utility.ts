@@ -13,7 +13,8 @@
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import { findSentFolder } from "@/lib/specialFolders";
 import { getAccountOwnAddresses } from "../senderIdentities";
-import { isOwnAddress } from "../../ownAddresses";
+import addressParser from "nodemailer/lib/addressparser/index.js";
+import { isOwnAddress, normalizeIdentityEmail, parseAddressEmails } from "../../ownAddresses";
 import { getAccountDb } from "../connection";
 
 /**
@@ -145,14 +146,8 @@ export async function listRecipientSuggestions(
       fromEmail?: string | null;
       mailboxPath?: string | null;
     }>;
-  // The upsert derives fromEmail only from an angle-bracket fromAddr, so a
-  // bare stored address leaves it NULL — fall back to fromAddr then.
-  const authorEmail = (row: { fromAddr?: string | null; fromEmail?: string | null }) => {
-    const direct = row.fromEmail?.trim();
-    if (direct) return direct.toLowerCase();
-    const raw = row.fromAddr?.trim() ?? "";
-    return raw && !raw.includes("<") ? raw.toLowerCase() : "";
-  };
+  const authorEmail = (row: { fromAddr?: string | null; fromEmail?: string | null }) =>
+    parseAddressEmails(row.fromAddr)[0] ?? "";
   const counts = new Map<string, number>();
   const names = new Map<string, string>();
   const ownNames = new Map<string, string>();
@@ -176,28 +171,10 @@ export async function listRecipientSuggestions(
   };
   const addEmails = (value: string | null | undefined, own: boolean) => {
     if (!value) return;
-    const seen = new Set<string>();
-    const pattern = /(?:"?([^"<]*)"?\s*)?<([^>]+)>/g;
-    let match = pattern.exec(value);
-    while (match) {
-      const name = match[1];
-      const email = match[2];
-      if (email) {
-        const key = email.trim().toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          addAddress(email, name, own);
-        }
-      }
-      match = pattern.exec(value);
-    }
-    const standalone = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
-    standalone.forEach((entry) => {
-      const key = entry.trim().toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      addAddress(entry, undefined, own);
-    });
+    const addresses = new Set(parseAddressEmails(value));
+    const displayNames = new Map(addressParser(value, { flatten: true }).map(entry =>
+      [normalizeIdentityEmail(entry.address), entry.name]));
+    for (const email of addresses) addAddress(email, displayNames.get(email), own);
   };
   rows.forEach((row) => {
     const own =

@@ -1,6 +1,7 @@
+import { createBoundedWorkerJobRegistry } from "./boundedWorkerJobRegistry";
 import { randomUUID } from "crypto";
 
-export type WorkerJobStatus = "running" | "done" | "failed";
+export type WorkerJobStatus = "queued" | "running" | "done" | "failed";
 
 export type WorkerJobRecord = {
   id: string;
@@ -12,7 +13,9 @@ export type WorkerJobRecord = {
   pid?: number;
 };
 
-type WorkerJobRegistryConfig = {
+export type WorkerJobRegistryConfig = {
+  maxConcurrentJobs?: number;
+  registryName?: string;
   scriptPath: string;
   jobTtlMs?: number;
   spawnStdout?: "pipe" | "inherit" | "ignore";
@@ -46,6 +49,7 @@ function isProcessAlive(pid: number) {
 }
 
 export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
+  if (config.maxConcurrentJobs) return createBoundedWorkerJobRegistry(config);
   const registryKey = config.scriptPath;
   const existingState = runtimeState.__noctuaWorkerJobRegistryState?.get(registryKey);
   const state = existingState ?? {
@@ -134,5 +138,6 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
     return job;
   };
 
-  return { getJob, startJob };
+  const getLatestJob = (accountId: string) => [...jobs.values()].filter(job => job.accountId === accountId).at(-1) ?? null;
+  return { getJob, startJob, getLatestJob };
 }

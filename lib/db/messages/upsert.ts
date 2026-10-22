@@ -97,10 +97,6 @@ export async function upsertMessages(
     if (nextMessages.some(message => message.accountId !== accountId)) throw new Error("Message belongs to another account");
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     const UPSERT_BATCH_SIZE = 200;
-    const yieldToEventLoop = () =>
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, 0);
-      });
     const db = await getAccountDb(accountId);
     const deleteSql = folderId
       ? `DELETE FROM messages WHERE accountId = ? AND folderId = ?`
@@ -149,7 +145,7 @@ export async function upsertMessages(
        WHERE accountId = ? AND id = ?`
     );
     const findFolderMessageDuplicates = db.prepare(
-      `SELECT id, threadId, folderId, mailboxPath, imapUid
+      `SELECT id, threadId, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId
        FROM messages
        WHERE accountId = ? AND folderId = ? AND messageId = ? AND id <> ?`
     );
@@ -278,23 +274,40 @@ export async function upsertMessages(
     } else {
       loadManualCategoryStatesForMessageIds(nextMessages.map((message) => message.id));
     }
-    // Sender identity metadata must also survive a full folder replacement.
-    const replacedMetadata = new Map<string, { id: string; folderId?: string | null; mailboxPath?: string | null; imapUid?: number | null; flags?: string | null; sizeBytes?: number | null; deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null }>();
-    if (replaceExisting) {
-      const rows = db.prepare(`SELECT id,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
-        FROM messages WHERE accountId=? ${folderId ? "AND folderId=?" : ""}`).all(...deleteArgs) as Array<NonNullable<ReturnType<typeof replacedMetadata.get>>>;
-      rows.forEach(row => replacedMetadata.set(row.id, row));
-    }
-    // End replacement metadata preservation.
+    // Identity snapshots are scoped to account + header ID + exact mailbox copy,
+    // independent of storage row IDs. Capture only inside the immediate writer.
+    type IdentitySnapshot = {
+      id: string; messageId?: string | null; folderId?: string | null; mailboxPath?: string | null;
+      imapUid?: number | null; flags?: string | null; sizeBytes?: number | null;
+      deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null;
+    };
+    const replacedMetadata = new Map<string, IdentitySnapshot>();
+    const replacedByHeader = new Map<string, IdentitySnapshot[]>();
+    const captureIdentitySnapshots = () => {
+      if (!replaceExisting) return;
+      const rows = db.prepare(`SELECT id,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
+        FROM messages WHERE accountId=? ${folderId ? "AND folderId=?" : ""}`).all(...deleteArgs) as IdentitySnapshot[];
+      for (const row of rows) {
+        replacedMetadata.set(row.id, row);
+        if (row.messageId) replacedByHeader.set(row.messageId, [...(replacedByHeader.get(row.messageId) ?? []), row]);
+      }
+    };
     const dedupedThreadIds = new Set<string>();
     const upsertBatch = db.transaction(
       (batch: Message[], shouldDeleteAttachments: boolean) => {
       batch.forEach((message) => {
-        let rowId = message.id;
+        // Resolve the prior same copy before selecting a storage row ID. In
+        // particular, a now-free base ID must not erase a shared-shard variant.
+        const priorCopy = message.messageId
+          ? [...(replacedByHeader.get(message.messageId) ?? []),
+              ...findFolderMessageDuplicates.all(accountId, message.folderId, message.messageId, "") as IdentitySnapshot[]]
+              .find(row => isSameMailboxMessageCopy(row, message))
+          : undefined;
+        let rowId = priorCopy?.id ?? message.id;
         // A shared shard may contain the same external Message-ID for two accounts.
         const foreignRow = db.prepare("SELECT 1 FROM messages WHERE id=? AND accountId<>?").get(rowId, accountId);
         if (foreignRow) rowId = `${rowId}-${createHash("sha1").update(accountId).digest("hex").slice(0, 12)}`;
-        const existingById = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId)) as
+        const existingById = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId) ?? priorCopy) as
           | {
               id: string;
               folderId?: string | null;
@@ -603,8 +616,11 @@ export async function upsertMessages(
       });
     });
 
-    if (replaceExisting) {
-      db.transaction(() => {
+    // Keep identity snapshot capture and all replacement writes under one lock.
+    // Port these additions inside collaboration's existing immediate transaction.
+    db.transaction(() => {
+      captureIdentitySnapshots();
+      if (replaceExisting) {
         deleteAttachmentsByScope.run(...deleteArgs);
         if (folderId) {
           deleteCalendarEventsByScope.run(accountId, accountId, folderId);
@@ -613,18 +629,11 @@ export async function upsertMessages(
         }
         deleteFtsByScope.run(...deleteArgs);
         deleteMessages.run(...deleteArgs);
-      })();
-    }
-
-    const shouldDeleteAttachments = !replaceExisting;
-    for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
-      const batch = nextMessages.slice(start, start + UPSERT_BATCH_SIZE);
-      if (batch.length === 0) continue;
-      upsertBatch(batch, shouldDeleteAttachments);
-      if (start + UPSERT_BATCH_SIZE < nextMessages.length) {
-        await yieldToEventLoop();
       }
-    }
+      for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
+        upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
+      }
+    }).immediate();
 
     let affectedThreadIds: string[] = [];
     let requiresFullRecompute = false;

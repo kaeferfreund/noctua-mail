@@ -1,3 +1,4 @@
+import { registerOwnAddressSql } from "./ownAddressSql";
 import path from "path";
 import { mkdirSync, promises as fs } from "fs";
 import {
@@ -65,6 +66,7 @@ async function ensureDatabaseCtor() {
 }
 
 export function configureDb(db: any, busyTimeoutMs = 15000) {
+  registerOwnAddressSql(db);
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec(`PRAGMA busy_timeout = ${busyTimeoutMs};`);
   db.exec("PRAGMA foreign_keys = ON;");

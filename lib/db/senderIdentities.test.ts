@@ -48,3 +48,19 @@ describe("sender identity migrations", () => {
     finally { fresh.close(); }
   });
 });
+
+test("cold migrated shard opens read-only under another connection's writer lock", () => {
+  const temp = createTempDir("identity-cold-reader-");
+  const writer = new Database(temp.dbPath);
+  let reader: Database | undefined;
+  try {
+    writer.exec("PRAGMA journal_mode=WAL; CREATE TABLE messages(id TEXT PRIMARY KEY)");
+    ensureSenderIdentityMessageRuntimeSchema(writer);
+    reader = new Database(temp.dbPath, { readonly: true });
+    reader.exec("PRAGMA busy_timeout=0");
+    writer.exec("BEGIN IMMEDIATE");
+    expect(() => ensureSenderIdentityMessageRuntimeSchema(reader)).not.toThrow();
+    expect(reader.prepare("SELECT count(*) n FROM messages").get()).toEqual({ n: 0 });
+    writer.exec("ROLLBACK");
+  } finally { reader?.close(); writer.close(); temp.cleanup(); }
+});
