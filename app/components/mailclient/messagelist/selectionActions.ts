@@ -93,3 +93,25 @@ export function bindSelectionActions(
     onMoveToAccount: () => run(actions.moveToAccount)
   };
 }
+
+export type RowReadAction = {
+  seen: boolean;
+  onSelect: () => void;
+};
+
+/** A collapsed row uses its displayed state; targets expand only on selection. */
+export function bindRowReadAction(
+  messageId: string,
+  seen: boolean,
+  actions: Pick<SelectionActions, "markRead" | "markUnread">,
+  getTargets: (ids: Iterable<string>) => SelectionActionTargets
+): RowReadAction {
+  return {
+    seen,
+    onSelect: () => {
+      const targets = getTargets([messageId]);
+      if (seen) actions.markUnread(targets);
+      else actions.markRead(targets);
+    }
+  };
+}
