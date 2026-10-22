@@ -8,8 +8,8 @@ export type SortKey = "date" | "from" | "subject" | "size";
 /**
  * The four layouts the message list can render in. This list is the
  * single source of truth for the derived `MessageViewMode` type and for
- * the orchestrator's runtime validator — but adding a new layout also
- * requires updating the rendering call sites (the segmented control in
+ * the runtime validator in `useMessageViewMode` — but adding a new layout also
+ * requires updating the rendering call sites (the view menu in
  * `MessageListHeader`, the branch in `MessageListView`, and any settings
  * UI that exposes the choice). The type/validator pair won't compile /
  * validate the new option until it's added here, so this is the right
@@ -17,6 +17,17 @@ export type SortKey = "date" | "from" | "subject" | "size";
  */
 export const MESSAGE_VIEW_MODES = ["card", "table", "compact", "threads"] as const;
 export type MessageViewMode = (typeof MESSAGE_VIEW_MODES)[number];
+
+/** How the list buckets messages under group headers. */
+export type MessageListGroupBy =
+  | "none"
+  | "date"
+  | "week"
+  | "sender"
+  | "domain"
+  | "year"
+  | "folder"
+  | "event";
 
 /** "on" = threads always; "scope" = threads only in a scoped view; "off" = never */
 export type ThreadsMode = "on" | "scope" | "off";

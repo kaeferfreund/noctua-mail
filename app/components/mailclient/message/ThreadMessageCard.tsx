@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import {
-  Image as ImageIcon,
-  Languages,
-  MoveRight,
-  Paperclip,
-  RefreshCw,
-  ZoomIn,
-  ZoomOut
-} from "lucide-react";
-import { Badge, Button, Card, Flex, Select, Tabs, Text } from "@radix-ui/themes";
+import { Image as ImageIcon, Languages, MoveRight, Paperclip, RefreshCw } from "lucide-react";
+import { Badge, Button, Card, Flex, Select, Text } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { badgeColors, getFlagBadgeColor, getPriorityBadgeColor } from "@/lib/ui/badgeColors";
@@ -39,6 +31,9 @@ import {
 } from "@/lib/deeplLanguages";
 import badgeStyles from "./MessageBadge.module.css";
 import styles from "./ThreadMessageCard.module.css";
+import headerStyles from "./MessageHeaderControls.module.css";
+import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import AttachmentsList from "../../AttachmentsList";
 import HtmlMessage from "../../HtmlMessage";
 import QuoteRenderer from "../../QuoteRenderer";
@@ -57,8 +52,8 @@ import { getMessageFromDisplay } from "../messagelist/threadGroupUtils";
 import type { InviteProcessingStatePatch } from "../utils/calendarInviteState";
 import { isRenderableInlineAttachment } from "@/lib/messageFlags";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
-
-type MessageTab = "html" | "text" | "markdown" | "source";
+import MessageDisplayOptionsMenu from "./MessageDisplayOptionsMenu";
+import type { MessageTab } from "./types";
 
 type ImapFlagBadge = { label: string; kind: string };
 
@@ -199,6 +194,7 @@ export default function ThreadMessageCard({
   onHideTranslation,
   onChangeTranslationLang
 }: ThreadMessageCardProps) {
+  const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<Attachment | null>(null);
   const [removingAttachment, setRemovingAttachment] = useState(false);
@@ -294,8 +290,7 @@ export default function ThreadMessageCard({
     return stored && tabs.includes(stored) ? stored : fallback;
   };
 
-  const handleTabChange = (value: string) => {
-    const next = value as MessageTab;
+  const handleTabChange = (next: MessageTab) => {
     setMessageTabs((prev) => ({ ...prev, [message.id]: next }));
     if (next === "source") {
       fetchSource(message.id);
@@ -333,115 +328,37 @@ export default function ThreadMessageCard({
     });
   };
 
-  const renderTabsBar = (tabs: { value: MessageTab; label: string }[], currentTab: MessageTab) => (
-    <div className={styles.tabsBar}>
-      <Tabs.Root value={currentTab} onValueChange={handleTabChange} className={styles.messageTabsRoot}>
-        <Tabs.List size="1" className={styles.tabsList}>
-          {tabs.map((tab) => (
-            <Tabs.Trigger key={tab.value} value={tab.value} className={styles.tabTrigger}>
-              {tab.label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-      </Tabs.Root>
-      {currentTab !== "source" ? (
-        <div className={styles.zoomControls}>
-          <div className={styles.buttonGroup}>
-            <Button
-              size="1"
-              variant="surface"
-              color="gray"
-              title="Decrease text size"
-              aria-label="Decrease text size"
-              onClick={() => updateFontScale(-0.1)}
-            >
-              A-
-            </Button>
-            <Button
-              size="1"
-              variant="surface"
-              color="gray"
-              title="Reset text size"
-              aria-label="Reset text size"
-              onClick={resetFontScale}
-            >
-              A
-            </Button>
-            <Button
-              size="1"
-              variant="surface"
-              color="gray"
-              title="Increase text size"
-              aria-label="Increase text size"
-              onClick={() => updateFontScale(0.1)}
-            >
-              A+
-            </Button>
-          </div>
-          {currentTab === "html" ? (
-            <div className={styles.buttonGroup}>
-              <TooltipIconButton
-                size="1"
-                variant="surface"
-                color="gray"
-                tooltip="Zoom out"
-                onClick={() => adjustMessageZoom(message.id, -0.1)}
-              >
-                <ZoomOut size={12} />
-              </TooltipIconButton>
-              <Button
-                size="1"
-                variant="surface"
-                color="gray"
-                title="Reset zoom"
-                aria-label="Reset zoom"
-                onClick={() => resetMessageZoom(message.id)}
-              >
-                100%
-              </Button>
-              <TooltipIconButton
-                size="1"
-                variant="surface"
-                color="gray"
-                tooltip="Zoom in"
-                onClick={() => adjustMessageZoom(message.id, 0.1)}
-              >
-                <ZoomIn size={12} />
-              </TooltipIconButton>
-            </div>
-          ) : null}
-          {translationEnabled && translationFormatForTab(currentTab)
-            ? (() => {
-                const active = translationActiveForTab(currentTab);
-                return (
-                  <div className={styles.buttonGroup}>
-                    <Button
-                      size="1"
-                      variant={active ? "solid" : "surface"}
-                      color={active ? "iris" : "gray"}
-                      title={active ? "Show original" : "Translate this message"}
-                      aria-label={active ? "Show original" : "Translate this message"}
-                      onClick={() => {
-                        const format = translationFormatForTab(currentTab);
-                        if (!format) return;
-                        if (active) {
-                          onHideTranslation?.(message.id);
-                        } else {
-                          onShowTranslation?.(message.id, format, translationTargetLang);
-                        }
-                      }}
-                    >
-                      <Languages size={12} />
-                      Translate
-                    </Button>
-                  </div>
-                );
-              })()
-            : null}
-        </div>
-      ) : null}
-    </div>
-  );
+  // Translate / Show original toggle for the current body format. A stable
+  // label plus aria-pressed carries the state; the tooltip names the action.
+  const renderTranslationToggle = (tab: MessageTab) => {
+    const format = translationFormatForTab(tab);
+    if (!translationEnabled || !format) return null;
+    const active = translationActiveForTab(tab);
+    return (
+      <TooltipIconButton
+        size="2"
+        variant="ghost"
+        color={active ? undefined : "gray"}
+        className={
+          [active ? headerStyles.toggleActive : null, isMobile ? mobileStyles.messageMore : null]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
+        tooltip={active ? "Show original" : "Translate this message"}
+        aria-label="Translate message"
+        aria-pressed={active}
+        onClick={() => {
+          if (active) {
+            onHideTranslation?.(message.id);
+          } else {
+            onShowTranslation?.(message.id, format, translationTargetLang);
+          }
+        }}
+      >
+        <Languages size={14} />
+      </TooltipIconButton>
+    );
+  };
 
   const renderTextPanel = (body: string | undefined) => (
     <div className={styles.textView} style={{ fontSize: `${14 * fontScale}px` }}>
@@ -596,6 +513,9 @@ export default function ThreadMessageCard({
   };
 
   let content: React.ReactNode = null;
+  // Set once the body renders; drives the header's display options.
+  let bodyView: { tabs: MessageTab[]; currentTab: MessageTab; defaultTab: MessageTab } | null =
+    null;
   if (bodyLoadError && needsContentHydration) {
     content = wrapPanel(
       "load-error",
@@ -615,84 +535,22 @@ export default function ThreadMessageCard({
         </div>
       </div>
     );
-  } else if (hasHtml && hasText) {
-    const tabs = [
-      { value: "html" as const, label: "HTML" },
-      { value: "text" as const, label: "Text" },
-      { value: "markdown" as const, label: "Markdown" },
-      { value: "source" as const, label: "Source" }
-    ];
-    const currentTab = pickTabValue(
-      tabs.map((tab) => tab.value),
-      preferTextTab ? "text" : "html"
-    );
-    const panel = renderPanelForTab(currentTab);
-    content = (
-      <>
-        {renderTabsBar(tabs, currentTab)}
-        {wrapPanel(currentTab, panel)}
-      </>
-    );
-  } else if (hasHtml) {
-    if (hasSource) {
-      const tabs = [
-        { value: "html" as const, label: "HTML" },
-        { value: "source" as const, label: "Source" }
-      ];
-      const currentTab = pickTabValue(
-        tabs.map((tab) => tab.value),
-        "html"
-      );
-      const panel = renderPanelForTab(currentTab);
-      content = (
-        <>
-          {renderTabsBar(tabs, currentTab)}
-          {wrapPanel(currentTab, panel)}
-        </>
-      );
-    } else {
-      const tabs = [{ value: "html" as const, label: "HTML" }];
-      const currentTab: MessageTab = "html";
-      content = (
-        <>
-          {renderTabsBar(tabs, currentTab)}
-          {wrapPanel(currentTab, renderPanelForTab(currentTab))}
-        </>
-      );
-    }
-  } else if (hasSource) {
-    const tabs = [
-      { value: "text" as const, label: "Text" },
-      { value: "markdown" as const, label: "Markdown" },
-      { value: "source" as const, label: "Source" }
-    ];
-    const currentTab = pickTabValue(
-      tabs.map((tab) => tab.value),
-      "text"
-    );
-    const panel = renderPanelForTab(currentTab);
-    content = (
-      <>
-        {renderTabsBar(tabs, currentTab)}
-        {wrapPanel(currentTab, panel)}
-      </>
-    );
   } else {
-    const tabs = [
-      { value: "text" as const, label: "Text" },
-      { value: "markdown" as const, label: "Markdown" }
-    ];
-    const currentTab = pickTabValue(
-      tabs.map((tab) => tab.value),
-      "text"
-    );
-    const panel = renderPanelForTab(currentTab);
-    content = (
-      <>
-        {renderTabsBar(tabs, currentTab)}
-        {wrapPanel(currentTab, panel)}
-      </>
-    );
+    // Body formats this message offers (in menu order) and the one it opens in.
+    const tabs: MessageTab[] =
+      hasHtml && hasText
+        ? ["html", "text", "markdown", "source"]
+        : hasHtml
+          ? hasSource
+            ? ["html", "source"]
+            : ["html"]
+          : hasSource
+            ? ["text", "markdown", "source"]
+            : ["text", "markdown"];
+    const defaultTab: MessageTab = hasHtml && !preferTextTab ? "html" : "text";
+    const currentTab = pickTabValue(tabs, defaultTab);
+    bodyView = { tabs, currentTab, defaultTab };
+    content = wrapPanel(currentTab, renderPanelForTab(currentTab));
   }
 
   // Compact collapsed row (two-line summary, no card border)
@@ -947,6 +805,23 @@ export default function ThreadMessageCard({
                 <div className={styles.messageActions}>
                   {renderQuickActions(message, 14, "thread")}
                 </div>
+                {bodyView && !isCollapsed ? (
+                  <>
+                    {renderTranslationToggle(bodyView.currentTab)}
+                    <MessageDisplayOptionsMenu
+                      formats={bodyView.tabs}
+                      format={bodyView.currentTab}
+                      defaultFormat={bodyView.defaultTab}
+                      onFormatChange={handleTabChange}
+                      textScale={fontScale}
+                      onAdjustTextScale={updateFontScale}
+                      onResetTextScale={resetFontScale}
+                      zoom={zoomValue}
+                      onAdjustZoom={(delta) => adjustMessageZoom(message.id, delta)}
+                      onResetZoom={() => resetMessageZoom(message.id)}
+                    />
+                  </>
+                ) : null}
                 {renderMessageMenu(message, "thread", setMenuOpen)}
               </div>
             </div>

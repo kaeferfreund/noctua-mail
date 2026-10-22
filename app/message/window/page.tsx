@@ -26,13 +26,13 @@ import MessageQuickActions from "@/app/components/mailclient/message/MessageQuic
 import MessageSourcePanel from "@/app/components/mailclient/message/MessageSourcePanel";
 import MessageViewPane from "@/app/components/mailclient/message/MessageViewPane";
 import ThreadView from "@/app/components/mailclient/message/ThreadView";
+import type { MessageTab } from "@/app/components/mailclient/message/types";
 import styles from "./page.module.css";
 
 const MarkdownPanel = dynamic(() => import("@/app/components/mailclient/message/MarkdownPanel"), {
   loading: () => <div role="status">Loading Markdown…</div>
 });
 
-type MessageTab = "html" | "text" | "markdown" | "source";
 type DeleteResponse = {
   action: "deleted" | "moved";
   trashFolderId?: string | null;
@@ -360,7 +360,7 @@ export default function MessageWindowPage() {
           {actionError && (
             <Text size="2" color="red">{actionError}</Text>
           )}
-          <MessageViewPane onShowJson={noop} onEvictThreadCache={noop} hideToolbar>
+          <MessageViewPane>
             <ThreadView
               showComposeInline={false}
               activeMessage={safeMessage}
