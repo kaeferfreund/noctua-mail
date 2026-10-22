@@ -28,7 +28,6 @@ const SENT_NAMES = [
   "gesendete",
   "gesendete objekte",
   "gesendete elemente",
-  "outbox",
   "enviado",
   "envoy\u00e9s",
   "gesendete nachrichten"
@@ -125,12 +124,19 @@ export function findJunkFolder(folders: Folder[], accountId: string) {
   });
 }
 
+// merged from feat/mailbox-watcher
 export function findSentFolder(folders: Folder[], accountId: string) {
-  return findFolder(folders, accountId, {
-    exactNames: SENT_NAMES,
-    idIncludes: SENT_NAMES,
-    nameIncludes: ["sent"]
-  });
+  const candidates = getAccountFolders(folders, accountId);
+  const special = candidates.find((folder) => normalize(folder.specialUse) === "\\sent");
+  if (special) return special;
+  return candidates.find((folder) => {
+    if (!SENT_NAMES.includes(normalize(folder.name))) return false;
+    // Parent ids are authoritative; use the path for older rows without one.
+    if (folder.parentId) return normalize(folder.parentId) === normalize(`${accountId}:INBOX`);
+    const path = folder.id.startsWith(`${accountId}:`) ? folder.id.slice(accountId.length + 1) : folder.id;
+    const parts = path.split(folder.delimiter || "/");
+    return parts.length === 1 || (parts.length === 2 && normalize(parts[0]) === "inbox");
+  }) ?? null;
 }
 
 export function findTrashFolder(folders: Folder[], accountId: string) {

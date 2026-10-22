@@ -310,3 +310,28 @@ export function remapThreadCollab(db: Database, accountId: string, pairs: Thread
     }
   }
 }
+
+export type SentMessageIdentity = { messageId: string; inReplyTo?: string; references?: string[] };
+/** Post-SMTP attribution is idempotent per RFC Message-ID, including non-replies. */
+export async function recordReplySent(accountId: string, message: SentMessageIdentity, actor: CollabActor) {
+  if (!actor.userId || !message.messageId) return;
+  return withDbWriteRetry("threadCollab.recordReplySent", async () => {
+    const db = await getAccountDb(accountId) as Database;
+    return db.transaction(() => {
+      const now = Date.now();
+      const inserted = db.prepare(`INSERT INTO sent_by(accountId,messageId,userId,sentAt) VALUES(?,?,?,?)
+        ON CONFLICT(accountId,messageId) DO NOTHING RETURNING messageId`).get(accountId, message.messageId, actor.userId, now);
+      if (!inserted) return;
+      // Prefer the immediate parent, then walk References from newest to oldest.
+      const parents = [message.inReplyTo, ...(message.references ?? []).slice().reverse()].filter((id): id is string => Boolean(id));
+      for (const parent of parents) {
+        const target = db.prepare(`SELECT threadId FROM messages WHERE accountId=? AND (messageId=? OR id=?)
+          AND COALESCE(deleted,0)=0 ORDER BY dateValue DESC,id LIMIT 1`).get(accountId, parent, parent) as { threadId: string } | null;
+        if (!target) continue;
+        appendThreadActivity(db, accountId, target.threadId, "reply_sent", actor, { messageId: message.messageId }, now);
+        touchThreadCollabState(db, getThreadCollabState(db, accountId, target.threadId), actor, now);
+        return;
+      }
+    }).immediate();
+  });
+}

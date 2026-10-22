@@ -1,9 +1,11 @@
+import { requireCollabAccountContext as requireAccountContext } from "@/app/api/_helpers/threadCollabContext";
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { getFolders, upsertCalendarEvent } from "@/lib/db";
+import { upsertCalendarEvent } from "@/lib/db";
 import type { ComposeInvitePayload } from "@/lib/composeInvite";
-import { appendImapMessage } from "@/lib/mail/imap";
+import { completeSend } from "@/lib/mail/completeSend";
 import {
   normalizeCalendarAttachments,
   parseComposeAttachments,
@@ -12,11 +14,8 @@ import {
 } from "@/lib/mail/composePayload";
 import { buildSentInvite } from "@/lib/mail/sentInvite";
 import { sendSmtpMessage } from "@/lib/mail/smtp";
-import { folderMailboxPath } from "@/lib/mailboxPaths";
-import { findSentFolder } from "@/lib/specialFolders";
 import {
   getAccountIdFromParams,
-  requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
@@ -29,35 +28,35 @@ function buildMessageId(address: string) {
 }
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
-  const payload = (await request.json()) as {
-    accountId?: string;
-    to?: string;
-    cc?: string;
-    bcc?: string;
-    subject: string;
-    text: string;
-    markdown?: string;
-    html?: string;
-    composeFormat?: string;
-    invite?: ComposeInvitePayload;
-    inReplyTo?: string;
-    references?: string[];
-    replyTo?: string;
-    xForwardedMessageId?: string;
-    attachments?: Array<{
-      filename: string;
-      contentType: string;
-      inline?: boolean;
-      cid?: string;
-      dataUrl?: string;
-    }>;
-  };
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId, {
-    missingAccountMessage: "Missing accountId"
-  });
+  const accountContext = await requireAccountContext(request, accountId, "editor");
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
+    const originError = requireJsonSameOrigin(request);
+    if (originError) return originError;
+    const payload = (await request.json()) as {
+      accountId?: string;
+      to?: string;
+      cc?: string;
+      bcc?: string;
+      subject: string;
+      text: string;
+      markdown?: string;
+      html?: string;
+      composeFormat?: string;
+      invite?: ComposeInvitePayload;
+      inReplyTo?: string;
+      references?: string[];
+      replyTo?: string;
+      xForwardedMessageId?: string;
+      attachments?: Array<{
+        filename: string;
+        contentType: string;
+        inline?: boolean;
+        cid?: string;
+        dataUrl?: string;
+      }>;
+    };
     const { account, clientId } = accountContext;
     const to = payload.to?.trim() ?? "";
     const cc = payload.cc?.trim() ?? "";
@@ -164,17 +163,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       throw error;
     }
 
-    const folders = await getFolders(account.id);
-    const sentFolder = findSentFolder(folders, account.id);
-    const sentMailbox = sentFolder ? folderMailboxPath(sentFolder, account.id) : null;
-    let appendedUid: number | null = null;
-    if (sentMailbox) {
-      try {
-        appendedUid = await appendImapMessage(account, sentMailbox, result.raw, ["\\Seen"], clientId);
-      } catch {
-        // ignore append failures
-      }
-    }
+    const sentResult = await completeSend({ account, clientId, raw: result.raw, messageId,
+      actor: accountContext.actor, inReplyTo: payload.inReplyTo, references: payload.references,
+      xForwardedMessageId: payload.xForwardedMessageId });
 
     let inviteScheduled = false;
     let inviteEventId: string | null = null;
@@ -195,9 +186,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
     return NextResponse.json({
       ok: true,
-      sentFolderId: sentFolder?.id ?? null,
-      sentMessageUid: appendedUid,
-      messageId,
+      ...sentResult,
       inviteScheduled,
       inviteEventId,
       inviteWarning

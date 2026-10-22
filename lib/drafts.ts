@@ -1,3 +1,5 @@
+import { completeSend, type SentCopyResult } from "@/lib/mail/completeSend";
+import type { CollabActor } from "@/lib/threadCollab";
 import type { Account, Message } from "@/lib/data";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import { COMPOSE_INVITE_HEADER, encodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
@@ -28,7 +30,7 @@ import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import { splitRecipientEntries } from "@/lib/recipientLists";
 import { buildReplyThreadHeaders } from "@/lib/replyThreadHeaders";
-import { findDraftsFolder, findSentFolder } from "@/lib/specialFolders";
+import { findDraftsFolder } from "@/lib/specialFolders";
 import {
   buildDraftSendEnvelopeRecipients,
   draftHasSendableRecipients
@@ -103,11 +105,7 @@ export class DraftSendError extends Error {
   }
 }
 
-export type SendDraftResult = {
-  sentFolderId: string | null;
-  sentMessageUid: number | null;
-  messageId: string | null;
-};
+export type SendDraftResult = SentCopyResult;
 
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
@@ -303,14 +301,14 @@ export async function saveDraftForAccount(params: {
  *
  * On success the draft is removed from both the IMAP Drafts mailbox
  * and the local message store, and a copy is appended to the Sent
- * folder (best-effort; append failures are swallowed to match the
- * compose-editor send path).
+ * folder. The result distinguishes delivery from Sent-copy failure.
  */
 export async function sendDraftForAccount(params: {
   account: Account;
   accountId: string;
   clientId: string;
   draftId: string;
+  actor: CollabActor;
 }): Promise<SendDraftResult> {
   const { account, accountId, clientId, draftId } = params;
   const draft = await getMessageById(accountId, draftId);
@@ -344,8 +342,6 @@ export async function sendDraftForAccount(params: {
       "Only messages saved as drafts can be sent via this endpoint. Open the message in compose and save it as a draft first."
     );
   }
-  const folders = await getFolders(account.id);
-
   if (!draftHasSendableRecipients(draft)) {
     throw new DraftSendError(400, "Please add at least one recipient before sending.");
   }
@@ -370,6 +366,8 @@ export async function sendDraftForAccount(params: {
   // The envelope recipients we build from the draft's parsed fields
   // still include Bcc addresses, so they receive the message — they
   // just don't appear in the message's own headers.
+  const messageId = draft.messageId?.trim() || rawSource.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim();
+  if (!messageId) throw new DraftSendError(409, "Draft has no Message-ID. Open it in compose and save it again.");
   const wireSource = injectUndisclosedRecipientsToHeader(stripBccHeader(rawSource));
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
   await sendRawSmtpMessage(account, wireSource, {
@@ -377,26 +375,9 @@ export async function sendDraftForAccount(params: {
     to: envelopeRecipients
   });
 
-  // Append to Sent (best-effort — mirror `/api/accounts/[accountId]/smtp/send`).
-  // Uses the ORIGINAL rawSource, keeping the Bcc header intact so the
-  // user can still see whom they bcc'd when they look at their Sent copy.
-  // (`folders` is already fetched above for the draft-status guard.)
-  const sentFolder = findSentFolder(folders, account.id);
-  const sentMailbox = sentFolder ? folderMailboxPath(sentFolder, account.id) : null;
-  let sentMessageUid: number | null = null;
-  if (sentMailbox) {
-    try {
-      sentMessageUid = await appendImapMessage(
-        account,
-        sentMailbox,
-        Buffer.from(rawSource),
-        ["\\Seen"],
-        clientId
-      );
-    } catch {
-      // ignore append failure; caller still sees ok:true
-    }
-  }
+  const sentResult = await completeSend({ account, clientId, raw: Buffer.from(rawSource),
+    messageId, actor: params.actor, inReplyTo: draft.inReplyTo, references: draft.references,
+    xForwardedMessageId: draft.xForwardedMessageId });
 
   // Everything past this point is post-send cleanup. The message has
   // already been relayed to the SMTP server; if any cleanup step
@@ -447,9 +428,5 @@ export async function sendDraftForAccount(params: {
     });
   }
 
-  return {
-    sentFolderId: sentFolder?.id ?? null,
-    sentMessageUid,
-    messageId: draft.messageId ?? null
-  };
+  return sentResult;
 }

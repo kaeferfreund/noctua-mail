@@ -1,9 +1,10 @@
+import { requireCollabAccountContext as requireAccountContext } from "@/app/api/_helpers/threadCollabContext";
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { DraftSaveError, saveDraftForAccount, type SaveDraftInput } from "@/lib/drafts";
 import {
   getAccountIdFromParams,
-  requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 
@@ -12,11 +13,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     accountId?: string;
   };
   const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId, {
-    missingAccountMessage: "Missing accountId"
-  });
+  const accountContext = await requireAccountContext(request, accountId, "editor");
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
+    const originError = requireJsonSameOrigin(request);
+    if (originError) return originError;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
     try {
       const result = await saveDraftForAccount({

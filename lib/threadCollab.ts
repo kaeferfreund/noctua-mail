@@ -16,7 +16,7 @@ export function collabActorFromSession(session: Pick<ActiveUserSession, "userId"
 // feat/team-auth slice 3: replace these two local helpers with the §5.1
 // resolveAccountRole / roleAtLeast exports once that branch lands. No admin
 // override: ownership grants manager, live enabled membership grants its role.
-async function resolveAccountRole(userId: string, accountId: string): Promise<AccountRole | null> {
+export async function resolveAccountRole(userId: string, accountId: string): Promise<AccountRole | null> {
   const db = await getDb();
   const row = db.prepare(`SELECT CASE WHEN a.ownerUserId=u.id THEN 'manager' ELSE ua.role END AS role
     FROM auth_user u JOIN accounts a ON a.id=?
@@ -27,7 +27,7 @@ async function resolveAccountRole(userId: string, accountId: string): Promise<Ac
     } | null;
   return row?.role ?? null;
 }
-function roleAtLeast(role: AccountRole | null, min: AccountRole) {
+export function roleAtLeast(role: AccountRole | null, min: AccountRole) {
   const order = { viewer: 1, editor: 2, manager: 3 };
   return role !== null && order[role] >= order[min];
 }
@@ -103,10 +103,30 @@ export async function listThreadActivity(accountId: string, threadId: string, op
   limit?: number;
 } = {}) {
   const limit = options.limit ?? 100;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 1000)
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500)
     throw new ThreadCollabError("Invalid activity limit", 400);
   const db = await getAccountDb(accountId);
   return store.threadHasMessages(db, accountId, threadId) ? store.listThreadActivity(db, accountId, threadId, limit) : [];
 }
 /** Internal post-revocation seam: access is already revoked in the master DB. */
 export const unassignUserInAccount = store.unassignUserInAccount;
+
+/** Sanitized, enabled membership DTO; keep role resolution on the Slice 3 seam. */
+export async function listCollabMembers(accountId: string) {
+  const db = await getDb();
+  const users = db.prepare(`SELECT DISTINCT u.id,u.name,u.email FROM auth_user u
+    JOIN accounts a ON a.id=? LEFT JOIN user_accounts ua ON ua.accountId=a.id AND ua.userId=u.id
+    WHERE a.ownerUserId=u.id OR ua.userId IS NOT NULL ORDER BY u.name,u.email,u.id`)
+    .all(accountId) as Array<{ id: string; name: string | null; email: string }>;
+  const members = await Promise.all(users.map(async user => ({ ...user, role: await resolveAccountRole(user.id, accountId) })));
+  return members.filter((member): member is typeof member & { role: AccountRole } => member.role !== null);
+}
+
+export const recordReplySent = store.recordReplySent;
+
+/** Account-scoped original copies for server-side reply/forward flags. */
+export async function listReplySourceMessageIds(accountId: string, parent: string) {
+  const db = await getAccountDb(accountId);
+  return db.prepare(`SELECT id FROM messages WHERE accountId=? AND (messageId=? OR id=?) AND COALESCE(deleted,0)=0`)
+    .all(accountId, parent, parent) as Array<{ id: string }>;
+}

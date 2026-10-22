@@ -1,3 +1,4 @@
+import { getSharedTestAuthHarness } from "@/lib/testAuthHarness";
 import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
@@ -165,9 +166,12 @@ function buildMessage(params: {
 }
 
 function uniqueAccountId(prefix: string) { return `${prefix}-${randomUUID()}`; }
-const fixtureContexts = new Map<string, {account:Account; tokenId:string}>();
+const fixtureContexts = new Map<string, {account:Account; tokenId:string; userId:string}>();
 async function createStoredToken(params: {account:Account;accountId:string;tokenId:string;expiresAt:number|null}) {
-  fixtureContexts.set(params.tokenId, params);
+  const auth = await getSharedTestAuthHarness();
+  const user = await auth.createUser(`executor-${randomUUID()}@example.test`);
+  await auth.addMembership(user.id, params.accountId, "editor");
+  fixtureContexts.set(params.tokenId, { ...params, userId: user.id });
   return params.tokenId;
 }
 // Domain tests call the MCP executor directly; HTTP activation is independently denied below.
@@ -175,8 +179,8 @@ async function postMcp(body:unknown, tokenId?:string) {
   const context = fixtureContexts.get(tokenId ?? "");
   if(!context) throw new Error("Missing synthetic MCP executor context");
   const result = await executeMcpHttpRequest({body,accountId:context.account.id,account:context.account,
-    tokenRecord:{id:context.tokenId,accountId:context.account.id,createdByUserId:"synthetic-executor",label:"Synthetic",tokenSuffix:"test",createdAt:Date.now(),expiresAt:null,lastUsedAt:null},
-    authInfo:{token:context.tokenId,clientId:"synthetic",scopes:[],extra:{accountId:context.account.id,userId:"synthetic-executor"}},
+    tokenRecord:{id:context.tokenId,accountId:context.account.id,createdByUserId:context.userId,label:"Synthetic",tokenSuffix:"test",createdAt:Date.now(),expiresAt:null,lastUsedAt:null},
+    authInfo:{token:context.tokenId,clientId:"synthetic",scopes:[],extra:{accountId:context.account.id,userId:context.userId}},
     requestInfo:{headers:{}}});
   return result.responses.length ? Response.json(result.responses.length===1?result.responses[0]:result.responses) : new Response(null,{status:202});
 }
