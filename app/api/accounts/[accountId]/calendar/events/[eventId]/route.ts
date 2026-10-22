@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin, requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -59,6 +60,7 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
     accountId?: string;
   } | null;
@@ -149,6 +151,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const { searchParams } = new URL(request.url);
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;

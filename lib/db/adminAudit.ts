@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { randomUUID } from "crypto";
 import type { AdminAuditAction, AdminAuditEntry } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
@@ -36,6 +37,12 @@ function stripSecretKeys(payload: Record<string, unknown>): Record<string, unkno
 
 /** Writes one `admin_audit` row; password-like keys are removed from `payload`. */
 export async function recordAdminAudit(input: AdminAuditInput): Promise<AdminAuditEntry> {
+  const db = await getDb();
+  return withDbWriteRetry("recordAdminAudit", () => recordAdminAuditRow(db, input));
+}
+
+/** Synchronous writer for audit entries that must commit with the master mutation. */
+export function recordAdminAuditRow(db: Database, input: AdminAuditInput): AdminAuditEntry {
   const payload = input.payload ? stripSecretKeys(input.payload) : null;
   const row: StoredAdminAuditRow = {
     id: randomUUID(),
@@ -46,9 +53,7 @@ export async function recordAdminAudit(input: AdminAuditInput): Promise<AdminAud
     payload: payload ? JSON.stringify(payload) : null,
     createdAt: Date.now()
   };
-  return withDbWriteRetry("recordAdminAudit", async () => {
-    const db = await getDb();
-    db.prepare(
+  db.prepare(
       `INSERT INTO admin_audit
        (id, actorUserId, action, targetUserId, targetAccountId, payload, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -61,8 +66,7 @@ export async function recordAdminAudit(input: AdminAuditInput): Promise<AdminAud
       row.payload,
       row.createdAt
     );
-    return mapAdminAuditRow(row);
-  });
+  return mapAdminAuditRow(row);
 }
 
 function clampAuditLimit(limit: number | undefined) {

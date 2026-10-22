@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { requireAdminSessionOr403 } from "../../_auth";
 import { withAuthResponse } from "@/lib/auth";
 import { deleteAccountControlPlane, AccountDeletionForbiddenError } from "@/lib/serverDb";
-import { recordAdminAudit } from "@/lib/serverDb";
-import { revokeAuthStreams } from "@/lib/authStreams";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireBodylessSameOrigin } from "@/app/api/_helpers/requestOrigin";
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
@@ -15,8 +13,6 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
     try { deleted = await deleteAccountControlPlane(accountId, session.userId); }
     catch (error) { if (error instanceof AccountDeletionForbiddenError) return NextResponse.json({ ok: false, message: error.message }, { status: 403 }); throw error; }
     if (!deleted) return NextResponse.json({ ok: false, message: "Account not found" }, { status: 404 });
-    revokeAuthStreams({ accountId });
-    await recordAdminAudit({ actorUserId: session.userId, action: "account.delete", targetAccountId: accountId });
     return NextResponse.json({ ok: true });
   });
 }

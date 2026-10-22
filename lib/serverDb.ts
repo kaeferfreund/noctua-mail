@@ -159,3 +159,16 @@ export { AccountDeletionForbiddenError } from "./db/accounts";
 export async function deleteAccountControlPlane(...args: Parameters<ServerDbModule["deleteAccountControlPlane"]>) {
   return (await loadServerDb()).deleteAccountControlPlane(...args);
 }
+
+export async function getLatestMessageUid(...args: Parameters<ServerDbModule["getLatestMessageUid"]>) {
+  return (await loadServerDb()).getLatestMessageUid(...args);
+}
+export async function getMailboxState(...args: Parameters<ServerDbModule["getMailboxState"]>) {
+  return (await loadServerDb()).getMailboxState(...args);
+}
+export async function saveMailboxState(...args: Parameters<ServerDbModule["saveMailboxState"]>) {
+  return (await loadServerDb()).saveMailboxState(...args);
+}
+export async function deleteMessageByFolderUid(...args: Parameters<ServerDbModule["deleteMessageByFolderUid"]>) {
+  return (await loadServerDb()).deleteMessageByFolderUid(...args);
+}

@@ -1,3 +1,5 @@
+import { mailboxErrorResponse } from "@/lib/mailboxFailure";
+import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -123,6 +125,7 @@ function statusForRemovalError(message: string) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
   const messageId = (messageIdParam ?? "").trim();
@@ -150,6 +153,8 @@ export async function DELETE(request: Request, { params }: Params) {
       const result = await removeMessageAttachmentEverywhere(account, message, attachmentId, clientId);
       return NextResponse.json({ ok: true, ...result });
     } catch (error) {
+      const failure = await mailboxErrorResponse(error, accountId, context.role);
+      if (failure) return failure;
       const detail = error instanceof Error ? error.message : "Failed to remove attachment";
       return NextResponse.json(
         { ok: false, message: appendMessageIdToError(detail, messageId) },

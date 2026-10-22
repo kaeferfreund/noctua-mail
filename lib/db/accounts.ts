@@ -1,3 +1,4 @@
+import { recordAdminAuditRow } from "./adminAudit";
 import { revokeAuthStreams } from "../authStreams";
 import type { Account } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
@@ -140,8 +141,6 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
     const deleteShardFile =
       (sharedPathRow?.count ?? 0) === 0 && !(await areEquivalentDbPaths(dbPath, mainDbPath));
 
-    closeAccountDbConnection(dbPath);
-
     db.transaction(() => {
       if (actorUserId) {
         const allowed = db.prepare(`SELECT 1 FROM accounts a JOIN auth_user u ON u.id=? JOIN users p ON p.id=u.id
@@ -154,7 +153,10 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
       deleteUserAccountPrefRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM mcp_tokens WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
-    })();
+      if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
+    }).immediate();
+
+    closeAccountDbConnection(dbPath);
 
     revokeAuthStreams({ accountId });
     await cleanupAccountLifecycleArtifacts(accountId, dbPath, deleteShardFile);

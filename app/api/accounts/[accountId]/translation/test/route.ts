@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { DeeplError, deeplUsage, isDeeplFreeKey } from "@/lib/deepl";
@@ -8,6 +9,7 @@ import {
 } from "@/app/api/_helpers/accountContext";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
 
   const context = await requireAccountContext(request, accountId, {

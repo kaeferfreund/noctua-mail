@@ -1,3 +1,4 @@
+import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -10,6 +11,7 @@ import { syncCalendarEvents } from "@/lib/caldav/sync";
 const syncInProgress = new Map<string, boolean>();
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "viewer",

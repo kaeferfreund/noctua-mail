@@ -18,7 +18,7 @@ test("client correlation IDs accept only 1–64 safe characters", () => {
 test("215-character client IDs never reach unauthorized status logs, account contexts or sync workers", async () => {
   const invalid = "x".repeat(215);
   const request = (cookie = "", method = "GET", clientId = invalid) => new Request("http://localhost:3000/api/sync?jobId=synthetic", {
-    method, headers: { cookie, "x-noctua-client": clientId, "content-type": "application/json" },
+    method, headers: { cookie, "x-noctua-client": clientId, "content-type": "application/json", origin: "http://localhost:3000" },
     ...(method === "POST" ? { body: "{}" } : {})
   });
   const log = spyOn(console, "info").mockImplementation(() => {});

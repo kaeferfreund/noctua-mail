@@ -1,3 +1,4 @@
+import { recordAdminAuditRow } from "./db/adminAudit";
 import type { Database } from "bun:sqlite";
 import type { Account } from "./data";
 import { getDb } from "./db/connection";
@@ -55,7 +56,7 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
   const explicitSmtp = JSON.stringify(next.smtp) !== JSON.stringify(original.smtp);
   if (next.imap.password !== original.imap.password && !patch.smtp?.password?.trim() &&
       normalized(original.smtp.user) === normalized(original.imap.user) &&
-      (!original.smtp.password || original.smtp.password === original.imap.password)) next.smtp.password = next.imap.password;
+      (!original.smtp.password || original.smtp.password === original.imap.password)) next.smtp = { ...next.smtp, password: next.imap.password };
   // An owned personal address may be a login identity even while optional IMAP login is off.
   // Ownerless or differently addressed team mailboxes never acquire a personal identity here.
   const owner = original.ownerUserId ? db.prepare("SELECT id,email FROM auth_user WHERE id=?").get(original.ownerUserId) as { id: string; email: string } | undefined : undefined;
@@ -83,6 +84,8 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
     // Network verification may race another repair or account update. Never overwrite the newly stored state.
     if (JSON.stringify(live) !== JSON.stringify(originalRow)) throw new MailboxCredentialError("Mailbox changed; retry repair", 409);
     persistAccountRow(db, next, (originalRow as { dbPath?: string }).dbPath);
+    const changedFields = changedAccountFields(original, next);
+    if (changedFields.length) recordAdminAuditRow(db, { actorUserId: actor.userId, action: "account.update", targetAccountId: accountId, payload: { changedFields } });
     if (loginOwner && credentialChanged) {
       const result = db.prepare("UPDATE auth_security_state SET generation=generation+1 WHERE userId=?").run(loginOwner);
       if (!result.changes) throw new Error("Missing auth security state");
@@ -97,4 +100,16 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
   } finally {
     if (operation && operation !== inherited) await finishSecurityOperation(db, operation);
   }
+}
+
+/** Audit names only: never serialize credential or setting values into the trail. */
+function changedAccountFields(before: unknown, after: unknown, prefix = ""): string[] {
+  if (JSON.stringify(before) === JSON.stringify(after)) return [];
+  const isObject = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
+  if ((isObject(before) || before == null) && (isObject(after) || after == null)) {
+    const left = before ?? {}, right = after ?? {};
+    return [...new Set([...Object.keys(left), ...Object.keys(right)])].sort()
+      .flatMap(key => changedAccountFields(left[key], right[key], prefix ? `${prefix}.${key}` : key));
+  }
+  return [prefix];
 }

@@ -48,7 +48,7 @@ async function buildRequest(
   return new Request(`http://localhost/api/accounts/${accountId}/translation/compose`, {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/json", origin: "http://localhost:3000",
       ...(options?.omitCookie ? {} : { cookie: await buildCookieHeader(accountId) })
     },
     body: JSON.stringify(body)
@@ -81,7 +81,7 @@ function mockDeeplFetch(
 function deeplSuccessResponse(text: string, detected = "DE") {
   return new Response(
     JSON.stringify({ translations: [{ detected_source_language: detected, text }] }),
-    { status: 200, headers: { "content-type": "application/json" } }
+    { status: 200, headers: { "content-type": "application/json", origin: "http://localhost:3000" } }
   );
 }
 

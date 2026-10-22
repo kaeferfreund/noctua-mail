@@ -13,7 +13,7 @@ describe("probe session gate", () => {
     try {
       const port = (server.address() as net.AddressInfo).port;
       const request = (cookie = "") => new Request("http://localhost:3000/api/probe", {
-        method: "POST", headers: { cookie, "content-type": "application/json" },
+        method: "POST", headers: { cookie, "content-type": "application/json", origin: "http://localhost:3000" },
         body: JSON.stringify({ protocol: "imap", host: "localhost", port })
       });
       expect((await POST(request())).status).toBe(401);

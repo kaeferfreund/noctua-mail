@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -18,6 +19,7 @@ type BulkDeletePayload = {
 };
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json().catch(() => null)) as BulkDeletePayload | null;
   const accountId = await getAccountIdFromParams(params);
 

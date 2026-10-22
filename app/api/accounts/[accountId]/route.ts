@@ -5,8 +5,6 @@ import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/
 import { requireBodylessSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { handleMailboxCredentialMutation } from "@/app/api/_helpers/mailboxPatch";
 import { errorResponse, okResponse } from "@/app/api/_helpers/response";
-import { revokeAuthStreams } from "@/lib/authStreams";
-import { recordAdminAudit } from "@/lib/serverDb";
 export async function PUT(request: Request, { params }: AccountRouteParams) {
   return handleMailboxCredentialMutation(request, "put", params);
 }
@@ -21,8 +19,6 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
     try { deleted = await deleteAccountControlPlane(context.accountId, context.userId); }
     catch (error) { if (error instanceof AccountDeletionForbiddenError) return errorResponse(error.message, 403); throw error; }
     if (!deleted) return errorResponse("Account not found", 404);
-    revokeAuthStreams({ accountId: context.accountId });
-    await recordAdminAudit({ actorUserId: context.userId, action: "account.delete", targetAccountId: context.accountId });
     return okResponse();
   });
 }

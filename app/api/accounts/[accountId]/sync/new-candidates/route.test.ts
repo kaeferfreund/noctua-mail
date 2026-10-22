@@ -47,7 +47,7 @@ function buildAccount(accountId: string): Account {
 
 async function buildRequest(accountId:string) {
   return new Request(`http://localhost/api/accounts/${accountId}/sync/new-candidates`, {
-    method:"POST",headers:{"content-type":"application/json",cookie:await authenticatedTestCookie(accountId)},
+    method:"POST",headers:{"content-type":"application/json",origin:"http://localhost:3000",cookie:await authenticatedTestCookie(accountId)},
     body:JSON.stringify({folderIds:[]})
   });
 }

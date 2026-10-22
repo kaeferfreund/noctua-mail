@@ -1,3 +1,4 @@
+import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders } from "@/lib/db";
@@ -15,6 +16,7 @@ type NewSyncCandidatesPayload = {
 };
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
+  const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const payload = (await request.json()) as NewSyncCandidatesPayload;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {

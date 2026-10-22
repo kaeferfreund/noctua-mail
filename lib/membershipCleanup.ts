@@ -20,13 +20,13 @@ export async function cleanupUserAccountAccess(accountId: string, userId: string
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('thread_collab_state','thread_activity')").all();
       if (!tables.length) return { status: "not_installed" as const, unassigned: 0 };
       if (tables.length !== 2) throw new Error("Incomplete collaboration cleanup schema");
+      const activityInsert = db.prepare(`INSERT INTO thread_activity
+        (id,accountId,threadId,type,actorUserId,actorClientId,payload,createdAt) VALUES (?,?,?,'unassigned',?,'system',?,?)`);
       const rows = db.prepare("SELECT threadId FROM thread_collab_state WHERE accountId=? AND assigneeUserId=?").all(accountId, userId) as { threadId: string }[];
       const now = Date.now();
       db.prepare(`UPDATE thread_collab_state SET assigneeUserId=NULL,assignedAt=NULL,updatedAt=?,lastActivityAt=?
         WHERE accountId=? AND assigneeUserId=?`).run(now, now, accountId, userId);
-      for (const row of rows) db.prepare(`INSERT INTO thread_activity
-        (id,accountId,threadId,type,actorUserId,actorClientId,payload,createdAt) VALUES (?,?,?,'unassigned',?,'system',?,?)`)
-        .run(randomUUID(), accountId, row.threadId, actor.userId, JSON.stringify({ assigneeUserId: null, previousAssigneeUserId: userId }), now);
+      for (const row of rows) activityInsert.run(randomUUID(), accountId, row.threadId, actor.userId, JSON.stringify({ assigneeUserId: null, previousAssigneeUserId: userId }), now);
       return { status: "complete" as const, unassigned: rows.length };
     }).immediate());
   } finally { db.close(); }
