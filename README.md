@@ -180,8 +180,8 @@ Bind the backend to loopback behind one reverse proxy which overwrites Host and 
 `TRUSTED_PROXY_HOPS` defaults to 1 for Noctua wrapper limits; set 0 for direct traffic (all
 unidentified peers share a bucket). Never expose the backend directly or accept client-supplied
 forwarding headers. See [deployment examples](doc/DEPLOYMENT.md) for reset-log suppression,
-secret storage and stopped-process backups. This branch completes the Stage 1 backend;
-UI/phone acceptance and go-live remain later stages.
+secret storage and stopped-process backups. This branch integrates the Stage 1 backend and auth/admin UI;
+canonical phone/PWA acceptance and go-live remain release work.
 
 ### Data Directory
 Customize the data directory location:
@@ -213,7 +213,7 @@ This project is licensed under the [Elastic License 2.0](LICENSE).
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+This fork integrates feature work locally and does not target upstream pull requests.
 
 The code is primarily written by AI agents (Claude, Codex, GitHub Copilot, Antigravity).
 

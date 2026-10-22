@@ -1492,6 +1492,8 @@ from HTTP 200: inspect `twoFactorRedirect`, then refresh `/api/auth/me`. A chall
 
 ## 8. Compatibility and migration
 
+This fork integrates its feature branches locally; it does not target upstream pull requests.
+
 - Back up the master DB, shards and encryption/auth secrets before cutover. New sessions deliberately
   invalidate `noctua_session` and existing MCP tokens; expire the old browser cookie and remove old
   token rows. Keep IMAP_SECRET_KEY for existing mailbox encryption; removing SESSION_SEAL_KEY does
@@ -1527,7 +1529,7 @@ from HTTP 200: inspect `twoFactorRedirect`, then refresh `/api/auth/me`. A chall
 | `BETTER_AUTH_URL` | `https://mails.monkeymed.de` (path-free canonical origin) |
 | `PASSKEY_RP_ID` / passkey `rpID` | `mails.monkeymed.de`; defaults to the canonical hostname, without scheme/port/path |
 | Better Auth `trustedOrigins` | Explicit canonical origin `https://mails.monkeymed.de`; no wildcard or Host reflection |
-| `NOCTUA_TRUSTED_ORIGINS` | Unset in canonical production; only explicit additional HTTPS origins if separately required, never automatic preview trust |
+| `NOCTUA_TRUSTED_ORIGINS` | Unset; only the configured canonical origin is accepted; extra origins fail startup |
 | `IMAP_SECRET_KEY` | Retain the existing independent at-rest encryption key |
 | `IMAP_CREDENTIALS_STORAGE` | `db` only; `both` is a deprecated alias for `db`; `cookie` fails startup |
 | `NOCTUA_IMAP_LOGIN_HOSTS` | Unset/empty = OFF (deployment default); only a nonempty explicit exact normalized hostname allowlist enables the optional personal IMAP method; shared mailboxes remain forbidden |

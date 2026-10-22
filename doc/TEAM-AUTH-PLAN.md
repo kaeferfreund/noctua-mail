@@ -238,7 +238,7 @@ Implementation status (2026-10-22): provisioning/active-only journals, lifecycle
 targeted invites, admin/operator handover and anonymous reset policy implemented. Contract and
 verification evidence: `doc/AUTHENTICATION.md` "Slice 5"; fault/contender tests:
 `lib/teamAuthSlice5.test.ts`, HTTP handoff: `app/api/admin/users/route.test.ts`.
-Public `/api/ba` activation remains hardcoded 503 until Slice 6; reset UI remains Slice 7.
+Integrated status: backend activation and reset UI are merged; see AUTHENTICATION.md “Contracts after integration”.
 
 Owner: feat/team-auth. Design: §3.1 journals/triggers, §4.3–4.5, §8, §10 recovery/admin.
 Closes S5/S6, F4/F6/F8, I2 (backend), I5, I7; closes reset edge of S4.
@@ -282,6 +282,10 @@ nor a caller's revocation flag are security dependencies. Public HTTP activation
 
 ### Slice 6 — migration, backend activation and production smoke
 
+Implementation status (2026-10-22): merged from `6e480bf`; mounted policy handler, canonical
+environment, migration/bootstrap and synthetic restore smoke are integrated with shared lifetime
+locking, audited stale override and release. Full integration validation is recorded in AUTHENTICATION.md.
+
 Owner: feat/team-auth (deployment integration owner coordinates). Design: §7.4 API readiness,
 §8–§10, §11 auth/backup contract. Closes I1 exposure half and I4 planning/owner handoff; finishes backend evidence for all S/F IDs.
 
@@ -314,6 +318,11 @@ one auth stack, no temporary bypass. ui-shell can now run full client acceptance
 backend completion, not MailPlus go-live; §1.1 items 11–18 have their own owners.
 
 ### Slice 7 — ui-shell auth/reset integration and release evidence
+
+Implementation status (2026-10-22): auth-stage client/screens and admin-ui `6a21154` are merged.
+Signup/admin/members/audit/invite DTOs, shared reauthentication and admin-only mailbox creation
+are reconciled. Compiled browser and DOM gates cover the actual screens. Canonical phone/PWA
+and live IMAP browser acceptance remain release work; these are not claimed complete.
 
 Owner: feat/ui-shell for UI files, integration owner for check record. No team-auth agent edits its
 worktree. Design: §4.1/§4.4/§4.6 client contracts, §7.2/§7.4, §10–§10.1; closes I2 UI, I10, I11
