@@ -1408,6 +1408,14 @@ export function initAccountSchema(db: any) {
       ON messages(accountId, sizeBytes DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_size
       ON messages(accountId, folderId, sizeBytes DESC);
+
+    -- perf-sqlite quick-win indexes
+    CREATE INDEX IF NOT EXISTS idx_messages_account_folder_messageid
+      ON messages(accountId, folderId, messageId);
+    CREATE INDEX IF NOT EXISTS idx_messages_account_msgid_date
+      ON messages(accountId, lower(messageId), dateValue DESC);
+    CREATE INDEX IF NOT EXISTS idx_messages_account_folder_unread
+      ON messages(accountId, folderId, unread);
   `);
   ensureThreadOptionalColumns(db);
   ensureTopicOptionalColumns(db);
