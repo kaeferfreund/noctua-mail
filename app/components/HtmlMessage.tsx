@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import {
   QUOTE_TEXT_SCAN_LIMIT,
   canWrapQuoteInParent,
@@ -353,6 +353,7 @@ function attachQuoteAnimation(details: HTMLDetailsElement, content: HTMLElement,
 
 function buildPreviewDocument({
   html,
+  safeHtml,
   darkMode,
   fontScale,
   zoom,
@@ -360,6 +361,7 @@ function buildPreviewDocument({
   token
 }: {
   html: string;
+  safeHtml: string;
   darkMode: boolean;
   fontScale: number;
   zoom: number;
@@ -376,7 +378,6 @@ function buildPreviewDocument({
     ])
   );
   const promotedFontStylesheetUrls = new Set(fontStylesheetUrls);
-  const safeHtml = sanitizeHtmlForDisplay(cleanedHtml);
   let injectedCss = "";
   const withRewrites = safeHtml.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
     const scaledCss = scaleFontSizes(stripPromotedFontImports(css, promotedFontStylesheetUrls));
@@ -461,12 +462,15 @@ function HtmlMessage({
   html,
   darkMode,
   fontScale = 1,
-  zoom = 1
+  zoom = 1,
+  sanitizeHtml = sanitizeHtmlForDisplay
 }: {
   html: string;
   darkMode: boolean;
   fontScale?: number;
   zoom?: number;
+  /** Display sanitizer. Dark mode and font scale do not change its output. */
+  sanitizeHtml?: (input: string) => string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Theme, zoom and font changes rebuild the whole srcdoc, which would silently
@@ -476,6 +480,9 @@ function HtmlMessage({
   const setLinkPreviewUrl = useMessageLinkPreview();
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
+  // sanitizeHtmlForDisplay has no per-call options. The key is the cleaned
+  // HTML plus the sanitizer function. Theme and zoom only change the wrapper.
+  const safeHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -488,6 +495,7 @@ function HtmlMessage({
     const previewToken = `preview-${(previewDocumentSequence += 1)}`;
     const previewDocument = buildPreviewDocument({
       html,
+      safeHtml,
       darkMode,
       fontScale,
       zoom,
@@ -704,7 +712,7 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [darkMode, fontScale, html, setLinkPreviewUrl, showViewerFrame, zoom]);
+  }, [darkMode, fontScale, html, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>
