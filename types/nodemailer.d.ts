@@ -12,3 +12,8 @@ declare module "nodemailer/lib/addressparser/index.js" {
     options: { flatten: true }
   ): { address: string; name: string }[];
 }
+
+declare module "nodemailer/lib/punycode/index.js" {
+  const punycode: { toASCII(value: string): string };
+  export default punycode;
+}

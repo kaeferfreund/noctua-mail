@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { createAuthenticatedTestSession } from "./testAuthHarness";
 import { createCollabFixture } from "./testThreadCollabHarness";
 import { GET } from "@/app/api/accounts/[accountId]/messages/[messageId]/html/route";
-import { PUT } from "@/app/api/accounts/[accountId]/prefs/route";
+import { GET as getPrefs, PUT } from "@/app/api/accounts/[accountId]/prefs/route";
+import { remoteContentSenderKey } from "./html/remoteContent";
+import { senderPermissionCases } from "./testFixtures/senderPermissions";
 
 // Regression scenario copied from the S3 review probe, with privacy expectations.
 test("HTML route blocks remote resources and navigation and applies document policies", async () => {
@@ -64,4 +66,51 @@ test("HTML route matches the real From mailbox and rejects a quoted display-name
   expect(await (await get()).text()).not.toMatch(/\ssrc="https:\/\//);
   expect((await setAllowed("actual@example.test")).status).toBe(200);
   expect(await (await get()).text()).toContain('src="https://images.example.test/pixel"');
+});
+
+test("HTML route rejects unrelated sender permissions and saves/reads the full sender matrix", async () => {
+  const f = await createCollabFixture();
+  const user = await createAuthenticatedTestSession(f.accountId);
+  const prefsParams = { params: Promise.resolve({ accountId: f.accountId }) };
+  const patchPrefs = (patch: unknown) => PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
+    method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
+    body: JSON.stringify(patch)
+  }), prefsParams);
+  for (const { name, from, key } of senderPermissionCases) {
+    await patchPrefs({ remoteContent: null });
+    expect((await patchPrefs({ remoteContent: { allowedSenders: { "trusted@example.test": true } } })).status).toBe(200);
+    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, { from, htmlBody: '<img src="https://images.example.test/pixel">' }));
+    const get = () => GET(new Request("http://localhost:3000/html", { headers: user.jar.headers() }), {
+      params: Promise.resolve({ accountId: f.accountId, messageId: message.id })
+    });
+    const blocked = await get();
+    expect(blocked.status, name).toBe(200);
+    expect(await blocked.text(), name).not.toMatch(/\ssrc="https:\/\/images\.example\.test\/pixel"/);
+    expect(blocked.headers.get("content-security-policy"), name).not.toContain("https: http:");
+    expect(remoteContentSenderKey(from), name).toBe(key);
+    if (!key) continue;
+    const saved = await patchPrefs({ remoteContent: { allowedSenders: { [key]: true } } });
+    expect(saved.status, name).toBe(200);
+    const read = await getPrefs(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, { headers: user.jar.headers() }), prefsParams);
+    expect((await read.json()).prefs.remoteContent.allowedSenders[key], name).toBe(true);
+    expect(await (await get()).text(), name).toMatch(/\ssrc="https:\/\/images\.example\.test\/pixel"/);
+  }
+});
+
+test("sender preference saves canonicalize IDN, case and whitespace into one key and preserve quoted mailboxes", async () => {
+  const f = await createCollabFixture();
+  const user = await createAuthenticatedTestSession(f.accountId);
+  const params = { params: Promise.resolve({ accountId: f.accountId }) };
+  for (const input of [" \t ACTUAL@BÜCHER.EXAMPLE \t ", "actual@xn--bcher-kva.example", '  "ATTACKER TRUSTED"@EXAMPLE.TEST  ']) {
+    const saved = await PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
+      method: "PUT", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }),
+      body: JSON.stringify({ remoteContent: { allowedSenders: { [input]: true } } })
+    }), params);
+    expect(saved.status).toBe(200);
+  }
+  const read = await getPrefs(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, { headers: user.jar.headers() }), params);
+  expect((await read.json()).prefs.remoteContent.allowedSenders).toEqual({
+    "actual@xn--bcher-kva.example": true,
+    '"attacker trusted"@example.test': true
+  });
 });

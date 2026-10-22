@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { buildAccountApiPath } from "@/lib/accountApiPaths";
-import { remoteContentSenderKey, senderAllowsRemoteContent } from "@/lib/html/remoteContent";
+import { remoteContentSenderKey } from "@/lib/html/remoteContent";
 import type { UserAccountPrefs } from "@/lib/data";
 import { hasLoadedRemoteContent, loadRemoteContentOnce, retainRemoteContentDecision, subscribeRemoteContent } from "@/lib/html/remoteContentSession";
 
@@ -26,7 +26,7 @@ export function useRemoteContent(accountId: string | undefined, sender: string |
         const response = await fetch(buildAccountApiPath(accountId, "/prefs"));
         if (!response.ok) return;
         const { prefs } = await response.json() as { prefs: UserAccountPrefs };
-        if (active) setPreference({ key: preferenceKey, allowed: senderAllowsRemoteContent(prefs, senderKey) });
+        if (active) setPreference({ key: preferenceKey, allowed: prefs.remoteContent?.allowedSenders?.[senderKey] === true });
       } catch { /* Keep remote content blocked when preferences are unavailable. */ }
     };
     void refresh();

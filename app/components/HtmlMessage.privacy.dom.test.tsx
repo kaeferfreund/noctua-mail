@@ -1,13 +1,44 @@
 // @ts-expect-error bun:test is provided by the runner and is absent from this tsconfig.
 import { afterEach, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import HtmlMessage from "./HtmlMessage";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
+import { senderPermissionCases } from "@/lib/testFixtures/senderPermissions";
+import { accountPrefsPatchSchema } from "@/lib/accountPrefs";
+import type { UserAccountPrefs } from "@/lib/data";
 
 const originalFetch = globalThis.fetch;
 const originalOpen = window.open;
 afterEach(() => { cleanup(); globalThis.fetch = originalFetch; window.open = originalOpen; });
 const html = '<img width="200" height="100" src="https://images.example.test/photo"><img src="cid:logo">';
+
+for (const { name, from, key } of senderPermissionCases) {
+  test(`reader rejects unrelated sender permissions and saves/reads the mailbox: ${name}`, async () => {
+    let prefs: UserAccountPrefs = { remoteContent: { allowedSenders: { "trusted@example.test": true } } };
+    let saved: unknown;
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        saved = JSON.parse(String(init.body));
+        prefs = accountPrefsPatchSchema.parse(saved) as UserAccountPrefs;
+      }
+      return Response.json({ prefs });
+    }) as typeof fetch;
+    const props = { html, darkMode: false, accountId: crypto.randomUUID(), sender: from, messageId: "first" };
+    // Flush the async preference read before the rejecting assertions; an
+    // initial blocked render alone would miss a later unauthorized allow.
+    let view!: ReturnType<typeof render>;
+    await act(async () => { view = render(<HtmlMessage {...props} />); });
+    expect((view.getByTitle("HTML message") as HTMLIFrameElement).srcdoc).toContain("data-remote-src=");
+    const always = view.queryByRole("button", { name: "Always load from this sender" });
+    if (!key) { expect(always).toBeNull(); return; }
+    await act(async () => { fireEvent.click(always!); });
+    expect(saved).toEqual({ remoteContent: { allowedSenders: { [key]: true } } });
+    expect((view.getByTitle("HTML message") as HTMLIFrameElement).srcdoc).toMatch(/\ssrc="https:\/\/images\.example\.test\/photo"/);
+    view.unmount();
+    await act(async () => { view = render(<HtmlMessage {...props} messageId="reopened" />); });
+    expect((view.getByTitle("HTML message") as HTMLIFrameElement).srcdoc).toMatch(/\ssrc="https:\/\/images\.example\.test\/photo"/);
+  });
+}
 
 test("notice, load once, message change and persisted sender choice", async () => {
   const requests: { url: string; body?: string }[] = [];
