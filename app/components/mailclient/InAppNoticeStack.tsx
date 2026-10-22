@@ -8,6 +8,7 @@ import {
   X,
   type LucideIcon
 } from "lucide-react";
+import styles from "./InAppNoticeStack.module.css";
 
 export type InAppNoticeType = "info" | "success" | "warning" | "error";
 export type InAppNoticeIcon = "mail";
@@ -26,7 +27,15 @@ export type InAppNotice = {
   expiresAt?: number | null;
 };
 
+/**
+ * "floating" is the fixed toast over the panes (and in the detached compose
+ * and calendar windows); "sidebar" is the slim card docked in the sidebar
+ * footer above the account card.
+ */
+export type InAppNoticePlacement = "floating" | "sidebar";
+
 type InAppNoticeStackProps = {
+  placement?: InAppNoticePlacement;
   className?: string;
   style?: CSSProperties;
   state: {
@@ -49,8 +58,42 @@ const ICON_BY_NAME: Record<InAppNoticeIcon, LucideIcon> = {
 };
 
 const DISMISS_ANIMATION_DURATION = 140; // ms
+// The sidebar card must stay slim: older notices stay queued (and keep their
+// timers) and surface again when a newer one is dismissed.
+export const SIDEBAR_NOTICE_LIMIT = 2;
 
-export default function InAppNoticeStack({ className, style, state, actions }: InAppNoticeStackProps) {
+const CLASS_NAMES = {
+  floating: {
+    stack: "inapp-notice-stack",
+    notice: "inapp-notice",
+    icon: "notice-icon",
+    text: "notice-text",
+    title: "notice-title",
+    description: "notice-description",
+    controls: "notice-controls",
+    action: "notice-action",
+    dismiss: "icon-button ghost notice-dismiss"
+  },
+  sidebar: {
+    stack: styles.sidebarStack,
+    notice: styles.sidebarNotice,
+    icon: styles.icon,
+    text: styles.text,
+    title: styles.title,
+    description: styles.description,
+    controls: styles.controls,
+    action: styles.action,
+    dismiss: styles.dismiss
+  }
+} satisfies Record<InAppNoticePlacement, Record<string, string>>;
+
+export default function InAppNoticeStack({
+  placement = "floating",
+  className,
+  style,
+  state,
+  actions
+}: InAppNoticeStackProps) {
   const { inAppNotices } = state;
   const { onOpenNotice, onDismissNotice } = actions;
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
@@ -97,8 +140,6 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
     };
   }, []);
 
-  if (inAppNotices.length === 0) return null;
-
   const runNoticeAction = async (notice: InAppNotice) => {
     if (!notice.onAction) return;
     try {
@@ -108,9 +149,22 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
     }
   };
 
+  const docked = placement === "sidebar";
+  const classNames = CLASS_NAMES[placement];
+  const visibleNotices = docked ? inAppNotices.slice(-SIDEBAR_NOTICE_LIMIT) : inAppNotices;
+
+  // The live region stays mounted while empty so screen readers announce
+  // notices that are added to it later.
   return (
-    <div className={`inapp-notice-stack${className ? ` ${className}` : ""}`} style={style}>
-      {inAppNotices.map((notice) => {
+    <div
+      className={[styles.stack, classNames.stack, className].filter(Boolean).join(" ")}
+      style={style}
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+      data-placement={placement}
+    >
+      {visibleNotices.map((notice) => {
         const openable =
           Boolean(notice.messageId || (notice.ids && notice.ids.length > 0)) ||
           notice.type === "error";
@@ -123,7 +177,14 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
         return (
           <div
             key={notice.id}
-            className={`inapp-notice inapp-notice-${notice.type} ${openable ? "openable" : ""} ${isDismissing ? "dismissing" : ""}`}
+            className={
+              docked
+                ? classNames.notice
+                : `inapp-notice inapp-notice-${notice.type} ${openable ? "openable" : ""} ${isDismissing ? "dismissing" : ""}`
+            }
+            data-tone={notice.type}
+            data-openable={openable || undefined}
+            data-dismissing={isDismissing || undefined}
             role={openable ? "button" : undefined}
             tabIndex={openable ? 0 : -1}
             title={tooltip}
@@ -140,20 +201,20 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
               }
             }}
           >
-            <div className="notice-icon">
+            <div className={classNames.icon} aria-hidden="true">
               <TypeIcon size={14} />
             </div>
-            <div className="notice-text">
-              <strong className="notice-title">{notice.title}</strong>
+            <div className={classNames.text}>
+              <strong className={classNames.title}>{notice.title}</strong>
               {notice.description ? (
-                <span className="notice-description">{notice.description}</span>
+                <span className={classNames.description}>{notice.description}</span>
               ) : null}
             </div>
-            <div className="notice-controls">
+            <div className={classNames.controls}>
               {notice.actionLabel && notice.onAction ? (
                 <button
                   type="button"
-                  className="notice-action"
+                  className={classNames.action}
                   onClick={(event) => {
                     event.stopPropagation();
                     void runNoticeAction(notice);
@@ -164,7 +225,7 @@ export default function InAppNoticeStack({ className, style, state, actions }: I
               ) : null}
               <button
                 type="button"
-                className="icon-button ghost notice-dismiss"
+                className={classNames.dismiss}
                 onClick={(event) => {
                   event.stopPropagation();
                   handleDismiss(notice.id);
