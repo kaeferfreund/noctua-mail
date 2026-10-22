@@ -89,8 +89,8 @@ export async function deleteMessageById(accountId: string, messageId: string) {
       .prepare(`SELECT threadId FROM messages WHERE accountId = ? AND id = ?`)
       .get(accountId, messageId) as { threadId?: string | null } | undefined;
     db.transaction(() => {
-      db.prepare(`DELETE FROM attachments WHERE messageId = ?`).run(messageId);
-      db.prepare(`DELETE FROM message_fts WHERE messageId = ?`).run(messageId);
+      db.prepare(`DELETE FROM attachments WHERE accountId = ? AND messageId = ?`).run(accountId, messageId);
+      db.prepare(`DELETE FROM message_fts WHERE accountId = ? AND messageId = ?`).run(accountId, messageId);
       db.prepare(`DELETE FROM messages WHERE accountId = ? AND id = ?`).run(accountId, messageId);
     })();
     if (row?.threadId) {
@@ -138,17 +138,11 @@ export async function deleteMessagesByIds(accountId: string, messageIds: string[
         const placeholders = chunk.map(() => "?").join(",");
         db.prepare(
           `DELETE FROM attachments
-           WHERE messageId IN (
-             SELECT id FROM messages
-             WHERE accountId = ? AND id IN (${placeholders})
-           )`
+           WHERE accountId = ? AND messageId IN (${placeholders})`
         ).run(accountId, ...chunk);
         db.prepare(
           `DELETE FROM message_fts
-           WHERE messageId IN (
-             SELECT id FROM messages
-             WHERE accountId = ? AND id IN (${placeholders})
-           )`
+           WHERE accountId = ? AND messageId IN (${placeholders})`
         ).run(accountId, ...chunk);
         db.prepare(`DELETE FROM messages WHERE accountId = ? AND id IN (${placeholders})`).run(
           accountId,
@@ -207,16 +201,18 @@ export async function deleteMessagesByFolderPrefix(accountId: string, folderPref
     db.transaction(() => {
       db.prepare(
         `DELETE FROM attachments
-         WHERE messageId IN (
-           SELECT id FROM messages
-           WHERE accountId = ? AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')
+         WHERE EXISTS (
+           SELECT 1 FROM messages m
+           WHERE m.accountId = attachments.accountId AND m.id = attachments.messageId
+             AND m.accountId = ? AND (m.folderId = ? OR m.folderId LIKE ? ESCAPE '\\')
          )`
       ).run(accountId, prefix, childPattern);
       db.prepare(
         `DELETE FROM message_fts
-         WHERE messageId IN (
-           SELECT id FROM messages
-           WHERE accountId = ? AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')
+         WHERE EXISTS (
+           SELECT 1 FROM messages m
+           WHERE m.accountId = message_fts.accountId AND m.id = message_fts.messageId
+             AND m.accountId = ? AND (m.folderId = ? OR m.folderId LIKE ? ESCAPE '\\')
          )`
       ).run(accountId, prefix, childPattern);
       db.prepare(

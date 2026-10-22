@@ -67,6 +67,7 @@ export async function GET(request: Request, { params }: Params) {
     const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
 
+    // Resolve ownership before preview, cache validation, or filesystem access.
     const attachment = await getAttachmentMeta(accountId, messageId, attachmentId);
     if (!attachment) {
       return NextResponse.json({ ok: false, message: "Attachment not found" }, { status: 404 });

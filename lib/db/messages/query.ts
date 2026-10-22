@@ -726,7 +726,7 @@ function applySearchQueryFilters(params: {
       const ftsTokenQuery = ftsTokenQueries[index];
       if (ftsTokenQuery) {
         tokenParts.push(
-          `${messageAlias}.id IN (SELECT messageId FROM message_fts WHERE message_fts MATCH ?)`
+          `(${messageAlias}.accountId, ${messageAlias}.id) IN (SELECT accountId, messageId FROM message_fts WHERE message_fts MATCH ?)`
         );
         params.args.push(ftsTokenQuery);
       }
@@ -736,7 +736,7 @@ function applySearchQueryFilters(params: {
           `EXISTS (
             SELECT 1
             FROM attachments a
-            WHERE a.messageId = ${messageAlias}.id
+            WHERE a.accountId = ${messageAlias}.accountId AND a.messageId = ${messageAlias}.id
               AND lower(COALESCE(a.filename, '')) LIKE ?
           )`
         );
@@ -943,7 +943,7 @@ function buildMeaningfulAttachmentExistsSql(messageAlias = "m", attachmentAlias 
   return `EXISTS (
     SELECT 1
     FROM attachments ${attachmentAlias}
-    WHERE ${attachmentAlias}.messageId = ${messageAlias}.id
+    WHERE ${attachmentAlias}.accountId = ${messageAlias}.accountId AND ${attachmentAlias}.messageId = ${messageAlias}.id
       AND ${buildMeaningfulAttachmentPredicateSql(attachmentAlias)}
   )`;
 }
@@ -1055,11 +1055,11 @@ async function getGroupCounts(params: {
 
   // Apply "topic:" filter (messages assigned to a topic)
   topicTerms.forEach((topicId) => {
-    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId AND tt.topicId = ?)";
+    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId AND tt.topicId = ?)";
     args.push(topicId);
   });
   if (noTopicFilter) {
-    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId)";
+    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId)";
   }
 
   // Apply "in:" filter (searches in folder names)
@@ -1302,11 +1302,11 @@ async function getTotalCount(params: {
 
   // Apply "topic:" filter (messages assigned to a topic)
   topicTerms.forEach((topicId) => {
-    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId AND tt.topicId = ?)";
+    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId AND tt.topicId = ?)";
     args.push(topicId);
   });
   if (noTopicFilter) {
-    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId)";
+    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId)";
   }
 
   // Apply "in:" filter (searches in folder names)
@@ -1623,7 +1623,7 @@ export async function listRelatedMessages(params: {
         m.categoryScore,
         m.categorySignals,
         ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
-        EXISTS(SELECT 1 FROM attachments a WHERE a.messageId = m.id AND a.inline = 1)
+        EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
           as hasInlineAttachments
       FROM messages m
       WHERE ${where}
@@ -1942,11 +1942,11 @@ export async function listMessages(params: {
 
   // Apply "topic:" filter (messages assigned to a topic)
   topicTerms.forEach((topicId) => {
-    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId AND tt.topicId = ?)";
+    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId AND tt.topicId = ?)";
     args.push(topicId);
   });
   if (noTopicFilter) {
-    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId)";
+    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId)";
   }
 
   // Apply "in:" filter (searches in folder names)
@@ -2046,7 +2046,7 @@ export async function listMessages(params: {
         m.categoryScore,
         m.categorySignals,
         ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
-        EXISTS(SELECT 1 FROM attachments a WHERE a.messageId = m.id AND a.inline = 1)
+        EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
           as hasInlineAttachments
       FROM messages m
       WHERE ${where}
@@ -2251,11 +2251,11 @@ export async function listThreads(params: {
 
   // Apply "topic:" filter (messages assigned to a topic)
   topicTerms.forEach((topicId) => {
-    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId AND tt.topicId = ?)";
+    where += " AND EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId AND tt.topicId = ?)";
     args.push(topicId);
   });
   if (noTopicFilter) {
-    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.threadId = m.threadId)";
+    where += " AND NOT EXISTS (SELECT 1 FROM thread_topics tt WHERE tt.accountId = m.accountId AND tt.threadId = m.threadId)";
   }
 
   // Apply "in:" filter (searches in folder names)
@@ -2574,7 +2574,7 @@ export async function listThreads(params: {
               m.categoryScore,
               m.categorySignals,
               ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
-              EXISTS(SELECT 1 FROM attachments a WHERE a.messageId = m.id AND a.inline = 1)
+              EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
                 as hasInlineAttachments
             FROM messages m
             WHERE ${threadMessageWhere}
@@ -2804,9 +2804,9 @@ export async function listThreadMessages(params: {
     const chunk = ids.slice(start, start + QUERY_BATCH_SIZE);
     const batchRows = db
       .prepare(
-        `SELECT * FROM attachments WHERE messageId IN (${chunk.map(() => "?").join(",")})`
+        `SELECT * FROM attachments WHERE accountId = ? AND messageId IN (${chunk.map(() => "?").join(",")})`
       )
-      .all(...chunk) as any[];
+      .all(accountId, ...chunk) as any[];
     attachmentRows.push(...batchRows);
   }
   const calendarInviteDataByMessageId = await getMessageCalendarInviteDataByMessageId(
