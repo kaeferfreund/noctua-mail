@@ -31,7 +31,7 @@ export type SecurityInfo = {
   sessions: { id: string; current: boolean; createdAt: string; updatedAt: string; userAgent?: string; ip?: string }[];
 };
 export type ProofPurpose = "totp.enroll" | "totp.replace" | "passkey.enroll" | "passkey.remove" |
-  "passkey.rename" | "password.set" | "password.change" | "backup.regenerate" | "sessions.revoke";
+  "passkey.rename" | "password.set" | "password.change" | "backup.regenerate" | "sessions.revoke" | "admin.recovery";
 export type Proof = { ok: true; grant: string; purpose: ProofPurpose; expiresAt: number; ceremonyRequired?: boolean };
 export type ProofInput = { purpose: ProofPurpose; currentPassword?: string; totpCode?: string; backupCode?: string; proofMode?: "passkey" };
 export type SignupInput = { inviteCode: string; email: string; name: string; password: string };
