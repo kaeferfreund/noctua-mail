@@ -2,24 +2,21 @@ import styles from "./MessageListCommon.module.css";
 
 type UnreadDotProps = {
   seen: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
 };
 
-export default function UnreadDot({ seen, disabled, onToggle }: UnreadDotProps) {
+// Status only: read state is toggled from the row menu, the bulk menu and the
+// r/u shortcuts, so a click here falls through to the row. Read rows keep an
+// empty slot of the same size so the leading column does not shift.
+export default function UnreadDot({ seen }: UnreadDotProps) {
+  if (seen) {
+    return <span data-unread-dot="" className={styles.unreadDotSlot} aria-hidden="true" />;
+  }
   return (
-    <button
-      type="button"
-      className={`${styles.unreadDot} ${seen ? styles.unreadDotRead : ""} ${
-        disabled ? styles.unreadDotDisabled : ""
-      }`}
-      title={seen ? "Mark as unread" : "Mark as read"}
-      aria-label={seen ? "Mark as unread" : "Mark as read"}
-      disabled={disabled}
-      onClick={(event) => {
-        event.stopPropagation();
-        onToggle();
-      }}
+    <span
+      data-unread-dot=""
+      className={`${styles.unreadDotSlot} ${styles.unreadDot}`}
+      role="img"
+      aria-label="Unread"
     />
   );
 }
