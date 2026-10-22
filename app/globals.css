@@ -527,6 +527,13 @@ a {
   white-space: nowrap;
 }
 
+.inapp-notice .notice-description-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .inapp-notice .notice-controls {
   display: inline-flex;
   align-items: center;

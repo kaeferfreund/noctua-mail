@@ -1,3 +1,4 @@
+import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { memo, useEffect, useRef, useState } from "react";
 import type React from "react";
 import { CalendarDays, GitBranch, MoveRight, Paperclip, Search, Trash2 } from "lucide-react";
@@ -463,12 +464,13 @@ function MessageRow({
             {message.subject}
           </Text>
         </div>
+        <span className={styles.mobileCollab}><CollabRowBadges message={message} /></span>
         {(
           showFolderBadgesInSubjectMeta ||
           showThreadIndicator ||
           showAttachmentIcon ||
           showCalendarInviteIcon ||
-          categoryIcon
+          categoryIcon || message.collab
         ) && (
           <div className={styles.subjectMeta}>
             {showFolderBadgesInSubjectMeta && folderBadges}
@@ -521,6 +523,7 @@ function MessageRow({
             {messageTopics && messageTopics.map((topic) => (
               <TopicBadge key={topic.id} topic={topic} showText size="1" preferShortName />
             ))}
+            <CollabRowBadges message={message} />
             {(threadHasFlagged ?? message.flagged) && (
               <FlagBadge onClick={() => toggleFlaggedFlag(message, collapsedThreadMessages)} />
             )}

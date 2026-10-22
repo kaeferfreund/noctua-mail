@@ -19,7 +19,7 @@ describe("collaboration thread remap", () => {
     }).immediate();
     await recomputeThreadIdsForAccount(f.accountId);
     expect(store.getThreadCollabState(f.db, f.accountId, a)).toMatchObject({ status: "waiting", assigneeUserId: "second", assignedAt: 200, commentCount: 2, updatedAt: 400, updatedByUserId: actor.userId });
-    expect(f.db.prepare("SELECT * FROM thread_collab_state WHERE accountId=? AND threadId=?").get(f.accountId, b)).toBeNull();
+    expect(store.getThreadCollabState(f.db, f.accountId, b)).toMatchObject({ status: "open", commentCount: 0, revision: 3 });
     expect(store.listThreadComments(f.db, f.accountId, a).map(c => c.body)).toEqual(["Root comment", "Reply comment"]);
     expect(f.db.prepare("SELECT topicId FROM thread_topics WHERE accountId=? AND threadId=?").all(f.accountId, a)).toHaveLength(3);
     const merged = store.listThreadActivity(f.db, f.accountId, a).filter(a => a.type === "threads_merged");

@@ -889,7 +889,9 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
   const existing = new Set((db.prepare(`SELECT name FROM sqlite_master
     WHERE type IN ('table', 'index') AND name IN (${requiredObjects.map(() => "?").join(",")})`)
     .all(...requiredObjects) as Array<{ name: string }>).map(row => row.name));
-  if (requiredObjects.every(name => existing.has(name))) {
+  if (requiredObjects.every(name => existing.has(name)) &&
+    ["thread_collab_state", "thread_comments"].every(table =>
+      db.prepare(`PRAGMA table_info(${table})`).all().some((column: { name: string }) => column.name === "revision"))) {
     threadCollabSchemaByDb.add(db);
     return;
   }
@@ -901,12 +903,13 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
         assignedByUserId TEXT, assignedAt INTEGER, statusChangedAt INTEGER,
         statusChangedByUserId TEXT, commentCount INTEGER NOT NULL DEFAULT 0,
         lastActivityAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, updatedByUserId TEXT,
+        revision INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (accountId, threadId)
       );
       CREATE TABLE IF NOT EXISTS thread_comments (
         id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,
         authorUserId TEXT NOT NULL, body TEXT NOT NULL, createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL, deletedAt INTEGER
+        updatedAt INTEGER NOT NULL, deletedAt INTEGER, revision INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS sent_by (
         accountId TEXT NOT NULL, messageId TEXT NOT NULL, userId TEXT NOT NULL, sentAt INTEGER NOT NULL,
@@ -926,8 +929,12 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
       CREATE INDEX IF NOT EXISTS idx_thread_activity_thread
         ON thread_activity(accountId, threadId, createdAt);
     `);
-    // Future additive columns belong here: re-read PRAGMA inside this immediate
-    // transaction and tolerate duplicate-column errors, as required by §3.
+    // Re-read under the writer lock: another connection may have migrated first.
+    for (const table of ["thread_collab_state", "thread_comments"]) {
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (!columns.some(column => column.name === "revision"))
+        db.exec(`ALTER TABLE ${table} ADD COLUMN revision INTEGER NOT NULL DEFAULT 0`);
+    }
   }).immediate();
   threadCollabSchemaByDb.add(db);
 }

@@ -4,11 +4,13 @@ export const DETACHED_COMPOSE_HANDOFF_STORAGE_PREFIX =
   "noctua:detached-compose-handoff:";
 export const DETACHED_COMPOSE_EVENT_STORAGE_KEY =
   "noctua:detached-compose-event";
+export const DETACHED_COMPOSE_WARNING_PREFIX = "noctua:detached-compose-warning:";
 export const DETACHED_COMPOSE_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type DetachedComposeSessionBase = {
   version: 1;
   accountId: string;
+  ownerUserId?: string;
   mode: ComposeMode;
   sourceMessageId: string | null;
   createdAtMs: number;
@@ -38,7 +40,9 @@ export type DetachedComposeEvent = {
   eventId: string;
   handoffId: string;
   accountId: string;
+  ownerUserId?: string;
   outcome: DetachedComposeEventOutcome;
+  warnings?: string[];
   draftId: string | null;
   sourceMessageId: string | null;
   mode: ComposeMode;
@@ -91,6 +95,7 @@ export function parseDetachedComposeHandoff(
     if (
       !parsed ||
       parsed.version !== 1 ||
+      (parsed.ownerUserId !== undefined && (typeof parsed.ownerUserId !== "string" || !parsed.ownerUserId.trim())) ||
       typeof parsed.accountId !== "string" ||
       !parsed.accountId.trim() ||
       !isComposeMode(parsed.mode) ||
@@ -206,6 +211,7 @@ export function parseDetachedComposeEvent(rawValue: string | null): DetachedComp
     if (
       !parsed ||
       parsed.version !== 1 ||
+      (parsed.ownerUserId !== undefined && (typeof parsed.ownerUserId !== "string" || !parsed.ownerUserId.trim())) ||
       typeof parsed.eventId !== "string" ||
       !parsed.eventId ||
       typeof parsed.handoffId !== "string" ||
@@ -221,6 +227,7 @@ export function parseDetachedComposeEvent(rawValue: string | null): DetachedComp
     ) {
       return null;
     }
+    if (parsed.warnings !== undefined && (!Array.isArray(parsed.warnings) || !parsed.warnings.every((warning: unknown) => typeof warning === "string"))) return null;
     return parsed as DetachedComposeEvent;
   } catch {
     return null;
@@ -231,9 +238,10 @@ export function notifyDetachedComposeOutcome(
   handoffId: string,
   handoff: Extract<DetachedComposeHandoff, { status: "ready" }>,
   outcome: DetachedComposeOutcome,
-  draftId: string | null
+  draftId: string | null,
+  warnings?: string[]
 ) {
-  writeDetachedComposeEvent(handoffId, handoff, outcome, draftId);
+  writeDetachedComposeEvent(handoffId, handoff, outcome, draftId, warnings);
   removeDetachedComposeHandoff(handoffId);
 }
 
@@ -249,22 +257,48 @@ function writeDetachedComposeEvent(
   handoffId: string,
   handoff: Extract<DetachedComposeHandoff, { status: "ready" }>,
   outcome: DetachedComposeEventOutcome,
-  draftId: string | null
+  draftId: string | null,
+  warnings?: string[]
 ) {
   const event: DetachedComposeEvent = {
     version: 1,
     eventId: window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
     handoffId,
     accountId: handoff.accountId,
+    ownerUserId: handoff.ownerUserId,
     outcome,
+    ...(warnings?.length ? { warnings } : {}),
     draftId,
     sourceMessageId: handoff.sourceMessageId,
     mode: handoff.mode,
     createdAtMs: Date.now()
   };
   try {
+    if (event.ownerUserId && event.warnings?.length) {
+      window.localStorage.setItem(`${DETACHED_COMPOSE_WARNING_PREFIX}${event.eventId}`, JSON.stringify(event));
+    }
     window.localStorage.setItem(DETACHED_COMPOSE_EVENT_STORAGE_KEY, JSON.stringify(event));
   } catch {
     // The server-side operation already succeeded; storage reconciliation is best effort.
   }
+}
+
+/** Warning receipts survive later events/reloads until explicitly acknowledged. */
+export function readDetachedComposeWarnings(
+  ownerUserId: string | null | undefined,
+  accountIds: readonly string[],
+): DetachedComposeEvent[] {
+  if (!ownerUserId) return [];
+  const accessibleAccounts = new Set(accountIds);
+  const receipts: DetachedComposeEvent[] = [];
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (!key?.startsWith(DETACHED_COMPOSE_WARNING_PREFIX)) continue;
+    const event = parseDetachedComposeEvent(window.localStorage.getItem(key));
+    if (event?.ownerUserId === ownerUserId && accessibleAccounts.has(event.accountId) && event.warnings?.length) receipts.push(event);
+  }
+  return receipts.sort((a, b) => a.createdAtMs - b.createdAtMs);
+}
+export function acknowledgeDetachedComposeWarning(eventId: string) {
+  window.localStorage.removeItem(`${DETACHED_COMPOSE_WARNING_PREFIX}${eventId}`);
 }

@@ -29,7 +29,7 @@ describe("collaboration domain", () => {
     (await getDb()).prepare("UPDATE user_accounts SET role='viewer' WHERE userId=? AND accountId=?").run(principal.user.id, f.accountId);
     await expect(collab.addThreadComment(f.accountId, f.thread, "denied", f.actor)).rejects.toMatchObject({ status: 403 });
   });
-  test("comments validate body, enforce authorship and manager override, and no-op on repeats", async () => {
+  test("comments validate body, enforce authorship and manager override, and keep repeated content idempotent", async () => {
     const f = await fixture();
     await f.seed(f.message(f.thread));
     for (const body of ["", "   ", "x".repeat(20001)])
@@ -39,7 +39,10 @@ describe("collaboration domain", () => {
     expect(edited!.state.commentCount).toBe(1);
     const before = await collab.getThreadCollabState(f.accountId, f.thread);
     await collab.editThreadComment(f.accountId, f.thread, added.comment.id, "Updated note", f.actor);
-    expect(await collab.getThreadCollabState(f.accountId, f.thread)).toEqual(before);
+    expect(await collab.getThreadCollabState(f.accountId, f.thread)).toMatchObject({
+      commentCount: before.commentCount, revision: before.revision + 1,
+    });
+    expect((await collab.listThreadComments(f.accountId, f.thread))[0].revision).toBe(edited!.comment.revision);
     const other = await principal.createUser(`other-${crypto.randomUUID()}@example.test`);
     await principal.addMembership(other.id, f.accountId, "editor");
     const otherActor = { userId: other.id, clientId: "mcp:synthetic" };
