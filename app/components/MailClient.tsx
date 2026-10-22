@@ -5308,7 +5308,7 @@ export default function MailClient({
             onSwitch: (accountId: string) => {
               void switchAccount(accountId);
             },
-            onAdd: () => { if (isAdminUser) setNewMailboxOpen(true); }
+            onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
           views: {
             inbox: inboxView,
