@@ -28,6 +28,7 @@ import {
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export type UseAccountControllerParams = {
+  currentUser: AuthUser | null;
   activeAccountId: string;
   accounts: Account[];
   accountFolders: Folder[];
@@ -79,6 +80,7 @@ export type UseAccountControllerParams = {
 };
 
 export function useAccountController({
+  currentUser,
   activeAccountId,
   accounts,
   accountFolders,
@@ -122,6 +124,11 @@ export function useAccountController({
   const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [accountSaveError, setAccountSaveError] = useState<string | null>(null);
+  const [accountSaving, setAccountSaving] = useState(false);
+  const savingAccount = useRef(false);
+  // A failed grant/refresh can be retried without creating the mailbox twice.
+  const createdMailbox = useRef<{ draftId: string; accountId: string } | null>(null);
   const loadVersion = useRef(0);
   const lastIdentity = useRef<string | null>(null);
   const loadInitialData = useCallback(
@@ -250,30 +257,58 @@ export function useAccountController({
   );
 
   const saveAccount = async (account: Account) => {
+    if (savingAccount.current) return;
+    setAccountSaveError(null);
+    const exists = accounts.some((a) => a.id === account.id);
+    const fail = (message: string) => {
+      setAccountSaveError(message);
+      reportError(message);
+    };
+    if (!exists && (currentUser?.role !== "admin" || !currentUser.id)) {
+      fail("Only an admin can add mailboxes");
+      return;
+    }
     if (!account.email?.trim()) {
-      reportError("Email address is required");
+      fail("Email address is required");
       return;
     }
-    const exists = Boolean(accounts.find((a) => a.id === account.id));
-    const { endpoint, method, body, isNew } = buildAccountSaveRequest(account, exists);
-    const saveResult = await apiFetch(endpoint, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!saveResult.ok) {
-      reportError(await readErrorMessage(saveResult));
-      return;
-    }
-    const newAccountId = isNew
-      ? ((await saveResult.json()) as { id: string }).id
-      : account.id;
-    const refreshed = await apiFetch("/api/accounts");
-    if (refreshed.ok) {
-      const nextAccounts = (await refreshed.json()) as Account[];
-      setAccounts(nextAccounts);
+    savingAccount.current = true;
+    setAccountSaving(true);
+    try {
+      const { endpoint, method, body, isNew } = buildAccountSaveRequest(account, exists);
+      let newAccountId = isNew && createdMailbox.current?.draftId === account.id
+        ? createdMailbox.current.accountId : account.id;
+      if (!isNew || createdMailbox.current?.draftId !== account.id) {
+        const saveResult = await apiFetch(endpoint, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (!saveResult.ok) { fail(await readErrorMessage(saveResult)); return; }
+        if (isNew) {
+          newAccountId = ((await saveResult.json()) as { account: Account }).account.id;
+          createdMailbox.current = { draftId: account.id, accountId: newAccountId };
+        }
+      }
+      if (isNew) {
+        // Admin creation grants no mail access. Use the audited membership route,
+        // including for the creating admin, before refreshing or selecting mail.
+        const grant = await apiFetch(`/api/admin/accounts/${encodeURIComponent(newAccountId)}/members/${encodeURIComponent(currentUser!.id)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "manager" })
+        });
+        if (!grant.ok) {
+          fail(`Mailbox created, but access could not be granted: ${await readErrorMessage(grant)}. Retry Save to grant access.`);
+          return;
+        }
+      }
+      const refreshed = await apiFetch("/api/accounts");
+      if (!refreshed.ok) { fail(await readErrorMessage(refreshed)); return; }
+      setAccounts((await refreshed.json()) as Account[]);
       setManageOpen(false);
       setEditingAccount(null);
+      createdMailbox.current = null;
       if (isNew) {
         await switchAccount(newAccountId);
         await refreshFolders(newAccountId);
@@ -285,15 +320,14 @@ export function useAccountController({
             fullSyncReason: "Initial sync for a newly created account."
           });
         } catch (error) {
-          reportError(
-            error instanceof Error
-              ? error.message
-              : "Initial sync for the new account failed."
-          );
+          reportError(error instanceof Error ? error.message : "Initial sync for the new account failed.");
         }
       }
-    } else {
-      reportError(await readErrorMessage(refreshed));
+    } catch (error) {
+      fail(error instanceof Error ? error.message : "Failed to save mailbox. Please retry.");
+    } finally {
+      savingAccount.current = false;
+      setAccountSaving(false);
     }
   };
 
@@ -345,6 +379,12 @@ export function useAccountController({
   };
 
   const startEditAccount = (account?: Account) => {
+    setAccountSaveError(null);
+    if (!account && currentUser?.role !== "admin") {
+      reportError("Only an admin can add mailboxes");
+      return;
+    }
+    createdMailbox.current = null;
     const targetAccount: Account =
       account ?? createBlankEditAccount(() => crypto.randomUUID());
     setEditingAccount(targetAccount);
@@ -436,7 +476,7 @@ export function useAccountController({
   }, [loadInitialData]);
 
   return {
-    mailboxState, security, bootstrapError, logout,
+    mailboxState, security, bootstrapError, logout, accountSaveError, accountSaving,
     loadInitialData,
     switchAccount,
     refreshFolders,
