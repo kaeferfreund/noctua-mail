@@ -90,7 +90,9 @@
   --destructive: var(--red-9);
   --border: var(--gray-6);
   --input: var(--gray-6);
-  --ring: var(--iris-8);
+  /* Opaque sRGB focus contrast (installed Radix iris-9 #5b5bd6):
+     5.37:1 on white, 5.10:1 on gray-2 sidebar, 4.38:1 on gray-4 hover. */
+  --ring: var(--iris-9);
   --chart-1: var(--iris-6);
   --chart-2: var(--iris-8);
   --chart-3: var(--iris-9);
@@ -104,7 +106,7 @@
   --sidebar-accent: var(--gray-4);
   --sidebar-accent-foreground: var(--gray-12);
   --sidebar-border: var(--gray-6);
-  --sidebar-ring: var(--iris-8);
+  --sidebar-ring: var(--ring);
 }
 
 /* Same names as :root. The Radix scales flip under .dark; the steps differ
@@ -127,7 +129,10 @@
   --destructive: var(--red-9);
   --border: rgb(255 255 255 / 10%);
   --input: rgb(255 255 255 / 10%);
-  --ring: var(--iris-8);
+  /* Opaque iris-11 #b1a9ff: 8.52:1 on the oklch(.205 0 0) card /
+     sidebar, 9.41:1 on the .145 background, 6.19:1 on gray-5 hover.
+     iris-10 is only 2.96:1 on gray-5, so dark focus needs iris-11. */
+  --ring: var(--iris-11);
   --chart-1: var(--iris-6);
   --chart-2: var(--iris-8);
   --chart-3: var(--iris-9);
@@ -140,7 +145,7 @@
   --sidebar-accent: var(--gray-5);
   --sidebar-accent-foreground: var(--gray-12);
   --sidebar-border: rgb(255 255 255 / 10%);
-  --sidebar-ring: var(--iris-8);
+  --sidebar-ring: var(--ring);
 }
 
 /* Legacy aliases used by the kept components and the @layer legacy rules.
@@ -167,7 +172,7 @@
   --list-row-selected-border: var(--iris-5);
   --list-row-active-bg: var(--iris-3);
   --list-row-active-border: var(--iris-6);
-  --list-row-focus-ring: var(--iris-8);
+  --list-row-focus-ring: var(--ring);
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
   --quote-2: var(--iris-4);
 }
@@ -273,8 +278,7 @@ body {
      9998  shadcn popper content (z-[9998] in app/components/ui/{popover,
            select,dropdown-menu,tooltip}.tsx) and Radix Themes popper
            content (.rt-PopperContent, below)
-     9999  .auth-overlay (removed together with LoginOverlay) and the
-           off-screen .drag-ghost
+     9999  off-screen .drag-ghost
    Radix Themes dialog overlays portal into `.radix-themes` with z-index: auto,
    and a fixed-position element always forms a stacking context, so without
    the lift a dialog opened from the calendar panel (e.g. EventDialog via the
@@ -312,62 +316,40 @@ a {
   text-decoration: none;
 }
 
-.auth-overlay {
-  position: fixed;
-  inset: 0;
-  backdrop-filter: blur(6px);
-  background: rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+/* Retained Radix controls share the opaque shell focus token, including
+   explicitly coloured controls that redeclare --focus-8. Soft buttons use
+   --accent-8 directly, so bridge their outline separately. */
+.radix-themes,
+.radix-themes [data-accent-color] {
+  --focus-8: var(--ring);
 }
 
-.auth-modal {
-  background: var(--surface-2);
-  color: var(--text);
-  width: min(560px, 92vw);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.radix-themes .rt-BaseButton:where(:focus-visible) {
+  outline-color: var(--ring);
 }
 
-.auth-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+/* Retained secondary surface buttons follow the neutral shell palette.
+   Solid primary buttons keep their accent. */
+[data-shell] :where(.rt-Button.rt-variant-surface, .rt-IconButton.rt-variant-surface) {
+  background-color: var(--gray-3);
+  box-shadow: inset 0 0 0 1px var(--gray-6);
+  color: var(--gray-12);
 }
 
-.auth-close {
-  opacity: 0.4;
+[data-shell] :where(.rt-Button.rt-variant-surface:hover, .rt-IconButton.rt-variant-surface:hover) {
+  background-color: var(--gray-4);
+  box-shadow: inset 0 0 0 1px var(--gray-7);
 }
 
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.dark [data-shell] :where(.rt-Button.rt-variant-surface, .rt-IconButton.rt-variant-surface) {
+  background-color: var(--gray-4);
+  box-shadow: inset 0 0 0 1px var(--gray-7);
+  color: var(--gray-12);
 }
 
-.auth-form input[type="text"],
-.auth-form input[type="email"],
-.auth-form input[type="password"],
-.auth-form input[type="number"] {
-  width: 100%;
-}
-
-.auth-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px 12px;
-}
-
-.auth-error {
-  color: var(--red-11);
-  background: var(--red-a3);
-  border: 1px solid var(--red-a6);
-  padding: 8px 10px;
-  border-radius: 8px;
+.dark [data-shell] :where(.rt-Button.rt-variant-surface:hover, .rt-IconButton.rt-variant-surface:hover) {
+  background-color: var(--gray-5);
+  box-shadow: inset 0 0 0 1px var(--gray-8);
 }
 
 .auth-error-floating {

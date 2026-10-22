@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-libra
 import { Theme, Button as KeptButton } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
-import { SidebarProvider } from "@/app/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { ShellAccount } from "./types";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
@@ -135,5 +135,32 @@ describe("resizable shell panes", () => {
     expect(view.queryByText("Calendar")).toBeNull();
     expect(view.getByTestId("list-viewport")).toBe(viewport);
     expect(view.getByTestId("reader-content")).toBe(content);
+  });
+});
+
+
+describe("shell landmarks", () => {
+  it("keeps a single main landmark when SidebarInset sits inside the root main", () => {
+    const view = render(<main><SidebarProvider><SidebarInset>Mail</SidebarInset></SidebarProvider></main>);
+    expect(view.getAllByRole("main")).toHaveLength(1);
+  });
+});
+
+
+describe("sidebar editable target guard", () => {
+  it("leaves native text fields and nested contenteditable targets to their own shortcuts", () => {
+    let toggles = 0;
+    const view = render(<><SidebarProvider onOpenChange={() => { toggles++; }} />
+      <input aria-label="Synthetic input" /><textarea aria-label="Synthetic textarea" />
+      <div contentEditable suppressContentEditableWarning><span>Editable child</span></div>
+    </>);
+    for (const target of [view.getByLabelText("Synthetic input"), view.getByLabelText("Synthetic textarea"), view.getByText("Editable child")]) {
+      for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+        expect(fireEvent.keyDown(target, { key: "b", ...modifier })).toBe(true);
+        expect(toggles).toBe(0);
+      }
+    }
+    expect(fireEvent.keyDown(window, { key: "b", ctrlKey: true })).toBe(false);
+    expect(toggles).toBe(1);
   });
 });

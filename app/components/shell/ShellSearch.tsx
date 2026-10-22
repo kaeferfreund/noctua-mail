@@ -1,16 +1,12 @@
 "use client";
 
 import type React from "react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import {
-  Circle,
-  CircleDot,
   Folder as FolderIcon,
   Search,
   SlidersHorizontal,
   Sparkles,
-  Square,
-  SquareCheck,
   X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,34 +62,43 @@ export type ShellSearchProps = {
 type FilterRowProps = {
   kind: "checkbox" | "radio";
   checked: boolean;
+  name?: string;
+  value?: string;
   disabled?: boolean;
   indented?: boolean;
   onSelect: () => void;
   children: React.ReactNode;
 };
 
-function FilterRow({ kind, checked, disabled, indented, onSelect, children }: FilterRowProps) {
-  const Icon = kind === "radio" ? (checked ? CircleDot : Circle) : checked ? SquareCheck : Square;
+function FilterRow({ kind, checked, name, value, disabled, indented, onSelect, children }: FilterRowProps) {
   return (
-    <button
-      type="button"
-      role={kind === "radio" ? "menuitemradio" : "menuitemcheckbox"}
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onSelect}
+    <label
       className={cn(
-        "flex w-full items-center gap-2 rounded-md bg-transparent px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent disabled:pointer-events-none disabled:opacity-50",
+        "flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent has-[:focus-visible]:bg-accent has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50",
         indented && "pl-7"
       )}
     >
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <input
+        type={kind}
+        name={name}
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={onSelect}
+        className="m-0 size-3.5 shrink-0 appearance-auto accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      />
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
-    </button>
+    </label>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="px-2 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">{children}</div>;
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="m-0 min-w-0 shrink-0 border-0 p-0">
+      <legend className="px-2 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">{label}</legend>
+      {children}
+    </fieldset>
+  );
 }
 
 /**
@@ -126,6 +131,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
     setLastFolderId
   } = actions;
 
+  const scopeName = useId();
   const folderById = useMemo(
     () => new Map(accountFolders.map((folder) => [folder.id, folder])),
     [accountFolders]
@@ -147,6 +153,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
   }, [currentFolder, folderById]);
 
   const handleScopeChange = (nextScope: SearchScope) => {
+    if (nextScope === searchScope) return;
     setSearchScope(nextScope);
     if (nextScope === "all") {
       setLastFolderId(activeFolderId);
@@ -216,105 +223,115 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
             ) : null}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-80 gap-0 p-1">
-          <SectionLabel>Scope</SectionLabel>
-          <FilterRow
-            kind="radio"
-            checked={searchScope === "folder"}
-            onSelect={() => handleScopeChange("folder")}
-          >
-            <span>Current folder:</span>
-            {currentFolder ? (
-              <Badge variant="outline" title={currentFolderPath} className="max-w-40">
-                <FolderIcon data-icon="inline-start" />
-                <span className="truncate">{currentFolder.name}</span>
-              </Badge>
-            ) : null}
-          </FilterRow>
-          <FilterRow
-            kind="radio"
-            checked={searchScope === "all"}
-            onSelect={() => handleScopeChange("all")}
-          >
-            Everywhere
-          </FilterRow>
-          {sentFolderName ? (
+        <PopoverContent align="end" className="max-h-(--radix-popover-content-available-height) w-80 gap-0 overflow-y-auto p-1 [&>[data-slot=separator]]:shrink-0">
+          <FilterGroup label="Scope">
             <FilterRow
-              kind="checkbox"
-              checked={includeSentInEverywhere}
-              disabled={searchScope !== "all"}
-              indented
-              onSelect={() => setIncludeSentInEverywhere((value) => !value)}
-            >
-              {`Include ${sentFolderName}`}
-            </FilterRow>
-          ) : null}
-          <Separator className="my-1" />
-          <SectionLabel>Search in</SectionLabel>
-          {SEARCH_FIELD_OPTIONS.map(([key, label]) => (
-            <FilterRow
-              key={key}
-              kind="checkbox"
-              checked={searchFields[key]}
-              disabled={key === "sender" && searchFields.participants}
-              onSelect={() =>
-                setSearchFields((prev) => {
-                  const next = !prev[key];
-                  return {
-                    ...prev,
-                    [key]: next,
-                    ...(key === "participants" && next ? { sender: false } : {})
-                  };
-                })
-              }
-            >
-              {label}
-            </FilterRow>
-          ))}
-          <Separator className="my-1" />
-          <SectionLabel>Filter</SectionLabel>
-          {PRIMARY_BADGES.map(([key, label]) => (
-            <FilterRow
-              key={key}
-              kind="checkbox"
-              checked={searchBadges[key]}
-              onSelect={() => setSearchBadges((prev) => ({ ...prev, [key]: !prev[key] }))}
-            >
-              {label}
-            </FilterRow>
-          ))}
-          <Separator className="my-1" />
-          {CATEGORY_BADGE_OPTIONS.map(([key, label]) => (
-            // The three categories are exclusive: selecting one clears the
-            // others, selecting it again clears the category filter.
-            <FilterRow
-              key={key}
               kind="radio"
-              checked={searchBadges[key]}
+              name={scopeName}
+              value="folder"
+              checked={searchScope === "folder"}
+              onSelect={() => handleScopeChange("folder")}
+            >
+              <span>Current folder:</span>
+              {currentFolder ? (
+                <Badge variant="outline" title={currentFolderPath} className="max-w-40">
+                  <FolderIcon data-icon="inline-start" />
+                  <span className="truncate">{currentFolder.name}</span>
+                </Badge>
+              ) : null}
+            </FilterRow>
+            <FilterRow
+              kind="radio"
+              name={scopeName}
+              value="all"
+              checked={searchScope === "all"}
+              onSelect={() => handleScopeChange("all")}
+            >
+              Everywhere
+            </FilterRow>
+            {sentFolderName ? (
+              <FilterRow
+                kind="checkbox"
+                checked={includeSentInEverywhere}
+                disabled={searchScope !== "all"}
+                indented
+                onSelect={() => setIncludeSentInEverywhere((value) => !value)}
+              >
+                {`Include ${sentFolderName}`}
+              </FilterRow>
+            ) : null}
+          </FilterGroup>
+          <Separator className="my-1" />
+          <FilterGroup label="Search in">
+            {SEARCH_FIELD_OPTIONS.map(([key, label]) => (
+              <FilterRow
+                key={key}
+                kind="checkbox"
+                checked={searchFields[key]}
+                disabled={key === "sender" && searchFields.participants}
+                onSelect={() =>
+                  setSearchFields((prev) => {
+                    const next = !prev[key];
+                    return {
+                      ...prev,
+                      [key]: next,
+                      ...(key === "participants" && next ? { sender: false } : {})
+                    };
+                  })
+                }
+              >
+                {label}
+              </FilterRow>
+            ))}
+          </FilterGroup>
+          <Separator className="my-1" />
+          <FilterGroup label="Filter">
+            {PRIMARY_BADGES.map(([key, label]) => (
+              <FilterRow
+                key={key}
+                kind="checkbox"
+                checked={searchBadges[key]}
+                onSelect={() => setSearchBadges((prev) => ({ ...prev, [key]: !prev[key] }))}
+              >
+                {label}
+              </FilterRow>
+            ))}
+          </FilterGroup>
+          <Separator className="my-1" />
+          <FilterGroup label="Categories">
+            {CATEGORY_BADGE_OPTIONS.map(([key, label]) => (
+              // The three categories are exclusive: selecting one clears the
+              // others, selecting it again clears the category filter.
+              <FilterRow
+                key={key}
+                kind="checkbox"
+                checked={searchBadges[key]}
+                onSelect={() =>
+                  setSearchBadges((prev) => ({
+                    ...prev,
+                    newsletter: key === "newsletter" ? !prev.newsletter : false,
+                    notification: key === "notification" ? !prev.notification : false,
+                    transactional: key === "transactional" ? !prev.transactional : false
+                  }))
+                }
+              >
+                {label}
+              </FilterRow>
+            ))}
+          </FilterGroup>
+          <Separator className="my-1" />
+          <FilterGroup label="AI">
+            <FilterRow
+              kind="checkbox"
+              checked={searchBadges["ai-modified"]}
               onSelect={() =>
-                setSearchBadges((prev) => ({
-                  ...prev,
-                  newsletter: key === "newsletter" ? !prev.newsletter : false,
-                  notification: key === "notification" ? !prev.notification : false,
-                  transactional: key === "transactional" ? !prev.transactional : false
-                }))
+                setSearchBadges((prev) => ({ ...prev, "ai-modified": !prev["ai-modified"] }))
               }
             >
-              {label}
+              <Sparkles className="size-3.5" aria-hidden />
+              AI Modified
             </FilterRow>
-          ))}
-          <Separator className="my-1" />
-          <SectionLabel>AI</SectionLabel>
-          <FilterRow
-            kind="checkbox"
-            checked={searchBadges["ai-modified"]}
-            onSelect={() =>
-              setSearchBadges((prev) => ({ ...prev, "ai-modified": !prev["ai-modified"] }))
-            }
-          >
-            <Sparkles className="size-3.5" aria-hidden />
-            AI Modified
-          </FilterRow>
+          </FilterGroup>
         </PopoverContent>
       </Popover>
     </div>
