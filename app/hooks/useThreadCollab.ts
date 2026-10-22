@@ -16,7 +16,9 @@ type Snapshot = {
 type Options = {
   apiFetch?: typeof fetch;
   onUpdate?: (state: ThreadCollabState) => void;
-  onCommit?: () => void;
+  onCommit?: (accountId: string) => void;
+  refreshVersion?: number;
+  onReadDenied?: (accountId: string) => void;
   sessionKey?: string;
 };
 const defaultFetch: typeof fetch = (...args) => fetch(...args);
@@ -31,6 +33,12 @@ export function useThreadCollab(
   const onCommit = useRef(options.onCommit);
   onCommit.current = options.onCommit;
   const sessionKey = options.sessionKey;
+  const onReadDenied = useRef(options.onReadDenied);
+  onReadDenied.current = options.onReadDenied;
+  const sessionRef = useRef(sessionKey);
+  sessionRef.current = sessionKey;
+  const [deniedScopes, setDeniedScopes] = useState(new Set<string>());
+  const denied = useRef(new Set<string>());
   const onUpdate = useRef(options.onUpdate);
   onUpdate.current = options.onUpdate;
   const cache = useRef(new Map<string, Snapshot>());
@@ -61,10 +69,11 @@ export function useThreadCollab(
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
   const accept = useCallback((data: Snapshot, requestKey: string) => {
+    const [requestSession, requestAccount] = JSON.parse(requestKey);
+    if (!mounted.current || requestSession !== (sessionRef.current ?? null) || denied.current.has(JSON.stringify([requestSession, requestAccount]))) return;
     cache.current.set(requestKey, data);
-    if (!mounted.current || currentKey.current !== requestKey) return;
-    setEntry({ key: requestKey, data });
     onUpdate.current?.(data.state);
+    if (currentKey.current === requestKey) setEntry({ key: requestKey, data });
   }, []);
   useEffect(() => {
     mounted.current = true;
@@ -113,9 +122,23 @@ export function useThreadCollab(
     const version = generation.current;
     const sequence = ++loadSequence.current;
     const response = await apiFetch(`${path}/collab`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok || !data.ok)
-      throw new Error(data.message ?? "Could not load collaboration.");
+    const data = await response.json().catch(() => null);
+    if (response.status === 403 && sessionRef.current === sessionKey) {
+      for (const cachedKey of cache.current.keys()) {
+        const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
+        if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
+      }
+      membersCache.current.delete(memberScope);
+      denied.current.add(memberScope);
+      if (mounted.current) {
+        setDeniedScopes(new Set(denied.current));
+        setEntry(current => current && JSON.parse(current.key)[1] === accountId ? null : current);
+        setMemberEntry(current => current?.scope === memberScope ? null : current);
+        onReadDenied.current?.(accountId);
+      }
+    }
+    if (!response.ok || !data?.ok)
+      throw new Error(data?.message ?? "Could not load collaboration.");
     if (
       currentKey.current !== key ||
       generation.current !== version ||
@@ -123,11 +146,22 @@ export function useThreadCollab(
       !mounted.current
     )
       return;
+    denied.current.delete(memberScope);
+    setDeniedScopes(new Set(denied.current));
     membersCache.current.set(memberScope, data.members);
     setMemberEntry({ scope: memberScope, members: data.members });
     accept(data, key);
     setError(null);
-  }, [accountId, threadId, path, apiFetch, key, memberScope, accept]);
+  }, [accountId, threadId, path, apiFetch, key, memberScope, accept, sessionKey]);
+  const refreshVersion = options.refreshVersion;
+  useEffect(() => {
+    // List refresh/resync is authoritative, even if remapping preserves updatedAt.
+    for (const cachedKey of cache.current.keys()) {
+      const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
+      if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
+    }
+    setEntry(null);
+  }, [refreshVersion, accountId, sessionKey]);
   useEffect(() => {
     let active = true;
     void reload().catch((e) => {
@@ -136,7 +170,7 @@ export function useThreadCollab(
     return () => {
       active = false;
     };
-  }, [key, reload]);
+  }, [key, reload, refreshVersion]);
   const mutate = useCallback(
     async (
       suffix: string,
@@ -144,7 +178,7 @@ export function useThreadCollab(
       body?: unknown,
       optimistic?: (data: Snapshot) => Snapshot,
     ) => {
-      if (!threadId || busy.current.has(key)) return false;
+      if (!threadId || busy.current.has(key) || denied.current.has(memberScope)) return false;
       const previous = cache.current.get(key);
       if (!previous) return false;
       busy.current.add(key);
@@ -178,7 +212,7 @@ export function useThreadCollab(
         );
         // Reload activity after the committed mutation. A read failure must not roll it back.
         if (currentKey.current === key) await reload().catch(() => {});
-        if (mounted.current && currentKey.current === key) onCommit.current?.();
+        if (mounted.current && sessionRef.current === sessionKey) onCommit.current?.(accountId);
         return true;
       } catch (e) {
         accept(previous, key);
@@ -195,14 +229,16 @@ export function useThreadCollab(
           setPendingKey((current) => (current === key ? null : current));
       }
     },
-    [threadId, key, path, apiFetch, accept, reload],
+    [threadId, key, path, apiFetch, accept, reload, memberScope, sessionKey, accountId],
   );
-  const data = entry?.key === key ? entry.data : cache.current.get(key);
+  const readDenied = deniedScopes.has(memberScope);
+  const data = readDenied ? undefined : entry?.key === key ? entry.data : cache.current.get(key);
   return {
+    readDenied,
     state: data?.state,
     comments: data?.comments ?? [],
     activity: data?.activity ?? [],
-    members:
+    members: readDenied ? [] :
       memberEntry?.scope === memberScope
         ? memberEntry.members
         : (membersCache.current.get(memberScope) ?? []),

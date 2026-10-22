@@ -16,7 +16,7 @@ export default function ThreadCollaborationBar({
   onActivity: () => void;
 }) {
   const commentCount = collab.state?.commentCount ?? 0;
-  const readOnly = !role || role === "viewer";
+  const readOnly = collab.readDenied || !role || role === "viewer";
   return (
     <div
       onKeyDown={(e) => e.stopPropagation()}

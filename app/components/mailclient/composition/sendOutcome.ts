@@ -18,6 +18,10 @@ export function getSendWarnings(
     warnings.unshift(
       "Email sent, but the Sent copy could not be saved. Do not send it again.",
     );
+  if (outcome?.sentCopy === "failed")
+    warnings.push("Check the Sent folder. If the copy is missing, contact a mailbox manager. Do not send it again.");
+  if (outcome?.sentCopy === "no-sent-folder")
+    warnings.push("Ask a mailbox manager to configure the Sent folder (managers: configure it in mailbox settings). Do not send it again.");
   return warnings;
 }
 

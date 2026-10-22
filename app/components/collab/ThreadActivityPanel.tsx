@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
 import type { AccountRole } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
 import MarkdownPanel from "@/app/components/mailclient/message/MarkdownPanel";
@@ -12,6 +12,11 @@ import {
   type ThreadActivity,
   type ThreadStatus,
 } from "./types";
+export function focusThreadActivity(region: HTMLElement | null) {
+  region?.focus({ preventScroll: true });
+  region?.scrollIntoView({ behavior: "smooth" });
+}
+
 function relativeTime(time: number) {
   const seconds = Math.max(0, (Date.now() - time) / 1000);
   return seconds < 60
@@ -48,7 +53,9 @@ export default function ThreadActivityPanel({
   role,
   pending,
   onDelete,
+  ref,
 }: {
+  ref?: Ref<HTMLElement>;
   comments: ThreadComment[];
   activity: ThreadActivity[];
   members: CollabMember[];
@@ -83,6 +90,8 @@ export default function ThreadActivityPanel({
   ].sort((a, b) => a.time - b.time || a.id.localeCompare(b.id));
   return (
     <section
+      ref={ref}
+      tabIndex={-1}
       aria-label="Internal notes and activity"
       className="min-w-0 border-t border-border p-4"
       onKeyDown={(e) => e.stopPropagation()}
