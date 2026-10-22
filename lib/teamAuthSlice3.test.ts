@@ -207,14 +207,14 @@ describe("Slice 3 live MCP/streams and shard cleanup", () => {
       // Merged shards install collaboration by default; explicitly model the pre-install state.
       shard.exec("DROP TABLE IF EXISTS thread_collab_state; DROP TABLE IF EXISTS thread_activity");
       expect((await cleanupUserAccountAccess(f.id, f.user.id, { userId: f.user.id, clientId: "synthetic" })).status).toBe("not_installed");
-      shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER)");
+      shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER,revision INTEGER NOT NULL DEFAULT 0)");
       const target = await f.createUser(`cleanup-${crypto.randomUUID()}@example.test`); await f.db.addUserAccountLink(target.id, f.id, "editor");
       expect((await changeAccountMember(f.id, target.id, f.user.id, null)).cleanupPending).toBe(true);
       expect(await resolveAccountRole(target.id, f.id)).toBeNull();
       const op = f.master.prepare("SELECT id,state FROM admin_lifecycle_operations WHERE targetUserId=? AND action='member.revoke'").get(target.id);
       expect(op.state).toBe("cleanup_pending");
       shard.exec("CREATE TABLE thread_activity(id TEXT PRIMARY KEY,accountId TEXT,threadId TEXT,type TEXT,actorUserId TEXT,actorClientId TEXT,payload TEXT,createdAt INTEGER)");
-      shard.prepare("INSERT INTO thread_collab_state VALUES(?,?,?,1,1,1)").run(f.id, "synthetic-thread", target.id);
+      shard.prepare("INSERT INTO thread_collab_state(accountId,threadId,assigneeUserId,assignedAt,updatedAt,lastActivityAt) VALUES(?,?,?,1,1,1)").run(f.id, "synthetic-thread", target.id);
       expect(await retryMembershipCleanup(op.id)).toBe(true); expect(await retryMembershipCleanup(op.id)).toBe(true);
       expect(shard.prepare("SELECT assigneeUserId FROM thread_collab_state").get().assigneeUserId).toBeNull();
       expect(shard.prepare("SELECT COUNT(*) AS n FROM thread_activity WHERE type='unassigned' AND actorClientId='system'").get().n).toBe(1);
@@ -364,7 +364,7 @@ test("installed malformed activity schema with zero assignments remains cleanup_
   try {
     // Deliberately replace the installed schema with the corruption under test.
     shard.exec("DROP TABLE IF EXISTS thread_collab_state; DROP TABLE IF EXISTS thread_activity");
-    shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER)");
+    shard.exec("CREATE TABLE thread_collab_state(accountId TEXT,threadId TEXT,assigneeUserId TEXT,assignedAt INTEGER,updatedAt INTEGER,lastActivityAt INTEGER,revision INTEGER NOT NULL DEFAULT 0)");
     shard.exec("CREATE TABLE thread_activity(id TEXT PRIMARY KEY)");
     const target = await f.createUser(`zero-assignment-${crypto.randomUUID()}@example.test`);
     await f.db.addUserAccountLink(target.id, f.id, "editor");

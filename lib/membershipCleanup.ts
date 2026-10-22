@@ -24,7 +24,7 @@ export async function cleanupUserAccountAccess(accountId: string, userId: string
         (id,accountId,threadId,type,actorUserId,actorClientId,payload,createdAt) VALUES (?,?,?,'unassigned',?,'system',?,?)`);
       const rows = db.prepare("SELECT threadId FROM thread_collab_state WHERE accountId=? AND assigneeUserId=?").all(accountId, userId) as { threadId: string }[];
       const now = Date.now();
-      db.prepare(`UPDATE thread_collab_state SET assigneeUserId=NULL,assignedAt=NULL,updatedAt=?,lastActivityAt=?
+      db.prepare(`UPDATE thread_collab_state SET assigneeUserId=NULL,assignedAt=NULL,updatedAt=?,lastActivityAt=?,revision=revision+1
         WHERE accountId=? AND assigneeUserId=?`).run(now, now, accountId, userId);
       for (const row of rows) activityInsert.run(randomUUID(), accountId, row.threadId, actor.userId, JSON.stringify({ assigneeUserId: null, previousAssigneeUserId: userId }), now);
       return { status: "complete" as const, unassigned: rows.length };

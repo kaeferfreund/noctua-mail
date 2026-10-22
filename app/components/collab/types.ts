@@ -9,7 +9,7 @@ export type {
 } from "@/lib/threadCollab";
 export type CollabMember = {
   userId: string;
-  name: string;
+  name: string | null;
   email: string;
   role: AccountRole;
   isOwner: boolean;
@@ -30,7 +30,7 @@ export const STATUS_STYLES = {
 };
 export function memberName(members: CollabMember[], userId: string) {
   const member = members.find((m) => m.userId === userId && !m.disabled);
-  return member ? member.name.trim() || member.email : "Former member";
+  return member ? member.name?.trim() || member.email : "Former member";
 }
 export function memberInitials(name: string) {
   return name
