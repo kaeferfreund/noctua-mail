@@ -19,10 +19,17 @@ export function assertNewIdentity(db:Database, email:string, account?:Account) {
     EXISTS(SELECT 1 FROM user_accounts ua WHERE ua.accountId=a.id AND ua.userId<>a.ownerUserId))`).get(email)) throw new AuthPolicyError("mailbox_exists",409);
 }
 
+/** Checked before network, in reservation, and again in the final transaction. */
+export function assertInviteAuthority(db:Database, code:string, email:string) {
+  const invite = db.prepare(`SELECT * FROM invite_codes WHERE code=?`).get(code) as {role:string;email:string|null;expiresAt:number|null;maxUses:number|null;uses:number;issuedByUserId:string|null;provenance:string;revokedAt:number|null}|null;
+  if (!invite || invite.revokedAt !== null || (invite.email && invite.email.trim().toLowerCase() !== email) || (invite.expiresAt !== null && invite.expiresAt <= Date.now()) ||
+      (invite.provenance === "admin" ? !invite.issuedByUserId || !db.prepare(`SELECT 1 FROM auth_user WHERE id=? AND ${enabledAdminSql}`).get(invite.issuedByUserId) : invite.provenance !== "operator" || invite.issuedByUserId !== null)) throw new AuthPolicyError("invalid_invite",403);
+  return invite;
+}
+
 /** Read-only preflight also runs in the reservation transaction after network verification. */
 export function validateSignupInvite(db:Database, code:string, email:string) {
-  const invite = db.prepare(`SELECT * FROM invite_codes WHERE code=?`).get(code) as {role:string;email:string|null;expiresAt:number|null;maxUses:number|null;uses:number}|null;
-  if (!invite || (invite.email && invite.email.trim().toLowerCase() !== email) || (invite.expiresAt !== null && invite.expiresAt <= Date.now())) throw new AuthPolicyError("invalid_invite",403);
+  const invite = assertInviteAuthority(db,code,email);
   const reserved = db.prepare(`SELECT count(*) n FROM user_provisioning WHERE inviteCode=? AND kind='signup' AND state IN ${ACTIVE_PROVISIONING}`).get(code).n;
   if (invite.maxUses !== null && invite.uses + reserved >= invite.maxUses) throw new AuthPolicyError("invite_exhausted",409);
   const empty = !db.prepare(`SELECT 1 FROM users p WHERE NOT EXISTS(SELECT 1 FROM user_provisioning op WHERE op.userId=p.id AND op.kind='signup' AND op.state IN ${ACTIVE_PROVISIONING}) LIMIT 1`).get();
@@ -51,6 +58,7 @@ export async function finalizeProvisioning(db:Database, op:ProvisioningOperation
     const live=db.prepare(`SELECT state FROM user_provisioning WHERE id=? AND userId=?`).get(op.id,op.userId);
     if (live?.state === "complete") return;
     if (live?.state !== "auth_created" || !db.prepare(`SELECT 1 FROM auth_user a JOIN users p ON p.id=a.id JOIN auth_account c ON c.userId=a.id WHERE a.id=? AND c.providerId='credential' AND c.password IS NOT NULL`).get(op.userId)) throw new AuthPolicyError("provisioning_incomplete",409);
+    assertInviteAuthority(db,op.inviteCode!,op.normalizedEmail);
     if (account) {
       if (db.prepare(`SELECT 1 FROM accounts WHERE id=? OR lower(trim(email))=?`).get(account.id,account.email)) throw new AuthPolicyError("mailbox_exists",409);
       persistAccountRow(db,{...account,ownerUserId:op.userId},undefined,true);

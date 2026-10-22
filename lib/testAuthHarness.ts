@@ -17,6 +17,11 @@ import { withAuthProof } from "./authPolicyContext";
 export const TEST_SECRET = "noctua-auth-test-secret-0123456789abcdef";
 export const TEST_BASE_URL = "http://localhost:3000";
 
+/** Valid documentation-range IPs remain unique when Bun reloads tests but retains rate buckets. */
+export function syntheticRequestIp() {
+  return `2001:db8:${Array.from(crypto.getRandomValues(new Uint16Array(6)),value=>value.toString(16)).join(":")}`;
+}
+
 /** A temp directory per test file; the master DB file lives in it. */
 export function createTempDir(prefix: string) {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));

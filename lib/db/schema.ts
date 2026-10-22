@@ -114,6 +114,15 @@ function isDuplicateColumnError(error: unknown) {
   return /duplicate column name/i.test(message);
 }
 
+/** Add provenance and revoke unidentified targeted invites in the same schema transaction. */
+export function ensureInviteIssuerSchema(db:any) {
+  db.transaction(()=>{
+    const hadProvenance=(db.prepare(`PRAGMA table_info(invite_codes)`).all() as {name:string}[]).some(column=>column.name==="provenance");
+    ensureTableColumns(db,"invite_codes",[["email","TEXT"],["issuedByUserId","TEXT"],["provenance","TEXT NOT NULL DEFAULT 'operator'"],["revokedAt","INTEGER"]]);
+    if(!hadProvenance)db.prepare(`UPDATE invite_codes SET revokedAt=? WHERE email IS NOT NULL`).run(Date.now());
+  }).immediate();
+}
+
 // Adds every listed column that is missing from `tableName`. Reads PRAGMA
 // table_info at call time, so callers wrap it in an immediate transaction
 // to make the read and the ALTERs one unit. "duplicate column name" is
@@ -809,6 +818,7 @@ export function initMasterSchema(db: any) {
     db.prepare(`ALTER TABLE invite_codes ADD COLUMN usedByUserId TEXT`).run();
   }
   if (!inviteColumns.has("email")) db.prepare(`ALTER TABLE invite_codes ADD COLUMN email TEXT`).run();
+  ensureInviteIssuerSchema(db);
 
   const accountColumns = new Set(
     (db.prepare(`PRAGMA table_info(accounts)`).all() as Array<{ name?: string }>).map((row) =>
