@@ -154,7 +154,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <span className="truncate text-sm font-semibold">{DEFAULT_APP_TITLE}</span>
               {brand.buildVersionLabel ? (
                 <span
-                  className="truncate font-mono text-[10px] text-muted-foreground"
+                  className="truncate font-mono text-2xs text-muted-foreground"
                   title={`Build ${brand.buildVersionLabel}`}
                 >
                   {brand.buildVersionLabel}
