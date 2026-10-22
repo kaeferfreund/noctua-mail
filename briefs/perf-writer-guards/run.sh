@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+ulimit -t 1800 -v 4194304 -u 4096 -f 2097152
+exec nice -n 10 timeout 1800 bwrap --unshare-all --ro-bind /usr /usr --ro-bind /lib /lib --ro-bind /bin /bin --ro-bind /etc /etc --dev /dev --proc /proc --ro-bind /home/monkey/.bun/bin/bun /opt/bun --ro-bind /home/monkey/code/noctua-mail/wt-perf-guards /home/monkey/code/noctua-mail/wt-perf-guards --ro-bind /dev/null /home/monkey/code/noctua-mail/wt-perf-guards/.env.local --bind /tmp/perf-guards /tmp/perf-guards --clearenv --setenv PATH /opt:/usr/bin:/bin --setenv HOME /tmp/perf-guards/home --setenv TMPDIR /tmp/perf-guards/tmp --setenv NOCTUA_DATA_DIR /tmp/perf-guards/data --setenv IMAP_SECRET_KEY synthetic-perf-only-012345678901234567890123 --setenv BETTER_AUTH_SECRET synthetic-auth-only-01234567890123456789 --setenv ACCOUNT_DB_IDLE_MS 0 --chdir /home/monkey/code/noctua-mail/wt-perf-guards bun --tsconfig-override /home/monkey/code/noctua-mail/wt-perf-guards/tsconfig.json "$@"

@@ -1,0 +1,521 @@
+[
+  {
+    "mode": "current",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "SQLiteError: Unsupported account shard writer",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "builtin",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 0,
+    "total": 78,
+    "unexpected": [
+      "INSERT INTO \"attachments\" DEFAULT VALUES",
+      "UPDATE \"attachments\" SET accountId=accountId",
+      "DELETE FROM \"attachments\"",
+      "INSERT INTO \"calendar_event_conflicts\" DEFAULT VALUES",
+      "UPDATE \"calendar_event_conflicts\" SET accountId=accountId",
+      "DELETE FROM \"calendar_event_conflicts\"",
+      "INSERT INTO \"calendar_event_suppressions\" DEFAULT VALUES",
+      "UPDATE \"calendar_event_suppressions\" SET accountId=accountId",
+      "DELETE FROM \"calendar_event_suppressions\"",
+      "INSERT INTO \"calendar_events\" DEFAULT VALUES",
+      "UPDATE \"calendar_events\" SET accountId=accountId",
+      "DELETE FROM \"calendar_events\"",
+      "INSERT INTO \"calendar_participation_overrides\" DEFAULT VALUES",
+      "UPDATE \"calendar_participation_overrides\" SET accountId=accountId",
+      "DELETE FROM \"calendar_participation_overrides\"",
+      "INSERT INTO \"calendar_reminders\" DEFAULT VALUES",
+      "UPDATE \"calendar_reminders\" SET accountId=accountId",
+      "DELETE FROM \"calendar_reminders\"",
+      "INSERT INTO \"category_feedback_events\" DEFAULT VALUES",
+      "UPDATE \"category_feedback_events\" SET accountId=accountId",
+      "DELETE FROM \"category_feedback_events\"",
+      "INSERT INTO \"category_model_state\" DEFAULT VALUES",
+      "UPDATE \"category_model_state\" SET accountId=accountId",
+      "DELETE FROM \"category_model_state\"",
+      "INSERT INTO \"draft_tombstones\" DEFAULT VALUES",
+      "UPDATE \"draft_tombstones\" SET accountId=accountId",
+      "DELETE FROM \"draft_tombstones\"",
+      "INSERT INTO \"folders\" DEFAULT VALUES",
+      "UPDATE \"folders\" SET accountId=accountId",
+      "DELETE FROM \"folders\"",
+      "INSERT INTO \"mailbox_state\" DEFAULT VALUES",
+      "UPDATE \"mailbox_state\" SET accountId=accountId",
+      "DELETE FROM \"mailbox_state\"",
+      "INSERT INTO \"mailbox_summary\" DEFAULT VALUES",
+      "UPDATE \"mailbox_summary\" SET accountId=accountId",
+      "DELETE FROM \"mailbox_summary\"",
+      "INSERT INTO \"message_calendar_events\" DEFAULT VALUES",
+      "UPDATE \"message_calendar_events\" SET accountId=accountId",
+      "DELETE FROM \"message_calendar_events\"",
+      "INSERT INTO \"message_translations\" DEFAULT VALUES",
+      "UPDATE \"message_translations\" SET accountId=accountId",
+      "DELETE FROM \"message_translations\"",
+      "INSERT INTO \"messages\" DEFAULT VALUES",
+      "UPDATE \"messages\" SET accountId=accountId",
+      "DELETE FROM \"messages\"",
+      "INSERT INTO \"recipient_aliases\" DEFAULT VALUES",
+      "UPDATE \"recipient_aliases\" SET accountId=accountId",
+      "DELETE FROM \"recipient_aliases\"",
+      "INSERT INTO \"sent_by\" DEFAULT VALUES",
+      "UPDATE \"sent_by\" SET accountId=accountId",
+      "DELETE FROM \"sent_by\"",
+      "INSERT INTO \"thread_activity\" DEFAULT VALUES",
+      "UPDATE \"thread_activity\" SET accountId=accountId",
+      "DELETE FROM \"thread_activity\"",
+      "INSERT INTO \"thread_collab_state\" DEFAULT VALUES",
+      "UPDATE \"thread_collab_state\" SET accountId=accountId",
+      "DELETE FROM \"thread_collab_state\"",
+      "INSERT INTO \"thread_comments\" DEFAULT VALUES",
+      "UPDATE \"thread_comments\" SET accountId=accountId",
+      "DELETE FROM \"thread_comments\"",
+      "INSERT INTO \"thread_signals\" DEFAULT VALUES",
+      "UPDATE \"thread_signals\" SET accountId=accountId",
+      "DELETE FROM \"thread_signals\"",
+      "INSERT INTO \"thread_topics\" DEFAULT VALUES",
+      "UPDATE \"thread_topics\" SET accountId=accountId",
+      "DELETE FROM \"thread_topics\"",
+      "INSERT INTO \"threads\" DEFAULT VALUES",
+      "UPDATE \"threads\" SET accountId=accountId",
+      "DELETE FROM \"threads\"",
+      "INSERT INTO \"topic_learning_signals\" DEFAULT VALUES",
+      "UPDATE \"topic_learning_signals\" SET accountId=accountId",
+      "DELETE FROM \"topic_learning_signals\"",
+      "INSERT INTO \"topic_signal_exclusions\" DEFAULT VALUES",
+      "UPDATE \"topic_signal_exclusions\" SET accountId=accountId",
+      "DELETE FROM \"topic_signal_exclusions\"",
+      "INSERT INTO \"topics\" DEFAULT VALUES",
+      "UPDATE \"topics\" SET accountId=accountId",
+      "DELETE FROM \"topics\""
+    ],
+    "staleFail": [
+      "MUTATED",
+      "MUTATED",
+      "MUTATED"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "PREPARED"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": false,
+    "wrongMarker": "ACCEPTED",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "when",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "SQLiteError: Unsupported account shard writer",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "det",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "SQLiteError: Unsupported account shard writer",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "when_det",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "SQLiteError: Unsupported account shard writer",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "native",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "SQLiteError: Unsupported account shard writer",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "prepare",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "ACCEPTED",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  },
+  {
+    "mode": "deadcase",
+    "load": "22:28:30 up  8:30,  0 users,  load average: 2.57, 2.42, 2.91",
+    "prepFail": 78,
+    "total": 78,
+    "unexpected": [],
+    "staleFail": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: no such function: noctua_writer_v2"
+    ],
+    "variantErrors": [
+      {
+        "sql": "INSERT INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',3) ON CONFLICT(accountId) DO UPDATE SET lastSyncAt=excluded.lastSyncAt",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',4)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "REPLACE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',5)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT OR IGNORE INTO mailbox_summary(accountId,lastSyncAt) VALUES('synthetic',6)",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "UPDATE OR REPLACE mailbox_summary SET lastSyncAt=7",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "DELETE FROM mailbox_summary WHERE 0",
+        "error": "SQLiteError: no such function: noctua_writer_v2"
+      },
+      {
+        "sql": "INSERT INTO message_fts(messageId,body) VALUES ('synthetic','body')",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "UPDATE message_fts SET body='body'",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      },
+      {
+        "sql": "DELETE FROM message_fts",
+        "error": "SQLiteError: cannot modify message_fts because it is a view"
+      }
+    ],
+    "unchanged": true,
+    "wrongMarker": "ACCEPTED",
+    "ftsV2": "PREPARED (same limitation as current)",
+    "newer": "Error: Account shard format 3 is newer than supported format 2",
+    "newerUnchanged": true
+  }
+]

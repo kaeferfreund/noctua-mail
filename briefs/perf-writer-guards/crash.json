@@ -1,0 +1,128 @@
+[
+  {
+    "mode": "current",
+    "pid": 13,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "when",
+    "pid": 20,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "det",
+    "pid": 27,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "when_det",
+    "pid": 34,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "native",
+    "pid": 41,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "prepare",
+    "pid": 48,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  },
+  {
+    "mode": "deadcase",
+    "pid": 55,
+    "exitCode": 137,
+    "rolledBack": true,
+    "restartVersion": {
+      "user_version": 2
+    },
+    "guards": {
+      "n": 78
+    },
+    "failures": [
+      "SQLiteError: no such function: noctua_writer_v2",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view",
+      "SQLiteError: cannot modify message_fts because it is a view"
+    ]
+  }
+]

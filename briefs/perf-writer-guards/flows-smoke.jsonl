@@ -1,0 +1,14 @@
+{"rep":0,"mode":"none","flow":"initial-sync","load":"22:16:25 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":23720.344774999998,"cpu":27524.848,"changes":62073,"result":5000}
+{"rep":0,"mode":"none","flow":"incremental-sync","load":"22:16:26 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":621.6025560000016,"cpu":716.441,"changes":1121,"result":100}
+{"rep":0,"mode":"none","flow":"bulk-flags","load":"22:16:26 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":135.96983300000284,"cpu":172.647,"changes":5100}
+{"rep":0,"mode":"none","flow":"bulk-move","load":"22:16:26 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":63.44717500000115,"cpu":63.635,"changes":5100}
+{"rep":0,"mode":"none","flow":"thread-recompute","load":"22:16:27 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":322.5377240000016,"cpu":339.722,"changes":6120}
+{"rep":0,"mode":"none","flow":"draft-autosave-10","load":"22:16:27 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":177.0158850000007,"cpu":210.836,"changes":248}
+{"rep":0,"mode":"none","flow":"bulk-delete","load":"22:16:27 up  8:18,  0 users,  load average: 3.45, 3.82, 3.61","wall":252.20880600000237,"cpu":272.404,"changes":23759}
+{"rep":0,"mode":"current","flow":"initial-sync","load":"22:16:51 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":22912.826175000002,"cpu":26912.442,"changes":62073,"result":5000}
+{"rep":0,"mode":"current","flow":"incremental-sync","load":"22:16:52 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":601.1839299999992,"cpu":703.021,"changes":1121,"result":100}
+{"rep":0,"mode":"current","flow":"bulk-flags","load":"22:16:52 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":182.04573099999834,"cpu":184.181,"changes":5100}
+{"rep":0,"mode":"current","flow":"bulk-move","load":"22:16:52 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":69.29678799999965,"cpu":69.35,"changes":5100}
+{"rep":0,"mode":"current","flow":"thread-recompute","load":"22:16:53 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":326.5434800000003,"cpu":355.046,"changes":6120}
+{"rep":0,"mode":"current","flow":"draft-autosave-10","load":"22:16:53 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":164.0450469999996,"cpu":210.819,"changes":248}
+{"rep":0,"mode":"current","flow":"bulk-delete","load":"22:16:53 up  8:19,  0 users,  load average: 3.68, 3.85, 3.63","wall":259.07282800000394,"cpu":278.736,"changes":23759}
