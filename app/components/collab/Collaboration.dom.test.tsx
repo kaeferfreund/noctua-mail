@@ -232,7 +232,7 @@ describe("ThreadActivityPanel", () => {
         }}
       />,
     );
-    expect(view.container.querySelectorAll("strong").length).toBe(3);
+    await waitFor(() => expect(view.container.querySelectorAll("strong").length).toBe(3));
     expect(view.container.querySelector("script")).toBeNull();
     expect(view.getAllByText("Former member").length).toBe(1);
     expect(view.getAllByRole("button", { name: /Delete note/ }).length).toBe(1);
