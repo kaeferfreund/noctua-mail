@@ -18,9 +18,9 @@ import { applyFlagMutationsToMessages } from "@/lib/messageFlagMutation";
 
 let storedRows: StoredMessageSummary[] = [];
 const getStoredMessagesByIds = mock(async () => storedRows);
-const updateImapFlagsBulk = mock(async () => {});
-const bulkUpdateMessageFlags = mock(async () => {});
-const recomputeThreadsForAccount = mock(async () => {});
+const updateImapFlagsBulk = mock<typeof import("@/lib/serverImap").updateImapFlagsBulk>(async () => {});
+const bulkUpdateMessageFlags = mock<typeof import("@/lib/serverDb").bulkUpdateMessageFlags>(async () => {});
+const recomputeThreadsForAccount = mock<typeof import("@/lib/serverDb").recomputeThreadsForAccount>(async () => {});
 
 const actualDb = await import("@/lib/db");
 const actualServerImap = await import("@/lib/serverImap");

@@ -66,7 +66,7 @@ describe("sync new-candidates route", () => {
       mailboxPath: "INBOX",
       uidNext: 42,
       skip: false,
-      reason: "has-new-uids"
+      reason: "has-new-uids" as const
     };
     planImapNewSyncFolders.mockResolvedValueOnce([decision]);
 

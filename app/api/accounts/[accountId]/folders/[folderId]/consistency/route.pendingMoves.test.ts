@@ -7,7 +7,7 @@ import { markImapConnectFailure } from "@/lib/mail/imapError";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "@/app/api/_helpers/imapUpstreamError";
 
-const getImapMailboxStatus = mock(async () => ({
+const getImapMailboxStatus = mock<() => Promise<{messages: number; uidNext: number | null; uidValidity: string | null; highestModSeq: string | null}>>(async () => ({
   messages: 0,
   uidNext: null,
   uidValidity: null,

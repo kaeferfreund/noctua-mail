@@ -1,4 +1,3 @@
-// @ts-expect-error -- Bun test declarations are not installed in this repository.
 import { afterEach, describe, expect, it } from "bun:test";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { Account } from "@/lib/data";

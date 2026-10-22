@@ -1,4 +1,3 @@
-// @ts-expect-error bun:test is provided by the runner and is absent from this tsconfig.
 import { describe, expect, test } from "bun:test";
 import { rewriteHtmlViewportHeightUnits, rewriteViewportHeightUnits, stripBodyHeightStyles } from "./viewportUnits";
 

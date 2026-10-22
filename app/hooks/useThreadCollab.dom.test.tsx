@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { createRef, useImperativeHandle } from "react";
 import { act, cleanup, render, renderHook, waitFor } from "@testing-library/react";
 import { useThreadCollab, type ThreadCollabController } from "./useThreadCollab";
-import type { ThreadCollabState, ThreadComment } from "@/app/components/collab/types";
+import type { CollabMember, ThreadCollabState, ThreadComment } from "@/app/components/collab/types";
 
 const state: ThreadCollabState = {
   accountId: "a", threadId: "one", status: "open", assigneeUserId: null,
@@ -10,7 +10,7 @@ const state: ThreadCollabState = {
   statusChangedByUserId: null, commentCount: 0, lastActivityAt: 1,
   updatedAt: 1, updatedByUserId: null, revision: 0,
 };
-const members = [{ userId: "synthetic-editor", name: "Synthetic Editor", email: "editor@example.test", role: "editor", isOwner: false }];
+const members: CollabMember[] = [{ userId: "synthetic-editor", name: "Synthetic Editor", email: "editor@example.test", role: "editor", isOwner: false }];
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { "Content-Type": "application/json" },
 });
@@ -480,7 +480,7 @@ for (const order of [[0, 1, 2], [2, 1, 0], [1, 0, 2]]) {
 
 describe("R5 server revision regressions", () => {
 const T = 1800000000000;
-const members = [{ userId: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.test', role: 'editor', isOwner: false }];
+const members: CollabMember[] = [{ userId: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.test', role: 'editor', isOwner: false }];
 const state = (patch: Partial<ThreadCollabState> = {}): ThreadCollabState => ({ accountId: 'a', threadId: 'X', status: 'open', assigneeUserId: null, assignedByUserId: null, assignedAt: null, statusChangedAt: null, statusChangedByUserId: null, commentCount: 0, lastActivityAt: T, updatedAt: T, updatedByUserId: null, revision: 1, ...patch });
 const note = (body = 'Synthetic original', time = T, revision = 2): ThreadComment => ({ id: 'synthetic-note', accountId: 'a', threadId: 'X', authorUserId: 'synthetic-editor', body, createdAt: time, updatedAt: time, deletedAt: null, revision });
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });

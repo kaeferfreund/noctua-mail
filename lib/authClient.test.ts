@@ -1,4 +1,3 @@
-// @ts-expect-error -- Bun test declarations are not installed in this repository.
 import { describe, expect, it } from "bun:test";
 import { AuthClientError, authErrorMessage, createAuthClient, validateNewPassword, type Proof } from "./authClient";
 

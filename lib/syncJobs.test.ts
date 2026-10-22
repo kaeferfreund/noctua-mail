@@ -10,7 +10,7 @@ type SpawnedWorker = {
   exited: boolean;
 };
 
-type BunGlobal = typeof globalThis & { Bun: { spawn: unknown } };
+type BunGlobal = { Bun: { spawn: unknown } };
 
 const spawned: SpawnedWorker[] = [];
 let nextWorkerToFinish = 0;

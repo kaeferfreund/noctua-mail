@@ -7,7 +7,8 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseSetCookieHeader } from "better-auth/cookies";
 
-const root=process.cwd(), port=3785, origin="https://mail.example.org";
+const root=process.cwd(), port=Number(process.env.AUTH_SMOKE_PORT ?? 3799), origin="https://mail.example.org";
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid AUTH_SMOKE_PORT");
 mkdirSync(path.join(root,".tmp"),{recursive:true});
 const scratch=mkdtempSync(path.join(root,".tmp","auth-smoke-"));
 const data=path.join(scratch,"data");

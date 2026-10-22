@@ -67,15 +67,16 @@ function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
   }
   return true;
 }
+type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type Options = {
-  apiFetch?: typeof fetch;
+  apiFetch?: ApiFetch;
   onUpdate?: (state: ThreadCollabState) => void;
   onCommit?: (accountId: string) => void;
   refreshVersion?: number;
   onReadDenied?: (accountId: string) => void;
   sessionKey?: string;
 };
-const defaultFetch: typeof fetch = (...args) => fetch(...args);
+const defaultFetch: ApiFetch = (...args) => fetch(...args);
 
 /** Cache belongs to the mounted mail client, never to a module or another login. */
 export function useThreadCollab(
