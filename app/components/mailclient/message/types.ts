@@ -22,3 +22,10 @@ export type TopicSuggestionExplanation = {
     }>;
   }>;
 };
+
+/**
+ * Body presentation of one message in the thread view. Shared by the
+ * per-message state map (`MessageViewOrchestrator.messageTabs`), the card
+ * that renders the panels and the display-options menu that switches them.
+ */
+export type MessageTab = "html" | "text" | "markdown" | "source";

@@ -1,82 +1,18 @@
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.infoRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.meta {
-  color: var(--gray-11);
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.actionsRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.segmented {
-  flex: 0 0 auto;
-  width: max-content;
-}
-
-.viewSelectTrigger {
-  min-width: 160px;
-}
-
-.rightActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.sortSelectTrigger {
-  min-width: 118px;
-}
-
-.groupSelectTrigger {
-  min-width: 170px;
-}
-
-.threadDateSelectTrigger {
-  min-width: 108px;
-}
-
-.threadsToggle {
+/* Menu content is portalled outside the Radix Themes root, so it uses the
+   shell tokens; these unlayered rules override the trigger-width default. */
+.viewMenu {
   width: auto;
-  min-width: var(--space-6);
-  padding-inline: 6px;
+  min-width: 10rem;
 }
 
-.threadsScopeIcon {
-  margin-left: 2px;
+.sortMenu {
+  width: 15rem;
 }
 
-@media (max-width: 760px) {
-  .infoRow,
-  .actionsRow,
-  .rightActions {
-    align-items: flex-start;
-  }
+.menuHint {
+  margin: 0;
+  padding: 0 6px 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
 }
