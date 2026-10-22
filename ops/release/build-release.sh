@@ -16,15 +16,17 @@ check_sha "$sha"
 [[ $(git -C "$checkout" rev-parse HEAD) == "$sha" ]] || fail 'Checkout SHA mismatch.'
 [[ -z $(git -C "$checkout" status --porcelain) ]] || fail 'Build checkout must be clean.'
 check_evidence "$evidence" "$sha"
+artifacts=$(realpath -e -- "${NOCTUA_ARTIFACT_ROOT:-$checkout}")
+[[ -z ${NOCTUA_ARTIFACT_ROOT:-} || $OPS_SCRATCH == 1 ]] || fail 'Alternate artifacts are supported only for synthetic scratch runs.'
 # Never open an env file; reject even ignored files and secret-bearing copied output.
-[[ -z $(find "$checkout" -path "$checkout/node_modules" -prune -o -name '.env*' -print -quit) ]] || fail 'Remove all .env* files from the clean build checkout.'
+[[ -z $(find "$artifacts/.next/standalone" "$artifacts/.next/static" "$artifacts/public" -name '.env*' -print -quit) ]] || fail 'Remove all .env* files from packaged artifact trees.'
 for entry in .next/standalone/server.js .next/standalone/scripts/runSyncJob.ts .next/standalone/tsconfig.json public/runtime-config.js .next/static; do
-    [[ -e $checkout/$entry ]] || fail "Missing build artifact: $entry"
+    [[ -e $artifacts/$entry ]] || fail "Missing build artifact: $entry"
 done
 [[ -f $evidence.artifacts.sha256 ]] || fail 'Missing EVIDENCE_FILE.artifacts.sha256; see README.'
 # The checksum list is operator-reviewed data, not shell code. Validate complete coverage below.
-python3 "$SCRIPT_DIR/verify-artifacts.py" "$checkout" "$evidence.artifacts.sha256"
-release="/srv/noctua/releases/$sha"
+python3 "$SCRIPT_DIR/verify-artifacts.py" "$artifacts" "$evidence.artifacts.sha256"
+release="$OPS_ROOT/releases/$sha"
 [[ ! -e $release && ! -L $release ]] || fail 'Release already exists; never overwrite it.'
 if [[ $mode == --dry-run ]]; then
     printf 'DRY RUN: assemble verified %s at %s; no files or services changed.\n' "$sha" "$release"
@@ -32,21 +34,23 @@ if [[ $mode == --dry-run ]]; then
 fi
 need_root
 operation_lock
-stage=$(mktemp -d /srv/noctua/releases/.assemble.XXXXXXXX)
+stage=$(mktemp -d "$OPS_ROOT/releases/.assemble.XXXXXXXX")
 trap 'printf "Incomplete assembly retained privately at %s\n" "$stage" >&2' ERR
-cp -a "$checkout/.next/standalone/." "$stage/"
+cp -a "$artifacts/.next/standalone/." "$stage/"
 # As deploy-dev.sh: replace .next/static and public in the flat standalone root.
 rm -rf -- "$stage/.next/static" "$stage/public" "$stage/.next/cache"
 mkdir -p "$stage/.next/static" "$stage/public"
-cp -a "$checkout/.next/static/." "$stage/.next/static/"
-cp -a "$checkout/public/." "$stage/public/"
-ln -s /var/cache/noctua "$stage/.next/cache"
+cp -a "$artifacts/.next/static/." "$stage/.next/static/"
+cp -a "$artifacts/public/." "$stage/public/"
+ln -s "$OPS_CACHE" "$stage/.next/cache"
 printf '%s\n' "$sha" > "$stage/REVISION"
 printf '%s\n' '1.4.4' > "$stage/BUN_VERSION"
 cp "$evidence" "$stage/RELEASE_EVIDENCE"
 cp "$evidence.artifacts.sha256" "$stage/BUILD_ARTIFACTS.sha256"
-chown -hR root:root "$stage"
+if [[ $OPS_SCRATCH == 0 ]]; then chown -hR root:root "$stage"; fi
 chmod -R a+rX,go-w "$stage"
+# Bind the assembled layout separately; BUILD_ARTIFACTS covers source-tree paths.
+python3 "$SCRIPT_DIR/verify-artifacts.py" --write-release "$stage" "$stage/RELEASE_ARTIFACTS.sha256"
 mv -T "$stage" "$release"
 trap - ERR
 printf 'Assembled %s; not activated.\n' "$release"

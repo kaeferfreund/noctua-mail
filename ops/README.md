@@ -173,3 +173,65 @@ helper and migration example. Bash syntax checks, Python AST parsing, required h
 checks and git whitespace checks passed. No application installs/tests/builds, Caddy
 validation, systemd execution, backup/restore, migration, DNS or other network calls
 were run. Runtime tool/version compatibility and all live acceptance remain open.
+
+## Dry-run 2026-10-22: production build and synthetic operations
+
+This supersedes the syntax-only validation statement above for the paths exercised
+here. Full command/result evidence is in
+[release/dry-run-2026-10-22.json](release/dry-run-2026-10-22.json).
+Build checkout: detached `164a57e0224ad48a1a0843947fcd19efeb59ae4f`; no git changes
+or commits there. All execution/staging used `release-dryrun-scratch/` under the
+project root, synthetic data/keys, installed tools and `nice -n 10`; no installs,
+external network, production paths, sudo, systemd or Caddy operations. Local HTTP
+used newly assigned ports **3822/3823** after an unrelated process occupied the
+initial allocation; that process was never signaled.
+
+- `timeout 1200 bun run build` and standalone worker verification passed. Runtime
+  config generation passed with `ENV_FILE=/dev/null APP_ENV_LABEL=Production`.
+  `test:ci` was not run. Actual lint failed with one existing calendar-hook error
+  and 27 warnings. Evidence containing `test:ci=dry-run: tests not executed` was
+  rejected (exit 1); a separate file explicitly labelled SYNTHETIC was accepted
+  solely to test packaging. No release approval was issued.
+- Flat assembly, exact static/public copies, all six Inter font subsets, traced
+  dependencies, external Bun 1.4.4 and source/package checksum coverage passed.
+  A tampered public file failed verification (exit 1); restoring its bytes passed.
+  Six generated dependency symlinks required explicit `cp -aL` in scratch. The
+  assembler now supports scratch paths and records an assembled-layout manifest;
+  activation/rollback verify it. Checkout-root synthetic `.env.local` is excluded
+  without blocking assembly; environment files inside packaged trees remain forbidden.
+- Activation and rollback exercised real packaged Bun servers and atomic links,
+  but the required HTTP gate **failed**, correctly leaving the owned server stopped.
+  The requested localhost RP ID with a 127.0.0.1 URL first failed instrumentation;
+  with RP ID corrected to 127.0.0.1, actual HTTP was **503/401**, not 200/401.
+  The supplied app deliberately returns `auth_integration_pending` on BA routes;
+  its AUTHENTICATION.md lacks the promised final Slice-6 environment section.
+  The required gate was preserved. A synthetic second revision reused the same
+  build; no cross-version/schema compatibility was claimed.
+- Restic and Caddy are absent. No repository was initialized or downloaded. An
+  explicitly labelled local PATH test double exercised backup/check/forget and
+  restore flow only. Injected restic-check failure (exit 42) resumed the original
+  app, and the operation lock did not leak into its child process. Restore verified
+  all eight archive checksums, rebased the master + encoded synthetic account shard,
+  passed SQLite integrity/foreign keys, then failed the same 503/401 HTTP gate on
+  port 3823 and stopped its process. A real defect was fixed: GNU tar emitted 309
+  valid dependency hardlinks that restore previously rejected; regular in-archive
+  hardlink targets are now validated and accepted. No real encrypted repository,
+  off-box durability or systemd namespace isolation was proven by the stub.
+
+ShellCheck, Bash syntax, Python AST and git whitespace checks pass for the changed
+scripts. The scratch environment parser rejects duplicate assignments and treats
+command substitution as literal text. The actual `db/main.db` and
+`db/accounts/<encodeURIComponent(id)>.db` layout passed unchanged `db-manifest.py`;
+no database path workaround was needed. Scratch data, archives, runtime PIDs, stub
+and build logs are removed after copying this short evidence record. Build outputs
+remain in the designated build checkout as authorized.
+
+Operator work remains: supply the final activated Slice-6 integration build, resolve
+lint, run the full test/acceptance gates, generate honest reviewed evidence, and
+repeat successful 200/401 activation/rollback. On the separate prepared production
+and restore hosts, provision/review the pinned ARM64 Bun and Caddy/plugin versions,
+private runtime/backup files and SSH host keys, initialize the intended restic
+repository separately, run real backup/check/read-data/restore plus household
+acceptance, validate units/isolation, TLS/DNS/proxy redaction/renewal and alerting,
+and approve timers only after those checks. Nothing here enables jobs or authorizes
+a production deployment. Use the exact release and backup procedures linked above.

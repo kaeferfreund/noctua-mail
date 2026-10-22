@@ -1,0 +1,259 @@
+{
+  "date": "2026-10-22",
+  "release_sha": "164a57e0224ad48a1a0843947fcd19efeb59ae4f",
+  "docs_branch": "docs/briefs-2026-10-22",
+  "go_live": "NO-GO",
+  "paths": {
+    "ROOT": "/home/monkey/code/noctua-mail",
+    "CHECKOUT": "/home/monkey/code/noctua-mail/wt-release-dryrun",
+    "OPS": "/home/monkey/code/noctua-mail/wt-docs/ops",
+    "SCRATCH": "/home/monkey/code/noctua-mail/release-dryrun-scratch"
+  },
+  "ports": {
+    "primary": 3822,
+    "restore": 3823,
+    "unrelated_pid_626564": "never signaled; original 3814/3815 attempt collided and failed"
+  },
+  "evidence_policy": "Actual skipped tests and failed lint reject the gate. Passing attestations used below are explicitly SYNTHETIC; no release approval.",
+  "command_context": "Run build commands in CHECKOUT. Ops commands export NOCTUA_OPS_ROOT=SCRATCH, NOCTUA_ARTIFACT_ROOT=SCRATCH/artifacts; backup uses local RESTIC_REPOSITORY=SCRATCH/repo, RESTIC_PASSWORD_FILE=SCRATCH/restic-password. Stub commands additionally prepend SCRATCH/stubs to PATH; restore sets NOCTUA_OPS_DRILL_PORT=3823. All heavy commands use nice -n 10.",
+  "steps": [
+    {
+      "step": 1,
+      "status": "pass",
+      "evidence": [
+        {
+          "command": "nice -n 10 timeout 1200 bun run build",
+          "exit": 0,
+          "result": "Next 16.2.4 production build completed; flat .next/standalone/server.js"
+        },
+        {
+          "command": "ENV_FILE=/dev/null APP_ENV_LABEL=Production nice -n 10 bun --no-env-file --bun build-scripts/generateRuntimeConfig.ts",
+          "exit": 0
+        },
+        {
+          "command": "nice -n 10 bun --no-env-file --bun build-scripts/verifyStandaloneWorkerBuild.ts",
+          "exit": 0
+        },
+        {
+          "command": "nice -n 10 timeout 600 bun run lint",
+          "exit": 1,
+          "result": "1 error at app/components/calendar/useCalendarConflicts.ts:58; 27 warnings"
+        },
+        {
+          "command": "bun run test:ci",
+          "result": "not executed, as explicitly permitted"
+        },
+        {
+          "command": "nice -n 10 bash OPS/release/build-release.sh --dry-run CHECKOUT RELEASE_SHA SCRATCH/evidence-rejected.txt",
+          "exit": 1,
+          "result": "Missing/duplicate release evidence: test:ci=pass; field was test:ci=dry-run: tests not executed"
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "status": "pass",
+      "evidence": [
+        {
+          "command": "nice -n 10 cp -aL CHECKOUT/.next/standalone SCRATCH/artifacts/.next/",
+          "exit": 0,
+          "result": "6 dependency symlinks explicitly materialized in disposable output; copied static/public separately"
+        },
+        {
+          "command": "nice -n 10 bash OPS/release/build-release.sh --execute CHECKOUT RELEASE_SHA SCRATCH/evidence-synthetic.txt",
+          "exit": 0,
+          "result": "Synthetic evidence accepted, source checksums passed, flat package assembled"
+        },
+        {
+          "command": "nice -n 10 python3 OPS/release/verify-artifacts.py --release SCRATCH/releases/RELEASE_SHA SCRATCH/releases/RELEASE_SHA/RELEASE_ARTIFACTS.sha256",
+          "exit": 0,
+          "result": "Exact packaged coverage passed; tampering public/runtime-config.js returned exit 1, restored bytes passed again"
+        },
+        {
+          "command": "Python byte comparison of CHECKOUT/.next/static and public versus packaged copies",
+          "exit": 0,
+          "result": "63 static files and 26 public files identical; all six Inter font subsets present; traced node_modules and worker sources present; external Bun 1.4.4 exercised"
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "status": "fail",
+      "evidence": [
+        {
+          "command": "ss -ltn before each new binding on 3822/3823",
+          "exit": 0,
+          "result": "Target port free immediately before its binding"
+        },
+        {
+          "command": "nice -n 10 bash OPS/release/activate-release.sh --execute RELEASE_SHA --confirm-no-other-writers",
+          "exit": 1,
+          "result": "With requested localhost RP ID and 127.0.0.1 URL, instrumentation rejected hostname mismatch. Corrected RP ID=127.0.0.1 follow-up switched current to RELEASE_SHA then failed required HTTP gate: 503/401 on 3822; owned PID 653001 stopped."
+        },
+        {
+          "command": "curl --noproxy '*' http://127.0.0.1:3822/api/ba/ok; curl unauthenticated /api/auth/me",
+          "result": "503 {code:auth_integration_pending}; 401"
+        },
+        {
+          "command": "nice -n 10 bash OPS/release/rollback.sh --execute --confirm-schema-compatible --confirm-no-other-writers",
+          "exit": 1,
+          "result": "current switched to synthetic previous 0000000000000000000000000000000000000001; 503/401 health gate failed; owned PID 643181 stopped; previous retained. Same build used for both revisions; cross-version schema compatibility unproven."
+        }
+      ]
+    },
+    {
+      "step": 4,
+      "status": "not-possible",
+      "reason": "restic is absent; no installation or real repository initialization performed",
+      "evidence": [
+        {
+          "command": "command -v restic; command -v caddy",
+          "result": "both absent"
+        },
+        {
+          "command": "PATH=/usr/local/bin:/usr/bin:/bin nice -n 10 bash OPS/backup/restic-backup.sh --execute --confirm-no-other-writers",
+          "exit": 1,
+          "result": "restic is not installed; no snapshot performed"
+        },
+        {
+          "command": "PATH=SCRATCH/stubs:$PATH nice -n 10 bash OPS/backup/restic-backup.sh --execute --confirm-no-other-writers",
+          "exit": 0,
+          "result": "STUB ONLY: local stopped data/env/release/Bun archives, checksums, backup/check/retention-preview command flow"
+        },
+        {
+          "command": "STUB_RESTIC_FAIL=check nice -n 10 bash OPS/backup/restic-backup.sh --execute --pre-deploy --confirm-no-other-writers",
+          "exit": 42,
+          "result": "Injected failure resumed original app (is-active exit 0), then only owned PID 649714 stopped"
+        },
+        {
+          "command": "nice -n 10 python3 OPS/backup/db-manifest.py capture SCRATCH/data SCRATCH/db-manifest.json SCRATCH/current",
+          "exit": 0,
+          "result": "db/main.db and app-created db/accounts/synthetic%2Bshard%40example.test.db integrity/foreign keys/inventory passed"
+        },
+        {
+          "command": "PATH=SCRATCH/stubs:$PATH nice -n 10 bash OPS/backup/restic-restore-drill.sh --execute aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa SCRATCH/drills/stub-restore-fixed --confirm-isolated-host",
+          "exit": 1,
+          "result": "STUB ONLY: all eight archive checksums passed; 309 valid tar hardlinks accepted after fix; master/shard restored, paths rebased and SQLite checked; real restored Bun on 3823 failed 503/401; owned PID 647454 stopped. No encryption/durability/isolation claim."
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "status": "pass",
+      "evidence": [
+        {
+          "command": "nice -n 10 shellcheck -x -P SCRIPTDIR OPS/lib/operations.sh OPS/release/*.sh OPS/backup/*.sh; bash -n changed shell files; Python ast.parse all ops Python; git diff --check",
+          "exit": 0
+        },
+        {
+          "command": "scratch environment parser: quoted command-substitution literal and duplicate PORT checks",
+          "exit": 0,
+          "result": "No command executed from env value; duplicate assignment rejected"
+        },
+        {
+          "command": "git -C CHECKOUT status --short",
+          "exit": 0,
+          "result": "clean; no git mutations in build checkout"
+        }
+      ]
+    }
+  ],
+  "defects_fixed": [
+    {
+      "file": "ops/lib/operations.sh:15",
+      "what": "Hardcoded system paths/privilege/service control prevented safe local execution; explicit marker-gated scratch paths preserve production defaults."
+    },
+    {
+      "file": "ops/lib/operations.sh:58",
+      "what": "Scratch health checks use configured port/origin and owned-process status, with HTTP status diagnostics."
+    },
+    {
+      "file": "ops/lib/scratch-runtime.py:19",
+      "what": "Local adapter records PID/starttime/cwd, avoids inherited operation-lock FDs, rejects occupied ports and parses synthetic env without shell execution."
+    },
+    {
+      "file": "ops/release/build-release.sh:19",
+      "what": "Scratch artifact override supports explicit materialization of normal tracing symlinks without modifying the build checkout; env rejection applies to packaged trees rather than excluded checkout-root synthetic env."
+    },
+    {
+      "file": "ops/release/build-release.sh:53",
+      "what": "Added assembled-layout checksum manifest; source-path manifest alone cannot validate the assembled package."
+    },
+    {
+      "file": "ops/release/verify-artifacts.py:19",
+      "what": "Exact package coverage and cache-link validation; closes each hashed file promptly; preserves strict unchecked-symlink rejection."
+    },
+    {
+      "file": "ops/release/activate-release.sh:13",
+      "what": "Verify assembled package before activation; rollback does the same at ops/release/rollback.sh:23."
+    },
+    {
+      "file": "ops/backup/restic-restore-drill.sh:59",
+      "what": "Restore rejected 309 valid GNU tar hardlinks; now validates relative in-archive regular-file targets."
+    },
+    {
+      "file": "ops/backup/restic-backup.sh:41",
+      "what": "Missing restic now fails before stopping services; scratch uses local repo/paths and a LOCAL_SUCCESS marker without off-box claims."
+    },
+    {
+      "file": "ops/env/noctua.env.example:15",
+      "what": "Clarified exact URL-host/RP-ID match; localhost cannot accompany a literal 127.0.0.1 origin."
+    }
+  ],
+  "no_defect_found": [
+    "Flat standalone layout, static/public/font/worker coverage already matched dev deployment after assembly.",
+    "db-manifest.py correctly handled the actual master and shard layout unchanged.",
+    "No original set -e failure found; injected backup failure and inactive-service paths were exercised."
+  ],
+  "operator_steps_left": [
+    "Use a final Slice-6 integration build whose BA route is activated; keep the 200/401 gate. Set PASSKEY_RP_ID equal to BETTER_AUTH_URL hostname. Resolve lint and run bun run test:ci plus all release/acceptance gates; regenerate honest reviewed evidence and artifact checksums.",
+    "On prepared production hosts only, supply reviewed ARM64 Bun 1.4.4, Caddy/DNS plugin, installed ops/units, private runtime and backup files, reviewed-marker, accounts/permissions, cache/data paths and SSH identity/verified host key per ops release/backup READMEs. None were installed here.",
+    "With approved private SFTP restic environment, initialize only a verified new empty repository separately (restic init), then run restic-backup.sh --execute --confirm-no-other-writers and restic check --read-data. Real encryption, remote durability and notifications remain unverified.",
+    "On the dedicated isolated restore host, select a full immutable ID from restic snapshots --json; run restic-restore-drill.sh --execute FULL_SNAPSHOT_ID /srv/noctua-drills/NEW_NAME --confirm-isolated-host. Prove systemd PrivateNetwork/mount restrictions and complete household/data/factor acceptance.",
+    "Run build-release.sh --dry-run CHECKOUT FULL_SHA EVIDENCE then --execute after review. During an approved no-writers window run activate-release.sh --execute FULL_SHA --confirm-no-other-writers; require actual 200/401. Rehearse rollback.sh --execute --confirm-schema-compatible --confirm-no-other-writers only with proven schema/key/Bun compatibility.",
+    "Validate installed units with systemd-analyze verify; validate Caddy config with caddy validate --config /etc/caddy/Caddyfile on its target host. Prove DNS/tailnet access, TLS renewal, sanitized proxy headers, log redaction, alerts, MFA/device/mail acceptance and archive coverage before manually approving timers."
+  ],
+  "package": {
+    "file_bytes": 99853280,
+    "file_count": 4534,
+    "font_subsets": [
+      "InterVariable-cyrillic.woff2",
+      "InterVariable-greek.woff2",
+      "InterVariable-latin-ext.woff2",
+      "InterVariable-latin.woff2",
+      "InterVariable-remainder.woff2",
+      "InterVariable-vietnamese.woff2"
+    ],
+    "entries": [
+      ".next",
+      "BUILD_ARTIFACTS.sha256",
+      "BUN_VERSION",
+      "RELEASE_ARTIFACTS.sha256",
+      "RELEASE_EVIDENCE",
+      "REVISION",
+      "app",
+      "lib",
+      "node_modules",
+      "package.json",
+      "public",
+      "scripts",
+      "server.js",
+      "tsconfig.json"
+    ],
+    "external_bun": "/home/monkey/.bun/bin/bun",
+    "bun_version": "1.4.4",
+    "directory_apparent_bytes": 96375517,
+    "tar_gz_bytes": 30391272,
+    "retained": false
+  },
+  "log_excerpt": [
+    "Artifact checksums and coverage verified",
+    "Missing/duplicate release evidence: test:ci=pass",
+    "Health gate failed: /api/ba/ok=503 /api/auth/me=401 port=3822",
+    "Health gate failed: /api/ba/ok=503 /api/auth/me=401 port=3823",
+    "SQLite integrity/foreign keys and shard inventory verified",
+    "data.tgz/config-tls.tgz/release.tgz/bun/DB_MANIFEST.json/REVISION/BUN_VERSION/RELEASE_PATH: OK",
+    "restic is not installed; no snapshot performed"
+  ],
+  "cleanup": "All scratch contents and owned server records removed after copying this record; build output intentionally retained in CHECKOUT. No push."
+}

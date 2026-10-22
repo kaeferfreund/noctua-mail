@@ -1,15 +1,17 @@
 <!-- Purpose: review the release evidence and deployment sequence; runbook §3; REVIEW BEFORE USE. -->
 # Release procedure
 
-These scripts default to `--dry-run`, contain no sudo, and were not used to build or
-activate anything. `build-release.sh` packages **existing verified artifacts**; it
+These scripts default to `--dry-run` and contain no sudo. They have been exercised
+with synthetic scratch data; see the 2026-10-22 dry-run note in `ops/README.md`. `build-release.sh` packages **existing verified artifacts**; it
 never installs dependencies or runs the application test/build tools. Preparation
 is a separate operator step in a clean approved integration checkout, not this docs
 worktree. Pin ARM64 Bun 1.4.4. Preserve old tested Bun binaries separately.
 
 Prepare as in runbook §3.1 with synthetic build-only keys and an empty independent
 build-data root; production secrets appear only at runtime. Exclude every `.env*`
-file (including ignored files); do not source development environments. Existing
+file (including ignored files) from the three packaged artifact trees. The assembler
+never copies or sources checkout-root environment files; a separately supplied synthetic
+build-only `.env.local` does not enter the release. Never build with production secrets. Existing
 frozen dependencies are a prerequisite. Generate `public/runtime-config.js` with
 `build-scripts/generateRuntimeConfig.ts` **before** building/copying public assets;
 use `APP_ENV_LABEL=Production`, `ENV_FILE=/dev/null` and synthetic build environment.
@@ -42,8 +44,9 @@ find .next/standalone .next/static public -type f -print0   | sort -z | xargs -0
 ```
 
 The verifier requires complete matching coverage of all three trees and rejects
-symlinks. Packaging Bun dependencies with symlinks requires a separately reviewed
-materialization step in the disposable build output; it is not silently followed.
+symlinks. Next/Turbopack emits dependency symlinks even with the flat layout. Materialize
+these explicitly with `cp -aL` in disposable build output before generating the
+manifest; the assembler never follows unchecked symlinks silently.
 The checksum manifest is private reviewed input, never sourced. It binds artifacts
 to the evidence and SHA; the source/build environment still needs trusted provenance.
 A clean git tree alone does not prove ignored build outputs belong to HEAD.
@@ -58,7 +61,10 @@ The assembler copies the **whole flat** `.next/standalone` tree, then replaces i
 old nested layout. `outputFileTracingRoot` must already be fixed in the integration
 build; do not patch another worktree here. The immutable root-owned result is
 `/srv/noctua/releases/<sha>` with `server.js` at its root, metadata/evidence, and
-`.next/cache → /var/cache/noctua`. No `app` alias or timestamp ID is used.
+`.next/cache → /var/cache/noctua`. `RELEASE_ARTIFACTS.sha256` separately covers
+the assembled layout and metadata; activation and rollback verify it, including the
+configured cache link, before service changes. To check a package manually, run
+`python3 verify-artifacts.py --release RELEASE RELEASE/RELEASE_ARTIFACTS.sha256`. No `app` alias or timestamp ID is used.
 Runbook lines 149–150/434–474 describe the older layout; this task explicitly
 supersedes it. The system unit works from `/srv/noctua/current` directly.
 
@@ -100,3 +106,56 @@ using the signed-off §6 drill, preserving newer collaboration data for reconcil
 No script rotates keys, restores production data, deletes releases or prunes backups.
 Keep at least five approved releases, 30 days and the last restorable schema point;
 manual deletion must exclude current, previous and restore-linked versions.
+
+## Synthetic local harness
+
+`NOCTUA_OPS_ROOT=/absolute/scratch/root` is an explicit **synthetic-only** mode,
+not a production relocation option. Create that directory and an empty
+`SYNTHETIC_ONLY` marker, plus `releases/`, `data/`, `cache/`, `backups/`, `env/`
+and `bin/`. System paths are rejected; root privileges are unnecessary. Supply an
+executable Bun 1.4.4 at `bin/bun` (a link to the installed binary is acceptable),
+a caller-owned 0600 `env/noctua.env`, and synthetic values only. This selects a
+root-local flock and cache; no systemd, Caddy, TLS files or installed ops are touched.
+The local adapter starts `bun --no-env-file --bun server.js` with a minimal parsed
+environment and records PID, process start time and cwd. It signals only that recorded
+process, checks port availability before starting, and refuses HTTP probing after
+that process exits. The restricted single-line environment format accepts quoted
+values without shell evaluation and rejects duplicate assignments.
+
+Set `PORT` and `BETTER_AUTH_URL=http://127.0.0.1:<PORT>` explicitly, with
+`PASSKEY_RP_ID=127.0.0.1` and `NOCTUA_DATA_DIR=<root>/data`. `localhost` RP ID
+with a `127.0.0.1` URL is rejected by the supplied application. Watcher and telemetry
+are forced off in this harness. Check port allocation on the shared host immediately
+before binding; 3822/3823 were assigned for this run. All heavy commands use `nice -n 10`.
+
+For an untouched build checkout with symlinked tracing output, the scratch-only
+`NOCTUA_ARTIFACT_ROOT=<root>/artifacts` selects a disposable artifact copy while
+SHA/clean-tree checks still refer to CHECKOUT. For example:
+
+```sh
+mkdir -p "$NOCTUA_ARTIFACT_ROOT/.next"
+nice -n 10 cp -aL "$CHECKOUT/.next/standalone" "$NOCTUA_ARTIFACT_ROOT/.next/"
+nice -n 10 cp -a "$CHECKOUT/.next/static" "$NOCTUA_ARTIFACT_ROOT/.next/"
+nice -n 10 cp -a "$CHECKOUT/public" "$NOCTUA_ARTIFACT_ROOT/"
+# Generate EVIDENCE.artifacts.sha256 from this artifact root, then:
+nice -n 10 /path/to/ops/release/build-release.sh --execute "$CHECKOUT" "$SHA" "$EVIDENCE"
+```
+
+Use the same root override for activation, rollback, verification, backup and drill.
+Backup requires a local `RESTIC_REPOSITORY` inside the scratch root and caller-owned
+0600 `RESTIC_PASSWORD_FILE`; it archives only synthetic env/data/release/Bun.
+Production keeps the SFTP, root ownership and reviewed-marker requirements. Real
+restic must already be installed and the local repository initialized independently.
+For a scratch restore, choose a new `<root>/drills/<name>` directory and set
+`NOCTUA_OPS_DRILL_PORT` (default 3815; 3823 for this run). It restores/rebases into
+that directory and starts/stops an owned local Bun process. This does **not** prove
+production systemd network/mount isolation. An injected restic test double on PATH
+can exercise archive/control flow when restic is absent; label every result STUB,
+never count it as encrypted repository or off-box backup verification.
+
+Evidence rejection is mandatory even in the harness: `test:ci=dry-run: tests not
+executed` must fail. A separate file labelled SYNTHETIC may contain passing fields
+solely to exercise subsequent gates. It is never go-live approval. The second
+synthetic previous release in this run reused the same build with synthetic revision
+`0000000000000000000000000000000000000001`; it does not prove cross-version schema
+compatibility. Never transfer synthetic attestations into a production release.
