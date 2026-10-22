@@ -63,16 +63,6 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
         data-shell=""
         open={sidebarOpen ?? savedOpen}
         onOpenChange={setSidebarOpen}
-        onKeyDown={(event) => {
-          // SidebarProvider listens on window for Cmd/Ctrl+B. Let the kept
-          // editor process Bold, then keep that shortcut inside the editor.
-          const target = event.target;
-          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b" &&
-            target instanceof HTMLElement &&
-            (target.isContentEditable || target.closest("input, textarea, select, [contenteditable]"))) {
-            event.stopPropagation();
-          }
-        }}
         className="h-dvh min-h-0 overflow-hidden bg-sidebar text-foreground"
         style={{ "--sidebar-width": SIDEBAR_WIDTH, "--header-height": "3rem" } as CSSProperties}
       >

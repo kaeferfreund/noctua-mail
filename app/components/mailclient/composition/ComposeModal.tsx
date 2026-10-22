@@ -183,6 +183,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             composeShowBcc={composeShowBcc}
             composeOpenedAt={composeOpenedAt}
             activeAccountId={activeAccountId}
+            fromValue={fromValue}
             inReplyToMessage={inReplyToMessage}
             onJumpToMessage={jumpToMessage}
             setComposeSubject={setComposeSubject}

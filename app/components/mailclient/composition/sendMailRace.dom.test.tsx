@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test";
 import React from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
+import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { Message } from "@/lib/data";
 import ComposeOrchestrator from "./ComposeOrchestrator";
 
@@ -11,6 +12,7 @@ type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSign
 
 type RenderComposeOptions = {
   isMobile?: boolean;
+  onSidebarToggle?: (open: boolean) => void;
   smtpResponse?: Response | (() => Response | Promise<Response>);
   reportError?: (message: string) => void;
   readErrorMessage?: (response: Response) => Promise<string>;
@@ -135,11 +137,19 @@ function renderCompose(options: RenderComposeOptions = {}) {
     detachedWindow: options.detachedWindow ?? false
   } as unknown as React.ComponentProps<typeof ComposeOrchestrator>;
 
-  const view = render(
+  // The orchestrator is a sibling of the shell; its inline portal must
+  // not rely on a React keydown handler on the shell to guard Bold.
+  const renderTree = (inlineCard: React.ReactNode = null) => (
     <Theme>
+      {options.onSidebarToggle && <SidebarProvider onOpenChange={options.onSidebarToggle}>
+        <SidebarInset>{inlineCard}</SidebarInset>
+      </SidebarProvider>}
       <ComposeOrchestrator ref={handleRef} {...props} />
     </Theme>
   );
+  const view = render(options.onSidebarToggle ? renderTree() : <Theme>
+    <ComposeOrchestrator ref={handleRef} {...props} />
+  </Theme>);
 
   const sendButton = () =>
     [...view.baseElement.querySelectorAll("button")].find((button) =>
@@ -151,6 +161,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
 
   return {
     view,
+    mountInlineCard: () => view.rerender(renderTree(handleRef.current?.renderInlineCard())),
     props,
     handleRef,
     calls,
@@ -552,6 +563,7 @@ describe("mobile compose", () => {
     try {
       await act(async () => { await handleRef.current?.openCompose("new"); });
       expect(view.getByText("New message")).toBeTruthy();
+      expect((view.getByRole("textbox", { name: "From:" }) as HTMLInputElement).value).toBe("me@example.test");
       for (const requested of ["inline", "minimized"] as const) {
         act(() => handleRef.current?.setComposeView(requested));
         expect(view.getByText("New message")).toBeTruthy();
@@ -564,4 +576,42 @@ describe("mobile compose", () => {
       expect(view.baseElement.querySelector('.modal-backdrop > div')?.getAttribute("style")).toBeNull();
     } finally { cleanup(); }
   });
+});
+
+
+describe("shell shortcut in composers", () => {
+  for (const variant of ["inline", "modal"] as const) {
+    it(`keeps Ctrl/Cmd+B in the ${variant} Lexical editor and fields`, async () => {
+      let toggles = 0;
+      const { view, handleRef, mountInlineCard } = renderCompose({
+        onSidebarToggle: () => { toggles++; },
+        showComposeInline: variant === "inline", showComposeModal: variant === "modal"
+      });
+      try {
+        await act(async () => { handleRef.current?.openCompose("new"); });
+        if (variant === "inline") act(mountInlineCard);
+        const editor = await waitFor(() => {
+          const element = view.baseElement.querySelector<HTMLElement>('[data-lexical-editor="true"]');
+          expect(element).not.toBeNull();
+          return element!;
+        });
+        const from = view.getByRole("textbox", { name: "From:" }) as HTMLInputElement;
+        expect(from.value).toBe("me@example.test");
+        expect(from.readOnly).toBe(true);
+        const recipient = view.baseElement.querySelector<HTMLInputElement>(`#compose-${variant}-to`)!;
+        for (const target of [editor, recipient]) {
+          act(() => target.focus());
+          for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+            fireEvent.keyDown(target, { key: "b", ...modifier });
+            expect(toggles).toBe(0);
+          }
+        }
+        // The shortcut still works outside an editable target.
+        fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+        expect(toggles).toBe(1);
+      } finally {
+        cleanup();
+      }
+    });
+  }
 });
