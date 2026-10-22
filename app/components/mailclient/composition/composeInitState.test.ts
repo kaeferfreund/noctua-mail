@@ -17,7 +17,7 @@ import { FORWARDED_MESSAGE_MARKER, hasForwardMetaHtml, stripForwardMetaHtml } fr
 
 const noop = (s: string) => s;
 const deps = { stripHtml: noop, normalizeHtmlDerivedText: noop };
-const opts = { accountEmail: "me@example.com", accountDateFormat: "MMM d, yyyy" as const };
+const opts = { accountEmail: "me@example.com", accountDateFormat: "locale" as const };
 
 function formattedFixtureDate() {
   const message = makeMessage();
@@ -32,30 +32,18 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
     messageId: "<msg1@example.com>",
     from: "Alice <alice@example.com>",
     to: "me@example.com",
-    cc: null,
-    bcc: null,
     subject: "Hello",
     body: "Original body",
-    htmlBody: null,
     date: "Mon, 1 Jan 2024 12:00:00 +0000",
     dateValue: 1704110400000,
-    inReplyTo: null,
-    references: null,
-    xForwardedMessageId: null,
-    xComposeFormat: null,
-    quotedHtmlEdited: null,
     threadId: "thread-1",
-    parentId: null,
-    uid: 1,
+    imapUid: 1,
     flags: [],
-    attachmentCount: 0,
     preview: "Original body",
-    isSeen: true,
-    isFlagged: false,
-    isDraft: false,
-    isTodo: false,
-    isAnswered: false,
-    isForwarded: false,
+    seen: true,
+    flagged: false,
+    draft: false,
+    answered: false,
     ...overrides
   };
 }
@@ -210,7 +198,7 @@ describe("computeComposeInitState — reply", () => {
   it("uses text tab and buildTextReplyBody when message has no HTML", () => {
     const fields = computeComposeInitState(
       "reply",
-      makeMessage({ body: "Original body", htmlBody: null }),
+      makeMessage({ body: "Original body" }),
       false,
       opts,
       deps
@@ -318,8 +306,7 @@ describe("computeComposeInitState — replyAll", () => {
       "replyAll",
       makeMessage({
         from: "Alice <alice@example.com>",
-        to: "me@example.com, Bob <bob@example.com>",
-        cc: null
+        to: "me@example.com, Bob <bob@example.com>"
       }),
       false,
       opts,
@@ -334,8 +321,7 @@ describe("computeComposeInitState — replyAll", () => {
       "replyAll",
       makeMessage({
         from: "Alice <alice@example.com>",
-        to: "me@example.com, Bob <bob@example.com>",
-        cc: null
+        to: "me@example.com, Bob <bob@example.com>"
       }),
       false,
       opts,
@@ -477,7 +463,7 @@ describe("computeComposeInitState — forward", () => {
   it("keeps the Forwarded-message marker embedded in composeBody for text-only forwards", () => {
     const fields = computeComposeInitState(
       "forward",
-      makeMessage({ from: "Alice <alice@example.com>", body: "Original", htmlBody: null }),
+      makeMessage({ from: "Alice <alice@example.com>", body: "Original" }),
       false,
       opts,
       deps
@@ -585,7 +571,7 @@ describe("computeComposeInitState — forward", () => {
   it("omits header rows whose value is unknown", () => {
     const fields = computeComposeInitState(
       "forward",
-      makeMessage({ cc: null, replyTo: null, htmlBody: "<p>Hello</p>" }),
+      makeMessage({ htmlBody: "<p>Hello</p>" }),
       false,
       opts,
       deps
@@ -605,8 +591,7 @@ describe("computeComposeInitState — forward", () => {
         to: "me@example.com",
         cc: "carol@example.com",
         subject: "Hello",
-        body: "Original",
-        htmlBody: null
+        body: "Original"
       }),
       false,
       opts,
@@ -700,7 +685,7 @@ describe("computeComposeInitState — edit", () => {
   it("populates recipients from message fields", () => {
     const fields = computeComposeInitState(
       "edit",
-      makeMessage({ to: "bob@example.com", cc: "carol@example.com", bcc: null }),
+      makeMessage({ to: "bob@example.com", cc: "carol@example.com" }),
       false,
       opts,
       deps

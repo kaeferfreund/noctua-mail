@@ -15,7 +15,7 @@ const baseOpts: BuildMessageListQueryUrlOptions = {
   activeFolderId: "folder-inbox",
   currentSearchExcludedFolderIds: [],
   supportsThreads: false,
-  threadDateSource: "latest",
+  threadDateSource: "latestDateValue",
   isRelatedSearch: false,
   relatedQueryId: "",
   query: "",
@@ -55,11 +55,11 @@ describe("buildMessageListQueryUrl — endpoint selection", () => {
     const url = buildMessageListQueryUrl({
       ...baseOpts,
       supportsThreads: true,
-      threadDateSource: "first"
+      threadDateSource: "latestReceivedDateValue"
     });
     expect(url).toMatch(/^\/api\/accounts\/acc-1\/threads\?/);
     const params = parseQuery(url);
-    expect(params.threadDateSource).toBe("first");
+    expect(params.threadDateSource).toBe("latestReceivedDateValue");
   });
 
   test("query + no threads → /search with q", () => {

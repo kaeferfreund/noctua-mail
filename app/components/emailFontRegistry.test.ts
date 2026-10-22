@@ -68,7 +68,7 @@ function createFakeDocument() {
   };
 }
 
-const globalWithDom = globalThis as typeof globalThis & {
+const globalWithDom = globalThis as unknown as {
   document?: {
     head: { append: (style: FakeStyleElement) => void; querySelector: (selector: string) => FakeStyleElement | null };
     createElement: (tag: string) => FakeStyleElement;
@@ -199,7 +199,7 @@ describe("emailFontRegistry lifecycle", () => {
       ok: true,
       text: async () =>
         "@font-face { font-family: 'Roboto Slab'; src: url('https://fonts.gstatic.com/s/robotoslab.woff2') format('woff2'); } .x{color:red;}"
-    })) as typeof fetch;
+    })) as unknown as typeof fetch;
 
     await acquireEmailFonts(["https://fonts.googleapis.com/css2?family=Roboto+Slab"]);
 
@@ -221,7 +221,7 @@ describe("emailFontRegistry lifecycle", () => {
       text: async () =>
         "@font-face { font-family: 'Roboto Slab'; src: url('https://fonts.gstatic.com/s/robotoslab.woff2') format('woff2'); }"
     }));
-    globalWithDom.fetch = fetchMock as typeof fetch;
+    globalWithDom.fetch = fetchMock as unknown as typeof fetch;
 
     await Promise.all([
       acquireEmailFonts(["https://fonts.googleapis.com/css2?family=Roboto+Slab"]),

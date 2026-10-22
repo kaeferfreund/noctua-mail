@@ -53,7 +53,7 @@ describe("senderIcons", () => {
     globalThis.fetch = (async () => {
       callCount += 1;
       return new Response(null, { status: 500 });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const result = await resolveSenderIcon({
       from: "\"Apple\" <news@apple.com>",
@@ -72,7 +72,7 @@ describe("senderIcons", () => {
         status: 200,
         headers: { "Content-Type": "image/png" }
       });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
 
     const first = await resolveSenderIcon({
       from: "\"Apple\" <news@apple.com>",

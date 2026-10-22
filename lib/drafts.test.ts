@@ -200,7 +200,7 @@ describe("saveDraftForAccount", () => {
 
     expect(buildRawMessage).toHaveBeenCalledTimes(1);
     expect(lastBuiltDraftMail?.inReplyTo).toBe(original.messageId);
-    expect(lastBuiltDraftMail?.references).toEqual([original.messageId]);
+    expect<(string | undefined)[] | undefined>(lastBuiltDraftMail?.references).toEqual([original.messageId]);
     expect(lastBuiltDraftMail?.xForwardedMessageId).toBe(original.messageId);
 
     expect(result.message?.threadId).toBe(original.threadId);
