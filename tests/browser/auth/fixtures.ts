@@ -40,7 +40,14 @@ export const test=base.extend<{seed:Seed;authenticator:{setUV:(verified:boolean)
     for(const device of devices)await cdp.send("WebAuthn.removeVirtualAuthenticator",{authenticatorId:device});
   }
 });
+let lastProofAt = 0;
 export async function api(page:Page,path:string,body?:unknown,grant?:string) {
+  // Exercise the real production proof limit (5/minute/user+IP), including failed proofs.
+  if (path === "/api/auth/reauth") {
+    const remaining = lastProofAt + 12500 - Date.now();
+    if (remaining > 0) await new Promise(resolve=>setTimeout(resolve,remaining));
+    lastProofAt=Date.now();
+  }
   return page.evaluate(async({path,body,grant})=>{
     const result=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"content-type":"application/json",...(grant?{"x-noctua-reauth":grant}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
     return {status:result.status,body:await result.json().catch(()=>({}))};
