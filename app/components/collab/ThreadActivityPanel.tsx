@@ -2,7 +2,7 @@
 import { useEffect, useState, type Ref } from "react";
 import type { AccountRole } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
-import MarkdownPanel from "@/app/components/mailclient/message/MarkdownPanel";
+import { MarkdownPanel } from "@/app/components/mailclient/RenderHelpers";
 import {
   memberInitials,
   memberName,
