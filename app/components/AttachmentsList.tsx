@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Download, Loader2, RotateCw } from "lucide-react";
-import { FileIcon, defaultStyles } from "react-file-icon";
+import { X, Download, File, FileText, Loader2, RotateCw } from "lucide-react";
 import type { Attachment } from "@/lib/data";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { formatByteSize } from "@/lib/ui/byteSize";
@@ -107,10 +106,6 @@ const isImage = (contentType?: string) => {
   return contentType?.toLowerCase().startsWith("image/") ?? false;
 };
 
-const EXT_ALIAS: Record<string, string> = {
-  "7z": "7zip",
-};
-
 const MIME_TO_EXT: Record<string, string> = {
   "application/pdf": "pdf",
   "application/msword": "doc",
@@ -122,7 +117,7 @@ const MIME_TO_EXT: Record<string, string> = {
   "application/zip": "zip",
   "application/x-zip-compressed": "zip",
   "application/x-rar-compressed": "rar",
-  "application/x-7z-compressed": "7zip",
+  "application/x-7z-compressed": "7z",
   "application/x-tar": "tar",
   "application/gzip": "gz",
   "application/json": "json",
@@ -157,15 +152,13 @@ const MIME_TO_EXT: Record<string, string> = {
   "video/webm": "webm",
 };
 
-export const getIconExtension = (contentType?: string, filename?: string): string => {
+export const getAttachmentExtension = (contentType?: string, filename?: string): string => {
   const ext = getFileExtension(filename);
-  if (ext && ext in defaultStyles) return ext;
-  if (ext && ext in EXT_ALIAS) return EXT_ALIAS[ext];
+  if (ext) return ext;
 
   const lower = normalizeMimeType(contentType);
   if (lower in MIME_TO_EXT) {
-    const mapped = MIME_TO_EXT[lower];
-    if (mapped in defaultStyles) return mapped;
+    return MIME_TO_EXT[lower];
   }
 
   if (lower.startsWith("image/")) return "jpg";
@@ -280,8 +273,10 @@ export default function AttachmentsList({
     : [];
 
   const renderItem = (file: Attachment) => {
-    const ext = getIconExtension(file.contentType, file.filename);
-    const iconStyle = ext in defaultStyles ? defaultStyles[ext] : {};
+    const ext = getAttachmentExtension(file.contentType, file.filename);
+    const AttachmentIcon = normalizeMimeType(file.contentType).startsWith("text/") || ext === "pdf"
+      ? FileText
+      : File;
     const showImagePreview = isImage(file.contentType) && (file.url || file.dataUrl);
     const previewHref = getAttachmentPreviewHref(file);
     const downloadHref = getAttachmentDownloadHref(file);
@@ -311,9 +306,12 @@ export default function AttachmentsList({
             {file.loadStatus === "loading" ? (
               <Loader2 size={14} className="attachment-load-spinner" aria-label="Loading attachment" />
             ) : (
-              <FileIcon extension={ext} {...iconStyle} />
+              <AttachmentIcon size={16} aria-hidden="true" />
             )}
           </div>
+          <span className="attachment-extension" aria-hidden="true" title={ext || "file"}>
+            {ext || "file"}
+          </span>
         </div>
         <a
           className="attachment-link"

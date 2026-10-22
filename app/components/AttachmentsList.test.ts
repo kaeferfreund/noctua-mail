@@ -4,7 +4,7 @@ import {
   canPreviewAttachment,
   getAttachmentDownloadHref,
   getAttachmentPreviewHref,
-  getIconExtension,
+  getAttachmentExtension,
   getVisibleAttachments
 } from "./AttachmentsList";
 
@@ -71,32 +71,33 @@ describe("getAttachmentDownloadHref", () => {
   });
 });
 
-describe("getIconExtension", () => {
-  it("uses the filename extension when react-file-icon supports it", () => {
-    expect(getIconExtension("application/pdf", "invoice.pdf")).toBe("pdf");
-    expect(getIconExtension(undefined, "photo.png")).toBe("png");
+describe("getAttachmentExtension", () => {
+  it("uses the filename extension, including unknown and uppercase extensions", () => {
+    expect(getAttachmentExtension("application/pdf", "invoice.pdf")).toBe("pdf");
+    expect(getAttachmentExtension(undefined, "photo.PNG")).toBe("png");
+    expect(getAttachmentExtension("application/pdf", "data.custom")).toBe("custom");
   });
 
-  it("aliases .7z to the 7zip icon key", () => {
-    expect(getIconExtension(undefined, "archive.7z")).toBe("7zip");
+  it("preserves .7z as the displayed extension", () => {
+    expect(getAttachmentExtension(undefined, "archive.7z")).toBe("7z");
   });
 
   it("falls back to the MIME type when the filename has no usable extension", () => {
-    expect(getIconExtension("application/pdf", "invoice")).toBe("pdf");
-    expect(getIconExtension("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "report")).toBe("docx");
+    expect(getAttachmentExtension("application/pdf", "invoice")).toBe("pdf");
+    expect(getAttachmentExtension("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "report")).toBe("docx");
   });
 
   it("falls back to a broad MIME prefix for unknown types", () => {
-    expect(getIconExtension("image/x-unknown", "weird")).toBe("jpg");
-    expect(getIconExtension("audio/x-unknown", undefined)).toBe("mp3");
-    expect(getIconExtension("video/x-unknown", undefined)).toBe("mp4");
-    expect(getIconExtension("text/x-unknown", undefined)).toBe("txt");
+    expect(getAttachmentExtension("image/x-unknown", "weird")).toBe("jpg");
+    expect(getAttachmentExtension("audio/x-unknown", undefined)).toBe("mp3");
+    expect(getAttachmentExtension("video/x-unknown", undefined)).toBe("mp4");
+    expect(getAttachmentExtension("text/x-unknown", undefined)).toBe("txt");
   });
 
   it("returns an empty string when nothing matches", () => {
-    expect(getIconExtension(undefined, undefined)).toBe("");
-    expect(getIconExtension("application/octet-stream", undefined)).toBe("");
-    expect(getIconExtension("application/octet-stream", "README")).toBe("");
+    expect(getAttachmentExtension(undefined, undefined)).toBe("");
+    expect(getAttachmentExtension("application/octet-stream", undefined)).toBe("");
+    expect(getAttachmentExtension("application/octet-stream", "README")).toBe("");
   });
 });
 
