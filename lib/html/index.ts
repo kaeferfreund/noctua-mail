@@ -9,6 +9,7 @@
 //   - linkify.ts: auto-linkify bare URLs in HTML text nodes
 //   - inlineImages.ts: inline-image rewriting (cid: <-> resolved URL)
 //   - quotedParts.ts: build / assemble / extract the "quoted original" block
+//   - viewportUnits.ts: freeze viewport-height lengths in auto-height previews
 //   - quoteBoundary.ts: locate the quoted thread inside an incoming message
 //
 // Prefer importing from "@/lib/html" rather than the sibling files directly;
@@ -30,6 +31,11 @@ export {
   extractHtmlBody
 } from "./extract";
 export { shouldShowHtmlViewerFrame, ensureHtmlDocumentTitle } from "./document";
+export {
+  rewriteViewportHeightUnits,
+  rewriteHtmlViewportHeightUnits,
+  stripBodyHeightStyles
+} from "./viewportUnits";
 export { linkifyHtmlTextNodes } from "./linkify";
 export { enforceSafeLinks } from "./safeLinks";
 export {
