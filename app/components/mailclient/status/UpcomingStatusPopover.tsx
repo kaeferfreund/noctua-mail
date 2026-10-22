@@ -8,7 +8,6 @@ import {
   Card,
   Flex,
   Heading,
-  Popover,
   Text
 } from "@radix-ui/themes";
 import {
@@ -31,6 +30,7 @@ import {
   type BottomStatusTone
 } from "./BottomStatusSection";
 import { buildUpcomingEntries, type UpcomingEntry } from "./upcomingEntries";
+import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type UpcomingStatusPopoverProps = {
@@ -214,22 +214,19 @@ export default function UpcomingStatusPopover({
   );
 
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Trigger>
-        <BottomStatusTriggerButton
+    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Upcoming"
+      trigger={<BottomStatusTriggerButton
           label="Upcoming"
           value={upcomingStatusValue}
           tone={upcomingStatusTone}
           alignRight
           wide
-        />
-      </Popover.Trigger>
-      <Popover.Content
-        className="bottom-popover bottom-popover-reminders"
-        side="top"
-        align="end"
-        sideOffset={8}
-      >
+        />}
+      contentProps={{ className: "bottom-popover bottom-popover-reminders",
+        side: "top",
+        align: "end",
+        sideOffset: 8, }}
+    >
         <Flex align="center" justify="between" className="popover-title-row">
           <Flex align="baseline" gap="3">
             <Heading size="3" weight="medium" className="reminder-main-title">
@@ -420,7 +417,6 @@ export default function UpcomingStatusPopover({
             </Flex>
           )}
         </Box>
-      </Popover.Content>
-    </Popover.Root>
+    </StatusPanelFrame>
   );
 }

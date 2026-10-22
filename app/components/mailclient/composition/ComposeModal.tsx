@@ -1,17 +1,20 @@
+import { useLayoutEffect, useRef } from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { Dock, ExternalLink, X } from "lucide-react";
 import { MinusIcon } from "@radix-ui/react-icons";
 import ComposeFields from "./ComposeFields";
 import ComposeActions from "./ComposeActions";
-import { Heading, Text } from "@radix-ui/themes";
+import { Heading, Text, Theme } from "@radix-ui/themes";
 import { useComposeContext } from "./ComposeContext";
 import styles from "./Compose.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type ComposeModalProps = {
   open: boolean;
+  isMobile?: boolean;
 };
 
-export default function ComposeModal({ open }: ComposeModalProps) {
+export default function ComposeModal({ open, isMobile = false }: ComposeModalProps) {
   const {
     composeMode,
     composeTo,
@@ -67,6 +70,11 @@ export default function ComposeModal({ open }: ComposeModalProps) {
     composeMessageField
   } = useComposeContext();
 
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (open && isMobile) returnFocusRef.current = document.activeElement as HTMLElement | null;
+  }, [open, isMobile]);
+
   if (!open) return null;
 
   const composeTitle =
@@ -82,28 +90,20 @@ export default function ComposeModal({ open }: ComposeModalProps) {
               ? "Forward"
               : "New message";
 
-  return (
-    <div
-      className="modal-backdrop"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          if (detachedWindow) {
-            setComposeView("inline");
-            return;
-          }
-          setComposeOpen(false);
-          setComposeView("inline");
-        }
-      }}
-    >
+  const close = () => {
+    if (!detachedWindow) setComposeOpen(false);
+    setComposeView("inline");
+  };
+  const heading = <Heading size="5" weight="bold" className={styles.composeTitle}>{composeTitle}</Heading>;
+  const modal = (
       <div
         className={`${styles.composeModal} ${discardingDraft ? styles.disabled : ""} ${
           composeDragActive ? styles.composeDropActive : ""
         }`}
         ref={composeModalRef}
-        style={{
+        style={isMobile ? undefined : {
           width: composeSize.width,
-          height: composeSize.height ?? "85vh"
+          height: composeSize.height ?? "85dvh"
         }}
         onClick={(event) => event.stopPropagation()}
         onDragEnter={handleComposeDragEnter}
@@ -113,15 +113,13 @@ export default function ComposeModal({ open }: ComposeModalProps) {
       >
         <div className={styles.composeHeader}>
           <div>
-            <Heading size="5" weight="bold" className={styles.composeTitle}>
-              {composeTitle}
-            </Heading>
+            {isMobile ? <DialogPrimitive.Title asChild>{heading}</DialogPrimitive.Title> : heading}
             <Text size="2" color="gray" className={styles.composeSubtitle}>
               From {fromValue}
             </Text>
           </div>
           <div className={styles.composeHeaderActions}>
-            <TooltipIconButton
+            {!isMobile && <TooltipIconButton
               variant="ghost"
               size="2"
               tooltip="Dock in thread view"
@@ -129,8 +127,8 @@ export default function ComposeModal({ open }: ComposeModalProps) {
               disabled={detachingCompose || sendingMail || discardingDraft}
             >
               <Dock size={16} />
-            </TooltipIconButton>
-            {!detachedWindow && (
+            </TooltipIconButton>}
+            {!isMobile && !detachedWindow && (
               <>
                 <TooltipIconButton
                   variant="ghost"
@@ -182,6 +180,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
             composeShowBcc={composeShowBcc}
             composeOpenedAt={composeOpenedAt}
             activeAccountId={activeAccountId}
+            fromValue={fromValue}
             inReplyToMessage={inReplyToMessage}
             onJumpToMessage={jumpToMessage}
             setComposeSubject={setComposeSubject}
@@ -220,7 +219,7 @@ export default function ComposeModal({ open }: ComposeModalProps) {
           handleSendMail={handleSendMail}
           formatRelativeTime={formatRelativeTime}
         />
-        <div
+        {!isMobile && <div
           className={styles.composeResizer}
           onPointerDown={(event) => {
             event.preventDefault();
@@ -241,8 +240,34 @@ export default function ComposeModal({ open }: ComposeModalProps) {
             };
             setComposeResizing(true);
           }}
-        />
+        />}
       </div>
-    </div>
   );
+  if (isMobile) return (
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) close(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className={`modal-backdrop ${styles.composeBackdrop}`} />
+        <Theme asChild>
+          <DialogPrimitive.Content asChild aria-modal="true" aria-describedby={undefined}
+            onCloseAutoFocus={(event) => {
+              // A mobile sidebar opener unmounts as the composer opens.
+              // Its persistent header trigger is the next useful focus target.
+              const opener = returnFocusRef.current;
+              const target = opener?.isConnected && opener !== document.body
+                ? opener
+                : document.querySelector<HTMLButtonElement>('button[aria-label="Toggle sidebar"]');
+              if (target) {
+                event.preventDefault();
+                target.focus();
+              }
+            }}>
+            {modal}
+          </DialogPrimitive.Content>
+        </Theme>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+  return <div className={`modal-backdrop ${styles.composeBackdrop}`} onClick={(event) => {
+    if (event.target === event.currentTarget) close();
+  }}>{modal}</div>;
 }

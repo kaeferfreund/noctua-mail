@@ -3,6 +3,9 @@
 import { useCallback, useState } from "react";
 import type React from "react";
 import { Button } from "@radix-ui/themes";
+import { ArrowLeft } from "lucide-react";
+import { useIsMobile } from "@/app/hooks/use-mobile";
+import { useMobileBack } from "@/app/components/shell/MobileNavigation";
 import { MessageLinkPreviewProvider } from "./MessageLinkPreviewContext";
 import styles from "./MessageViewPane.module.css";
 
@@ -21,6 +24,9 @@ export default function MessageViewPane({
   header,
   hideToolbar = false
 }: MessageViewPaneProps) {
+  const isMobile = useIsMobile();
+  hideToolbar = hideToolbar || isMobile;
+  const back = useMobileBack();
   const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
   const handleLinkPreviewChange = useCallback((nextValue: string | null) => {
     setLinkPreviewUrl((currentValue) => (currentValue === nextValue ? currentValue : nextValue));
@@ -28,6 +34,7 @@ export default function MessageViewPane({
 
   return (
     <section className={styles.pane}>
+      {back ? <div className={styles.mobileHeader}><Button variant="ghost" onClick={back} aria-label="Back to messages"><ArrowLeft size={18} />Back</Button></div> : null}
       {!hideToolbar && (
         <div className={styles.toolbar}>
           <span className={styles.shortcutHint}>
