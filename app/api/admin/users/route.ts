@@ -1,7 +1,5 @@
-import { listAccountMembers } from "@/lib/accountAccess";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { sanitizeAccountForClient } from "@/lib/accountPresentation";
 import { getAccounts, getUserAccounts, getUsers } from "@/lib/db";
 import { requireAdminSessionOr403 } from "../_auth";
 import { handleAdminUser } from "../_users";
@@ -14,12 +12,8 @@ export async function GET(request: Request) {
   return withAuthResponse(auth, async () => {
 
     const [users, accounts, links] = await Promise.all([getUsers(), getAccounts(), getUserAccounts()]);
-    const accountById = new Map(
-      await Promise.all(accounts.map(async (account) => {
-        const sanitized = sanitizeAccountForClient(account, { role: "manager", viewerUserId: auth.userId, memberCount: (await listAccountMembers(account.id)).length });
-        return [sanitized.id, sanitized] as const;
-      }))
-    );
+    const accountById = new Map(accounts.map(account => [account.id, account]));
+    const memberships = new Map(links.map(link => [JSON.stringify([link.userId, link.accountId]), link.role]));
     const accountIdsByUserId = new Map<string, Set<string>>();
 
     const ensureAccountSet = (userId: string) => {
@@ -49,7 +43,14 @@ export async function GET(request: Request) {
       .map((user) => {
         const accountIds = [...(accountIdsByUserId.get(user.id) ?? new Set<string>())];
         const userAccounts = accountIds
-          .map((accountId) => accountById.get(accountId))
+          .map((accountId) => {
+            const account=accountById.get(accountId);
+            if (!account) return undefined;
+            const isOwner=account.ownerUserId===user.id;
+            const role=isOwner?"manager":memberships.get(JSON.stringify([user.id,accountId]));
+            if (!role) return undefined;
+            return {id:account.id,name:account.name,email:account.email,role,isOwner};
+          })
           .filter((account): account is NonNullable<typeof account> => Boolean(account))
           .sort((a, b) => a.email.localeCompare(b.email));
         return {

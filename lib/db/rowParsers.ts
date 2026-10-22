@@ -25,6 +25,9 @@ function safeParseJson<T = unknown>(value: string | null | undefined, fallback?:
 
 export function mapInviteRow(row: any): InviteCode {
   return {
+    issuedByUserId: row.issuedByUserId ?? null,
+    provenance: row.provenance ?? "operator",
+    revokedAt: row.revokedAt ?? null,
     code: row.code,
     role: row.role,
     maxUses: row.maxUses === null ? null : Number(row.maxUses),

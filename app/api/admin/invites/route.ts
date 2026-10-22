@@ -1,7 +1,7 @@
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { createInviteCode, getInviteCodes, getUsers } from "@/lib/db";
-import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { getInviteCodes, getUsers } from "@/lib/db";
+import { handleAdminUser } from "../_users";
 import { requireAdminSessionOr403 } from "../_auth";
 
 export async function GET(request: Request) {
@@ -31,13 +31,5 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const error = requireJsonSameOrigin(request);
-  if (error) return error;
-  const auth = await requireAdminSessionOr403(request);
-  if (auth instanceof NextResponse) return auth;
-  return withAuthResponse(auth, async () => {
-
-    const invite = await createInviteCode({ role: "user", maxUses: 1, expiresAt: null });
-    return NextResponse.json({ ok: true, invite }, { status: 201 });
-  });
+  return handleAdminUser(request,"generic-invite");
 }

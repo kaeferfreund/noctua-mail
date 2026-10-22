@@ -591,7 +591,7 @@ validated at 10..256 characters before admin `createUser` (the pinned library om
 The optional mailbox password never becomes the app password. Names are nonblank, at most 256
 characters; personal e-mail is normalized, trimmed and validated, at most 320 characters.
 
-`POST /api/auth/signup` requires same-origin JSON, limited to 3/minute/IP. Example:
+`POST /api/auth/signup` requires same-origin JSON, limited to 3/minute/IP. Its internal setup sign-in forwards the wrapper-resolved trusted IP to the library limiter, so unrelated signup clients do not share an unknown-IP bucket. Example:
 
 ```json
 {"inviteCode":"synthetic-invite","email":"person@example.test","name":"Synthetic Person","password":"synthetic-app-password","account":{"email":"personal@example.test","name":"Synthetic Mailbox","imap":{"host":"imap.example.test","port":993,"secure":true,"user":"personal@example.test","password":"synthetic-imap-secret"},"smtp":{"host":"smtp.example.test","port":465,"secure":true,"user":"personal@example.test","password":"synthetic-smtp-secret"}}}
@@ -604,7 +604,18 @@ before reservation or network. Invalid, expired or wrong-person invites return 4
 exhaustion returns 409 `invite_exhausted`, all with zero outbound IMAP/SMTP calls. The empty-install
 first person needs the startup admin invite (`bootstrap_invite_required` otherwise). A pending
 bootstrap returns 409 `bootstrap_pending`; a generic bootstrap admin invite cannot be used after
-bootstrap (`bootstrap_invite_closed`). Targeted admin invitations remain usable.
+bootstrap (`bootstrap_invite_closed`). Targeted admin invitations remain usable only while their issuer remains an enabled admin.
+
+Admin-issued targeted and generic invitations carry `issuedByUserId`, `provenance:"admin"`,
+and nullable `revokedAt`. Preflight rejects revoked invites and missing/banned/demoted/incomplete
+issuers with 403 `invalid_invite`, before network or reservation. The same live authority check runs
+inside reservation and finalization transactions. Demotion/ban revokes the issuer's outstanding
+invitations in the **same library write transaction**, with one secret-free `invite.revoke` audit
+(count/reason/actor/issuer; no invite capability). Unbanning/promoting never revives them.
+Operator/bootstrap invitations have `provenance:"operator"`, no issuer, and retain their existing
+bootstrap/email/capacity checks. On provenance-schema adoption, historical unbound bootstrap/generic
+invites retain that operator authority; historical email-bound invites with unknown issuers are
+revoked and must be reissued. This is additive schema adoption, not an identity migration.
 
 The read-only invite preflight precedes optional IMAP/SMTP verification. A subsequent immediate
 transaction rechecks identity/mailbox/invite authority, expiry, e-mail binding and capacity, counting
@@ -614,9 +625,9 @@ the identity. Unauthenticated headerless server creation outside provisioning/mi
 with `provisioning_required`. The final immediate transaction inserts a new mailbox (never REPLACE),
 manager membership, invite claim, audit and `complete` together.
 
-201 response is `{ok:true,userId,accountId:null|string,enrollmentRequired:true,loginRequired:false}`
+201 response is `{ok:true,userId,accountId:null,security:{enrollmentRequired:true},loginRequired:false}`
 with a **setup-only** session cookie. If the independent post-commit sign-in fails, the same 201 has
-`loginRequired:true`; provisioning remains committed and the client proceeds to login. No mailbox
+`loginRequired:true` (including a thrown sign-in error); provisioning remains committed and the client proceeds to login. The new mailbox is not selected or returned in this DTO; it is discovered through `/api/auth/me` after enrollment. No mailbox
 access exists until fresh proof/TOTP activation finalizes that session. Malformed input is 400
 `invalid_request`; contention is 409 `provisioning_pending`; internal failure is 503
 `provisioning_failed`. Signup errors use `{ok:false,code}`. All responses are no-store.
@@ -632,11 +643,35 @@ login/session/MCP boundaries. Manual reconciliation requires the app stopped; ne
 
 All `/api/admin` paths require an active, MFA-assured admin. JSON mutations use same-origin hygiene;
 every successful mutation records secret-free audit. `GET /api/admin/audit?limit=&before=` returns
-`{ok:true,entries:[...]}` with the existing bounded, newest-first audit pagination (unix ms `before`).
+`{ok:true,entries:[...]}` with newest-first audit pagination: `limit` defaults to 100 and is
+clamped to 1..500; `before` is a strictly older Unix-ms timestamp.
+
+`GET /api/admin/users` returns exactly:
+
+```ts
+{ok:true, users:Array<{
+  id:string; email:string; name:string|null; role:"admin"|"user"; createdAt:number;
+  hasPassword:boolean; disabled:boolean; twoFactorEnabled:boolean; passkeyCount:number;
+  accounts:Array<{id:string; name:string; email:string; role:"viewer"|"editor"|"manager"; isOwner:boolean}>;
+}>}
+```
+
+Users sort by creation time, accounts by email. Each account describes the **target user's**
+membership: owners are manager/isOwner:true even without a link; non-owners use their stored
+membership role and isOwner:false. Unrelated accounts are absent. No connection credentials,
+password hashes, session tokens or viewer-admin role overrides appear in this DTO.
+
+`GET /api/admin/invites` retains `{ok:true,invites:[Invite & {isUsed,usedByUserEmail}]}`;
+`Invite` includes the fields below plus `issuedByUserId`, `provenance`, `revokedAt`.
+`POST /api/admin/invites` accepts same-origin JSON `{}` (an empty body with the same JSON hygiene
+is also accepted for the existing client). It deliberately issues a generic single-use user invite,
+`email:null,expiresAt:null`, via the same authority/serialization/audit service as targeted issuance.
+The 201 response is `{ok:true,invite}`; generic redemption still uses ordinary signup. Local
+`createInviteCode` is operator-only storage authority; it is never the HTTP issuance boundary.
 
 - `POST /api/admin/users` JSON `{email,name,role:"admin"|"user"}` → 201
   `{ok:true,invite:{code,email,role,maxUses:1,uses:0,createdAt,expiresAt,usedByUserId:null}}`.
-  Invitation TTL is one day. Hand over the code personally; no user/password/session is created.
+  Invitation TTL is one day; additive fields are `issuedByUserId`, `provenance:"admin"`, `revokedAt:null`. Hand over the code personally; no user/password/session is created.
   The invite's e-mail binding is checked again on signup; the person chooses their own name/password.
 - `PATCH /api/admin/users/[userId]` sparse `{name?,role?,disabled?}` → `{ok:true}`. Names use
   `auth.api.adminUpdateUser` for the target; `updateUser` remains a self-only library API. Role/status
@@ -671,18 +706,44 @@ and revokes old access, while interrupted deletion must finish cleanup. Never re
 by client operation ID. The service intentionally reports partial downstream failures as 503
 `admin_operation_failed`; re-fetch status after operator reconciliation instead of replaying blindly.
 
-Recovery/admin-security attempts are limited to 3/minute/admin: 429 `recovery_rate_limited`,
+All mutations through the user lifecycle wrapper (PATCH, DELETE, targeted/generic invite issuance,
+recovery, MFA reset, passkey removal and session revocation) share a 10-attempt/minute **actor**
+budget and a separate 30-attempt/minute **IP** budget. Both successful and failed authorized
+attempts count, across action types and targets; changing IP cannot evade the actor budget and
+changing actor cannot evade the IP budget. Limits precede JSON parsing and service calls, after
+same-origin and admin checks. Exhaustion is 429 `{ok:false,code:"admin_rate_limited"}` with
+`Retry-After: 60`. IP resolution uses existing `TRUSTED_PROXY_HOPS`; proxy sanitization remains required.
+These are process-memory windows, reset by restart.
+
+Recovery/admin-security attempts additionally retain the stricter 3/minute/admin limit: 429 `recovery_rate_limited`,
 `Retry-After: 60`. Missing/stale/wrong-purpose grants fail 403 `reauth_required` / `invalid_proof`;
 missing explicit target verification fails 400 `target_verification_required`; unknown target is
 404 `user_not_found`. Invalid sessions are 401; insufficient authority is 403. Mutations and secret
 handover responses set `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
 
-Local lockout equivalent (local DB/auth/encryption-key access is operator authority): stop the app,
+Local lockout equivalent (local DB/auth/encryption-key access is operator authority): **stop service →
+run recovery → start service**. Stop the app,
 then run from the worktree, with a private terminal and shell tracing/session recording disabled:
 
 ```sh
 bun --env-file=.env.local scripts/recoverTeamAuth.ts --application-stopped --confirm-personal-handover --user-id <id>
 ```
+
+Auth startup and the recovery script acquire the same Linux `flock(LOCK_EX|LOCK_NB)` on
+`<canonical database directory>/main.db.auth.lock` **before auth initialization or reconciliation**.
+The application holds it for its process lifetime, including DB connection teardown/reopen; the
+operator holds it until the script exits. A held lock makes the other process refuse immediately;
+`--application-stopped` records intent and cannot bypass this check. Never remove/replace the lock
+file while a process might hold its inode. Multiple server processes sharing one datastore are
+intentionally refused. The lock requires the Bun Linux FFI/libc runtime, already the server platform.
+
+Normal exit clears metadata and closes the descriptor; crash/SIGKILL releases the OS lock.
+An orphaned metadata record is automatically accepted only with a valid PID/acquisition timestamp
+and a different/missing `/proc` process start stamp (boot ID + start ticks prevents PID reuse).
+Ambiguous metadata, inaccessible liveness data or a future timestamp fail closed. After independently
+verifying the service is stopped, the operator may add `--override-stale-lock`; it still cannot
+bypass a held OS lock and writes `operator.lock_override` before auth reconciliation. No secret or
+reset URL is stored in that audit. Start the service only after recovery has exited.
 
 It reconciles interrupted work, records actor `operator`, and prints the link once. It never changes
 MFA, chooses a password, sends SMTP, or logs the link in the audit trail. Restart after successful
@@ -707,7 +768,7 @@ returns 503 `auth_integration_pending` externally until Slice 6:
    no session/cookie. Token expiry is 900 seconds; consumption and password change are transactional
    with library session revocation. Expired/reused tokens fail 400 `INVALID_TOKEN`; malformed shape
    fails 400 `invalid_request`; concurrent attempts have one winner (the other may receive retryable
-   409 `security_operation_pending`). Redemption is limited to 5/minute/IP by the library.
+   409 `security_operation_pending`). Redemption is limited to 5/minute/IP by the library. Its 429 response is `{message:"Too many requests. Please try again later."}` with `X-Retry-After` seconds (the pinned library header). Wrapper 429s use `Retry-After`.
 
 MFA survives password reset. A durable reset intent records the prior generation without the token;
 startup can finish stale-row deletion and the missing audit even after the one-use token is spent.
@@ -754,3 +815,84 @@ Parent `e3aad60`; Bun 1.4.4, Better Auth 1.7.12, Next.js 16.2.4. Heavy commands 
 These results verify backend contracts and the retained WebAuthn harness. Compiled public HTTP
 activation/migration/proxy log configuration remain Slice 6; the reset page, complete UI and physical
 phone/PWA acceptance remain Slice 7. No push, PR or deployment is part of this slice.
+
+
+## Fix round 5 contract changes
+
+Slice-7 handoff (signup):
+
+- Old: `{ok:true,userId,accountId:null|string,enrollmentRequired:true,loginRequired:boolean}`.
+- New: `{ok:true,userId,accountId:null,security:{enrollmentRequired:true},loginRequired:boolean}`.
+  Read the nested security flag; the flat flag is removed. `userId` and `loginRequired` are additive
+  extensions to the canonical restricted-enrollment DTO. A mailbox supplied at signup is committed
+  but never presented as selected during enrollment. Discover it through `/api/auth/me` after
+  enrollment. Failed/throwing post-commit sign-in returns 201 with `loginRequired:true`; proceed to
+  login without replaying signup. Successful sign-in still forwards only a setup-session cookie.
+
+Admin consumers: GET users previously reused a sanitized account based on the viewing admin,
+with `accessRole:"manager"` and viewer ownership. It now returns target-specific accounts exactly
+`{id,name,email,role,isOwner}`; connection presentation fields are removed. Generic invite issuance
+now shares the audited lifecycle boundary; both invite DTOs add issuer/provenance/revocation metadata.
+Destructive admin wrappers can now return 429 `admin_rate_limited`, `Retry-After:60` (10/minute/actor,
+30/minute/IP, shared across actions). The stricter recovery/admin-security 3/minute/actor limit remains.
+
+### Fix round 5 gate ownership
+
+The following §10 gates are exercised in this fix round: issuer revocation before verification and
+across both awaits; reservation/finalization collision compensation; exact 403/409 error codes;
+application/operator lifetime exclusion, crash/stale-lock handling and audited override; target
+membership DTOs; shared audited targeted/generic issuance; actor/IP wrapper 429s across actions and
+Next module graphs; canonical signup with/without a mailbox and failed/throwing post-commit sign-in;
+real library reset limits, throttled-token preservation and subsequent redemption; desktop-tagged
+HTTP signup, including empty installation; recovery reserve/mint/audit/complete/release faults with
+two reconciliations; self-demotion/self-disable; and ban/unban/role/delete/disable-audit failures.
+
+Inherited gates are retained and rerun through CI/stress and the reviewer-probe copy: core auth
+migration idempotency and transactional mirrors, dedicated-writer contention/rollback controls,
+assurance/factor/session/challenge generation, raw-admin-path denial, all nine concurrent last-admin
+mutation pairs, MFA-preserving reset, callback-independent MCP revocation, shard cleanup and
+secret-free audits. The eight real Chromium/WebAuthn scenarios remain the Slice-4 fixture acceptance,
+not the actual Slice-7 screens. The fixture invalidation helper now avoids a second auth startup:
+reset redeems via the running server; synthetic revocation abandons only its named fixture user's
+ceremony, without startup reconciliation of the live server.
+
+Deferred to the integration/release owners: activated compiled public `/api/ba` smoke (the mount is
+still deliberately 503), identity migration/cutover/backup restore, deployed proxy logging and TLS/DNS
+acceptance (Slice 6); real login/enrollment/reset UI, both phones and PWA flows (Slice 7); collaboration
+and mailbox-watcher integration acceptance; and a dedicated mixed signup/password-change/ban versus
+Noctua-write concurrency workload. The inherited dedicated-connection tests and randomized suite
+establish their stated controls, not that unimplemented mixed workload. No deployment, production
+network/mailbox access, desktop retirement or migration script is included in this round.
+
+The archived reviewer runner hardcodes another worktree, old commit `48b1612` and port 3786.
+`tests/runTeamAuthSecurityControls.sh` is its current-worktree adaptation, with a read-only source
+copy, isolated network/PID namespace, allowlisted environment, bounded scratch/resources and S1/S2
+rejection assertions in `tests/teamAuthSecurityControls.test.ts`. It leaves the retained briefs
+unchanged and uses only allowed ports 3784/3785 (the backend probes need no listener).
+
+
+### Fix round 5 verification (2026-10-22)
+
+Base `2458a09` (merge above `48b1612`); branch `feat/team-auth`. All execution used
+worktree-local `.tmp`/TMPDIR and synthetic data; heavy commands used `nice -n 10`.
+
+- `timeout 1500 nice -n 10 bun run test:ci`: exit 0; 2,173 server tests in 228 files
+  (423.97s), followed by 69 DOM tests in 13 files (18.53s), zero failures.
+- Randomized targeted rate/signup reruns (seed 1337, rerun-each=3): 12 passed, zero failed,
+  126 assertions. Valid unique documentation-range IPs prevent retained limiter buckets from
+  leaking across Bun module reruns; production setup sign-in forwards the wrapper-resolved IP.
+- `timeout 600 nice -n 10 bun run lint`: exit 1, the same pre-existing calendar effect error
+  and 27 warnings; no new findings.
+- `bun check --no-pretty --all`: exit 1, 151 non-`bun:test` diagnostics. A clean `2458a09`
+  archive has the same 151; normalized diagnostic sets add/remove zero. The requested filtered
+  `grep ... | wc -l` command also returns 151.
+- `timeout 1200 nice -n 10 bun run build`: exit 0.
+- ARM override + `AUTH_BROWSER_USE_BUILD=1 bun run test:auth-browser`: exit 0; eight real
+  Chromium/WebAuthn scenarios passed in 16.0s on port 3784, with the corrected isolated fixture helper.
+- `nice -n 10 bash tests/runTeamAuthSecurityControls.sh`: exit 0; 141 tests in five files,
+  zero failures, 778 assertions (91.40s). This includes all original 105 test entries, with S1/S2
+  changed from defect observations to rejection assertions, plus the new boundary cases.
+
+- `timeout 1800 nice -n 10 bun run test:stress`: exit 0, seed 1337, rerun-each=3;
+  6,519 passed, zero failed, 19,422 assertions in 228 files (1011.94s).
+- `git diff --check` and `git diff --cached --check`: exit 0. No push, PR or deployment.
