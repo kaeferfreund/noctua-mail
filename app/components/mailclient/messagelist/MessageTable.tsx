@@ -560,7 +560,7 @@ export default function MessageTable({
                   >
                     <Search size={14} />
                   </TooltipIconButton>
-                  {renderMessageMenu(message, "table")}
+                  {renderMessageMenu(message, "table", undefined, isCollapsedThreadRoot ? displaySeen : undefined)}
                   {showAddSuggestionAction && (
                     <TopicSuggestionAcceptButton
                       topicColor={activeTopic?.color}

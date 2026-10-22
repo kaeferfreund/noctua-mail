@@ -40,6 +40,7 @@ import {
   getUnsubscribeCapability,
   hasSendableRecipients
 } from "../utils/messageHelpers";
+import type { RowReadAction } from "../messagelist/selectionActions";
 import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
@@ -80,6 +81,7 @@ type MessageMenuProps = {
   message: Message;
   origin?: "list" | "thread" | "table";
   isDraft: boolean;
+  readAction?: RowReadAction;
   actionVisibility?: Partial<Record<MessageMenuAction, boolean>>;
   actionEnabled?: Partial<Record<MessageMenuAction, boolean>>;
   pendingMessageActions: Set<string>;
@@ -127,6 +129,7 @@ export default function MessageMenu({
   message,
   origin = "list",
   isDraft,
+  readAction,
   actionVisibility,
   actionEnabled,
   pendingMessageActions,
@@ -164,6 +167,8 @@ export default function MessageMenu({
 }: MessageMenuProps) {
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
+  const rowReadAction = origin === "thread" ? undefined : readAction;
+  const seen = rowReadAction?.seen ?? Boolean(message.seen);
   const showDeleteInMenu = origin !== "table";
   const allowThreadDeletion = origin !== "thread";
   const inSpamFolder = isSpamFolder(message.folderId);
@@ -301,9 +306,9 @@ export default function MessageMenu({
             isVisible("markRead")
               ? buildItem(
                   "markRead",
-                  message.seen ? "Mark as unread" : "Mark as read",
-                  message.seen ? <MailOpen size={14} /> : <Mail size={14} />,
-                  () => updateFlagState(message, "seen", !message.seen),
+                  seen ? "Mark as unread" : "Mark as read",
+                  seen ? <MailOpen size={14} /> : <Mail size={14} />,
+                  () => rowReadAction ? rowReadAction.onSelect() : updateFlagState(message, "seen", !message.seen),
                   isDisabled("markRead")
                 )
               : null,
