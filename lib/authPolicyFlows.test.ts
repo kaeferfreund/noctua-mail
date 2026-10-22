@@ -55,6 +55,24 @@ async function enrolled() {
 }
 
 describe("HTTP assurance and purpose-bound factors",()=>{
+  test("reconciliation repairs flag-only activation into fresh-proof restricted setup",async()=>{
+    const f=await fixture(),jar=await login(f,f.user.email);
+    const grant=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
+    const seed=await http(f,jar,"/two-factor/enable",{password},grant.grant);
+    f.master.exec("CREATE TRIGGER fail_verified BEFORE UPDATE OF verified ON auth_two_factor WHEN NEW.verified=1 BEGIN SELECT RAISE(ABORT,'synthetic verified fault'); END");
+    expect((await http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(seed.body.totpURI)},grant.grant)).status).not.toBe(200);
+    expect(f.master.prepare('SELECT twoFactorEnabled FROM auth_user WHERE id=?').get(f.user.id).twoFactorEnabled).toBe(1);
+    f.master.exec('DROP TRIGGER fail_verified');
+    await reconcileSecurityOperations(f.master,Date.now()+1);
+    const next=new CookieJar();
+    const signed=await http(f,next,"/sign-in/email",{email:f.user.email,password});
+    expect(signed.body.twoFactorRedirect).not.toBe(true);
+    expect((await source(f,next)).assurance).toBe("setup");
+    expect((await http(f,next,"/two-factor/enable",{password},grant.grant)).status).not.toBe(200);
+    await enroll(f,next);
+    expect((await source(f,next)).assurance).toBe("mfa");
+  });
+
   test("two sessions before enrollment: only the proving rotated session is promoted",async()=>{
     const f=await fixture();
     const a=await login(f,f.user.email),b=await login(f,f.user.email);
@@ -160,7 +178,7 @@ describe("HTTP assurance and purpose-bound factors",()=>{
     f.jar.absorb(replacement.headers);
     expect((await source(f,f.jar)).assurance).toBe("setup");
     expect(f.master.prepare(`SELECT twoFactorEnabled FROM auth_user WHERE id=?`).get(f.user.id).twoFactorEnabled).toBe(0);
-    await expect(proof(f,f.jar,{purpose:"totp.enroll",currentPassword:password})).rejects.toThrow();
+    await expect(proof(f,f.jar,{purpose:"totp.enroll",currentPassword:"wrong-synthetic-password"})).rejects.toThrow();
     await reconcileSecurityOperations(f.master,Date.now()+1);
     expect(await f.auth.api.getSession({headers:f.jar.headers()})).toBeNull();
     const next=await login(f,f.user.email);
@@ -169,7 +187,7 @@ describe("HTTP assurance and purpose-bound factors",()=>{
     await enroll(f,next);
     expect((await source(f,next)).assurance).toBe("mfa");
   });
-  test("each activation write/finalizer fault leaves no assured session",async()=>{
+  test("each activation write/finalizer fault reconciles and permits fresh enrollment",async()=>{
     for(const boundary of ["flag","session","verified","finalizer"]) {
       const f=await fixture(),jar=await login(f,f.user.email);
       const grant=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
@@ -182,6 +200,21 @@ describe("HTTP assurance and purpose-bound factors",()=>{
       expect((await http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(enabled.body.totpURI)},grant.grant)).status).not.toBe(200);
       expect(f.master.prepare(`SELECT COUNT(*) n FROM auth_session_security WHERE userId=? AND assurance='mfa'`).get(f.user.id).n).toBe(0);
       expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${f.user.id}`)).not.toBeNull();
+      await expect(proof(f,jar,{purpose:"totp.enroll",currentPassword:password})).rejects.toThrow();
+      f.master.exec("DROP TRIGGER synthetic_activation_fault");
+      await reconcileSecurityOperations(f.master,Date.now()+1);
+      expect(await f.auth.api.getSession({headers:jar.headers()})).toBeNull();
+      const next=await login(f,f.user.email);
+      if(boundary === "finalizer") {
+        // Both factor writes committed: reconciliation must preserve the healthy factor.
+        expect(f.master.prepare(`SELECT verified FROM auth_two_factor WHERE userId=?`).get(f.user.id).verified).toBe(1);
+        expect((await http(f,next,"/two-factor/verify-totp",{code:totpFromUri(enabled.body.totpURI)})).status).toBe(200);
+        const fresh=await proof(f,next,{purpose:"totp.replace",currentPassword:password,totpCode:totpFromUri(enabled.body.totpURI)});
+        const replaced=await mutateSecurity(f.auth,f.master,await source(f,next),request(next,{}, {"x-noctua-reauth":fresh.grant}),{currentPassword:password},"totp-replace");
+        next.absorb(replaced.headers);
+      } else expect((await source(f,next)).assurance).toBe("setup");
+      await enroll(f,next);
+      expect((await source(f,next)).assurance).toBe("mfa");
     }
   });
   test("backup regeneration binds session, expires and is consumed once; revokes old codes",async()=>{
@@ -221,9 +254,68 @@ describe("HTTP assurance and purpose-bound factors",()=>{
     expect((await http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(enabled.body.totpURI)},continuation)).status).toBe(200);
     expect((await source(f,jar)).assurance).toBe("mfa");
     const next=await login(f,f.user.email);
+    expect((await http(f,next,"/two-factor/verify-totp",{code:totpFromUri(f.factors.totpURI)})).status).not.toBe(200);
     expect((await http(f,next,"/two-factor/verify-totp",{code:totpFromUri(enabled.body.totpURI)})).status).toBe(200);
     expect((await source(f,next)).assurance).toBe("mfa");
     const oldCode=await login(f,f.user.email);
     expect((await http(f,oldCode,"/two-factor/verify-backup-code",{code:f.factors.backupCodes[2]})).status).not.toBe(200);
   });
+});
+
+
+describe("setup recovery and production limits",()=>{
+  test("enable password typo releases the slot and correct fresh proof retries immediately",async()=>{
+    const f=await fixture(),jar=await login(f,f.user.email);
+    const g=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
+    const rejected=await http(f,jar,"/two-factor/enable",{password:"synthetic-typo"},g.grant);
+    expect(rejected.body.code).toBe("INVALID_PASSWORD");
+    expect(f.master.prepare("SELECT 1 FROM admin_lifecycle_operations WHERE slot=?").get(`security:${f.user.id}`)).toBeNull();
+    expect(f.master.prepare("SELECT 1 FROM auth_two_factor WHERE userId=?").get(f.user.id)).toBeNull();
+    await enroll(f,jar);
+    expect((await source(f,jar)).assurance).toBe("mfa");
+  });
+  for(const expired of [false,true])test(`fresh proof abandons ${expired?"expired":"live"} seed but wrong proof cannot`,async()=>{
+    const f=await fixture(),jar=await login(f,f.user.email);
+    const g=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
+    const old=await http(f,jar,"/two-factor/enable",{password},g.grant);
+    if(expired)f.master.prepare("UPDATE auth_reauth_grants SET expiresAt=0 WHERE userId=?").run(f.user.id);
+    await expect(proof(f,jar,{purpose:"totp.enroll",currentPassword:"synthetic-wrong"})).rejects.toThrow();
+    expect(f.master.prepare("SELECT state FROM admin_lifecycle_operations WHERE slot=?").get(`security:${f.user.id}`).state).toBe("totp_seed_issued");
+    const fresh=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
+    expect(f.master.prepare("SELECT 1 FROM auth_two_factor WHERE userId=?").get(f.user.id)).toBeNull();
+    expect((await http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(old.body.totpURI)},g.grant)).status).not.toBe(200);
+    const seed=await http(f,jar,"/two-factor/enable",{password},fresh.grant);
+    expect(seed.status).toBe(200);
+    expect((await http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(seed.body.totpURI)},fresh.grant)).status).toBe(200);
+  });
+  test("expired and locked login challenges cannot create sessions",async()=>{
+    const f=await enrolled();
+    const expired=await login(f,f.user.email);
+    f.master.prepare("UPDATE auth_pending_challenges SET expiresAt=0 WHERE userId=?").run(f.user.id);
+    expect((await http(f,expired,"/two-factor/verify-totp",{code:totpFromUri(f.factors.totpURI)})).body.code).toBe("invalid_challenge");
+    expect(await f.auth.api.getSession({headers:expired.headers()})).toBeNull();
+    const locked=await login(f,f.user.email);
+    f.master.prepare("UPDATE auth_two_factor SET lockedUntil=? WHERE userId=?").run(new Date(Date.now()+900000).toISOString(),f.user.id);
+    const rejected=await http(f,locked,"/two-factor/verify-totp",{code:totpFromUri(f.factors.totpURI)});
+    expect(rejected.status).toBe(429);expect(rejected.body.code).toBe("ACCOUNT_TEMPORARILY_LOCKED");
+    expect(await f.auth.api.getSession({headers:locked.headers()})).toBeNull();
+  });
+  test("production library two-factor limits reject the fourth HTTP attempt",async()=>{
+    const f=await createTestAuthHarness(undefined,{}, {libraryRateLimits:true});fixtures.push(f);
+    const ip=`synthetic-${crypto.randomUUID()}`;
+    for(let i=0;i<4;i++) {
+      const res=await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/two-factor/verify-totp`,{method:"POST",headers:{origin:TEST_BASE_URL,"content-type":"application/json","x-forwarded-for":ip},body:JSON.stringify({code:"000000"})}));
+      expect(res.status).toBe(i===3?429:403);
+    }
+  });
+});
+
+test("a concurrent activation rejection cannot cancel the request holding the seed slot",async()=>{
+  const f=await fixture(),jar=await login(f,f.user.email);
+  const g=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
+  const enabled=await http(f,jar,"/two-factor/enable",{password},g.grant);
+  const results=await Promise.all([0,1].map(()=>http(f,jar,"/two-factor/verify-totp",{code:totpFromUri(enabled.body.totpURI)},g.grant)));
+  expect(results.filter(result=>result.status===200)).toHaveLength(1);
+  expect((await source(f,jar)).assurance).toBe("mfa");
+  expect(f.master.prepare("SELECT 1 FROM admin_lifecycle_operations WHERE slot=?").get(`security:${f.user.id}`)).toBeNull();
 });

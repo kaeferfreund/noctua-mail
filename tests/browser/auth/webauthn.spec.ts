@@ -1,5 +1,5 @@
 import {SCENARIOS} from "./scenarios";
-import {test,expect,api,ceremony,signIn,grant,register,invalidate} from "./fixtures";
+import {test,expect,api,ceremony,signIn,grant,register,invalidate,finalizerFault,faultState} from "./fixtures";
 
 // Real CTAP/WebAuthn ceremonies; no verification callback is faked. Secret screens are never recorded.
 test(SCENARIOS.registration,async({page,seed,authenticator})=>{
@@ -14,6 +14,10 @@ test(SCENARIOS.registration,async({page,seed,authenticator})=>{
   const me=await api(page,"/api/auth/me");
   expect(me.body.security.reauthRequired).toBe(false);
   const oldCookies=await page.context().cookies();
+  await page.context().clearCookies();
+  await signIn(page,seed); // Independent live session, not the source retired by UV rotation.
+  const otherCookies=await page.context().cookies();
+  await page.context().clearCookies();await page.context().addCookies(oldCookies);
   const uvIntent=await grant(page,seed,"passkey.enroll",true);
   const uvOptions=await api(page,"/api/ba/passkey/generate-authenticate-options",undefined,uvIntent);
   const uvResponse=await ceremony(page,uvOptions.body,false);
@@ -25,6 +29,10 @@ test(SCENARIOS.registration,async({page,seed,authenticator})=>{
   await page.context().clearCookies();
   await page.context().addCookies(oldCookies);
   expect((await api(page,"/api/ba/passkey/generate-register-options",undefined,verified.body.grant)).status).not.toBe(200);
+  await page.context().clearCookies();await page.context().addCookies(otherCookies);
+  expect((await api(page,"/api/auth/me")).status).toBe(200);
+  expect((await api(page,"/api/ba/passkey/generate-register-options",undefined,verified.body.grant)).status).not.toBe(200);
+  expect((await api(page,"/api/auth/me")).status).toBe(200);
   await page.context().clearCookies();
   await page.context().addCookies(newCookies);
   expect((await api(page,"/api/ba/passkey/generate-register-options",undefined,verified.body.grant)).status).toBe(200);
@@ -79,4 +87,52 @@ for(const mode of ["reset","revoke"] as const)test(SCENARIOS[mode],async({page,s
   invalidate(seed,mode);
   expect((await api(page,"/api/ba/passkey/verify-authentication",{response:assertion})).status).not.toBe(200);
   expect((await api(page,"/api/auth/me")).status).toBe(401);
+});
+
+
+test(SCENARIOS.management,async({page,seed,authenticator})=>{
+  await authenticator.setUV(true);await signIn(page,seed);
+  const firstDevice=authenticator.id();
+  const first=await register(page,seed);
+  await authenticator.addDevice();
+  const second=await register(page,seed);
+  await authenticator.selectDevice(firstDevice);
+  async function uv(purpose:string,key=first.response.id) {
+    const intent=await grant(page,seed,purpose,true);
+    const opts=await api(page,"/api/ba/passkey/generate-authenticate-options",undefined,intent);
+    expect(opts.status).toBe(200);
+    const response=await ceremony(page,{...opts.body,allowCredentials:[{id:key,type:"public-key"}]},false);
+    const verified=await api(page,"/api/ba/passkey/verify-authentication",{response},intent);
+    expect(verified.status).toBe(200);expect(verified.body.purpose).toBe(purpose);
+    return verified.body.grant as string;
+  }
+  const same=await uv("passkey.remove");
+  const rejected=await api(page,"/api/auth/security/passkeys/remove",{passkeyId:first.passkeyId},same);
+  expect(rejected.status).toBe(403);expect(rejected.body.code).toBe("another_passkey_required");
+  const another=await uv("passkey.remove");
+  expect((await api(page,"/api/auth/security/passkeys/remove",{passkeyId:second.passkeyId},another)).status).toBe(200);
+  for(const purpose of ["password.change","backup.regenerate","totp.replace","sessions.revoke","admin.recovery"]) {
+    const wrong=await api(page,"/api/auth/reauth",{purpose,currentPassword:"synthetic-wrong-password",proofMode:"passkey"});
+    expect(wrong.status).toBe(403);
+    const token=await uv(purpose);
+    if(purpose === "backup.regenerate")expect((await api(page,"/api/auth/security/backup-codes",{currentPassword:seed.password},token)).status).toBe(200);
+  }
+});
+
+for(const mode of ["registration","uv"] as const)test(SCENARIOS[mode === "registration" ? "registrationFault" : "uvFault"],async({page,seed,authenticator})=>{
+  await authenticator.setUV(true);await signIn(page,seed);
+  if(mode === "uv")await register(page,seed);
+  const token=await grant(page,seed,mode === "uv" ? "backup.regenerate" : "passkey.enroll",mode === "uv");
+  const options=await api(page,`/api/ba/passkey/generate-${mode === "uv" ? "authenticate" : "register"}-options`,undefined,token);
+  expect(options.status).toBe(200);
+  const response=await ceremony(page,options.body,mode === "registration");
+  finalizerFault(seed,mode);
+  try {
+    const result=await api(page,`/api/ba/passkey/verify-${mode === "uv" ? "authentication" : "registration"}`,{response},token);
+    expect(result.status).toBe(503);
+    expect(faultState(seed)).toMatchObject({passkeys:mode === "uv" ? 1 : 0,grants:0,pendingState:"interrupted",sessions:1});
+    const me=await api(page,"/api/auth/me");
+    expect(me.body.security.enrollmentRequired).toBe(true);
+    expect((await api(page,`/api/ba/passkey/verify-${mode === "uv" ? "authentication" : "registration"}`,{response},token)).status).not.toBe(200);
+  } finally {finalizerFault(seed,"clear");}
 });

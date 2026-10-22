@@ -12,6 +12,7 @@ export async function handleAuthSecurity(request: Request, action: SecurityActio
   const session = await requireActiveUserSession(request,{allowRestricted:action === "reauth" || action === "password"});
   if (session instanceof NextResponse) return session;
   const headers = session.responseHeaders;
+  headers.set("cache-control","no-store");
   try {
     const body: unknown = await request.json();
     const auth = await getAuth();
@@ -24,8 +25,10 @@ export async function handleAuthSecurity(request: Request, action: SecurityActio
   } catch (error) {
     const policy = error instanceof AuthPolicyError;
     const library = error as {statusCode?:number;body?:{code?:string}};
-    const status = policy ? error.status : library.statusCode && library.statusCode < 500 ? library.statusCode : error instanceof SyntaxError ? 400 : 503;
-    const code = policy ? error.code : library.body?.code ?? (status === 400 ? "invalid_request" : "security_operation_failed");
-    return forwardAuthHeaders(NextResponse.json({ok:false,code},{status}),headers);
+    let status = policy ? error.status : library.statusCode && library.statusCode < 500 ? library.statusCode : error instanceof SyntaxError ? 400 : 503;
+    let code = policy ? error.code : library.body?.code ?? (status === 400 ? "invalid_request" : "security_operation_failed");
+    if (["invalid_credentials","INVALID_PASSWORD","INVALID_CODE","INVALID_BACKUP_CODE"].includes(code)) { status=403;code="invalid_proof"; }
+    if (status === 429) { code="proof_rate_limited";headers.set("retry-after",library.body?.code === "ACCOUNT_TEMPORARILY_LOCKED" ? "900" : "60"); }
+    return forwardAuthHeaders(NextResponse.json({ok:false,code},{status,headers:{"cache-control":"no-store"}}),headers);
   }
 }

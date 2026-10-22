@@ -100,9 +100,10 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           if (stopped) return;
           try {
             const safeData = event === "error" ? getImapHttpError(data) ? await mailboxFailureDto(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
-            await assertStreamAuthorized(identity);
-            if (stopped) return;
-            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
+            await assertStreamAuthorized(identity, () => {
+              if (stopped) return;
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
+            });
           } catch { authStream.close(); }
         };
 

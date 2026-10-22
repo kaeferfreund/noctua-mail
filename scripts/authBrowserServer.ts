@@ -9,6 +9,8 @@ import {getDb} from "../lib/db/connection";
 import {readSessionSecurity} from "../lib/db/authPolicy";
 import {totpFromUri} from "../tests/helpers/totp";
 import {writeFileSync} from "node:fs";
+import {GET as security} from "../app/api/auth/security/route";
+import {handleAuthSecurity} from "../app/api/_helpers/authSecurity";
 import {GET as me} from "../app/api/auth/me/route";
 
 import {createRateLimiter} from "../lib/rateLimit";
@@ -20,8 +22,8 @@ const auth=await getAuth();
 (await auth.$context).rateLimit.enabled=false;
 const {parseSetCookieHeader}=await import("better-auth/cookies");
 const seeds:Record<string,unknown>={};
-for(const [index,scenario] of Object.values(SCENARIOS).entries()) {
-  const user=await auth.api.createUser({body:{email:`browser-${index}@example.test`,name:"Synthetic Browser",password}});
+for(const [index,[scenarioId,scenario]] of Object.entries(SCENARIOS).entries()) {
+  const user=await auth.api.createUser({body:{email:`browser-${index}@example.test`,name:"Synthetic Browser",password,...(scenarioId==="management"?{role:"admin"}:{})}});
   const signed=await auth.api.signInEmail({body:{email:user.user.email,password},returnHeaders:true});
   const cookies=new Map<string,string>();
   const absorb=(headers:Headers)=>parseSetCookieHeader(headers.get("set-cookie")??"").forEach((value,name)=>{if(value.value)cookies.set(name,value.value);});
@@ -49,6 +51,9 @@ const server=createServer(async(req,res)=>{
     let response:Response;
     if(url.pathname.startsWith("/api/ba/"))response=await auth.handler(request);
     else if(url.pathname==="/api/auth/me")response=await me(request);
+    else if(url.pathname==="/api/auth/security")response=await security(request);
+    else if(url.pathname==="/api/auth/security/passkeys/remove")response=await handleAuthSecurity(request,"passkey-remove");
+    else if(url.pathname==="/api/auth/security/backup-codes")response=await handleAuthSecurity(request,"backup-codes");
     else {
       const db=await getDb();
       const session=await auth.api.getSession({headers:request.headers});

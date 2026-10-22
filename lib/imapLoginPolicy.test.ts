@@ -1,4 +1,4 @@
-import {afterEach,describe,expect,test} from "bun:test";
+import {afterEach,describe,expect,test,spyOn} from "bun:test";
 import {twoFactor} from "better-auth/plugins";
 import {betterAuth} from "better-auth";
 import {imapSignIn} from "./betterAuthImapSignIn";
@@ -6,6 +6,10 @@ import {noctuaAuthOptions} from "./betterAuth";
 import {eligibleImapLoginMailbox,imapLoginAvailable,verifyEligibleImap} from "./imapLoginPolicy";
 import {CookieJar,createTestAuthHarness,TEST_BASE_URL,TEST_SECRET,totpFromUri,type TestAuthHarness} from "./testAuthHarness";
 import {persistAccountRow,mapAccountRow} from "./db/rowParsers";
+import * as imapAuth from "./mail/imapAuth";
+import {reauthenticate,mutateSecurity,hasAppPassword} from "./authSecurity";
+import {readSessionSecurity} from "./db/authPolicy";
+import {createRateLimiter} from "./rateLimit";
 import type {Account} from "./data";
 
 const fixtures:TestAuthHarness[]=[];
@@ -84,7 +88,7 @@ describe("strict IMAP first-factor gate",()=>{
     expect(body.token).toBeUndefined();
     expect(jar.get("noctua.session_token")).toBeUndefined();
     expect(f.master.prepare(`SELECT COUNT(*) n FROM auth_session WHERE userId=?`).get(f.user.id).n).toBe(0);
-    expect(f.network()).toBe(2); // First credential check and the common repair service's verification.
+    expect(f.network()).toBe(1); // The shared credential service owns the single verification.
     expect(eligiblePassword(f)).toBe("new-synthetic-secret");
     const challenge=f.master.prepare(`SELECT generation FROM auth_pending_challenges WHERE userId=?`).get(f.user.id);
     expect(challenge.generation).toBe(f.master.prepare(`SELECT generation FROM auth_security_state WHERE userId=?`).get(f.user.id).generation);
@@ -129,3 +133,34 @@ function eligiblePassword(f:Awaited<ReturnType<typeof setup>>) {
 function eligibleAccount(f:Awaited<ReturnType<typeof setup>>) {
   return mapAccountRow(f.master.prepare(`SELECT * FROM accounts WHERE id=?`).get(f.account.id));
 }
+
+for(const onboarding of [true,false])test(`IMAP-only first-password enrollment succeeds in ${onboarding?"restricted onboarding":"enrolled MFA"}`,async()=>{
+  const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+  f.master.prepare("DELETE FROM auth_account WHERE userId=? AND providerId='credential'").run(f.user.id);
+  if(onboarding) {
+    f.master.prepare("DELETE FROM auth_two_factor WHERE userId=?").run(f.user.id);
+    f.master.prepare("UPDATE auth_user SET twoFactorEnabled=0 WHERE id=?").run(f.user.id);
+  }
+  const signed=await login(f,f.user.email);
+  expect(signed.response.status).toBe(200);
+  if(!onboarding) {
+    const response=await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/two-factor/verify-totp`,{method:"POST",headers:signed.jar.headers({origin:TEST_BASE_URL,"content-type":"application/json"}),body:JSON.stringify({code:totpFromUri(f.factor.totpURI)})}));
+    signed.jar.absorb(response.headers);expect(response.status).toBe(200);
+  }
+  const session=await f.auth.api.getSession({headers:signed.jar.headers()});
+  const source=readSessionSecurity(f.master,session!.session.id);
+  let checks=0;const verify=spyOn(imapAuth,"verifyImapCredentials").mockImplementation(async()=>{checks++;return true;});
+  try {
+    const request=new Request(`${TEST_BASE_URL}/api/auth/reauth`,{method:"POST",headers:signed.jar.headers({origin:TEST_BASE_URL,"content-type":"application/json","x-forwarded-for":`synthetic-${crypto.randomUUID()}`}),body:"{}"});
+    const proof=await reauthenticate(f.auth,f.master,source,request,{purpose:"password.set",currentPassword:"new-synthetic-secret",...(!onboarding?{totpCode:totpFromUri(f.factor.totpURI)}:{})},createRateLimiter({max:50}));
+    expect(checks).toBe(1);
+    request.headers.set("x-noctua-reauth",proof.grant);
+    const changed=await mutateSecurity(f.auth,f.master,source,request,{newPassword:"synthetic-first-app-password"},"password");
+    signed.jar.absorb(changed.headers);
+    expect(changed.body.ok).toBe(true);expect(hasAppPassword(f.master,f.user.id)).toBe(true);
+    expect(readSessionSecurity(f.master,source.sessionId).assurance).toBe(onboarding?"setup":"mfa");
+    const passwordLogin=await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/sign-in/email`,{method:"POST",headers:{origin:TEST_BASE_URL,"content-type":"application/json"},body:JSON.stringify({email:f.user.email,password:"synthetic-first-app-password"})}));
+    expect(passwordLogin.status).toBe(200);
+    expect((await passwordLogin.json()).twoFactorRedirect===true).toBe(!onboarding);
+  } finally {verify.mockRestore();}
+});

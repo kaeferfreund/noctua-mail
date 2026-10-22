@@ -41,6 +41,11 @@ async function takeSlot(proof: AuthProofContext, userId: string, action: string)
   proof.op = await reserveSecurityOperation(proof.db, userId, action);
 }
 
+function totpSnapshot(proof: AuthProofContext) {
+  return JSON.stringify({user:proof.db.prepare(`SELECT twoFactorEnabled FROM auth_user WHERE id=?`).get(proof.source!.userId),
+    factors:proof.db.prepare(`SELECT * FROM auth_two_factor WHERE userId=? ORDER BY id`).all(proof.source!.userId)});
+}
+
 function checkChallenge(proof: AuthProofContext, identifier: string | false | null) {
   if (!identifier) failure("invalid_challenge");
   const challenge = proof.db.prepare(`SELECT * FROM auth_pending_challenges WHERE identifier=? AND expiresAt>?`).get(identifier, Date.now()) as PendingChallenge | null;
@@ -91,19 +96,26 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
     const source = await loadSource(ctx, proof, true);
     if (enrollmentState(db, source.userId).complete) failure("factor_already_enrolled");
     const grant = readReauthGrant(db, ctx.headers?.get("x-noctua-reauth") ?? null, source, "totp.enroll");
+    let operation;
     // A replacement continuation is the only way to reuse its reserved slot.
     if (grant.challengeId) {
       const intent = db.prepare(`SELECT * FROM admin_lifecycle_operations WHERE id=? AND slot=? AND state='replacement_setup'`).get(grant.challengeId, `security:${source.userId}`);
       if (!intent) failure("invalid_proof");
-      proof.op = { id: intent.id, userId: source.userId, generation: source.generation, action: intent.action };
-    } else await takeSlot(proof, source.userId, "security.totp.enroll");
+      operation = { id: intent.id, userId: source.userId, generation: source.generation, action: intent.action };
+    } else {
+      await takeSlot(proof, source.userId, "security.totp.enroll");
+      operation = proof.op!;
+    }
+    proof.totpBefore = totpSnapshot(proof);
+    await withDbWriteRetry("reserveTotpGrant", () => db.transaction(() => {
+      assertSecurityOperation(db, operation);
+      if (db.prepare(`UPDATE auth_reauth_grants SET state='reserved' WHERE tokenHash=? AND state='issued'`).run(grant.tokenHash).changes !== 1) failure("invalid_proof");
+      db.prepare(`UPDATE admin_lifecycle_operations SET state='totp_enabling',updatedAt=? WHERE id=?`).run(Date.now(),operation.id);
+    }).immediate());
+    proof.op = operation;
     proof.grantHash = grant.tokenHash;
     proof.kind = "totp_setup";
     proof.destructive = true;
-    await withDbWriteRetry("reserveTotpGrant", () => db.transaction(() => {
-      assertSecurityOperation(db, proof.op!);
-      if (db.prepare(`UPDATE auth_reauth_grants SET state='reserved' WHERE tokenHash=? AND state='issued'`).run(grant.tokenHash).changes !== 1) failure("invalid_proof");
-    }).immediate());
     return;
   }
   if (path === "/two-factor/verify-totp" || path === "/two-factor/verify-backup-code") {
@@ -117,7 +129,12 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
       if (challenge.kind !== "totp_setup" || challenge.sourceSessionId !== source.sessionId || grant.challengeId !== challenge.identifier) failure("invalid_proof");
       const intent = db.prepare(`SELECT * FROM admin_lifecycle_operations WHERE slot=? AND state='totp_seed_issued'`).get(`security:${source.userId}`);
       if (!intent) failure("invalid_proof");
-      proof.op = { id: intent.id, userId: source.userId, generation: source.generation, action: intent.action };
+      const operation = { id: intent.id, userId: source.userId, generation: source.generation, action: intent.action };
+      await withDbWriteRetry("beginTotpActivation", () => db.transaction(() => {
+        assertSecurityOperation(db,operation);
+        if (db.prepare(`UPDATE admin_lifecycle_operations SET state='totp_activating',updatedAt=? WHERE id=? AND state='totp_seed_issued'`).run(Date.now(),intent.id).changes !== 1) failure("security_operation_pending",409);
+      }).immediate());
+      proof.op = operation;
       proof.grantHash = grant.tokenHash;
       proof.kind = "totp_setup";
       proof.destructive = true;
@@ -252,6 +269,7 @@ export function recordVerifiedPasskey(userId: string | undefined, uv: boolean, r
   const expected = registration ? proof.source?.userId : proof.op?.userId;
   if (!expected || (userId && userId !== expected)) failure("invalid_proof");
   proof.verifiedUV = true;
+  proof.destructive = true; // A successful callback is followed by library credential/session writes.
   proof.verifiedUserId = expected;
   if (passkeyId) proof.createdPasskeyId = passkeyId;
 }
@@ -326,8 +344,13 @@ export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Res
       try {
         const response = await handler(request);
         if (!response.ok) {
-          // A rejected write may have committed earlier library statements; keep a destructive intent.
-          await cleanupFailedPolicy(proof);
+          const code = (await response.clone().json().catch(() => ({}))).code;
+          // In the pinned library INVALID_PASSWORD precedes every enable write. Also
+          // require an identical DB snapshot before releasing its destructive intent.
+          if (path === "/two-factor/enable" && proof.totpBefore !== undefined &&
+              code === "INVALID_PASSWORD" &&
+              proof.totpBefore === totpSnapshot(proof)) proof.destructive = false;
+          await cleanupFailedPolicy(proof,code === "INVALID_CODE");
           return response;
         }
         const finalized = await finalizePolicy(proof, path, response);
@@ -343,15 +366,19 @@ export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Res
   };
 }
 
-async function cleanupFailedPolicy(proof: AuthProofContext) {
+async function cleanupFailedPolicy(proof: AuthProofContext, invalidCode = false) {
   if (!proof.op) return;
+  let retryTotp = false;
   await withDbWriteRetry("cleanupFailedAuthPolicy", () => proof.db.transaction(() => {
     for (const id of proof.createdSessionIds) proof.db.prepare(`DELETE FROM auth_session WHERE id=?`).run(id);
     if (proof.createdPasskeyId) proof.db.prepare(`DELETE FROM auth_passkey WHERE credentialID=? AND userId=?`).run(proof.createdPasskeyId, proof.op!.userId);
     // An incorrect TOTP has no activation writes. Keep its one-use seed capability for another code attempt.
-    const retryTotp = proof.kind === "totp_setup" && proof.challenge && !proof.createdSessionIds.length &&
-      proof.db.prepare(`SELECT twoFactorEnabled FROM auth_user WHERE id=?`).get(proof.op!.userId)?.twoFactorEnabled === 0;
+    retryTotp = !!(invalidCode && proof.kind === "totp_setup" && proof.challenge && !proof.createdSessionIds.length &&
+      proof.db.prepare(`SELECT twoFactorEnabled FROM auth_user WHERE id=?`).get(proof.op!.userId)?.twoFactorEnabled === 0);
     if (proof.grantHash && !retryTotp) proof.db.prepare(`DELETE FROM auth_reauth_grants WHERE tokenHash=?`).run(proof.grantHash);
+    if (retryTotp) proof.db.prepare(`UPDATE admin_lifecycle_operations SET state='totp_seed_issued',updatedAt=? WHERE id=?`).run(Date.now(),proof.op!.id);
+    else if (proof.destructive) proof.db.prepare(`UPDATE admin_lifecycle_operations SET state='interrupted',action='security.interrupted',updatedAt=? WHERE id=?`).run(Date.now(),proof.op!.id);
   }).immediate());
   if (!proof.destructive) await finishSecurityOperation(proof.db, proof.op);
+  else if (!retryTotp) revokeAuthStreams({userId:proof.op.userId});
 }

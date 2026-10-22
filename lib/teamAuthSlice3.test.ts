@@ -1,8 +1,11 @@
 import { handleMailboxCredentialMutation } from "@/app/api/_helpers/mailboxPatch";
 import { setTimeout as sleep } from "node:timers/promises";
 import { describe, test, expect } from "bun:test";
-import { createAuthenticatedTestSession } from "./testAuthHarness";
+import { CookieJar, totpFromUri, createAuthenticatedTestSession } from "./testAuthHarness";
 import { dbModulePromise } from "./testDbHarness";
+import {reauthenticate,mutateSecurity} from "./authSecurity";
+import {readSessionSecurity} from "./db/authPolicy";
+import {createRateLimiter} from "./rateLimit";
 import { requireActiveUserSession } from "./auth";
 import { resolveAccountRole, listAccessibleAccountsForUser, listAccountMembers } from "./accountAccess";
 import { sanitizeAccountForClient } from "./accountPresentation";
@@ -172,7 +175,7 @@ describe("Slice 3 live MCP/streams and shard cleanup", () => {
     const reader = stream.getReader();
     const registration = registerAuthStream(identity, () => { disposed++; controller.close(); });
     const emit = async (message: string) => {
-      try { await assertStreamAuthorized(identity); controller.enqueue(message); }
+      try { await assertStreamAuthorized(identity, () => controller.enqueue(message)); }
       catch (error) { registration.close(); throw error; }
     };
     await emit("synthetic initial envelope");
@@ -367,4 +370,29 @@ test("installed malformed activity schema with zero assignments remains cleanup_
     expect(op.state).toBe("cleanup_pending");
     expect(await retryMembershipCleanup(op.id)).toBe(false);
   } finally { shard.close(); }
+});
+
+test("complete TOTP replacement rejects the old MCP bearer and old seed on next login",async()=>{
+  const f=await fixture(),password="synthetic-password-123";
+  const old=(await f.auth.api.getTOTPURI({headers:f.jar.headers(),body:{password}})).totpURI;
+  const bearer=await mintMcpToken(f.context,f.id,"Synthetic replacement",3600);
+  expect(await validateMcpToken(bearer.token)).not.toBeNull();
+  const req=jsonRequest(f,{});
+  const g=await reauthenticate(f.auth,f.master,readSessionSecurity(f.master,f.context.sessionId),req,{purpose:"totp.replace",currentPassword:password,totpCode:totpFromUri(old)},createRateLimiter({max:50}));
+  req.headers.set("x-noctua-reauth",g.grant);
+  const replacement=await mutateSecurity(f.auth,f.master,readSessionSecurity(f.master,f.context.sessionId),req,{currentPassword:password},"totp-replace");
+  f.jar.absorb(replacement.headers);
+  async function http(path:string,body:unknown,jar=f.jar,grant?:string) {
+    const result=await f.auth.handler(new Request(`http://localhost:3000/api/ba${path}`,{method:"POST",headers:jar.headers({origin:"http://localhost:3000","content-type":"application/json",...(grant?{"x-noctua-reauth":grant}:{})}),body:JSON.stringify(body)}));
+    jar.absorb(result.headers);return result;
+  }
+  const token=replacement.body.grant as string;
+  const seed=await (await http("/two-factor/enable",{password},f.jar,token)).json();
+  expect((await http("/two-factor/verify-totp",{code:totpFromUri(seed.totpURI)},f.jar,token)).status).toBe(200);
+  expect(await validateMcpToken(bearer.token)).toBeNull();
+  const next=new CookieJar();
+  expect((await http("/sign-in/email",{email:f.user.email,password},next)).status).toBe(200);
+  expect((await http("/two-factor/verify-totp",{code:totpFromUri(old)},next)).status).not.toBe(200);
+  expect((await http("/two-factor/verify-totp",{code:totpFromUri(seed.totpURI)},next)).status).toBe(200);
+  expect(await validateMcpToken(bearer.token)).toBeNull();
 });

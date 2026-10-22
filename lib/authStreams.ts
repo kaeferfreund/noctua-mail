@@ -13,8 +13,8 @@ const key = Symbol.for("noctua.authStreams");
 const globals = globalThis as typeof globalThis & { [key]?: Set<Entry> };
 const streams = globals[key] ??= new Set<Entry>();
 
-/** Call immediately before enqueue, with no intervening await after resolution. */
-export async function assertStreamAuthorized(identity: AuthStreamIdentity): Promise<void> {
+/** Delivery runs synchronously in the final DB snapshot; awaiting a check alone is unsafe. */
+export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliver?: () => void): Promise<void> {
   const db = await getDb();
   db.transaction(() => {
   const now = Date.now();
@@ -37,6 +37,7 @@ export async function assertStreamAuthorized(identity: AuthStreamIdentity): Prom
       (identity.accountId && !roleAtLeast(resolveAccountRoleRow(db, identity.userId, identity.accountId), identity.minRole ?? "viewer"))) {
     throw new Error("Stream authorization revoked");
   }
+  deliver?.();
   }).deferred();
 }
 
