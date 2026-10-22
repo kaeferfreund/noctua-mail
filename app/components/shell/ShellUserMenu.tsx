@@ -1,6 +1,8 @@
 "use client";
 
 import { Braces, EllipsisVertical, Eraser, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { useState } from "react";
+import AdminPanel from "@/app/components/admin/AdminPanel";
 import type { Account } from "@/lib/data";
 import { Avatar, AvatarFallback } from "@/app/components/ui/avatar";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/app/components/ui/sidebar";
@@ -25,6 +27,7 @@ export type ShellUserMenuProps = {
   isAdminUser: boolean;
   onOpenSettings: () => void;
   onOpenSecurity?: () => void;
+  /** Legacy callback retained; Admin owns its mailbox-independent panel. */
   onOpenAdmin: () => void;
   onShowThreadJson: () => void;
   onEvictThreadCache: () => void;
@@ -38,17 +41,18 @@ export default function ShellUserMenu({
   isAdminUser,
   onOpenSettings,
   onOpenSecurity,
-  onOpenAdmin,
   onShowThreadJson,
   onEvictThreadCache,
   onLogout
 }: ShellUserMenuProps) {
+  const [adminOpen, setAdminOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const identity = userEmail ?? "";
   const triggerLabel = userName?.trim() || identity.split("@")[0] || "Account";
   const initials = mailboxInitials({ name: triggerLabel, email: identity });
 
   return (
+    <>
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
@@ -77,7 +81,7 @@ export default function ShellUserMenu({
                 Settings
               </DropdownMenuItem>
               {isAdminUser ? (
-                <DropdownMenuItem onSelect={onOpenAdmin}>
+                <DropdownMenuItem onSelect={() => setAdminOpen(true)}>
                   <ShieldCheck />
                   Admin
                 </DropdownMenuItem>
@@ -111,5 +115,7 @@ export default function ShellUserMenu({
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
+    {adminOpen && isAdminUser && <AdminPanel isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} />}
+    </>
   );
 }
