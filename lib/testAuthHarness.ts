@@ -144,7 +144,7 @@ export async function createTestAuthHarness(options?: (config: ReturnType<typeof
  */
 export async function getSharedTestAuthHarness() {
   const { dbModulePromise } = await import("./testDbHarness");
-  await (await dbModulePromise).initializeMasterDb();
+  await dbModulePromise;
   const { getAuth } = await import("./betterAuth");
   const { getDb } = await import("./db/connection");
   const auth = await getAuth();

@@ -51,6 +51,10 @@ const proxy = createServer(socket => {
 const { dbModulePromise } = await import("@/lib/testDbHarness");
 await dbModulePromise;
 process.env.NOCTUA_DATA_DIR = dataDir;
+const { TEST_SECRET, TEST_BASE_URL } = await import("@/lib/testAuthHarness");
+process.env.BETTER_AUTH_SECRET = TEST_SECRET;
+process.env.BETTER_AUTH_URL = TEST_BASE_URL;
+const { getAuth } = await import("@/lib/betterAuth");
 const accountId = "synthetic-watcher";
 const { upsertAccount, patchAccount, deleteAccountControlPlane, getStoredAccounts,
   withAccountDb, closeAllDbConnections, getMailboxSummaries } = await import("@/lib/db");
@@ -97,6 +101,8 @@ process.once("SIGINT", terminate);
 const watchdog = setTimeout(terminate, 50000);
 
 try {
+  // Use production startup before fixture writes or watcher activity.
+  await getAuth();
   fixture = spawn(process.execPath, [fixturePath, "--host", "127.0.0.1", "--port", process.env.NOCTUA_TEST_IMAP_PORT ?? "0",
     "--control-port", process.env.NOCTUA_TEST_CONTROL_PORT ?? "0", "--user", "demo@monkeydent.test", "--pass", "demo", "--seed", "monkeydent"],
   { cwd: path.resolve(fixturePath, "../../.."), stdio: ["ignore", "pipe", "pipe"], env: process.env });
