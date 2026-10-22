@@ -155,8 +155,20 @@ export async function getSharedTestAuthHarness() {
 function authFixtures(auth: NoctuaAuth, master: Database) {
   return {
     createUser: (email: string, password = "synthetic-password-123", role: "admin" | "user" = "user") =>
-      withAuthProof({db:master,internal:true,creation:{userId:crypto.randomUUID(),email:email.trim().toLowerCase(),role},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]},()=>
-        auth.api.createUser({ body: { email, password, role, name: "Synthetic User" } }).then(result => result.user)),
+      withAuthProof({db:master,internal:true,creation:{userId:crypto.randomUUID(),email:email.trim().toLowerCase(),role},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]}, async () => {
+        // Retry each fixture insert separately: retrying createUser with a
+        // password could replay an already committed user after linkAccount fails.
+        const { user } = await withDbWriteRetry("testAuthHarness.createUser", () =>
+          auth.api.createUser({ body: { email, role, name: "Synthetic User" } }));
+        if (password) {
+          const context = await auth.$context;
+          const hashedPassword = await context.password.hash(password);
+          await withDbWriteRetry("testAuthHarness.linkAccount", () => context.internalAdapter.linkAccount({
+            providerId: "credential", accountId: user.id, userId: user.id, password: hashedPassword
+          }));
+        }
+        return user;
+      }),
     async signIn(email: string, password = "synthetic-password-123") {
       const result = await auth.api.signInEmail({ body: { email, password }, returnHeaders: true });
       const jar = new CookieJar().absorb(result.headers);
