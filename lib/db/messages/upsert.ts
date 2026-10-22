@@ -30,6 +30,7 @@
  *     learning state refreshed. `replaceExisting` + account-scoped
  *     writes escalate to a full-account recompute.
  */
+import { publishThreadCollabEvent } from "../../threadCollabEvents";
 import type { Message } from "../../data";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
@@ -600,7 +601,7 @@ export async function upsertMessages(
 
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
-    db.transaction(() => {
+    const collabChanges = db.transaction(() => {
       if (replaceExisting) {
         // Capture identities under the same writer lock as delete + remap.
         const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
@@ -618,8 +619,9 @@ export async function upsertMessages(
       for (let start = 0; start < nextMessages.length; start += UPSERT_BATCH_SIZE) {
         upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
       }
-      remapThreadCollab(db, accountId, remaps);
+      return remapThreadCollab(db, accountId, remaps);
     }).immediate();
+    for (const event of collabChanges) publishThreadCollabEvent(event);
 
     let affectedThreadIds: string[] = [];
     let requiresFullRecompute = false;

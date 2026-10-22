@@ -23,7 +23,8 @@ Base: `/api/accounts/{accountId}/threads/{threadId}`. Encode threadId with
 | GET | `/api/accounts/{accountId}/members` | — | `{ok:true,members}` |
 
 Status is `open`, `in_progress`, `waiting`, or `closed`. Every transition is allowed;
-assigning/setting the existing value is a no-op. PATCH accepts at least one known field.
+assigning/setting the existing value preserves content and advances the thread revision.
+PATCH accepts at least one known field.
 `assigneeUserId:null` unassigns; a string must identify an enabled current mailbox member.
 Comments are Markdown source of 1–20000 characters, with at least one non-whitespace character.
 Only the author or a manager may soft-delete a comment; repeat deletion is idempotent.
@@ -51,18 +52,75 @@ Same-origin rejection is HTTP 403 `{ok:false,code:"invalid_origin"}`; wrong medi
 415 `{ok:false,code:"json_required"}`. A nonempty comment DELETE body returns
 400 `{ok:false,code:"unexpected_body"}`.
 
+## Mailbox summaries and user events
+
+`GET /api/me/mailboxes/summary` requires an active MFA session, without requiring a selected
+mailbox. It returns `Cache-Control: no-store` and this contract (timestamps are Unix milliseconds):
+
+```ts
+{
+  ok: true,
+  mailboxes: [{
+    accountId: string, name: string, email: string,
+    accessRole: "viewer" | "editor" | "manager", isOwner: boolean, shared: boolean,
+    unread: number | null, assignedToMe: number, unassignedOpen: number,
+    watcher: {
+      state: "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped",
+      lastEventAt?: number
+    }
+  }],
+  generatedAt: number
+}
+```
+
+Only accessible mailboxes are enumerated, through `listAccessibleAccountsForUser`. An admin
+without mailbox membership gets an empty list. Viewer and manager use the same counts.
+`unread` counts live unread INBOX messages in the watcher-maintained shard; it is null until
+the first recorded successful sync. `watcher.lastEventAt` is that sync's timestamp, omitted
+when unknown. `shared` follows the account DTO's member-count definition. Collaboration
+counts are distinct live threads across mailbox folders: `assignedToMe` includes every status
+assigned to the session user; `unassignedOpen` has no assignee and status open, in_progress or
+waiting, including threads with no state row. Deleted messages and state without live messages
+do not contribute. Counts use one indexed collaboration query per shard. These are mailbox
+badges and notifications; message browsing still selects one mailbox.
+
+`GET /api/me/events` uses the same guard and returns `text/event-stream` with named events.
+Each JSON data payload includes its event type:
+
+```ts
+{ type: "mailbox-summary", accountId: string, unread: number | null, assignedToMe: number, unassignedOpen: number }
+{ type: "thread-collab", accountId: string, threadId: string, revision: number }
+{ type: "mailboxes-changed" }
+```
+
+Watcher state/sync invalidations and committed collaboration mutations coalesce for 250 ms
+per mailbox. A refresh sends current counts followed by each changed thread's greatest
+committed revision in that burst. Revisions belong to `(accountId,threadId)` and match REST
+state/comment revisions; **mailbox-summary has no thread revision** because its counts can
+combine multiple threads. Membership changes send `mailboxes-changed`: refetch the summary
+and discard inaccessible mailboxes/caches. A revoked mailbox produces no further counts or
+thread events; other accessible mailboxes continue on the same stream. Logout, ban, session
+revocation, expiry and auth liveness failure close the stream. Every enqueue, including the
+15-second comment heartbeat, rechecks authorization synchronously in the final DB snapshot.
+Aborting/cancelling removes subscriptions and timers. Session refresh cookies are forwarded.
+As with the existing IMAP stream there is no additional per-session stream limit.
+
+This is a process-local live invalidation channel with no replay/event IDs. Fetch a complete
+summary on connect/reconnect and on `mailboxes-changed`; refresh a thread when its revision
+advances. The transitional `/api/accounts/summary` route was removed.
+
 ## MCP tools
 
-HTTP MCP activation remains HTTP 503 `{ok:false,code:"auth_integration_pending"}` in this
-base until feat/team-auth Slice 3 lands. The executor implements these tools with explicit
-input/output schemas. Scopes remain reserved. Account binding and live mailbox role are
+The executor implements these tools with explicit input/output schemas. Scopes remain
+reserved. Account binding and live mailbox role are
 checked at each tool invocation; optional accountId may only repeat the token mailbox.
-`list_accounts` returns that mailbox with `accessRole`. Token-creator identity comes from
+`list_accounts` enumerates accessible account metadata with `accessRole`. Token-creator identity comes from
 `tokenRecord.createdByUserId`; activity actor is `mcp:<tokenId>`.
 
 | Tool | Input (accountId optional on every tool) | Output |
 | --- | --- | --- |
 | `list_mailbox_members` | `{}` | `{ok,members}` |
+| `list_mailbox_summary` | `{}` (no account override) | same `{ok,mailboxes,generatedAt}` contract as above, narrowed to the token mailbox |
 | `get_thread_collaboration` | `{threadId? ,messageId?}` | `{ok,threadId,state,comments,activity}` |
 | `set_thread_status` | `{threadId?,messageId?,status}` | `{ok,state}` |
 | `assign_thread` | `{threadId?,messageId?,assigneeUserId}` | `{ok,state}` |
@@ -70,6 +128,9 @@ checked at each tool invocation; optional accountId may only repeat the token ma
 | `list_thread_activity` | `{threadId?,messageId?,limit?}` | `{ok,activity}` |
 
 Thread tools require threadId or a stored row/RFC Message-ID; threadId takes precedence.
+`list_mailbox_summary` requires viewer, derives the viewer from the live token creator, and
+rechecks the token before returning. A mailbox-bound token cannot read counts from the
+creator's other mailboxes, even when `list_accounts` exposes their metadata.
 Assignment accepts `"me"` for the token creator or null to unassign. Read tools require viewer;
 status, assignment and comment tools require editor. Existing draft/topic/flag mutation tools
 also enforce editor. Viewer mutation calls return an MCP tool error containing

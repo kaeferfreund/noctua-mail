@@ -1,3 +1,4 @@
+import { publishThreadCollabEvent } from "./threadCollabEvents";
 import { existsSync } from "fs";
 import { randomUUID } from "crypto";
 import { getDb, configureDb } from "./db/connection";
@@ -5,7 +6,7 @@ import { getDefaultAccountDbPath } from "./runtimePaths";
 import { withDbWriteRetry } from "./dbWriteRetry";
 
 export type MembershipCleanupActor = { userId: string | null; clientId: string };
-/** No collaboration import or schema creation: safe before Stage 2 is installed. */
+/** No collaboration service import or table creation: safe before Stage 2 is installed. */
 export async function cleanupUserAccountAccess(accountId: string, userId: string, actor: MembershipCleanupActor): Promise<{ status: "not_installed" | "complete"; unassigned: number }> {
   const master = await getDb();
   const account = master.prepare("SELECT dbPath FROM accounts WHERE id=?").get(accountId) as { dbPath?: string } | undefined;
@@ -16,19 +17,26 @@ export async function cleanupUserAccountAccess(accountId: string, userId: string
   const db = new Database(dbPath, { create: false, readwrite: true });
   try {
     configureDb(db, 0);
-    return await withDbWriteRetry("cleanupUserAccountAccess", () => db.transaction(() => {
+    const result = await withDbWriteRetry("cleanupUserAccountAccess", () => db.transaction(() => {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('thread_collab_state','thread_activity')").all();
-      if (!tables.length) return { status: "not_installed" as const, unassigned: 0 };
+      if (!tables.length) return { status: "not_installed" as const, unassigned: 0, events: [] };
       if (tables.length !== 2) throw new Error("Incomplete collaboration cleanup schema");
+      // Upgrade an installed legacy shard under the same writer lock. Never
+      // create collaboration tables for a mailbox without that feature.
+      const columns = db.prepare("PRAGMA table_info(thread_collab_state)").all() as { name: string }[];
+      if (!columns.some(column => column.name === "revision"))
+        db.exec("ALTER TABLE thread_collab_state ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
       const activityInsert = db.prepare(`INSERT INTO thread_activity
         (id,accountId,threadId,type,actorUserId,actorClientId,payload,createdAt) VALUES (?,?,?,'unassigned',?,'system',?,?)`);
-      const rows = db.prepare("SELECT threadId FROM thread_collab_state WHERE accountId=? AND assigneeUserId=?").all(accountId, userId) as { threadId: string }[];
+      const rows = db.prepare("SELECT threadId,revision FROM thread_collab_state WHERE accountId=? AND assigneeUserId=?").all(accountId, userId) as { threadId: string; revision: number }[];
       const now = Date.now();
-      db.prepare(`UPDATE thread_collab_state SET assigneeUserId=NULL,assignedAt=NULL,updatedAt=?,lastActivityAt=?
+      db.prepare(`UPDATE thread_collab_state SET assigneeUserId=NULL,assignedAt=NULL,updatedAt=?,lastActivityAt=?,revision=revision+1
         WHERE accountId=? AND assigneeUserId=?`).run(now, now, accountId, userId);
       for (const row of rows) activityInsert.run(randomUUID(), accountId, row.threadId, actor.userId, JSON.stringify({ assigneeUserId: null, previousAssigneeUserId: userId }), now);
-      return { status: "complete" as const, unassigned: rows.length };
+      return { status: "complete" as const, unassigned: rows.length, events: rows.map(row => ({ accountId, threadId: row.threadId, revision: row.revision + 1 })) };
     }).immediate());
+    for (const event of result.events) publishThreadCollabEvent(event);
+    return { status: result.status, unassigned: result.unassigned };
   } finally { db.close(); }
 }
 
