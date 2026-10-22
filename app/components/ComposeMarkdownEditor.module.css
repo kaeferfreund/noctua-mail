@@ -9,7 +9,7 @@
 .container :global(.w-md-editor) {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  --md-editor-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --md-editor-font-family: var(--font-mono);
 }
 
 .container :global(.w-md-editor-toolbar) {
@@ -39,7 +39,7 @@
 .container :global(.w-md-editor-text-pre) *,
 .container :global(.w-md-editor-text-pre),
 .container :global(.w-md-editor-text-input) {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+  font-family: var(--font-mono) !important;
   font-size: 14px !important;
   line-height: 22px !important;
   letter-spacing: normal !important;

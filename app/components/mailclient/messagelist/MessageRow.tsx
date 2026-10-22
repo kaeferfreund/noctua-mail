@@ -2,7 +2,7 @@ import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { memo, useEffect, useRef, useState } from "react";
 import type React from "react";
 import { CalendarDays, GitBranch, MoveRight, Paperclip, Search, Trash2 } from "lucide-react";
-import { Badge, Checkbox, Text } from "@radix-ui/themes";
+import { Badge, Checkbox, Text, VisuallyHidden } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import { describeMessageSize } from "@/lib/ui/byteSize";
@@ -60,7 +60,6 @@ type MessageRowProps = {
   toggleFlaggedFlag: (message: Message, collapsedThreadMessages?: Message[]) => void;
   toggleTodoFlag: (message: Message, collapsedThreadMessages?: Message[], clickedBadge?: "todo" | "done") => void;
   deleteTitle: string;
-  renderUnreadDot: React.ReactNode;
   renderSelectIndicators: React.ReactNode;
   fromText?: string;
   fromTooltip?: string;
@@ -136,7 +135,6 @@ function MessageRow({
   toggleFlaggedFlag,
   toggleTodoFlag,
   deleteTitle,
-  renderUnreadDot,
   renderSelectIndicators,
   fromText,
   fromTooltip,
@@ -326,7 +324,6 @@ function MessageRow({
     >
       <div data-message-cell="header" className={headerClassName}>
         <span data-message-cell="unread" className={commonStyles.select}>
-          {renderUnreadDot}
           {renderSelectIndicators}
           <Checkbox
             size="1"
@@ -348,6 +345,7 @@ function MessageRow({
             title={fromLineTooltip}
           >
             <span className={styles.fromContent}>
+              {!seen && <VisuallyHidden>Unread</VisuallyHidden>}
               {!showRecipientIcon && (
                 <SenderIcon
                   accountId={message.accountId}
@@ -356,6 +354,7 @@ function MessageRow({
                   enabled={senderIconsEnabled}
                   className={styles.senderIcon}
                   title={fromLineTooltip}
+                  unread={!seen}
                 />
               )}
               {showRecipientIcon && (

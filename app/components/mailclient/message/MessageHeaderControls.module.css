@@ -1,0 +1,12 @@
+/* Icon toggles in the message card header (translate, display options).
+   They stay ghost so switching state never shifts the layout; the accent tint
+   marks "on" (translation shown, non-default display options). */
+.toggleActive {
+  background-color: var(--accent-a3);
+}
+
+@media (hover: hover) {
+  .toggleActive:hover {
+    background-color: var(--accent-a4);
+  }
+}

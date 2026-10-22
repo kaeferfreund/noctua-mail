@@ -9,6 +9,7 @@ import { MobileNavigationContext } from "./MobileNavigation";
 import ShellHeader, { type ShellHeaderProps } from "./ShellHeader";
 import ShellPanes, { type ShellPanesProps } from "./ShellPanes";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
+import type { InAppNoticePlacement } from "@/app/components/mailclient/InAppNoticeStack";
 
 // shadcn's SidebarProvider persists the open state in this cookie. The shell
 // is server-rendered open and reads the cookie after mount; reading it during
@@ -17,6 +18,15 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const noop = () => {};
 const SIDEBAR_WIDTH = "18rem";
 const subscribeSidebarCookie = () => () => {};
+
+/**
+ * Notices dock above the account card only while the desktop sidebar is
+ * visible. A collapsed sidebar or the phone sheet would hide them, so they
+ * float over the panes instead.
+ */
+export function resolveNoticePlacement(isMobile: boolean, sidebarOpen: boolean): InAppNoticePlacement {
+  return !isMobile && sidebarOpen ? "sidebar" : "floating";
+}
 
 function readSidebarCookie(): boolean {
   const entry = document.cookie
@@ -35,11 +45,12 @@ export type AppShellProps = {
   /** Compact status bar below the panes (BottomStatusBar). */
   statusBar: ReactNode;
   /**
-   * Fixed-position overlays that belong to the shell viewport (the in-app
-   * notice stack). Dialogs and portals are rendered by MailClient next to
-   * the shell, not inside it.
+   * Fixed-position overlays that belong to the shell viewport. Dialogs and
+   * portals are rendered by MailClient next to the shell, not inside it.
    */
   overlays?: ReactNode;
+  /** In-app notice stack, rendered for the placement the shell layout allows. */
+  notices?: (placement: InAppNoticePlacement) => ReactNode;
 };
 
 /**
@@ -48,30 +59,42 @@ export type AppShellProps = {
  * navigation state; all data state and handler bags stay in MailClient and
  * arrive as props.
  */
-export default function AppShell({ sidebar, header, panes, statusBar, overlays, mobileNavigation }: AppShellProps) {
+export default function AppShell({ sidebar, header, panes, statusBar, overlays, notices, mobileNavigation }: AppShellProps) {
   // Hydrate the saved cookie without a synchronous setState effect. Changes
   // made through SidebarProvider drive local state and update its cookie.
   const isMobile = useIsMobile();
   const navigation = useMobileNavigation(isMobile, mobileNavigation?.messageId ?? null, mobileNavigation?.clearMessage ?? noop);
   const savedOpen = useSyncExternalStore(subscribeSidebarCookie, readSidebarCookie, () => true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean | null>(null);
+  const open = sidebarOpen ?? savedOpen;
+  const noticePlacement = resolveNoticePlacement(isMobile, open);
 
   return (
     <MobileNavigationContext.Provider value={navigation.back}>
     <TooltipProvider>
       <SidebarProvider
         data-shell=""
-        open={sidebarOpen ?? savedOpen}
+        open={open}
         onOpenChange={setSidebarOpen}
         className="h-dvh min-h-0 overflow-hidden bg-sidebar text-foreground"
         style={{ "--sidebar-width": SIDEBAR_WIDTH, "--header-height": "3rem" } as CSSProperties}
       >
-        <ShellSidebar {...sidebar} onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined} />
+        <ShellSidebar
+          {...sidebar}
+          notices={noticePlacement === "sidebar" ? notices?.("sidebar") : null}
+          onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined}
+        />
         <SidebarInset className="h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs">
-          <ShellHeader {...header} indicators={isMobile ? statusBar : undefined} />
+          <ShellHeader
+            {...header}
+            // On phones an open message covers the list, so its controls go too.
+            toolbar={isMobile && navigation.view === "thread" ? undefined : header.toolbar}
+            indicators={isMobile ? statusBar : undefined}
+          />
           <ShellPanes {...panes} mobileView={navigation.view} />
           {!isMobile ? statusBar : null}
         </SidebarInset>
+        {noticePlacement === "floating" ? notices?.("floating") : null}
         {overlays}
       </SidebarProvider>
     </TooltipProvider>

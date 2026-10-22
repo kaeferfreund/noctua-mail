@@ -1,0 +1,191 @@
+/* Docked variant: a slim card in the sidebar footer, directly above the
+   account card. It lives in the footer's flex flow, so the scrollable folder
+   area shrinks instead of being covered. Typography is set only on the card. */
+.sidebarStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sidebarStack:empty {
+  display: none;
+}
+
+.sidebarNotice {
+  --notice-tone-a3: var(--blue-a3);
+  --notice-tone-a4: var(--blue-a4);
+  --notice-tone-7: var(--blue-7);
+  --notice-tone-11: var(--blue-11);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 3px 4px 7px;
+  border: 1px solid var(--notice-tone-7);
+  border-radius: var(--radius-md);
+  background: var(--color-panel-solid);
+  color: var(--gray-12);
+  box-shadow: 0 1px 2px var(--black-a2);
+  font-size: 12px;
+  line-height: 16px;
+  animation: dockIn 0.14s ease both;
+}
+
+.sidebarNotice[data-tone="success"] {
+  --notice-tone-a3: var(--green-a3);
+  --notice-tone-a4: var(--green-a4);
+  --notice-tone-7: var(--green-7);
+  --notice-tone-11: var(--green-11);
+}
+
+.sidebarNotice[data-tone="warning"] {
+  --notice-tone-a3: var(--amber-a3);
+  --notice-tone-a4: var(--amber-a4);
+  --notice-tone-7: var(--amber-7);
+  --notice-tone-11: var(--amber-11);
+}
+
+.sidebarNotice[data-tone="error"] {
+  --notice-tone-a3: var(--red-a3);
+  --notice-tone-a4: var(--red-a4);
+  --notice-tone-7: var(--red-7);
+  --notice-tone-11: var(--red-11);
+}
+
+.sidebarNotice[data-openable] {
+  cursor: pointer;
+}
+
+.sidebarNotice[data-openable]:hover {
+  background: var(--gray-a2);
+}
+
+.sidebarNotice:focus-visible,
+.action:focus-visible,
+.dismiss:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: 1px;
+}
+
+.sidebarNotice[data-dismissing] {
+  animation: dockOut 0.14s ease both;
+  pointer-events: none;
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--notice-tone-11);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title,
+.description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  font-weight: 500;
+}
+
+.description {
+  color: var(--gray-11);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* Notices that must be read in full (detached send warnings) wrap instead of
+   truncating, even in the slim sidebar card. */
+.descriptionWrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.controls {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
+.action {
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--notice-tone-a3);
+  color: var(--notice-tone-11);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--notice-tone-a4);
+}
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gray-11);
+  cursor: pointer;
+}
+
+.dismiss:hover {
+  background: var(--gray-a3);
+  color: var(--gray-12);
+}
+
+@keyframes dockIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dockOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Applies to both placements: the floating card animates via globals.css. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebarNotice,
+  .sidebarNotice[data-dismissing],
+  .stack :global(.inapp-notice),
+  .stack :global(.inapp-notice.dismissing) {
+    animation: none;
+    transition: none;
+  }
+
+  .stack :global(.inapp-notice.openable:hover) {
+    transform: none;
+  }
+}

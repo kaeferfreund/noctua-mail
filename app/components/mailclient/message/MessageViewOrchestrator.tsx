@@ -27,7 +27,7 @@ import threadViewStyles from "./ThreadView.module.css";
 import { renderMarkdownPanel as renderMarkdownPanelHelper } from "../RenderHelpers";
 import type { ComposeOrchestratorHandle } from "../composition/ComposeOrchestrator";
 import type { ComposeMode } from "../composition/composeTypes";
-import type { TopicSuggestionExplanation } from "./types";
+import type { MessageTab, TopicSuggestionExplanation } from "./types";
 import type {
   MessageTranslationEntry,
   MessageTranslationFormat
@@ -40,7 +40,7 @@ import {
 } from "@/lib/accountApiPaths";
 
 /**
- * The message-view pane: toolbar + optional thread-subject/topic header
+ * The message-view pane: optional thread-subject/topic header
  * + the `ThreadView` subtree that renders the active message or thread.
  *
  * Owns `threadViewMode` ("compact" | "full") because the Compact/Full
@@ -227,10 +227,6 @@ export type MessageViewOrchestratorBodyInputs = {
 };
 
 export type MessageViewOrchestratorProps = {
-  // Toolbar actions.
-  onShowJson: () => void;
-  onEvictThreadCache: () => void;
-
   // Header + body input bags. Split purely for readability — the
   // orchestrator itself doesn't treat them differently.
   header: MessageViewOrchestratorHeaderInputs;
@@ -238,7 +234,7 @@ export type MessageViewOrchestratorProps = {
 };
 
 function MessageViewOrchestratorImpl(
-  { onShowJson, onEvictThreadCache, header, body }: MessageViewOrchestratorProps,
+  { header, body }: MessageViewOrchestratorProps,
   ref: React.ForwardedRef<MessageViewOrchestratorHandle>
 ) {
   const [noteOpen, setNoteOpen] = useState(false);
@@ -249,7 +245,7 @@ function MessageViewOrchestratorImpl(
   const [messageFontScale, setMessageFontScale] = useState<Record<string, number>>({});
   const [messageZoom, setMessageZoom] = useState<Record<string, number>>({});
   const [messageTabs, setMessageTabs] = useState<
-    Record<string, "html" | "text" | "markdown" | "source">
+    Record<string, MessageTab>
   >({});
   const [collapsedMessages, setCollapsedMessages] = useState<Record<string, boolean>>({});
   // Per-message translation state (which messages show a translated body, the
@@ -330,7 +326,7 @@ function MessageViewOrchestratorImpl(
         setMessageTabs((prev) => {
           // Lazily allocate the new map only if at least one id is
           // actually present, so no-op evictions don't churn memory.
-          let next: Record<string, "html" | "text" | "markdown" | "source"> | undefined;
+          let next: Record<string, MessageTab> | undefined;
           idSet.forEach((id) => {
             if (id in prev) {
               next ??= { ...prev };
@@ -665,8 +661,6 @@ function MessageViewOrchestratorImpl(
 
   return (
     <MessageViewPane
-      onShowJson={onShowJson}
-      onEvictThreadCache={onEvictThreadCache}
       header={activeMessage ? (() => {
               const rootSubject =
                 activeThread[0]?.subject ?? activeMessage?.subject ?? "";

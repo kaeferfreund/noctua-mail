@@ -31,11 +31,7 @@ import {
   Tags,
   Trash2
 } from "lucide-react";
-import { DropdownMenu as KeptDropdownMenu, Theme } from "@radix-ui/themes";
-import { useIsMobile } from "@/app/hooks/use-mobile";
-import * as MobileMenu from "@/app/components/ui/dropdown-menu";
-
-
+import { Theme } from "@radix-ui/themes";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import type { Message, Topic, Folder } from "@/lib/data";
 import {
@@ -48,14 +44,7 @@ import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
-
-const mobileMenu = {
-  Root: MobileMenu.DropdownMenu, Trigger: MobileMenu.DropdownMenuTrigger,
-  Content: MobileMenu.DropdownMenuContent, Item: MobileMenu.DropdownMenuItem,
-  Sub: MobileMenu.DropdownMenuSub, SubTrigger: MobileMenu.DropdownMenuSubTrigger,
-  SubContent: MobileMenu.DropdownMenuSubContent, Label: MobileMenu.DropdownMenuLabel,
-  Separator: MobileMenu.DropdownMenuSeparator
-};
+import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -173,8 +162,7 @@ export default function MessageMenu({
   isSpamFolder,
   onOpenChange
 }: MessageMenuProps) {
-  const isMobile = useIsMobile();
-  const DropdownMenu = isMobile ? mobileMenu : KeptDropdownMenu;
+  const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const showDeleteInMenu = origin !== "table";
   const allowThreadDeletion = origin !== "thread";
