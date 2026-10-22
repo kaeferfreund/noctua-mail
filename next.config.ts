@@ -1,8 +1,20 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles";
 
+// Next walks parent lockfiles and otherwise picks /home/user as the
+// workspace root, which nests standalone output under that absolute path.
+// SWC compiles this file to CJS and rewrites import.meta.dirname to
+// __dirname (the directory of next.config.ts). Native TS loading keeps
+// import.meta.dirname, which is the same directory.
+const projectDir = path.resolve(import.meta.dirname);
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: projectDir,
+  turbopack: {
+    root: projectDir
+  },
   typedRoutes: false,
   // Worker subprocesses execute TS entrypoints from ./scripts at runtime.
   // Standalone builds only ship traced files, so include the worker source tree
