@@ -281,10 +281,13 @@ describe("app chrome typography", () => {
       path.join("lib", "senderIcons.ts"),
       path.join("lib", "ui", "fonts.ts")
     ]);
+    // Synthetic mail fixtures are e-mail HTML, which renders in the iframe too.
+    const exemptDirs = [path.join("lib", "testFixtures") + path.sep];
     const allowed = /^(var\(--font-(sans|mono)\)|inherit)(\s*!important)?$/;
     const offending: string[] = [];
     for (const file of [...listSourceFiles("app"), ...listSourceFiles("lib")]) {
       if (exempt.has(file) || file.endsWith(".test.ts") || file.endsWith(".test.tsx")) continue;
+      if (exemptDirs.some((dir) => file.startsWith(dir))) continue;
       const source = readFileSync(path.join(repoRoot, file), "utf8");
       const values = [
         ...source.matchAll(/(?:font-family|fontFamily)\s*:\s*["'`]?([^;"'`}\n]+)/g)
