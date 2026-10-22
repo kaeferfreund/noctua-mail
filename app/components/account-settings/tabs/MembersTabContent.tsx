@@ -13,7 +13,7 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
   accountId: string; accessRole?: AccountRole; apiFetch?: AdminFetch; admin?: boolean; initialMembers?: Member[]; users?: AdminUser[]; currentUserId?: string; onChanged?: () => void;
 }) {
   const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
-  const [directory, setDirectory] = useState<(MemberCandidate & { disabled?: boolean })[]>(admin ? users ?? [] : []);
+  const [directory, setDirectory] = useState<(Pick<MemberCandidate, "id" | "email"> & { name?: string | null; disabled?: boolean })[]>(admin ? users ?? [] : []);
   const [actor, setActor] = useState(currentUserId ?? "");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");

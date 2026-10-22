@@ -5,7 +5,7 @@ import {setTimeout as delay} from "node:timers/promises";
 import {spawn,type ChildProcess} from "node:child_process";
 
 const root=process.cwd();
-const port=Number(process.env.AUTH_BROWSER_PORT ?? 3793);
+const port=Number(process.env.AUTH_BROWSER_PORT ?? 3784);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid AUTH_BROWSER_PORT");
 const base=`http://localhost:${port}`;
 mkdirSync(path.join(root,".tmp"),{recursive:true});

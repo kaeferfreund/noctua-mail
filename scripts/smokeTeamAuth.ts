@@ -7,7 +7,7 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseSetCookieHeader } from "better-auth/cookies";
 
-const root=process.cwd(), port=3794, origin="https://mails.monkeymed.de";
+const root=process.cwd(), port=3785, origin="https://mails.monkeymed.de";
 mkdirSync(path.join(root,".tmp"),{recursive:true});
 const scratch=mkdtempSync(path.join(root,".tmp","auth-smoke-"));
 const data=path.join(scratch,"data");
@@ -171,5 +171,5 @@ try {
   for(const secret of sensitive) if(secret)assert.ok(!serverLog.includes(secret),"server logs exposed synthetic capability");
   assert.ok(!serverLog.includes("Admin invite code:"));
   console.log("PASS startup/request logs contain no known synthetic password, hash, TOTP seed, backup code, session/challenge cookie, MCP token or recovery capability");
-  console.log("SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun "+process.versions.bun+", port 3794, synthetic isolated storage only");
+  console.log("SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun "+process.versions.bun+", port 3785, synthetic isolated storage only");
 } finally { await stop();closeAllDbConnections();rmSync(scratch,{recursive:true,force:true}); }

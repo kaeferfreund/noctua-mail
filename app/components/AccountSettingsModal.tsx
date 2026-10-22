@@ -30,8 +30,7 @@ export type ManageTab =
   | "translation"
   | "mcp"
   | "recipient-aliases"
-  | "members"
-  | "admin";
+  | "members";
 
 function deriveImapSecurity(imap: Account["imap"]): "tls" | "starttls" | "none" {
   if (imap.secure) return "tls";
