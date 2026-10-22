@@ -18,7 +18,7 @@ export function requireJsonSameOrigin(request: Request) {
   const error = requireSameOrigin(request);
   if (error) return error;
   if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
-    return NextResponse.json({ ok: false, code: "json_required" }, { status: 415 });
+    return NextResponse.json({ ok: false, code: "json_required" }, { status: 400 });
   }
   return null;
 }

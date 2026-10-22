@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { betterAuth } from "better-auth";
-import { installAuthControlPlane } from "./authPolicy";
+import { importLegacyProfileFields, installAuthControlPlane } from "./authPolicy";
 import { migrateAuthSchema, noctuaAuthOptions } from "../betterAuth";
 import { caught, createTestAuthHarness, openMasterDb, TEST_BASE_URL, TEST_SECRET, type TestAuthHarness } from "../testAuthHarness";
 
@@ -419,6 +419,49 @@ describe("credential generation barrier", () => {
 });
 
 describe("historical profile import",()=>{
+  test("startup before identity binding transfers legacy ban and name exactly once in the operator transaction", async () => {
+    const f = await setup();
+    f.master.exec("ALTER TABLE users ADD COLUMN name TEXT; ALTER TABLE users ADD COLUMN disabledAt INTEGER");
+    f.master.prepare(`INSERT INTO users(id,email,role,createdAt,name,disabledAt) VALUES(?,?,'user',1,?,123)`)
+      .run("late-bound", "late-bound@example.test", "Historical Person");
+    installAuthControlPlane(f.database);
+    const context = await f.auth.$context;
+    const bind = async (abort = false) => context.adapter.transaction(async trx => {
+      await trx.create({ model: "user", forceAllowId: true, data: {
+        id: "late-bound", email: "late-bound@example.test", name: "Migration Placeholder",
+        role: "user", emailVerified: false, createdAt: new Date(), updatedAt: new Date()
+      } });
+      expect(importLegacyProfileFields(f.database, "late-bound")).toBe(true);
+      if (abort) throw new Error("abort identity bind");
+    });
+    await expect(bind(true)).rejects.toThrow("abort identity bind");
+    expect(f.master.prepare("SELECT id FROM auth_user WHERE id='late-bound'").get()).toBeNull();
+    expect(f.master.prepare("SELECT id FROM noctua_auth_migrations WHERE id='legacy-profile-v1:late-bound'").get()).toBeNull();
+    await bind();
+    expect(f.master.prepare("SELECT name,banned,banExpires FROM auth_user WHERE id='late-bound'").get())
+      .toEqual({ name: "Historical Person", banned: 1, banExpires: null });
+    const generation = state(f, "late-bound");
+    expect(generation).toBe(1);
+    f.master.exec("UPDATE auth_user SET name='Authoritative Name',banned=0 WHERE id='late-bound'");
+    expect(importLegacyProfileFields(f.database, "late-bound")).toBe(false);
+    installAuthControlPlane(f.database);
+    expect(f.master.prepare("SELECT name,banned FROM auth_user WHERE id='late-bound'").get())
+      .toEqual({ name: "Authoritative Name", banned: 0 });
+    expect(state(f, "late-bound")).toBe(generation + 1);
+  });
+
+  test("upgrading the global receipt preserves authoritative fields", async () => {
+    const f = await setup(); const user = await f.createUser("old-import@example.test");
+    f.master.exec("ALTER TABLE users ADD COLUMN name TEXT; ALTER TABLE users ADD COLUMN disabledAt INTEGER");
+    f.master.prepare("UPDATE users SET name='Stale Name',disabledAt=123 WHERE id=?").run(user.id);
+    f.master.exec("INSERT INTO noctua_auth_migrations(id) VALUES('legacy-profile-v1')");
+    installAuthControlPlane(f.database);
+    expect(f.master.prepare("SELECT name,banned FROM auth_user WHERE id=?").get(user.id))
+      .toEqual({ name: "Synthetic User", banned: 0 });
+    expect(importLegacyProfileFields(f.database, user.id)).toBe(false);
+    expect(() => importLegacyProfileFields(f.database, "not-bound")).toThrow("explicit matching identity binding");
+  });
+
   test("imports name and permanent ban once without reviving legacy auth authority",async()=>{
     const f=await setup(); const user=await f.createUser("historical@example.test");
     f.master.exec("ALTER TABLE users ADD COLUMN name TEXT; ALTER TABLE users ADD COLUMN disabledAt INTEGER");

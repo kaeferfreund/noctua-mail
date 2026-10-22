@@ -237,7 +237,16 @@ export function installAuthControlPlane(db: Database) {
         throw new Error(`Missing or malformed auth trigger: ${name}`);
       }
     }
-    importLegacyProfileFields(db);
+    db.exec(migrationsDdl);
+    // Upgrade the old global receipt without reapplying legacy fields to
+    // identities already imported by that version. Unmapped profiles stay pending.
+    if (db.prepare("SELECT 1 FROM noctua_auth_migrations WHERE id='legacy-profile-v1'").get()) {
+      db.exec(`INSERT OR IGNORE INTO noctua_auth_migrations(id)
+        SELECT 'legacy-profile-v1:' || a.id FROM auth_user a JOIN users p ON p.id=a.id`);
+      db.exec("DELETE FROM noctua_auth_migrations WHERE id='legacy-profile-v1'");
+    }
+    const profiles = db.prepare(`SELECT a.id FROM auth_user a JOIN users p ON p.id=a.id`).all() as { id: string }[];
+    for (const profile of profiles) importLegacyProfileFields(db, profile.id);
     db.exec(installationDdl);
     db.exec(migrationsDdl);
     db.exec("INSERT OR IGNORE INTO auth_control_plane_installation(id,version) VALUES(1,1)");
@@ -245,17 +254,29 @@ export function installAuthControlPlane(db: Database) {
   }).immediate();
 }
 
-/** Historical development columns stay inert after this one-time, explicit-ID import. */
-function importLegacyProfileFields(db: Database) {
-  const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as {name:string}[]).map(row=>row.name));
-  if (!columns.has("name") && !columns.has("disabledAt")) return;
-  db.exec(migrationsDdl);
-  if (db.prepare("SELECT 1 FROM noctua_auth_migrations WHERE id='legacy-profile-v1'").get()) return;
-  if (columns.has("name")) db.exec(`UPDATE auth_user SET name=(SELECT p.name FROM users p WHERE p.id=auth_user.id)
-    WHERE EXISTS(SELECT 1 FROM users p WHERE p.id=auth_user.id AND length(trim(p.name))>0)`);
-  if (columns.has("disabledAt")) db.exec(`UPDATE auth_user SET banned=1,banExpires=NULL
-    WHERE EXISTS(SELECT 1 FROM users p WHERE p.id=auth_user.id AND p.disabledAt IS NOT NULL)`);
-  db.exec("INSERT INTO noctua_auth_migrations(id) VALUES('legacy-profile-v1')");
+/**
+ * Transfer an explicitly bound legacy profile once. Slice 6 must call this on
+ * the library connection INSIDE the adapter transaction that creates auth_user
+ * with the reserved legacy ID. The nested transaction keeps fields + receipt
+ * atomic; the enclosing adapter transaction also rolls back the identity bind.
+ * No email lookup may choose the profile ID.
+ */
+export function importLegacyProfileFields(db: Database, userId: string): boolean {
+  return db.transaction(() => {
+    const columns = new Set((db.prepare("PRAGMA table_info(users)").all() as { name: string }[]).map(row => row.name));
+    if (!columns.has("name") && !columns.has("disabledAt")) return false;
+    const receipt = `legacy-profile-v1:${userId}`;
+    if (db.prepare("SELECT 1 FROM noctua_auth_migrations WHERE id=?").get(receipt)) return false;
+    const bound = db.prepare(`SELECT a.id FROM auth_user a JOIN users p ON p.id=a.id
+      WHERE a.id=? AND lower(trim(a.email))=lower(trim(p.email))`).get(userId);
+    if (!bound) throw new Error("Legacy profile transfer requires an explicit matching identity binding");
+    if (columns.has("name")) db.prepare(`UPDATE auth_user SET name=(SELECT name FROM users WHERE id=?)
+      WHERE id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND length(trim(name))>0)`).run(userId, userId, userId);
+    if (columns.has("disabledAt")) db.prepare(`UPDATE auth_user SET banned=1,banExpires=NULL
+      WHERE id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND disabledAt IS NOT NULL)`).run(userId, userId);
+    db.prepare("INSERT INTO noctua_auth_migrations(id) VALUES(?)").run(receipt);
+    return true;
+  }).immediate();
 }
 
 /** Noctua proof cleanup runs on its own master handle after library signOut. */

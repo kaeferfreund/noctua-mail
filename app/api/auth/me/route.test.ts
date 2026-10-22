@@ -99,13 +99,26 @@ describe("shell mutation contracts",()=>{
  });
  test("bodyless logout deletes cookie, DB session, sidecar, grants and source challenges; next me rejects",async()=>{
   const f=await createAuthenticatedTestSession();const saved=f.jar.header();
-  await withDbWriteRetry("test.proof",()=>f.master.prepare("INSERT INTO auth_pending_challenges(identifier,userId,generation,authenticatedAt,kind,sourceSessionId,expiresAt) SELECT ?,userId,generation,?,'passkey_reauth',?,? FROM auth_security_state WHERE userId=?").run(randomUUID(),Date.now(),f.session.id,Date.now()+60_000,f.user.id));
+  const context = await f.auth.$context;
+  const control = await context.internalAdapter.createSession(f.user.id);
+  const controlId = control.id;
+  await f.seedSessionSecurity(controlId,f.user.id,"mfa","password_totp");
+  await withDbWriteRetry("test.proof",()=>f.master.transaction(()=>{
+   for (const sessionId of [f.session.id,controlId]) {
+    f.master.prepare("INSERT INTO auth_pending_challenges(identifier,userId,generation,authenticatedAt,kind,sourceSessionId,expiresAt) SELECT ?,userId,generation,?,'passkey_reauth',?,? FROM auth_security_state WHERE userId=?").run(randomUUID(),Date.now(),sessionId,Date.now()+60_000,f.user.id);
+    f.master.prepare("INSERT INTO auth_reauth_grants(tokenHash,userId,sessionId,purpose,generation,expiresAt) SELECT ?,userId,?,'test',generation,? FROM auth_security_state WHERE userId=?").run(randomUUID(),sessionId,Date.now()+60_000,f.user.id);
+   }
+  }).immediate());
   const response=await logout(req(saved,"POST"));expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true});
   expect(response.headers.getSetCookie().join(";")).toContain("Max-Age=0");f.jar.absorb(response.headers);
   expect(f.jar.names()).not.toContain("noctua.session_token");
   expect(f.master.prepare("SELECT id FROM auth_session WHERE id=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare("SELECT sessionId FROM auth_session_security WHERE sessionId=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare("SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?").get(f.session.id)).toBeNull();
+  expect(f.master.prepare("SELECT tokenHash FROM auth_reauth_grants WHERE sessionId=?").get(f.session.id)).toBeNull();
+  for (const [table,column] of [["auth_session","id"],["auth_session_security","sessionId"],["auth_pending_challenges","sourceSessionId"],["auth_reauth_grants","sessionId"]]) {
+   expect(f.master.prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(controlId)).not.toBeNull();
+  }
   expect((await GET(req(saved))).status).toBe(401);expect((await GET(req(f.jar.header()))).status).toBe(401);
   expect((await logout(req("","POST"))).status).toBe(200);
  });

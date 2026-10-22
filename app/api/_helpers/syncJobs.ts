@@ -1,3 +1,4 @@
+import { getRequestClientId } from "./clientId";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireAccountAccessOr403, requireActiveUserSession } from "@/lib/auth";
@@ -15,7 +16,7 @@ export async function handleSyncStartRequest(
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
-    const clientId = request.headers.get("x-noctua-client") ?? undefined;
+    const clientId = getRequestClientId(request);
     const body = (await request.json().catch(() => null)) as Omit<SyncPayload, "accountId"> &
       Partial<Pick<SyncPayload, "accountId">> | null;
     const accountId = options?.accountId?.trim() || "";
@@ -57,7 +58,7 @@ export async function handleSyncStatusRequest(
   request: Request,
   options?: SyncHandlerOptions
 ) {
-  const clientId = request.headers.get("x-noctua-client") ?? "";
+  const clientId = getRequestClientId(request);
   const { searchParams } = new URL(request.url);
   const jobId = searchParams.get("jobId");
   const routeAccountId = options?.accountId?.trim() || "";

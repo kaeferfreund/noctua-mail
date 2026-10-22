@@ -1,3 +1,4 @@
+import { getRequestClientId } from "./clientId";
 import { NextResponse } from "next/server";
 import { forwardAuthHeaders, requireAccountAccessOr403, requireActiveUserSession, type ActiveUserSession } from "@/lib/auth";
 import { getAccountById } from "@/lib/serverDb";
@@ -53,8 +54,7 @@ export async function requireAccountContext(
   if (!account) {
     return forwardAuthHeaders(errorResponse("Account not found", 404), session.responseHeaders);
   }
-  const rawClientId = request.headers.get("x-noctua-client") ?? "";
-  const clientId = /^[A-Za-z0-9_-]{1,64}$/.test(rawClientId) ? rawClientId : undefined;
+  const clientId = getRequestClientId(request);
   return { session, accountId, account, clientId };
 }
 
@@ -77,8 +77,7 @@ export async function requireOwnedAccountContext(
   if (access instanceof NextResponse) return access;
   const account = await getAccountById(accountId);
   if (!account) return forwardAuthHeaders(errorResponse("Forbidden", 403), session.responseHeaders);
-  const rawClientId = request.headers.get("x-noctua-client") ?? "";
-  const clientId = /^[A-Za-z0-9_-]{1,64}$/.test(rawClientId) ? rawClientId : undefined;
+  const clientId = getRequestClientId(request);
   return { session, accountId, account, clientId };
 }
 
