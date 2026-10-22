@@ -266,10 +266,10 @@
   border-bottom: none !important;
 }
 
+/* Sentence case at the Radix size-1 tab size (12px), matching the
+   Signature/Attach buttons beside the compose tabs. */
 .tabTrigger {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--text-xs);
 }
 
 .content {
@@ -368,8 +368,7 @@
 }
 
 .textView {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
   color: var(--mail-view-fg);

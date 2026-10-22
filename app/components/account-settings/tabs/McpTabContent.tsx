@@ -226,7 +226,7 @@ export default function McpTabContent({
               Use the MCP endpoint below with an <code>Authorization: Bearer &lt;token&gt;</code> header.
             </Text>
             <Flex align="center" gap="2" wrap="wrap">
-              <Text size="2" style={{ fontFamily: "var(--default-mono-font-family)" }}>
+              <Text size="2" style={{ fontFamily: "var(--font-mono)" }}>
                 {serverUrl}
               </Text>
               <TooltipIconButton
@@ -296,7 +296,7 @@ export default function McpTabContent({
                   <Text
                     size="1"
                     style={{
-                      fontFamily: "var(--default-mono-font-family)",
+                      fontFamily: "var(--font-mono)",
                       overflowWrap: "anywhere"
                     }}
                   >

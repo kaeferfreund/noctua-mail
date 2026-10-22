@@ -148,6 +148,21 @@ describe("shell header", () => {
     const title = within(header).getByRole("heading", { name: "Synthetic / INBOX" });
     expect(title.nextElementSibling).toBe(within(header).getByRole("button", { name: "View: Threads" }));
   });
+
+  it("renders mailbox and folder as one heading with a quiet separator", () => {
+    const view = render(
+      <SidebarProvider><TooltipProvider>
+        <ShellHeader title={["Synthetic", "INBOX"]} search={search} sync={{ isSyncing: false, onCheckNewMail: noop }} />
+      </TooltipProvider></SidebarProvider>
+    );
+    const title = within(view.container).getByRole("heading", { name: "Synthetic / INBOX" });
+    expect(title.title).toBe("Synthetic / INBOX");
+    expect(title.className).toContain("font-medium");
+    expect(title.className).not.toContain("tracking-");
+    const separator = title.querySelector("span")!;
+    expect(separator.textContent).toBe(" / ");
+    expect(separator.className).toContain("text-muted-foreground");
+  });
 });
 
 describe("Radix components in shadcn portals", () => {
