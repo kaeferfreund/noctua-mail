@@ -1,14 +1,14 @@
+/* Fills the list panel of the shell's resizable group; the panel separator
+   draws the divider, so the pane has no border of its own. */
 .pane {
-  padding: 18px 10px;
-  border-right: 1px solid var(--gray-5);
-  background: var(--gray-1);
-  flex-shrink: 0;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px;
+  background: var(--card);
+  font-size: 14px;
   overflow-y: auto;
   scrollbar-gutter: stable;
-}
-
-:global(.dark) .pane {
-  background: var(--gray-2);
 }
 
 .list {

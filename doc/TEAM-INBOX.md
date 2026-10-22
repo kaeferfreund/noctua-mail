@@ -492,12 +492,14 @@ documents REST and MCP.
 ### 7.1 Stack and setup
 
 Dependencies: `tailwindcss@4`, `@tailwindcss/postcss`, `postcss`, `next-themes`,
-`react-resizable-panels`, `class-variance-authority`, `clsx`, `tailwind-merge`, `cmdk` (via shadcn
+`react-resizable-panels`, `class-variance-authority`, `cn` (the generated registry helper), `cmdk` (via shadcn
 `command`). `radix-ui` primitives are already present through `@radix-ui/themes`.
 
 Setup order (verified on 2026-10-22 in a throwaway worktree with shadcn 4.22.1, tailwindcss 4.3.3,
 next-themes 0.4.6; `bun run build`, `bun run lint`, `bun run test:ci` and the standalone output all
-stayed green):
+stayed green). Slice 1 uses the generated `radix-nova` style and pins `radix-ui` to
+1.4.3 so the shell and Radix Themes share one primitive instance; preserve that pin after
+`shadcn add`. These are the accepted implementation details for D10:
 
 1. `bun add tailwindcss @tailwindcss/postcss next-themes`; write `postcss.config.mjs`
    (`export default { plugins: { "@tailwindcss/postcss": {} } }`); put the four-line CSS header
@@ -536,10 +538,10 @@ stayed green):
 
 @font-face { font-family: "Inter"; src: url("/fonts/InterVariable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 
-@theme inline { /* shadcn colour/radius/font mapping: --color-background: var(--background) ... --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px); --radius-lg: var(--radius); */ }
-:root { /* shadcn tokens from :root-scoped Radix scales: --background: var(--sand-2); --foreground: var(--sand-12); --primary: var(--indigo-9); --muted: var(--sand-3); --muted-foreground: var(--sand-11); --border: var(--sand-6); --ring: var(--indigo-8); --radius: 0.5rem; ... never --gray-N / --accent-N / --space-N here */ }
-.dark { /* same names */ }
-:root { /* legacy aliases: --bg, --surface, --surface-1/2/3, --text, --muted-foreground, --link, --input-bg/fg, --mail-view-bg/fg, --list-row-* (from --indigo-*/--sand-*), --shadow, --quote-2 */ }
+@theme inline static { /* shadcn colour/radius/font mapping: --color-background: var(--background) ... --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif; --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px); --radius-lg: var(--radius); */ }
+:root { /* shadcn tokens from :root-scoped Radix scales: --background: #fff; --card: #fff; --popover: #fff; --sidebar: var(--gray-2); --foreground: var(--gray-12); --primary: var(--iris-9); --primary-foreground: #fff; --muted: var(--gray-3); --muted-foreground: var(--gray-11); --border: var(--gray-6); --input: var(--gray-6); --ring: var(--iris-8); --radius: 0.5rem; ... never --accent-N / --space-N here */ }
+.dark { /* same names; --background: oklch(0.145 0 0); --card/--popover/--sidebar: oklch(0.205 0 0); --border/--input/--sidebar-border: rgb(255 255 255 / 10%); other neutral steps from gray-dark */ }
+:root { /* legacy aliases: --bg, --surface, --surface-1/2/3, --text, --muted-foreground, --link, --input-bg/fg, --mail-view-bg/fg, --list-row-* (from --iris-*/--gray-*), --shadow, --quote-2 */ }
 .radix-themes { --color-background: var(--background); --color-panel-solid: var(--card); --color-surface: var(--card); --default-font-family: "Inter", system-ui, sans-serif; }
 
 @layer base {
@@ -557,13 +559,19 @@ Rules:
   `\bvar\(--accent\)` → `var(--link)` (never touch `--accent-N`/`--accent-aN`), `--accent-2` →
   `--quote-2`; delete the unused `--accent-2-strong/-bg/-border`. Legacy `--radius-sm/md/lg` are
   redefined from the shadcn radius (4/6/8px); the slight change for md/lg is accepted.
+- Palette: pure neutral gray; white light surfaces and a gray-2 sidebar on the near-white
+  canvas. The single soft accent is iris: primary/sidebar-primary = iris-9 with white text
+  (sRGB `#5b5bd6`, 5.37:1 contrast), ring/sidebar-ring = iris-8, chart-1..5 = iris-6/8/9/10/11,
+  link = iris-11. Limit accent to primary buttons, active sidebar indicators, focus rings, links,
+  unread dots/badges and selected rows. Selected rows use iris-3/4 tints with subtle borders;
+  navigation hovers stay gray. Legacy surface/list/input/quote aliases follow the same palette.
 - Fonts: vendor Inter Variable (OFL) at `public/fonts/InterVariable.woff2` with the licence file next
   to it. No `next/font` (Docker and Tauri builds must stay hermetic). `HtmlMessage.tsx` injects the
   same `@font-face` with the absolute `/fonts/...` URL into the srcdoc and uses the family; the
   compose editor uses the family through the token.
-- `<Theme accentColor="indigo" grayColor="sand" panelBackground="solid">` stays in the root layout.
+- `<Theme accentColor="iris" grayColor="gray" panelBackground="solid">` stays in the root layout.
   `<html suppressHydrationWarning>`, `ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem`
-  (users without a stored value now follow the OS theme). `darkMode` for the kept renderers comes
+  (users without a stored value follow the OS theme); the header menu offers light / dark / system. `darkMode` for the kept renderers comes
   from a `useSyncExternalStore` over `document.documentElement.classList` (correct on the first
   client render, so the HtmlMessage iframe is built once). Remove the manual `.dark` toggling in
   MailClient and the detached windows.
@@ -584,37 +592,34 @@ in `MailClient.tsx`. MailClient keeps all data state and handler bags; the shell
 theme, and navigation state. The `data-shell` attribute goes on the shell root, the login screen
 root, and the admin panel root.
 
-Desktop (`md` and up):
+Desktop (`md` and up), following the shadcn dashboard-01 inset layout:
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ Header: [☰] [search ........ filters] [Compose] [theme] [user]│
-├───────────┬──────────────────────┬───────────────────────────┤
-│ Sidebar   │ Message list         │ Thread / reading pane      │
-│ Mailboxes │ (filters: Open,      │ ThreadCollaborationBar     │
-│  mine     │  Unassigned, Mine,   │ messages (kept components) │
-│  shared   │  All)                │ comments + activity        │
-│ Views     │                      │ reply / internal note      │
-│ Topics    │                      │                            │
-│ Folders   │                      │                            │
-├───────────┴──────────────────────┴───────────────────────────┤
-│ Status bar (compact; hidden on mobile)                         │
-└──────────────────────────────────────────────────────────────┘
-```
-
-- Sidebar: shadcn `Sidebar` with `collapsible="offcanvas"` (icon mode clips the folder tree).
-  Sections: "My mailboxes" (`!shared`), "Shared mailboxes" (`shared`), each row = avatar + name,
-  active highlighted; clicking calls `switchAccount`. Then "Views": Inbox, Assigned to me,
-  Unassigned, Open, Focused, Action queue, Invite deck (counts as today). Then Topics, then the
-  folder tree (the existing `FolderTree`, restyled through tokens; drag-and-drop stays on desktop).
-- List + reading pane: `ResizablePanelGroup` with `autoSaveId="noctua:panes"`; every panel has a
-  stable `id` and `order` (the calendar panel mounts conditionally). `MessageListPane` loses its
-  inline pixel width (`width: 100%`); `listWidth` state in MailClient is fed by a `ResizeObserver`
-  on `listPaneRef` and still drives `listIsNarrow` and `collapseViewSwitcher`. Pane chrome is
-  restyled by editing the CSS modules (unlayered modules beat utilities).
-- Header: search input with the existing field/badge filter menus in a `Popover`; compose button;
-  sync indicator; theme toggle; user menu (profile and password, settings, admin, developer tools
-  "Show thread JSON" / "Evict thread cache", logout). The account switcher lives in the sidebar.
+- `SidebarProvider` defines `--sidebar-width: 18rem` and `--header-height: 3rem` on the
+  `data-shell` root (`100dvh`). `Sidebar variant="inset" collapsible="offcanvas"` sits on a
+  near-white canvas. `SidebarInset` holds the 48px site header, resizable content and compact
+  status bar; it is white, rounded-xl and subtly shadowed in light mode. Content uses an 8px
+  grid with calm `bg-card`, subtle borders and shadow-xs pane frames.
+- Sidebar header: app mark + title from `lib/appBranding.ts`, then a prominent Compose button
+  and a secondary "Check all folders for new mail" icon button calling
+  `syncAccount(undefined, "new")`. Drafts remain reachable. Sections: "My mailboxes" (`!shared`),
+  "Shared mailboxes" (`shared`), each row = avatar + name with e-mail tooltip; rows sort by name,
+  and sections with more than six mailboxes group by e-mail domain. Optional `accessRole`,
+  `isOwner`, `shared` fields arrive with feat/team-auth; absent `shared` means personal.
+  Clicking a mailbox calls `switchAccount`. Views: Inbox, Focused, Action queue and Invite deck
+  retain their counts; an explicit empty slot reserves Assigned to me / Unassigned / Open for
+  feat/collab-ui. Then Topics and the existing folder tree (token styling; desktop drag-and-drop).
+- Sidebar footer: NavUser-style avatar, user name and e-mail with Settings, Admin (admin only),
+  disabled "Profile & security" placeholder for Better Auth, developer tools "Show thread JSON"
+  / "Evict thread cache", and Log out. The person is separate from the active mailbox.
+- List + reading pane: `ResizablePanelGroup` with `useDefaultLayout({ id: "noctua:panes",
+  panelIds, storage })` (v4 has no `autoSaveId`/`order`). Stable ids `list`, `reader`, `calendar`
+  and fixed render order allow separate persisted layouts with/without the conditional calendar.
+  `MessageListPane` fills its panel (`width: 100%`); a `ResizeObserver` on `listPaneRef` feeds
+  `listWidth` in MailClient and still drives `listIsNarrow` and `collapseViewSwitcher`.
+  Pane chrome lives in the CSS modules because those unlayered rules beat utilities.
+- Header: SidebarTrigger, vertical Separator, current mailbox name + folder; right-aligned search
+  with the existing field/badge filters in a Popover, sync indicator and light/dark/system menu.
+  AppShell provides the TooltipProvider (the installed SidebarProvider does not include one).
 
 Mobile (below `md`):
 

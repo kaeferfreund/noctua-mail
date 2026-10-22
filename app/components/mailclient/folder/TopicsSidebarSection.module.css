@@ -1,7 +1,4 @@
 .section {
-  border-bottom: 1px solid var(--gray-a4);
-  padding-bottom: 8px;
-  margin-bottom: 4px;
   display: flex;
   flex-direction: column;
   gap: 2px;
