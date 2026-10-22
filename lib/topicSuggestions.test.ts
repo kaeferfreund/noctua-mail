@@ -1368,4 +1368,210 @@ describe("topic suggestions", () => {
     expect(suggestions.map((item) => item.suggestionScore)).toEqual([11, 5]);
     expect(suggestions.every((item) => item.representativeMessageId?.startsWith("msg-candidate-"))).toBe(true);
   });
+
+  test("batched thread suggestions match per-thread scores, exclusion, and name order", async () => {
+    const accountId = uniqueAccountId("acc-topic-suggestions-batch-equiv");
+    const folder = buildFolder(accountId);
+    const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
+
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+
+    await upsertMessages(
+      accountId,
+      folder.id,
+      [
+        buildMessage({
+          id: "msg-hist-alpha",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-hist-alpha",
+          messageId: "<hist-alpha@example.com>",
+          from: "Alpha Bot <alpha-bot@vendor.example>",
+          fromEmail: "alpha-bot@vendor.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 12, 0, 0)
+        }),
+        buildMessage({
+          id: "msg-hist-zulu",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-hist-zulu",
+          messageId: "<hist-zulu@example.com>",
+          from: "Zulu Bot <zulu-bot@vendor.example>",
+          fromEmail: "zulu-bot@vendor.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 12, 1, 0)
+        }),
+        buildMessage({
+          id: "msg-hist-mid",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-hist-mid",
+          messageId: "<hist-mid@example.com>",
+          from: "Alerts <alerts@vendor.example>",
+          fromEmail: "alerts@vendor.example",
+          to: "owner@example.com",
+          listId: "lists.vendor.example/alerts",
+          dateValue: Date.UTC(2026, 2, 18, 12, 2, 0)
+        }),
+        buildMessage({
+          id: "msg-target-ranked",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-target-ranked",
+          messageId: "<target-ranked@example.com>",
+          from: "Alerts <alerts@vendor.example>",
+          fromEmail: "alerts@vendor.example",
+          to: "owner@example.com",
+          listId: "lists.vendor.example/alerts",
+          dateValue: Date.UTC(2026, 2, 18, 12, 3, 0)
+        }),
+        buildMessage({
+          id: "msg-target-self",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-target-self",
+          messageId: "<target-self@example.com>",
+          from: "Only Self <only-self@isolated.example>",
+          fromEmail: "only-self@isolated.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 12, 4, 0)
+        }),
+        buildMessage({
+          id: "msg-target-miss",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-target-miss",
+          messageId: "<target-miss@example.com>",
+          from: "Newsletter <news@other.example>",
+          fromEmail: "news@other.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 12, 5, 0)
+        })
+      ],
+      true,
+      { recomputeThreads: false }
+    );
+
+    const alpha = await createTopic(accountId, "Alpha", "blue");
+    const zulu = await createTopic(accountId, "Zulu", "red");
+    const mid = await createTopic(accountId, "Mid", "green");
+    const isolated = await createTopic(accountId, "Isolated", "orange");
+    await setThreadTopics(accountId, "thread-hist-alpha", [alpha.id]);
+    await setThreadTopics(accountId, "thread-hist-zulu", [zulu.id]);
+    await setThreadTopics(accountId, "thread-hist-mid", [mid.id]);
+    await setThreadTopics(accountId, "thread-target-ranked", [alpha.id]);
+    await setThreadTopics(accountId, "thread-target-self", [isolated.id]);
+
+    const threadIds = [
+      "thread-target-ranked",
+      "  thread-target-ranked  ",
+      "thread-target-self",
+      "thread-target-miss",
+      ""
+    ];
+    const batched = await getTopicSuggestionsForThreads(accountId, threadIds, {
+      accountEmail: "owner@example.com"
+    });
+
+    const ranked = batched.get("thread-target-ranked") ?? [];
+    expect(ranked.map((item) => item.name)).toEqual(["Mid", "Alpha", "Zulu"]);
+    expect(ranked.map((item) => item.suggestionScore)).toEqual([9, 1, 1]);
+    expect(ranked.map((item) => item.matchCount)).toEqual([1, 1, 1]);
+    expect(batched.has("thread-target-self")).toBe(false);
+    expect(batched.has("thread-target-miss")).toBe(false);
+    expect(batched.size).toBe(1);
+
+    for (const threadId of ["thread-target-ranked", "thread-target-self", "thread-target-miss"]) {
+      const single = await getTopicSuggestionsForThread(accountId, threadId, {
+        accountEmail: "owner@example.com"
+      });
+      expect(batched.get(threadId) ?? []).toEqual(single);
+    }
+  });
+
+  test("batched thread suggestions stay equivalent when signal pairs exceed one SQL chunk", async () => {
+    const accountId = uniqueAccountId("acc-topic-suggestions-batch-chunk");
+    const folder = buildFolder(accountId);
+    const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
+
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+
+    const recipientCount = 410;
+    const recipients = Array.from(
+      { length: recipientCount },
+      (_, index) => `user${index}@chunk.example`
+    ).join(", ");
+    const lateRecipient = "user400@chunk.example";
+
+    await upsertMessages(
+      accountId,
+      folder.id,
+      [
+        buildMessage({
+          id: "msg-hist-chunk",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-hist-chunk",
+          messageId: "<hist-chunk@example.com>",
+          from: "Chunk Bot <chunk-bot@vendor.example>",
+          fromEmail: "chunk-bot@vendor.example",
+          to: recipients,
+          dateValue: Date.UTC(2026, 2, 18, 13, 0, 0)
+        }),
+        buildMessage({
+          id: "msg-target-chunk",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-target-chunk",
+          messageId: "<target-chunk@example.com>",
+          from: "Chunk Bot <chunk-bot@vendor.example>",
+          fromEmail: "chunk-bot@vendor.example",
+          to: recipients,
+          dateValue: Date.UTC(2026, 2, 18, 13, 1, 0)
+        }),
+        buildMessage({
+          id: "msg-target-late",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-target-late",
+          messageId: "<target-late-chunk@example.com>",
+          from: "Other <other-late@elsewhere.example>",
+          fromEmail: "other-late@elsewhere.example",
+          to: lateRecipient,
+          dateValue: Date.UTC(2026, 2, 18, 13, 2, 0)
+        })
+      ],
+      true,
+      { recomputeThreads: false }
+    );
+
+    const topic = await createTopic(accountId, "Chunked", "violet");
+    await setThreadTopics(accountId, "thread-hist-chunk", [topic.id]);
+
+    const batched = await getTopicSuggestionsForThreads(
+      accountId,
+      ["thread-target-chunk", "thread-target-late"],
+      { accountEmail: "owner@example.com" }
+    );
+
+    for (const threadId of ["thread-target-chunk", "thread-target-late"]) {
+      const single = await getTopicSuggestionsForThread(accountId, threadId, {
+        accountEmail: "owner@example.com"
+      });
+      expect(batched.get(threadId) ?? []).toEqual(single);
+    }
+
+    const full = batched.get("thread-target-chunk") ?? [];
+    expect(full.map((item) => item.name)).toEqual(["Chunked"]);
+    expect(full[0]?.matchCount).toBe(1);
+    expect(full[0]?.suggestionScore).toBe(4 + 1 + recipientCount * 2);
+
+    const late = batched.get("thread-target-late") ?? [];
+    expect(late.map((item) => item.name)).toEqual(["Chunked"]);
+    expect(late[0]?.suggestionScore).toBe(2);
+    expect(late[0]?.matchCount).toBe(1);
+  });
 });
