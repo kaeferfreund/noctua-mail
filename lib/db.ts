@@ -427,3 +427,6 @@ export function listCalendarInviteSourceMessagesByEventUid(
 }
 
 export { deleteSessionProofState } from "./db/authPolicy";
+export { getStoredAccounts } from "./db/accounts";
+export { getMailboxSummaries, recordMailboxSync, setMailboxWatcherState } from "./db/mailboxSummary";
+export type { MailboxSummary, WatcherState } from "./db/mailboxSummary";

@@ -1,3 +1,4 @@
+import { connectIdleImapClient, runImapIdleLoop } from "@/lib/mail/imap/idle";
 import { mailboxFailureDto } from "@/lib/mailboxFailure";
 import { getImapHttpError } from "@/lib/mail/imapError";
 import { assertStreamAuthorized, registerAuthStream } from "@/lib/authStreams";
@@ -185,21 +186,12 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           }
           const mailbox = mailboxPathFromFolderId(folder.id, accountId);
 
-          const client = await connectImapClientWithRetry({
-            account,
+          const client = await connectIdleImapClient(account, { ...logContext, mailbox }, {
             disposeClient,
-            logContext: { ...logContext, mailbox },
-            connectOp: "imap.connect",
-            createClient: () => {
+            createClient: (options) => {
               if (stopped) throw new Error("Stream closed");
-              const nextClient = new ImapFlow(
-                buildImapFlowOptions(account, {
-                  maxIdleTime: 10 * 60 * 1000,
-                  qresync: true
-                }, { ...logContext, mailbox })
-              );
+              const nextClient = new ImapFlow(options);
               ownedClients.add(nextClient);
-              bindImapClientError(nextClient, { ...logContext, mailbox });
               return nextClient;
             }
           });
@@ -280,8 +272,14 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             const status = await logImapOp(
               "imap.status",
               { ...logContext, mailbox },
-              async () => await client.status(mailbox, { uidNext: true })
+              async () => await client.status(mailbox, { uidNext: true, uidValidity: true })
             );
+            // Reconcile resets even if the server reuses the previous UIDs.
+            const currentState = await getMailboxState(accountId, folder.id);
+            await saveMailboxState({ accountId, folderId: folder.id, mailboxPath: mailbox,
+              uidValidity: status.uidValidity == null ? currentState?.uidValidity : String(status.uidValidity),
+              highestUid: currentState?.highestUid, highestModSeq: currentState?.highestModSeq,
+              supportsQresync });
             const uidNext = status?.uidNext ?? previousUidNext;
             if (uidNext <= previousUidNext) return;
             const range = { uid: `${previousUidNext}:${uidNext - 1}` };
@@ -324,13 +322,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               accountId,
               folderId: folder.id,
               mailboxPath: mailbox,
-              uidValidity: (mailboxInfo as any)?.uidValidity
-                ? (mailboxInfo as any).uidValidity.toString()
-                : null,
+              uidValidity: status.uidValidity == null ? currentState?.uidValidity : String(status.uidValidity),
               highestModSeq: (status as any)?.highestModseq
                 ? (status as any).highestModseq.toString()
                 : null,
-              highestUid: currentHighestUid ?? (storedState?.highestUid ?? null),
+              highestUid: currentHighestUid ?? null,
               supportsQresync
             });
           };
@@ -367,18 +363,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             });
           });
 
-          const idleLoop = async () => {
-            while (!stopped && !(client as any).closed) {
-              try {
-                await client.idle();
-              } catch (error) {
-                void send("error", error);
-                break;
-              }
-            }
-          };
-
-          void idleLoop();
+          void runImapIdleLoop(client).catch((error: unknown) => {
+            if (!stopped) void send("error", error);
+          });
           } catch (error) {
             if (!sessionRegistered) {
               await disposeClient(client);

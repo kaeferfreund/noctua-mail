@@ -1,7 +1,8 @@
+import type { ImapFlow } from "imapflow";
 import type { Account } from "@/lib/data";
 import { getFolders } from "@/lib/serverDb";
 import { planImapNewSyncFolders } from "@/lib/mail/imap";
-import { getSyncJob, startSyncJob, type SyncJob } from "@/lib/syncJobs";
+import { getSyncJob, startSyncJob, type SyncJob, type SyncJobSource } from "@/lib/syncJobs";
 
 const POLL_INTERVAL_MS = 1_000;
 const TIMEOUT_MS = 120_000;
@@ -18,8 +19,10 @@ export type NewMailCheckResult = {
 export async function runNewMailCheck(
   account: Account,
   accountId: string,
-  clientId?: string
+  clientId?: string,
+  options: { source?: SyncJobSource; signal?: AbortSignal; client?: ImapFlow } = {}
 ): Promise<NewMailCheckResult> {
+  options.signal?.throwIfAborted();
   const folders = await getFolders(accountId);
   const folderIds = folders.filter((f) => f.accountId === accountId).map((f) => f.id);
 
@@ -27,7 +30,7 @@ export async function runNewMailCheck(
     return { ok: true, foldersChecked: 0, foldersWithNewMail: 0, jobIds: [], jobs: [] };
   }
 
-  const decisions = await planImapNewSyncFolders(account, folderIds, clientId);
+  const decisions = await planImapNewSyncFolders(account, folderIds, clientId, options);
   const foldersToSync = decisions.filter((d) => !d.skip);
 
   if (foldersToSync.length === 0) {
@@ -40,8 +43,9 @@ export async function runNewMailCheck(
     };
   }
 
+  options.signal?.throwIfAborted();
   const startedJobs = foldersToSync.map((d) =>
-    startSyncJob({ accountId, folderId: d.folderId, mode: "new" }, clientId)
+    startSyncJob({ accountId, folderId: d.folderId, mode: "new" }, clientId, options.source)
   );
   const jobIds = startedJobs.map((j) => j.id);
 
@@ -49,7 +53,16 @@ export async function runNewMailCheck(
   const pending = new Set(jobIds);
 
   while (pending.size > 0 && Date.now() < deadline) {
-    await new Promise<void>((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    options.signal?.throwIfAborted();
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        options.signal?.removeEventListener("abort", done);
+        resolve();
+      };
+      const timer = setTimeout(done, POLL_INTERVAL_MS);
+      options.signal?.addEventListener("abort", done, { once: true });
+    });
     for (const jobId of [...pending]) {
       const job = getSyncJob(jobId);
       if (!job || job.status === "done" || job.status === "failed") {

@@ -248,6 +248,11 @@ function clearImapConnectFailureState(account: Account) {
   imapConnectCircuitState.delete(key);
 }
 
+/** Watchers wait out an open breaker without creating a connection or logging repeatedly. */
+export function getImapConnectBlockedUntil(account: Account): number {
+  return getImapConnectBreakerState(account).state?.openedUntil ?? 0;
+}
+
 export function resetImapConnectFailureState(account?: Account) {
   if (account) {
     clearImapConnectFailureState(account);
@@ -292,6 +297,7 @@ export async function connectImapClientWithRetry(params: {
   logContext?: ImapClientLogContext;
   connectOp?: string;
   skipBreaker?: boolean;
+  maxAttempts?: number;
 }) {
   const {
     account,
@@ -323,7 +329,7 @@ export async function connectImapClientWithRetry(params: {
     }
   }
 
-  const maxAttempts = Math.max(1, retryOptions.retryCount + 1);
+  const maxAttempts = params.maxAttempts ?? Math.max(1, retryOptions.retryCount + 1);
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {

@@ -11,5 +11,6 @@ export async function register() {
   await initializeMasterDb();
   const { getAuth } = await import("@/lib/betterAuth");
   await getAuth();
+  if (process.env.NOCTUA_MAILBOX_WATCHER === "1") (await import("@/lib/mailboxWatcher")).startMailboxWatcher();
   startupInitialized = true;
 }

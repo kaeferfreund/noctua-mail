@@ -20,6 +20,8 @@ let nextTimer = 1;
 let configure: (client: FakeClient) => void = () => {};
 class FakeClient extends EventEmitter {
   closed = false;
+  get usable() { return !this.closed; }
+  close() { this.closed = true; this.idleGate.resolve(); this.emit("close"); }
   logouts = 0;
   connects = 0;
   statuses = 0;
