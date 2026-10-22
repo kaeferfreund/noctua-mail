@@ -65,6 +65,9 @@ export async function reauthenticate(auth: NoctuaAuth, db: Database, source: Ses
       const setup = source.assurance === "setup" && !enrolled;
       if (purpose === "totp.enroll" && !setup) throw new AuthPolicyError("setup_required");
       if (purpose === "password.set" && hasPassword) throw new AuthPolicyError("password_already_set");
+      if (purpose === "password.set" && setup && (!db.prepare(`SELECT 1 FROM user_provisioning WHERE userId=? AND kind IN ('signup','migration') AND state='complete'`).get(source.userId) ||
+        db.prepare(`SELECT 1 FROM user_provisioning WHERE userId=? AND kind='recovery'`).get(source.userId) ||
+        db.prepare(`SELECT 1 FROM noctua_auth_migrations WHERE id=?`).get(`mfa-enrolled:${source.userId}`))) throw new AuthPolicyError("onboarding_proof_required");
       if (purpose === "password.change" && !hasPassword) throw new AuthPolicyError("password_not_set");
       if (!setup && (source.assurance !== "mfa" || !enrolled)) throw new AuthPolicyError("mfa_required");
       if (setup && !["totp.enroll","password.set"].includes(purpose)) throw new AuthPolicyError("mfa_required");

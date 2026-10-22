@@ -134,7 +134,7 @@ describe("shell mutation contracts",()=>{
   expect((await logout(new Request("http://localhost:3000/api/auth/logout",{method:"POST"}))).status).toBe(403);
   expect((await logout(new Request("http://localhost:3000/api/auth/logout",{method:"POST",headers:{referer:"http://localhost:3000/inbox"}}))).status).toBe(200);
  });
- test("signup stays 503 and legacy login is 410 without parsing credentials",async()=>{
-  const request=req("","POST");expect((await signup(request)).status).toBe(503);expect((await login(request)).status).toBe(410);
+ test("signup enforces request hygiene and legacy login stays 410",async()=>{
+  const request=req("","POST");expect((await signup(request)).status).toBe(400);expect((await login(request)).status).toBe(410);
  });
 });

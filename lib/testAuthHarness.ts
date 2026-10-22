@@ -12,6 +12,7 @@ import { attachAuthPolicyHandler, migrateAuthSchema, noctuaAuthOptions, type Noc
 import { installAuthControlPlane } from "./db/authPolicy";
 import { configureDb } from "./db/connection";
 import { initMasterSchema } from "./db/schema";
+import { withAuthProof } from "./authPolicyContext";
 
 export const TEST_SECRET = "noctua-auth-test-secret-0123456789abcdef";
 export const TEST_BASE_URL = "http://localhost:3000";
@@ -108,7 +109,7 @@ export async function createTestAuthHarness(options?: (config: ReturnType<typeof
     master = openMasterDb(temp.dbPath);
     database = new Database(temp.dbPath);
     configureDb(database, 0);
-    const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET, ...configOverrides };
+    const config = { database, baseURL: TEST_BASE_URL, secret: TEST_SECRET, policyDatabase:async()=>master!, ...configOverrides };
     const authOptions = noctuaAuthOptions(config);
     // Per-process library burst buckets outlive a fixture, especially under randomized reruns.
     // Tests that exercise rate limits opt in explicitly; production options remain enabled.
@@ -149,7 +150,8 @@ export async function getSharedTestAuthHarness() {
 function authFixtures(auth: NoctuaAuth, master: Database) {
   return {
     createUser: (email: string, password = "synthetic-password-123", role: "admin" | "user" = "user") =>
-      auth.api.createUser({ body: { email, password, role, name: "Synthetic User" } }).then(result => result.user),
+      withAuthProof({db:master,internal:true,creation:{userId:crypto.randomUUID(),email:email.trim().toLowerCase(),role},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]},()=>
+        auth.api.createUser({ body: { email, password, role, name: "Synthetic User" } }).then(result => result.user)),
     async signIn(email: string, password = "synthetic-password-123") {
       const result = await auth.api.signInEmail({ body: { email, password }, returnHeaders: true });
       const jar = new CookieJar().absorb(result.headers);

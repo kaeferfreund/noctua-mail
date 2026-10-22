@@ -31,8 +31,12 @@ function liveToken(db: any, where: string, value: string): McpAccountContext | n
   }).deferred();
 }
 export async function validateMcpToken(token: string): Promise<McpAccountContext | null> {
+  return validateMcpTokenRow(await getDb(),token);
+}
+/** Same synchronous bearer boundary for isolated storage and the request wrapper. */
+export function validateMcpTokenRow(db:import("bun:sqlite").Database,token:string):McpAccountContext|null {
   if (!/^mcp_[A-Za-z0-9_-]{43}$/.test(token)) return null;
-  return liveToken(await getDb(), "t.tokenHash", hashMcpToken(token));
+  return liveToken(db, "t.tokenHash", hashMcpToken(token));
 }
 /** Tools recheck by id so batched calls and downgrades cannot reuse a role snapshot. */
 export async function resolveMcpToolContext(tokenId: string, accountId: string, minRole: AccountRole = "viewer"): Promise<McpAccountContext> {

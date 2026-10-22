@@ -6,6 +6,7 @@ import next from "next";
 import {getAuth} from "../lib/betterAuth";
 import {reauthenticate,mutateSecurity} from "../lib/authSecurity";
 import {getDb} from "../lib/db/connection";
+import {withAuthProof} from "../lib/authPolicyContext";
 import {readSessionSecurity} from "../lib/db/authPolicy";
 import {totpFromUri} from "../tests/helpers/totp";
 import {writeFileSync} from "node:fs";
@@ -23,7 +24,8 @@ const auth=await getAuth();
 const {parseSetCookieHeader}=await import("better-auth/cookies");
 const seeds:Record<string,unknown>={};
 for(const [index,[scenarioId,scenario]] of Object.entries(SCENARIOS).entries()) {
-  const user=await auth.api.createUser({body:{email:`browser-${index}@example.test`,name:"Synthetic Browser",password,...(scenarioId==="management"?{role:"admin"}:{})}});
+  const email=`browser-${index}@example.test`,role=scenarioId==="management"?"admin":"user";
+  const user=await withAuthProof({db:await getDb(),internal:true,creation:{userId:crypto.randomUUID(),email,role},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]},()=>auth.api.createUser({body:{email,name:"Synthetic Browser",password,role}}));
   const signed=await auth.api.signInEmail({body:{email:user.user.email,password},returnHeaders:true});
   const cookies=new Map<string,string>();
   const absorb=(headers:Headers)=>parseSetCookieHeader(headers.get("set-cookie")??"").forEach((value,name)=>{if(value.value)cookies.set(name,value.value);});

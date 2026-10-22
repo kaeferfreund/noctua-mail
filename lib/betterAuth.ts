@@ -12,6 +12,9 @@ import { imapSignIn } from "./betterAuthImapSignIn";
 import { verifyEligibleImap } from "./imapLoginPolicy";
 import { currentAuthProof } from "./authPolicyContext";
 import { revokeAuthStreams } from "./authStreams";
+import { handOverResetLink } from "./authRecoveryContext";
+import { withDbWriteRetry } from "./dbWriteRetry";
+import { recordAdminAuditRow } from "./db/adminAudit";
 
 export const AUTH_BASE_PATH = "/api/ba";
 export const AUTH_COOKIE_PREFIX = "noctua";
@@ -97,7 +100,18 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
       maxPasswordLength: PASSWORD_MAX,
       password: argon2idPassword,
       revokeSessionsOnPasswordReset: true,
-      resetPasswordTokenExpiresIn: 900
+      resetPasswordTokenExpiresIn: 900,
+      sendResetPassword: async data => { handOverResetLink(data); },
+      onPasswordReset: async ({user}) => {
+        // Credential triggers are the security barrier. This callback only removes stale
+        // rows and records the result after the password/token transaction has committed.
+        const db=await (config.policyDatabase??getDb)();
+        await withDbWriteRetry("passwordResetCleanup",()=>db.transaction(()=>{
+          db.prepare(`DELETE FROM mcp_tokens WHERE createdByUserId=? AND securityGeneration IS NOT (SELECT generation FROM auth_security_state WHERE userId=?)`).run(user.id,user.id);
+          recordAdminAuditRow(db,{actorUserId:user.id,action:"user.password_reset",targetUserId:user.id,payload:{operationId:currentAuthProof()?.op?.id??null}});
+        }).immediate());
+        revokeAuthStreams({userId:user.id});
+      }
     },
     user: { modelName: "auth_user" },
     session: {
@@ -126,7 +140,8 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
     // answers 404 for these. (auth.api.* server calls are not routed.)
     disabledPaths: RAW_DISABLED_PATHS,
     rateLimit: { enabled: true, storage: "memory", customRules: {
-      "/sign-in/*": { window: 10, max: 3 }, "/two-factor/*": { window: 10, max: 3 }
+      "/sign-in/*": { window: 10, max: 3 }, "/two-factor/*": { window: 10, max: 3 },
+      "/reset-password": { window: 60, max: 5 }
     } },
     databaseHooks: authPolicyDatabaseHooks(),
     plugins: [
@@ -255,9 +270,15 @@ export function getAuth(): Promise<NoctuaAuth> {
       await migrateAuthSchema(options);
       installAuthControlPlane(database);
       if (getDbConnectionGeneration() !== generation) throw new Error("Auth storage closed during initialization.");
-      const interrupted = await reconcileSecurityOperations(await getDb(), Date.now() - process.uptime() * 1000);
+      const auth=attachAuthPolicyHandler(betterAuth(options));
+      const db=await getDb(),cutoff=Date.now()-process.uptime()*1000;
+      const {reconcileProvisioning}=await import("./db/userProvisioning");
+      const {reconcileLifecycle}=await import("./userLifecycle");
+      await reconcileProvisioning(db,cutoff);
+      await reconcileLifecycle(auth,db,cutoff);
+      const interrupted = await reconcileSecurityOperations(db, cutoff);
       for (const userId of interrupted) revokeAuthStreams({userId});
-      return attachAuthPolicyHandler(betterAuth(options));
+      return auth;
     })();
     authPromise = pending;
     void pending.catch(() => { if (authPromise === pending) authPromise = null; });

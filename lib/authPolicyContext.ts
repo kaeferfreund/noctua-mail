@@ -14,6 +14,7 @@ export type AuthProofContext = {
   verifiedCredentialId?: string; verifiedUV?: boolean; verifiedUserId?: string; newSessionId?: string;
   createdSessionIds: string[]; createdPasskeyId?: string; destructive?: boolean; retainOperation?: boolean;
   totpBefore?: string;
+  creation?: { userId: string; email: string; role: "admin" | "user" };
 };
 
 // AsyncLocalStorage isolates requests across awaits and module graphs. No client header can create a scope.

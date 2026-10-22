@@ -468,6 +468,10 @@ export type SparsePatch<T> = {
 export type UserAccountPrefsPatch = SparsePatch<UserAccountPrefs>;
 
 export type AdminAuditAction =
+  | "user.recovery_issue"
+  | "user.mfa_reset"
+  | "user.passkey_remove"
+  | "user.sessions_revoke"
   | "user.create"
   | "user.update"
   | "user.disable"
@@ -495,6 +499,7 @@ export type AdminAuditEntry = {
 };
 
 export type InviteCode = {
+  email?: string | null;
   code: string;
   role: "admin" | "user";
   maxUses: number | null;

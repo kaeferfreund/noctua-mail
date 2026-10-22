@@ -14,6 +14,7 @@ export async function createInviteCode(options?: {
   role?: InviteCode["role"];
   maxUses?: number | null;
   expiresAt?: number | null;
+  email?: string | null;
 }) {
   return withDbWriteRetry("createInviteCode", async () => {
     const db = await getDb();
@@ -34,11 +35,12 @@ export async function createInviteCode(options?: {
       uses: 0,
       expiresAt,
       createdAt: Date.now(),
-      usedByUserId: null
+      usedByUserId: null,
+      email: options?.email?.trim().toLowerCase() || null
     };
     db.prepare(
-      `INSERT INTO invite_codes (code, role, maxUses, uses, expiresAt, createdAt, usedByUserId)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO invite_codes (code, role, maxUses, uses, expiresAt, createdAt, usedByUserId,email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       invite.code,
       invite.role,
@@ -46,7 +48,8 @@ export async function createInviteCode(options?: {
       invite.uses,
       invite.expiresAt,
       invite.createdAt,
-      invite.usedByUserId
+      invite.usedByUserId,
+      invite.email ?? null
     );
     return invite;
   });
@@ -57,8 +60,8 @@ export async function saveInviteCodes(items: InviteCode[]) {
     const db = await getDb();
     const insert = db.prepare(
       `INSERT OR REPLACE INTO invite_codes
-       (code, role, maxUses, uses, expiresAt, createdAt, usedByUserId)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+       (code, role, maxUses, uses, expiresAt, createdAt, usedByUserId,email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     );
     db.transaction(() => {
       db.exec(`DELETE FROM invite_codes`);
@@ -70,7 +73,8 @@ export async function saveInviteCodes(items: InviteCode[]) {
           it.uses,
           it.expiresAt,
           Number.isFinite(it.createdAt) ? Math.floor(it.createdAt) : 0,
-          it.usedByUserId ?? null
+          it.usedByUserId ?? null,
+          it.email ?? null
         )
       );
     })();

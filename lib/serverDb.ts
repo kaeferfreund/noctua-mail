@@ -7,6 +7,10 @@ function loadServerDb(): Promise<ServerDbModule> {
   return import(SERVER_DB_SPECIFIER);
 }
 
+export async function listAdminAudit(...args: Parameters<ServerDbModule["listAdminAudit"]>) {
+  return (await loadServerDb()).listAdminAudit(...args);
+}
+
 export async function getAccountById(...args: Parameters<ServerDbModule["getAccountById"]>) {
   const db = await loadServerDb();
   return db.getAccountById(...args);

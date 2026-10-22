@@ -2,6 +2,7 @@ import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
 import type { Database } from "bun:sqlite";
 import { ensureTableColumns } from "./schema";
+import { recordAdminAuditRow } from "./adminAudit";
 
 // Better Auth owns its six model tables. These are Noctua's policy metadata;
 // never manufacture a session/assurance record from a user-wide MFA flag.
@@ -83,6 +84,10 @@ const triggers: Record<string, string> = {
     SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM auth_login_epoch WHERE id=1)
       THEN RAISE(ABORT,'Missing auth login epoch') END;
     UPDATE auth_login_epoch SET generation=generation+1 WHERE id=1;
+    DELETE FROM auth_verification WHERE identifier IN
+      (SELECT identifier FROM auth_pending_challenges WHERE userId=NEW.userId);
+    DELETE FROM auth_pending_challenges WHERE userId=NEW.userId;
+    DELETE FROM auth_reauth_grants WHERE userId=NEW.userId;
   END`,
   noctua_credential_insert: `CREATE TRIGGER noctua_credential_insert AFTER INSERT ON auth_account
     WHEN NEW.providerId='credential' AND NEW.password IS NOT NULL BEGIN
@@ -393,6 +398,7 @@ export async function finalizeAuthentication(db: Database, op: SecurityOperation
       throw new AuthPolicyError("Unauthorized", 401);
     }
     if (security.assurance === "mfa" && !enrollmentState(db, op.userId).complete) throw new AuthPolicyError("mfa_state_inconsistent");
+    if (initialEnrollment) db.prepare(`INSERT OR IGNORE INTO noctua_auth_migrations(id) VALUES(?)`).run(`mfa-enrolled:${op.userId}`);
     const generation = initialEnrollment ? advanceSecurityGeneration(db, op.userId, security.sessionId) : op.generation;
     db.prepare(`INSERT INTO auth_session_security(sessionId,userId,generation,assurance,authenticatedAt,method)
       VALUES(?,?,?,?,?,?) ON CONFLICT(sessionId) DO UPDATE SET generation=excluded.generation,
@@ -406,8 +412,16 @@ export async function finalizeAuthentication(db: Database, op: SecurityOperation
 /** Startup reconciliation is deliberately conservative: partial proof is never resumed. */
 export async function reconcileSecurityOperations(db: Database, before = Date.now()) {
   return withDbWriteRetry("reconcileSecurityOperations", () => db.transaction(() => {
-    const operations = db.prepare(`SELECT id,targetUserId FROM admin_lifecycle_operations WHERE slot LIKE 'security:%' AND createdAt<?`).all(before) as {id:string;targetUserId:string}[];
+    const operations = db.prepare(`SELECT id,targetUserId,action,payload FROM admin_lifecycle_operations WHERE slot LIKE 'security:%' AND action LIKE 'security.%' AND createdAt<?`).all(before) as {id:string;targetUserId:string;action:string;payload:string|null}[];
     for (const op of operations) {
+      if (op.action==="security.password.reset") {
+        const generation=db.prepare(`SELECT generation FROM auth_security_state WHERE userId=?`).get(op.targetUserId)?.generation;
+        const beforeReset=JSON.parse(op.payload??"{}").generationBeforeReset;
+        if (Number.isSafeInteger(beforeReset) && generation>beforeReset &&
+          !db.prepare(`SELECT 1 FROM admin_audit WHERE action='user.password_reset' AND json_extract(payload,'$.operationId')=?`).get(op.id)) {
+          recordAdminAuditRow(db,{actorUserId:op.targetUserId,action:"user.password_reset",targetUserId:op.targetUserId,payload:{operationId:op.id,reconciled:true}});
+        }
+      }
       // The library commits the enabled flag before the verified-factor write. Never
       // resume that seed or invent verification, but preserve a healthy committed factor.
       discardPartialTotp(db, op.targetUserId);
