@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { Database } from "bun:sqlite";
 import { betterAuth } from "better-auth";
 import { withResetDelivery } from "../authRecoveryContext";
 import { importLegacyProfileFields, installAuthControlPlane } from "./authPolicy";
@@ -21,6 +22,142 @@ function deferred() {
   const promise = new Promise<void>(done => { resolve = done; });
   return { promise, resolve };
 }
+
+// The local bun:sqlite declaration omits the runtime statement lifecycle method.
+type FinalizableStatement = ReturnType<Database["prepare"]> & { finalize(): void };
+
+const provisioningUserIndex = "idx_user_provisioning_user_state";
+const provisioningUserMigration = "user-provisioning-user-state-index-v1";
+const provisioningProbe = "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')";
+
+function expectProvisioningUserIndex(db: Database) {
+  const indexes = db.prepare("PRAGMA index_list(user_provisioning)").all() as Array<{ name: string; unique: number; partial: number }>;
+  expect(indexes.find(index => index.name === provisioningUserIndex)).toMatchObject({ unique: 0, partial: 0 });
+  const columns = db.prepare(`PRAGMA index_xinfo(${provisioningUserIndex})`).all() as Array<{ key: number; name: string; coll: string; desc: number }>;
+  expect(columns.filter(column => column.key === 1).map(({ name, coll, desc }) => ({ name, coll, desc })))
+    .toEqual([{ name: "userId", coll: "BINARY", desc: 0 }, { name: "state", coll: "BINARY", desc: 0 }]);
+  expect(db.prepare("SELECT id FROM noctua_auth_migrations WHERE id=?").all(provisioningUserMigration))
+    .toEqual([{ id: provisioningUserMigration }]);
+}
+
+function provisioningPlan(db: Database) {
+  const statement = db.prepare("EXPLAIN QUERY PLAN " + provisioningProbe) as FinalizableStatement;
+  try {
+    return (statement.all("synthetic-missing") as Array<{ detail: string }>).map(row => row.detail);
+  } finally { statement.finalize(); }
+}
+
+describe("provisioning user index", () => {
+  test("fresh library schema installs a covering index and reopen is idempotent", async () => {
+    const f = await setup();
+    expectProvisioningUserIndex(f.database);
+    expect(provisioningPlan(f.database)).toEqual([
+      `SEARCH user_provisioning USING COVERING INDEX ${provisioningUserIndex} (userId=?)`
+    ]);
+    const reopened = openMasterDb(f.temp.dbPath);
+    try {
+      const options = noctuaAuthOptions({ database: reopened, baseURL: TEST_BASE_URL, secret: TEST_SECRET });
+      expect(await migrateAuthSchema(options)).toEqual({ createdTables: [], addedColumns: [], addedIndexes: [] });
+      const schema = reopened.prepare("SELECT sql FROM sqlite_master WHERE name=?").get(provisioningUserIndex);
+      for (let startup = 0; startup < 2; startup++) {
+        installAuthControlPlane(reopened);
+        expectProvisioningUserIndex(reopened);
+        expect(reopened.prepare("SELECT sql FROM sqlite_master WHERE name=?").get(provisioningUserIndex)).toEqual(schema);
+      }
+    } finally { reopened.close(); }
+  });
+
+  test("an existing master gains the index and receipt without changing auth state", async () => {
+    const f = await setup();
+    const user = await f.createUser("index-upgrade@example.test");
+    f.master.prepare("UPDATE auth_security_state SET generation=7 WHERE userId=?").run(user.id);
+    const beforeEpoch = epoch(f);
+    const librarySchema = f.master.prepare("SELECT type,name,sql FROM sqlite_master WHERE tbl_name IN ('auth_user','auth_account','auth_session','auth_verification','auth_two_factor','auth_passkey') ORDER BY type,name").all();
+    f.master.exec(`DROP INDEX ${provisioningUserIndex}`);
+    f.master.prepare("DELETE FROM noctua_auth_migrations WHERE id=?").run(provisioningUserMigration);
+    expect(provisioningPlan(f.master)).toEqual(["SCAN user_provisioning"]);
+    const reopened = openMasterDb(f.temp.dbPath);
+    try {
+      installAuthControlPlane(reopened);
+      expectProvisioningUserIndex(reopened);
+      expect(state(f, user.id)).toBe(7);
+      expect(epoch(f)).toBe(beforeEpoch);
+      expect(reopened.prepare("SELECT type,name,sql FROM sqlite_master WHERE tbl_name IN ('auth_user','auth_account','auth_session','auth_verification','auth_two_factor','auth_passkey') ORDER BY type,name").all()).toEqual(librarySchema);
+    } finally { reopened.close(); }
+  });
+
+  test.each([
+    "CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId)",
+    "CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(state,userId)",
+    "CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId COLLATE NOCASE,state)",
+    "CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId DESC,state)",
+    "CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId,state) WHERE state='reserved'",
+    "CREATE UNIQUE INDEX idx_user_provisioning_user_state ON user_provisioning(userId,state)",
+  ])("startup repairs malformed user index despite its existing receipt: %s", async (ddl: string) => {
+    const f = await setup();
+    f.master.exec(`DROP INDEX ${provisioningUserIndex}; ${ddl}`);
+    installAuthControlPlane(f.database);
+    expectProvisioningUserIndex(f.master);
+    expect(provisioningPlan(f.master)[0]).toContain(`USING COVERING INDEX ${provisioningUserIndex}`);
+  });
+
+  test("a missing index is repaired even when its migration receipt exists", async () => {
+    const f = await setup();
+    f.master.exec(`DROP INDEX ${provisioningUserIndex}`);
+    installAuthControlPlane(f.database);
+    expectProvisioningUserIndex(f.master);
+  });
+
+  test("a failed upgrade rolls back the index together with its receipt", async () => {
+    const f = await setup();
+    f.master.exec(`DROP INDEX ${provisioningUserIndex}`);
+    f.master.prepare("DELETE FROM noctua_auth_migrations WHERE id=?").run(provisioningUserMigration);
+    f.master.exec(`CREATE TRIGGER reject_index_receipt BEFORE INSERT ON noctua_auth_migrations
+      WHEN NEW.id='${provisioningUserMigration}' BEGIN SELECT RAISE(ABORT,'reject receipt'); END`);
+    expect(() => installAuthControlPlane(f.database)).toThrow("reject receipt");
+    expect(f.master.prepare("SELECT name FROM sqlite_master WHERE name=?").get(provisioningUserIndex)).toBeNull();
+    expect(f.master.prepare("SELECT id FROM noctua_auth_migrations WHERE id=?").get(provisioningUserMigration)).toBeNull();
+    f.master.exec("DROP TRIGGER reject_index_receipt");
+    installAuthControlPlane(f.database);
+    expectProvisioningUserIndex(f.master);
+  });
+
+  test("indexed probes preserve results over completed history, active, pending and cancelled states", async () => {
+    const f = await setup();
+    const insert = f.master.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt)
+      VALUES(?,?,?,'signup',?,1,1)`) as FinalizableStatement;
+    const states = ["reserved", "auth_created", "cleanup_required", "cancelled", "pending", "complete", "COMPLETE", "CANCELLED", "unknown"];
+    try {
+      f.master.transaction(() => {
+        for (let i = 0; i < 20000; i++) insert.run(`history-${i}`, `synthetic-${i % 100}`, `history-${i}@example.test`, "complete");
+        for (const [i, value] of states.entries()) {
+          insert.run(`state-${i}`, `synthetic-${i}`, `state-${i}@example.test`, value);
+          insert.run(`cancelled-${i}`, `synthetic-${i}`, `cancelled-${i}@example.test`, "cancelled");
+        }
+        insert.run("second-active", "synthetic-0", "second-active@example.test", "pending");
+      }).immediate();
+    } finally { insert.finalize(); }
+    f.master.exec(`DROP INDEX ${provisioningUserIndex}`);
+    const ids = [...Array.from({ length: 100 }, (_, i) => `synthetic-${i}`), "synthetic-missing"];
+    const probe = () => {
+      const statement = f.master.prepare(provisioningProbe) as FinalizableStatement;
+      try { return ids.map(id => statement.all(id)); }
+      finally { statement.finalize(); }
+    };
+    const before = probe();
+    expect(before[0]).toHaveLength(2);
+    for (const i of [1, 2, 4, 6, 7, 8]) expect(before[i]).toHaveLength(1);
+    for (const i of [3, 5, 99, 100]) expect(before[i]).toHaveLength(0);
+    expect(provisioningPlan(f.master)).toEqual(["SCAN user_provisioning"]);
+    installAuthControlPlane(f.database);
+    expect(probe()).toEqual(before);
+    expect(provisioningPlan(f.master)[0]).toContain(`USING COVERING INDEX ${provisioningUserIndex}`);
+    f.master.exec("UPDATE user_provisioning SET state='complete' WHERE userId='synthetic-0'");
+    expect(probe()[0]).toEqual([]);
+    f.master.exec("UPDATE user_provisioning SET state='pending' WHERE id='state-5'");
+    expect(probe()[5]).toHaveLength(1);
+  });
+});
 
 describe("transactional mirrors", () => {
   test("real adapter rollback and queued creation commit the matching profiles together", async () => {
