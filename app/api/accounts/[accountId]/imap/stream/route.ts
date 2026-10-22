@@ -242,8 +242,15 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           const status = await logImapOp(
             "imap.status",
             { ...logContext, mailbox },
-            async () => await client.status(mailbox, { uidNext: true })
+            async () => await client.status(mailbox, { uidNext: true, uidValidity: true })
           );
+          // STATUS may report a reset with unchanged/reused UIDs. Reconcile it
+          // before the early return, using fresh state rather than the SELECT closure.
+          const currentState = await getMailboxState(accountId, folder.id);
+          await saveMailboxState({ accountId, folderId: folder.id, mailboxPath: mailbox,
+            uidValidity: status.uidValidity == null ? currentState?.uidValidity : String(status.uidValidity),
+            highestUid: currentState?.highestUid, highestModSeq: currentState?.highestModSeq,
+            supportsQresync });
           const uidNext = status?.uidNext ?? previousUidNext;
           if (uidNext <= previousUidNext) return;
           const range = { uid: `${previousUidNext}:${uidNext - 1}` };
@@ -286,13 +293,11 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
             accountId,
             folderId: folder.id,
             mailboxPath: mailbox,
-            uidValidity: (mailboxInfo as any)?.uidValidity
-              ? (mailboxInfo as any).uidValidity.toString()
-              : null,
+            uidValidity: status.uidValidity == null ? null : String(status.uidValidity),
             highestModSeq: (status as any)?.highestModseq
               ? (status as any).highestModseq.toString()
               : null,
-            highestUid: currentHighestUid ?? (storedState?.highestUid ?? null),
+            highestUid: currentHighestUid ?? null,
             supportsQresync
           });
         };

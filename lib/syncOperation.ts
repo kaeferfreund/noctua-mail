@@ -4,7 +4,6 @@ import {
   deleteMessagesByIds,
   deleteMessagesWithFilesByIds,
   getAccounts,
-  getMailboxState,
   getFolderIdsByMessageIds,
   listFullyProcessedCalendarInviteMessageIds,
   listMessageFileRefs,
@@ -229,21 +228,6 @@ export function resolveOrphanedMessageFileRefs(params: {
   });
 }
 
-/** Matching UIDs cannot identify content after UIDVALIDITY changes. */
-async function resetChangedUidNamespace(
-  accountId: string, folderId: string, mailboxPath: string,
-  uidValidity: string | null, localRows: Array<{ id: string }>
-) {
-  const previous = await getMailboxState(accountId, folderId);
-  if (previous?.uidValidity == null || uidValidity == null ||
-      String(previous.uidValidity) === String(uidValidity)) return false;
-  // Delete old files/content before replacing the watermark. A failed reset
-  // still compares unequal on retry; a completed reset has no old UID baseline.
-  await deleteMessagesWithFilesByIds(accountId, localRows.map(row => row.id));
-  await saveMailboxState({ accountId, folderId, mailboxPath, uidValidity, highestUid: null },
-    { resetUidNamespace: true });
-  return true;
-}
 
 export async function runSyncOperation(
   payload: SyncPayload,
@@ -338,7 +322,8 @@ export async function runSyncOperationBatched(
       listFolderMessageUidAndFlagRows(account.id, payload.folderId)
     ]);
 
-    if (await resetChangedUidNamespace(account.id, payload.folderId, mailboxPath, remoteSnapshot.uidValidity, localRows)) {
+    if (await saveMailboxState({ accountId: account.id, folderId: payload.folderId, mailboxPath,
+      uidValidity: remoteSnapshot.uidValidity }, { onlyIfUidValidityChanged: true })) {
       return runSyncOperationBatched({ ...payload, mode: "full", fullSync: true,
         resumeFromUid: undefined, backfillUids: undefined }, clientId, options);
     }
@@ -463,7 +448,8 @@ export async function runSyncOperationBatched(
     folders = snapshot.folders;
 
     const localRows = await listFolderMessageUidAndFlagRows(account.id, twoPhaseFolderId);
-    if (await resetChangedUidNamespace(account.id, twoPhaseFolderId, twoPhaseMailboxPath, snapshot.uidValidity, localRows)) {
+    if (await saveMailboxState({ accountId: account.id, folderId: twoPhaseFolderId, mailboxPath: twoPhaseMailboxPath,
+      uidValidity: snapshot.uidValidity }, { onlyIfUidValidityChanged: true })) {
       return runSyncOperationBatched({ ...payload, mode: "full", fullSync: true,
         resumeFromUid: undefined, backfillUids: undefined }, clientId, options);
     }

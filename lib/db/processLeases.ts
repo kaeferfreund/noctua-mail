@@ -23,24 +23,42 @@ async function write<T>(name: string, action: (db: any) => T): Promise<T> {
   return withDbWriteRetry(name, () => db.transaction(() => action(db)).immediate());
 }
 
+function renewOwner(db: any, owner: string) {
+  db.prepare(`INSERT INTO sync_worker_owners(ownerInstance,expiresAt) VALUES (?,?)
+    ON CONFLICT(ownerInstance) DO UPDATE SET expiresAt=excluded.expiresAt`).run(owner, Date.now() + LEASE_MS);
+}
+
 export async function queueWorker(jobId: string, owner: string, priority: number, accountId = jobId) {
-  await write("queueSyncWorker", db => db.prepare(`INSERT OR IGNORE INTO sync_worker_queue
-    (jobId,accountId,ownerInstance,ownerPid,priority,queuedAt,bypasses) VALUES (?,?,?,?,?,?,0)`)
-    .run(jobId, accountId, owner, process.pid, priority, Date.now()));
+  await write("queueSyncWorker", db => {
+    renewOwner(db, owner);
+    db.prepare(`INSERT OR IGNORE INTO sync_worker_queue
+      (jobId,accountId,ownerInstance,ownerPid,priority,queuedAt,bypasses) VALUES (?,?,?,?,?,?,0)`)
+      .run(jobId, accountId, owner, process.pid, priority, Date.now());
+  });
 }
 
 export async function reserveWorker(jobId: string, owner: string, capacity: number) {
   return write("reserveSyncWorker", db => {
-    // Expiry is a diagnostic, never proof of process death. A live child of a
-    // dead owner still consumes its slot until that exact PID has exited.
+    const expiredOwners = new Set((db.prepare("SELECT ownerInstance FROM sync_worker_owners WHERE expiresAt<=?")
+      .all(Date.now()) as Array<{ ownerInstance: string }>).map(row => row.ownerInstance));
+    // An expired owner can no longer hold an unspawned reservation: spawn must
+    // still find that exact ticket under the same write lock. A recorded child
+    // always retains capacity until its own PID is confirmed dead, even if its
+    // owner is dead/expired. This also recovers exited children of live owners.
     for (const row of db.prepare("SELECT * FROM sync_worker_leases").all() as WorkerLease[]) {
-      if (processExited(row.ownerPid) && (row.pid === null || processExited(row.pid))) {
+      if (row.pid !== null ? processExited(row.pid) :
+          processExited(row.ownerPid) || expiredOwners.has(row.ownerInstance)) {
         db.prepare("DELETE FROM sync_worker_leases WHERE slot=?").run(row.slot);
       }
     }
     for (const row of db.prepare("SELECT * FROM sync_worker_queue").all() as Waiter[]) {
-      if (processExited(row.ownerPid)) db.prepare("DELETE FROM sync_worker_queue WHERE jobId=?").run(row.jobId);
+      if (processExited(row.ownerPid) || expiredOwners.has(row.ownerInstance)) {
+        db.prepare("DELETE FROM sync_worker_queue WHERE jobId=?").run(row.jobId);
+      }
     }
+    db.prepare(`DELETE FROM sync_worker_owners WHERE expiresAt<=?
+      AND ownerInstance NOT IN (SELECT ownerInstance FROM sync_worker_leases)
+      AND ownerInstance NOT IN (SELECT ownerInstance FROM sync_worker_queue)`).run(Date.now());
     const first = db.prepare(`SELECT jobId,accountId,ownerInstance FROM sync_worker_queue
       WHERE accountId NOT IN (SELECT accountId FROM sync_worker_leases) ORDER BY
       CASE WHEN bypasses >= ? THEN 0 ELSE 1 END, CASE WHEN bypasses >= ? THEN queuedAt ELSE priority END,
@@ -86,8 +104,11 @@ export async function spawnLeasedWorker<T extends { pid: number; kill: (signal: 
 }
 
 export async function heartbeatWorkers(owner: string) {
-  await write("heartbeatSyncWorkers", db => db.prepare("UPDATE sync_worker_leases SET expiresAt=? WHERE ownerInstance=?")
-    .run(Date.now() + LEASE_MS, owner));
+  await write("heartbeatSyncWorkers", db => {
+    renewOwner(db, owner);
+    db.prepare("UPDATE sync_worker_leases SET expiresAt=? WHERE ownerInstance=?")
+      .run(Date.now() + LEASE_MS, owner);
+  });
 }
 export async function removeWorker(jobId: string, owner: string, confirmedExit = false) {
   await write("releaseSyncWorker", db => {

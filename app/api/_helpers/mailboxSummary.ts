@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-// feat/team-auth: import requireActiveUserSession directly when its async guard lands.
-import { requireSessionOr401 as requireActiveUserSession } from "@/lib/auth";
+import * as auth from "@/lib/auth";
 import { getMailboxSummaries } from "@/lib/serverDb";
 
 type SummarySession = {
@@ -21,6 +20,18 @@ type Dependencies = {
   getMailboxSummaries: typeof getMailboxSummaries;
   summaryAccountIds?: typeof summaryAccountIds;
 };
+
+// Detect exports once: feat/team-auth removes the synchronous guard on merge.
+// A namespace lookup keeps this module valid on either side of that merge.
+export function mailboxSummarySessionGuard(exports: {
+  requireActiveUserSession?: Dependencies["requireActiveUserSession"];
+  requireSessionOr401?: Dependencies["requireActiveUserSession"];
+}): Dependencies["requireActiveUserSession"] {
+  const guard = exports.requireActiveUserSession ?? exports.requireSessionOr401;
+  if (!guard) throw new Error("Mailbox summaries require an active session guard");
+  return async request => await guard(request);
+}
+const requireActiveUserSession = mailboxSummarySessionGuard(auth);
 
 export function createMailboxSummaryHandler(deps: Dependencies = { requireActiveUserSession, getMailboxSummaries }) {
   return async (request: Request) => {

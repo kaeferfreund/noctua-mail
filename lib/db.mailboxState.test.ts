@@ -81,7 +81,7 @@ describe("saveMailboxState / getMailboxState", () => {
     expect(state).toBeNull();
   });
 
-  test("overwrites existing state for the same folder", async () => {
+  test("changed UIDVALIDITY clears watermarks before saving the new namespace", async () => {
     const accountId = uniqueAccountId("acc-mbx-overwrite");
     const folder = buildFolder(accountId, "INBOX");
     await upsertAccount(buildAccount(accountId));
@@ -108,7 +108,8 @@ describe("saveMailboxState / getMailboxState", () => {
 
     const state = await getMailboxState(accountId, folder.id);
     expect(state?.uidValidity).toBe("2");
-    expect(state?.highestUid).toBe(20);
+    expect(state?.highestUid).toBeNull();
+    expect(state?.highestModSeq).toBeNull();
     expect(state?.supportsQresync).toBe(true);
   });
 

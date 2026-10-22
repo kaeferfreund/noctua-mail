@@ -1,7 +1,7 @@
 import { createHmac } from "crypto";
 import type { ImapFlow } from "imapflow";
 import type { Account } from "./data";
-import { getStoredAccounts, getMailboxState, recordMailboxSync, setMailboxWatcherState, type WatcherState } from "./db";
+import { getStoredAccounts, getMailboxState, saveMailboxState, recordMailboxSync, setMailboxWatcherState, type WatcherState } from "./db";
 import { connectIdleImapClient, runImapIdleLoop } from "./mail/imap/idle";
 import { getImapConnectBlockedUntil, resetImapConnectFailureState } from "./mail/imapClientOptions";
 import { getImapHttpError } from "./mail/imapError";
@@ -146,15 +146,14 @@ export class MailboxWatcher {
       while (entry.dirty && !entry.abort.signal.aborted) {
         entry.dirty = false;
         const folderId = `${entry.account.id}:INBOX`;
-        const baseline = await getMailboxState(entry.account.id, folderId);
         entry.abort.signal.throwIfAborted();
         const mailbox = entry.client?.mailbox;
-        const remoteValidity = mailbox ? mailbox.uidValidity : null;
-        const namespaceChanged = baseline?.uidValidity != null && remoteValidity != null &&
-          String(baseline.uidValidity) !== String(remoteValidity);
+        await saveMailboxState({ accountId: entry.account.id, folderId, mailboxPath: "INBOX",
+          uidValidity: mailbox ? String(mailbox.uidValidity) : null }, { onlyIfUidValidityChanged: true });
+        const baseline = await getMailboxState(entry.account.id, folderId);
         const job = startSyncJob({
           accountId: entry.account.id, folderId,
-          mode: baseline?.highestUid == null || namespaceChanged ? "full" : "repair"
+          mode: baseline?.highestUid == null ? "full" : "repair"
         }, undefined, "watcher");
         await this.waitJob(entry, job);
         entry.abort.signal.throwIfAborted();

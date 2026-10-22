@@ -587,6 +587,9 @@ export function initMasterSchema(db: any) {
       slot INTEGER PRIMARY KEY, jobId TEXT UNIQUE NOT NULL, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL,
       ownerPid INTEGER NOT NULL, pid INTEGER, expiresAt INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS sync_worker_owners (
+      ownerInstance TEXT PRIMARY KEY, expiresAt INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS sync_worker_queue (
       jobId TEXT PRIMARY KEY, accountId TEXT NOT NULL, ownerInstance TEXT NOT NULL, ownerPid INTEGER NOT NULL,
       priority INTEGER NOT NULL, queuedAt INTEGER NOT NULL, bypasses INTEGER NOT NULL DEFAULT 0

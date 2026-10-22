@@ -1,6 +1,7 @@
 import type { Folder, MailboxState } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getAccountDb, getDb } from "./connection";
+import { deleteMessagesWithFilesByIds } from "./messages/delete";
 
 function safeParseJson<T = unknown>(value: string | null | undefined, fallback?: T): T | undefined {
   if (!value) return fallback;
@@ -114,33 +115,48 @@ export async function getMailboxState(accountId: string, folderId: string) {
   };
 }
 
-export async function saveMailboxState(state: MailboxState, options: { resetUidNamespace?: boolean } = {}) {
+/** Every UIDVALIDITY writer must invalidate the old namespace before publishing the new one.
+ * Files/rows are removed first; failure leaves the old validity so retry still detects it.
+ * The final compare and reset run under a write lock across independent module graphs.
+ * Returns whether this call invalidated a namespace. */
+export async function saveMailboxState(state: MailboxState, options: { onlyIfUidValidityChanged?: boolean } = {}) {
   return withDbWriteRetry("saveMailboxState", async () => {
     const db = await getAccountDb(state.accountId);
-    const insert = db.prepare(`
-      INSERT OR REPLACE INTO mailbox_state
-      (folderId, accountId, mailboxPath, uidValidity, highestModSeq, highestUid, supportsQresync)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    const save = () => insert.run(
-      state.folderId,
-      state.accountId,
-      state.mailboxPath,
-      state.uidValidity ?? null,
-      state.highestModSeq ?? null,
-      state.highestUid ?? null,
-      state.supportsQresync == null ? null : state.supportsQresync ? 1 : 0
-    );
-    if (options.resetUidNamespace) {
-      db.transaction(() => {
-        // Staged moves reference the old source UID namespace too. Retain their
-        // destination content, but never suppress replacement messages by UID.
-        db.prepare(`UPDATE messages SET pendingMoveSourceFolderId=NULL,
-          pendingMoveSourceMailboxPath=NULL,pendingMoveSourceUid=NULL,pendingMoveStartedAt=NULL
-          WHERE accountId=? AND pendingMoveSourceFolderId=?`).run(state.accountId, state.folderId);
-        save();
-      })();
-    } else save();
+    let invalidated = false;
+    for (;;) {
+      const previous = await getMailboxState(state.accountId, state.folderId);
+      const uidValidity = state.uidValidity ?? previous?.uidValidity ?? null;
+      const changed = previous?.uidValidity != null && uidValidity != null &&
+        String(previous.uidValidity) !== String(uidValidity);
+      if (changed) {
+        const rows = db.prepare("SELECT id FROM messages WHERE accountId=? AND folderId=?")
+          .all(state.accountId, state.folderId) as Array<{ id: string }>;
+        await deleteMessagesWithFilesByIds(state.accountId, rows.map(row => row.id));
+        invalidated = true;
+      }
+      const saved = db.transaction(() => {
+        const current = db.prepare("SELECT uidValidity FROM mailbox_state WHERE accountId=? AND folderId=?")
+          .get(state.accountId, state.folderId) as { uidValidity: string | null } | null;
+        if ((current?.uidValidity ?? null) !== (previous?.uidValidity ?? null)) return false;
+        if (changed) {
+          // A concurrent sync may have added old rows during file cleanup. Retry
+          // instead of ever publishing a new validity over surviving old content.
+          if (db.prepare("SELECT 1 FROM messages WHERE accountId=? AND folderId=? LIMIT 1")
+            .get(state.accountId, state.folderId)) return false;
+          db.prepare(`UPDATE messages SET pendingMoveSourceFolderId=NULL,
+            pendingMoveSourceMailboxPath=NULL,pendingMoveSourceUid=NULL,pendingMoveStartedAt=NULL
+            WHERE accountId=? AND pendingMoveSourceFolderId=?`).run(state.accountId, state.folderId);
+        } else if (options.onlyIfUidValidityChanged) return true;
+        db.prepare(`INSERT OR REPLACE INTO mailbox_state
+          (folderId,accountId,mailboxPath,uidValidity,highestModSeq,highestUid,supportsQresync)
+          VALUES (?,?,?,?,?,?,?)`).run(state.folderId, state.accountId, state.mailboxPath, uidValidity,
+          changed ? null : state.highestModSeq ?? null,
+          changed ? null : state.highestUid ?? null,
+          state.supportsQresync == null ? null : state.supportsQresync ? 1 : 0);
+        return true;
+      }).immediate();
+      if (saved) return invalidated;
+    }
   });
 }
 
