@@ -685,7 +685,8 @@ export default function MailClient({
   const threadMessagesRef = useRef<Message[]>([]);
   const currentKeyRef = useRef("");
   const [, setRelativeTimeCounter] = useState(0);
-  const listIsNarrow = listWidth < 360;
+  // Fixed sender/date columns need a two-line row in a split pane.
+  const listIsNarrow = listWidth < 600;
   // searchFields, searchBadges, activeVirtualFolderId, and virtual folder counts moved to useSearchState hook
   const [relatedContext, setRelatedContext] = useState<{
     id: string;

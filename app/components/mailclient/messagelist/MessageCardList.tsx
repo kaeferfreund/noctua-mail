@@ -1,3 +1,4 @@
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
 import type { Message } from "@/lib/data";
@@ -101,7 +102,8 @@ export default function MessageCardList({
     toggleNested
   } = useThreadListAnimationState();
 
-  const rowHeight = isCompactView ? 60 : 100;
+  const isMobile = useIsMobile();
+  const rowHeight = isCompactView ? (isMobile ? 72 : 60) : 100;
   const groupHeight = isCompactView ? 28 : 32;
   const { ids: selectedMessageIds, activeId: activeMessageId } =
     useSelectionSnapshot(selectionStore);

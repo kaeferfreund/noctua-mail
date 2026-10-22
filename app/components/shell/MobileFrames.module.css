@@ -37,7 +37,7 @@
 .settingsBody :global(.rt-TabsContent) { min-width: 0; }
 .indicators { display: flex; align-items: center; }
 .activityDot { width: 6px; height: 6px; border-radius: 50%; background: var(--destructive); }
-.messageMore { min-width: 44px; min-height: 44px; }
+.messageMore { width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0; box-sizing: border-box; align-self: center; }
 .messageMenu :global([data-slot="dropdown-menu-item"]),
 .messageMenu :global([data-slot="dropdown-menu-sub-trigger"]),
 .messageMenu :global(.rt-DropdownMenuItem),
