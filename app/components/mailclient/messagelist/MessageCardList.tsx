@@ -143,10 +143,6 @@ export default function MessageCardList({
       }}
       classNames={{
         virtualItem: styles.virtualItem,
-        groupTitle: styles.groupTitle,
-        groupToggle: styles.groupToggle,
-        groupTitleFlagged: styles.groupTitleFlagged,
-        groupCaret: styles.groupCaret,
         suggestionSection: styles.suggestionSection,
         suggestionSectionRows: styles.suggestionSectionRows,
         suggestionSectionRow: styles.suggestionSectionRow,

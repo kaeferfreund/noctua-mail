@@ -155,10 +155,6 @@ export default function MessageThreadList({
       }}
       classNames={{
         virtualItem: styles.virtualItem,
-        groupTitle: groupStyles.groupTitle,
-        groupToggle: groupStyles.groupToggle,
-        groupTitleFlagged: groupStyles.groupTitleFlagged,
-        groupCaret: groupStyles.groupCaret,
         suggestionSection: groupStyles.suggestionSection,
         suggestionSectionRows: groupStyles.suggestionSectionRows,
         suggestionSectionRow: groupStyles.suggestionSectionRow,
