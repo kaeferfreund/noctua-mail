@@ -3,6 +3,7 @@ import React from "react";
 import { Inbox, Send, FileText, Trash2, ShieldOff, Archive } from "lucide-react";
 import type { Message, Folder, Topic } from "@/lib/data";
 import type { ComposeMode } from "./composition/composeTypes";
+import type { RowReadAction } from "./messagelist/selectionActions";
 import MessageQuickActions from "./message/MessageQuickActions";
 import MessageMenu from "./message/MessageMenu";
 import MessageSourcePanel from "./message/MessageSourcePanel";
@@ -73,11 +74,13 @@ export const renderMessageMenu = (
   onOpenChange?: (open: boolean) => void,
   hasOtherAccounts?: boolean,
   handleCopyToAccount?: (target: Message) => void,
-  handleMoveToAccount?: (target: Message) => void
+  handleMoveToAccount?: (target: Message) => void,
+  readAction?: RowReadAction
 ) => (
   <MessageMenu
     message={message}
     origin={origin}
+    readAction={readAction}
     isDraft={isDraftItem(message)}
     pendingMessageActions={pendingMessageActions}
     openCompose={openCompose}
