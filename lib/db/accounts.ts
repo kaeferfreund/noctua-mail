@@ -1,3 +1,5 @@
+import { getOwnAddresses } from "../ownAddresses";
+import { listSenderIdentityRows } from "./senderIdentities";
 import { recordAdminAuditRow } from "./adminAudit";
 import { revokeAuthStreams } from "../authStreams";
 import type { Account } from "../data";
@@ -28,7 +30,7 @@ async function ensureCategoryLinearModelForAccount(accountId: string) {
 export async function getAccounts() {
   const db = await getDb();
   const rows = db.prepare(`SELECT * FROM accounts`).all() as any[];
-  return rows.map((row) => mapAccountRow(row)) as Account[];
+  return rows.map((row) => { const account = mapAccountRow(row); return { ...account, ownAddresses: getOwnAddresses(account, listSenderIdentityRows(db, account.id)) }; }) as Account[];
 }
 
 // Mailbox watcher: DB credentials only, never the browser session overlay.
@@ -48,7 +50,7 @@ export async function getAccountsForUser(userId: string) {
        ORDER BY a.id ASC`
     )
     .all(userId, userId) as any[];
-  return rows.map((row) => mapAccountRow(row)) as Account[];
+  return rows.map((row) => { const account = mapAccountRow(row); return { ...account, ownAddresses: getOwnAddresses(account, listSenderIdentityRows(db, account.id)) }; }) as Account[];
 }
 
 export async function saveAccounts(nextAccounts: Account[]) {
@@ -67,7 +69,7 @@ export async function saveAccounts(nextAccounts: Account[]) {
       nextAccounts.forEach((account) => {
         persistAccountRow(db, account, existingPaths.get(account.id));
       });
-    })();
+    }).immediate();
     const newAccountIds = nextAccounts
       .map((account) => account.id)
       .filter((accountId) => !existingPaths.has(accountId));
@@ -79,7 +81,8 @@ export async function getAccountById(accountId: string) {
   const db = await getDb();
   const row = db.prepare(`SELECT * FROM accounts WHERE id = ?`).get(accountId) as any;
   if (!row) return null;
-  return mapAccountRow(row);
+  const account = mapAccountRow(row);
+  return { ...account, ownAddresses: getOwnAddresses(account, listSenderIdentityRows(db, accountId)) };
 }
 
 /**
@@ -105,7 +108,7 @@ export async function upsertAccount(account: Account) {
       .get(account.id) as { dbPath?: string | null } | undefined;
     db.transaction(() => {
       persistAccountRow(db, account, existing?.dbPath ?? null);
-    })();
+    }).immediate();
     if (!existing) {
       await ensureCategoryLinearModelForAccount(account.id);
     }
@@ -122,7 +125,7 @@ export async function patchAccount(accountId: string, payload: Partial<Account>)
     const next = mergeAccount(current, payload);
     db.transaction(() => {
       persistAccountRow(db, next, row.dbPath ?? null);
-    })();
+    }).immediate();
     return next;
   });
 }
@@ -158,6 +161,7 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
       db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
       deleteUserAccountPrefRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM mcp_tokens WHERE accountId = ?`).run(accountId);
+      db.prepare(`DELETE FROM sender_identities WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
       if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
     }).immediate();

@@ -4,6 +4,8 @@ import type { ActiveUserSession } from "./auth";
 import { getDb } from "./db/connection";
 import { mapAccountRow, mapMcpTokenRow } from "./db/rowParsers";
 import { resolveAccountRoleRow } from "./db/accountAccess";
+import { listSenderIdentityRows } from "./db/senderIdentities";
+import { getOwnAddresses } from "./ownAddresses";
 import { roleAtLeast } from "./accountRole";
 import { withDbWriteRetry } from "./dbWriteRetry";
 
@@ -27,7 +29,12 @@ function liveToken(db: any, where: string, value: string): McpAccountContext | n
   if (!row) return null;
   const role = resolveAccountRoleRow(db, row.createdByUserId, row.accountId);
   const account = db.prepare("SELECT * FROM accounts WHERE id=?").get(row.accountId);
-  return role && account ? { accountId: row.accountId, account: mapAccountRow(account), role, tokenRecord: mapMcpTokenRow(row) } : null;
+  if (!role || !account) return null;
+  const mapped = mapAccountRow(account);
+  // Same scoped read snapshot as the live membership check. Only address data is
+  // attached; personal prefs and identity configuration are never token output.
+  mapped.ownAddresses = getOwnAddresses(mapped, listSenderIdentityRows(db, row.accountId));
+  return { accountId: row.accountId, account: mapped, role, tokenRecord: mapMcpTokenRow(row) };
   }).deferred();
 }
 export async function validateMcpToken(token: string): Promise<McpAccountContext | null> {

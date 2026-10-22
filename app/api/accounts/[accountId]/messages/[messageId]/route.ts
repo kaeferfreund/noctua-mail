@@ -1,4 +1,5 @@
 import { getThreadCollabState } from "@/lib/threadCollab";
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -42,7 +43,7 @@ export async function GET(request: Request, { params }: Params) {
         message.topicSuggestions = await getTopicSuggestionsForThread(
           context.accountId,
           message.threadId,
-          { accountEmail: context.account.email }
+          { accountEmail: getOwnAddresses(context.account) }
         );
       }
     }

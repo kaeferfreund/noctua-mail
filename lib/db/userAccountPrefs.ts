@@ -64,6 +64,9 @@ export async function mergeUserAccountPrefs(
   return withDbWriteRetry("mergeUserAccountPrefs", async () => {
     const db = await getDb();
     const merge = (): UserAccountPrefs => {
+      if (patch.defaultIdentityId != null && !db.prepare(
+        "SELECT 1 FROM sender_identities WHERE id=? AND accountId=? AND enabled=1"
+      ).get(patch.defaultIdentityId, accountId)) throw new InvalidAccountPreferencesError();
       const row = db
         .prepare(`SELECT prefs FROM user_account_prefs WHERE userId = ? AND accountId = ?`)
         .get(userId, accountId) as { prefs?: string | null } | undefined;
@@ -110,4 +113,8 @@ export async function deleteUserAccountPrefsForAccount(accountId: string) {
     const db = await getDb();
     return deleteUserAccountPrefRowsForAccount(db, accountId);
   });
+}
+
+export class InvalidAccountPreferencesError extends Error {
+  constructor() { super("Choose an enabled identity in this mailbox"); }
 }

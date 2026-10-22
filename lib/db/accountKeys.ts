@@ -53,6 +53,9 @@ export const ACCOUNT_KEY_TABLE_SQL = {
       listId TEXT,
       sizeBytes INTEGER,
       listUnsubscribe TEXT,
+      deliveredTo TEXT,
+      originalTo TEXT,
+      senderIdentityId TEXT,
       PRIMARY KEY (accountId, id)
     );`,
   attachments: `CREATE TABLE IF NOT EXISTS attachments (

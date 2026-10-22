@@ -1,3 +1,4 @@
+import { hydrateIdentityMetadata } from "./identityMetadata";
 /**
  * Read-side queries for the messages domain.
  *
@@ -14,7 +15,8 @@ import { SHARD_FTS_TABLE } from "../shardFormat";
 import { simpleParser } from "mailparser";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
-import { getAccountEmail } from "../accounts";
+import { getAccountOwnAddresses } from "../senderIdentities";
+import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "../../ownAddresses";
 import {
   CALENDAR_FILENAME_EXTENSIONS,
   CALENDAR_INVITE_FLAG,
@@ -522,10 +524,12 @@ function normalizeSearchTermList(values?: string[] | null) {
   return Array.from(new Set((values ?? []).map((value) => value.trim()).filter(Boolean)));
 }
 
+// An array is one `me` token: OR within that identity set, AND between tokens.
+type AddressSearchTerm = string | readonly string[];
 type AddressSearchFilters = {
-  fromTerms?: string[];
+  fromTerms?: AddressSearchTerm[];
   recipientTerms?: string[];
-  participantTerms?: string[];
+  participantTerms?: AddressSearchTerm[];
 };
 
 function applyAddressSearchFilters(params: {
@@ -540,10 +544,15 @@ function applyAddressSearchFilters(params: {
   const recipientTerms = params.filters.recipientTerms ?? [];
   const participantTerms = params.filters.participantTerms ?? [];
 
-  fromTerms.forEach(() => {
-    where += ` AND lower(COALESCE(${messageAlias}.fromAddr, '')) LIKE ?`;
+  fromTerms.forEach(term => {
+    if (typeof term === "string") {
+      where += ` AND lower(COALESCE(${messageAlias}.fromAddr, '')) LIKE ?`;
+      params.args.push(`%${term.toLowerCase()}%`);
+    } else {
+      where += ` AND mailbox_address_in(${messageAlias}.fromAddr, ?) = 1`;
+      params.args.push(JSON.stringify(term));
+    }
   });
-  fromTerms.forEach((term) => params.args.push(`%${term.toLowerCase()}%`));
 
   recipientTerms.forEach(() => {
     where += ` AND (
@@ -557,17 +566,15 @@ function applyAddressSearchFilters(params: {
     params.args.push(pattern, pattern, pattern);
   });
 
-  participantTerms.forEach(() => {
-    where += ` AND (
-      lower(COALESCE(${messageAlias}.fromAddr, '')) LIKE ?
-      OR lower(COALESCE(${messageAlias}.toAddr, '')) LIKE ?
-      OR lower(COALESCE(${messageAlias}.ccAddr, '')) LIKE ?
-      OR lower(COALESCE(${messageAlias}.bccAddr, '')) LIKE ?
-    )`;
-  });
-  participantTerms.forEach((term) => {
-    const pattern = `%${term.toLowerCase()}%`;
-    params.args.push(pattern, pattern, pattern, pattern);
+  participantTerms.forEach(term => {
+    const columns = ["fromAddr", "toAddr", "ccAddr", "bccAddr"];
+    if (typeof term === "string") {
+      where += ` AND (${columns.map(column => `lower(COALESCE(${messageAlias}.${column}, '')) LIKE ?`).join(" OR ")})`;
+      columns.forEach(() => params.args.push(`%${term.toLowerCase()}%`));
+    } else {
+      where += ` AND (${columns.map(column => `mailbox_address_in(${messageAlias}.${column}, ?) = 1`).join(" OR ")})`;
+      columns.forEach(() => params.args.push(JSON.stringify(term)));
+    }
   });
 
   return where;
@@ -584,18 +591,18 @@ function hasAddressSearchFilters(filters: AddressSearchFilters) {
 function parseSearchInput(
   raw: string | null | undefined,
   fields?: string[] | null,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ) {
   const input = raw ?? "";
 
   // Extract "from:" terms and handle "from:me"
-  const fromTerms: string[] = [];
+  const fromTerms: AddressSearchTerm[] = [];
   const withoutFrom = input.replace(/(^|\s)from:("([^"]+)"|\S+)/gi, (match, lead, term) => {
     const cleaned = term.replace(/^"|"$/g, "").trim();
     if (cleaned) {
       // Handle "from:me" - replace with current account email
       if (cleaned.toLowerCase() === "me" && accountEmail) {
-        fromTerms.push(accountEmail);
+        fromTerms.push(ownAddressList(accountEmail));
       } else {
         fromTerms.push(cleaned);
       }
@@ -612,12 +619,12 @@ function parseSearchInput(
   });
 
   // Extract "with:" terms (searches in From, To, Cc, and Bcc fields — i.e. any participant)
-  const withTerms: string[] = [];
+  const withTerms: AddressSearchTerm[] = [];
   const withoutWith = withoutTo.replace(/(^|\s)with:("([^"]+)"|\S+)/gi, (match, lead, term) => {
     const cleaned = term.replace(/^"|"$/g, "").trim();
     if (cleaned) {
       if (cleaned.toLowerCase() === "me" && accountEmail) {
-        withTerms.push(accountEmail);
+        withTerms.push(ownAddressList(accountEmail));
       } else {
         withTerms.push(cleaned);
       }
@@ -809,9 +816,7 @@ function normalizeSubjectLine(subject?: string | null) {
 }
 
 function extractEmailsFromText(value?: string | null) {
-  if (!value) return [];
-  const matches = value.toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g);
-  return matches ? Array.from(new Set(matches)) : [];
+  return [...new Set(parseAddressEmails(value))];
 }
 
 function getThreadDateColumn(
@@ -1018,7 +1023,7 @@ async function getGroupCounts(params: {
   } =
     params;
   const db = await getAccountDb(accountId);
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -1265,7 +1270,7 @@ async function getTotalCount(params: {
     participants
   } =
     params;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -1461,7 +1466,7 @@ export async function listRelatedMessages(params: {
     return { items: [] as Message[], groups: [], total: 0, hasMore: false, baseCount: 0 };
   }
 
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   // Message-Id equality is case-insensitive by RFC-5322 convention, and
   // `getMessageById` already does case-insensitive lookups — match that.
@@ -1501,7 +1506,7 @@ export async function listRelatedMessages(params: {
       ]
     )
   )
-    .filter((email) => email && email !== accountEmail)
+    .filter((email) => email && !isOwnAddress(email, accountEmail))
     .slice(0, 6);
 
   const targetRefs = new Set(
@@ -1611,7 +1616,7 @@ export async function listRelatedMessages(params: {
         m.dateValue,
         m.priority,
         m.hasSource,
-        m.sizeBytes,
+        m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
         m.unread,
         m.flags,
         m.seen,
@@ -1777,7 +1782,8 @@ export async function listRelatedMessages(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -1904,7 +1910,7 @@ export async function listMessages(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
 
   const {
     ftsTokenQueries,
@@ -2034,7 +2040,7 @@ export async function listMessages(params: {
         m.dateValue,
         m.priority,
         m.hasSource,
-        m.sizeBytes,
+        m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
         m.unread,
         m.flags,
         m.seen,
@@ -2111,7 +2117,8 @@ export async function listMessages(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -2211,7 +2218,7 @@ export async function listThreads(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountEmail(accountId);
+  const accountEmail = await getAccountOwnAddresses(accountId);
   const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
   const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
 
@@ -2562,7 +2569,7 @@ export async function listThreads(params: {
               m.dateValue,
               m.priority,
               m.hasSource,
-              m.sizeBytes,
+              m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
               m.unread,
               m.flags,
               m.seen,
@@ -2640,7 +2647,8 @@ export async function listThreads(params: {
       htmlBody: undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -2861,7 +2869,8 @@ export async function listThreadMessages(params: {
       htmlBody: row.htmlBody ?? undefined,
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
-      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      ...hydrateIdentityMetadata(row),
+    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       attachments: attachmentsByMessage.get(row.id) ?? [],
       unread: Boolean(row.unread),
       flags: safeParseJson<string[]>(row.flags),

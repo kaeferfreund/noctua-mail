@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import { inferCalendarInviteActionType, collectCalendarInviteMutationGroups } from "@/lib/calendarInviteProcessing";
 import {
   mergeCalendarParticipation,
@@ -11,7 +12,7 @@ export async function importEmailCalendarEvents(
   accountId: string,
   messageId: string,
   icsSource: string,
-  accountEmail?: string | null
+  accountEmail?: OwnAddressInput
 ): Promise<void> {
   if (!icsSource?.trim()) return;
   try {

@@ -39,6 +39,8 @@ export type Account = {
   accessRole?: AccountRole;
   isOwner?: boolean;
   shared?: boolean;
+  /** Live mailbox own-address metadata, including disabled sender identities. */
+  ownAddresses?: string[];
   settings?: AccountSettings;
   caldav?: CaldavConfig;
   deepl?: DeeplConfig;
@@ -89,6 +91,20 @@ export type AccountSettings = {
   notifications?: { newMail?: boolean };
 };
 
+export type SenderIdentity = {
+  id: string;
+  accountId: string;
+  email: string;
+  displayName: string;
+  replyTo?: string;
+  signatureId?: string;
+  isDefault: boolean;
+  enabled: boolean;
+  createdBy: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type MailboxState = {
   accountId: string;
   folderId: string;
@@ -127,6 +143,9 @@ export type Message = {
   xForwardedMessageId?: string;
   xComposeFormat?: string;
   quotedHtmlEdited?: boolean;
+  deliveredTo?: string[];
+  originalTo?: string[];
+  senderIdentityId?: string;
   subject: string;
   from: string;
   fromEmail?: string;
@@ -460,7 +479,7 @@ export type UserAccountLink = {
 export type UserAccountPrefs = Pick<
   AccountSettings,
   "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId" | "notifications"
-> & { remoteContent?: { allowedSenders?: Record<string, boolean> } };
+> & { remoteContent?: { allowedSenders?: Record<string, boolean> }; defaultIdentityId?: string; signatureOverride?: string };
 
 /**
  * Sparse patch for `UserAccountPrefs`: absent keys are untouched, `null`
@@ -476,6 +495,11 @@ export type UserAccountPrefsPatch = SparsePatch<UserAccountPrefs>;
 export type AdminAuditAction =
   | "invite.revoke"
   | "operator.lock_override"
+  | "identity.create"
+  | "identity.update"
+  | "identity.disable"
+  | "identity.enable"
+  | "identity.default_changed"
   | "user.recovery_issue"
   | "user.mfa_reset"
   | "user.passkey_remove"

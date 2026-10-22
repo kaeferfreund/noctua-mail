@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "../ownAddresses";
 import { randomUUID } from "crypto";
 import { simpleParser } from "mailparser";
 import { withDbWriteRetry } from "../dbWriteRetry";
@@ -412,7 +413,7 @@ export async function recomputeCategoriesForAccount(
 
   const db = await getAccountDb(accountId);
   const account = await getAccountById(accountId);
-  const accountEmail = account?.email ?? "";
+  const accountEmail = account ? getOwnAddresses(account) : [];
   const folderIdFilter = options?.folderId?.trim() ? options.folderId.trim() : null;
 
   // Get all eligible message IDs (source-backed and metadata-only).

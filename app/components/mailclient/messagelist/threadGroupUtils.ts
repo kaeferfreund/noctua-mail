@@ -1,7 +1,7 @@
+import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { Message, RecipientAlias } from "@/lib/data";
 import {
   extractDisplayName,
-  extractPrimaryEmail,
   normalizeWhitespace
 } from "@/lib/senderIdentity";
 import type { ThreadNode } from "./threadTree";
@@ -34,6 +34,8 @@ type RecipientFields = {
   bcc?: string;
 };
 
+const recipientEmail = (value?: string | null) => parseAddressEmails(value)[0] ?? null;
+
 type FindRecipientAlias = (value?: string | null) => RecipientAlias | null;
 type ParticipantEntry = {
   text: string;
@@ -44,16 +46,13 @@ type ParticipantEntry = {
 };
 
 const buildParticipant = (raw: string, fallbackDisplay?: string): FromParticipant => {
-  const email = extractPrimaryEmail(raw) ?? "";
+  const email = recipientEmail(raw) ?? "";
   const displayName = extractDisplayName(raw) || fallbackDisplay || "";
   return { displayName, email };
 };
 
-const isMessageFromUser = (fromValue: string, userEmail?: string): boolean => {
-  if (!userEmail) return false;
-  const messageEmail = extractPrimaryEmail(fromValue);
-  const normalizedUserEmail = userEmail.trim().toLowerCase();
-  return messageEmail === normalizedUserEmail;
+const isMessageFromUser = (fromValue: string, userEmail?: OwnAddressInput): boolean => {
+  return isOwnAddress(fromValue, ownAddressList(userEmail));
 };
 
 const splitRecipients = (value?: string) =>
@@ -65,7 +64,7 @@ const splitRecipients = (value?: string) =>
 const recipientDisplayValue = (recipient: string) => {
   const displayName = extractDisplayName(recipient);
   if (displayName) return displayName;
-  const email = extractPrimaryEmail(recipient);
+  const email = recipientEmail(recipient);
   return email || recipient;
 };
 
@@ -93,7 +92,7 @@ const extractRecipientsDisplay = (
   [fields.to, fields.cc, fields.bcc].forEach((value) => {
     splitRecipients(value).forEach((recipient) => {
       const display = recipientDisplayValue(recipient);
-      const key = extractPrimaryEmail(recipient) ?? display.toLowerCase();
+      const key = recipientEmail(recipient) ?? display.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
       displayValues.push(display);
@@ -112,7 +111,7 @@ const recipientTooltip = (fields?: RecipientFields): string => {
 
 const getRecipientParticipantEntries = (
   fields?: RecipientFields,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   findRecipientAlias?: FindRecipientAlias
 ): ParticipantEntry[] => {
   if (!fields) return [];
@@ -132,14 +131,14 @@ const getRecipientParticipantEntries = (
     ];
   }
 
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+  const ownAddresses = ownAddressList(userEmail);
   const seen = new Set<string>();
   const entries: ParticipantEntry[] = [];
 
   [fields.to, fields.cc, fields.bcc].forEach((value) => {
     splitRecipients(value).forEach((recipient) => {
-      const email = extractPrimaryEmail(recipient);
-      if (email && normalizedUserEmail && email === normalizedUserEmail) return;
+      const email = recipientEmail(recipient);
+      if (email && isOwnAddress(email, ownAddresses)) return;
       const text = recipientDisplayValue(recipient);
       const key = text.toLowerCase();
       if (seen.has(key)) return;
@@ -158,12 +157,12 @@ const getRecipientParticipantEntries = (
   return entries;
 };
 
-const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: string) => {
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: OwnAddressInput) => {
+  const ownAddresses = ownAddressList(userEmail);
   for (const value of [fields?.to, fields?.cc, fields?.bcc]) {
     for (const recipient of splitRecipients(value)) {
-      const email = extractPrimaryEmail(recipient);
-      if (email && normalizedUserEmail && email === normalizedUserEmail) continue;
+      const email = recipientEmail(recipient);
+      if (email && isOwnAddress(email, ownAddresses)) continue;
       return {
         from: recipient,
         fromEmail: email
@@ -176,7 +175,7 @@ const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: stri
 export function getMessageFromDisplay(
   fromValue: string,
   recipients?: RecipientFields,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   isInExpandedThread?: boolean,
   forceRecipientDisplay?: boolean,
   findRecipientAlias?: FindRecipientAlias
@@ -233,21 +232,21 @@ export function getMessageFromDisplay(
     isFromUser,
     showRecipientIcon: false,
     iconFrom: normalized,
-    iconFromEmail: extractPrimaryEmail(normalized)
+    iconFromEmail: recipientEmail(normalized)
   };
 }
 
 export function getCollapsedThreadIconParticipant(
   fullFlat: Array<{ message: Message; depth: number }>,
-  userEmail?: string
+  userEmail?: OwnAddressInput
 ) {
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+  const ownAddresses = ownAddressList(userEmail);
 
   for (const { message } of fullFlat) {
     const normalizedFrom = normalizeWhitespace(message.from ?? "");
     if (!normalizedFrom) continue;
-    const fromEmail = extractPrimaryEmail(normalizedFrom);
-    if (fromEmail && normalizedUserEmail && fromEmail === normalizedUserEmail) continue;
+    const fromEmail = recipientEmail(normalizedFrom);
+    if (fromEmail && isOwnAddress(fromEmail, ownAddresses)) continue;
     return {
       from: normalizedFrom,
       fromEmail
@@ -267,7 +266,7 @@ export function getCollapsedThreadIconParticipant(
 
 export function getCollapsedThreadFromDisplay(
   fullFlat: Array<{ message: Message; depth: number }>,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   forceRecipientDisplay?: boolean,
   findRecipientAlias?: FindRecipientAlias
 ): FromDisplayInfo {
@@ -331,7 +330,7 @@ export function getCollapsedThreadFromDisplay(
       tooltip: senderEntry.tooltip,
       key: senderEntry.text.toLowerCase(),
       displayName: extractDisplayName(normalized) || senderEntry.text,
-      email: extractPrimaryEmail(normalized) ?? ""
+      email: recipientEmail(normalized) ?? ""
     });
 
     if (!senderEntry.isFromUser) return;

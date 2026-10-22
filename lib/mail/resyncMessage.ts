@@ -17,6 +17,9 @@ import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 import { deleteAttachmentData } from "@/lib/storage";
 
 type ExistingMessage = Message & { mailboxPath?: string | null };
+const resyncDeps = { getAttachmentIds, getMessageById, resolveThreadingForAccountMessages,
+  updateMessageImapUid, upsertMessages, syncImapMessage, sanitizeSyncedMessage, deleteAttachmentData };
+export type ResyncMessageDeps = typeof resyncDeps;
 
 /**
  * Fetches `uid` from `mailboxPath`, re-ingests it onto `existing`'s row, and
@@ -28,8 +31,11 @@ export async function resyncImapMessageIntoDb(
   account: Account,
   existing: ExistingMessage,
   uid: number,
-  clientId?: string
+  clientId?: string,
+  deps: ResyncMessageDeps = resyncDeps
 ): Promise<Message | null> {
+  const { getAttachmentIds, getMessageById, resolveThreadingForAccountMessages,
+    updateMessageImapUid, upsertMessages, syncImapMessage, sanitizeSyncedMessage, deleteAttachmentData } = deps;
   const mailboxPath = existing.mailboxPath?.trim();
   if (!mailboxPath) return null;
 

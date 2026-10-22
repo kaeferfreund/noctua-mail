@@ -1,8 +1,9 @@
+import { SenderIdentityError } from "@/lib/senderIdentities";
 import { NextResponse } from "next/server";
 import { requireAccountContext, getAccountIdFromParams, type AccountContext, type AccountRouteParams } from "./accountContext";
 import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "./requestOrigin";
-import { getAccountById } from "@/lib/serverDb";
+import { getAccountOwnAddresses, getAccountById } from "@/lib/serverDb";
 import { accountIdFromEmail } from "@/lib/accountId";
 import { updateMailboxCredentials, MailboxCredentialError, type MailboxPatch, type CredentialVerification } from "@/lib/mailboxCredentials";
 import { sanitizeAccountForClient } from "@/lib/accountPresentation";
@@ -11,8 +12,9 @@ export async function applyMailboxPatch(context: AccountContext, patch: MailboxP
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
   try {
     const account = await updateMailboxCredentials(context.accountId, patch, { userId: context.userId, clientId: context.clientId }, verification);
-    return NextResponse.json(sanitizeAccountForClient(account, { role: context.role, viewerUserId: context.userId, memberCount: (await listAccountMembers(context.accountId)).length }));
+    return NextResponse.json(sanitizeAccountForClient({ ...account, ownAddresses: await getAccountOwnAddresses(context.accountId) }, { role: context.role, viewerUserId: context.userId, memberCount: (await listAccountMembers(context.accountId)).length }));
   } catch (error) {
+    if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
     if (error instanceof MailboxCredentialError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
     throw error;
   }

@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type { CalendarEvent } from "@/lib/data";
 import { parseIcsEvents } from "@/lib/calendar";
 import { calendarPreviewToDbEvent } from "./icsSerializer";
@@ -15,7 +16,7 @@ import { calendarPreviewToDbEvent } from "./icsSerializer";
 export function mergeRemoteIcsIntoEvent(
   local: CalendarEvent,
   icsData: string,
-  opts: { accountId: string; accountEmail: string; remoteEtag?: string; remoteHref?: string }
+  opts: { accountId: string; accountEmail: OwnAddressInput; remoteEtag?: string; remoteHref?: string }
 ): CalendarEvent | null {
   let preview;
   try {

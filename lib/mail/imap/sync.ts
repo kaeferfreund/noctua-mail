@@ -1,3 +1,5 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
+import { parseDeliveryMetadata } from "./parser";
 // IMAP sync machinery: batched account/folder sync, single-message sync,
 // new-sync planning, and stored-copy verification.
 //
@@ -227,7 +229,7 @@ function classifyImapMessageCategory(params: {
     config: getCategorizationConfig(),
     linearModel: linearModel ?? null,
     context: {
-      accountEmail: account.email,
+      accountEmail: getOwnAddresses(account),
       mailboxPath,
       folderSpecialUse
     }
@@ -403,6 +405,7 @@ function buildLightweightImapMessage(params: {
     subject: envelope?.subject?.trim() || "(no subject)",
     from,
     replyTo,
+    ...parseDeliveryMetadata(rawHeaders),
     to,
     cc,
     bcc,
@@ -595,6 +598,7 @@ async function parseImapMessage(
     subject: envelope?.subject?.trim() || headerValue("subject") || "(no subject)",
     from: formatEnvelopeAddresses(envelope?.from) || account.email,
     replyTo: pickReplyTo(parsedSource, headerValue("reply-to")),
+    ...parseDeliveryMetadata(message.headers?.length ? message.headers : message.source),
     to: formatEnvelopeAddresses(envelope?.to),
     cc: formatEnvelopeAddresses(envelope?.cc),
     bcc: formatEnvelopeAddresses(envelope?.bcc),

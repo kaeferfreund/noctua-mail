@@ -1669,6 +1669,18 @@ This fork integrates its feature branches locally; it does not target upstream p
 
 ## 9. Work breakdown (branches)
 
+Sender-identities handoff: [Slice 1 contract and slices 2/3 boundary](SENDER-IDENTITIES.md),
+source design `briefs/sender-identities-design.md` §§2–7, 9. Slice 1 is configuration,
+metadata and recognition only; outgoing From remains primary. Its fix branch is
+not merged wholesale: port it after the integration owner finalizes collaboration
+`133bddc`, watcher `bd7eb5f` and collab-ui `1d0f0ce`. Preserve the collaboration writer
+lock/remap/messageRowIds contracts; capture exact-copy identity metadata inside
+that lock, repair legacy authors before summaries, and preserve watcher summary/
+UIDVALIDITY hooks. Run combined identity/collaboration/watcher regressions after
+porting. Send/draft/RSVP/MCP authorization belongs to Slice 2; compose/settings/
+signature insertion and refresh belong to Slice 3 after prior-owner handoff.
+This records the handoff plan, not completed integration acceptance.
+
 Branch names are fixed so parallel agents can reference each other. Integration branch:
 `team-inbox`. `main` tracks upstream.
 

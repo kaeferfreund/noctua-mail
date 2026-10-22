@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
@@ -50,7 +51,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });

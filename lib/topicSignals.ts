@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { TopicSuggestionSignal } from "./data";
 
 export type TopicSignalSource = {
@@ -18,17 +19,7 @@ const JIRA_PROJECT_KEY_PATTERN = /\b([A-Z][A-Z0-9]+)-\d+\b/g;
 const JIRA_SUBJECT_HINT_PATTERN = /\[[^\]]+\].*\b[A-Z][A-Z0-9]+-\d+\b/;
 
 export function extractEmailAddresses(fields: Array<string | null | undefined>): string[] {
-  return Array.from(new Set(fields
-    .filter(Boolean)
-    .flatMap((field) =>
-      (field as string)
-        .split(/,|;/)
-        .map((part) => {
-          const match = part.match(/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i);
-          return match ? match[0].toLowerCase() : null;
-        })
-        .filter((email): email is string => Boolean(email))
-    )));
+  return [...new Set(fields.flatMap(field => parseAddressEmails(field)))];
 }
 
 function looksLikeJiraMessage(source: Pick<TopicSignalSource, "subject" | "messageId">) {
@@ -63,10 +54,10 @@ export function extractJiraProjectKeys(
 export function collectTopicSignalEntries(
   rows: TopicSignalSource[],
   options?: {
-    excludeAccountEmail?: string | null;
+    excludeAccountEmail?: OwnAddressInput;
   }
 ): TopicSignalEntry[] {
-  const excludeAccountEmail = options?.excludeAccountEmail?.toLowerCase().trim() || null;
+  const ownAddresses = ownAddressList(options?.excludeAccountEmail);
   const seen = new Set<string>();
   const entries: TopicSignalEntry[] = [];
 
@@ -80,8 +71,8 @@ export function collectTopicSignalEntries(
   };
 
   rows.forEach((row) => {
-    const fromEmail = row.fromEmail?.toLowerCase().trim() ?? "";
-    if (fromEmail && fromEmail !== excludeAccountEmail) {
+    const fromEmail = parseAddressEmails(row.fromEmail)[0] ?? "";
+    if (fromEmail && !isOwnAddress(fromEmail, ownAddresses)) {
       add("senderEmail", fromEmail);
       const senderDomain = fromEmail.includes("@") ? fromEmail.split("@")[1] : "";
       if (senderDomain) {
@@ -94,7 +85,7 @@ export function collectTopicSignalEntries(
     }
 
     extractEmailAddresses([row.to, row.cc])
-      .filter((email) => email !== excludeAccountEmail)
+      .filter((email) => !isOwnAddress(email, ownAddresses))
       .forEach((email) => add("recipient", email));
   });
 

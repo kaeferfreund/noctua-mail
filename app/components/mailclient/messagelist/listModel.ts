@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type { Message, RecipientAlias } from "@/lib/data";
 import { INVITE_DECK_GROUP_BY, sortGroupsForGroupBy } from "@/lib/messageGrouping";
 import {
@@ -112,7 +113,7 @@ type SharedListParams = {
     visited?: Set<string>
   ) => Array<{ message: Message; depth: number }>;
   getThreadLatestDate: (node: ThreadNode) => number;
-  userEmail?: string;
+  userEmail?: OwnAddressInput;
   preferToDisplay: boolean;
   findRecipientAlias?: (value?: string | null) => RecipientAlias | null;
 };

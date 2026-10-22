@@ -1,3 +1,4 @@
+import { parseAddressEmails } from "../../ownAddresses";
 /**
  * The single write path that takes a batch of parsed RFC 5322 messages
  * and installs them into the local SQLite store. The function is large
@@ -96,6 +97,7 @@ export async function upsertMessages(
   options: { recomputeThreads?: boolean } = {}
 ) {
   return withDbWriteRetry("upsertMessages", async () => {
+    if (nextMessages.some(message => message.accountId !== accountId)) throw new Error("Message belongs to another account");
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     if (nextMessages.some(message => message.accountId !== accountId)) {
       throw new Error("Message accountId must match the destination account");
@@ -146,12 +148,12 @@ export async function upsertMessages(
     );
     const deleteMessageById = db.prepare(`DELETE FROM messages WHERE accountId = ? AND id = ?`);
     const findMessageById = db.prepare(
-      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes
+      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId
        FROM messages
        WHERE accountId = ? AND id = ?`
     );
     const findFolderMessageDuplicates = db.prepare(
-      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid
+      `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId
        FROM messages
        WHERE accountId = ? AND folderId = ? AND messageId = ? AND id <> ?`
     );
@@ -192,8 +194,8 @@ export async function upsertMessages(
         id, accountId, folderId, threadId, parentId, messageId, inReplyTo, "references", xForwardedMessageId, xComposeFormat, quotedHtmlEdited,
         subject, fromAddr, fromEmail, replyToAddr, toAddr, ccAddr, bccAddr, mailboxPath, imapUid, preview, date, dateValue,
         body, htmlBody, priority, hasSource, unread, flags, seen, answered, flagged, deleted, draft, recent,
-        category, categoryScore, categorySignals, categoryManualState, listUnsubscribe, listId, sizeBytes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        category, categoryScore, categorySignals, categoryManualState, listUnsubscribe, listId, sizeBytes, deliveredTo, originalTo, senderIdentityId
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(accountId, id) DO UPDATE SET
         folderId=excluded.folderId,
         threadId=excluded.threadId,
@@ -235,6 +237,9 @@ export async function upsertMessages(
         listUnsubscribe=excluded.listUnsubscribe,
         listId=excluded.listId,
         sizeBytes=excluded.sizeBytes,
+        deliveredTo=excluded.deliveredTo,
+        originalTo=excluded.originalTo,
+        senderIdentityId=excluded.senderIdentityId,
         pendingMoveSourceFolderId=NULL,
         pendingMoveSourceMailboxPath=NULL,
         pendingMoveSourceUid=NULL,
@@ -328,6 +333,24 @@ export async function upsertMessages(
     } else {
       loadManualCategoryStatesForMessageIds(nextMessages.map((message) => message.id));
     }
+    // Identity snapshots are scoped to account + header ID + exact mailbox copy,
+    // independent of storage row IDs. Capture only inside the immediate writer.
+    type IdentitySnapshot = {
+      id: string; messageId?: string | null; folderId?: string | null; mailboxPath?: string | null;
+      imapUid?: number | null; flags?: string | null; sizeBytes?: number | null;
+      deliveredTo?: string | null; originalTo?: string | null; senderIdentityId?: string | null;
+    };
+    const replacedMetadata = new Map<string, IdentitySnapshot>();
+    const replacedMetadataByHeader = new Map<string, IdentitySnapshot[]>();
+    const captureIdentitySnapshots = () => {
+      if (!replaceExisting) return;
+      const rows = db.prepare(`SELECT id,messageId,folderId,mailboxPath,imapUid,flags,sizeBytes,deliveredTo,originalTo,senderIdentityId
+        FROM messages WHERE accountId=? ${folderId ? "AND folderId=?" : ""}`).all(...deleteArgs) as IdentitySnapshot[];
+      for (const row of rows) {
+        replacedMetadata.set(row.id, row);
+        if (row.messageId) replacedMetadataByHeader.set(row.messageId, [...(replacedMetadataByHeader.get(row.messageId) ?? []), row]);
+      }
+    };
     const dedupedThreadIds = new Set<string>();
     const remaps: ThreadRemapPair[] = [];
     type ReplacedRow = { id: string; threadId: string; messageId: string | null; dateValue: number };
@@ -335,8 +358,18 @@ export async function upsertMessages(
     const replacedByHeader = new Map<string, ReplacedRow>();
     const upsertBatch = (batch: Message[], shouldDeleteAttachments: boolean) => {
       batch.forEach((message) => {
-        let rowId = message.id;
-        const existingById = findMessageById.get(accountId, rowId) as
+        // Resolve the prior same copy before selecting a storage row ID. In
+        // particular, a now-free base ID must not erase a shared-shard variant.
+        const priorCopy = message.messageId
+          ? [...(replacedMetadataByHeader.get(message.messageId) ?? []),
+              ...findFolderMessageDuplicates.all(accountId, message.folderId, message.messageId, "") as IdentitySnapshot[]]
+              .find(row => isSameMailboxMessageCopy(row, message))
+          : undefined;
+        let rowId = priorCopy?.id ?? message.id;
+        // A shared shard may contain the same external Message-ID for two accounts.
+        const foreignRow = db.prepare("SELECT 1 FROM messages WHERE id=? AND accountId<>?").get(rowId, accountId);
+        if (foreignRow) rowId = `${rowId}-${createHash("sha1").update(accountId).digest("hex").slice(0, 12)}`;
+        const existingById = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId) ?? priorCopy) as
           | {
               id: string;
               threadId: string;
@@ -347,13 +380,16 @@ export async function upsertMessages(
               imapUid?: number | null;
               flags?: string | null;
               sizeBytes?: number | null;
+              deliveredTo?: string | null;
+              originalTo?: string | null;
+              senderIdentityId?: string | null;
             }
           | undefined;
         let existingRow = existingById;
         if (existingById && !isSameMailboxMessageCopy(existingById, message)) {
           rowId = buildMessageCollisionVariantId(
             message.id,
-            message.mailboxPath ?? message.folderId,
+            foreignRow ? `${accountId}|${message.mailboxPath ?? message.folderId}` : message.mailboxPath ?? message.folderId,
             message.imapUid ?? null
           );
           // Keep any existing on-disk blobs attached to the base message id.
@@ -364,7 +400,7 @@ export async function upsertMessages(
           // `buildMessageRowIdLookupCandidates`); the reverse direction is
           // not guaranteed. The newly-assigned variant row is fresh and
           // will fetch its own source/attachments on first access.
-          existingRow = findMessageById.get(accountId, rowId) as typeof existingById;
+          existingRow = (findMessageById.get(accountId, rowId) ?? replacedMetadata.get(rowId)) as typeof existingById;
         }
         messageRowIds.set(message.id, rowId);
         const previous = existingRow ?? replacedById.get(rowId) ?? (message.messageId ? replacedByHeader.get(message.messageId) : undefined);
@@ -543,8 +579,7 @@ export async function upsertMessages(
           manualCategoryState === "cleared"
             ? ["manual-category:cleared", "manual-feedback:negative"]
             : message.categorySignals;
-        const emailMatch = message.from.match(/<([^>]+)>/);
-        const fromEmail = emailMatch ? emailMatch[1] : null;
+        const fromEmail = parseAddressEmails(message.from)[0] ?? null;
         // Attachment URLs embed the message id as a path segment
         // (/messages/<id>/attachments/<att>), so a collision variant must
         // rewrite that segment. Sanitization baked the base id into htmlBody
@@ -603,7 +638,12 @@ export async function upsertMessages(
           manualCategoryState,
           message.listUnsubscribe ?? null,
           message.listId ?? null,
-          sizeBytes
+          sizeBytes,
+          // Sender identities: retain metadata only from this exact mailbox copy.
+          message.deliveredTo === undefined ? existingRow?.deliveredTo ?? null : JSON.stringify(message.deliveredTo),
+          message.originalTo === undefined ? existingRow?.originalTo ?? null : JSON.stringify(message.originalTo),
+          message.senderIdentityId ?? existingRow?.senderIdentityId ?? null
+          // End sender identity metadata.
         );
         deleteFts.run(accountId, rowId);
         insertFts.run(
@@ -656,6 +696,7 @@ export async function upsertMessages(
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
     const collabChanges = db.transaction(() => {
+      captureIdentitySnapshots();
       if (replaceExisting) {
         // Capture identities under the same writer lock as delete + remap.
         const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages

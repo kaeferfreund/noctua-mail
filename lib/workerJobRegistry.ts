@@ -1,6 +1,7 @@
+import { createBoundedWorkerJobRegistry } from "./boundedWorkerJobRegistry";
 import { randomUUID } from "crypto";
 
-export type WorkerJobStatus = "running" | "done" | "failed";
+export type WorkerJobStatus = "queued" | "running" | "done" | "failed";
 
 export type WorkerJobRecord = {
   id: string;
@@ -12,13 +13,16 @@ export type WorkerJobRecord = {
   pid?: number;
 };
 
-type WorkerJobRegistryConfig = {
+export type WorkerJobRegistryConfig = {
+  maxConcurrentJobs?: number;
+  registryName?: string;
   scriptPath: string;
   jobTtlMs?: number;
   spawnStdout?: "pipe" | "inherit" | "ignore";
   spawnStderr?: "pipe" | "inherit" | "ignore";
   readStderrText?: boolean;
   runtimeMissingMessage?: string;
+  commandPrefix?: string[];
 };
 
 type WorkerJobRegistryState = {
@@ -45,6 +49,7 @@ function isProcessAlive(pid: number) {
 }
 
 export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
+  if (config.maxConcurrentJobs) return createBoundedWorkerJobRegistry(config);
   const registryKey = config.scriptPath;
   const existingState = runtimeState.__noctuaWorkerJobRegistryState?.get(registryKey);
   const state = existingState ?? {
@@ -74,7 +79,7 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
     return job;
   };
 
-  const startJob = (accountId: string) => {
+  const startJob = (accountId: string, args: string[] = []) => {
     const id = randomUUID();
     const job: WorkerJobRecord = {
       id,
@@ -92,9 +97,11 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
         );
       }
       const child = bun.spawn(
-        ["bun", "run", config.scriptPath, accountId],
+        [...(config.commandPrefix ?? []), "bun", "run", config.scriptPath, accountId, ...args],
         {
           cwd: process.cwd(),
+          // Bun otherwise inherits the original OS environment, ignoring runtime path overrides.
+          env: { ...process.env },
           stdout: config.spawnStdout ?? "ignore",
           stderr: config.spawnStderr ?? "pipe"
         }
@@ -131,5 +138,6 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
     return job;
   };
 
-  return { getJob, startJob };
+  const getLatestJob = (accountId: string) => [...jobs.values()].filter(job => job.accountId === accountId).at(-1) ?? null;
+  return { getJob, startJob, getLatestJob };
 }

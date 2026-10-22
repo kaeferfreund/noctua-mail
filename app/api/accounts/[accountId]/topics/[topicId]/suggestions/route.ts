@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
@@ -30,7 +31,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     const limit = Number(searchParams.get("limit") ?? "5");
     const maxAgeDays = Number(searchParams.get("maxAgeDays") ?? "180");
     const suggestions = await getTopicThreadSuggestions(context.accountId, topicId, {
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       limit,
       maxAgeDays
     });

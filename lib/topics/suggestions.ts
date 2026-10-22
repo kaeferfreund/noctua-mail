@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import { withAccountDb } from "../db";
 import type { Topic, TopicSuggestionSignal } from "../data";
 import { TOPIC_SUGGESTION_SIGNALS } from "../data";
@@ -110,16 +111,16 @@ function topicSuggestionSignalEntries(signals: TopicSuggestionSignals): TopicSig
 function shouldIgnoreTopicSuggestionSignal(
   entry: Pick<TopicSignalEntry, "type" | "value">,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ) {
-  const accountEmail = options?.accountEmail?.toLowerCase().trim() || null;
+  const ownAddresses = ownAddressList(options?.accountEmail);
   const value = entry.value.trim();
   if (!value) return true;
 
   if (entry.type === "senderEmail") {
     const normalizedEmail = value.toLowerCase();
-    if (accountEmail && normalizedEmail === accountEmail) {
+    if (isOwnAddress(normalizedEmail, ownAddresses)) {
       return true;
     }
     const domain = normalizedEmail.split("@")[1] ?? "";
@@ -130,7 +131,7 @@ function shouldIgnoreTopicSuggestionSignal(
     return isFreeMailDomain(value.toLowerCase());
   }
 
-  if (entry.type === "recipient" && accountEmail && value.toLowerCase() === accountEmail) {
+  if (entry.type === "recipient" && isOwnAddress(value, ownAddresses)) {
     return true;
   }
 
@@ -140,7 +141,7 @@ function shouldIgnoreTopicSuggestionSignal(
 function normalizeTopicSuggestionSignals(
   signals: MessageSignals,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): TopicSuggestionSignals {
   return topicSuggestionSignalsFromEntries(
@@ -154,7 +155,7 @@ function normalizeTopicSuggestionSignals(
 function topicSuggestionEntriesFromThreadSignalRows(
   rows: Array<Pick<TopicThreadSignalRow, "signalType" | "signalValue">>,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): TopicSignalEntry[] {
   return rows.flatMap((row) => {
@@ -173,7 +174,7 @@ function getTopicSuggestionSignalsForThreadsFromDb(
   accountId: string,
   threadIds: string[],
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Map<string, TopicSuggestionSignals> {
   const normalizedThreadIds = Array.from(
@@ -229,7 +230,7 @@ async function getTopicSuggestionSignalsForThread(
   accountId: string,
   threadId: string,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<TopicSuggestionSignals> {
   return withAccountDb(accountId, (db) => {
@@ -475,7 +476,7 @@ export async function getTopicSuggestionsForMessage(
   accountId: string,
   signals: MessageSignals,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<Topic[]> {
   const normalizedSignals = normalizeTopicSuggestionSignals(signals, options);
@@ -486,7 +487,7 @@ export async function getTopicSuggestionsForThread(
   accountId: string,
   threadId: string,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<Topic[]> {
   const normalizedThreadId = threadId.trim();
@@ -499,7 +500,7 @@ export async function getTopicSuggestionExplanationForThread(
   accountId: string,
   threadId: string,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<TopicSuggestionExplanation> {
   const normalizedThreadId = threadId.trim();
@@ -674,7 +675,7 @@ export async function getTopicSuggestionsForThreads(
   accountId: string,
   threadIds: string[],
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<Map<string, Topic[]>> {
   const normalizedThreadIds = Array.from(
@@ -708,7 +709,7 @@ export async function getTopicThreadSuggestions(
   accountId: string,
   topicId: string,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
     limit?: number;
     maxAgeDays?: number;
   }

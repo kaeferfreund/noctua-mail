@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import {
   getAccountById,
   listCalendarEventsBySource,
@@ -128,7 +129,7 @@ export async function syncCalendarEvents(
                 if (!preview.start) continue;
                 const dbEvent = calendarPreviewToDbEvent(preview, accountId, "caldav", {
                   calendarId,
-                  accountEmail: account.email,
+                  accountEmail: getOwnAddresses(account),
                   remoteEtag: remote.etag,
                   remoteHref: remote.href,
                   rawIcs: remote.icsData
@@ -149,7 +150,7 @@ export async function syncCalendarEvents(
             try {
               const updated = mergeRemoteIcsIntoEvent(local, remote.icsData, {
                 accountId,
-                accountEmail: account.email,
+                accountEmail: getOwnAddresses(account),
                 remoteEtag: remote.etag,
                 remoteHref: remote.href
               });

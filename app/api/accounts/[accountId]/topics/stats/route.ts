@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
@@ -14,7 +15,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(context, async () => {
 
     const stats = await getTopicStats(accountId, {
-      accountEmail: context.account.email
+      accountEmail: getOwnAddresses(context.account)
     });
     return NextResponse.json({ ok: true, stats });
   });
