@@ -52,6 +52,8 @@ import {
 import MessageListOrchestrator, {
   type MessageListHandle
 } from "./mailclient/messagelist/MessageListOrchestrator";
+import MessageListHeader from "./mailclient/messagelist/MessageListHeader";
+import { useMessageViewMode } from "./mailclient/messagelist/useMessageViewMode";
 import BulkActionContextMenu from "./mailclient/messagelist/BulkActionContextMenu";
 import {
   dedupeAccountMessages,
@@ -1896,6 +1898,7 @@ export default function MailClient({
   const stripHtml = stripHtmlToText;
 
   const currentAccount = accounts.find((account) => account.id === activeAccountId) ?? null;
+  const [messageView, setMessageView] = useMessageViewMode(currentAccount?.settings?.layout?.defaultView);
   const reloginAccount = accounts.find((account) => account.id === reloginAccountId) ?? null;
 
   // The mail window is the one window that stays open, so its title names the
@@ -3713,6 +3716,10 @@ export default function MailClient({
       if (target.isContentEditable) return true;
       return Boolean(target.closest("input, textarea, select"));
     };
+    // Open menus and listboxes use letter keys for typeahead and Delete/
+    // Backspace for nothing; they must not reach the message shortcuts.
+    const isMenuTarget = (target: EventTarget | null) =>
+      target instanceof HTMLElement && Boolean(target.closest('[role="menu"], [role="listbox"]'));
     const isMessageListShortcutTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       Boolean(target.closest('[data-message-list-row="true"]'));
@@ -3788,7 +3795,7 @@ export default function MailClient({
       const isTodoKey = key === "t" && !event.metaKey && !event.ctrlKey && !event.altKey;
       const isActionShortcut = isMarkReadKey || isMarkUnreadKey || isFlagKey || isTodoKey;
       if (!isDeleteKey && !isActionShortcut && !isSelectAllKey) return;
-      if (isTypingTarget(event.target)) return;
+      if (isTypingTarget(event.target) || isMenuTarget(event.target)) return;
       if (isSelectAllKey) {
         if (!isMessageListShortcutTarget(event.target)) return;
         event.preventDefault();
@@ -4816,8 +4823,8 @@ export default function MailClient({
   }, [activeTopic, activeTopicSuggestionsLoading, baseGetGroupLabel]);
 
   // The list pane is sized by the shell's resizable panel group; listWidth
-  // mirrors its rendered width so listIsNarrow and the header's collapsed
-  // view switcher keep following the pane. The pane mounts together with
+  // mirrors its rendered width so listIsNarrow and the notice offset keep
+  // following the pane. The pane mounts together with
   // the shell, i.e. whenever the auth state leaves "unauth".
   useEffect(() => {
     if (authState === "unauth") return;
@@ -5420,7 +5427,35 @@ export default function MailClient({
           sync: {
             isSyncing,
             onCheckNewMail: () => syncAccount(undefined, "new")
-          }
+          },
+          toolbar: (
+            <MessageListHeader
+              state={{
+                searchScope,
+                loadedMessageCount,
+                totalMessages,
+                listLoading,
+                messageView,
+                groupBy,
+                messageSort,
+                eventGroupingAvailable: isCalendarGroupByAvailable,
+                threadDateSource,
+                threadsMode,
+                threadsScopeAvailable,
+                threadsAllowed,
+                groupedMessages,
+                collapsedGroups
+              }}
+              actions={{
+                setMessageView,
+                setGroupBy,
+                setMessageSort: handleMessageSortChange,
+                setThreadDateSource,
+                setThreadsMode,
+                toggleAllGroups
+              }}
+            />
+          )
         }}
         panes={{
           onCloseCalendar: () => setCalendarSidebarOpen(false),
@@ -5428,37 +5463,7 @@ export default function MailClient({
             <MessageListOrchestrator
               scrollRef={listPaneRef}
               listHandleRef={listHandleRef}
-              defaultMessageView={currentAccount?.settings?.layout?.defaultView}
-              header={{
-                state: {
-                  listWidth,
-                  searchScope,
-                  activeFolderName,
-                  activeVirtualFolderName: activeVirtualFolder?.name,
-                  loadedMessageCount,
-                  totalMessages,
-                  listLoading,
-                  loadingMessages,
-                  hasMoreMessages,
-                  groupBy,
-                  messageSort,
-                  eventGroupingAvailable: isCalendarGroupByAvailable,
-                  threadDateSource,
-                  threadsMode,
-                  threadsScopeAvailable,
-                  threadsAllowed,
-                  groupedMessages,
-                  collapsedGroups
-                },
-                actions: {
-                  setMessagesPage,
-                  setGroupBy,
-                  setMessageSort: handleMessageSortChange,
-                  setThreadDateSource,
-                  setThreadsMode,
-                  toggleAllGroups
-                }
-              }}
+              messageView={messageView}
               searchActive={searchActive}
               isRelatedSearch={isRelatedSearch}
               relatedNotice={relatedNotice}
@@ -5578,11 +5583,6 @@ export default function MailClient({
           reader: (
             <MessageViewOrchestrator
               ref={messageViewHandleRef}
-              onShowJson={() => setShowJson(true)}
-              onEvictThreadCache={() => {
-                console.info("[noctua] evict thread cache");
-                resetThreadCache();
-              }}
               header={{
                 activeMessage: activeMessage ?? null,
                 activeThread,

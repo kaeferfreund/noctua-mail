@@ -68,7 +68,12 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
       >
         <ShellSidebar {...sidebar} onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined} />
         <SidebarInset className="h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs">
-          <ShellHeader {...header} indicators={isMobile ? statusBar : undefined} />
+          <ShellHeader
+            {...header}
+            // On phones an open message covers the list, so its controls go too.
+            toolbar={isMobile && navigation.view === "thread" ? undefined : header.toolbar}
+            indicators={isMobile ? statusBar : undefined}
+          />
           <ShellPanes {...panes} mobileView={navigation.view} />
           {!isMobile ? statusBar : null}
         </SidebarInset>

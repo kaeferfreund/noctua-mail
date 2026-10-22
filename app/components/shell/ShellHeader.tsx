@@ -18,6 +18,12 @@ import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 export type ShellHeaderProps = {
   indicators?: ReactNode;
   title: string;
+  /**
+   * Controls for the list under the title (count, view and sort menus). The
+   * header is a `@container/header`, so the toolbar can drop secondary parts
+   * with `@…/header:` variants when space runs out.
+   */
+  toolbar?: ReactNode;
   search: ShellSearchProps;
   sync: { isSyncing: boolean; onCheckNewMail: () => void };
 };
@@ -47,15 +53,18 @@ export function ThemeToggle() {
   );
 }
 
-export default function ShellHeader({ title, search, sync, indicators }: ShellHeaderProps) {
+export default function ShellHeader({ title, toolbar, search, sync, indicators }: ShellHeaderProps) {
   const isMobile = useIsMobile();
   const syncLabel = sync.isSyncing ? "Checking for new mail" : "Check for new mail";
   return (
-    <header data-slot="shell-header" className="flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6">
+    <header data-slot="shell-header" className="@container/header flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6">
       <SidebarTrigger className="-ml-1 size-11 md:size-7" aria-label="Toggle sidebar" />
       <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
-      <h1 className="m-0 min-w-0 truncate text-sm font-medium tracking-tight" title={title}>{title}</h1>
-      <div className="ml-auto flex min-w-0 items-center gap-2">
+      {/* On phones the title takes the free space so the toolbar sits with search on the right. */}
+      <h1 className="m-0 min-w-0 truncate text-sm font-medium tracking-tight max-md:flex-1" title={title}>{title}</h1>
+      {toolbar}
+      {/* The search box gives way before the title (shrink-3) and may get narrow; the buttons never shrink. */}
+      <div className="ml-auto flex min-w-0 shrink-3 items-center gap-2">
         {!isMobile ? <div className="hidden w-64 min-w-0 md:block xl:w-80"><ShellSearch {...search} /></div> : null}
         {isMobile ? <div className="md:hidden"><Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label="Search messages"><Search /></Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[calc(100dvw-16px)] max-w-96"><ShellSearch {...search} /></PopoverContent>
