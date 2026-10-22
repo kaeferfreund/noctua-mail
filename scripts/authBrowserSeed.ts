@@ -2,6 +2,9 @@
 import {SCENARIOS} from "../tests/browser/auth/scenarios";
 import {getAuth} from "../lib/betterAuth";
 import {getDb,closeAllDbConnections} from "../lib/db/connection";
+import {persistAccountRow} from "../lib/db/rowParsers";
+import {insertUserAccountLinkRow} from "../lib/db/users";
+import {createInviteCode} from "../lib/db/inviteCodes";
 import {withAuthProof} from "../lib/authPolicyContext";
 import {totpFromUri} from "../tests/helpers/totp";
 import {writeFileSync} from "node:fs";
@@ -12,7 +15,7 @@ const auth=await getAuth();
 const {parseSetCookieHeader}=await import("better-auth/cookies");
 const seeds:Record<string,unknown>={};
 for(const [index,[scenarioId,scenario]] of Object.entries(SCENARIOS).entries()) {
-  const email=`browser-${index}@example.test`,role=scenarioId==="management"?"admin":"user";
+  const email=`browser-${index}@example.test`,role=["management","activatedReset","shellReset"].includes(scenarioId)?"admin":"user";
   const user=await withAuthProof({db:await getDb(),internal:true,creation:{userId:crypto.randomUUID(),email,role},authenticatedAt:Date.now(),method:"migration_fixture",createdSessionIds:[]},()=>auth.api.createUser({body:{email,name:"Synthetic Browser",password,role}}));
   const signed=await auth.api.signInEmail({body:{email:user.user.email,password},returnHeaders:true});
   const cookies=new Map<string,string>();
@@ -24,7 +27,17 @@ for(const [index,[scenarioId,scenario]] of Object.entries(SCENARIOS).entries()) 
   const verified=await auth.api.verifyTOTP({headers:cookieHeaders(),body:{code:totpFromUri(seed.totpURI)},returnHeaders:true});
   absorb(verified.headers);
   await auth.api.signOut({headers:cookieHeaders()});
-  seeds[scenario]={email:user.user.email,password,totpURI:seed.totpURI,userId:user.user.id};
+  if (scenarioId === "shellMailbox") {
+    const db = await getDb();
+    for (const id of ["synthetic-mailbox-a", "synthetic-mailbox-b"]) {
+      const email = `${id}@example.test`;
+      persistAccountRow(db, {id, email, name: id, avatar: "", ownerUserId: user.user.id,
+        imap: {host: "imap.example.invalid", port: 993, secure: true, user: email, password: ""},
+        smtp: {host: "smtp.example.invalid", port: 465, secure: true, user: email, password: ""}});
+      insertUserAccountLinkRow(db, user.user.id, id, "manager");
+    }
+  }
+  seeds[scenario]={email:user.user.email,password,totpURI:seed.totpURI,backupCodes:seed.backupCodes,userId:user.user.id,...(scenarioId==="activatedSignup"?{inviteCode:(await createInviteCode({role:"user",email:"new-person@example.test"})).code}:{})};
 }
 writeFileSync(process.env.AUTH_BROWSER_SEED_FILE!,JSON.stringify(seeds),{mode:0o600});
 

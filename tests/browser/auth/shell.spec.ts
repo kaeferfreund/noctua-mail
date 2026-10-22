@@ -1,6 +1,6 @@
 import { totpFromUri } from "../../helpers/totp";
 import { SCENARIOS } from "./scenarios";
-import { test, expect, api, signIn, register, resetToken } from "./fixtures";
+import { test, expect, api, signIn, register, recoveryLink } from "./fixtures";
 
 // The existing harness feeds real policy-protected BA HTTP and minted sessions
 // into the production Next shell. No fake auth route or shipped fixture page.
@@ -44,7 +44,7 @@ test(SCENARIOS.shellSecurity, async ({ page, seed, authenticator }) => {
   await page.getByLabel("Current password", { exact: true }).fill("synthetic-wrong-password");
   await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
   await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(page.getByRole("alert")).toContainText("incorrect");
+  await expect(page.locator("[data-shell] [role=alert]")).toContainText("incorrect");
   expect((await api(page, "/api/auth/me")).status).toBe(200);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   // UV reauth uses the existing device. Registration then uses a second
@@ -78,8 +78,8 @@ test(SCENARIOS.shellPasskey, async ({ page, seed, authenticator }) => {
 });
 
 test(SCENARIOS.shellReset, async ({ page, seed }) => {
-  const token = resetToken(seed);
-  await page.context().clearCookies();
+  const link = await recoveryLink(page, seed);
+  const token = decodeURIComponent(new URL(link).pathname.split("/").at(-1)!);
   await page.goto(`/reset-password?token=${encodeURIComponent(token)}`);
   await expect(page).toHaveURL(/\/reset-password$/);
   await page.getByLabel("New password", { exact: true }).fill("synthetic-reset-password");
@@ -100,16 +100,19 @@ test(SCENARIOS.shellReset, async ({ page, seed }) => {
   await expect(page.locator("[data-shell] [role=alert]")).toContainText("expired or already used");
 });
 
-test(SCENARIOS.activatedSignup, async ({ page }) => {
-  test.skip(true, "Requires Slice 6 activation of mounted signup and factor APIs plus the integration owner's invite fixture; this harness intentionally has no signup dispatch.");
+test(SCENARIOS.activatedSignup, async ({ page, seed }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign up with an invite code" }).click();
-  await page.getByLabel("Invite code", { exact: true }).fill(process.env.AUTH_BROWSER_SIGNUP_INVITE!);
+  await page.getByLabel("Invite code", { exact: true }).fill(seed.inviteCode!);
   await page.getByLabel("Email", { exact: true }).fill("new-person@example.test");
   await page.getByLabel("Name", { exact: true }).fill("Synthetic New Person");
   await page.getByLabel("App password", { exact: true }).fill("synthetic-new-person-password");
   await page.getByLabel("Confirm app password", { exact: true }).fill("synthetic-new-person-password");
   await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Set up your authenticator" })).toBeVisible();
+  expect((await api(page, "/api/auth/me")).body.mailboxState).toBe("enrollment");
+  expect((await api(page, "/api/accounts")).status).toBe(403);
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Set up your authenticator" })).toBeVisible();
   await page.getByLabel("Current password", { exact: true }).fill("synthetic-new-person-password");
   await page.getByRole("button", { name: "Start authenticator setup", exact: true }).click();
@@ -121,7 +124,6 @@ test(SCENARIOS.activatedSignup, async ({ page }) => {
   await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
 });
 test(SCENARIOS.activatedManagement, async ({ page, seed, authenticator }) => {
-  test.skip(true, "Requires Slice 6 mounted wrapper integration; authBrowserServer dispatch does not route sessions/revoke or passkeys/rename. DOM tests cover the client contracts.");
   await authenticator.setUV(true); await signIn(page, seed); await register(page, seed);
   await page.goto("/");
   await page.getByRole("button", { name: "Profile & security", exact: true }).click();
@@ -140,12 +142,101 @@ test(SCENARIOS.activatedManagement, async ({ page, seed, authenticator }) => {
   expect((await api(page, "/api/auth/me")).status).toBe(200);
 });
 test(SCENARIOS.activatedReset, async ({ page, seed }) => {
-  test.skip(true, "Requires Slice 6 mounted /api/ba instead of the harness-owned handler; valid reset redemption and token clearing are tested above.");
-  const token = resetToken(seed);
-  const callbackURL = `${new URL(page.url()).origin}/reset-password`;
-  const response = await page.goto(`/api/ba/reset-password/${encodeURIComponent(token)}?callbackURL=${encodeURIComponent(callbackURL)}`);
+  const link = await recoveryLink(page, seed);
+  const response = await page.goto(link);
   await expect(page.getByLabel("New password", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/reset-password$/);
   expect(response?.headers()["cache-control"]).toContain("no-store");
   expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+  const redirect = response?.request().redirectedFrom();
+  expect((await redirect?.response())?.status()).toBe(302);
+  expect((await redirect?.response())?.headers()["cache-control"]).toBe("no-store");
+  expect((await redirect?.response())?.headers()["referrer-policy"]).toBe("no-referrer");
+  await page.getByLabel("New password", { exact: true }).fill("synthetic-admin-recovered-password");
+  await page.getByLabel("Confirm new password", { exact: true }).fill("synthetic-admin-recovered-password");
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Password changed" })).toBeVisible();
+  expect((await api(page, "/api/auth/me")).status).toBe(401);
+  await page.getByRole("link", { name: "Return to sign in" }).click();
+  await passwordLogin(page, seed.email, "synthetic-admin-recovered-password");
+  await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
+});
+
+async function passwordLogin(page: import("@playwright/test").Page, email: string, password: string) {
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("App password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Verify your sign-in" })).toBeVisible();
+}
+
+test(SCENARIOS.shellBackup, async ({ page, seed }) => {
+  await page.goto("/");
+  await passwordLogin(page, seed.email, seed.password);
+  await page.getByRole("button", { name: "Use a backup code", exact: true }).click();
+  await page.getByLabel("Backup code", { exact: true }).fill(seed.backupCodes[0]);
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
+  await page.getByRole("button", { name: "Add a mailbox", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("dialog").getByLabel("Close", { exact: true }).click();
+  const logout = page.waitForRequest(request => new URL(request.url()).pathname === "/api/auth/logout");
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  expect((await logout).postData()).toBeNull();
+  await expect(page.getByRole("heading", { name: "Sign in to Noctua" })).toBeVisible();
+  expect((await api(page, "/api/auth/me")).status).toBe(401);
+});
+
+test(SCENARIOS.shellReplacement, async ({ page, seed }) => {
+  await page.goto("/");
+  await passwordLogin(page, seed.email, seed.password);
+  await page.getByRole("button", { name: "I lost my phone", exact: true }).click();
+  await page.getByLabel("Backup code", { exact: true }).fill(seed.backupCodes[0]);
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Replace your lost authenticator" })).toBeVisible();
+  await page.getByLabel("Current password", { exact: true }).fill(seed.password);
+  await page.getByLabel("Unused replacement backup code", { exact: true }).fill(seed.backupCodes[1]);
+  await page.getByRole("button", { name: "Replace authenticator", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Set up your authenticator" })).toBeVisible();
+  expect((await api(page, "/api/auth/me")).body.mailboxState).toBe("enrollment");
+  expect((await api(page, "/api/accounts")).status).toBe(403);
+  await page.getByLabel("Current password", { exact: true }).fill(seed.password);
+  await page.getByRole("button", { name: "Start authenticator setup", exact: true }).click();
+  const secret = await page.getByLabel("Setup secret", { exact: true }).inputValue();
+  const uri = `otpauth://totp/Synthetic?secret=${secret}`;
+  await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(uri));
+  await page.getByRole("button", { name: "Verify authenticator", exact: true }).click();
+  await page.getByRole("button", { name: "I saved my backup codes", exact: true }).click();
+  await page.getByRole("button", { name: "Continue to Noctua", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await passwordLogin(page, seed.email, seed.password);
+  expect((await api(page, "/api/ba/two-factor/verify-totp", {code: totpFromUri(seed.totpURI)})).status).not.toBe(200);
+  await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(uri));
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
+});
+
+test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
+  await page.goto("/");
+  await passwordLogin(page, seed.email, seed.password);
+  await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  const first = page.locator('button[title="synthetic-mailbox-a@example.test"]');
+  const second = page.locator('button[title="synthetic-mailbox-b@example.test"]');
+  await expect(first).toHaveAttribute("aria-current", "true");
+  expect((await api(page, "/api/auth/me")).body.mailboxState).toBe("selected");
+  const switched = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/switch-account");
+  await second.click();
+  expect((await switched).status()).toBe(200);
+  await expect(second).toHaveAttribute("aria-current", "true");
+  const me = (await api(page, "/api/auth/me")).body;
+  expect(me.accountId).toBe("synthetic-mailbox-b");
+  expect(me.user.id).toBe(seed.userId);
+  await page.reload();
+  await expect(second).toHaveAttribute("aria-current", "true");
+  await page.getByRole("button", { name: "User menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Profile & security", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "App password", exact: true })).toBeVisible();
 });

@@ -5,7 +5,8 @@ import {setTimeout as delay} from "node:timers/promises";
 import {spawn,type ChildProcess} from "node:child_process";
 
 const root=process.cwd();
-const port=3793;
+const port=Number(process.env.AUTH_BROWSER_PORT ?? 3793);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid AUTH_BROWSER_PORT");
 const base=`http://localhost:${port}`;
 mkdirSync(path.join(root,".tmp"),{recursive:true});
 const scratch=mkdtempSync(path.join(root,".tmp","noctua-auth-browser-"));
@@ -21,7 +22,7 @@ async function run(args:string[]) {
 async function requireFreePort() {
   await new Promise<void>((resolve,reject)=>{
     const probe=createServer();
-    probe.once("error",()=>reject(new Error("Port 3793 is occupied; refusing to reuse a server")));
+    probe.once("error",()=>reject(new Error(`Port ${port} is occupied; refusing to reuse a server`)));
     probe.listen(port,"localhost",()=>probe.close(()=>resolve()));
   });
 }
@@ -38,7 +39,7 @@ try {
     await delay(500);
   }
   if(!ready)throw new Error("Browser harness readiness timed out");
-  await run(["x","playwright","test","--config=playwright.auth.config.ts"]);
+  await run(["x","playwright","test","--config=playwright.auth.config.ts",...process.argv.slice(2)]);
 } finally {
   if(server&&server.exitCode===null) {
     server.kill("SIGTERM");
