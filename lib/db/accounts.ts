@@ -14,6 +14,7 @@ import {
   persistAccountRow,
   resolveAccountDbPathForPersist
 } from "./rowParsers";
+import { deleteUserAccountPrefRowsForAccount } from "./userAccountPrefs";
 
 // Category-linear-model seeding is lazy-imported because `./categories`
 // pulls in `getAccountById` from this module; a top-level import would
@@ -139,6 +140,7 @@ export async function deleteAccountControlPlane(accountId: string) {
 
     db.transaction(() => {
       db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
+      deleteUserAccountPrefRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM mcp_tokens WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
     })();

@@ -86,6 +86,25 @@ export async function deleteMcpToken(accountId: string, tokenId: string) {
   });
 }
 
+/**
+ * Deletes every MCP token created by `userId`, across all mailboxes. Runs on
+ * the caller's connection so it can join a larger transaction (user delete).
+ */
+export function deleteMcpTokenRowsForUser(db: any, userId: string): number {
+  const result = db
+    .prepare(`DELETE FROM mcp_tokens WHERE createdByUserId = ?`)
+    .run(userId) as { changes?: number };
+  return Number(result?.changes ?? 0);
+}
+
+/** Revokes a user's MCP tokens (disable, admin password reset, delete). */
+export async function deleteMcpTokensForUser(userId: string) {
+  return withDbWriteRetry("deleteMcpTokensForUser", async () => {
+    const db = await getDb();
+    return deleteMcpTokenRowsForUser(db, userId);
+  });
+}
+
 export async function touchMcpTokenLastUsed(tokenId: string, lastUsedAt = Date.now()) {
   return withDbWriteRetry("touchMcpTokenLastUsed", async () => {
     const db = await getDb();

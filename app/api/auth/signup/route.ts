@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { buildSessionPayload, setSessionCookie } from "@/lib/auth";
 import {
+  DuplicateUserEmailError,
+  addUserAccountLink,
   claimInviteCode,
   getAccounts,
   getInviteCodes,
-  getUserAccounts,
   getUsers,
-  saveAccounts,
-  saveUserAccounts,
-  saveUsers
+  insertUser,
+  saveAccounts
 } from "@/lib/db";
-import type { Account } from "@/lib/data";
+import type { Account, User } from "@/lib/data";
 import { verifyImapCredentials } from "@/lib/mail/imapAuth";
 import { shouldStorePasswordInDb } from "@/lib/secret";
 import { accountIdFromEmail } from "@/lib/accountId";
@@ -102,20 +102,18 @@ export async function POST(request: Request) {
     claimedInviteRole = claimedInvite.role;
   }
 
-  const [users, accounts, links] = await Promise.all([
-    getUsers(),
-    getAccounts(),
-    getUserAccounts()
-  ]);
+  const [users, accounts] = await Promise.all([getUsers(), getAccounts()]);
 
   const assignedRole: "admin" | "user" = users.length === 0 ? "admin" : claimedInviteRole;
-  const user = {
-    id: userId,
-    email: account.email,
-    role: assignedRole,
-    createdAt: Date.now()
-  };
-  const nextUsers = [...users, user];
+  let user: User;
+  try {
+    user = await insertUser({ id: userId, email: account.email, role: assignedRole });
+  } catch (error) {
+    if (error instanceof DuplicateUserEmailError) {
+      return NextResponse.json({ ok: false, message: error.message }, { status: 409 });
+    }
+    throw error;
+  }
   const nextAccounts = [
     ...accounts,
     {
@@ -131,13 +129,9 @@ export async function POST(request: Request) {
       }
     }
   ];
-  const nextLinks = [...links, { userId, accountId }];
 
-  await Promise.all([
-    saveUsers(nextUsers),
-    saveAccounts(nextAccounts),
-    saveUserAccounts(nextLinks)
-  ]);
+  await saveAccounts(nextAccounts);
+  await addUserAccountLink(userId, accountId, "manager");
 
   const session = buildSessionPayload({
     userId,

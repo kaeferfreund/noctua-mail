@@ -132,17 +132,50 @@ export {
 } from "./db/translations";
 
 export {
+  DuplicateUserEmailError,
   addUserAccountLink,
+  deleteUser,
+  deleteUserAccountLinksForUser,
+  getUserAccountRole,
   getUserAccounts,
+  getUserAuthByEmail,
   getUserById,
+  getUserLiveness,
   getUsers,
+  insertUser,
   listAccessibleAccountIdsForUser,
-  saveUserAccounts,
-  saveUsers
+  listUserAccountLinks,
+  listUserAccountLinksForUser,
+  normalizeUserEmail,
+  removeUserAccountLink,
+  setUserAccountRole,
+  setUserDisabled,
+  updateUserPassword,
+  updateUserProfile,
+  type NewUser,
+  type UserAuthRecord,
+  type UserLiveness,
+  type UserRole
 } from "./db/users";
 
 export {
+  deleteUserAccountPrefsForAccount,
+  deleteUserAccountPrefsForUser,
+  getUserAccountPrefs,
+  mergeUserAccountPrefs
+} from "./db/userAccountPrefs";
+
+export {
+  ADMIN_AUDIT_DEFAULT_LIMIT,
+  ADMIN_AUDIT_MAX_LIMIT,
+  listAdminAudit,
+  recordAdminAudit,
+  type AdminAuditInput
+} from "./db/adminAudit";
+
+export {
   deleteMcpToken,
+  deleteMcpTokensForUser,
   getMcpTokenByHash,
   insertMcpToken,
   listMcpTokens,

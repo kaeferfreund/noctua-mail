@@ -1,4 +1,15 @@
 declare module "bun:sqlite" {
+  /**
+   * Returned by `Database#transaction`: calling it runs the function in a
+   * deferred transaction; `immediate()` takes the write lock up front.
+   */
+  export type Transaction<T> = {
+    (): T;
+    deferred(): T;
+    immediate(): T;
+    exclusive(): T;
+  };
+
   export class Database {
     constructor(path: string);
     exec(sql: string): void;
@@ -12,6 +23,7 @@ declare module "bun:sqlite" {
       get: (...params: any[]) => any;
       all: (...params: any[]) => any[];
     };
-    transaction<T>(fn: () => T): () => T;
+    transaction<T>(fn: () => T): Transaction<T>;
+    close(): void;
   }
 }
