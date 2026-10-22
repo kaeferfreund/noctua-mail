@@ -128,6 +128,15 @@ describe("applyConflictResolution", () => {
     expect(await getCalendarEventConflict(accountId, event.id)).toBeNull();
   });
 
+  test("remote: preserves the exact own alias attendee when adopting a conflict", async () => {
+    const accountId = `acc-resolve-alias-${randomUUID()}`;
+    const { account, event, conflict } = await setupConflict(accountId);
+    account.ownAddresses = [account.email, "alias@example.test"];
+    conflict.remoteIcs = conflict.remoteIcs.replace("END:VEVENT", "ATTENDEE;PARTSTAT=ACCEPTED:mailto:alias@example.test\nEND:VEVENT");
+    expect((await applyConflictResolution({ accountId, event, conflict, account, resolution: "remote" }, deps)).ok).toBe(true);
+    expect(await getCalendarEventById(accountId, event.id)).toMatchObject({ myAttendeeEmail: "alias@example.test", myPartstat: "ACCEPTED" });
+  });
+
   test("local: refuses to push when the conflict has no remote etag", async () => {
     const accountId = `acc-resolve-noetag-${randomUUID()}`;
     const { account, event, conflict } = await setupConflict(accountId);

@@ -1,5 +1,7 @@
 "use client";
 
+import type { OwnAddressInput } from "@/lib/ownAddresses";
+
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -79,7 +81,7 @@ export type UseSyncControllerParams = {
   authState: "loading" | "ok" | "unauth";
   inboxMailboxPath: string;
   accountFolders: Folder[];
-  currentAccountEmail?: string;
+  currentAccountEmail?: OwnAddressInput;
   currentAccountSyncSettings?: {
     maxIdleSessions?: number;
     pollIntervalMs?: number;

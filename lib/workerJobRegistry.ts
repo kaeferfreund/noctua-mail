@@ -19,6 +19,7 @@ type WorkerJobRegistryConfig = {
   spawnStderr?: "pipe" | "inherit" | "ignore";
   readStderrText?: boolean;
   runtimeMissingMessage?: string;
+  commandPrefix?: string[];
 };
 
 type WorkerJobRegistryState = {
@@ -74,7 +75,7 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
     return job;
   };
 
-  const startJob = (accountId: string) => {
+  const startJob = (accountId: string, args: string[] = []) => {
     const id = randomUUID();
     const job: WorkerJobRecord = {
       id,
@@ -92,9 +93,11 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
         );
       }
       const child = bun.spawn(
-        ["bun", "run", config.scriptPath, accountId],
+        [...(config.commandPrefix ?? []), "bun", "run", config.scriptPath, accountId, ...args],
         {
           cwd: process.cwd(),
+          // Bun otherwise inherits the original OS environment, ignoring runtime path overrides.
+          env: { ...process.env },
           stdout: config.spawnStdout ?? "ignore",
           stderr: config.spawnStderr ?? "pipe"
         }

@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "@/lib/ownAddresses";
 import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
 import { resolveMcpToolContext } from "@/lib/mcpAuth";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -267,6 +268,9 @@ const SEARCH_RESULT_TOPIC_SCHEMA = {
 };
 
 const SEARCH_RESULT_MESSAGE_SCHEMA = {
+  deliveredTo: z.array(z.string()).optional(),
+  originalTo: z.array(z.string()).optional(),
+  senderIdentityId: z.string().optional(),
   id: z.string(),
   accountId: z.string(),
   folderId: z.string(),
@@ -680,7 +684,7 @@ async function searchMessages(
     });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     return {
@@ -714,7 +718,7 @@ async function searchMessages(
     });
     await enrichMessagesWithThreadTopics(data.items, {
       accountId: context.accountId,
-      accountEmail: context.account.email,
+      accountEmail: getOwnAddresses(context.account),
       includeSuggestions: true
     });
     return {

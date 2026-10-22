@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type React from "react";
 import type { Message } from "@/lib/data";
@@ -39,7 +40,7 @@ type UseMessageListDerivedStateParams = {
     visited?: Set<string>
   ) => Array<{ message: Message; depth: number }>;
   getThreadLatestDate: (node: ThreadNode) => number;
-  userEmail?: string;
+  userEmail?: OwnAddressInput;
   preferToDisplay: boolean;
   setCollapsedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 };

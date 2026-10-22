@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import { getTopicSuggestionsForThreads, getTopicsForThreads } from "@/lib/topics";
 import type { Message, Topic } from "@/lib/data";
 
@@ -9,13 +10,13 @@ type TopicLoader = (
 type SuggestionLoader = (
   accountId: string,
   threadIds: string[],
-  options?: { accountEmail?: string | null }
+  options?: { accountEmail?: OwnAddressInput }
 ) => Promise<Map<string, Topic[]>>;
 
 type EnrichMessagesWithThreadTopicsOptions = {
   accountId: string;
   includeSuggestions?: boolean;
-  accountEmail?: string | null;
+  accountEmail?: OwnAddressInput;
   loadTopicsForThreads?: TopicLoader;
   loadTopicSuggestionsForThreads?: SuggestionLoader;
 };

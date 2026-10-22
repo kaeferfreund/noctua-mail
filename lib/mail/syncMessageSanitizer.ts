@@ -1,3 +1,4 @@
+import { parseDeliveryMetadata } from "./imap/parser";
 import type { Attachment, Message } from "@/lib/data";
 import { buildAccountAttachmentPath } from "@/lib/accountApiPaths";
 import {
@@ -78,6 +79,7 @@ export async function sanitizeSyncedMessage(message: Message, accountId: string)
   const { source, ...rest } = message;
   return {
     ...rest,
+    ...(source ? parseDeliveryMetadata(Buffer.from(source)) : {}),
     htmlBody,
     attachments,
     hasSource: Boolean(source ?? message.hasSource),

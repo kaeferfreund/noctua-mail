@@ -2,6 +2,11 @@ import type { AccountRole } from "./data";
 
 /** Independent design §5.2 route inventory, used by HTTP authorization tests. */
 export const accountRouteRoles: Array<{ method: string; path: string; minRole: AccountRole }> = [
+  { method: "GET", path: "identities", minRole: "viewer" },
+  { method: "POST", path: "identities", minRole: "manager" },
+  { method: "PUT", path: "identities", minRole: "manager" },
+  { method: "PATCH", path: "identities/[identityId]", minRole: "manager" },
+  { method: "DELETE", path: "identities/[identityId]", minRole: "manager" },
   {
     "method": "DELETE",
     "path": "",

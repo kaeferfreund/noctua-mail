@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { TopicSuggestionSignal } from "./data";
 
 export type TopicSignalSource = {
@@ -63,10 +64,10 @@ export function extractJiraProjectKeys(
 export function collectTopicSignalEntries(
   rows: TopicSignalSource[],
   options?: {
-    excludeAccountEmail?: string | null;
+    excludeAccountEmail?: OwnAddressInput;
   }
 ): TopicSignalEntry[] {
-  const excludeAccountEmail = options?.excludeAccountEmail?.toLowerCase().trim() || null;
+  const ownAddresses = ownAddressList(options?.excludeAccountEmail);
   const seen = new Set<string>();
   const entries: TopicSignalEntry[] = [];
 
@@ -81,7 +82,7 @@ export function collectTopicSignalEntries(
 
   rows.forEach((row) => {
     const fromEmail = row.fromEmail?.toLowerCase().trim() ?? "";
-    if (fromEmail && fromEmail !== excludeAccountEmail) {
+    if (fromEmail && !isOwnAddress(fromEmail, ownAddresses)) {
       add("senderEmail", fromEmail);
       const senderDomain = fromEmail.includes("@") ? fromEmail.split("@")[1] : "";
       if (senderDomain) {
@@ -94,7 +95,7 @@ export function collectTopicSignalEntries(
     }
 
     extractEmailAddresses([row.to, row.cc])
-      .filter((email) => email !== excludeAccountEmail)
+      .filter((email) => !isOwnAddress(email, ownAddresses))
       .forEach((email) => add("recipient", email));
   });
 

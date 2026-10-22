@@ -176,3 +176,11 @@ export async function saveMailboxState(...args: Parameters<ServerDbModule["saveM
 export async function deleteMessageByFolderUid(...args: Parameters<ServerDbModule["deleteMessageByFolderUid"]>) {
   return (await loadServerDb()).deleteMessageByFolderUid(...args);
 }
+
+export { InvalidAccountPreferencesError } from "./db/userAccountPrefs";
+export async function listSenderIdentities(...args: Parameters<ServerDbModule["listSenderIdentities"]>) {
+  return (await loadServerDb()).listSenderIdentities(...args);
+}
+export async function getAccountOwnAddresses(...args: Parameters<ServerDbModule["getAccountOwnAddresses"]>) {
+  return (await loadServerDb()).getAccountOwnAddresses(...args);
+}

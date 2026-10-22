@@ -1,3 +1,4 @@
+import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { Message, RecipientAlias } from "@/lib/data";
 import {
   extractDisplayName,
@@ -49,11 +50,8 @@ const buildParticipant = (raw: string, fallbackDisplay?: string): FromParticipan
   return { displayName, email };
 };
 
-const isMessageFromUser = (fromValue: string, userEmail?: string): boolean => {
-  if (!userEmail) return false;
-  const messageEmail = extractPrimaryEmail(fromValue);
-  const normalizedUserEmail = userEmail.trim().toLowerCase();
-  return messageEmail === normalizedUserEmail;
+const isMessageFromUser = (fromValue: string, userEmail?: OwnAddressInput): boolean => {
+  return isOwnAddress(fromValue, ownAddressList(userEmail));
 };
 
 const splitRecipients = (value?: string) =>
@@ -112,7 +110,7 @@ const recipientTooltip = (fields?: RecipientFields): string => {
 
 const getRecipientParticipantEntries = (
   fields?: RecipientFields,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   findRecipientAlias?: FindRecipientAlias
 ): ParticipantEntry[] => {
   if (!fields) return [];
@@ -132,14 +130,14 @@ const getRecipientParticipantEntries = (
     ];
   }
 
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+  const ownAddresses = ownAddressList(userEmail);
   const seen = new Set<string>();
   const entries: ParticipantEntry[] = [];
 
   [fields.to, fields.cc, fields.bcc].forEach((value) => {
     splitRecipients(value).forEach((recipient) => {
       const email = extractPrimaryEmail(recipient);
-      if (email && normalizedUserEmail && email === normalizedUserEmail) return;
+      if (email && isOwnAddress(email, ownAddresses)) return;
       const text = recipientDisplayValue(recipient);
       const key = text.toLowerCase();
       if (seen.has(key)) return;
@@ -158,12 +156,12 @@ const getRecipientParticipantEntries = (
   return entries;
 };
 
-const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: string) => {
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: OwnAddressInput) => {
+  const ownAddresses = ownAddressList(userEmail);
   for (const value of [fields?.to, fields?.cc, fields?.bcc]) {
     for (const recipient of splitRecipients(value)) {
       const email = extractPrimaryEmail(recipient);
-      if (email && normalizedUserEmail && email === normalizedUserEmail) continue;
+      if (email && isOwnAddress(email, ownAddresses)) continue;
       return {
         from: recipient,
         fromEmail: email
@@ -176,7 +174,7 @@ const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: stri
 export function getMessageFromDisplay(
   fromValue: string,
   recipients?: RecipientFields,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   isInExpandedThread?: boolean,
   forceRecipientDisplay?: boolean,
   findRecipientAlias?: FindRecipientAlias
@@ -239,15 +237,15 @@ export function getMessageFromDisplay(
 
 export function getCollapsedThreadIconParticipant(
   fullFlat: Array<{ message: Message; depth: number }>,
-  userEmail?: string
+  userEmail?: OwnAddressInput
 ) {
-  const normalizedUserEmail = userEmail?.trim().toLowerCase() ?? null;
+  const ownAddresses = ownAddressList(userEmail);
 
   for (const { message } of fullFlat) {
     const normalizedFrom = normalizeWhitespace(message.from ?? "");
     if (!normalizedFrom) continue;
     const fromEmail = extractPrimaryEmail(normalizedFrom);
-    if (fromEmail && normalizedUserEmail && fromEmail === normalizedUserEmail) continue;
+    if (fromEmail && isOwnAddress(fromEmail, ownAddresses)) continue;
     return {
       from: normalizedFrom,
       fromEmail
@@ -267,7 +265,7 @@ export function getCollapsedThreadIconParticipant(
 
 export function getCollapsedThreadFromDisplay(
   fullFlat: Array<{ message: Message; depth: number }>,
-  userEmail?: string,
+  userEmail?: OwnAddressInput,
   forceRecipientDisplay?: boolean,
   findRecipientAlias?: FindRecipientAlias
 ): FromDisplayInfo {

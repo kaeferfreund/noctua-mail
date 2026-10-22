@@ -1,3 +1,4 @@
+import { ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import { randomUUID } from "crypto";
 import {
   addTopicSignalExclusion,
@@ -331,10 +332,10 @@ export async function excludeTopicLearningSignal(
 export async function getTopicStats(
   accountId: string,
   options?: {
-    accountEmail?: string | null;
+    accountEmail?: OwnAddressInput;
   }
 ): Promise<TopicStat[]> {
-  const accountEmail = options?.accountEmail?.toLowerCase().trim() || null;
+  const ownAddresses = ownAddressList(options?.accountEmail);
   return withAccountDb(accountId, (db) => {
     const threadCounts = db
       .prepare(
@@ -373,11 +374,11 @@ export async function getTopicStats(
          WHERE tls.accountId = ?
            AND (
              tls.signalType != 'recipient'
-             OR lower(tls.signalValue) != lower(COALESCE(?, ''))
+             OR lower(tls.signalValue) NOT IN (${ownAddresses.length ? ownAddresses.map(() => '?').join(',') : "''"})
            )
          GROUP BY tls.topicId, tls.signalType, tls.signalValue`
       )
-      .all(accountId, accountEmail) as Array<{
+      .all(accountId, ...ownAddresses) as Array<{
       topicId: string;
       signalType?: string | null;
       signalValue?: string | null;

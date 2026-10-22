@@ -12,7 +12,8 @@
  */
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import { findSentFolder } from "@/lib/specialFolders";
-import { getAccountEmail } from "../accounts";
+import { getAccountOwnAddresses } from "../senderIdentities";
+import { isOwnAddress } from "../../ownAddresses";
 import { getAccountDb } from "../connection";
 
 /**
@@ -110,7 +111,7 @@ export async function listRecipientSuggestions(
   query?: string | null
 ) {
   const db = await getAccountDb(accountId);
-  const accountEmail = (await getAccountEmail(accountId)).trim();
+  const ownAddresses = await getAccountOwnAddresses(accountId);
   // Not getFolders(): that recomputes per-folder message/unread counts with a
   // whole-table aggregate, far too heavy for a per-keystroke autocomplete
   // path. A bare folders-table read covers everything findSentFolder matches on.
@@ -159,7 +160,7 @@ export async function listRecipientSuggestions(
     name.replace(/^"|"$/g, "").replace(/\s+/g, " ").trim();
   const addAddress = (emailRaw: string, nameRaw: string | undefined, own: boolean) => {
     const email = emailRaw.trim().toLowerCase();
-    if (!email) return;
+    if (!email || isOwnAddress(email, ownAddresses)) return;
     counts.set(email, (counts.get(email) ?? 0) + 1);
     if (nameRaw) {
       const cleaned = normalizeName(nameRaw);
@@ -200,7 +201,7 @@ export async function listRecipientSuggestions(
   };
   rows.forEach((row) => {
     const own =
-      (Boolean(accountEmail) && authorEmail(row) === accountEmail) ||
+      isOwnAddress(authorEmail(row), ownAddresses) ||
       (sentMailboxPath !== null && row.mailboxPath === sentMailboxPath);
     addEmails(row.toAddr, own);
     addEmails(row.ccAddr, own);

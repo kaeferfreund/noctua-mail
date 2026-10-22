@@ -427,3 +427,6 @@ export function listCalendarInviteSourceMessagesByEventUid(
 }
 
 export { deleteSessionProofState } from "./db/authPolicy";
+
+export { InvalidAccountPreferencesError } from "./db/userAccountPrefs";
+export { listSenderIdentities, getAccountOwnAddresses } from "./db/senderIdentities";

@@ -1,3 +1,4 @@
+import { getOwnAddresses } from "./ownAddresses";
 import {
   bulkUpdateMessageFlags,
   deleteMessagesByIds,
@@ -857,7 +858,7 @@ export async function runSyncOperationBatched(
       messageId: invite.messageId,
       icsSource: invite.icsSource,
       process: invite.process && !fullyProcessedInviteMessageIds.has(invite.messageId),
-      accountEmail: account.email,
+      accountEmail: getOwnAddresses(account),
       reminderUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedByUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedAutomatically: autoProcessCalendarInvites ? true : undefined

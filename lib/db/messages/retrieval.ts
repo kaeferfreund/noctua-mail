@@ -1,3 +1,7 @@
+import { parseDeliveryMetadata } from "../../mail/imap/parser";
+import { getMessageSource } from "../../storage";
+import { withDbWriteRetry } from "../../dbWriteRetry";
+import { hydrateIdentityMetadata } from "./identityMetadata";
 /**
  * Single-record fetchers and attachment/ref listings for the messages domain.
  *
@@ -46,6 +50,19 @@ export async function getMessageById(accountId: string, messageId: string) {
     }
   }
   if (!row) return null;
+  // Lazy cached-source enrichment for explicitly reopened legacy messages.
+  if (row.hasSource && (row.deliveredTo == null || row.originalTo == null)) {
+    const source = await getMessageSource(accountId, row.id);
+    if (source) {
+      const metadata = parseDeliveryMetadata(Buffer.from(source));
+      await withDbWriteRetry("hydrateDeliveryMetadata", () => db.prepare(`UPDATE messages SET
+        deliveredTo=COALESCE(deliveredTo,?), originalTo=COALESCE(originalTo,?),
+        senderIdentityId=COALESCE(senderIdentityId,?) WHERE accountId=? AND id=?`)
+        .run(JSON.stringify(metadata.deliveredTo), JSON.stringify(metadata.originalTo), metadata.senderIdentityId ?? null, accountId, row.id));
+      row = db.prepare("SELECT * FROM messages WHERE accountId=? AND id=?").get(accountId, row.id);
+      if (!row) return null;
+    }
+  }
   const attachments = db
     .prepare(`SELECT * FROM attachments WHERE messageId = ?`)
     .all(row.id) as any[];
@@ -79,6 +96,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     htmlBody: row.htmlBody ?? undefined,
     priority: row.priority ?? undefined,
     hasSource: Boolean(row.hasSource),
+    ...hydrateIdentityMetadata(row),
     sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
     attachments: attachments.map((att) => hydrateAttachment(accountId, row.id, att)),
     unread: Boolean(row.unread),

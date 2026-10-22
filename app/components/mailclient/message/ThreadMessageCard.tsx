@@ -1,3 +1,4 @@
+import type { OwnAddressInput } from "@/lib/ownAddresses";
 import { useEffect, useState } from "react";
 import type React from "react";
 import {
@@ -121,7 +122,7 @@ type ThreadMessageCardProps = {
   reportError: (message: string) => void;
   dateFormat?: AccountDateFormat;
   threadViewMode?: "full" | "compact";
-  userEmail?: string;
+  userEmail?: OwnAddressInput;
   senderIconsEnabled?: boolean;
   onSearchByAddress?: (action: "with" | "from" | "to", email: string) => void;
   onComposeTo?: (email: string) => void;
