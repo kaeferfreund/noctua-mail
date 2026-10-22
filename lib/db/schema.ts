@@ -846,7 +846,47 @@ export function initMasterSchema(db: any) {
   }
 }
 
+// Collaboration shard schema. Kept separate from watcher summary/lastSyncAt changes.
+const threadCollabSchemaByDb = new WeakSet<object>();
+export function ensureThreadCollabRuntimeSchema(db: any) {
+  if (threadCollabSchemaByDb.has(db)) return;
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS thread_collab_state (
+        accountId TEXT NOT NULL, threadId TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open', assigneeUserId TEXT,
+        assignedByUserId TEXT, assignedAt INTEGER, statusChangedAt INTEGER,
+        statusChangedByUserId TEXT, commentCount INTEGER NOT NULL DEFAULT 0,
+        lastActivityAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, updatedByUserId TEXT,
+        PRIMARY KEY (accountId, threadId)
+      );
+      CREATE TABLE IF NOT EXISTS thread_comments (
+        id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,
+        authorUserId TEXT NOT NULL, body TEXT NOT NULL, createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL, deletedAt INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS thread_activity (
+        id TEXT PRIMARY KEY, accountId TEXT NOT NULL, threadId TEXT NOT NULL,
+        type TEXT NOT NULL, actorUserId TEXT, actorClientId TEXT, payload TEXT,
+        createdAt INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_thread_collab_state_assignee
+        ON thread_collab_state(accountId, assigneeUserId);
+      CREATE INDEX IF NOT EXISTS idx_thread_collab_state_status
+        ON thread_collab_state(accountId, status);
+      CREATE INDEX IF NOT EXISTS idx_thread_comments_thread
+        ON thread_comments(accountId, threadId, createdAt);
+      CREATE INDEX IF NOT EXISTS idx_thread_activity_thread
+        ON thread_activity(accountId, threadId, createdAt);
+    `);
+    // Future additive columns belong here: re-read PRAGMA inside this immediate
+    // transaction and tolerate duplicate-column errors, as required by §3.
+  }).immediate();
+  threadCollabSchemaByDb.add(db);
+}
+
 export function initAccountSchema(db: any) {
+  ensureThreadCollabRuntimeSchema(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY,

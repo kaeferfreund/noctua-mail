@@ -1,3 +1,4 @@
+import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
@@ -63,11 +64,13 @@ export async function handleListMessagesRequest(
       groupBy,
       fields,
       badges,
+      viewerUserId: session.userId,
       attachmentsOnly,
       excludedFolderIds,
       sortBy
     });
     await enrichMessagesWithThreadTopics(data.items, { accountId });
+    await enrichMessagesWithThreadCollab(data.items, { accountId });
     return NextResponse.json({
       items: data.items,
       groups: data.groups,
