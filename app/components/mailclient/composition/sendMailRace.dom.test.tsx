@@ -1,12 +1,20 @@
 // Runs only under `bun run test:dom`, which preloads lib/testSetupDom.ts to
 // register happy-dom before any component module loads.
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 import React from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { Message } from "@/lib/data";
 import ComposeOrchestrator from "./ComposeOrchestrator";
+
+// FocusScope restores focus and removes itself from Radix's shared stack in a
+// zero-delay timer on unmount. Flush that task inside act before the next test
+// focuses an opener; otherwise the previous dialog can steal that focus.
+afterEach(async () => {
+  cleanup();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+});
 
 type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSignal | null };
 
@@ -594,7 +602,7 @@ describe("mobile composer accessibility", () => {
       await act(async () => { await handleRef.current?.openCompose("new"); });
       opener.remove();
       fireEvent.keyDown(view.getByRole("dialog", { name: "New message" }), { key: "Escape" });
-      await waitFor(() => expect(document.activeElement).toBe(header));
+      await waitFor(() => expect(document.activeElement === header).toBe(true));
     } finally { cleanup(); opener.remove(); header.remove(); }
   }, 20000);
   it("traps reverse tab, closes with Escape and restores the opener", async () => {
@@ -611,8 +619,8 @@ describe("mobile composer accessibility", () => {
       fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
       expect(dialog.contains(document.activeElement)).toBe(true);
       fireEvent.keyDown(dialog, { key: "Escape" });
-      await waitFor(() => expect(view.queryByRole("dialog", { name: "New message" })).toBeNull());
-      await waitFor(() => expect(document.activeElement).toBe(opener));
+      await waitFor(() => expect(view.queryByRole("dialog", { name: "New message" }) === null).toBe(true));
+      await waitFor(() => expect(document.activeElement === opener).toBe(true));
     } finally { cleanup(); opener.remove(); }
   }, 20000);
 });

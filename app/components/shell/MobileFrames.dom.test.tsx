@@ -6,6 +6,9 @@ import MessageMenu from "@/app/components/mailclient/message/MessageMenu";
 import ProcessStatusPopover from "@/app/components/mailclient/status/ProcessStatusPopover";
 import ExceptionStatusPopover from "@/app/components/mailclient/status/ExceptionStatusPopover";
 
+import MessageCardList from "@/app/components/mailclient/messagelist/MessageCardList";
+import MessageTable from "@/app/components/mailclient/messagelist/MessageTable";
+import mobileStyles from "./MobileFrames.module.css";
 import MessageThreadList from "@/app/components/mailclient/messagelist/MessageThreadList";
 import { createSelectionStore } from "@/app/components/mailclient/messagelist/selectionStore";
 import { buildThreadTree, flattenThread, getThreadLatestDate } from "@/app/components/mailclient/messagelist/threadTree";
@@ -55,7 +58,8 @@ describe("mobile kept component frames", () => {
     fireEvent.keyDown(page.getByRole("button", { name: "Message actions" }), { key: "Enter" });
     const move = await page.findByRole("menuitem", { name: "Move to" });
     fireEvent.keyDown(move, { key: "ArrowRight" });
-    expect(await page.findByRole("menuitem", { name: "More..." })).toBeTruthy();
+    const more = await page.findByRole("menuitem", { name: "More..." });
+    expect(more.closest(`.${mobileStyles.messageMenu}`) !== null).toBe(true);
   });
   it("shows the shared process content inside a themed Sheet", async () => {
     const page = render(<Theme><ProcessStatusPopover open onOpenChange={noop} isSyncing={false}
@@ -104,6 +108,39 @@ function threadListProps(onSelect = noop): MessageThreadListProps {
 }
 
 describe("mobile message rows", () => {
+  it("switches desktop narrow thread rows and virtual spacing together", () => {
+    window.innerWidth = 1280;
+    const props = threadListProps();
+    const page = render(<Theme><MessageThreadList {...props} /></Theme>);
+    const row = () => page.container.querySelector<HTMLElement>('[data-message-list-row]')!;
+    expect(row().dataset.messageNarrow).toBe("true");
+    expect(row().parentElement!.parentElement!.style.height).toBe("72px");
+    page.rerender(<Theme><MessageThreadList {...props} state={{ ...props.state, listIsNarrow: false }} /></Theme>);
+    expect(row().dataset.messageNarrow).toBe("false");
+    expect(row().parentElement!.parentElement!.style.height).toBe("40px");
+  });
+  it("allocates 72px for Compact on mobile and 60px on desktop", () => {
+    const props = threadListProps();
+    const page = render(<Theme><MessageCardList {...props} state={{ ...props.state, isCompactView: true }} /></Theme>);
+    const rows = [...page.container.querySelectorAll('[data-compact="true"]')];
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["72px", "72px"]);
+    act(() => window.dispatchEvent(new Event("resize")));
+    act(() => { window.innerWidth = 1280; window.dispatchEvent(new Event("resize")); });
+    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["60px", "60px"]);
+  });
+  it("keeps Table selection independent from unread and row activation on mobile", () => {
+    const props = threadListProps();
+    let selected = 0;
+    const page = render(<Theme><MessageTable {...props} actions={{ ...props.actions, toggleMessageSelection: () => { selected++; } }} /></Theme>);
+    const row = page.container.querySelector<HTMLElement>('[data-message-list-row]')!;
+    const checkbox = within(row).getByRole("checkbox", { name: "Select message" });
+    expect(checkbox.closest('[data-message-cell="unread"]') !== null).toBe(true);
+    fireEvent.click(checkbox);
+    expect(selected).toBe(1);
+    expect(within(row).getByRole("button", { name: "Mark as read" }) !== null).toBe(true);
+  });
+
   it("allocates nonoverlapping 72px virtual rows and restores desktop density at the breakpoint", () => {
     const props = threadListProps();
     const page = render(<Theme><MessageThreadList {...props} /></Theme>);
@@ -112,6 +149,8 @@ describe("mobile message rows", () => {
     expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["72px", "72px"]);
     expect(rows[0].querySelector('[data-message-subject]')!.textContent).toBe("Synthetic subject");
     expect(rows[0].querySelector('[data-message-cell="actions"] button[aria-label="Message actions"]')).toBeTruthy();
+    props.state.listIsNarrow = false;
+    page.rerender(<Theme><MessageThreadList {...props} /></Theme>);
     act(() => window.dispatchEvent(new Event("resize")));
     act(() => { window.innerWidth = 1280; window.dispatchEvent(new Event("resize")); });
     expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["40px", "40px"]);

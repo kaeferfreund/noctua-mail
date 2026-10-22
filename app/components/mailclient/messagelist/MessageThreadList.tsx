@@ -70,7 +70,8 @@ export default function MessageThreadList({
     dateFormat,
     showMessageSize,
     topicColorRows,
-    senderIconsEnabled
+    senderIconsEnabled,
+    listIsNarrow
   } = state;
   const { scrollRef } = refs;
 
@@ -113,7 +114,8 @@ export default function MessageThreadList({
     toggleNested
   } = useThreadListAnimationState();
 
-  const rowHeight = useIsMobile() ? 72 : 40;
+  const narrowRows = useIsMobile() || listIsNarrow;
+  const rowHeight = narrowRows ? 72 : 40;
   const groupHeight = 28;
   const { ids: selectedMessageIds, activeId: activeMessageId } =
     useSelectionSnapshot(selectionStore);
@@ -280,6 +282,7 @@ export default function MessageThreadList({
               className={styles.row}
               data-message-list-row="true"
               data-message-layout="stacked"
+              data-message-narrow={narrowRows}
               data-message-id={message.id}
               role="button"
               tabIndex={0}

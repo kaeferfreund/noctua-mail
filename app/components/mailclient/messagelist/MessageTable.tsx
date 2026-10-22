@@ -65,7 +65,8 @@ export default function MessageTable({
     findRecipientAlias,
     dateFormat,
     topicColorRows,
-    senderIconsEnabled
+    senderIconsEnabled,
+    listIsNarrow
   } = state;
   const { scrollRef } = refs;
   const {
@@ -139,7 +140,8 @@ export default function MessageTable({
     };
   }, [animationClock]);
 
-  const rowHeight = useIsMobile() ? 72 : 44;
+  const narrowRows = useIsMobile() || listIsNarrow;
+  const rowHeight = narrowRows ? 72 : 44;
   const groupHeight = 32;
   const activeThreadKey =
     activeMessage?.threadId ?? activeMessage?.messageId ?? activeMessage?.id;
@@ -339,6 +341,7 @@ export default function MessageTable({
               className={rowClassName}
               data-message-list-row="true"
               data-message-layout="stacked"
+              data-message-narrow={narrowRows}
               data-message-id={message.id}
               style={topicTintVar}
               role="button"

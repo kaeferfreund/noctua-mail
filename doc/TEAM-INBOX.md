@@ -641,8 +641,9 @@ Mobile (below `md`):
   below `md` and `composeSize` is ignored. The mobile frame is a labelled modal Dialog with
   trapped focus, Escape dismissal and focus restoration. `sendMailRace.dom.test.tsx` covers the prop.
 - Message list rows: sender above subject, date aligned right, a reserved "more" button and
-  an 8px unread glyph with an invisible 44px hit area. Thread/table rows and their virtualizer
-  share a 72px mobile height; desktop density stays unchanged. Reader sender/date metadata stacks.
+  an 8px unread glyph with an invisible 44px hit area. Thread/table/Compact rows and their virtualizer
+  share a 72px mobile height. Below a 600px list-pane width, desktop thread/table rows
+  also use the two-line layout and 72px spacing; wider panes keep their desktop density. Reader sender/date metadata stacks.
 - Status bar hidden. Its panels (process status, mail check, reminders, exceptions) and the
   calendar open from the header indicator menu into a `Sheet`; `openBottomStatusPanel` routes
   there on mobile, including the PWA `?openCalendar=1` handler; the calendar sidebar is a
