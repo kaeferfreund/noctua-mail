@@ -62,6 +62,7 @@ const state: ThreadCollabState = {
   commentCount: 2,
   lastActivityAt: 1,
   updatedAt: 1,
+  revision: 0,
   updatedByUserId: null,
 };
 const json = (body: unknown, status = 200) =>
@@ -213,6 +214,7 @@ describe("ThreadActivityPanel", () => {
     body: "**Private** [safe link](https://example.test) <script>bad()</script>",
     createdAt: 1,
     updatedAt: 1,
+    revision: 0,
     deletedAt: null,
   }));
   it("renders safe Markdown and author delete permission", async () => {
@@ -436,7 +438,7 @@ for (const navigateAccount of [false, true]) {
       act(() => { mutation = hook.result.current.update({ status: "waiting" }); });
       hook.rerender({ account: navigateAccount ? "b" : "a", thread: "two" });
       await waitFor(() => expect(hook.result.current.state?.threadId).toBe("two"));
-      await act(async () => { settle(succeeds ? json({ ok: true, state: { ...state, threadId: "one", status: "waiting" } }) : json({ message: "Denied" }, 403)); await mutation; });
+      await act(async () => { settle(succeeds ? json({ ok: true, state: { ...state, revision: 1, threadId: "one", status: "waiting" } }) : json({ message: "Denied" }, 403)); await mutation; });
       expect(updates.at(-1)?.accountId).toBe("a");
       expect(updates.at(-1)?.threadId).toBe("one");
       expect(updates.at(-1)?.status).toBe(succeeds ? "waiting" : "open");
@@ -452,7 +454,7 @@ it("authoritative list refresh reloads selected collaboration and timeline even 
   const apiFetch = (async (url: RequestInfo | URL) => {
     if (String(url).endsWith("/me")) return json({ user: { id: "alex" } });
     if (String(url).endsWith("/members")) return json({ members });
-    const summary = { ...state, status: closed ? "closed" : "open", commentCount: closed ? 1 : 0 };
+    const summary = { ...state, revision: closed ? 1 : 0, status: closed ? "closed" : "open", commentCount: closed ? 1 : 0 };
     if (String(url).endsWith("/collab")) {
       collaborationReads++;
       return json({ ok: true, state: summary, members, comments: closed ? [{ id: "new-comment", body: "New synthetic note" }] : [], activity: closed ? [{ id: "new-activity" }] : [] });

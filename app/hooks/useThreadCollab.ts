@@ -14,15 +14,42 @@ type Snapshot = {
   activity: ThreadActivity[];
 };
 type CachedSnapshot = Snapshot & {
-  // Request order is compared only within this session/account/thread key.
+  // Ownership controls rollback only; request start order is not commit order.
   owner: number;
-  // Optimistic wall-clock timestamps are never server freshness evidence.
-  serverUpdatedAt: number;
+  serverSnapshot: Snapshot;
+  complete: boolean;
 };
+function sameRecord(a: object, b: object): boolean {
+  const left = a as Record<string, unknown>, right = b as Record<string, unknown>;
+  return Object.keys(left).length === Object.keys(right).length &&
+    Object.keys(left).every(key => JSON.stringify(left[key]) === JSON.stringify(right[key]));
+}
+function sameRows<T extends { id: string }>(left: T[], right: T[]) {
+  const byId = new Map(right.map(row => [row.id, row]));
+  return left.length === right.length && left.every(row => {
+    const other = byId.get(row.id);
+    return other !== undefined && sameRecord(row, other);
+  });
+}
 function canAcceptSnapshot(next: CachedSnapshot, current?: CachedSnapshot) {
-  return !current || (
-    next.owner >= current.owner && next.serverUpdatedAt >= current.serverUpdatedAt
-  );
+  if (!current) return true;
+  const incoming = next.serverSnapshot, accepted = current.serverSnapshot;
+  if (incoming.state.revision !== accepted.state.revision)
+    return incoming.state.revision > accepted.state.revision;
+  if (!sameRecord(incoming.state, accepted.state)) return false;
+  // A mutation returns state and at most one written comment, not a full list.
+  // Its same-revision GET may complete unknown data, but cannot contradict a
+  // comment written at that revision. Complete snapshots must be idempotent.
+  if (!current.complete && next.complete) {
+    const incomingComments = new Map(incoming.comments.map(comment => [comment.id, comment]));
+    return accepted.comments.filter(comment => comment.revision === accepted.state.revision)
+      .every(comment => {
+        const other = incomingComments.get(comment.id);
+        return other !== undefined && sameRecord(comment, other);
+      });
+  }
+  return sameRows(incoming.comments, accepted.comments) &&
+    (!next.complete || !current.complete || sameRows(incoming.activity, accepted.activity));
 }
 type Options = {
   apiFetch?: typeof fetch;
@@ -73,7 +100,7 @@ export function useThreadCollab(
     key: string;
     message: string;
   } | null>(null);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [pendingKeys, setPendingKeys] = useState(new Set<string>());
   const busy = useRef(new Set<string>());
   const snapshotSequence = useRef(0);
   const loadSequence = useRef(0);
@@ -81,14 +108,16 @@ export function useThreadCollab(
   const scopeSuccessfulLoadSequence = useRef(new Map<string, number>());
   const mounted = useRef(true);
   const path = `/api/accounts/${encodeURIComponent(accountId)}/threads/${encodeURIComponent(threadId ?? "")}`;
-  const accept = useCallback((data: CachedSnapshot, requestKey: string) => {
+  const publish = useCallback((data: CachedSnapshot, requestKey: string) => {
     const [requestSession, requestAccount] = JSON.parse(requestKey);
     if (!mounted.current || requestSession !== (sessionRef.current ?? null) || denied.current.has(JSON.stringify([requestSession, requestAccount]))) return;
-    if (!canAcceptSnapshot(data, cache.current.get(requestKey))) return;
     cache.current.set(requestKey, data);
     onUpdate.current?.(data.state);
     if (currentKey.current === requestKey) setEntry({ key: requestKey, data });
   }, []);
+  const accept = useCallback((data: CachedSnapshot, requestKey: string) => {
+    if (canAcceptSnapshot(data, cache.current.get(requestKey))) publish(data, requestKey);
+  }, [publish]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -156,18 +185,18 @@ export function useThreadCollab(
         onReadDenied.current?.(accountId);
       }
     }
-    if (scopeLoadSequence.current.get(memberScope) !== sequence) return;
+    if (scopeLoadSequence.current.get(memberScope) !== sequence &&
+      (!response.ok || !data?.ok || denied.current.has(memberScope))) return;
     if (!response.ok || !data?.ok)
       throw new Error(data?.message ?? "Could not load collaboration.");
     if (
       currentKey.current !== key ||
-      loadSequence.current !== sequence ||
       !mounted.current
     )
       return;
-    const next: CachedSnapshot = { ...data, owner, serverUpdatedAt: data.state.updatedAt };
+    const next: CachedSnapshot = { ...data, owner, serverSnapshot: data, complete: true };
     if (!canAcceptSnapshot(next, cache.current.get(key))) return;
-    scopeSuccessfulLoadSequence.current.set(memberScope, sequence);
+    scopeSuccessfulLoadSequence.current.set(memberScope, Math.max(sequence, scopeSuccessfulLoadSequence.current.get(memberScope) ?? 0));
     denied.current.delete(memberScope);
     setDeniedScopes(new Set(denied.current));
     membersCache.current.set(memberScope, data.members);
@@ -176,14 +205,6 @@ export function useThreadCollab(
     setError(null);
   }, [accountId, threadId, path, apiFetch, key, memberScope, accept, sessionKey]);
   const refreshVersion = options.refreshVersion;
-  useEffect(() => {
-    // List refresh/resync is authoritative, even if remapping preserves updatedAt.
-    for (const cachedKey of cache.current.keys()) {
-      const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
-      if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
-    }
-    setEntry(null);
-  }, [refreshVersion, accountId, sessionKey]);
   useEffect(() => {
     let active = true;
     void reload().catch((e) => {
@@ -206,10 +227,10 @@ export function useThreadCollab(
       if (!previous) return false;
       busy.current.add(key);
       const owner = ++snapshotSequence.current;
-      setPendingKey(key);
+      setPendingKeys(new Set(busy.current));
       setError(null);
       // The operation owns this optimistic snapshot until a newer GET/write wins.
-      accept({ ...optimistic(previous), owner, serverUpdatedAt: previous.serverUpdatedAt }, key);
+      publish({ ...previous, ...optimistic(previous), owner }, key);
       try {
         const response = await apiFetch(`${path}/${suffix}`, {
           method,
@@ -224,22 +245,19 @@ export function useThreadCollab(
         if (!response.ok || !data.ok)
           throw new Error(data.message ?? "Could not save collaboration.");
         const next = cache.current.get(key) ?? previous;
-        // An authoritative read wins ties after taking ownership. A
-        // newer commit still applies, including to its originating thread after navigation.
-        if (next.owner <= owner || data.state.updatedAt > next.serverUpdatedAt) {
-          const comments = new Map(next.comments.map(comment => [comment.id, comment]));
+        if (data.state.revision >= next.serverSnapshot.state.revision) {
+          const comments = new Map(next.serverSnapshot.comments.map(comment => [comment.id, comment]));
           if (data.comment) {
             const existing = comments.get(data.comment.id);
-            if (!existing || data.comment.updatedAt > existing.updatedAt)
+            if (!existing || data.comment.revision > existing.revision)
               comments.set(data.comment.id, data.comment);
           }
           if (deletedCommentId) comments.delete(deletedCommentId);
+          const committed: Snapshot = { state: data.state, comments: [...comments.values()], activity: next.activity };
           accept({
-            ...next,
-            owner: Math.max(owner, next.owner),
-            serverUpdatedAt: data.state.updatedAt,
-            state: data.state,
-            comments: [...comments.values()],
+            ...committed, owner, serverSnapshot: committed,
+            // An idempotent late mutation must not downgrade a complete GET.
+            complete: next.complete && data.state.revision === next.serverSnapshot.state.revision,
           }, key);
         }
         // Reload activity after the committed mutation. A read failure must not roll it back.
@@ -248,8 +266,9 @@ export function useThreadCollab(
         return true;
       } catch (e) {
         // A failed operation may undo only the snapshot it still owns.
-        if (cache.current.get(key)?.owner === owner)
-          accept({ ...previous, owner }, key);
+        if (cache.current.get(key)?.owner === owner &&
+          cache.current.get(key)?.serverSnapshot.state.revision === previous.serverSnapshot.state.revision)
+          publish({ ...previous, owner }, key);
         if (mounted.current && currentKey.current === key)
           setError({
             key,
@@ -260,10 +279,10 @@ export function useThreadCollab(
       } finally {
         busy.current.delete(key);
         if (mounted.current)
-          setPendingKey((current) => (current === key ? null : current));
+          setPendingKeys(new Set(busy.current));
       }
     },
-    [threadId, key, path, apiFetch, accept, reload, memberScope, sessionKey, accountId],
+    [threadId, key, path, apiFetch, accept, publish, reload, memberScope, sessionKey, accountId],
   );
   const readDenied = deniedScopes.has(memberScope);
   const data = readDenied ? undefined : entry?.key === key ? entry.data : cache.current.get(key);
@@ -278,7 +297,7 @@ export function useThreadCollab(
         : (membersCache.current.get(memberScope) ?? []),
     me: meEntry?.sessionKey === sessionKey ? (meEntry?.id ?? null) : null,
     loading: Boolean(threadId && !data && errorEntry?.key !== key),
-    pending: pendingKey === key,
+    pending: pendingKeys.has(key),
     error: errorEntry?.key === key ? errorEntry.message : null,
     reload,
     update: (patch: ThreadCollabPatch) =>
