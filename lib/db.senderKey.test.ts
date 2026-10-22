@@ -13,11 +13,7 @@ test("senderKey migration is additive, nullable and leaves the v2 writer guard/v
     db.exec(`INSERT INTO messages (id, accountId, folderId, threadId, subject, fromAddr, toAddr, preview, date, dateValue, body)
       VALUES ('legacy', 'synthetic', 'inbox', 'thread', 'Synthetic', 'trusted@example.test', 'team@example.test', '', '', 0, '')`);
     db.exec("ALTER TABLE messages DROP COLUMN senderKey; ALTER TABLE messages DROP COLUMN sourceSha256; PRAGMA user_version = 2");
-    // Same connection-local function/trigger contract as fix/audit-s1s2.
-    db.function("noctua_writer_v2", () => 2);
-    db.exec(`CREATE TRIGGER noctua_writer_v2_messages_update BEFORE UPDATE ON messages
-      BEGIN SELECT CASE WHEN noctua_writer_v2() IS NOT 2
-      THEN RAISE(ABORT, 'Unsupported account shard writer') END; END`);
+    // initAccountSchema already installs the production writer-v2 guards.
     initAccountSchema(db);
     initAccountSchema(db);
     const column = (db.prepare("PRAGMA table_info(messages)").all() as { name: string; notnull: number }[])

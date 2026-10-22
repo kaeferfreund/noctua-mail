@@ -142,7 +142,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
     expect((await savePrefs(JSON.stringify({ remoteContent: { allowedSenders: { "trusted@example.test": true, "second@example.test": true } } }))).status).toBe(200);
     for (let index = 0; index < senderMessages.length; index++) {
       requests.length = 0;
-      await page.goto(`http://127.0.0.1:3824/?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/?case=${index}`);
       await page.getByRole("button", { name: "Load once" }).waitFor();
       await page.waitForLoadState("networkidle");
       expect(requests, `reader sender case ${index}`).toEqual([]);
@@ -154,7 +154,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
         expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);
         requests.length = 0;
       }
-      await page.goto(`http://127.0.0.1:3824/standalone?case=${index}`);
+      await page.goto(`http://127.0.0.1:3798/standalone?case=${index}`);
       await page.waitForLoadState("networkidle");
       expect(requests, `standalone sender case ${index}`).toEqual([]);
     }

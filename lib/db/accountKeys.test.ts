@@ -7,7 +7,7 @@ import path from "node:path";
 import { initAccountSchema } from "./schema";
 import { ensureAccountKeySchema } from "./accountKeys";
 import { getShardCollisionReport } from "./shardCollisionReport";
-import { SHARD_FORMAT_VERSION } from "./shardFormat";
+import { SHARD_FORMAT_VERSION, shardWriterGuardsInstalled } from "./shardFormat";
 
 const legacySql = readFileSync(new URL("../testFixtures/sharedShardLegacy.sql", import.meta.url), "utf8");
 function legacyDb() {
@@ -66,6 +66,45 @@ describe("account shard key migration", () => {
       expect(db.prepare("SELECT * FROM threads WHERE threadId='root'").all()).toHaveLength(2);
     } finally { db.close(); }
   });
+
+  for (const order of ["before", "after"] as const) {
+    test(`sender provenance added ${order} the v2 rebuild survives reopen with writer guards`, () => {
+      const db = legacyDb();
+      try {
+        if (order === "before") {
+          db.exec("ALTER TABLE messages ADD COLUMN senderKey TEXT; ALTER TABLE messages ADD COLUMN sourceSha256 TEXT");
+          db.prepare("UPDATE messages SET senderKey=?,sourceSha256=? WHERE id='a-row'")
+            .run("sender@example.test", "a".repeat(64));
+        } else {
+          initAccountSchema(db);
+          // A shard migrated by round 4 has v2 keys/guards, but neither S3 column.
+          db.exec("ALTER TABLE messages DROP COLUMN senderKey; ALTER TABLE messages DROP COLUMN sourceSha256");
+        }
+        const rootPage = db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage;
+        initAccountSchema(db);
+        if (order === "after") {
+          expect(db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage).toBe(rootPage);
+        }
+        const columns = db.prepare("PRAGMA table_info(messages)").all() as { name: string; notnull: number }[];
+        for (const name of ["senderKey", "sourceSha256"]) {
+          expect(columns.find(column => column.name === name)?.notnull).toBe(0);
+        }
+        expect(db.prepare("SELECT senderKey,sourceSha256 FROM messages WHERE accountId='a' AND id='a-row'").get()).toEqual({
+          senderKey: order === "before" ? "sender@example.test" : null,
+          sourceSha256: order === "before" ? "a".repeat(64) : null
+        });
+        expect(db.prepare("SELECT accountId,filename FROM attachments").all()).toEqual([{ accountId: "a", filename: "A.pdf" }]);
+        expect(db.prepare("SELECT COUNT(*) AS n FROM messages").get().n).toBe(2);
+        expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(2);
+        expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+        expect(shardWriterGuardsInstalled(db)).toBe(true);
+        const schemaVersion = db.prepare("PRAGMA schema_version").get().schema_version;
+        initAccountSchema(db);
+        expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(schemaVersion);
+        expect(shardWriterGuardsInstalled(db)).toBe(true);
+      } finally { db.close(); }
+    });
+  }
 
   test("a failed rebuild rolls back every table and restores foreign key enforcement", () => {
     const db = legacyDb();
