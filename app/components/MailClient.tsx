@@ -16,6 +16,7 @@ import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from ".
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
+import type { BuildIdentity } from "@/lib/buildVersion";
 
 import type React from "react";
 import dynamic from "next/dynamic";
@@ -360,6 +361,7 @@ function describeRequestTarget(input: RequestInfo | URL): string | null {
 
 type MailClientProps = {
   buildVersionLabel?: string;
+  buildInfo?: BuildIdentity | null;
 };
 
 type MoveToDialogState = {
@@ -388,7 +390,8 @@ import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 export default function MailClient({
-  buildVersionLabel = ""
+  buildVersionLabel = "",
+  buildInfo = null
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
   const tv = useTranslations("Views");
@@ -5741,6 +5744,7 @@ export default function MailClient({
             onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}
             calendarFirstDay={calendarFirstDay}
             accountDateFormat={accountDateFormat}
+            buildInfo={buildInfo}
           />
         }
         notices={(placement) => (

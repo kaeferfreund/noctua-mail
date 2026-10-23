@@ -9,7 +9,7 @@ import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Button } from "@/app/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/app/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/app/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import calendarFrame from "@/app/components/calendar/CalendarPopover.module.css";
 import styles from "./BottomStatusBar.module.css";
@@ -17,12 +17,14 @@ import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser
 import type { Account, AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
 import { formatDate, formatTime } from "@/lib/i18n/format";
 import type { UiLocale } from "@/lib/i18n/config";
+import type { BuildIdentity } from "@/lib/buildVersion";
 import type { CalendarReminder } from "../utils/calendarReminders";
 import type { ExceptionEntry, SyncJobProgress } from "../types";
 import ProcessStatusPopover from "./ProcessStatusPopover";
 import UpcomingStatusPopover from "./UpcomingStatusPopover";
 import ExceptionStatusPopover from "./ExceptionStatusPopover";
 import { resolveStatusIndicator } from "./statusIndicator";
+import BuildInfo from "./BuildInfo";
 
 export type BottomStatusPanel = "process" | "exception" | "reminder" | "calendar" | "mail-check" | "exceptions" | "reminders" | null;
 
@@ -58,6 +60,7 @@ type BottomStatusBarProps = {
   onFindRelatedCalendarInviteUid?: (uid: string) => void;
   calendarFirstDay?: 0 | 1;
   accountDateFormat?: AccountDateFormat;
+  buildInfo: BuildIdentity | null;
 };
 
 function normalizePanel(panel: BottomStatusPanel) {
@@ -125,6 +128,8 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
         <DropdownMenuItem onSelect={() => setOpenPanel("reminder")}>{t("reminder.title")}</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setOpenPanel("exception")}>{t("exception.title")} ({exceptionEntries.length})</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setOpenPanel("calendar")}>{t("calendar")}</DropdownMenuItem>
+        {props.buildInfo ? <><DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground tabular-nums"><BuildInfo info={props.buildInfo} /></DropdownMenuLabel></> : null}
       </DropdownMenuContent></DropdownMenu>
       {process}{exceptions}{upcoming}
       <Sheet open={openPanel === "calendar" || openPanel === "mail-check"} onOpenChange={open => { if (!open) close(); }}>
@@ -154,6 +159,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
               </div> : null}
             </section>;
           })}
+          <BuildInfo info={props.buildInfo} className="block border-t border-border pt-3 text-xs text-muted-foreground tabular-nums" />
         </div></Theme>
       </PopoverContent>
     </Popover>}
