@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import SendWarnings from "./SendWarnings";
+import DraftSavedLabel from "./DraftSavedLabel";
 import { Button, Text } from "@radix-ui/themes";
 import styles from "./Compose.module.css";
 
@@ -64,7 +65,7 @@ export default function ComposeActions({
               : draftSaveError
                 ? t("draft.saveFailedStatus")
                 : draftSavedAt
-                  ? t("draft.savedAgo", { time: formatRelativeTime(draftSavedAt) })
+                  ? <DraftSavedLabel savedAt={draftSavedAt} formatRelativeTime={formatRelativeTime} />
                   : t("draft.notSavedYet")}
           </Text>
         )}
