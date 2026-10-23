@@ -1,0 +1,25 @@
+/* Counts take real layout space so wrapped names cannot run underneath them. */
+.viewRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.viewButton {
+  height: auto;
+  min-height: 32px;
+  min-width: 0;
+}
+.viewButton > .viewLabel {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+}
+.viewCount {
+  position: static;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+@media (width < 768px) {
+  .viewButton { min-height: 44px; }
+}

@@ -1,6 +1,10 @@
 "use client";
 
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { useStartupSync } from "./mailclient/useStartupSync";
+import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
+import { isAccountFolder } from "@/lib/folderAccount";
+import { findInboxFolder } from "@/lib/specialFolders";
 
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
@@ -188,7 +192,8 @@ import {
   DEFAULT_SEARCH_BADGES,
   DEFAULT_SEARCH_FIELDS,
   useSearchState,
-  VIRTUAL_FOLDERS
+  VIRTUAL_FOLDERS,
+  getVirtualFolderLabels
 } from "./mailclient/useSearchState";
 import { useReminderNotifications } from "./mailclient/useReminderNotifications";
 import { useMessageData } from "./mailclient/useMessageData";
@@ -294,7 +299,6 @@ import {
   normalizeRecipientListForComparison,
   replaceLastRecipientToken
 } from "@/lib/recipientLists";
-import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 
 const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
@@ -303,11 +307,11 @@ const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
 });
 const AdminPanel = dynamic(() => import("./admin/AdminPanel"), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Admin" />
+  loading: () => <LazyDialogLoading kind="admin" />
 });
 const CreateMailbox = dynamic(() => import("./admin/AdminMailboxes").then(module => module.CreateMailbox), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Postfach hinzufügen" mailboxDialog />
+  loading: () => <LazyDialogLoading mailboxDialog />
 });
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
@@ -378,12 +382,20 @@ type ActiveTopicSuggestionsResponse = {
   suggestions?: TopicThreadSuggestion[];
 };
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
+  const tv = useTranslations("Views");
+  const tshell = useTranslations("Shell");
+  const ts = useTranslations("Search");
+  const tl = useTranslations("List");
+  const locale = useLocale();
+  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -491,68 +503,7 @@ export default function MailClient({
   const activeTopicSuggestionCacheKey =
     activeAccountId && activeTopicId ? `${activeAccountId}:${activeTopicId}` : "";
 
-  const readErrorMessage = useCallback(async (res: Response) => {
-    const responsePath = (() => {
-      if (!res.url) return null;
-      try {
-        const url = new URL(res.url);
-        return `${url.pathname}${url.search}`;
-      } catch {
-        return null;
-      }
-    })();
-    const withRequestPath = (message: string) => {
-      if (!responsePath) return message;
-      const normalized = message.trim();
-      if (!normalized) return message;
-      const statusOnly = normalized === String(res.status);
-      const statusPrefix = normalized.startsWith(`${res.status}`);
-      const statusTextOnly =
-        res.statusText && normalized.toLowerCase() === res.statusText.toLowerCase();
-      const requestFailedOnly = normalized === `Request failed (${res.status})`;
-      if (statusOnly || statusPrefix || statusTextOnly || requestFailedOnly) {
-        return `${normalized} ${responsePath}`.trim();
-      }
-      return message;
-    };
-    try {
-      const data = (await res.json()) as {
-        message?: string;
-        error?: string;
-        stack?: string;
-        details?: string;
-        code?: string;
-        accountId?: string;
-        reauthRequired?: boolean;
-        repairAllowed?: boolean;
-      };
-      const resolvedAccountId =
-        data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
-      if (data?.code === "mailbox_credentials_invalid") {
-        if (data.repairAllowed && resolvedAccountId) {
-          setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
-          return "Mailbox credentials need repair.";
-        }
-        setReloginAccountId("");
-        return "Mailbox unavailable; contact a manager.";
-      }
-      // Personal auth 401 is logout. Form proof/permission failures use 403.
-      if (res.status === 401 && !responsePath?.startsWith("/api/ba/")) setAuthState("unauth");
-      const parts = [data?.message, data?.error, data?.details, data?.stack].filter(
-        (value) => value && typeof value === "string"
-      ) as string[];
-      if (parts.length) return withRequestPath(parts.join("\n"));
-    } catch {
-      // ignore
-    }
-    try {
-      const text = await res.text();
-      if (text) return withRequestPath(text.slice(0, 2000));
-    } catch {
-      // ignore
-    }
-    return withRequestPath(`Request failed (${res.status})`);
-  }, []);
+  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription });
 
   const {
     exceptionEntries,
@@ -576,6 +527,8 @@ export default function MailClient({
     apiFetch
   });
 
+  const activeAccountIdRef = useRef(activeAccountId);
+  activeAccountIdRef.current = activeAccountId;
   const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
     const targetAccountId = accountIdOverride?.trim() || activeAccountId;
     if (!targetAccountId) {
@@ -586,7 +539,7 @@ export default function MailClient({
       const foldersRes = await apiFetch(buildAccountFoldersPath(targetAccountId));
       if (foldersRes.ok) {
         const nextFolders = (await foldersRes.json()) as Folder[];
-        setFolders(nextFolders);
+        if (activeAccountIdRef.current === targetAccountId) setFolders(nextFolders);
         return nextFolders;
       } else {
         reportError(await readErrorMessage(foldersRes));
@@ -660,7 +613,6 @@ export default function MailClient({
   const [bulkContextMenuSelection, setBulkContextMenuSelection] = useState<string[]>([]);
   const bulkContextMenuReturnFocusRef = useRef<HTMLElement | null>(null);
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
-  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
   useEffect(() => deferUntilIdle(() => {
@@ -1092,8 +1044,8 @@ export default function MailClient({
     () =>
       activeVirtualFolder
         ? [activeVirtualFolder.badgeLabel]
-        : selectedSearchBadges.map((key) => getSearchBadgeLabel(key)),
-    [activeVirtualFolder, selectedSearchBadges]
+        : selectedSearchBadges.map((key) => getSearchBadgeLabel(key, ts)),
+    [activeVirtualFolder, selectedSearchBadges, ts]
   );
   const hasFilteredSearchCriteria =
     isRelatedSearch || trimmedQuery.length > 0 || effectiveSearchBadges.length > 0;
@@ -1117,41 +1069,26 @@ export default function MailClient({
     const adjusted = fields.includes("participants") ? fields.filter((field) => field !== "sender") : fields;
     return adjusted;
   }, [searchFields]);
-  const searchFieldsLabel = useMemo(() => {
-    const allEnabled =
-      searchFields.participants &&
-      searchFields.subject &&
-      searchFields.body &&
-      searchFields.attachments;
-    if (allEnabled) return "Fields: All";
+  const allSearchFields = searchFields.participants && searchFields.subject && searchFields.body && searchFields.attachments;
+  const searchFieldsCriteriaLabel = useMemo(() => {
     const selected = SEARCH_FIELD_ORDER.filter((key) => searchFields[key]);
-    const effective = selected.includes("participants")
-      ? selected.filter((key) => key !== "sender")
-      : selected;
-    if (effective.length === 0) return "Fields: All";
-    return `Fields: ${effective.map((key) => getSearchFieldLabel(key)).join(", ")}`;
-  }, [searchFields]);
-  const searchFieldsCriteriaLabel = useMemo(
-    () => searchFieldsLabel.replace(/^Fields:\s*/, ""),
-    [searchFieldsLabel]
-  );
-  const searchFieldsSummaryLabel = useMemo(() => {
-    const normalized = searchFieldsCriteriaLabel.trim();
-    if (!normalized || normalized.toLowerCase() === "all") return "in all fields";
-    return `in fields ${normalized}`;
-  }, [searchFieldsCriteriaLabel]);
+    const effective = selected.includes("participants") ? selected.filter((key) => key !== "sender") : selected;
+    return allSearchFields || effective.length === 0 ? ts("allFields") : effective.map((key) => getSearchFieldLabel(key, ts)).join(", ");
+  }, [allSearchFields, searchFields, ts]);
+  const searchFieldsLabel = ts("fieldSummary", { fields: searchFieldsCriteriaLabel });
+  const searchFieldsSummaryLabel = allSearchFields || !Object.values(searchFields).some(Boolean)
+    ? tv("allFieldsScope") : tv("fieldsScope", { fields: searchFieldsCriteriaLabel });
   const searchBadgesLabel = useMemo(() => {
     const selected = SEARCH_BADGE_ORDER.filter((key) => searchBadges[key]);
-    if (selected.length === 0) return "Filter: Any";
-    return `Filter: ${selected.map((key) => getSearchBadgeLabel(key)).join(", ")}`;
-  }, [searchBadges]);
+    return ts("badgeSummary", { badges: selected.length ? selected.map((key) => getSearchBadgeLabel(key, ts)).join(", ") : ts("noFilters") });
+  }, [searchBadges, ts]);
   const searchScopeSummaryLabel = useMemo(() => {
     if (searchScope === "all") {
-      return activeVirtualFolder ? `in ${activeVirtualFolder.name}` : "everywhere";
+      return activeVirtualFolder ? tv("viewScope", { name: activeVirtualFolder.name }) : tv("everywhereScope");
     }
-    const folderName = activeFolderId ? folderById.get(activeFolderId)?.name?.trim() : "";
-    return folderName ? `in ${folderName}` : "in current folder";
-  }, [activeFolderId, activeVirtualFolder, folderById, searchScope]);
+    const folder = activeFolderId ? folderById.get(activeFolderId) : undefined;
+    return folder ? tv("folderScope", { name: getFolderDisplayName(folder, locale) }) : tv("currentFolderScope");
+  }, [activeFolderId, activeVirtualFolder, folderById, searchScope, locale, tv]);
   const searchActive = useMemo(() => {
     const hasQuery = query.trim().length > 0;
     const hasBadges = Object.values(searchBadges).some(Boolean);
@@ -1161,22 +1098,22 @@ export default function MailClient({
     const parts: string[] = [];
     const trimmedQuery = query.trim();
     if (trimmedQuery.length > 0) {
-      parts.push(`"${trimmedQuery}"`);
+      parts.push(tv("queryCriteria", { query: trimmedQuery }));
     }
     if (trimmedQuery.length > 0) {
       parts.push(searchFieldsSummaryLabel);
     }
     if (selectedSearchBadgeLabels.length > 0) {
-      parts.push(`filter ${selectedSearchBadgeLabels.join(", ")}`);
+      parts.push(tv("filterCriteria", { badges: selectedSearchBadgeLabels.join(", ") }));
     }
     parts.push(searchScopeSummaryLabel);
     return parts.join(" · ");
-  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels]);
+  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels, tv]);
   const searchCriteriaBadges = useMemo(() => {
     const badges: { key: string; label: string }[] = [];
     const trimmedQuery = query.trim();
     if (trimmedQuery.length > 0) {
-      badges.push({ key: "query", label: `"${trimmedQuery}"` });
+      badges.push({ key: "query", label: tv("queryCriteria", { query: trimmedQuery }) });
     }
     if (trimmedQuery.length > 0) {
       badges.push({ key: "fields", label: searchFieldsSummaryLabel });
@@ -1188,10 +1125,10 @@ export default function MailClient({
     }
     badges.push({ key: "scope", label: searchScopeSummaryLabel });
     if (badges.length === 0) {
-      badges.push({ key: "all", label: "All messages" });
+      badges.push({ key: "all", label: tl("allMessages") });
     }
     return badges;
-  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels]);
+  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels, tv, tl]);
   const relatedNotice = useMemo(() => {
     if (!isRelatedSearch) return "";
     const subject = relatedContext?.subject?.trim();
@@ -1969,7 +1906,7 @@ export default function MailClient({
           ? inviteDeckUnreadCount
           : null;
     return formatMailboxPageTitle({
-      folderName: activeVirtualFolder?.name ?? folder?.name,
+      folderName: activeVirtualFolder?.name ?? (folder ? getFolderDisplayName(folder, locale) : undefined),
       accountEmail: currentAccount?.email,
       unreadCount: activeVirtualFolder ? virtualUnreadCount : folder?.unreadCount
     });
@@ -1979,7 +1916,8 @@ export default function MailClient({
     currentAccount?.email,
     focusedUnreadCount,
     folderById,
-    inviteDeckUnreadCount
+    inviteDeckUnreadCount,
+    locale
   ]);
   useWindowTitle(mailboxTitle);
   const handleOpenReloginFromException = useCallback(
@@ -4133,7 +4071,8 @@ export default function MailClient({
     }));
   }, [omitBody, threadMessages]);
 
-  const activeFolderName = accountFolders.find((folder) => folder.id === activeFolderId)?.name;
+  const activeFolder = accountFolders.find((folder) => folder.id === activeFolderId);
+  const activeFolderName = activeFolder ? getFolderDisplayName(activeFolder, locale) : undefined;
 
   useEffect(() => {
     if (!activeAccountId) return;
@@ -4344,84 +4283,11 @@ export default function MailClient({
     return () => { active = false; window.removeEventListener("noctua:sender-settings-changed", refreshSenders); };
   }, [apiFetch, reportError, currentUser?.id, senderMessages.identityRefreshFailed]);
 
-  // Initial sync on login (once per session per account). For existing accounts,
-  // sync only the active folder first so new mail appears before any broader repair work.
-  useEffect(() => {
-    if (!initialDataReady || !activeAccountId) return;
-    if (initialFoldersLoadedAccountId !== activeAccountId) return;
-
-    const hasAccountFolders = accountFolders.length > 0;
-
-    // For returning users, wait until the active folder is selected before starting
-    // sync, so the syncAccount closure captures the correct activeFolderId. Without
-    // this guard, activeFolderId is "" when the effect first fires (it gets set by a
-    // sibling effect that runs in the same flush), causing refreshMailboxData() to be
-    // skipped after sync completes and the user sees stale mail.
-    if (hasAccountFolders && !activeFolderId) return;
-
-    const syncStatus =
-      initialSyncStatusRef.current[activeAccountId] ?? readInitialSyncSessionStatus(activeAccountId);
-    if (syncStatus === "running" || syncStatus === "done") return;
-
-    initialSyncStatusRef.current[activeAccountId] = "running";
-    writeInitialSyncSessionStatus(activeAccountId, "running");
-    const accountId = activeAccountId;
-    const startupDecision = decideStartupSync({
-      hasAccountFolders,
-      activeFolderId
-    });
-    const startupTriggerId = logSyncPolicyCall({
-      caller: "startup",
-      policy: "decideStartupSync",
-      accountId: activeAccountId,
-      folderId: activeFolderId || null,
-      input: {
-        hasAccountFolders,
-        activeFolderId
-      },
-      decision: startupDecision
-    });
-    if (startupDecision.kind === "skip") {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-    const syncPromise =
-      startupDecision.kind === "account"
-        ? syncAccountRef.current?.(undefined, startupDecision.mode, {
-            fullSyncReason: startupDecision.reason,
-            triggerId: startupTriggerId
-          })
-        : startupDecision.mode === "new" || startupDecision.mode === "repair" || startupDecision.mode === "full"
-          ? syncAccountRef.current?.(startupDecision.folderId, startupDecision.mode, {
-              fullSyncReason: startupDecision.reason,
-              triggerId: startupTriggerId
-            })
-          : undefined;
-    if (!syncPromise) {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-
-    void syncPromise
-      .then(() => {
-        initialSyncStatusRef.current[accountId] = "done";
-        writeInitialSyncSessionStatus(accountId, "done");
-      })
-      .catch(() => {
-        delete initialSyncStatusRef.current[accountId];
-        writeInitialSyncSessionStatus(accountId, null);
-      });
-  }, [
-    activeAccountId,
-    accountFolders.length,
-    initialDataReady,
-    initialFoldersLoadedAccountId,
-    activeFolderId,
-    readInitialSyncSessionStatus,
-    writeInitialSyncSessionStatus
-  ]);
+  useStartupSync({
+    initialDataReady, activeAccountId, initialFoldersLoadedAccountId, accountFolders,
+    activeFolderId, initialSyncStatusRef, readInitialSyncSessionStatus,
+    writeInitialSyncSessionStatus, syncAccountRef
+  });
 
   // CalDAV periodic sync
   useEffect(() => {
@@ -4943,16 +4809,17 @@ export default function MailClient({
     if (prevAccountIdRef.current !== activeAccountId) {
       prevAccountIdRef.current = activeAccountId;
       composeHandleRef.current?.resetSession();
+      setLastFolderId("");
       if (searchScope === "all") {
         setActiveFolderId("");
       } else {
-        setActiveFolderId(accountFolders[0]?.id ?? "");
+        setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
       }
       return;
     }
     if (searchScope === "all") return;
-    if (!activeFolderId) {
-      setActiveFolderId(accountFolders[0]?.id ?? "");
+    if (!isAccountFolder(activeAccountId, activeFolderId, accountFolders)) {
+      setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
     }
   }, [accountFolders, activeAccountId, activeFolderId, searchScope]);
 
@@ -5321,52 +5188,17 @@ export default function MailClient({
     window.addEventListener("storage", handleDetachedComposeEvent);
     return () => window.removeEventListener("storage", handleDetachedComposeEvent);
   }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice]);
-  // Auto-repair empty folders: if a folder shows no messages after loading,
-  // check if raw messages exist in DB (threading issue → recompute) or not (missing → sync).
-  useEffect(() => {
-    if (searchScope !== "folder" || !activeFolderId || !activeAccountId) return;
-    // Wait for the first real list response for this key before deciding the folder
-    // is unexpectedly empty. On initial refresh there is a short window where the
-    // list is empty simply because page 1 has not hydrated yet.
-    if (totalMessages === null) return;
-    if (listLoading || emptyListSyncing || isRecomputingThreads) return;
-    if (filteredMessages.length > 0) return;
-    if (autoRepairAttemptedFolderIdsRef.current.has(activeFolderId)) return;
-    autoRepairAttemptedFolderIdsRef.current.add(activeFolderId);
-    const folderId = activeFolderId;
-    const accountId = activeAccountId;
-    void (async () => {
-      try {
-        const params = new URLSearchParams({
-          folderId,
-          pageSize: "1"
-        });
-        const res = await apiFetch(buildAccountMessagesPath(accountId, params));
-        if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (typeof data?.total === "number" && data.total > 0) {
-          await recomputeThreadsRef.current();
-        } else {
-          await syncFolderWithBackgroundRef.current(folderId, true, "full", {
-            fullSyncReason:
-              "Auto-repair requested full sync because the folder list is empty and no raw messages were found in the DB."
-          });
-        }
-      } catch {
-        // silently ignore auto-repair errors
-      }
-    })();
-  }, [
-    searchScope,
-    activeFolderId,
-    activeAccountId,
+  useEmptyFolderRepair({
+    accountId: activeAccountId,
+    folderId: activeFolderId,
+    accountFolders,
+    enabled: searchScope === "folder" && totalMessages !== null &&
+      !listLoading && !emptyListSyncing && !isRecomputingThreads && filteredMessages.length === 0,
     apiFetch,
-    listLoading,
-    emptyListSyncing,
-    isRecomputingThreads,
-    filteredMessages.length,
-    totalMessages
-  ]);
+    attemptedFolderIdsRef: autoRepairAttemptedFolderIdsRef,
+    recomputeThreadsRef,
+    syncFolderRef: syncFolderWithBackgroundRef
+  });
 
 
   const rootFolders = accountFolders.filter((folder) => !folder.parentId);
@@ -5374,6 +5206,7 @@ export default function MailClient({
     () =>
       VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
         ...folder,
+        ...getVirtualFolderLabels(folder, tv),
         active: activeVirtualFolder?.id === folder.id,
         onSelect: () => activateVirtualFolder(folder.id),
         count:
@@ -5384,30 +5217,24 @@ export default function MailClient({
             : folder.id === "virtual:invite-deck"
               ? inviteDeckUnreadCount
               : null,
-        countLabel:
-          folder.id === "virtual:focused"
-            ? `Unread: ${focusedUnreadCount ?? 0}`
-            : folder.id === "virtual:action-queue"
-            ? `To-Do: ${actionQueueTodoCount ?? 0}`
-            : undefined,
         countAriaLabel:
           folder.id === "virtual:focused"
-            ? `${focusedUnreadCount ?? 0} unread`
+            ? tv("unreadCount", { count: focusedUnreadCount ?? 0 })
             : folder.id === "virtual:action-queue"
-            ? `${actionQueueTodoCount ?? 0} to-do`
-            : `${inviteDeckUnreadCount ?? 0} unread`,
+            ? tv("pendingCount", { count: actionQueueTodoCount ?? 0 })
+            : tv("unreadCount", { count: inviteDeckUnreadCount ?? 0 }),
         countTitle:
           folder.id === "virtual:invite-deck" &&
           typeof inviteDeckTotalCount === "number" &&
           typeof inviteDeckUnreadCount === "number"
-            ? `${folder.description} (${inviteDeckTotalCount} Messages, ${inviteDeckUnreadCount} unread)`
+            ? tv("countTitle", { description: tv(`${folder.messageKey}.description`), total: inviteDeckTotalCount, unread: inviteDeckUnreadCount })
             : undefined,
         rowTitle:
           folder.id === "virtual:invite-deck" &&
           typeof inviteDeckTotalCount === "number" &&
           typeof inviteDeckUnreadCount === "number"
-            ? `${folder.description} (${inviteDeckTotalCount} Messages, ${inviteDeckUnreadCount} unread)`
-            : `${folder.name}: ${folder.description}`,
+            ? tv("countTitle", { description: tv(`${folder.messageKey}.description`), total: inviteDeckTotalCount, unread: inviteDeckUnreadCount })
+            : tv("rowTitle", getVirtualFolderLabels(folder, tv)),
         emphasize:
           folder.id === "virtual:focused"
             ? (focusedUnreadCount ?? 0) > 0
@@ -5429,7 +5256,8 @@ export default function MailClient({
       activeVirtualFolder?.id,
       focusedUnreadCount,
       inviteDeckTotalCount,
-      inviteDeckUnreadCount
+      inviteDeckUnreadCount,
+      tv
     ]
   );
   // "Inbox" heads the sidebar's Views section (design §7.2). Only a real
@@ -5439,11 +5267,11 @@ export default function MailClient({
     const unread = inboxFolder.unreadCount ?? 0;
     return {
       id: `folder:${inboxFolder.id}`,
-      name: "Inbox",
-      description: "Incoming mail",
+      name: tv("inbox.name"),
+      description: tv("inbox.description"),
       active: !activeVirtualFolder && searchScope === "folder" && activeFolderId === inboxFolder.id,
       count: unread,
-      countAriaLabel: `${unread} unread`,
+      countAriaLabel: tv("unreadCount", { count: unread }),
       emphasize: unread > 0,
       icon: <Inbox size={13} />,
       onSelect: () => {
@@ -5459,7 +5287,8 @@ export default function MailClient({
     inboxFolder,
     searchScope,
     setActiveFolderId,
-    setSearchScope
+    setSearchScope,
+    tv
   ]);
   const isExistingAccount = Boolean(
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
@@ -5547,9 +5376,9 @@ export default function MailClient({
             // feat/collab-ui adds "Assigned to me", "Unassigned" and "Open"
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
-              ...folder, active: activeVirtualFolder?.id === folder.id,
+              ...folder, ...getVirtualFolderLabels(folder, tv), active: activeVirtualFolder?.id === folder.id,
               count: collaborationViewCount(folder.id, activeMailboxSummary),
-              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary) ?? 0} threads`, icon: <ListTodo size={13} />,
+              countAriaLabel: tshell("threadsCount", { count: collaborationViewCount(folder.id, activeMailboxSummary) ?? 0 }), icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane
@@ -5601,7 +5430,7 @@ export default function MailClient({
               query,
               searchScope,
               includeSentInEverywhere,
-              sentFolderName: sentFolderBySpecialUse?.name ?? null,
+              sentFolderName: sentFolderBySpecialUse ? getFolderDisplayName(sentFolderBySpecialUse, locale) : null,
               searchFields,
               searchBadges,
               isRelatedSearch,

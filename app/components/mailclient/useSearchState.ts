@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { buildAccountMessagesPath } from "@/lib/accountApiPaths";
 import type { Folder } from "@/lib/data";
@@ -38,41 +39,30 @@ export const DEFAULT_SEARCH_BADGES: SearchBadgesState = {
 
 export type VirtualFolderDefinition = {
   id: "virtual:focused" | "virtual:action-queue" | "virtual:invite-deck" | "virtual:assigned-to-me" | "virtual:unassigned" | "virtual:open";
-  name: string;
-  description: string;
-  badgeLabel: string;
+  messageKey: "focused" | "actionQueue" | "inviteDeck" | "assignedToMe" | "unassigned" | "open";
   queryBadges: readonly string[];
 };
 
+type ViewLabelKey = `${VirtualFolderDefinition["messageKey"]}.${"name" | "description" | "badgeLabel"}`;
+export function getVirtualFolderLabels(folder: VirtualFolderDefinition, t: (key: ViewLabelKey) => string) {
+  return {
+    name: t(`${folder.messageKey}.name`),
+    description: t(`${folder.messageKey}.description`),
+    badgeLabel: t(`${folder.messageKey}.badgeLabel`)
+  };
+}
+
 export const COLLAB_FOLDERS: readonly VirtualFolderDefinition[] = [
-  { id: "virtual:assigned-to-me", name: "Assigned to me", description: "Conversations assigned to you", badgeLabel: "Assigned to me", queryBadges: ["assigned-to-me"] },
-  { id: "virtual:unassigned", name: "Unassigned", description: "Conversations without an assignee", badgeLabel: "Unassigned", queryBadges: ["unassigned"] },
-  { id: "virtual:open", name: "Open", description: "Conversations that are not closed", badgeLabel: "Open", queryBadges: ["open"] }
+  { id: "virtual:assigned-to-me", messageKey: "assignedToMe", queryBadges: ["assigned-to-me"] },
+  { id: "virtual:unassigned", messageKey: "unassigned", queryBadges: ["unassigned"] },
+  { id: "virtual:open", messageKey: "open", queryBadges: ["open"] }
 ];
 
 export const VIRTUAL_FOLDERS: readonly VirtualFolderDefinition[] = [
   ...COLLAB_FOLDERS,
-  {
-    id: "virtual:focused",
-    name: "Focused",
-    description: "Unread, unanswered, not newsletters",
-    badgeLabel: "Focused",
-    queryBadges: ["focused"]
-  },
-  {
-    id: "virtual:action-queue",
-    name: "Action Queue",
-    description: "To-Do & Flagged",
-    badgeLabel: "Flagged or To-Do",
-    queryBadges: ["attention"]
-  },
-  {
-    id: "virtual:invite-deck",
-    name: "Invite Deck",
-    description: "Calendar invites",
-    badgeLabel: "Calendar",
-    queryBadges: ["calendar"]
-  }
+  { id: "virtual:focused", messageKey: "focused", queryBadges: ["focused"] },
+  { id: "virtual:action-queue", messageKey: "actionQueue", queryBadges: ["attention"] },
+  { id: "virtual:invite-deck", messageKey: "inviteDeck", queryBadges: ["calendar"] }
 ];
 
 type UseSearchStateOptions = {
@@ -104,7 +94,7 @@ export type SearchState = {
   actionQueueTodoCount: number | null;
   inviteDeckTotalCount: number | null;
   inviteDeckUnreadCount: number | null;
-  activeVirtualFolder: VirtualFolderDefinition | null;
+  activeVirtualFolder: (VirtualFolderDefinition & ReturnType<typeof getVirtualFolderLabels>) | null;
 };
 
 export type SearchActions = {
@@ -117,6 +107,7 @@ export type SearchActions = {
 };
 
 export function useSearchState(options: UseSearchStateOptions) {
+  const t = useTranslations("Views");
   const {
     activeAccountId,
     activeFolderId,
@@ -162,8 +153,9 @@ export function useSearchState(options: UseSearchStateOptions) {
     if (!activeVirtualFolderId) return null;
     if (searchScope !== "all") return null;
     if (trimmedQuery.length > 0 || isRelatedSearch) return null;
-    return VIRTUAL_FOLDERS.find((folder) => folder.id === activeVirtualFolderId) ?? null;
-  }, [activeVirtualFolderId, isRelatedSearch, searchScope, trimmedQuery]);
+    const folder = VIRTUAL_FOLDERS.find((folder) => folder.id === activeVirtualFolderId);
+    return folder ? { ...folder, ...getVirtualFolderLabels(folder, t) } : null;
+  }, [activeVirtualFolderId, isRelatedSearch, searchScope, trimmedQuery, t]);
 
   const clearSearch = useCallback(() => {
     const relatedRestore =

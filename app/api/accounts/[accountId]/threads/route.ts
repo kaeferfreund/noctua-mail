@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
@@ -68,6 +69,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       : undefined;
     const attachmentsOnly = searchParams.get("attachments") === "1";
 
+    const folderError = await validateAccountFolders(accountId,
+      [folderId, ...(excludedFolderIds ?? [])]);
+    if (folderError) return folderError;
     const data = await listThreads({
       accountId: context.accountId,
       folderId: folderId ?? undefined,
