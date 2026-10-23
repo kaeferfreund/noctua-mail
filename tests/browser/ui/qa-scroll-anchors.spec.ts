@@ -60,7 +60,7 @@ async function openVisibleRow(page: Page, below: string) {
 
 test("390px: scroll far, open a mail, Back shows the same rows", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/?accountId=qa-shared"); await expect(rows(page).first()).toBeVisible();
+  await page.goto("/?a=~qa-shared"); await expect(rows(page).first()).toBeVisible();
   await expect.poll(() => search(page).get("folderId")).toBe("qa-shared:INBOX");
   const before = await scrollFar(page);
   await openVisibleRow(page, before.id!);
@@ -89,7 +89,7 @@ test("390px: scroll far, open a mail, Back shows the same rows", async ({ page }
 
 test("desktop: list position survives a mailbox switch on Back and on a revisit", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?accountId=qa-shared"); await expect(rows(page).first()).toBeVisible();
+  await page.goto("/?a=~qa-shared"); await expect(rows(page).first()).toBeVisible();
   await expect.poll(() => search(page).get("folderId")).toBe("qa-shared:INBOX");
   const before = await scrollFar(page);
   await openVisibleRow(page, before.id!);

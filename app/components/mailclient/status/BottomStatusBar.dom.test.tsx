@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import postcss from "postcss";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
-import { useEffect, useState, type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import BottomStatusBar, { type BottomStatusPanel } from "./BottomStatusBar";
-import { consumeCalendarOpenRequest } from "./statusIndicator";
 import type { SyncJobProgress } from "../types";
 
 const noop = () => {};
@@ -32,19 +31,10 @@ function props(): ComponentProps<typeof BottomStatusBar> {
     formatRelativeTime: () => "just now", onOpenCalendarSidebar: noop, onToggleCalendarSidebar: noop, buildInfo: null
   };
 }
-function Harness({ initial = null, overrides = {}, pwa = false }: {
-  initial?: BottomStatusPanel; overrides?: Partial<ComponentProps<typeof BottomStatusBar>>; pwa?: boolean
+function Harness({ initial = null, overrides = {} }: {
+  initial?: BottomStatusPanel; overrides?: Partial<ComponentProps<typeof BottomStatusBar>>
 }) {
   const [openPanel, setOpenPanel] = useState<BottomStatusPanel>(initial);
-  useEffect(() => {
-    if (!pwa) return;
-    const next = consumeCalendarOpenRequest(window.location.href);
-    if (next !== null) {
-      // Mirror the external PWA URL request consumed by MailClient on mount.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpenPanel("calendar"); window.history.replaceState({}, "", next);
-    }
-  }, [pwa]);
   return <I18nTestProvider locale="de"><Theme><BottomStatusBar {...props()} {...overrides} openPanel={openPanel} setOpenPanel={setOpenPanel} /></Theme></I18nTestProvider>;
 }
 
@@ -91,14 +81,6 @@ describe("compact header status", () => {
     const section = panel === "calendar" || panel === "reminders" ? "reminder" : panel === "exceptions" ? "exception" : panel;
     expect(popover.querySelector(`[data-status-section="${section}"] button`)?.getAttribute("aria-expanded")).toBe("true");
     if (panel === "calendar") expect(within(popover).getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
-  });
-  it("opens the PWA calendar route and consumes only its flag", async () => {
-    window.history.replaceState({}, "", "/?other=keep&openCalendar=1#anchor");
-    const view = render(<Harness pwa />);
-    expect(await view.findByRole("dialog")).toBeTruthy();
-    expect(view.getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
-    expect(window.location.search + window.location.hash).toBe("?other=keep#anchor");
-    expect(consumeCalendarOpenRequest("http://localhost/?openCalendar=0")).toBeNull();
   });
   it("resolves private identifiers to names and invokes retry; Details are readable", async () => {
     let retried: SyncJobProgress | undefined;

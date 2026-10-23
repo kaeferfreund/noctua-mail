@@ -31,34 +31,56 @@ export function emptyDeepLink(): DeepLinkState {
 function member<T extends string>(values: readonly T[], value: string | null): T | null {
   return values.includes(value as T) ? value as T : null;
 }
+/** The parameter determines the prefix; ~ escapes every other (including RFC) ID. */
+export function encodeDeepLinkId(id: string, prefix: "acc" | "imap"): string {
+  const hex = id.match(new RegExp(`^${prefix}-([0-9a-f]{24})$`))?.[1];
+  if (!hex) return `~${id}`;
+  const bytes = hex.match(/../g)!.map(byte => String.fromCharCode(parseInt(byte, 16))).join("");
+  return btoa(bytes).replace(/\+/g, "-").replace(/\//g, "_");
+}
+function decodeDeepLinkId(value: string, prefix: "acc" | "imap"): string {
+  if (value.startsWith("~")) return value.slice(1);
+  if (!/^[A-Za-z0-9_-]{16}$/.test(value)) return "";
+  const bytes = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+  return `${prefix}-${Array.from(bytes, byte => byte.charCodeAt(0).toString(16).padStart(2, "0")).join("")}`;
+}
 export function parseDeepLink(search: string): DeepLinkState {
   const p = new URLSearchParams(search);
   const view = member(VIEWS, p.get("view"));
-  return { ...emptyDeepLink(), accountId: p.get("accountId")?.trim() ?? "", folderId: p.get("folderId") ?? "",
-    // Legacy notification links carry RFC Message-ID; the authorized resolver supports both.
-    messageId: p.get("openMessageId") || p.get("messageId") || "", query: p.get("q") ?? "",
-    scope: view || p.get("scope") === "all" ? "all" : "folder", view,
-    group: member(GROUPS, p.get("group")) ?? "date",
+  const accountId = decodeDeepLinkId(p.get("a") ?? "", "acc");
+  const folder = p.get("f");
+  const folderId = folder === null ? "" : folder.startsWith("~:") ? folder.slice(2)
+    : accountId ? `${accountId}:${folder.startsWith("~~") ? folder.slice(1) : folder}` : "";
+  return { ...emptyDeepLink(), accountId, folderId,
+    // Notifications may carry RFC Message-ID; the authorized resolver supports both.
+    messageId: decodeDeepLinkId(p.get("m") ?? "", "imap"), query: p.get("q") ?? "",
+    scope: view || p.get("s") === "all" ? "all" : "folder", view,
+    group: member(GROUPS, p.get("g")) ?? "date",
     badges: BADGE_KEYS.filter(key => p.get("filter")?.split(",").includes(key)),
     fields: p.has("fields") ? FIELD_KEYS.filter(key => p.get("fields")!.split(",").includes(key)) : [...FIELD_KEYS],
     settings: member(SETTINGS_SECTIONS, p.get("settings")), admin: member(ADMIN_SECTIONS, p.get("admin")),
-    security: p.get("security") === "1", panel: member(PANELS, p.get("panel")) ?? (p.get("openCalendar") === "1" ? "calendar" : null),
-    calendar: p.get("calendar") === "1", compose: p.has("mailto") };
+    security: p.get("security") === "1", panel: member(PANELS, p.get("panel")),
+    calendar: p.get("calendar") === "1", compose: p.has("c") };
 }
-const OWNED_PARAMS = ["accountId", "folderId", "openMessageId", "messageId", "q", "scope", "view", "group", "filter", "fields", "settings", "admin", "security", "panel", "openCalendar", "calendar", "mailto"];
+const OWNED_PARAMS = ["a", "f", "m", "s", "g", "q", "view", "filter", "fields", "settings", "admin", "security", "panel", "calendar", "c"];
 export function serializeDeepLink(state: DeepLinkState, current = "/"): string {
   const url = new URL(current, "http://localhost");
   OWNED_PARAMS.forEach(key => url.searchParams.delete(key));
   const put = (key: string, value: string | null | false) => { if (value) url.searchParams.set(key, value); };
-  put("accountId", state.accountId); put("folderId", state.folderId); put("openMessageId", state.messageId);
-  put("scope", state.scope === "all" && "all"); put("q", state.query); put("view", state.view);
-  put("group", state.group !== "date" && state.group);
+  put("a", state.accountId && encodeDeepLinkId(state.accountId, "acc"));
+  if (state.folderId) {
+    const relative = state.accountId && state.folderId.startsWith(`${state.accountId}:`) ? state.folderId.slice(state.accountId.length + 1) : null;
+    url.searchParams.set("f", relative === null ? `~:${state.folderId}` : relative.startsWith("~") ? `~${relative}` : relative);
+  }
+  put("m", state.messageId && encodeDeepLinkId(state.messageId, "imap"));
+  put("s", state.scope === "all" && "all"); put("q", state.query); put("view", state.view);
+  put("g", state.group !== "date" && state.group);
   put("filter", BADGE_KEYS.filter(key => state.badges.includes(key)).join(","));
   if (FIELD_KEYS.some(key => !state.fields.includes(key))) url.searchParams.set("fields", FIELD_KEYS.filter(key => state.fields.includes(key)).join(","));
   put("settings", state.settings); put("admin", state.admin); put("security", state.security && "1");
   put("panel", state.panel); put("calendar", state.calendar && "1");
   // An outgoing link may reopen a blank composer; never serialize its draft or recipients.
-  put("mailto", state.compose && "mailto:");
+  put("c", state.compose && "mailto:");
   return `${url.pathname}${url.search}${url.hash}`;
 }
 export function deepLinkHistoryMode(previous: DeepLinkState, next: DeepLinkState, keyboard = false): "push" | "replace" {
@@ -84,12 +106,10 @@ export function messageDeepLink(message: { accountId: string; id: string; folder
   return new URL(serializeDeepLink({ ...emptyDeepLink(), accountId: message.accountId, folderId: message.folderId, messageId: message.id }), origin).href;
 }
 
-/** Adapter for both legacy SW payload fields and its legacy URL (never follows an external URL). */
-export function notificationDeepLink(payload: { accountId?: unknown; messageId?: unknown; url?: unknown }): DeepLinkState {
-  let target = emptyDeepLink();
+/** Warm service-worker clicks carry the same compact URL as cold notification opens. */
+export function notificationDeepLink(payload: { url?: unknown }): DeepLinkState {
   if (typeof payload.url === "string") {
-    try { target = parseDeepLink(new URL(payload.url, "http://localhost").search); } catch { /* Ignore malformed optional URL. */ }
+    try { return parseDeepLink(new URL(payload.url, "http://localhost").search); } catch { /* Ignore malformed optional URL. */ }
   }
-  return { ...emptyDeepLink(), accountId: typeof payload.accountId === "string" ? payload.accountId.trim() : target.accountId,
-    messageId: typeof payload.messageId === "string" && payload.messageId ? payload.messageId : target.messageId };
+  return emptyDeepLink();
 }
