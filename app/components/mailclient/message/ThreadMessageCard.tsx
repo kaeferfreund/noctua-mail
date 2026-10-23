@@ -1,6 +1,6 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { OwnAddressInput } from "@/lib/ownAddresses";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type React from "react";
 import { Image as ImageIcon, Languages, MoveRight, Paperclip, RefreshCw } from "lucide-react";
 import { Badge, Button, Card, Flex, Select, Text } from "@radix-ui/themes";
@@ -48,7 +48,7 @@ import FlagBadge from "./FlagBadge";
 import MessageBadge from "./MessageBadge";
 import SenderIcon from "../SenderIcon";
 import InReplyToReferenceRow from "../InReplyToReferenceRow";
-import { hasNonInlineAttachments, getUnsubscribeCapability, resolveInReplyToRef } from "../utils/messageHelpers";
+import { hasNonInlineAttachments, getUnsubscribeCapability } from "../utils/messageHelpers";
 import { formatAddressList } from "../utils/parseAddressList";
 import { getMessageFromDisplay } from "../messagelist/threadGroupUtils";
 import type { InviteProcessingStatePatch } from "../utils/calendarInviteState";
@@ -56,6 +56,7 @@ import { isRenderableInlineAttachment } from "@/lib/messageFlags";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import MessageDisplayOptionsMenu from "./MessageDisplayOptionsMenu";
 import type { MessageTab } from "./types";
+import { renderMarkdownPanel } from "../RenderHelpers";
 
 type ImapFlagBadge = { label: string; kind: string };
 
@@ -64,7 +65,7 @@ type ThreadMessageCardProps = {
   bodyLoading?: boolean;
   bodyLoadError?: string | null;
   messageRefs: React.MutableRefObject<Map<string, HTMLElement>>;
-  pendingMessageActions: Set<string>;
+  actionPending: boolean;
   includeThreadAcrossFolders: boolean;
   activeFolderId: string;
   threadPathById: (folderId: string) => string;
@@ -85,24 +86,25 @@ type ThreadMessageCardProps = {
     view: "thread" | "table" | "list",
     onOpenChange?: (open: boolean) => void
   ) => React.ReactNode;
-  collapsedMessages: Record<string, boolean>;
+  isCollapsed: boolean;
   setCollapsedMessages: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  messageTabs: Record<string, MessageTab>;
+  messageTab?: MessageTab;
   setMessageTabs: React.Dispatch<React.SetStateAction<Record<string, MessageTab>>>;
   fetchSource: (id: string) => void;
   ensureMessageContent: (message: Message, options?: { manual?: boolean }) => Promise<Message | null>;
-  messageContentLoading: Record<string, boolean>;
+  contentLoading: boolean;
   setMessageFontScale: React.Dispatch<React.SetStateAction<Record<string, number>>>;
-  messageFontScale: Record<string, number>;
+  fontScale: number;
   adjustMessageZoom: (messageId: string, delta: number) => void;
   resetMessageZoom: (messageId: string) => void;
-  messageZoom: Record<string, number>;
+  zoomValue: number;
   darkMode: boolean;
   hasHtmlContent: (html?: string) => boolean;
-  renderMarkdownPanel: (body: string | undefined, messageId: string) => React.ReactNode;
   renderSourcePanel: (messageId: string) => React.ReactNode;
   handleSelectMessage: (message: Message) => void;
-  messageByMessageId: Map<string, Message>;
+  replyTarget?: Message;
+  replyReferenceId?: string;
+  replyIsForward?: boolean;
   getPrimaryEmail: (value?: string) => string | null;
   findRecipientAlias: (value?: string | null) => RecipientAlias | null;
   onOpenRecipientAlias: (
@@ -124,7 +126,7 @@ type ThreadMessageCardProps = {
   onComposeTo?: (email: string) => void;
   translationEnabled?: boolean;
   defaultTranslationTargetLang?: string;
-  messageTranslations?: Record<string, MessageTranslationEntry>;
+  translation?: MessageTranslationEntry;
   onShowTranslation?: (
     messageId: string,
     format: MessageTranslationFormat,
@@ -138,12 +140,12 @@ type ThreadMessageCardProps = {
   ) => void;
 };
 
-export default function ThreadMessageCard({
+function ThreadMessageCard({
   message,
   bodyLoading = false,
   bodyLoadError = null,
   messageRefs,
-  pendingMessageActions,
+  actionPending,
   includeThreadAcrossFolders,
   activeFolderId,
   threadPathById,
@@ -156,24 +158,25 @@ export default function ThreadMessageCard({
   isDraftMessage,
   renderQuickActions,
   renderMessageMenu,
-  collapsedMessages,
+  isCollapsed,
   setCollapsedMessages,
-  messageTabs,
+  messageTab,
   setMessageTabs,
   fetchSource,
   ensureMessageContent,
-  messageContentLoading,
+  contentLoading: messageContentLoading,
   setMessageFontScale,
-  messageFontScale,
+  fontScale,
   adjustMessageZoom,
   resetMessageZoom,
-  messageZoom,
+  zoomValue,
   darkMode,
   hasHtmlContent,
-  renderMarkdownPanel,
   renderSourcePanel,
   handleSelectMessage,
-  messageByMessageId,
+  replyTarget,
+  replyReferenceId,
+  replyIsForward,
   getPrimaryEmail,
   findRecipientAlias,
   onOpenRecipientAlias,
@@ -191,7 +194,7 @@ export default function ThreadMessageCard({
   onComposeTo,
   translationEnabled = false,
   defaultTranslationTargetLang,
-  messageTranslations,
+  translation,
   onShowTranslation,
   onHideTranslation,
   onChangeTranslationLang
@@ -240,16 +243,12 @@ export default function ThreadMessageCard({
     };
   });
   const priorityColor = getPriorityBadgeColor(message.priority);
-  const isCollapsed = Boolean(collapsedMessages[message.id]);
   const hasHtml = hasHtmlContent(message.htmlBody);
   const hasText = hasTextContent(message.body);
   const preferTextTab = hasHtml && hasText && !hasMeaningfulHtmlText(message.htmlBody);
   const hasSource = Boolean(message.hasSource);
   const needsContentHydration = needsMessageContentHydration(message);
-  const contentLoading = bodyLoading || Boolean(messageContentLoading[message.id]);
-  const fontScale = messageFontScale[message.id] ?? 1;
-  const zoomValue = messageZoom[message.id] ?? 1;
-  const translation = messageTranslations?.[message.id];
+  const contentLoading = bodyLoading || messageContentLoading;
   const translationShowing = Boolean(translationEnabled && translation?.showing);
   // Normalize to a supported code so an invalid persisted/overridden language
   // can't leak into the banner label, the Select value, the request payload, or
@@ -290,7 +289,7 @@ export default function ThreadMessageCard({
   };
 
   const pickTabValue = (tabs: MessageTab[], fallback: MessageTab) => {
-    const stored = messageTabs[message.id];
+    const stored = messageTab;
     return stored && tabs.includes(stored) ? stored : fallback;
   };
 
@@ -409,7 +408,7 @@ export default function ThreadMessageCard({
           // Resolve cid: image refs to attachment URLs, as the HTML panel does;
           // otherwise the markdown body renders <img src="cid:…"> as a broken image.
           replaceInlineImageSources(message.body ?? "", message.attachments ?? []),
-          message.id
+          fontScale
         );
 
   const wrapPanel = (key: string, node: React.ReactNode) => (
@@ -484,7 +483,9 @@ export default function ThreadMessageCard({
     text: string
   ): React.ReactNode => {
     if (format === "html") return renderHtmlPanel(text);
-    if (tab === "markdown") return renderMarkdownPanel(text, `${message.id}::translation`);
+    // Translated Markdown previously used a separate virtual id without a
+    // font override; preserve that default presentation.
+    if (tab === "markdown") return renderMarkdownPanel(text, 1);
     return renderTextPanel(text);
   };
 
@@ -586,7 +587,7 @@ export default function ThreadMessageCard({
           if (el) messageRefs.current.set(message.id, el);
         }}
         className={`${styles.compactRow} ${
-          pendingMessageActions.has(message.id) ? styles.cardDisabled : ""
+          actionPending ? styles.cardDisabled : ""
         } ${menuOpen ? styles.cardMenuOpen : ""}`}
         onClick={() =>
           setCollapsedMessages((prev) => ({ ...prev, [message.id]: false }))
@@ -682,7 +683,7 @@ export default function ThreadMessageCard({
       size="1"
       variant="surface"
       className={`${styles.card} ${menuOpen ? styles.cardMenuOpen : ""} ${
-        pendingMessageActions.has(message.id) ? styles.cardDisabled : ""
+        actionPending ? styles.cardDisabled : ""
       }`}
     >
       <article
@@ -877,13 +878,12 @@ export default function ThreadMessageCard({
                 />
               ))}
               {(() => {
-                const ref = resolveInReplyToRef(message, messageByMessageId);
-                return ref ? (
+                return replyTarget ? (
                   <InReplyToReferenceRow
                     variant="message"
-                    label={ref.isForward ? t("forwardedMail") : t("inReplyTo")}
-                    value={ref.target.subject ?? ref.refId}
-                    onClick={() => handleSelectMessage(ref.target)}
+                    label={replyIsForward ? t("forwardedMail") : t("inReplyTo")}
+                    value={replyTarget.subject ?? replyReferenceId}
+                    onClick={() => handleSelectMessage(replyTarget)}
                   />
                 ) : null;
               })()}
@@ -896,7 +896,7 @@ export default function ThreadMessageCard({
                   variant="soft"
                   color="gray"
                   onClick={() => handleUnsubscribe(message)}
-                  disabled={pendingMessageActions.has(message.id)}
+                  disabled={actionPending}
                 >
                   {getUnsubscribeCapability(message) === "one-click"
                     ? t("unsubscribe")
@@ -942,4 +942,6 @@ export default function ThreadMessageCard({
   );
 }
 
+// Compare every prop, including callbacks and permission-dependent handlers.
+export default memo(ThreadMessageCard);
 export type { ThreadMessageCardProps };
