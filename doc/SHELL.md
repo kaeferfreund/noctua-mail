@@ -108,3 +108,85 @@ with `--no-ff`; fetch on 2026-10-23 found no newer head.
 - MailClient/useSearchState auto-merges retained; verify through DOM/browser gates.
 
 If i18n-views moves again before round 10, repeat the merge using these decisions.
+
+Merge commit: `97d3eff` (parents: status evidence relocation and `992b220`).
+
+### Round 10 merge rehearsal decisions
+
+`origin/feat/reader-focus` is now available at `14a1f8e`. Its shell-pane CSS,
+ShellPanes and MailClient changes auto-merge. Inspect the combined result to
+retain density tokens and separators together with reader focus visibility.
+Two conflict hunks remain:
+
+- AppShell toolbar/indicators hunk: keep the reader branch's desktop-focus
+  toolbar suppression expression AND unconditional `indicators={statusBar}`
+  from compact status. This preserves the activity control in desktop focus.
+- SHELL.md add/add hunk: retain both the reader layout documentation and this
+  status section, including evidence locations and integration decisions.
+
+`origin/feat/sender-identities-3` at `26d82d8` has five conflict files:
+
+- AccountSettingsModal, hunk 1: retain `"use client"` as the first statement,
+  then both `useTranslations` and `useSenderMessages` imports. Hunk 2: initialize
+  both hooks. Hunk 3: retain translated existing tabs plus the sender identities
+  tab. Hunk 4: include both `t` and `senderMessages.identitiesTitle` in memo
+  dependencies and retain sender's preferences-first active-tab fallback.
+- PreferencesTabContent, import hunk: retain next-intl hooks plus ReactNode.
+  Signature hunk: retain `!senderPreferences` and the translated signature label,
+  together with the matching conditional closing delimiter.
+- resyncMessage.senderKey.test, helper/first-case hunk: retain integration's
+  `runIsolated`/`NOCTUA_RESYNC_TEST_CHILD` mechanism and both real IMAP assertions.
+  Second-case declaration hunk: retain `test` and its same child guard; discard
+  the competing `realResyncTest` wrapper. Do not combine isolation mechanisms.
+- de/en, first hunk: merge `Settings.sender`/`edit` leaves into the complete
+  existing Settings object; keep shared `members.enabled` and preferences keys
+  once. Second hunk: merge sender Compose/Errors/Admin additions into their
+  existing namespaces; preserve all status, Views, Folders, refresh and topic
+  picker keys. Recheck JSON uniqueness, parity and ICU placeholders.
+
+These rehearsals do not merge or modify the reader/sender branches.
+
+## Round 2 calendar validation
+
+The composite calendar reuses the floating calendar's flex/min-height body in
+a bounded frame; mobile fills its Sheet. The status popover is at 9990, the
+mobile Sheet at 9994, event dialogs at 9995, and their pickers at 9998.
+EventDialog now reuses `useDialogFocusRestore` and explicitly focuses its title
+on opening; creation/editing returns focus to the calendar action.
+
+Production browser measurements (`.fc-view-harness`): 426.328125px at both
+1280×900 and 1024×900; 683.5px at 390×844. All three support actual pointer
+clicks to create, open and edit synthetic events, dialog child picker access,
+and action/indicator focus restoration. The committed regression cases assert
+positive grid height, surface < dialog < picker, and these interactions.
+
+The mobile create/edit/focus gate opens through the normal indicator menu.
+An exploratory PWA-open → edit → Escape sequence caused a history return that
+remounted the shell, so indicator focus could not survive that remount. This
+was not baseline-compared and is retained as an integration follow-up in
+`round2/mobile-focus-trace.log`; no shared history behavior was changed.
+PWA flag consumption and query/hash preservation are verified separately.
+
+Earlier probes exposed the missing dialog focus return (fixed), an ambiguous
+text locator matching both title and success notice (scoped to the heading),
+and a retry-count assumption racing a startup sync (now asserts one additional
+full-sync POST for the same folder). Original logs remain in external evidence.
+
+Final gates after `f97896c`: typecheck 0 errors (1,201 files); the status, Shell
+and MobileFrames DOM suites pass three times (51 tests / 228 assertions each).
+Catalog checks pass 9 tests / 5,150 assertions: 1,025 leaves per locale, all ICU
+arguments match, 57 status leaves, no duplicate JSON keys, and every non-status
+i18n-views message is preserved. Full CI passes 2,816 server tests / 305 files /
+16,998 assertions (442.25s), then 492 DOM tests / 60 files / 2,824 assertions
+(71.08s). Lint remains the baseline 1 error / 25 warnings. Production build
+passes (38.8s optimized compilation). Seven browser cases pass (39.4s), plus
+all five reviewer probes: calendar layout/event click, layers, retry wiring,
+exception clearing and all mobile routes/PWA flag handling.
+
+The original 12 PNGs and six JSON artifacts are preserved byte-for-byte in
+[round1-committed](/home/user/code/noctua-mail/briefs/status-bar-compact-evidence/round1-committed/);
+new captures are in the parent evidence directory and raw gates/probes in
+`round2/`. Browser fixtures use isolated `.tmp/qa-shell-*` storage, synthetic
+credentials and only ports 3875–3878. `.env.local` and the configured persistent
+data directory were not changed. Servers terminate via their recorded owned
+PIDs/process groups; no push or deployment occurs.
