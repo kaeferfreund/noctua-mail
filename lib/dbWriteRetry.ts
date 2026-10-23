@@ -106,6 +106,16 @@ export async function withDbWriteRetry<T>(
         error: getErrorSummary(error)
       });
       await workerPause(delayMs);
+      if (handshake && Date.now() >= handshakeDeadline) {
+        console.error("[db-write-retry] exhausted", {
+          operation,
+          retries,
+          attempts: attempt,
+          elapsedMs: Date.now() - startedAt,
+          error: getErrorSummary(error)
+        });
+        throw error;
+      }
     }
   }
 }
