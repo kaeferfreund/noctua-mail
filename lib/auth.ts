@@ -1,10 +1,14 @@
 import { expireLegacyCookie } from "./authCookies";
 import { mailboxErrorResponse } from "./mailboxFailure";
 import type { AccountRole } from "./data";
+import type { Database } from "bun:sqlite";
 import { NextResponse } from "next/server";
 import { getAuth, setActiveAccountId } from "./betterAuth";
 import { getDb } from "./db/connection";
-import { getAccountById, getAccountsForUser, getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { readAccountSelectionCandidates } from "./db/accounts";
+import { compareDisplayOrder } from "./accountPresentation";
+import type { AccountAccessSnapshot } from "./accountAccess";
 import { isMfaEnrollmentComplete } from "./authPolicy";
 
 export const SESSION_TTL_SECONDS = 86400;
@@ -13,6 +17,8 @@ export type ActiveUserSession = {
   sessionId: string;
   sessionToken: string;
   activeAccountId: string | null;
+  /** `auth_session.updatedAt` as read by this request's getSession (epoch ms; NaN if unreadable). */
+  sessionUpdatedAt: number;
   role: "admin" | "user";
   expiresAt: number;
   generation: number;
@@ -88,7 +94,7 @@ export async function requireActiveUserSession(request?: Request | null, options
   const securityCode = pendingSecurity ? "security_operation_pending" : mfa.inconsistent ? "mfa_state_inconsistent" : enrollmentRequired ? "mfa_enrollment_required" : "mfa_required";
   if (!options.allowRestricted && (enrollmentRequired || reauthRequired)) return denied(403, securityCode, headers);
   return { userId: user.id, sessionId: result.session.id, sessionToken: result.session.token,
-    activeAccountId: result.session.activeAccountId ?? null, role: user.role, expiresAt,
+    activeAccountId: result.session.activeAccountId ?? null, sessionUpdatedAt: new Date(result.session.updatedAt).getTime(), role: user.role, expiresAt,
     generation:security.generation, assurance:security.assurance, authenticatedAt:security.authenticatedAt, method:security.method,
     responseHeaders: headers, enrollmentRequired, reauthRequired,
     ...((enrollmentRequired || reauthRequired) ? { securityCode } : {}) };
@@ -104,31 +110,61 @@ export async function listSessionAccountIds(session: ActiveUserSession) {
   return new Set(await listAccessibleAccountIdsForUser(session.userId));
 }
 
-export type MailboxSelection = { mailboxState: "selected" | "none" | "unselected"; accountId: string | null; accounts: Awaited<ReturnType<typeof getAccountsForUser>> };
+/** `access` is this request's access read, taken after the last selection write; never reuse it elsewhere. */
+export type MailboxSelection = { mailboxState: "selected" | "none" | "unselected"; accountId: string | null; access: AccountAccessSnapshot };
 
-/** Persist a deterministic default, then recheck membership. Retry a revoked choice once. */
+/** The selection write also refreshes "Last active"; it is skipped while nothing changes and this is not exceeded. */
+export const SESSION_ACTIVITY_WRITE_INTERVAL_MS = 5 * 60_000;
+
+/** This exact session still exists, is unexpired and bound to the current security generation (a read, no write lock). */
+function isSessionLive(db: Database, session: ActiveUserSession) {
+  return !!db.query(`SELECT 1 FROM auth_session s
+    JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
+    JOIN auth_security_state st ON st.userId=s.userId
+    WHERE s.id=? AND s.token=? AND s.userId=? AND ss.generation=? AND st.generation=ss.generation
+      AND julianday(s.expiresAt)>julianday('now')`).get(session.sessionId, session.sessionToken, session.userId, session.generation);
+}
+
+/**
+ * Persist a deterministic default, then recheck membership on a fresh access read. Retry a revoked choice once.
+ * The read after the write proves the selected mailbox still exists and is still a candidate, and supplies the
+ * mailbox list, so grants, revocations and role changes committed during persistence are reflected.
+ */
 export async function ensureActiveAccountId(session: ActiveUserSession): Promise<MailboxSelection> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const accounts = (await getAccountsForUser(session.userId)).sort((a, b) =>
-      (a.name || a.email).localeCompare(b.name || b.email, "en") ||
-      a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.id.localeCompare(b.id, "en"));
-    if (!accounts.length) {
-      await setActiveAccountId(await getAuth(), session.sessionToken, null);
-      session.activeAccountId = null;
-      return { mailboxState: "none", accountId: null, accounts: [] };
+  const { readAccountAccess } = await import("./accountAccess");
+  const db = await getDb();
+  const readAccess = () => readAccountAccess(db, session.userId, { identities: true });
+  // Stored selection and activity as of this request's getSession, advanced by every write below.
+  let stored = { accountId: session.activeAccountId, updatedAt: session.sessionUpdatedAt };
+  /** Writes only on a change or stale activity. Liveness is read on every attempt, written or not. */
+  const persist = async (accountId: string | null) => {
+    const age = Date.now() - stored.updatedAt;
+    if (accountId !== stored.accountId || !(age >= 0 && age < SESSION_ACTIVITY_WRITE_INTERVAL_MS)) {
+      const updated = await setActiveAccountId(await getAuth(), session.sessionToken, accountId);
+      if (!updated) return false;
+      stored = { accountId, updatedAt: new Date(updated.updatedAt).getTime() };
     }
-    const selected = accounts.find(a => a.id === session.activeAccountId) ?? accounts[0];
-    const updated = await setActiveAccountId(await getAuth(), session.sessionToken, selected.id);
-    const liveIds = await listAccessibleAccountIdsForUser(session.userId);
-    if (updated && liveIds.includes(selected.id) && await getAccountById(selected.id)) {
+    return isSessionLive(db, session);
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const candidates = readAccountSelectionCandidates(db, session.userId).sort(compareDisplayOrder);
+    if (!candidates.length) {
+      await persist(null);
+      session.activeAccountId = null;
+      return { mailboxState: "none", accountId: null, access: readAccess() };
+    }
+    const selected = candidates.find(a => a.id === session.activeAccountId) ?? candidates[0];
+    const live = await persist(selected.id);
+    const access = readAccess();
+    if (live && access.candidateIds.includes(selected.id)) {
       session.activeAccountId = selected.id;
-      return { mailboxState: "selected", accountId: selected.id, accounts: accounts.filter(a => liveIds.includes(a.id)) };
+      return { mailboxState: "selected", accountId: selected.id, access };
     }
     session.activeAccountId = null;
   }
-  await setActiveAccountId(await getAuth(), session.sessionToken, null);
-  const accounts = await getAccountsForUser(session.userId);
-  return { mailboxState: accounts.length ? "unselected" : "none", accountId: null, accounts };
+  await persist(null);
+  const access = readAccess();
+  return { mailboxState: access.candidateIds.length ? "unselected" : "none", accountId: null, access };
 }
 
 /** Bearer-only: browser cookies are never an MCP fallback. */
