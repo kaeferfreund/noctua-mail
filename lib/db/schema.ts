@@ -1,6 +1,6 @@
 import { ACCOUNT_KEY_TABLE_SQL, ensureAccountKeySchema } from "./accountKeys";
 import { assertCompleteShardFormat, assertSupportedShardFormat, prepareAccountShardConnection } from "./shardFormat";
-import { getOwnAddresses, ownAddressList, type OwnAddressInput } from "../ownAddresses";
+import { ownAddressList, type OwnAddressInput } from "../ownAddresses";
 import { seedSenderIdentityRow } from "./senderIdentities";
 import { randomUUID } from "crypto";
 import type { InviteCode } from "../data";
@@ -657,9 +657,11 @@ function backfillEmailCalendarEventParticipation(
 }
 
 export async function ensureCalendarEventRuntimeData(db: any, accountId: string) {
-  const { getAccountById } = await import("./accounts");
-  const account = await getAccountById(accountId);
-  const ownAddresses = account ? getOwnAddresses(account) : [];
+  // Runs on every getAccountDb: read only the own addresses (email + sender
+  // identities), not the full account row with its decrypted secrets. Lazy
+  // import to avoid a top-level cycle with lib/db.ts (which re-exports this module).
+  const { getAccountOwnAddresses } = await import("./senderIdentities");
+  const ownAddresses = await getAccountOwnAddresses(accountId);
   const signature = `${CALENDAR_EVENT_RUNTIME_SIGNATURE}:${ownAddresses.join(",")}`;
   const perAccount = calendarEventRuntimeSignatureByDb.get(db);
   if (perAccount?.get(accountId) === signature) {
@@ -667,8 +669,6 @@ export async function ensureCalendarEventRuntimeData(db: any, accountId: string)
   }
   ensureCalendarEventOptionalColumns(db);
   backfillEmailCalendarEventStatuses(db);
-  // Lazy import of the account lookup to avoid a top-level cycle with
-  // lib/db.ts (which re-exports this module).
   backfillEmailCalendarEventParticipation(db, accountId, ownAddresses);
   const nextPerAccount = perAccount ?? new Map<string, string>();
   nextPerAccount.set(accountId, signature);
