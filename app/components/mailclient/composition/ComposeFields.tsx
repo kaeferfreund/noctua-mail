@@ -297,6 +297,7 @@ export default function ComposeFields({
   const inReplyToRow = inReplyToMessage ? (
     <InReplyToReferenceRow
       variant="compose"
+      label={t("Reader.inReplyTo")}
       value={t("Compose.fields.inReplyTo", { subject: inReplyToMessage.subject || t("Reader.noSubject"), from: inReplyToMessage.from })}
       onClick={onJumpToMessage ? () => onJumpToMessage(inReplyToMessage.id) : undefined}
     />
