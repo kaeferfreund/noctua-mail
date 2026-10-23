@@ -241,7 +241,6 @@
       "clearExceptions": "Clear exceptions",
       "copyError": "Copy error",
       "relogin": "Re-login",
-      "close": "Close",
       "deleteReminderError": "Failed to delete reminder.",
       "openSourceMail": "Open source mail",
       "duration": "Duration: {value}",

@@ -241,7 +241,6 @@
       "clearExceptions": "Alle Fehler löschen",
       "copyError": "Fehler kopieren",
       "relogin": "Erneut anmelden",
-      "close": "Schließen",
       "deleteReminderError": "Die Erinnerung konnte nicht gelöscht werden.",
       "openSourceMail": "Ursprüngliche E-Mail öffnen",
       "duration": "Dauer: {value}",

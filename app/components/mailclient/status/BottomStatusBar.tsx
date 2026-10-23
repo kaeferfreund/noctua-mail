@@ -10,7 +10,8 @@ import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Button } from "@/app/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/app/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
+import { Sheet, SheetContent } from "@/app/components/ui/sheet";
+import { StatusSheetTitle } from "@/app/components/shell/StatusPanelFrame";
 import calendarFrame from "@/app/components/calendar/CalendarPopover.module.css";
 import styles from "./BottomStatusBar.module.css";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
@@ -72,6 +73,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
   const { setOpenPanel, isSyncing, exceptionEntries } = props;
   const openPanel = normalizePanel(props.openPanel);
   const t = useTranslations("Shell.status");
+  const tShell = useTranslations("Shell");
   const locale = useLocale() as UiLocale;
   const isMobile = useIsMobile();
   const indicatorRef = useRef<HTMLButtonElement>(null);
@@ -135,7 +137,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
       <Sheet open={openPanel === "calendar" || openPanel === "mail-check"} onOpenChange={open => { if (!open) close(); }}>
         <SheetContent onCloseAutoFocus={event => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined}
           side={openPanel === "calendar" ? "right" : "bottom"} className={openPanel === "calendar" ? mobileStyles.fullscreenSheet : mobileStyles.statusSheet}>
-          <SheetTitle className={openPanel === "calendar" ? "flex min-h-13 items-center pr-14 pl-4" : "px-4"}>{openPanel === "calendar" ? t("calendar") : t("mailCheck.title")}</SheetTitle>
+          <StatusSheetTitle title={openPanel === "calendar" ? tShell("calendar") : t("mailCheck.title")} />
           <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
             {openPanel === "calendar" ? calendar : <><p className="mb-3 text-sm text-muted-foreground">{t("mailCheck.description")}</p>{mailCheck}</>}
           </div></Theme>
