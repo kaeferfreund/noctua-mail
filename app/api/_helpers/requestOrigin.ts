@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readAuthEnv } from "@/lib/betterAuth";
+import { readBoundedBody } from "./readAuthJson";
 
 function requireSameOrigin(request: Request) {
   const configured = readAuthEnv().baseURL;
@@ -27,10 +28,18 @@ export function requireJsonSameOrigin(request: Request) {
   return null;
 }
 
+/**
+ * Bodyless guards run before the session check on some routes, so emptiness is
+ * decided from the declared length or the first body chunk, never by buffering.
+ */
+async function isEmptyBody(request: Request) {
+  return (await readBoundedBody(request, 0)) !== null;
+}
+
 export async function requireBodylessSameOrigin(request: Request) {
   const error = requireSameOrigin(request);
   if (error) return error;
-  if ((await request.arrayBuffer()).byteLength !== 0) {
+  if (!(await isEmptyBody(request))) {
     return NextResponse.json({ ok: false, code: "unexpected_body" }, { status: 400 });
   }
   return null;
@@ -44,6 +53,6 @@ export async function requireBodylessSameOrigin(request: Request) {
 export async function requireMutationSameOrigin(request: Request) {
   const error = requireSameOrigin(request);
   if (error) return error;
-  if (isJsonRequest(request) || (await request.arrayBuffer()).byteLength === 0) return null;
+  if (isJsonRequest(request) || await isEmptyBody(request)) return null;
   return NextResponse.json({ ok: false, code: "json_required" }, { status: 400 });
 }
