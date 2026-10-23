@@ -99,6 +99,7 @@ describe("initMasterSchema: clean install", () => {
       expect.arrayContaining(["role", "grantedByUserId", "grantedAt"])
     );
     expect(columnNames(db, "mcp_tokens")).toContain("scopes");
+    expect(columnNames(db, "mcp_token_accounts")).toEqual(["tokenId", "accountId"]);
     expect(columnNames(db, "user_account_prefs")).toEqual([
       "userId",
       "accountId",
@@ -243,4 +244,20 @@ describe("initMasterSchema: legacy install", () => {
     expect(emailsById(db)).toEqual({ "user-dup-upper": "dup@example.test" });
     expect(emailIndex(db)?.unique).toBe(1);
   });
+});
+
+
+test("MCP mapping migration is additive/idempotent and token deletion cleans mappings without FK pragma", () => {
+  const db = openMemoryDb();
+  createLegacyMasterTables(db);
+  db.exec("INSERT INTO mcp_tokens(id,accountId,createdByUserId,label,tokenHash,tokenSuffix,createdAt) VALUES ('legacy','primary','synthetic','Synthetic','synthetic-hash','123456',1)");
+  runMigrationQuietly(db);
+  runMigrationQuietly(db);
+  expect(db.prepare("SELECT accountId,scopes FROM mcp_tokens WHERE id='legacy'").get()).toEqual({ accountId: "primary", scopes: null });
+  expect(db.prepare("SELECT * FROM mcp_token_accounts").all()).toEqual([]);
+  db.exec("INSERT INTO mcp_token_accounts VALUES ('legacy','primary')");
+  expect(() => db.exec("INSERT INTO mcp_token_accounts VALUES ('legacy','primary')")).toThrow("UNIQUE constraint");
+  db.exec("INSERT INTO mcp_token_accounts VALUES ('legacy','shared')");
+  db.exec("DELETE FROM mcp_tokens WHERE id='legacy'");
+  expect(db.prepare("SELECT * FROM mcp_token_accounts").all()).toEqual([]);
 });

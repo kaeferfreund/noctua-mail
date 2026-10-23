@@ -983,7 +983,7 @@ test("HTTP MCP immediately enforces viewer downgrade, mailbox binding, stale gen
   const deniedBody = await denied.json();
   expect(deniedBody.result.isError).toBe(true); expect(deniedBody.result.content[0].text).toContain("Insufficient mailbox role");
   const foreign = await call("list_folders", { accountId: "foreign-mailbox" });
-  expect((await foreign.json()).result.content[0].text).toContain("bound to another mailbox");
+  expect((await foreign.json()).result.content[0].text).toContain("Mailbox is not covered by MCP token");
   const read = await call("list_accounts", {});
   expect((await read.json()).result.structuredContent.accounts.find((a: {id:string}) => a.id === accountId).accessRole).toBe("viewer");
   const { master } = await (await import("@/lib/testAuthHarness")).getSharedTestAuthHarness();

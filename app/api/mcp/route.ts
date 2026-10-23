@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const result = await executeMcpHttpRequest({ ...context, body,
-    authInfo: { token: "", clientId: `mcp:${context.tokenRecord.id}`, scopes: [], extra: { userId: context.tokenRecord.createdByUserId } } });
+    authInfo: { token: "", clientId: `mcp:${context.tokenRecord.id}`, scopes: context.tokenRecord.scopes ?? [], extra: { userId: context.tokenRecord.createdByUserId } } });
   return result.responses.length ? NextResponse.json(result.responses.length === 1 ? result.responses[0] : result.responses) : new Response(null, { status: 202 });
 }
 

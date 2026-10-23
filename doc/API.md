@@ -129,16 +129,47 @@ advances. The transitional `/api/accounts/summary` route was removed.
 
 ## MCP tools
 
-The executor implements these tools with explicit input/output schemas. Scopes remain
-reserved. Account binding and live mailbox role are
-checked at each tool invocation; optional accountId may only repeat the token mailbox.
-`list_accounts` enumerates accessible account metadata with `accessRole`. Token-creator identity comes from
-`tokenRecord.createdByUserId`; activity actor is `mcp:<tokenId>`.
+The executor implements these tools with explicit input/output schemas. Each token
+covers a fixed set of mailboxes, including shared mailboxes. Optional `accountId`
+selects any covered mailbox; omission selects `mcp_tokens.accountId` (the primary).
+Mailbox membership and role are read live at every invocation. Losing membership
+in one mailbox does not disable the token's other mailboxes. `list_accounts` returns
+only covered mailboxes with a current membership and `accessRole`; it derives the
+creator from the stored token, never client-supplied identity metadata.
+
+`GET /api/accounts/{accountId}/mcp-tokens` returns `tokens` plus selectable `mailboxes`
+from the creator's accessible own/shared mailboxes. Managers see all tokens covering
+that mailbox; editors see their own. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
+`accountIds` must be a nonempty set of current memberships including the route mailbox
+(the primary); omission means primary only. `mode` defaults to `drafts`:
+
+| Mode | Stored scopes | Allowed operations |
+| --- | --- | --- |
+| `read` — Nur lesen | `["read"]` | list, search, check new mail, get |
+| `drafts` — Lesen und Entwürfe anlegen (kein Senden) | `["read","drafts"]` | read, create drafts, flags/todo/topics, thread status/assignment/comments |
+| `full` — Vollzugriff (auch senden) | `["read","drafts","manage","send"]` | all current tools including sender identity/preferences management; send permission reserved |
+
+Scopes only narrow mailbox roles. Sender identity writes still require manager;
+personal sender preference writes require `manage` plus viewer membership.
+The central `tools/call` gate denies unclassified tools and returns an MCP tool error
+`Token has no <scope> permission` for calls outside the mode. There is **no MCP send tool**.
+`authorizeOutbound({tokenId}, ...)` requires `send` by default and rechecks it at the
+final effect; draft saves explicitly require `drafts`, identity/preferences writes `manage`.
+The HTTP web send authorization is unchanged.
+
+Sets/modes cannot be edited after creation. A token appears in every covered mailbox's
+MCP tab; deleting it there revokes it everywhere. Deleting a mailbox removes its mapping,
+promotes a remaining mailbox if the primary was deleted, and deletes tokens with no
+mailbox left. Token deletion also removes mapping rows. The master-only
+`mcp_token_accounts(tokenId,accountId)` has a composite primary key; no shard changes.
+Existing tokens need no backfill: an empty mapping means primary only and `scopes=NULL`
+means `read` + `drafts`, without `manage` or `send`. Invalid scope JSON grants no permissions.
+Token-creator activity attribution remains `mcp:<tokenId>`.
 
 | Tool | Input (accountId optional on every tool) | Output |
 | --- | --- | --- |
 | `list_mailbox_members` | `{}` | `{ok,members}` |
-| `list_mailbox_summary` | `{}` (no account override) | same `{ok,mailboxes,generatedAt}` contract as above, narrowed to the token mailbox |
+| `list_mailbox_summary` | `{accountId?}` | same `{ok,mailboxes,generatedAt}` contract as above, narrowed to the selected covered mailbox |
 | `get_thread_collaboration` | `{threadId? ,messageId?}` | `{ok,threadId,state,comments,activity}` |
 | `set_thread_status` | `{threadId?,messageId?,status}` | `{ok,state}` |
 | `assign_thread` | `{threadId?,messageId?,assigneeUserId}` | `{ok,state}` |
@@ -147,8 +178,8 @@ checked at each tool invocation; optional accountId may only repeat the token ma
 
 Thread tools require threadId or a stored row/RFC Message-ID; threadId takes precedence.
 `list_mailbox_summary` requires viewer, derives the viewer from the live token creator, and
-rechecks the token before returning. A mailbox-bound token cannot read counts from the
-creator's other mailboxes, even when `list_accounts` exposes their metadata.
+rechecks the token before returning. It reads the selected covered mailbox only
+(default: primary), and cannot read counts from an uncovered mailbox.
 Assignment accepts `"me"` for the token creator or null to unassign. Read tools require viewer;
 status, assignment and comment tools require editor. Existing draft/topic/flag mutation tools
 also enforce editor. Viewer mutation calls return an MCP tool error containing
@@ -296,7 +327,7 @@ review (`draft_identity_changed`). MIME composition and module loading cannot re
 an earlier authorization decision: transports recheck after preparation. DB write
 retries repeat the check inside the write transaction. Revocation/downgrade returns the existing 401/403 shapes;
 identity invalidation returns 409, with zero outbound or mailbox mutations.
-Viewer remains sufficient for own MCP preferences; manager identity management can
+Viewer plus token `manage` remains sufficient for own MCP preferences; manager identity management with `manage` can
 edit/re-enable disabled identities. Local-only RSVP (`sendReply:false`) also checks
 before its first calendar write. After SMTP acceptance, Sent persistence, `sent_by`
 and cleanup proceed independently of later revocation and retain success/warnings.
