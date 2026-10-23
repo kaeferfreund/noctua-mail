@@ -3,13 +3,13 @@ import { applyMailboxSummary, readSummaryEvents, summaryReconnectDelay } from ".
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 
 const mailbox: UserMailboxSummary = { accountId: "synthetic-a", name: "Synthetic", email: "a@example.test", accessRole: "viewer", isOwner: false, shared: true,
-  unread: null, assignedToMe: 0, unassignedOpen: 0, watcher: { state: "idling" } };
-const update = { type: "mailbox-summary" as const, accountId: mailbox.accountId, unread: 5, assignedToMe: 3, unassignedOpen: 7 };
-test("summary events replace absolute counts without changing metadata or unrelated mailboxes", () => {
+  unread: null, assignedToMe: 0, unassignedOpen: 0, open: 0, watcher: { state: "idling" } };
+const update = { type: "mailbox-summary" as const, accountId: mailbox.accountId, unread: 5, assignedToMe: 3, unassignedOpen: 7, open: 9, watcher: { state: "auth_failed" as const, lastEventAt: 1234 } };
+test("summary events replace absolute counts with watcher metadata without changing unrelated mailboxes", () => {
   const other = { ...mailbox, accountId: "synthetic-b" };
   const rows = [mailbox, other];
   const next = applyMailboxSummary(rows, update)!;
-  expect(next[0]).toEqual({ ...mailbox, unread: 5, assignedToMe: 3, unassignedOpen: 7 });
+  expect(next[0]).toEqual({ ...mailbox, unread: 5, assignedToMe: 3, unassignedOpen: 7, open: 9, watcher: update.watcher });
   expect(next[1]).toBe(other);
   expect(rows[0].unread).toBeNull();
   expect(applyMailboxSummary(next, update)).toEqual(next);

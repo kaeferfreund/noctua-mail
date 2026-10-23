@@ -7,14 +7,16 @@ import type { ShellAccount } from "@/app/components/shell/types";
 import { COLLAB_FOLDERS } from "@/app/components/mailclient/useSearchState";
 import { collaborationViewCount } from "./mailboxSummaryEvents";
 import { useMailboxSummaries } from "./useMailboxSummaries";
+import type { MailboxState } from "@/lib/authClient";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 
 afterEach(cleanup);
 const mailbox: UserMailboxSummary = { accountId: "synthetic-mailbox", name: "Synthetic", email: "team@example.test",
-  accessRole: "viewer", isOwner: false, shared: true, unread: 2, assignedToMe: 3, unassignedOpen: 4, watcher: { state: "disabled" } };
+  accessRole: "viewer", isOwner: false, shared: true, unread: 2, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "disabled" } };
 const personal = { ...mailbox, accountId: "synthetic-personal", shared: false, unread: null, watcher: { state: "idling" as const } };
 const response = (rows: UserMailboxSummary[]) => Response.json({ ok: true, mailboxes: rows, generatedAt: 1 });
 function harness() {
+  const requests: string[] = [];
   const snapshots: Array<(response: Response) => void> = [];
   const sources: ReadableStreamDefaultController<Uint8Array>[] = [];
   const sourceRequests: string[] = [];
@@ -23,6 +25,7 @@ function harness() {
   const threadChanges: string[] = [];
   const summaryChanges: string[] = [];
   const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push(String(input));
     if (String(input).endsWith("/summary")) return new Promise<Response>((resolve, reject) => {
       snapshots.push(resolve);
       init?.signal?.addEventListener("abort", () => reject(new DOMException("Synthetic aborted read", "AbortError")), { once: true });
@@ -36,12 +39,12 @@ function harness() {
     } });
     return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
   };
-  function View({ sessionKey }: { sessionKey: string | null }) {
-    const rows = useMailboxSummaries({ sessionKey, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
+  function View({ sessionKey, authState = "selected" }: { sessionKey: string | null; authState?: MailboxState | null }) {
+    const rows = useMailboxSummaries({ sessionKey, authState, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
     return <Theme><SidebarProvider><output>{JSON.stringify(rows)}</output>
       <MailboxRows accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
       <ul>{COLLAB_FOLDERS.map(folder => {
-        const count = collaborationViewCount(folder.id, rows.find(row => row.accountId === mailbox.accountId), 6);
+        const count = collaborationViewCount(folder.id, rows.find(row => row.accountId === mailbox.accountId));
         return <ViewRow key={folder.id} view={{ ...folder, icon: null, count, countAriaLabel: `${count ?? 0} threads`, active: false, onSelect: () => {} }} />;
       })}</ul>
     </SidebarProvider></Theme>;
@@ -54,8 +57,8 @@ function harness() {
     await waitFor(() => expect(snapshots.length).toBeGreaterThan(0));
     await act(async () => snapshots.shift()!(response(rows)));
   };
-  return { view, sources, sourceRequests, snapshots, send, read, View, threadChanges, summaryChanges,
-    changes: () => mailboxChanges, denyStream: () => { streamStatus = 403; } };
+  return { view, requests, sources, sourceRequests, snapshots, send, read, View, threadChanges, summaryChanges,
+    changes: () => mailboxChanges, denyStream: (status = 403) => { streamStatus = status; } };
 }
 
 test("sidebar shows inactive and personal badges and view counts; burst SSE applies without full reads", async () => {
@@ -66,13 +69,15 @@ test("sidebar shows inactive and personal badges and view counts; burst SSE appl
   expect(h.view.getAllByRole("button")[0].getAttribute("title")).toContain("Watcher: idling");
   expect(h.view.getByLabelText("2 unread")).toBeTruthy();
   expect(h.view.getByLabelText("3 threads")).toBeTruthy();
-  for (const unread of [7, 8, 9]) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread, assignedToMe: 8, unassignedOpen: 7 });
+  for (const unread of [7, 8, 9]) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread, assignedToMe: 8, unassignedOpen: 7, open: 10, watcher: { state: "auth_failed", lastEventAt: 1234 } });
   expect(h.summaryChanges).toEqual([mailbox.accountId, mailbox.accountId, mailbox.accountId]);
   expect(h.view.getByLabelText("9 unread")).toBeTruthy();
   expect(h.view.getByLabelText("8 assigned to me")).toBeTruthy();
   expect(h.view.getByLabelText("8 threads")).toBeTruthy();
   expect(h.view.getByLabelText("7 threads")).toBeTruthy();
   expect(h.snapshots).toHaveLength(0);
+  expect(h.view.getByLabelText("10 threads")).toBeTruthy();
+  expect(h.view.getByLabelText("Watcher: auth_failed")).toBeTruthy();
   for (const revision of [2, 2, 1, 3]) await h.send({ type: "thread-collab", accountId: mailbox.accountId, threadId: "synthetic-thread", revision });
   expect(h.threadChanges).toEqual([mailbox.accountId, mailbox.accountId]);
   expect(h.snapshots).toHaveLength(0);
@@ -81,7 +86,7 @@ test("sidebar shows inactive and personal badges and view counts; burst SSE appl
 test("events during initial snapshot overlay latest absolute counts without a second GET", async () => {
   const h = harness();
   await waitFor(() => expect(h.snapshots).toHaveLength(1));
-  await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 9, assignedToMe: 8, unassignedOpen: 7 });
+  await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 9, assignedToMe: 8, unassignedOpen: 7, open: 10, watcher: { state: "auth_failed", lastEventAt: 1234 } });
   expect(h.snapshots).toHaveLength(1);
   await h.read();
   expect(h.view.getByLabelText("9 unread")).toBeTruthy();
@@ -90,7 +95,7 @@ test("events during initial snapshot overlay latest absolute counts without a se
 
 test("membership invalidation clears badges immediately and cannot accept an older in-flight read", async () => {
   const h = harness(); await h.read();
-  await h.send({ type: "mailbox-summary", accountId: "synthetic-grant", unread: 1, assignedToMe: 0, unassignedOpen: 1 });
+  await h.send({ type: "mailbox-summary", accountId: "synthetic-grant", unread: 1, assignedToMe: 0, unassignedOpen: 1, open: 1, watcher: { state: "idling" } });
   const stale = h.snapshots.shift()!;
   await h.send({ type: "mailboxes-changed" });
   expect(h.changes()).toBe(1); expect(h.view.queryByLabelText("2 unread")).toBeNull();
@@ -158,4 +163,115 @@ test("disconnect during a pending snapshot cancels the old read and reconnects w
   expect(h.view.getByLabelText("5 unread")).toBeTruthy();
   expect(h.view.queryByLabelText("2 unread")).toBeNull();
   expect(h.snapshots).toHaveLength(0);
+});
+
+async function withRetryTimers(run: (retries: Array<{ delay: number; run: () => void }>) => Promise<void>) {
+  const original = globalThis.setTimeout;
+  const retries: Array<{ delay: number; run: () => void }> = [];
+  const handles: ReturnType<typeof setTimeout>[] = [];
+  globalThis.setTimeout = ((fn: () => void, delay: number, ...args: unknown[]) => {
+    if ([1000, 2000, 4000, 8000, 16000, 30000].includes(delay)) {
+      retries.push({ delay, run: fn });
+      const handle = original(() => {}, 60_000); handles.push(handle); return handle;
+    }
+    return original(fn, delay, ...args);
+  }) as typeof setTimeout;
+  try { await run(retries); }
+  finally { cleanup(); globalThis.setTimeout = original; handles.forEach(clearTimeout); }
+}
+
+for (const denial of ["summary", "stream"] as const) {
+  test(`${denial} 401 clears data, retries with bounded backoff, and resumes canonical reads and live events`, async () => {
+    const h = harness(); await h.read();
+    await withRetryTimers(async retries => {
+      await act(async () => h.sources[0].close());
+      if (denial === "stream") h.denyStream(401);
+      await act(async () => retries.shift()!.run());
+      if (denial === "summary") await act(async () => h.snapshots.shift()!(new Response(null, { status: 401 })));
+      expect(h.view.queryByLabelText("2 unread")).toBeNull();
+      expect(retries.map(retry => retry.delay)).toEqual([2000]);
+      h.denyStream(200);
+      const before = h.requests.filter(path => path.endsWith("/summary")).length;
+      await act(async () => retries.shift()!.run());
+      await h.read();
+      expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(before + 1);
+      await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 11, assignedToMe: 3, unassignedOpen: 4, open: 8, watcher: { state: "idling" } });
+      expect(h.view.getByLabelText("11 unread")).toBeTruthy();
+      expect(h.view.getByLabelText("8 threads")).toBeTruthy();
+      expect(h.snapshots).toHaveLength(0);
+    });
+  });
+
+  test(`${denial} 401 immediately retries once when the four-state auth signal recovers with the same sessionKey`, async () => {
+    const h = harness(); await h.read();
+    await withRetryTimers(async retries => {
+      await act(async () => h.sources[0].close());
+      if (denial === "stream") h.denyStream(401);
+      await act(async () => retries.shift()!.run());
+      if (denial === "summary") await act(async () => h.snapshots.shift()!(new Response(null, { status: 401 })));
+      const before = h.requests.filter(path => path.endsWith("/summary")).length;
+      h.view.rerender(<h.View sessionKey="synthetic-session-a" authState="enrollment" />);
+      expect(h.view.queryByLabelText("2 unread")).toBeNull();
+      h.denyStream(200);
+      h.view.rerender(<h.View sessionKey="synthetic-session-a" authState="unselected" />);
+      await h.read();
+      expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(before + 1);
+      await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 12, assignedToMe: 3, unassignedOpen: 4, open: 8, watcher: { state: "idling" } });
+      expect(h.view.getByLabelText("12 unread")).toBeTruthy();
+      expect(h.snapshots).toHaveLength(0);
+    });
+  });
+}
+
+test("403 remains stopped across auth-state recovery for the same session", async () => {
+  const h = harness();
+  await waitFor(() => expect(h.snapshots).toHaveLength(1));
+  await act(async () => h.snapshots.shift()!(new Response(null, { status: 403 })));
+  h.view.rerender(<h.View sessionKey="synthetic-session-a" authState="enrollment" />);
+  h.view.rerender(<h.View sessionKey="synthetic-session-a" authState="selected" />);
+  expect(h.sourceRequests).toHaveLength(1);
+  expect(h.snapshots).toHaveLength(0);
+});
+
+test("unknown mailbox during pending GET is repaired by exactly one coalesced canonical read", async () => {
+  const h = harness();
+  await waitFor(() => expect(h.snapshots).toHaveLength(1));
+  const added = { ...mailbox, accountId: "synthetic-b", unread: 13 };
+  for (let i = 0; i < 20; i++) await h.send({ type: "mailbox-summary", accountId: added.accountId, unread: 13, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "idling" } });
+  expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(1);
+  await h.read([mailbox]);
+  await waitFor(() => expect(h.snapshots).toHaveLength(1));
+  await h.read([mailbox, added]);
+  expect(JSON.parse(h.view.container.querySelector("output")!.textContent!).map((row: UserMailboxSummary) => row.accountId)).toEqual([mailbox.accountId, added.accountId]);
+  expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(2);
+  expect(h.snapshots).toHaveLength(0);
+});
+
+test("watcher transition replaces stale state and timestamp incrementally; legacy events share one metadata repair", async () => {
+  const h = harness(); await h.read([{ ...mailbox, watcher: { state: "idling", lastEventAt: 1234 } }]);
+  await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 2, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "auth_failed" } });
+  expect(h.view.getByLabelText("Watcher: auth_failed")).toBeTruthy();
+  expect(JSON.parse(h.view.container.querySelector("output")!.textContent!)[0].watcher).toEqual({ state: "auth_failed" });
+  expect(h.snapshots).toHaveLength(0);
+  for (let i = 0; i < 20; i++) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 3, assignedToMe: 3, unassignedOpen: 4 });
+  expect(h.snapshots).toHaveLength(1);
+  await h.read([{ ...mailbox, watcher: { state: "backoff" } }]);
+  expect(h.view.getByLabelText("Watcher: backoff")).toBeTruthy();
+  expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(2);
+  expect(h.snapshots).toHaveLength(0);
+});
+
+test("request-count table: open 1 GET + 1 stream; 20 events 0 GETs; reconnect 1; membership change 1", async () => {
+  const h = harness(); await h.read();
+  await withRetryTimers(async retries => {
+    const gets = () => h.requests.filter(path => path.endsWith("/summary")).length;
+    expect(gets()).toBe(1); expect(h.sourceRequests).toHaveLength(1);
+    for (let unread = 1; unread <= 20; unread++) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "idling" } });
+    expect(gets()).toBe(1);
+    await act(async () => h.sources[0].close());
+    await act(async () => retries.shift()!.run()); await h.read();
+    expect(gets()).toBe(2);
+    await h.send({ type: "mailboxes-changed" }); await h.read();
+    expect(gets()).toBe(3); expect(h.sourceRequests).toHaveLength(2);
+  });
 });

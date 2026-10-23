@@ -908,8 +908,7 @@ export default function MailClient({
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion,
-    collabRevision
+    syncCompletionVersion
   });
 
   // Destructure search state and actions
@@ -922,8 +921,7 @@ export default function MailClient({
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder,
-    collabCounts
+    activeVirtualFolder
   } = searchState;
   const {
     setSearchScope,
@@ -2865,6 +2863,7 @@ export default function MailClient({
     }
   });
   const mailboxSummaries = useMailboxSummaries({
+    authState: mailboxState,
     sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
     apiFetch,
     onMailboxesChanged: () => { void loadInitialData(); },
@@ -5507,8 +5506,8 @@ export default function MailClient({
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
               ...folder, active: activeVirtualFolder?.id === folder.id,
-              count: collaborationViewCount(folder.id, activeMailboxSummary, collabCounts[folder.id] ?? null),
-              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary, collabCounts[folder.id] ?? null) ?? 0} threads`, icon: <ListTodo size={13} />,
+              count: collaborationViewCount(folder.id, activeMailboxSummary),
+              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary) ?? 0} threads`, icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane

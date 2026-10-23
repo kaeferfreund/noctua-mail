@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { UserMailboxSummary, MailboxSummaryResult } from "@/lib/mailboxSummary";
+import type { MailboxState } from "@/lib/authClient";
 import type { UserEvent } from "@/lib/userEvents";
-import { applyMailboxSummary, readSummaryEvents, summaryReconnectDelay } from "./mailboxSummaryEvents";
+import { applyMailboxSummary, hasSummaryMetadata, readSummaryEvents, summaryReconnectDelay, type MailboxSummaryUpdate } from "./mailboxSummaryEvents";
 
 type Options = {
   sessionKey: string | null;
+  authState?: MailboxState | null;
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   onMailboxesChanged: () => void;
   onSummaryChanged?: (accountId: string) => void;
@@ -15,11 +17,16 @@ type Options = {
 /** One canonical snapshot per connection; count events never reread known mailboxes. */
 export function useMailboxSummaries(options: Options) {
   const { sessionKey, apiFetch } = options;
+  // Reuse the account controller's /auth/me four-state signal. Selection is
+  // irrelevant to this user-wide feed; enrollment and unresolved auth suspend it.
+  const authenticated = options.authState === undefined || (options.authState !== null && options.authState !== "enrollment");
+  const deniedKey = useRef<string | null>(null);
   const callbacks = useRef(options);
   callbacks.current = options;
   const [entry, setEntry] = useState<{ key: string; mailboxes: UserMailboxSummary[] } | null>(null);
   useEffect(() => {
-    if (!sessionKey) return;
+    if (deniedKey.current !== sessionKey) deniedKey.current = null;
+    if (!sessionKey || !authenticated || deniedKey.current === sessionKey) return;
     const controller = new AbortController();
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -28,21 +35,29 @@ export function useMailboxSummaries(options: Options) {
     let generation = 0;
     let mailboxes: UserMailboxSummary[] | null = null;
     let refreshTask: Promise<void> | null = null;
-    const pending = new Map<string, Extract<UserEvent, { type: "mailbox-summary" }>>();
+    let repairTask: Promise<void> | null = null;
+    let repairNeeded = false;
+    const pending = new Map<string, MailboxSummaryUpdate>();
     const revisions = new Map<string, number>();
     const publish = () => { if (!stopped) setEntry({ key: sessionKey, mailboxes: mailboxes ?? [] }); };
     const stop = () => {
+      deniedKey.current = sessionKey;
       stopped = true; controller.abort(); stream?.abort(); clearTimeout(timer);
       mailboxes = null; pending.clear(); revisions.clear(); setEntry(null);
     };
     const refresh = (): Promise<void> => {
       if (refreshTask) return refreshTask;
       const start = generation;
+      const repairsMetadata = mailboxes !== null;
       const signal = stream?.signal ?? controller.signal;
       refreshTask = (async () => {
         const response = await apiFetch("/api/me/mailboxes/summary", { signal, cache: "no-store" });
         if (stopped || signal.aborted) return;
-        if (response.status === 403 || response.status === 401) { stop(); return; }
+        if (response.status === 403) { stop(); return; }
+        if (response.status === 401) {
+          ++generation; mailboxes = null; pending.clear(); revisions.clear(); publish();
+          throw new Error("Mailbox session is being restored");
+        }
         if (!response.ok) throw new Error("Mailbox summary unavailable");
         const result: MailboxSummaryResult = await response.json();
         if (stopped || signal.aborted || start !== generation) return;
@@ -50,25 +65,37 @@ export function useMailboxSummaries(options: Options) {
         mailboxes = result.mailboxes;
         // Events delivered during the GET are newer than its snapshot. Overlay
         // the latest coalesced values, without invalidating the whole read.
-        for (const update of pending.values()) mailboxes = applyMailboxSummary(mailboxes, update) ?? mailboxes;
+        for (const update of pending.values()) {
+          const next = applyMailboxSummary(mailboxes, update);
+          if (!next || (!repairsMetadata && !hasSummaryMetadata(update))) repairNeeded = true;
+          if (next) mailboxes = next;
+        }
         pending.clear(); publish();
       })().finally(() => { refreshTask = null; });
       return refreshTask;
     };
     const refreshMissing = () => {
-      void refresh().then(() => {
-        // Membership changed while the old snapshot was in flight.
-        if (!stopped && !stream?.signal.aborted && mailboxes === null) refreshMissing();
-      }).catch(() => { stream?.abort(); });
+      if (repairTask) return;
+      // All invalidations share the in-flight read. Its overlay records any
+      // unapplicable event, then this drain performs exactly one repair read.
+      repairTask = (async () => {
+        try {
+          do {
+            repairNeeded = false;
+            await refresh();
+          } while (!stopped && !stream?.signal.aborted && (repairNeeded || mailboxes === null));
+        } catch { stream?.abort(); }
+        finally { repairTask = null; }
+      })();
     };
     const onEvent = (event: UserEvent | null) => {
       if (stopped) return;
       if (event?.type === "mailbox-summary" && typeof event.accountId === "string" &&
         (event.unread === null || Number.isFinite(event.unread)) && Number.isFinite(event.assignedToMe) && Number.isFinite(event.unassignedOpen)) {
-        pending.set(event.accountId, event);
+        if (refreshTask) pending.set(event.accountId, event);
         const next = mailboxes && applyMailboxSummary(mailboxes, event);
         if (next) { mailboxes = next; publish(); if (!refreshTask) pending.delete(event.accountId); }
-        else refreshMissing();
+        if (!next || !hasSummaryMetadata(event)) refreshMissing();
         callbacks.current.onSummaryChanged?.(event.accountId);
       } else if (event?.type === "thread-collab" && typeof event.accountId === "string" && typeof event.threadId === "string" && Number.isFinite(event.revision)) {
         const key = JSON.stringify([event.accountId, event.threadId]);
@@ -91,7 +118,11 @@ export function useMailboxSummaries(options: Options) {
       try {
         const response = await apiFetch("/api/me/events", { signal: activeStream.signal, cache: "no-store", headers: { Accept: "text/event-stream" } });
         if (stopped) return;
-        if (response.status === 403 || response.status === 401) { stop(); return; }
+        if (response.status === 403) { stop(); return; }
+        if (response.status === 401) {
+          ++generation; mailboxes = null; pending.clear(); revisions.clear(); publish();
+          throw new Error("Mailbox session is being restored");
+        }
         if (!response.ok || !response.body || !response.headers.get("content-type")?.includes("text/event-stream")) throw new Error("Mailbox events unavailable");
         revisions.clear(); pending.clear();
         const snapshot = refresh();
@@ -108,6 +139,6 @@ export function useMailboxSummaries(options: Options) {
     };
     void connect();
     return () => { stopped = true; controller.abort(); stream?.abort(); clearTimeout(timer); };
-  }, [sessionKey, apiFetch]);
-  return entry?.key === sessionKey ? entry.mailboxes : [];
+  }, [sessionKey, authenticated, apiFetch]);
+  return authenticated && entry?.key === sessionKey ? entry.mailboxes : [];
 }

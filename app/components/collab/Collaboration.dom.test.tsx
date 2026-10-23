@@ -338,7 +338,7 @@ it("useThreadCollab optimistically publishes a mutation and rolls it back on fai
     ),
   ).toBe(true);
 });
-it("collaboration sidebar definitions activate their server badge filter; summary removes duplicate counts and Open counts whole-mailbox threads", async () => {
+it("collaboration sidebar definitions activate their server badge filter; summary owns every collaboration count", async () => {
   const requests: URLSearchParams[] = [];
   const apiFetch = (async (url: RequestInfo | URL) => {
     requests.push(new URL(String(url), "http://example.test").searchParams);
@@ -391,11 +391,11 @@ it("collaboration sidebar definitions activate their server badge filter; summar
     );
     expect(view.getByTestId("scope").textContent).toBe("all:");
   }
-  // Assigned/unassigned now come from the canonical summary, leaving the
-  // four existing view counts plus the Open thread total (same mailbox scope).
-  await waitFor(() => expect(requests.length).toBe(5));
+  // All collaboration counts come from the canonical summary, leaving only
+  // the four existing non-collaboration view counts.
+  await waitFor(() => expect(requests.length).toBe(4));
   expect(requests.map(request => [request.get("badges"), request.get("excludeFolderIds")]).sort()).toEqual([
-    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"], ["open", ""]
+    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"]
   ].sort());
 });
 
