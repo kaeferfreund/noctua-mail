@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CalendarDays } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Badge, Button, Flex, Text } from "@radix-ui/themes";
 import { shiftEndPreservingDuration, type ComposeInviteDraft } from "@/lib/composeInvite";
 import CalendarEventScheduleFields from "@/app/components/calendar/CalendarEventScheduleFields";
@@ -37,6 +38,7 @@ export default function ComposeInviteSection({
   onAllDayChange,
   onRecurrenceRuleChange
 }: Props) {
+  const t = useTranslations("Compose.invite");
   const enabled = Boolean(inviteDraft);
   const [localDraft, setLocalDraft] = useState<ComposeInviteDraft | null>(inviteDraft);
   const displayedDraft = localDraft ?? inviteDraft;
@@ -139,10 +141,10 @@ export default function ComposeInviteSection({
         <Flex align="center" gap="2">
           <Badge size="1" variant="soft" color="indigo">
             <CalendarDays size={12} />
-            Invite
+            {t("badge")}
           </Badge>
           <Text size="2" weight="medium">
-            Add event invitation
+            {t("title")}
           </Text>
         </Flex>
         <Button
@@ -161,7 +163,7 @@ export default function ComposeInviteSection({
             onEnableChange(!enabled);
           }}
         >
-          {enabled ? "Remove invite" : "Create invite"}
+          {enabled ? t("remove") : t("create")}
         </Button>
       </Flex>
 
@@ -181,10 +183,10 @@ export default function ComposeInviteSection({
             onLocationChange={handleLocationChange}
           />
           <Text size="1" color="gray">
-            The event title will use this email&apos;s subject.
+            {t("subjectHint")}
           </Text>
           <Text size="1" color="gray">
-            The event description will use the final plain-text version of this email.
+            {t("descriptionHint")}
           </Text>
         </div>
       ) : null}

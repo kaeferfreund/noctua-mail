@@ -45,9 +45,9 @@ async function signIn(page: Page, person?: {email:string;password:string;totpURI
   await page.reload();
   await expect(page.getByRole('button', {name:'Toggle sidebar',exact:true})).toBeVisible();
 }
-async function openCompose(page: Page) {
-  await page.getByRole('button', {name:'New mail',exact:true}).click();
-  await expect(page.getByLabel('Subject:',{exact:true})).toBeVisible();
+async function openCompose(page: Page, labels = {newMail:'New mail', subject:'Subject:'}) {
+  await page.getByRole('button', {name:labels.newMail,exact:true}).click();
+  await expect(page.getByLabel(labels.subject,{exact:true})).toBeVisible();
   await expect(page.locator('[data-lexical-editor="true"]')).toBeVisible();
 }
 
@@ -315,7 +315,11 @@ for (const locale of ['de', 'en'] as const) {
     const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
     const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
     const headers={origin:new URL(page.url()).origin};
-    const copy=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8')).Compose;
+    const ui=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8'));
+    const copy=ui.Compose;
+    // Locale-specific UI copy comes from the same catalogs the app renders.
+    // The relative save time always contains a number; "not saved yet" never does.
+    const draftSaved=new RegExp(copy.draft.savedAgo.split('{time}').map((part:string)=>part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*\\d.*'));
     expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:locale}})).status()).toBe(200);
     const longName='Synthetic Long Display Name NNNNNNNNNNNN';
     const longEmail=`${'a'.repeat(47)}@example.test`;
@@ -337,24 +341,24 @@ for (const locale of ['de', 'en'] as const) {
       expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:sender.id,signatureOverride:''}})).status()).toBe(200);
       await page.goto('/');
       await expect(page.locator('html')).toHaveAttribute('lang',locale);
-      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-      await openCompose(page);
+      await page.getByRole('button',{name:ui.Shell.sidebar.toggle,exact:true}).click();
+      await openCompose(page,{newMail:ui.Shell.compose.new,subject:copy.fields.subject});
       await expect(page.getByLabel(copy.from,{exact:true})).toContainText(sender.email);
       subject=`Synthetic editor space ${locale} ${state} ${Date.now()}`;
       const saved=page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
-      await page.getByLabel('Subject:',{exact:true}).fill(subject);
+      await page.getByLabel(copy.fields.subject,{exact:true}).fill(subject);
       const response=await saved;
       expect(response.status()).toBe(200);
       draftId=(await response.json()).draftId;
-      await expect(page.getByText(/Draft saved/)).toBeVisible();
+      await expect(page.getByText(draftSaved)).toBeVisible();
     }
     async function reopen() {
       await page.goto('/');
-      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-      await page.getByRole('button',{name:/Drafts/}).first().click();
+      await page.getByRole('button',{name:ui.Shell.sidebar.toggle,exact:true}).click();
+      await page.getByRole('button',{name:new RegExp(ui.Folders.drafts)}).first().click();
       await page.getByText(subject,{exact:true}).first().click();
-      await page.getByRole('button',{name:'Edit draft',exact:true}).click();
-      await expect(page.getByLabel('Subject:',{exact:true})).toHaveValue(subject);
+      await page.getByRole('button',{name:ui.Reader.editDraft,exact:true}).click();
+      await expect(page.getByLabel(copy.fields.subject,{exact:true})).toHaveValue(subject);
     }
     async function matrix(sender:{email:string;displayName:string},state:string) {
       const fullSender=`${sender.displayName} <${sender.email}>`;
@@ -370,7 +374,7 @@ for (const locale of ['de', 'en'] as const) {
         await expect(from).toContainText(fullSender);
         expect(await from.evaluate(el=>getComputedStyle(el.firstElementChild!).whiteSpace)).toBe('nowrap');
         const bounds=[];
-        for(const button of [page.getByRole('button',{name:copy.closeComposer,exact:true}),page.getByRole('button',{name:'Cancel',exact:true})]) {
+        for(const button of [page.getByRole('button',{name:copy.closeComposer,exact:true}),page.getByRole('button',{name:copy.actions.cancel,exact:true})]) {
           const box=await button.boundingBox();
           expect(box).not.toBeNull();
           expect(box!.x).toBeGreaterThanOrEqual(0);
@@ -382,7 +386,7 @@ for (const locale of ['de', 'en'] as const) {
           expect(await button.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
           bounds.push(box!);
         }
-        if(state.includes('unavailable')) await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
+        if(state.includes('unavailable')) await expect(page.getByRole('button',{name:copy.actions.send,exact:true})).toBeDisabled();
         await assertFromBounds(page,copy.from);
         const editor=page.locator('[data-lexical-editor="true"]');
         await expect(editor).toBeVisible();
@@ -408,7 +412,7 @@ for (const locale of ['de', 'en'] as const) {
         await expect(editor).toContainText(marker.trim());
         if(saved) {
           expect((await saved).status()).toBe(200);
-          await expect(page.getByText(/Draft saved/)).toBeVisible();
+          await expect(page.getByText(draftSaved)).toBeVisible();
           const persisted=await page.request.get(`${mailbox}/messages/${encodeURIComponent(draftId)}`);
           expect(persisted.status()).toBe(200);
           expect((await persisted.json()).message.body).toContain(marker.trim());
@@ -484,11 +488,11 @@ for (const locale of ['de', 'en'] as const) {
           await page.keyboard.press('Escape');
           await expect(page.getByRole('listbox')).toHaveCount(0);
           const fromBox=await from.boundingBox();
-          for(const label of ['To:','Subject:']) {
+          for(const label of [copy.fields.to,copy.fields.subject]) {
             const field=page.getByLabel(label,{exact:true});
             await wheelTo(field);
             await expect(field).toBeFocused();
-            if(label==='Subject:') {
+            if(label===copy.fields.subject) {
               await page.keyboard.press('End');
               await page.keyboard.type('.');
               await page.keyboard.press('Backspace');
@@ -498,12 +502,12 @@ for (const locale of ['de', 'en'] as const) {
           await page.keyboard.type(' Synthetic keyboard access.');
           await expect(editor).toContainText('Synthetic keyboard access.');
           await expect.poll(visibleEditor).toBeGreaterThanOrEqual(96);
-          const cancel=page.getByRole('button',{name:'Cancel',exact:true});
+          const cancel=page.getByRole('button',{name:copy.actions.cancel,exact:true});
 
           // Exercise every saved-draft footer action with a real pointer,
           // including disabled controls, without discarding/sending the draft.
           const actionBounds=[];
-          for(const name of ['Discard Draft','Save draft','Cancel','Send']) {
+          for(const name of [copy.actions.discardDraft,copy.actions.saveDraft,copy.actions.cancel,copy.actions.send]) {
             const action=page.getByRole('button',{name,exact:true});
             const b=await wheelTo(action,false);
             expect(b.width).toBeGreaterThanOrEqual(44);expect(b.height).toBeGreaterThanOrEqual(44);
@@ -521,7 +525,7 @@ for (const locale of ['de', 'en'] as const) {
           await wheelTo(from);
           await page.keyboard.press('Escape');
           await expect(page.getByRole('listbox')).toHaveCount(0);
-          for(const label of ['To:','Subject:']) await wheelTo(page.getByLabel(label,{exact:true}));
+          for(const label of [copy.fields.to,copy.fields.subject]) await wheelTo(page.getByLabel(label,{exact:true}));
           expect(await area.evaluate(el=>el.scrollTop)).toBeLessThan(forward);
           const close=page.getByRole('button',{name:copy.closeComposer,exact:true});
           const closeBox=(await close.boundingBox())!;
@@ -539,16 +543,16 @@ for (const locale of ['de', 'en'] as const) {
       await openFresh(long,'enabled long');
       await matrix(long,'enabled long');
       await keyboardMatrix('enabled');
-      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await page.getByRole('button',{name:copy.actions.cancel,exact:true}).click();
       expect((await page.request.patch(`${mailbox}/identities/${long.id}`,{headers,data:{enabled:false}})).status()).toBe(200);
       await reopen();
       await matrix(long,'unavailable');
       await keyboardMatrix('unavailable');
-      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await page.getByRole('button',{name:copy.actions.cancel,exact:true}).click();
       await reopen();
       await matrix(long,'reopened unavailable draft');
       await keyboardMatrix('reopened unavailable draft');
-      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await page.getByRole('button',{name:copy.actions.cancel,exact:true}).click();
       for(const [state,email,displayName] of [
         ['80-char name',`${'b'.repeat(47)}@example.test`,'N'.repeat(80)],
         ['120-char address',`${'a'.repeat(64)}@${'b'.repeat(42)}.example.test`,longName]
@@ -556,7 +560,7 @@ for (const locale of ['de', 'en'] as const) {
         const sender=await identity(email,displayName);
         await openFresh(sender,state);
         await matrix(sender,state);
-        await page.getByRole('button',{name:'Cancel',exact:true}).click();
+        await page.getByRole('button',{name:copy.actions.cancel,exact:true}).click();
       }
       expect(measurements).toHaveLength(30);
       await info.attach(`editor-space-${locale}`,{body:JSON.stringify(measurements,null,2),contentType:'application/json'});

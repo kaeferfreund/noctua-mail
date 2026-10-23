@@ -77,10 +77,10 @@ for (const locale of ["de", "en"] as const) test(`keyboard scroll area contains 
   const { view } = renderHeader({ locale, enabled: false, email: "unavailable@example.test", displayName: "Synthetic unavailable sender" });
   const messages = getMessages(locale).Compose;
   const from = view.getByLabelText(messages.from, { exact: true });
-  const to = view.getByLabelText("To:", { exact: true });
-  const subject = view.getByLabelText("Subject:", { exact: true });
+  const to = view.getByLabelText(messages.fields.to, { exact: true });
+  const subject = view.getByLabelText(messages.fields.subject, { exact: true });
   const editor = view.getByLabelText("Synthetic body");
-  const cancel = view.getByRole("button", { name: "Cancel" });
+  const cancel = view.getByRole("button", { name: messages.actions.cancel });
   // Geometry and the single active scroll ancestor are checked in Chromium.
   // Keep the footer in the same structural area, so it can scroll with the
   // fields when the keyboard leaves too little room for fixed actions.
@@ -92,4 +92,19 @@ for (const locale of ["de", "en"] as const) test(`keyboard scroll area contains 
   expect(area.contains(cancel)).toBe(true);
   expect(cancel.parentElement!.parentElement!.parentElement).toBe(area);
   expect(area.contains(view.getByRole("button", { name: messages.closeComposer }))).toBe(false);
+});
+
+test("German header, window controls and footer actions use the catalog copy", () => {
+  const { view, closed } = renderHeader({ locale: "de", email: "sender@example.test", displayName: "Synthetic Sender" });
+  expect(view.getByRole("dialog", { name: "Neue Nachricht" })).toBeTruthy();
+  expect(view.getByText("Von Synthetic Sender <sender@example.test>")).toBeTruthy();
+  expect(view.getByLabelText("An:", { exact: true })).toBeTruthy();
+  expect(view.getByLabelText("Betreff:", { exact: true })).toBeTruthy();
+  expect(view.getByRole("button", { name: "Cc/Bcc anzeigen" })).toBeTruthy();
+  expect(view.getByText("Entwurf noch nicht gespeichert")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Senden" })).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Abbrechen" }));
+  fireEvent.click(view.getByRole("button", { name: "Nachrichtenfenster schließen" }));
+  expect(closed()).toBe(2);
+  expect(view.queryByText(/New message|Cancel|Send$|Draft not saved/)).toBeNull();
 });
