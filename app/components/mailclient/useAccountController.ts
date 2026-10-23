@@ -80,6 +80,9 @@ export type UseAccountControllerParams = {
   setManageTab: React.Dispatch<React.SetStateAction<ManageTab>>;
   setEditingAccount: React.Dispatch<React.SetStateAction<Account | null>>;
   setDeletingFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  // Optional: request the next mailbox's first list page alongside the switch.
+  prefetchFirstPage?: (accountId: string) => void;
+  dropFirstPagePrefetch?: () => void;
 };
 
 export function useAccountController({
@@ -120,7 +123,9 @@ export function useAccountController({
   setManageOpen,
   setManageTab,
   setEditingAccount,
-  setDeletingFolderIds
+  setDeletingFolderIds,
+  prefetchFirstPage,
+  dropFirstPagePrefetch
 }: UseAccountControllerParams) {
   const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
@@ -284,9 +289,12 @@ export function useAccountController({
         setActiveVirtualFolderId(null);
         setLastFolderId("");
       };
+      let committed = false;
       try {
         const persisted = persistSelection(normalizedAccountId, () => version === switchVersion.current);
         const foldersRead = apiFetch(buildAccountFoldersPath(normalizedAccountId)).catch(() => null);
+        // Runs concurrently like the folder read; the list takes it only after the commit.
+        prefetchFirstPage?.(normalizedAccountId);
         const response = await persisted;
         if (version !== switchVersion.current || !response) return;
         if (!response.ok) {
@@ -317,12 +325,15 @@ export function useAccountController({
         setInitialFoldersLoadedAccountId(normalizedAccountId);
         setActiveFolderId(findInboxFolder(nextFolders, normalizedAccountId)?.id ?? nextFolders[0]?.id ?? "");
         setInitialDataReady(true);
+        committed = true;
       } catch {
         if (version === switchVersion.current) {
           reportError("Failed to switch account.");
           rebootstrap = true;
         }
       } finally {
+        // A switch that did not commit leaves nothing to take its first page.
+        if (!committed && version === switchVersion.current) dropFirstPagePrefetch?.();
         switchesInFlight.current--; switchEpoch.current++;
         const deferred = switchesInFlight.current === 0 ? deferredSelection.current : null;
         if (deferred) deferredSelection.current = null;
@@ -358,7 +369,9 @@ export function useAccountController({
       setTotalMessages,
       setViewMessage,
       defaultSearchBadges,
-      defaultSearchFields
+      defaultSearchFields,
+      prefetchFirstPage,
+      dropFirstPagePrefetch
     ]
   );
 

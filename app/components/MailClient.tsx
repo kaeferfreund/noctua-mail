@@ -1291,6 +1291,8 @@ export default function MailClient({
     queueFilteredSearchRefresh,
     markMessagesMutated,
     authoritativeRevision,
+    prefetchFirstPage,
+    dropFirstPagePrefetch,
   } = useMessageData({
     messagesKey,
     activeAccountId,
@@ -1721,7 +1723,9 @@ export default function MailClient({
     setManageOpen,
     setManageTab,
     setEditingAccount,
-    setDeletingFolderIds
+    setDeletingFolderIds,
+    prefetchFirstPage,
+    dropFirstPagePrefetch
   });
 
   const preferToDisplay = isDraftsFolder(activeFolderId) || isSentFolder(activeFolderId);
