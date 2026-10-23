@@ -6,7 +6,14 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import "./testSetupEnv";
 
-GlobalRegistrator.register();
+// happy-dom 21 disables iframe page loading by default, and every mount of a
+// frame without srcdoc (HtmlMessage before its effect assigns srcdoc) then logs
+// a NotSupportedError for about:blank. Enable it, but keep child frames from
+// navigating, so an iframe src never turns into a real network request
+// (lib/testSetupDom.dom.test.tsx). srcdoc documents do not navigate.
+GlobalRegistrator.register({
+  settings: { enableIframePageLoading: true, navigation: { disableChildFrameNavigation: true } }
+});
 
 // React 19 requires this flag before `act` will drive updates.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

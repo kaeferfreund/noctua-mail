@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { buildAccountTopicStatsPath, buildAccountTopicsPath } from "@/lib/accountApiPaths";
 import { deferUntilIdle } from "./deferUntilIdle";
 import type { Topic } from "@/lib/data";
@@ -20,8 +20,11 @@ type TopicStatsResponse = {
   }>;
 };
 
+const NO_TOPICS: Topic[] = [];
+
 export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
-  const [storedTopics, setStoredTopics] = useState<Topic[]>([]);
+  // Keyed by mailbox: one mailbox's topics are never shown under another.
+  const [storedTopics, setStoredTopics] = useState({ accountId: "", topics: NO_TOPICS });
   const [topicStats, setTopicStats] = useState({
     accountId: "", counts: new Map<string, number>()
   });
@@ -60,7 +63,7 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
       .then((res) => res.json())
       .then((data) => {
         if (!cancelled && data.ok && Array.isArray(data.topics)) {
-          setStoredTopics(data.topics);
+          setStoredTopics({ accountId: activeAccountId, topics: data.topics });
         }
       })
       .catch(() => {});
@@ -81,10 +84,16 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
     };
   }, [activeAccountId, apiFetch, fetchTopicMessageCounts]);
 
-  const allTopics = activeAccountId ? storedTopics : [];
+  const allTopics = activeAccountId && storedTopics.accountId === activeAccountId ? storedTopics.topics : NO_TOPICS;
   const topicMessageCountById = activeAccountId && topicStats.accountId === activeAccountId
     ? topicStats.counts : new Map<string, number>();
-  const setAllTopics = setStoredTopics;
+  // Updates apply to the active mailbox's topics.
+  const setAllTopics = useCallback((action: SetStateAction<Topic[]>) => {
+    setStoredTopics(prev => {
+      const current = prev.accountId === activeAccountId ? prev.topics : NO_TOPICS;
+      return { accountId: activeAccountId, topics: typeof action === "function" ? action(current) : action };
+    });
+  }, [activeAccountId]);
 
   return {
     allTopics,
