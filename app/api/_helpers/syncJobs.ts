@@ -1,3 +1,5 @@
+import { validateAccountFolders, folderAccountMismatchResponse } from "./folderAccount";
+import { FolderAccountMismatchError } from "@/lib/folderAccount";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { getRequestClientId } from "./clientId";
 import { withAuthResponse } from "@/lib/auth";
@@ -40,7 +42,16 @@ export async function handleSyncStartRequest(
         : undefined
     };
 
-    const job = startSyncJob(payload, clientId);
+    const folderError = await validateAccountFolders(accountId, [payload.folderId]);
+    if (folderError) return folderError;
+    let job;
+    try {
+      job = await startSyncJob(payload, clientId);
+    } catch (error) {
+      // The folder can disappear between route validation and queue admission.
+      if (error instanceof FolderAccountMismatchError) return folderAccountMismatchResponse();
+      throw error;
+    }
     if (job.status === "failed") {
       return NextResponse.json(
         { ok: false, message: job.error || "Failed to start sync job." },
