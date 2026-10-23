@@ -14,6 +14,7 @@ async function runContentionProbe(mode: "read" | "create") {
     return await execFileAsync(process.execPath, ["--eval", `
       import assert from "node:assert/strict";
       import { Database } from "bun:sqlite";
+      import { createV2FtsShard } from "./lib/testFixtures/v2FtsShard.ts";
       import { closeAllDbConnections, configureDb, getAccountDb } from "./lib/db/connection.ts";
       const exec = Database.prototype.exec;
       Database.prototype.exec = function(sql) {
@@ -27,6 +28,9 @@ async function runContentionProbe(mode: "read" | "create") {
       configureDb(writer, 0);
       const creating = process.env.COLLAB_PROBE === "create";
       if (creating) {
+        // Missing collaboration tables model an older shard. A declared v3
+        // shard must have the complete guard set and is explicitly rejected.
+        createV2FtsShard(writer);
         for (const table of ["thread_collab_state", "thread_comments", "thread_activity", "sent_by"])
           writer.exec("DROP TABLE " + table);
       }
@@ -70,7 +74,7 @@ test("cold shard reader succeeds under a held writer lock without schema writes"
   expect(stderr).not.toContain("[db-write-retry]");
 });
 
-test("collaboration schema creation retries contention at the async connection boundary", async () => {
+test("v2 collaboration schema creation retries contention at the async connection boundary", async () => {
   const { stdout, stderr } = await runContentionProbe("create");
   expect(stdout).toContain("collab-create-ok");
   expect(stderr).toContain("[db-write-retry] retry");

@@ -37,7 +37,7 @@ describe("account shard writer format boundary", () => {
         "UPDATE messages SET subject='Destroyed' WHERE id='same-local-id'",
         "INSERT INTO messages DEFAULT VALUES"
       ]) {
-        expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v2");
+        expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v3");
         expect(snapshot(db)).toEqual(before);
       }
       for (const sql of [
@@ -50,7 +50,7 @@ describe("account shard writer format boundary", () => {
       }
       // Also exercise exec/step, matching the old delete helper's ordering.
       expect(() => old.exec("DELETE FROM attachments WHERE messageId='same-local-id'; DELETE FROM message_fts WHERE messageId='same-local-id';"))
-        .toThrow("no such function: noctua_writer_v2");
+        .toThrow("no such function: noctua_writer_v3");
       expect(snapshot(db)).toEqual(before);
       expect(db.prepare(`SELECT accountId, COUNT(*) AS n FROM ${SHARD_FTS_TABLE}
         WHERE ${SHARD_FTS_TABLE} MATCH 'guarded' GROUP BY accountId ORDER BY accountId`).all())
@@ -69,7 +69,7 @@ describe("account shard writer format boundary", () => {
       const before = snapshot(db);
       for (const { name } of tables) {
         for (const sql of [`INSERT INTO "${name}" DEFAULT VALUES`, `UPDATE "${name}" SET accountId=accountId`, `DELETE FROM "${name}"`]) {
-          expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v2");
+          expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v3");
         }
       }
       expect(snapshot(db)).toEqual(before);
@@ -86,7 +86,7 @@ describe("account shard writer format boundary", () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM thread_activity WHERE accountId=?").get(a.accountId).n).toBe(1);
     closeAccountDbConnection(file);
     const reopened = await getAccountDb(b.accountId);
-    expect(reopened.prepare("SELECT noctua_writer_v2() AS version").get().version).toBe(SHARD_FORMAT_VERSION);
+    expect(reopened.prepare("SELECT noctua_writer_v3() AS version").get().version).toBe(SHARD_FORMAT_VERSION);
     expect(() => reopened.prepare("UPDATE folders SET count=count WHERE accountId=?").run(b.accountId)).not.toThrow();
   });
 
@@ -102,7 +102,7 @@ describe("account shard writer format boundary", () => {
         expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(schemaVersion);
         expect(db.prepare("PRAGMA user_version").get().user_version).toBe(SHARD_FORMAT_VERSION + 1);
         expect(db.prepare("PRAGMA foreign_keys").get().foreign_keys).toBe(0);
-        expect(() => db.prepare("SELECT noctua_writer_v2()")).toThrow("no such function");
+        expect(() => db.prepare("SELECT noctua_writer_v3()")).toThrow("no such function");
       }
     } finally { db.close(); }
   });
@@ -134,4 +134,57 @@ test("production shard-opening inventory routes every writable shard connection 
   for (const file of ["lib/db/threads.ts", "lib/db/categories.ts", "lib/db/mailboxSummary.ts", "lib/db/folders.ts", "scripts/backfillCalendarSnapshots.ts"]) {
     expect(source(file)).toContain("getAccountDb");
   }
+});
+
+// Frozen 112-site corpus extracted from 164a57e by the audited guard-cost probe.
+// Preserve each statement, including zero-row predicates and UPSERT variants.
+test("all 112 legacy-binary DML sites fail on v3 with FK enforcement disabled", async () => {
+  const { db } = await createSharedShardFixture();
+  const old = new Database(db.prepare("PRAGMA database_list").get().file);
+  try {
+    old.exec("PRAGMA foreign_keys=OFF");
+    const sites = (await import("../testFixtures/legacyShardDml.json")).default;
+    expect(sites).toHaveLength(112);
+    const before = snapshot(db);
+    let guarded = 0, views = 0;
+    for (const site of sites) {
+      try {
+        old.prepare(site.sql);
+        throw new Error(`Legacy statement unexpectedly prepared: ${site.file}:${site.line}`);
+      } catch (error) {
+        const text = String(error);
+        if (text.includes("no such function: noctua_writer_v3")) guarded++;
+        else if (text.includes("cannot modify message_fts because it is a view")) views++;
+        else throw error;
+      }
+    }
+    expect({ guarded, views }).toEqual({ guarded: 105, views: 7 });
+    expect(snapshot(db)).toEqual(before);
+  } finally { old.close(); }
+});
+
+test("81 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation", async () => {
+  const { db } = await createSharedShardFixture();
+  const old: any = new Database(db.prepare("PRAGMA database_list").get().file);
+  try {
+    old.function("noctua_writer_v2", () => 2);
+    const triggers = db.prepare("SELECT name,tbl_name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v3_%'").all() as { name: string; tbl_name: string }[];
+    expect(triggers).toHaveLength(81);
+    const tables = [...new Set(triggers.map(row => row.tbl_name))];
+    expect(tables).toHaveLength(27);
+    for (const table of tables) {
+      for (const sql of [`INSERT INTO "${table}" DEFAULT VALUES`, `UPDATE "${table}" SET accountId=accountId WHERE 0`, `DELETE FROM "${table}" WHERE 0`]) {
+        expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v3");
+      }
+    }
+    for (const table of ["message_fts", "message_fts_v2"]) {
+      for (const sql of [`INSERT INTO ${table}(body) VALUES('bad')`, `UPDATE ${table} SET body='bad'`, `DELETE FROM ${table}`]) {
+        expect(() => old.prepare(sql)).toThrow(`cannot modify ${table} because it is a view`);
+      }
+    }
+    old.function("noctua_writer_v3", () => 2);
+    // A wrong registered marker must reject at runtime on an actual row.
+    db.exec("INSERT INTO mailbox_summary(accountId) VALUES('wrong-marker-probe')");
+    expect(() => old.prepare("UPDATE mailbox_summary SET lastSyncAt=1 WHERE accountId='wrong-marker-probe'").run()).toThrow("Unsupported account shard writer");
+  } finally { old.close(); }
 });
