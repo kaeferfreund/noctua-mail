@@ -83,7 +83,7 @@ export default function AccountTabContent({
         </Flex>
 
         <Flex direction="column" gap="3">
-          <Flex align="center" justify="between">
+          <Flex align="center" justify="between" wrap="wrap" gap="2">
             <Text size="3" weight="medium">
               {t("account.imapTitle")}
             </Text>
@@ -177,7 +177,7 @@ export default function AccountTabContent({
         </Flex>
 
         <Flex direction="column" gap="3">
-          <Flex align="center" justify="between">
+          <Flex align="center" justify="between" wrap="wrap" gap="2">
             <Text size="3" weight="medium">
               {t("account.smtpTitle")}
             </Text>
@@ -281,7 +281,7 @@ export default function AccountTabContent({
         <Button size="2" color="red" variant="soft" onClick={onDelete} disabled={!isExistingAccount || !canDelete}>
           {t("account.delete")}
         </Button>
-        <Flex gap="3" align="center">
+        <Flex gap="3" align="center" wrap="wrap">
           <Button size="2" variant="soft" color="gray" onClick={onClose}>
             {saveDisabled ? t("close") : t("common.cancel")}
           </Button>

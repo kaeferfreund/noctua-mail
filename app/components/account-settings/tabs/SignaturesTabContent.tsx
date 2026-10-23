@@ -36,7 +36,7 @@ export default function SignaturesTabContent({
           {senderMessages.sharedTemplatesHelp}
         </Text>
         {invalidTemplate && <Text as="p" role="alert">{senderMessages.invalidTemplate}</Text>}
-        <Flex align="center" justify="between">
+        <Flex align="center" justify="between" wrap="wrap" gap="2">
           <Text size="3" weight="medium">
             {t("signatures.listTitle")}
           </Text>

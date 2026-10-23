@@ -106,7 +106,7 @@
       "invalidTemplate": "Verwende nur die unterstützten Signaturplatzhalter (höchstens 8 KiB).",
       "signaturePreview": "Signaturvorschau",
       "saveSenderPreferences": "Absendereinstellungen speichern",
-      "sharedTemplatesHelp": "Verwalte die gemeinsamen Signaturvorlagen des Postfachs. Deine persönliche Signatur legst du unter „Einstellungen“ fest. Unterstützte Platzhalter: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'.",
+      "sharedTemplatesHelp": "Verwalte die gemeinsamen Signaturvorlagen des Postfachs. Deine persönliche Signatur legst du unter „Persönliche Einstellungen“ fest. Unterstützte Platzhalter: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'.",
       "identityEnabled": "{sender}",
       "identityDefault": "{sender} — Postfachstandard",
       "identityDisabled": "{sender} — Deaktiviert",
