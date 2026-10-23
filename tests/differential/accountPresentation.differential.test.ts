@@ -158,7 +158,13 @@ async function serialize(value: unknown) {
   return JSON.stringify({ status: value.status, headers, cookies: value.headers.getSetCookie().sort(), body: await value.text() });
 }
 /** Runs legacy then current from the same state; arm() installs this case's mid-read injection before each run. */
-async function pair(run: (impl: "legacy" | "current") => Promise<unknown>, arm?: () => void, prepare?: () => void) {
+/**
+ * `skippedActivityWrite`: the current implementation may skip an unchanged session selection write while the
+ * session's updatedAt is younger than five minutes (owner decision 2). Only `auth_session.updatedAt` may then
+ * differ, and only by keeping the pre-request value; everything else must still be identical.
+ */
+async function pair(run: (impl: "legacy" | "current") => Promise<unknown>, arm?: () => void, prepare?: () => void,
+  options: { skippedActivityWrite?: boolean } = {}) {
   prepare?.();
   const before = readState();
   const out: Record<string, { bytes: string; state: State }> = {};
@@ -178,7 +184,12 @@ async function pair(run: (impl: "legacy" | "current") => Promise<unknown>, arm?:
   }
   restoreState(before);
   expect(out.current.bytes).toBe(out.legacy.bytes);
-  expect(out.current.state).toEqual(out.legacy.state);
+  if (options.skippedActivityWrite) {
+    type SessionRow = { id: string; updatedAt: string };
+    const withoutActivity = (state: State) => ({ ...state, sessions: (state.sessions as SessionRow[]).map(({ updatedAt, ...row }) => { void updatedAt; return row; }) });
+    expect(withoutActivity(out.current.state)).toEqual(withoutActivity(out.legacy.state));
+    expect(out.current.state.sessions).toEqual(before.sessions);
+  } else expect(out.current.state).toEqual(out.legacy.state);
   return out.legacy.bytes;
 }
 const revoke = (userId: string, accountId: string) => master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(userId, accountId);
@@ -279,7 +290,10 @@ describe("scoped summary event", () => {
 describe("/api/auth/me", () => {
   for (const key of ACCOUNT_KEYS) {
     test(`viewer ${key}, persisted selection`, async () => {
-      await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", viewers[key].jar)));
+      // Persist this viewer's default first, so the pair runs with an unchanged, fresh selection.
+      await meGET(req("/api/auth/me", viewers[key].jar));
+      await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", viewers[key].jar)), undefined, undefined,
+        { skippedActivityWrite: key !== "disabled" });
     });
     test(`viewer ${key}, null selection`, async () => {
       await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", viewers[key].jar)), undefined, clearSelection(viewers[key]));
@@ -334,9 +348,14 @@ describe("statement budget", () => {
   });
   test("/api/auth/me: session guard, user, selection pre-read, selection write, one access read", async () => {
     const counts: Record<string, number> = {};
-    for (const key of ["1", "2", "12"]) counts[key] = await countExecutions(async () => (await meGET(req("/api/auth/me", viewers[key].jar))).text());
-    // 7 guard statements + user + candidates projection + session UPDATE + 4 access statements.
-    expect(counts).toEqual({ 1: 14, 2: 14, 12: 14 });
+    for (const key of ["1", "2", "12"]) {
+      clearSelection(viewers[key])();
+      counts[`${key}/write`] = await countExecutions(async () => (await meGET(req("/api/auth/me", viewers[key].jar))).text());
+      counts[key] = await countExecutions(async () => (await meGET(req("/api/auth/me", viewers[key].jar))).text());
+    }
+    // 7 guard statements + user + candidates projection + [session UPDATE] + session liveness read + 4 access statements;
+    // an unchanged selection with fresh activity skips the UPDATE.
+    expect(counts).toEqual({ "1/write": 15, 1: 14, "2/write": 15, 2: 14, "12/write": 15, 12: 14 });
   });
   test("members: owner read plus one member statement, independent of the directory size", async () => {
     expect(await countExecutions(() => listAccountMembers(ACCOUNTS[6]))).toBe(2);
