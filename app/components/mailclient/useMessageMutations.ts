@@ -14,8 +14,11 @@ import { applyFolderStreamUpdates } from "./folderStreamUpdates";
 import { NOTICE_TIMEOUTS } from "./constants";
 import type { UndoMoveTarget } from "./useMessageMoveActions";
 
+import type { ContinueAfterRemoval } from "./messagelist/successfulRemoval";
+
 type UseMessageMutationsProps = {
-  continueAfterRemoval?: (removedIds: string[]) => void;
+  continueAfterRemoval?: ContinueAfterRemoval;
+  navigationRows?: Message[];
   activeAccountId: string;
   searchScope: "folder" | "all";
   viewMessage: Message | null;
@@ -61,6 +64,7 @@ type MoveReconcileParams = {
 
 export function useMessageMutations({
   continueAfterRemoval,
+  navigationRows,
   activeAccountId,
   searchScope,
   viewMessage,
@@ -218,7 +222,7 @@ export function useMessageMutations({
     // Let the shared continuation inspect the current reader, rather than the
     // view captured when this request started.
     if (continueAfterRemoval && (!movedMessage || !shouldKeepMessageInCurrentResults(movedMessage))) {
-      continueAfterRemoval([message.id]);
+      continueAfterRemoval([message.id], navigationRows);
     } else if (transition.kind === "clear") {
       setViewMessage(null);
       setActiveMessageId("");
@@ -245,6 +249,7 @@ export function useMessageMutations({
   }, [
     activeAccountId,
     continueAfterRemoval,
+    navigationRows,
     evictMessageCaches,
     pushNotice,
     searchScope,

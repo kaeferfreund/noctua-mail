@@ -327,18 +327,19 @@ export default function MessageListOrchestrator({
   useLayoutEffect(() => { removalInputsRef.current = mutationInputs; }, [mutationInputs]);
 
   // Both row actions and reader actions use the renderer's unique navigation order.
-  const continueAfterRemoval = useCallback((removedIds: string[]) => {
+  const continueAfterRemoval = useCallback((removedIds: string[], navigationRows?: Message[]) => {
     const current = removalInputsRef.current;
     const removed = new Set(removedIds);
-    if (!removed.has(current.activeMessageId) && !removed.has(current.viewMessage?.id ?? "")) return;
+    if (!removed.has(current.activeMessageId) && !removed.has(current.viewMessage?.id ?? "")) return false;
     const next = nextMessageAfterRemoval(
-      current.navigationRows ?? current.visibleMessages.map(item => item.message), removed
+      navigationRows ?? current.navigationRows ?? current.visibleMessages.map(item => item.message), removed
     );
     current.setActiveMessageId(next?.id ?? "");
     current.setViewMessage(next);
     if (next) selectionStore.setSelection(new Set([next.id]), next.id);
     else selectionStore.clearSelection();
     lastSelectedIdRef.current = next?.id ?? null;
+    return true;
   }, [selectionStore]);
 
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
@@ -374,6 +375,7 @@ export default function MessageListOrchestrator({
 
   const { handleDeleteMessage, handleDeleteMessagesByIds } = useMessageDeleteActions({
     continueAfterRemoval,
+    navigationRows: mutationInputs.navigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
     supportsThreads: mutationInputs.supportsThreads,
@@ -432,6 +434,7 @@ export default function MessageListOrchestrator({
     toggleFlaggedFlag
   } = useMessageMutations({
     continueAfterRemoval,
+    navigationRows: mutationInputs.navigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     searchScope: mutationInputs.searchScope,
     viewMessage: mutationInputs.viewMessage,

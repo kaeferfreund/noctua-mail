@@ -12,7 +12,7 @@ import type { Folder, Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState } from "./types";
 import type { LinkedCalendarEventDetail } from "./utils/deleteConfirm";
 import type { SelectionStore } from "./messagelist/selectionStore";
-import { nextMessageAfterRemoval } from "./messagelist/successfulRemoval";
+import { nextMessageAfterRemoval, type ContinueAfterRemoval } from "./messagelist/successfulRemoval";
 import { resolveCollapsedThreadSelectionTarget } from "./messagelist/listSelection";
 import type { MoveMessagesToFolder, UndoMoveTarget } from "./useMessageMoveActions";
 import {
@@ -105,7 +105,8 @@ type DeleteAssociationLookupResponse = {
 };
 
 type UseMessageDeleteActionsOptions = {
-  continueAfterRemoval?: (removedIds: string[]) => void;
+  continueAfterRemoval?: ContinueAfterRemoval;
+  navigationRows?: Message[];
   activeAccountId: string;
   activeMessageId: string;
   supportsThreads: boolean;
@@ -149,6 +150,7 @@ type UseMessageDeleteActionsOptions = {
 
 export function useMessageDeleteActions({
   continueAfterRemoval,
+  navigationRows,
   activeAccountId,
   activeMessageId,
   supportsThreads,
@@ -633,9 +635,10 @@ export function useMessageDeleteActions({
           permanentlyDeletedCount += deletedIds.length;
           removedIds.push(...deletedIds);
         }
-        if (continueAfterRemoval && removedIds.includes(activeMessageId)) {
-          continueAfterRemoval(removedIds);
-        } else if (activeWasDeleted) {
+        // Keep the operation's renderer order even if the move has already
+        // removed its row; the continuation checks the latest reader selection.
+        const continued = continueAfterRemoval?.(removedIds, navigationRows) ?? false;
+        if (!continueAfterRemoval && activeWasDeleted) {
           if (nextActiveId) {
             const nextActiveMessage = messages.find((m) => m.id === nextActiveId) ?? null;
             setActiveMessageId(nextActiveId);
@@ -647,7 +650,7 @@ export function useMessageDeleteActions({
             setViewMessage(null);
             selectionStore.clearSelection();
           }
-        } else if (options.clearSelectionWhenActiveRemains) {
+        } else if (!continued && options.clearSelectionWhenActiveRemains) {
           clearSelectionState();
         }
         await refreshFolders();
@@ -670,8 +673,8 @@ export function useMessageDeleteActions({
       }
     },
     [
-      activeMessageId,
       continueAfterRemoval,
+      navigationRows,
       clearSelectionState,
       deleteMessagesPermanently,
       findTrashFolderId,
