@@ -31,9 +31,11 @@ export function requireJsonSameOrigin(request: Request) {
 /**
  * Bodyless guards run before the session check on some routes, so emptiness is
  * decided from the declared length or the first body chunk, never by buffering.
+ * A body that cannot be read to its end (stalled past the read deadline, or
+ * aborted) counts as not empty.
  */
 async function isEmptyBody(request: Request) {
-  return (await readBoundedBody(request, 0)) !== null;
+  return (await readBoundedBody(request, 0).catch(() => null)) !== null;
 }
 
 export async function requireBodylessSameOrigin(request: Request) {
