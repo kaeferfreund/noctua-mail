@@ -16,7 +16,7 @@ import {
   useRef,
   useState
 } from "react";
-import { Flex, SegmentedControl } from "@radix-ui/themes";
+import { Badge, Flex, SegmentedControl } from "@radix-ui/themes";
 import type { Message, Topic } from "@/lib/data";
 
 import MessageViewPane from "./MessageViewPane";
@@ -147,6 +147,8 @@ export type MessageViewOrchestratorHandle = {
 };
 
 export type MessageViewOrchestratorHeaderInputs = {
+  toolbar?: React.ReactNode;
+  mailboxLabel?: string;
   collab?: { controller: ThreadCollabController; role?: AccountRole };
   // Used to compute thread topics / fallback thread-subject source and
   // also to reset the topic-explanation popover on active-thread change.
@@ -666,6 +668,7 @@ function MessageViewOrchestratorImpl(
 
   return (
     <MessageViewPane
+      toolbar={header.toolbar}
       header={activeMessage ? (() => {
               const rootSubject =
                 activeThread[0]?.subject ?? activeMessage?.subject ?? "";
@@ -692,6 +695,7 @@ function MessageViewOrchestratorImpl(
                 <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 0 }}>
                   <Flex align="center" gap="3" className={paneStyles.subjectRow}>
                     <ThreadSubject key={rootSubject} subject={rootSubject} />
+                    {header.mailboxLabel ? <Badge size="1" color="gray">{header.mailboxLabel}</Badge> : null}
                     <SegmentedControl.Root
                       size="1"
                       value={threadViewMode}

@@ -686,6 +686,21 @@
     "loadedGroupCount": "{count, plural, one {# Nachricht geladen} other {# Nachrichten geladen}}"
   },
   "Reader": {
+    "focus": {
+      "expand": "Vergrößern",
+      "showList": "Liste anzeigen",
+      "hint": "Tipp: Doppelklick öffnet die Nachricht groß",
+      "dismissHint": "Tipp zur Leseansicht schließen",
+      "shortcuts": "Umschalt+Enter: groß / Liste · Esc: zurück · j / k: weiter / zurück",
+      "markUndone": "Als nicht erledigt markieren",
+      "print": "Nachricht drucken",
+      "previous": "Vorherige Nachricht",
+      "next": "Nächste Nachricht",
+      "counter": "{position} / {total}",
+      "counterMore": "{position} / {total}+",
+      "position": "Nachricht {position} von {total} sichtbaren Zeilen",
+      "loadedPosition": "Nachricht {position} von {total} geladenen sichtbaren Zeilen; weitere Nachrichten verfügbar"
+    },
     "cancel": "Abbrechen",
     "remove": "Entfernen",
     "calendarChanges": "Änderungen der Kalendereinladung",

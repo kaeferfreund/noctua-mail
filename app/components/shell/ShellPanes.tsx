@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import type { ReaderLayout } from "@/lib/ui/readerFocus";
 import mobileStyles from "./MobileFrames.module.css";
 import { Theme } from "@radix-ui/themes";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -48,6 +49,7 @@ const panelContentStyle: CSSProperties = {
 };
 
 export type ShellPanesProps = {
+  readerLayout?: ReaderLayout;
   mobileView?: "list" | "thread";
   onCloseCalendar?: () => void;
   list: ReactNode;
@@ -56,9 +58,10 @@ export type ShellPanesProps = {
   calendar?: ReactNode | null;
 };
 
-export default function ShellPanes({ list, reader, calendar, mobileView = "list", onCloseCalendar }: ShellPanesProps) {
+export default function ShellPanes({ list, reader, calendar, mobileView = "list", readerLayout = "split", onCloseCalendar }: ShellPanesProps) {
   const t = useTranslations("Shell");
   const isMobile = useIsMobile();
+  const focus = !isMobile && readerLayout === "focus";
   const desktopCalendar = Boolean(calendar) && !isMobile;
   const panelIds = useMemo(() => desktopCalendar
     ? [LIST_PANEL_ID, READER_PANEL_ID, CALENDAR_PANEL_ID]
@@ -85,10 +88,11 @@ export default function ShellPanes({ list, reader, calendar, mobileView = "list"
     <ResizablePanelGroup
       id="noctua-panes"
       data-mobile-view={mobileView}
+      data-reader-layout={focus ? "focus" : "split"}
       orientation="horizontal"
-      disabled={isMobile}
+      disabled={isMobile || focus}
       groupRef={groupRef}
-      onLayoutChanged={isMobile ? undefined : onLayoutChanged}
+      onLayoutChanged={isMobile || focus ? undefined : onLayoutChanged}
       className={`${styles.panes} min-h-0 min-w-0 flex-1 gap-2 p-4`}
     >
       <ResizablePanel
