@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/i18n/format";
 import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
-import { useState, type ReactNode } from "react";
+import { memo, useMemo, useRef, useState, type ReactNode } from "react";
 import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
@@ -37,6 +37,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -56,7 +57,8 @@ export type ShellSidebarProps = {
     accounts: ShellAccount[];
     summaries?: readonly UserMailboxSummary[];
     activeAccountId: string;
-    onSwitch: (accountId: string) => void;
+    /** May return the switch promise; the clicked row shows a pending state until it settles. */
+    onSwitch: (accountId: string) => void | Promise<unknown>;
     onAdd?: () => void;
   };
   views: ShellViews;
@@ -72,60 +74,92 @@ export type ShellSidebarProps = {
 /** Active mailbox and view rows share the accent fill, which reads stronger
  * than the neutral hover fill in both colour schemes. */
 const ACTIVE_ROW_CLASS = "data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]";
+/** A clicked mailbox row before the switch commits: the accent fill at once
+ * (also under the pointer), pulsing while the mailbox loads. */
+const PENDING_ROW_CLASS = "aria-busy:bg-[var(--iris-3)] aria-busy:text-[var(--iris-11)] aria-busy:animate-pulse aria-busy:cursor-progress";
+
+type MailboxRowProps = {
+  account: ShellAccount;
+  summary: UserMailboxSummary | undefined;
+  isActive: boolean;
+  isPending: boolean;
+  onSwitch: (accountId: string) => void;
+};
+
+/** One mailbox row; memoized so a switch re-renders only the rows whose state changed. */
+const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPending, onSwitch }: MailboxRowProps) {
+  const t = useTranslations("Shell");
+  return (
+    <SidebarMenuItem>
+      {/* aria-current follows the committed mailbox only; a click shows
+          aria-busy on its row until the switch settles. */}
+      <SidebarMenuButton
+        isActive={isActive}
+        onClick={() => onSwitch(account.id)}
+        title={summary
+          ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: t(`mailboxes.watcherStates.${summary.watcher.state}`) })
+          : account.email}
+        aria-current={isActive ? "true" : undefined}
+        aria-busy={isPending ? "true" : undefined}
+        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, summary && "pr-32")}
+      >
+        <Avatar size="sm">
+          {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
+          <AvatarFallback>{mailboxInitials(account)}</AvatarFallback>
+        </Avatar>
+        <span>{mailboxLabel(account)}</span>
+      </SidebarMenuButton>
+      {summary && (
+        <SidebarMenuBadge className="right-1 w-auto gap-1.5 text-2xs">
+          <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})} title={t("mailboxes.unreadTitle")}>
+            <Mail className="size-2.5" aria-hidden="true" />{summary.unread ?? "—"}
+          </span>
+          <span className="flex items-center gap-0.5" aria-label={t("mailboxes.assigned", {count: summary.assignedToMe})} title={t("mailboxes.assignedTitle")}>
+            <UserRound className="size-2.5" aria-hidden="true" />{summary.assignedToMe}
+          </span>
+          <span className="flex items-center gap-0.5" aria-label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} title={t("mailboxes.unassignedTitle")}>
+            <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
+          </span>
+          <span role="img" data-watcher-state={summary.watcher.state} aria-label={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})} title={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})}
+            className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
+              summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
+        </SidebarMenuBadge>
+      )}
+    </SidebarMenuItem>
+  );
+});
 
 export function MailboxRows({
   accounts,
   activeAccountId,
+  pendingAccountId = null,
   onSwitch,
   summaries
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "onSwitch" | "summaries">) {
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries"> & {
+  pendingAccountId?: string | null;
+  onSwitch: (accountId: string) => void;
+}) {
   const t = useTranslations("Shell");
-  const summaryById = new Map(summaries?.map(summary => [summary.accountId, summary]));
+  const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
+  const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   return (
     <div className="space-y-1">
-      {groupMailboxes(accounts).map((group) => (
+      {groups.map((group) => (
         <div key={group.domain ?? "all"}>
           {group.domain || accounts.length > 6 ? (
             <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{group.domain ?? t("mailboxes.other")}</div>
           ) : null}
           <SidebarMenu>
-            {group.accounts.map((account) => {
-              const summary = summaryById.get(account.id);
-              return (
-              <SidebarMenuItem key={account.id}>
-                <SidebarMenuButton
-                  isActive={account.id === activeAccountId}
-                  onClick={() => onSwitch(account.id)}
-                  title={summary
-                    ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: t(`mailboxes.watcherStates.${summary.watcher.state}`) })
-                    : account.email}
-                  aria-current={account.id === activeAccountId ? "true" : undefined}
-                  className={cn(ACTIVE_ROW_CLASS, summary && "pr-32")}
-                >
-                  <Avatar size="sm">
-                    {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
-                    <AvatarFallback>{mailboxInitials(account)}</AvatarFallback>
-                  </Avatar>
-                  <span>{mailboxLabel(account)}</span>
-                </SidebarMenuButton>
-                {summary && (
-                  <SidebarMenuBadge className="right-1 w-auto gap-1.5 text-2xs">
-                    <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})} title={t("mailboxes.unreadTitle")}>
-                      <Mail className="size-2.5" aria-hidden="true" />{summary.unread ?? "—"}
-                    </span>
-                    <span className="flex items-center gap-0.5" aria-label={t("mailboxes.assigned", {count: summary.assignedToMe})} title={t("mailboxes.assignedTitle")}>
-                      <UserRound className="size-2.5" aria-hidden="true" />{summary.assignedToMe}
-                    </span>
-                    <span className="flex items-center gap-0.5" aria-label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} title={t("mailboxes.unassignedTitle")}>
-                      <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
-                    </span>
-                    <span role="img" data-watcher-state={summary.watcher.state} aria-label={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})} title={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})}
-                      className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
-                        summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
-                  </SidebarMenuBadge>
-                )}
-              </SidebarMenuItem>
-            ); })}
+            {group.accounts.map((account) => (
+              <MailboxRow
+                key={account.id}
+                account={account}
+                summary={summaryById.get(account.id)}
+                isActive={account.id === activeAccountId}
+                isPending={account.id === pendingAccountId}
+                onSwitch={onSwitch}
+              />
+            ))}
           </SidebarMenu>
         </div>
       ))}
@@ -188,7 +222,23 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
     action();
   };
   const [topicsCollapsed, setTopicsCollapsed] = useState(false);
-  const { mine, shared } = partitionMailboxes(mailboxes.accounts);
+  const { mine, shared } = useMemo(() => partitionMailboxes(mailboxes.accounts), [mailboxes.accounts]);
+  // The clicked mailbox row shows a pending state right away; only the latest
+  // click's settle clears it, so a superseded switch (A -> B -> A) cannot clear
+  // the newer one.
+  const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
+  const switchToken = useRef(0);
+  const { switchMailbox } = useStableHandlers({
+    switchMailbox: (id: string) => {
+      setOpenMobile(false);
+      onNavigate?.();
+      const token = ++switchToken.current;
+      setPendingAccountId(id);
+      void Promise.resolve(mailboxes.onSwitch(id)).finally(() => {
+        if (switchToken.current === token) setPendingAccountId(null);
+      });
+    }
+  });
   const viewRows: ShellView[] = [
     ...(views.inbox ? [views.inbox] : []),
     ...views.collab,
@@ -239,7 +289,8 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     accounts={mine}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
-                    onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
+                    pendingAccountId={pendingAccountId}
+                    onSwitch={switchMailbox}
                   />
                 ) : (
                   <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
@@ -254,7 +305,8 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     accounts={shared}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
-                    onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
+                    pendingAccountId={pendingAccountId}
+                    onSwitch={switchMailbox}
                   />
                 </SidebarGroupContent>
               </SidebarGroup>
