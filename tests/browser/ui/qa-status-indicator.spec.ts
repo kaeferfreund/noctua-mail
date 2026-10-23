@@ -223,8 +223,40 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     const harness = surface.locator(".fc-view-harness");
     await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
     const harnessHeight = await harness.evaluate(element => element.getBoundingClientRect().height);
-    await surface.locator(".fc-event-title").filter({ hasText: summary }).first().click();
-    await expect(surface.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
-    console.log("CALENDAR_FRAME", JSON.stringify({ width, height, harnessHeight, eventOpened: true }));
+    const add = surface.locator(".fc-addEvent-button");
+    await add.click();
+    const create = page.getByRole("dialog", { name: "New Event", exact: true });
+    const title = create.getByPlaceholder("Event title", { exact: true });
+    await expect(title).toBeFocused();
+    const surfaceLayer = await surface.evaluate(element => Number(getComputedStyle(element).zIndex));
+    const dialogLayer = await create.locator("xpath=ancestor::*[contains(@class, 'rt-BaseDialogOverlay')]").evaluate(element => Number(getComputedStyle(element).zIndex));
+    expect(surfaceLayer).toBeLessThan(dialogLayer);
+    // Real pointer hit testing catches a painted-over dialog that fill() alone misses.
+    await title.click();
+    await title.fill(`${summary} created`);
+    await create.getByRole("button", { name: "Open time picker" }).first().click();
+    const picker = page.getByRole("listbox");
+    await expect(picker).toBeVisible();
+    const pickerLayer = await picker.locator("xpath=ancestor::*[contains(@class, 'rt-PopperContent')]").evaluate(element => Number(getComputedStyle(element).zIndex));
+    expect(pickerLayer).toBeGreaterThan(dialogLayer);
+    await page.keyboard.press("Escape");
+    await create.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(create).toHaveCount(0);
+    await expect(add).toBeFocused();
+    await surface.locator(".fc-event-title").filter({ hasText: summary, hasNotText: "created" }).first().click();
+    const editButton = surface.getByRole("button", { name: "Edit", exact: true });
+    await editButton.click();
+    const edit = page.getByRole("dialog", { name: "Edit Event", exact: true });
+    await edit.getByPlaceholder("Event title", { exact: true }).click();
+    await edit.getByPlaceholder("Event title", { exact: true }).fill(`${summary} edited`);
+    await edit.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(edit).toHaveCount(0);
+    await expect(editButton).toBeFocused();
+    await expect(surface.getByText(`${summary} edited`, { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(surface).toHaveCount(0);
+    await expect(page.locator('[data-status-indicator]')).toBeFocused();
+    console.log("CALENDAR_FRAME", JSON.stringify({ width, height, harnessHeight, surfaceLayer, dialogLayer, pickerLayer,
+      eventOpened: true, created: true, edited: true, focusRestored: true }));
   });
 }

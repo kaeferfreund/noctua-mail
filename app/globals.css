@@ -333,7 +333,7 @@ body {
 }
 
 /* z-index ladder for fixed and portalled layers, lowest first:
-     9990  floating calendar panel (CalendarPopover.module.css)
+     9990  floating calendar and composite status popover frames
      9994  base shadcn dialog/sheet content
      9995  Radix Themes dialog overlay (.rt-BaseDialogOverlay, below)
      9996–9997  nested Settings/Admin dialogs and confirmations, assigned by
