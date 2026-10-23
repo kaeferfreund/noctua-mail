@@ -112,3 +112,17 @@ test("metadata survives full resync, move, copied-message ingest and related pro
     expect(draft.to).toBe('"alias@example.test" <customer@example.test>');
   }
 });
+
+test("the light own-address read matches the full account's own addresses", async () => {
+  const { getAccountById } = await import("./accounts");
+  const { getAccountOwnAddresses } = await import("./senderIdentities");
+  const { getOwnAddresses } = await import("../ownAddresses");
+  const f = await fixture();
+  await f.add("Alias@Bücher.example"); await f.add("disabled@example.test", false);
+  const account = await getAccountById(f.accountId);
+  expect(account).not.toBeNull();
+  const own = await getAccountOwnAddresses(f.accountId);
+  expect(own).toEqual(getOwnAddresses(account!));
+  expect(own).toContain("alias@xn--bcher-kva.example");
+  expect(await getAccountOwnAddresses(`missing-${crypto.randomUUID()}`)).toEqual([]);
+});
