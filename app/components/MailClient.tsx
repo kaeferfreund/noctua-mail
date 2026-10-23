@@ -688,9 +688,6 @@ export default function MailClient({
     composeDraftId,
     composeReplyMessage
   } = composeMirror;
-  // Separate mirror so the draft-save relative-time interval can still drive
-  // MailClient re-renders while a saved draft exists.
-  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   // Recipient suggestion cache (previously lived inside `useComposeState`).
   const recipientCacheRef = useRef<Record<string, RecipientSuggestion[]>>({});
   const messageRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -715,7 +712,6 @@ export default function MailClient({
   const activeVirtualFolderIdRef = useRef("");
   const threadMessagesRef = useRef<Message[]>([]);
   const currentKeyRef = useRef("");
-  const [, setRelativeTimeCounter] = useState(0);
   // Fixed sender/date columns need a two-line row in a split pane.
   const listIsNarrow = listWidth < 600;
   // searchFields, searchBadges, activeVirtualFolderId, and virtual folder counts moved to useSearchState hook
@@ -1055,17 +1051,6 @@ export default function MailClient({
   );
   const hasFilteredSearchCriteria =
     isRelatedSearch || trimmedQuery.length > 0 || effectiveSearchBadges.length > 0;
-
-  // Update relative time display every second while a saved draft exists.
-  // Driven by a `draftSavedAt` mirror pushed from the orchestrator so the
-  // status bar's relative-time displays keep ticking alongside compose's.
-  useEffect(() => {
-    if (!draftSavedAt) return;
-    const interval = setInterval(() => {
-      setRelativeTimeCounter((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [draftSavedAt]);
 
   const selectedSearchFields = useMemo(() => {
     const fields = Object.entries(searchFields)
@@ -5040,7 +5025,7 @@ export default function MailClient({
   });
 
 
-  const rootFolders = accountFolders.filter((folder) => !folder.parentId);
+  const rootFolders = useMemo(() => accountFolders.filter((folder) => !folder.parentId), [accountFolders]);
   const virtualFoldersForPane = useMemo(
     () =>
       VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
@@ -5206,9 +5191,9 @@ export default function MailClient({
             accounts,
             summaries: mailboxSummaries,
             activeAccountId,
-            onSwitch: (accountId: string) => {
-              navigateLinkedAccount(accountId);
-            },
+            // Deep links own mailbox navigation (history + URL); the sidebar shows the
+            // clicked row as pending until the returned value settles.
+            onSwitch: (accountId: string) => navigateLinkedAccount(accountId),
             onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
           views: {
@@ -5783,7 +5768,6 @@ export default function MailClient({
         showComposeInline={showComposeInline}
         showComposeModal={showComposeModal}
         showComposeMinimized={showComposeMinimized}
-        onDraftSavedAtChange={setDraftSavedAt}
         onComposeMirrorChange={setComposeMirror}
       />
 

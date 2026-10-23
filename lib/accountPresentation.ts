@@ -1,5 +1,11 @@
 import type { Account, AccountRole } from "@/lib/data";
 
+/** Mailbox and member list order: display name (or email), normalized email, then id. */
+export function compareDisplayOrder(a: { name?: string | null; email: string; id: string }, b: { name?: string | null; email: string; id: string }) {
+  return (a.name || a.email).localeCompare(b.name || b.email, "en") ||
+    a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.id.localeCompare(b.id, "en");
+}
+
 export function sanitizeAccountForClient(account: Account, options: { role: AccountRole; viewerUserId: string; memberCount: number }): Account {
   const manager = options.role === "manager";
   return {
@@ -37,8 +43,12 @@ export function sanitizeAccountForClient(account: Account, options: { role: Acco
   };
 }
 
+/** Client DTOs for one access read (the entries of an `AccountAccessSnapshot`). */
+export function sanitizeAccessEntriesForClient(userId: string, entries: ReadonlyArray<{ account: Account; role: AccountRole; memberCount: number }>) {
+  return entries.map(({ account, role, memberCount }) => sanitizeAccountForClient(account, { role, viewerUserId: userId, memberCount }));
+}
+
 export async function sanitizeAccountsForClient(userId: string) {
   const { listAccessibleAccountsForUser } = await import("./accountAccess");
-  return (await listAccessibleAccountsForUser(userId)).map(({ account, role, memberCount }) =>
-    sanitizeAccountForClient(account, { role, viewerUserId: userId, memberCount }));
+  return sanitizeAccessEntriesForClient(userId, await listAccessibleAccountsForUser(userId));
 }

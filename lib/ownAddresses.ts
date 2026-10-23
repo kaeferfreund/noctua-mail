@@ -58,8 +58,13 @@ export function getOwnAddresses(
 }
 
 export function isOwnAddress(value: string | null | undefined, ownAddresses: readonly string[]): boolean {
+  return ownAddressMatcher(ownAddresses)(value);
+}
+
+/** `isOwnAddress` with the own-address set normalized once, for checking many values. */
+export function ownAddressMatcher(ownAddresses: readonly string[]): (value: string | null | undefined) => boolean {
   const own = new Set(ownAddresses.map(email => normalizeIdentityEmail(email)).filter(Boolean));
-  return parseAddressEmails(value).some(email => own.has(email));
+  return value => parseAddressEmails(value).some(email => own.has(email));
 }
 
 export type OwnAddressInput = string | readonly string[] | null | undefined;
