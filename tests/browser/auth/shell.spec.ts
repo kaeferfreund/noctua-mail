@@ -261,11 +261,14 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
   expect((await api(page, "/api/auth/me")).body.user.uiLocale).toBe("de");
-  await page.getByRole("dialog", { name: "Account settings", exact: true }).getByRole("button", { name: "Schließen", exact: true }).first().click();
+  // The settings dialog re-renders in German with the switch (Settings.accountTitle).
+  await page.getByRole("dialog", { name: "Postfacheinstellungen", exact: true }).getByRole("button", { name: "Schließen", exact: true }).first().click();
   await expect(second).toHaveAttribute("aria-current", "true");
-  await expect(subject).toHaveValue("Synthetic unsent locale draft");
+  // The same unsent composer re-renders in German (Compose.fields/actions) and keeps its draft.
+  await expect(subject).toHaveCount(0);
+  await expect(page.getByPlaceholder("Betreff", { exact: true })).toHaveValue("Synthetic unsent locale draft");
   await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
   await page.getByRole("button", { name: "Benutzermenü", exact: true }).click();
   await page.getByRole("menuitem", { name: "Profil & Sicherheit", exact: true }).click();
   await expect(page.getByRole("heading", { name: "App-Passwort", exact: true })).toBeVisible();
