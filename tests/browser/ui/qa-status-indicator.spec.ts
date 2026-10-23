@@ -267,3 +267,84 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
       eventOpened: true, created: true, edited: true, focusRestored: true }));
   });
 }
+
+// Phone calendar in the fullscreen Sheet, including the 320x500 keyboard-
+// shortened viewport. Playwright's click() scrolls overflow:hidden ancestors
+// and would conceal clipped controls, so every control must already sit in
+// the viewport, keep a 44px target and win hit testing before a raw mouse
+// click at its centre is used.
+const phoneControls = [".fc-addEvent-button", ".fc-today-button", ".fc-prev-button", ".fc-next-button",
+  ".fc-dayGridMonth-button", ".fc-timeGridWeek-button", ".fc-timeGridDay-button"];
+const phoneCalendar: unknown[] = [];
+for (const [width, height] of [[320, 568], [320, 500], [360, 640], [390, 844]]) {
+  test(`phone calendar controls stay reachable at ${width}x${height}`, async ({ page }) => {
+    test.skip(baseline);
+    await page.setViewportSize({ width, height }); await page.goto("/");
+    const indicator = page.locator('[data-status-indicator]');
+    await indicator.click();
+    await page.getByRole("menuitem", { name: "Kalender öffnen", exact: true }).click();
+    const sheet = page.locator('[data-slot="sheet-content"]');
+    await expect(sheet).toHaveCSS("opacity", "1");
+    const harness = sheet.locator(".fc-view-harness");
+    const reachable = async (locator: ReturnType<Page["locator"]>) => {
+      const box = (await locator.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(height);
+      expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
+      const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      expect(await locator.evaluate((element, { x, y }) => {
+        const top = document.elementFromPoint(x, y);
+        return top !== null && element.contains(top);
+      }, center)).toBe(true);
+      return center;
+    };
+    const frame = () => sheet.evaluate(element => {
+      const body = element.querySelector<HTMLElement>(":scope > .radix-themes")!;
+      const overflow = [body, ...body.querySelectorAll<HTMLElement>(".fc, .fc-header-toolbar, .fc-view-harness, .fc-col-header-cell")]
+        .filter(node => node.scrollWidth > node.clientWidth || node.scrollLeft !== 0).map(node => node.className);
+      const columns = [...element.querySelectorAll(".fc-col-header-cell")].map(cell => cell.getBoundingClientRect())
+        .map(box => ({ left: box.left, right: box.right }));
+      // Every sampled point over the Sheet hits the Sheet: nothing paints above it.
+      const sheetBox = element.getBoundingClientRect(), foreign: string[] = [];
+      for (let x = sheetBox.left + 4; x < sheetBox.right; x += (sheetBox.width - 8) / 4)
+        for (let y = sheetBox.top + 4; y < sheetBox.bottom; y += (sheetBox.height - 8) / 7) {
+          const top = document.elementFromPoint(x, y);
+          if (!top || !element.contains(top)) foreign.push(`${Math.round(x)},${Math.round(y)}`);
+        }
+      return { overflow, columns, foreign, pageOverflow: document.documentElement.scrollWidth > innerWidth,
+        harness: element.querySelector(".fc-view-harness")!.getBoundingClientRect().height,
+        toolbar: element.querySelector(".fc-header-toolbar")!.getBoundingClientRect().height };
+    });
+    const views: Record<string, unknown> = {};
+    for (const [view, button] of [["month", ".fc-dayGridMonth-button"], ["week", ".fc-timeGridWeek-button"], ["day", ".fc-timeGridDay-button"]] as const) {
+      const center = await reachable(sheet.locator(button));
+      await page.mouse.click(center.x, center.y);
+      await expect(sheet.locator(button)).toHaveClass(/fc-button-active/);
+      await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+      for (const control of phoneControls) await reachable(sheet.locator(control));
+      for (const name of ["Kalender-Seitenleiste einblenden", "Demnächst"]) await reachable(sheet.getByRole("button", { name, exact: true }));
+      await reachable(sheet.locator('[data-slot="sheet-close"]'));
+      const measured = await frame();
+      expect(measured.overflow).toEqual([]); expect(measured.pageOverflow).toBe(false); expect(measured.foreign).toEqual([]);
+      expect(measured.columns.length).toBe(view === "day" ? 1 : 7);
+      for (const column of measured.columns) { expect(column.left).toBeGreaterThanOrEqual(0); expect(column.right).toBeLessThanOrEqual(width); }
+      views[view] = measured;
+      if (view !== "day") await page.screenshot({ animations: "disabled", path: `${artifacts}/phone-calendar-${width}x${height}-${view}.png` });
+    }
+    const add = await reachable(sheet.locator(".fc-addEvent-button"));
+    await page.mouse.click(add.x, add.y);
+    const create = page.getByRole("dialog", { name: "New Event", exact: true });
+    const title = create.getByPlaceholder("Event title", { exact: true });
+    await expect(title).toBeFocused();
+    const titleBox = (await title.boundingBox())!;
+    expect(await title.evaluate((element, { x, y }) => element.contains(document.elementFromPoint(x, y)),
+      { x: titleBox.x + titleBox.width / 2, y: titleBox.y + titleBox.height / 2 })).toBe(true);
+    const sheetLayer = await sheet.evaluate(element => Number(getComputedStyle(element).zIndex));
+    const dialogLayer = await create.locator("xpath=ancestor::*[contains(@class, 'rt-BaseDialogOverlay')]").evaluate(element => Number(getComputedStyle(element).zIndex));
+    expect(sheetLayer).toBeLessThan(dialogLayer);
+    await page.keyboard.press("Escape"); await expect(create).toHaveCount(0); await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape"); await expect(sheet).toHaveCount(0); await expect(indicator).toBeFocused();
+    phoneCalendar.push({ width, height, sheetLayer, dialogLayer, views });
+    writeFileSync(`${artifacts}/phone-calendar.json`, JSON.stringify(phoneCalendar, null, 2) + "\n");
+  });
+}

@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { readFileSync } from "node:fs";
+import postcss from "postcss";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
@@ -149,5 +151,65 @@ describe("compact header status", () => {
     await act(async () => { window.innerWidth = 390; window.dispatchEvent(new Event("resize")); });
     const sheet = await view.findByRole("dialog", { name: "Fehler" });
     expect(sheet.getAttribute("data-slot")).toBe("sheet-content");
+  });
+});
+
+// happy-dom has no layout engine (every rect is 0) and resolves CSS modules to
+// undefined, so these tests pin the DOM route and the CSS contract that the
+// phone frame relies on. Real 320/360/390 px geometry, 44px targets, grid
+// height and hit testing run in tests/browser/ui/qa-status-indicator.spec.ts.
+const phoneControls = ["addEvent", "today", "prev", "next", "dayGridMonth", "timeGridWeek", "timeGridDay"];
+describe("phone calendar frame", () => {
+  const calendarFetch = () => spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+    async () => new Response(JSON.stringify({ ok: true, items: [], conflicts: [] }), { headers: { "Content-Type": "application/json" } }),
+    { preconnect: globalThis.fetch.preconnect }));
+  for (const width of [320, 360, 390]) it(`mounts the wrapping calendar frame in the fullscreen Sheet at ${width}px`, async () => {
+    const network = calendarFetch();
+    try {
+      window.innerWidth = width;
+      const view = render(<Harness initial="calendar" overrides={{ activeAccountId: "synthetic-account" }} />);
+      const sheet = await view.findByRole("dialog", { name: "Kalender öffnen" });
+      expect(sheet.getAttribute("data-slot")).toBe("sheet-content");
+      expect(sheet.getAttribute("data-side")).toBe("right");
+      expect(sheet.querySelector('[data-slot="sheet-close"]')).toBeTruthy();
+      const frame = sheet.querySelector<HTMLElement>('[data-calendar-frame]')!;
+      expect(frame.dataset.calendarFrame).toBe("phone");
+      // The Sheet body (not the frame) is the vertical scroller for short viewports.
+      expect(frame.closest(".overflow-auto")?.parentElement).toBe(sheet);
+      await waitFor(() => expect(frame.querySelectorAll(".fc-header-toolbar .fc-button").length).toBe(phoneControls.length), { timeout: 10000 });
+      for (const control of phoneControls) expect(frame.querySelector(`.fc-${control}-button`)?.tagName).toBe("BUTTON");
+      // The CSS moves the second chunk (prev/title/next) onto its own first row.
+      const chunks = frame.querySelectorAll(".fc-header-toolbar > .fc-toolbar-chunk");
+      expect(chunks.length).toBe(3);
+      expect(chunks[1].querySelector(".fc-prev-button") && chunks[1].querySelector(".fc-toolbar-title") && chunks[1].querySelector(".fc-next-button")).toBeTruthy();
+      expect(chunks[2].querySelectorAll(".fc-button").length).toBe(3);
+      expect(frame.querySelector(".fc-view-harness")).toBeTruthy();
+      expect(within(sheet).getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
+    } finally { network.mockRestore(); }
+  });
+  it("keeps the bounded popover frame on desktop", async () => {
+    const network = calendarFetch();
+    try {
+      const view = render(<Harness initial="calendar" overrides={{ activeAccountId: "synthetic-account" }} />);
+      const popover = await view.findByRole("dialog");
+      expect(popover.getAttribute("data-slot")).toBe("popover-content");
+      expect(popover.querySelector<HTMLElement>("[data-calendar-frame]")!.dataset.calendarFrame).toBe("popover");
+    } finally { network.mockRestore(); }
+  });
+  it("wraps the toolbar, keeps 44px targets and a bounded grid in the phone CSS", () => {
+    const css = postcss.parse(readFileSync(new URL("../../shell/MobileFrames.module.css", import.meta.url), "utf8"));
+    const decls = (selector: string) => {
+      const found: Record<string, string> = {};
+      css.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(decl => { found[decl.prop] = decl.value; }); });
+      return found;
+    };
+    expect(decls(".calendarBody :global(.fc .fc-toolbar.fc-header-toolbar)")["flex-wrap"]).toBe("wrap");
+    expect(decls(".calendarBody :global(.fc-header-toolbar > .fc-toolbar-chunk:nth-child(2))")).toMatchObject({ order: "-1", flex: "1 0 100%" });
+    expect(decls(".calendarFrame button")["min-height"]).toBe("44px");
+    expect(decls(".calendarFrame :global(.fc-button)")["min-width"]).toBe("44px");
+    expect(decls('.fullscreenSheet > [data-slot="sheet-close"]')).toMatchObject({ width: "44px", height: "44px" });
+    const body = decls(".calendarBody");
+    expect(body).toMatchObject({ display: "flex", "flex-direction": "column", "min-width": "0", overflow: "hidden" });
+    expect(parseFloat(body["min-height"])).toBeGreaterThanOrEqual(300);
   });
 });

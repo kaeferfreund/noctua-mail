@@ -94,7 +94,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
     <p>{props.mailCheckMode === "idle" ? t("liveCheck") : t("nextCheck", { time: timestamp(props.mailCheckStatus.nextCheckAt) })}</p>
     {checkMail}
   </div>;
-  const calendar = <div className={`${styles.calendar} ${openPanel === "calendar" ? styles.calendarOpen : ""}`}>
+  const calendar = <div className={`${styles.calendar} ${openPanel === "calendar" ? styles.calendarOpen : ""} ${isMobile ? mobileStyles.calendarFrame : ""}`}>
     <div className="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => { props.onToggleCalendarSidebar(); close(); }}>
       {props.calendarSidebarOpen ? t("hideCalendarSidebar") : t("showCalendarSidebar")}
     </Button>
@@ -102,7 +102,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
       {openPanel === "calendar" ? t("reminder.title") : t("calendar")}
     </Button>
     </div>
-    {openPanel === "calendar" ? <div className={calendarFrame.body}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
+    {openPanel === "calendar" ? <div data-calendar-frame={isMobile ? "phone" : "popover"} className={isMobile ? mobileStyles.calendarBody : calendarFrame.body}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
       onOpenMessage={props.onOpenCalendarMessage ? id => { props.onOpenCalendarMessage?.(id); close(); } : undefined}
       onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /></div> : null}
   </div>;
@@ -130,7 +130,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
       <Sheet open={openPanel === "calendar" || openPanel === "mail-check"} onOpenChange={open => { if (!open) close(); }}>
         <SheetContent onCloseAutoFocus={event => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined}
           side={openPanel === "calendar" ? "right" : "bottom"} className={openPanel === "calendar" ? mobileStyles.fullscreenSheet : mobileStyles.statusSheet}>
-          <SheetTitle className="px-4">{openPanel === "calendar" ? t("calendar") : t("mailCheck.title")}</SheetTitle>
+          <SheetTitle className={openPanel === "calendar" ? "flex min-h-13 items-center pr-14 pl-4" : "px-4"}>{openPanel === "calendar" ? t("calendar") : t("mailCheck.title")}</SheetTitle>
           <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
             {openPanel === "calendar" ? calendar : <><p className="mb-3 text-sm text-muted-foreground">{t("mailCheck.description")}</p>{mailCheck}</>}
           </div></Theme>
