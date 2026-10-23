@@ -43,8 +43,12 @@ export function sanitizeAccountForClient(account: Account, options: { role: Acco
   };
 }
 
+/** Client DTOs for one access read (the entries of an `AccountAccessSnapshot`). */
+export function sanitizeAccessEntriesForClient(userId: string, entries: ReadonlyArray<{ account: Account; role: AccountRole; memberCount: number }>) {
+  return entries.map(({ account, role, memberCount }) => sanitizeAccountForClient(account, { role, viewerUserId: userId, memberCount }));
+}
+
 export async function sanitizeAccountsForClient(userId: string) {
   const { listAccessibleAccountsForUser } = await import("./accountAccess");
-  return (await listAccessibleAccountsForUser(userId)).map(({ account, role, memberCount }) =>
-    sanitizeAccountForClient(account, { role, viewerUserId: userId, memberCount }));
+  return sanitizeAccessEntriesForClient(userId, await listAccessibleAccountsForUser(userId));
 }

@@ -4,7 +4,10 @@ import type { AccountRole } from "./data";
 import { NextResponse } from "next/server";
 import { getAuth, setActiveAccountId } from "./betterAuth";
 import { getDb } from "./db/connection";
-import { getAccountById, getAccountsForUser, getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { readAccountSelectionCandidates } from "./db/accounts";
+import { compareDisplayOrder } from "./accountPresentation";
+import type { AccountAccessSnapshot } from "./accountAccess";
 import { isMfaEnrollmentComplete } from "./authPolicy";
 
 export const SESSION_TTL_SECONDS = 86400;
@@ -104,31 +107,37 @@ export async function listSessionAccountIds(session: ActiveUserSession) {
   return new Set(await listAccessibleAccountIdsForUser(session.userId));
 }
 
-export type MailboxSelection = { mailboxState: "selected" | "none" | "unselected"; accountId: string | null; accounts: Awaited<ReturnType<typeof getAccountsForUser>> };
+/** `access` is this request's access read, taken after the last selection write; never reuse it elsewhere. */
+export type MailboxSelection = { mailboxState: "selected" | "none" | "unselected"; accountId: string | null; access: AccountAccessSnapshot };
 
-/** Persist a deterministic default, then recheck membership. Retry a revoked choice once. */
+/**
+ * Persist a deterministic default, then recheck membership on a fresh access read. Retry a revoked choice once.
+ * The read after the write proves the selected mailbox still exists and is still a candidate, and supplies the
+ * mailbox list, so grants, revocations and role changes committed during persistence are reflected.
+ */
 export async function ensureActiveAccountId(session: ActiveUserSession): Promise<MailboxSelection> {
+  const { readAccountAccess } = await import("./accountAccess");
+  const db = await getDb();
+  const readAccess = () => readAccountAccess(db, session.userId, { identities: true });
   for (let attempt = 0; attempt < 2; attempt++) {
-    const accounts = (await getAccountsForUser(session.userId)).sort((a, b) =>
-      (a.name || a.email).localeCompare(b.name || b.email, "en") ||
-      a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.id.localeCompare(b.id, "en"));
-    if (!accounts.length) {
+    const candidates = readAccountSelectionCandidates(db, session.userId).sort(compareDisplayOrder);
+    if (!candidates.length) {
       await setActiveAccountId(await getAuth(), session.sessionToken, null);
       session.activeAccountId = null;
-      return { mailboxState: "none", accountId: null, accounts: [] };
+      return { mailboxState: "none", accountId: null, access: readAccess() };
     }
-    const selected = accounts.find(a => a.id === session.activeAccountId) ?? accounts[0];
+    const selected = candidates.find(a => a.id === session.activeAccountId) ?? candidates[0];
     const updated = await setActiveAccountId(await getAuth(), session.sessionToken, selected.id);
-    const liveIds = await listAccessibleAccountIdsForUser(session.userId);
-    if (updated && liveIds.includes(selected.id) && await getAccountById(selected.id)) {
+    const access = readAccess();
+    if (updated && access.candidateIds.includes(selected.id)) {
       session.activeAccountId = selected.id;
-      return { mailboxState: "selected", accountId: selected.id, accounts: accounts.filter(a => liveIds.includes(a.id)) };
+      return { mailboxState: "selected", accountId: selected.id, access };
     }
     session.activeAccountId = null;
   }
   await setActiveAccountId(await getAuth(), session.sessionToken, null);
-  const accounts = await getAccountsForUser(session.userId);
-  return { mailboxState: accounts.length ? "unselected" : "none", accountId: null, accounts };
+  const access = readAccess();
+  return { mailboxState: access.candidateIds.length ? "unselected" : "none", accountId: null, access };
 }
 
 /** Bearer-only: browser cookies are never an MCP fallback. */
