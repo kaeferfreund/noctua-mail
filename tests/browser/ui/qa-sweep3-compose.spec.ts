@@ -74,6 +74,58 @@ test("QA-201 From switch to an unsigned identity and back restores the signature
   recordQa("QA-201", { rounds, promptsWhileUntouched: 0, promptsAfterAuthoredText: dialogs.length });
 });
 
+test("QA-201 forwards and Text replies get the signature back at the start without a prompt", async ({ page, request }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.emulateMedia({ colorScheme: "light" });
+  await signInQa(page);
+  const textSubject = /^QA long subject checks wrapping/, htmlSubject = /^QA sweep 3 HTML forward/;
+  await expect(page.getByText(textSubject).first()).toBeVisible({ timeout: 60000 });
+  const html = `From: Synthetic Html <html@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-sweep3-html-forward@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: QA sweep 3 HTML forward\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><p>Synthetic <b>HTML</b> body to forward.</p></body></html>\r\n`;
+  expect((await request.post(new URL("/inject", process.env.QA_SHELL_CONTROL_URL!).toString(), { data: { source: html } })).ok()).toBe(true);
+  const { team, unsigned } = await seedSenders(page);
+  const dialogs: string[] = [];
+  // Leaving an open composer between cases may ask beforeunload; only signature prompts count.
+  page.on("dialog", dialog => { if (dialog.type() !== "beforeunload") dialogs.push(dialog.message()); void dialog.accept(); });
+  const results: Record<string, unknown> = {};
+  for (const [label, subject, action, width, height] of [["html-forward", htmlSubject, copy.Reader.forward, 1440, 900], ["html-forward", htmlSubject, copy.Reader.forward, 390, 844], ["text-forward", textSubject, copy.Reader.forward, 1440, 900], ["text-reply", textSubject, copy.Reader.reply, 1440, 900]] as const) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
+    if (!await page.getByText(subject).first().isVisible()) await page.getByRole("button", { name: copy.Shell.sync.allFolders, exact: true }).first().click();
+    await page.getByText(subject).first().click();
+    // Reply/forward take their format from the reader, so wait until it shows this message's HTML.
+    await expect(page.getByTitle(subject).first()).toBeVisible();
+    if (label.startsWith("html")) await expect(page.locator("iframe:visible").first().contentFrame().getByText("Synthetic HTML body to forward.")).toBeVisible();
+    await page.getByRole("button", { name: action, exact: true }).first().click();
+    await expect(page.getByLabel(copy.Compose.from, { exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: label.startsWith("html") ? "HTML" : "Text", exact: true })).toHaveAttribute("aria-selected", "true");
+    // The phone check reopens the same forward on a phone-sized viewport.
+    await page.setViewportSize({ width, height });
+    const field = label.startsWith("html") ? page.locator('[data-lexical-editor="true"]:visible').first() : page.locator('textarea[name="compose_body"]:visible');
+    const body = async () => label.startsWith("html") ? (await field.innerText()).replace(/\u00a0/g, " ") : await field.inputValue();
+    // Text replies open with the unsigned mailbox identity; the first pick adds the signature.
+    await pickFrom(page, team);
+    await expect.poll(body).toContain("team@example.test");
+    const signed = await body();
+    expect(signed.startsWith("Viele Grüße")).toBe(true);
+    const rounds = [];
+    for (let round = 0; round < 3; round += 1) {
+      await pickFrom(page, unsigned);
+      await expect.poll(body).not.toContain("Viele Grüße");
+      await pickFrom(page, team);
+      await expect.poll(body).toContain("team@example.test");
+      const back = await body();
+      expect(back).toBe(signed);
+      expect(back.match(/Viele Grüße/g)).toHaveLength(1);
+      rounds.push({ signatureIndex: back.indexOf("Viele Grüße"), start: JSON.stringify(back.slice(0, 120)) });
+    }
+    expect(dialogs).toEqual([]);
+    if (label === "html-forward") await field.scrollIntoViewIfNeeded();
+    if (label === "html-forward") await page.screenshot({ path: evidencePath(`QA-201-html-forward-switch-back-${width}-light.png`) });
+    results[`${label}-${width}`] = rounds;
+  }
+  recordQa("QA-201-forward-reply", { results, prompts: dialogs.length });
+});
+
 test("QA-204 the desktop From menu is about as wide as its field", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 }); await page.emulateMedia({ colorScheme: "dark" });
   await signInQa(page);
