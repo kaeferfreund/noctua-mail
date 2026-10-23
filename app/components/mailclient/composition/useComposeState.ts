@@ -51,6 +51,7 @@ export function useComposeState() {
   const [composeOpenedAt, setComposeOpenedAt] = useState("");
   const [composeSignatureId, setComposeSignatureId] = useState<string>("");
   const [signatureMenuOpen, setSignatureMenuOpen] = useState(false);
+  const composeEditorSnapshotRef = useRef<(() => { html: string; text: string } | undefined) | null>(null);
   const composeSignatureRef = useRef<ComposeSignatureState | null>(null);
   const [composeReplyMessage, setComposeReplyMessage] = useState<Message | null>(null);
   const [composeTab, setComposeTab] = useState<ComposeTab>("html");
@@ -149,6 +150,7 @@ export function useComposeState() {
     signatureMenuOpen,
     setSignatureMenuOpen,
     composeSignatureRef,
+    composeEditorSnapshotRef,
     composeReplyMessage,
     setComposeReplyMessage,
     composeTab,

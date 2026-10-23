@@ -1,3 +1,4 @@
+import { senderMessages, senderOption } from "@/lib/senderMessages";
 import { useEffect, useState } from "react";
 import type React from "react";
 import { Button, Select, Text, TextField } from "@radix-ui/themes";
@@ -21,6 +22,7 @@ type ComposeFieldsProps = {
   identityId?: string;
   identityDisabled?: boolean;
   senderMessage?: string | null;
+  onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage?: Message | null;
   onJumpToMessage?: (messageId: string) => void;
@@ -198,7 +200,7 @@ export default function ComposeFields({
   composeShowBcc,
   activeAccountId,
   fromValue,
-  identities = [], identityId, identityDisabled = false, senderMessage, onIdentityChange,
+  identities = [], identityId, identityDisabled = false, senderMessage, onSenderRetry, onIdentityChange,
   inReplyToMessage,
   onJumpToMessage,
   setComposeSubject,
@@ -318,15 +320,15 @@ export default function ComposeFields({
       </Text>
       <div className={styles.composeInputWrap}>
         <Select.Root value={identityId || "__unavailable"} disabled={identityDisabled || !onIdentityChange} onValueChange={id => { markComposeDirty(); onIdentityChange?.(id); }}>
-          <Select.Trigger id={`compose-${variant}-from`} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} style={{ width: "100%" }} />
-          <Select.Content position="popper">
-            {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? `${fromValue} — unavailable` : "Choose a sender"}</Select.Item>}
+          <Select.Trigger id={`compose-${variant}-from`} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} className={styles.composeFromTrigger} />
+          <Select.Content position="popper" className={styles.composeFromMenu} collisionPadding={16}>
+            {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? senderOption(fromValue, "unavailable") : senderMessages.chooseSender}</Select.Item>}
             {identities.filter(identity => identity.enabled).map(identity => <Select.Item key={identity.id} value={identity.id}>
-              {identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email}{identity.isDefault ? " (mailbox default)" : ""}
+              {senderOption(identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email, identity.isDefault ? "default" : "enabled")}
             </Select.Item>)}
           </Select.Content>
         </Select.Root>
-        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} <a href={`#compose-${variant}-from`}>Review From</a></Text>}
+        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} {onSenderRetry ? <button type="button" onClick={onSenderRetry}>{senderMessages.retrySender}</button> : <a href={`#compose-${variant}-from`}>{senderMessages.reviewSender}</a>}</Text>}
       </div>
     </div>
   );

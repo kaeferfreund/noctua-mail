@@ -1,3 +1,4 @@
+import { senderMessages } from "@/lib/senderMessages";
 import type { Account, SenderIdentity, UserAccountPrefs } from "../data";
 import type { SignatureUser } from "../signatureTemplates";
 
@@ -20,11 +21,11 @@ export async function loadSenderSettings(apiFetch: (input: RequestInfo | URL, in
     apiFetch("/api/auth/me", { cache: "no-store" })
   ]);
   for (const response of responses) {
-    if (!response.ok) throw new Error("Could not load sender identities and preferences. Reopen the composer to retry.");
+    if (!response.ok) throw new Error(senderMessages.senderLoadFailed);
   }
   const [identities, preferences, me] = await Promise.all(responses.map(response => response.json()));
   const account = (me.accounts as Account[] | undefined)?.find(item => item.id === accountId);
-  if (!account || !me.user?.email || !Array.isArray(identities.identities)) throw new Error("Sender settings are unavailable for this mailbox.");
+  if (!account || !me.user?.email || !Array.isArray(identities.identities)) throw new Error(senderMessages.senderUnavailable);
   return { account: { ...account, ownAddresses: identities.ownAddresses }, identities: identities.identities,
     prefs: preferences.prefs ?? {}, user: me.user, warnings: identities.warnings ?? [] };
 }

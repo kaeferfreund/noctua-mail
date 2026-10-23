@@ -38,7 +38,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
     composeDragActive,
     detachedWindow,
     fromValue,
-    identities, identityId, identityDisabled, sendDisabled, senderMessage, onIdentityChange,
+    identities, identityId, identityDisabled, sendDisabled, senderMessage, onSenderRetry, onIdentityChange,
     composeSize,
     inReplyToMessage,
     composeModalRef,
@@ -176,7 +176,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             composeOpenedAt={composeOpenedAt}
             activeAccountId={activeAccountId}
             fromValue={fromValue}
-              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onIdentityChange={onIdentityChange}
+              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onSenderRetry={onSenderRetry} onIdentityChange={onIdentityChange}
             inReplyToMessage={inReplyToMessage}
             onJumpToMessage={jumpToMessage}
             setComposeSubject={setComposeSubject}

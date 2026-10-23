@@ -33,6 +33,7 @@ export type ComposeContextValue = {
   identityDisabled?: boolean;
   sendDisabled?: boolean;
   senderMessage?: string | null;
+  onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage: Message | null;
   composeInviteDraft: ComposeInviteDraft | null;

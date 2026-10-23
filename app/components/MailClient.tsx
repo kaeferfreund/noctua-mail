@@ -1,4 +1,7 @@
 "use client";
+
+import { senderMessages } from "@/lib/senderMessages";
+
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
@@ -4332,7 +4335,7 @@ export default function MailClient({
     let active = true;
     const refreshSenders = () => { void apiFetch("/api/accounts", { cache: "no-store" }).then(async response => {
       if (response.ok) { const refreshedAccounts = await response.json(); if (active) setAccounts(refreshedAccounts); }
-    }).catch(() => reportError("Could not refresh sender identities.")); };
+    }).catch(() => reportError(senderMessages.identityRefreshFailed)); };
     window.addEventListener("noctua:sender-settings-changed", refreshSenders);
     return () => { active = false; window.removeEventListener("noctua:sender-settings-changed", refreshSenders); };
   }, [apiFetch, reportError, currentUser?.id]);
