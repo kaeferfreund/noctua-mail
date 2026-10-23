@@ -34,6 +34,7 @@ export default function MessageViewPane({ children, header, toolbar, backActions
         <MessageLinkPreviewProvider value={handleLinkPreviewChange}>
           <div
             className={styles.threadView}
+            data-reader-scroll=""
             onMouseLeave={() => handleLinkPreviewChange(null)}
           >
             {children}

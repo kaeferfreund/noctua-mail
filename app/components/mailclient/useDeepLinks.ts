@@ -18,8 +18,16 @@ type Options = {
   onForbidden?: () => void;
   openMessage: (message: Message) => void;
   notice: (kind: "forbidden" | "missing" | "moved" | "failed") => void;
+  /** URL → UI transaction boundaries, e.g. for scroll anchors of history entries. */
+  onTransaction?: (event: DeepLinkTransaction) => void;
 };
-type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; initial: boolean; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean; controller: AbortController; done: () => void };
+/** `history` is Back/Forward; `link` is an in-app navigation to an explicit target. */
+export type DeepLinkTransaction = { phase: "start" | "settled"; origin: "initial" | "history" | "link"; messageId: string };
+type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; origin: DeepLinkTransaction["origin"]; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean; controller: AbortController; done: () => void };
+
+let entrySequence = 0;
+/** Identifies one history entry, so two visits of the same place keep their own state. */
+const nextHistoryEntry = () => `${Date.now().toString(36)}.${(++entrySequence).toString(36)}`;
 
 /** URL → UI is an explicit transaction. UI → URL never initiates account loads. */
 export function useDeepLinks(options: Options) {
@@ -31,19 +39,21 @@ export function useDeepLinks(options: Options) {
   const initialized = useRef(false);
   const [, refresh] = useState(0);
   const update = useCallback(() => refresh(value => value + 1), []);
-  const request = useCallback((target: DeepLinkState, initial = false, historyMode: "push" | "replace" = "replace") => {
+  const request = useCallback((target: DeepLinkState, origin: Pending["origin"] = "link", historyMode: "push" | "replace" = "replace") => {
     pending.current?.controller.abort();
     pending.current?.done();
     let done = () => {};
     const settled = new Promise<void>(resolve => { done = resolve; });
-    pending.current = { target, initial, historyMode, phase: "requested", controller: new AbortController(), done };
+    pending.current = { target, origin, historyMode, phase: "requested", controller: new AbortController(), done };
+    latest.current.onTransaction?.({ phase: "start", origin, messageId: target.messageId });
     update();
     return settled;
   }, [update]);
   const write = useCallback((state: DeepLinkState, mode: "push" | "replace") => {
     const href = serializeDeepLink(state, window.location.href);
     const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const historyState = { ...window.history.state, noctuaUrl: true, noctuaMessageEntry: Boolean(state.messageId) };
+    const entry = mode === "replace" && typeof window.history.state?.noctuaEntry === "string" ? window.history.state.noctuaEntry : nextHistoryEntry();
+    const historyState = { ...window.history.state, noctuaUrl: true, noctuaMessageEntry: Boolean(state.messageId), noctuaEntry: entry };
     if (href !== current || !window.history.state?.noctuaUrl) {
       window.history[mode === "push" ? "pushState" : "replaceState"](historyState, "", href);
     }
@@ -52,9 +62,9 @@ export function useDeepLinks(options: Options) {
     initialized.current = true;
     // Hydrate external browser state after mount; subsequent updates come from popstate.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    request(parseDeepLink(window.location.search), true);
+    request(parseDeepLink(window.location.search), "initial");
     const onPop = (event: PopStateEvent) => {
-      if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search));
+      if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search), "history");
     };
     const onKey = (event: KeyboardEvent) => {
       const target = event.target;
@@ -142,10 +152,11 @@ export function useDeepLinks(options: Options) {
       work.done();
       previous.current = options.state;
       // A directly opened reader gets a list entry too, including after login/reload.
-      if (work.initial && options.state.messageId && !window.history.state?.noctuaMessageEntry) {
+      if (work.origin === "initial" && options.state.messageId && !window.history.state?.noctuaMessageEntry) {
         write({ ...options.state, messageId: "" }, "replace");
         write(options.state, "push");
       } else write(work.keepMessage ? { ...options.state, messageId: work.target.messageId } : options.state, work.historyMode);
+      latest.current.onTransaction?.({ phase: "settled", origin: work.origin, messageId: options.state.messageId });
     }
   });
   useEffect(() => {
@@ -172,7 +183,7 @@ export function useDeepLinks(options: Options) {
   }, [request, write]);
   const navigateMessage = useCallback((messageId: string, accountId?: string) => {
     const target = { ...emptyDeepLink(), accountId: accountId || latest.current.state.accountId, messageId };
-    afterMobileOverlayNavigation(() => request(target, false, "push"));
+    afterMobileOverlayNavigation(() => request(target, "link", "push"));
   }, [request]);
   return { navigateAccount, navigateMessage };
 }
