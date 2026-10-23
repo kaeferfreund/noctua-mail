@@ -8,7 +8,7 @@ import type { Message } from "@/lib/data";
 afterEach(cleanup);
 test("move notices follow locale changes, retain literal custom names and send raw destination IDs", async () => {
   const notices: string[] = [], requests: string[] = [];
-  const message: Message = { id: "synthetic-message", accountId: "synthetic", folderId: "synthetic:INBOX",
+  const message: Message = { id: "synthetic-message", threadId: "synthetic-thread", accountId: "synthetic", folderId: "synthetic:INBOX",
     subject: "Synthetic subject", from: "sender@example.test", to: "user@example.test", date: "2026-10-22T12:00:00Z",
     dateValue: 1792670400000, preview: "", body: "" };
   const folderById = new Map([

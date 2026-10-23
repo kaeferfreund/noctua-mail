@@ -5366,12 +5366,6 @@ export default function MailClient({
             : folder.id === "virtual:invite-deck"
               ? inviteDeckUnreadCount
               : null,
-        countLabel:
-          folder.id === "virtual:focused"
-            ? tv("unreadLabel", { count: focusedUnreadCount ?? 0 })
-            : folder.id === "virtual:action-queue"
-            ? tv("pendingLabel", { count: actionQueueTodoCount ?? 0 })
-            : undefined,
         countAriaLabel:
           folder.id === "virtual:focused"
             ? tv("unreadCount", { count: focusedUnreadCount ?? 0 })

@@ -8,7 +8,7 @@ import { useMessageListHelpers } from "../messagelist/useMessageListHelpers";
 import MessageWindowPage from "@/app/message/window/page";
 
 const folders: Folder[] = [{ id: "synthetic:INBOX", accountId: "synthetic", name: "INBOX", specialUse: "\\Inbox", count: 1 }];
-const message: Message = { id: "synthetic-message", accountId: "synthetic", folderId: folders[0].id,
+const message: Message = { id: "synthetic-message", threadId: "synthetic-thread", accountId: "synthetic", folderId: folders[0].id,
   subject: "Synthetic subject", from: "sender@example.test", to: "user@example.test", date: "2026-10-22T12:00:00Z",
   dateValue: 1792670400000, preview: "Synthetic preview", body: "Synthetic body" };
 const originalFetch = globalThis.fetch;
@@ -24,7 +24,7 @@ for (const locale of ["de", "en"] as const) {
       return renderFolderBadges([folders[0].id]);
     }
     const page = render(<I18nTestProvider locale={locale}><Theme><Harness /></Theme></I18nTestProvider>);
-    const badge = page.getByRole("button", { name, exact: true });
+    const badge = page.getByRole("button", { name });
     expect(badge.title).toBe(name);
     fireEvent.click(badge);
     expect(selected).toEqual([folders[0].id]);
@@ -41,6 +41,6 @@ for (const locale of ["de", "en"] as const) {
         <MessageWindowPage />
       </SearchParamsContext.Provider>
     </Theme></I18nTestProvider>);
-    expect((await page.findByRole("button", { name, exact: true })).title).toBe(name);
+    expect((await page.findByRole("button", { name })).title).toBe(name);
   });
 }

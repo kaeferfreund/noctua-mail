@@ -9,7 +9,7 @@ import { MOBILE_QUERY } from "@/app/hooks/use-mobile";
 
 afterEach(cleanup);
 const account: Account = {
-  id: "synthetic", email: "user@example.test", name: "Synthetic mailbox", accessRole: "manager",
+  id: "synthetic", avatar: "", email: "user@example.test", name: "Synthetic mailbox", accessRole: "manager",
   imap: { host: "imap.example.test", port: 993, secure: true, user: "user@example.test", password: "" },
   smtp: { host: "smtp.example.test", port: 465, secure: true, user: "user@example.test", password: "" }
 };
@@ -19,6 +19,7 @@ for (const locale of ["de", "en"] as const) for (const width of [320, 360, 390])
     const originalWidth = window.innerWidth;
     window.innerWidth = width;
     window.matchMedia = ((query: string) => ({ matches: query === MOBILE_QUERY, media: query,
+      onchange: null, addListener() {}, removeListener() {}, dispatchEvent: () => true,
       addEventListener() {}, removeEventListener() {} })) as typeof window.matchMedia;
     try {
       const t = getTranslator(locale);

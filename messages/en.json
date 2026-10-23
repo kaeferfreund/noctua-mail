@@ -161,7 +161,7 @@
     },
     "build": "Build {version}",
     "loading": {
-      "mailbox": "Postfach hinzufügen"
+      "mailbox": "Add mailbox"
     },
     "threadsCount": "{count, plural, one {# thread} other {# threads}}",
     "refreshTitle": "Refresh required",
