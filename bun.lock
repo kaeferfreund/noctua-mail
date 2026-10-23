@@ -40,7 +40,7 @@
         "next": "16.2.4",
         "next-intl": "4.14.9",
         "next-themes": "^0.4.6",
-        "nodemailer": "^8.0.11",
+        "nodemailer": "^10.2.1",
         "parse5": "^8.0.1",
         "postcss": "^8.5.31",
         "qrcode": "^1.5.4",
@@ -1564,7 +1564,7 @@
 
     "node-releases": ["node-releases@2.0.59", "", {}, "sha512-5qr2okC4ItAI0hG5SaV0HoYMpnM/Y6+Oqr7AmPYy/2uEoGvS+GbSKLeRxSS1uAdu59yz0ouzcuXievSgg///WA=="],
 
-    "nodemailer": ["nodemailer@8.0.11", "", {}, "sha512-nrO/pDAUKl+wXX+lx16tDLbnm0fW6sK/x8mgohaCpg+CdCEl482bD4tCuAZk2DyliruiNTIZxRCoWkDqJEnAiA=="],
+    "nodemailer": ["nodemailer@10.2.1", "", {}, "sha512-ZrDNsPFoDMwefNs7sJwrYiEJ/CG4ClJWDZv05iNJsEBWa8GRDry1QJHTJxsuTAY9eDDKjX4k+q3SxslXJOao7w=="],
 
     "npm-run-path": ["npm-run-path@6.0.0", "", { "dependencies": { "path-key": "^4.0.0", "unicorn-magic": "^0.3.0" } }, "sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA=="],
 
