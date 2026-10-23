@@ -33,6 +33,7 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
   return <><output data-testid="state">{JSON.stringify(state)}</output>
     <button onClick={() => { setOverlay(false); void navigateAccount("b"); }}>Mailbox B</button><button onClick={() => navigateAccount("a")}>Mailbox A</button>
     <button onClick={() => setState(old => ({ ...old, messageId: "imap-one" }))}>Message</button>
+    <button onClick={() => setState(old => ({ ...old, messageId: "imap-two" }))}>Next message</button>
     <button onClick={() => { setMessages(old => old.filter(item => item.id !== state.messageId)); setState(old => ({ ...old, messageId: "imap-two" })); }}>Remove message</button>
     <button onClick={() => navigateMessage("imap-one", "b")}>Notification</button>
     <button onClick={() => { setState(old => ({ ...old, folderId: `${old.accountId}:Sent` })); setOverlay(false); }}>Folder Sent</button>
@@ -191,4 +192,18 @@ it("settles a mailbox picked while its sidebar sheet closes with Back", async ()
   fireEvent.click(page.getByText("Mailbox B"));
   await waitFor(() => expect(new URLSearchParams(window.location.search).get("folderId")).toBe("b:INBOX"));
   expect(page.getByTestId("state").textContent).toContain('"accountId":"b"');
+});
+
+it.each(["window", "document", "body", "input"] as const)("tracks navigation keys from %s without replacing history for typed input", async target => {
+  const page = render(<Harness />); await settled();
+  fireEvent.click(page.getByText("Message"));
+  const pushes = spyOn(window.history, "pushState"); restores.push(() => pushes.mockRestore());
+  const replacements = spyOn(window.history, "replaceState"); restores.push(() => replacements.mockRestore());
+  const eventTarget = target === "window" ? window : target === "document" ? document : target === "body" ? document.body : page.getByRole("textbox");
+  fireEvent.keyDown(eventTarget, { key: "j" });
+  // Simulate the reader's subsequent selection without a pointerdown resetting the keyboard flag.
+  fireEvent.click(page.getByText("Next message"));
+  expect(new URLSearchParams(window.location.search).get("openMessageId")).toBe("imap-two");
+  expect(pushes).toHaveBeenCalledTimes(target === "input" ? 1 : 0);
+  expect(replacements).toHaveBeenCalledTimes(target === "input" ? 0 : 1);
 });

@@ -57,8 +57,9 @@ export function useDeepLinks(options: Options) {
       if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search));
     };
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.closest("input, textarea, [contenteditable=true]") && ["j", "k", "ArrowDown", "ArrowUp"].includes(event.key)) keyboard.current = true;
+      const target = event.target;
+      const editing = target instanceof Element && target.closest("input, textarea, [contenteditable=true]");
+      if (!editing && ["j", "k", "ArrowDown", "ArrowUp"].includes(event.key)) keyboard.current = true;
     };
     const onPointer = () => { keyboard.current = false; };
     window.addEventListener("popstate", onPop);
