@@ -220,7 +220,10 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     expect(await post(page, "/api/accounts/qa-shared/calendar/events", {
       summary, startAtMs: Date.now(), endAtMs: Date.now() + 3600000, allDay: true, sourceType: "local"
     })).toBe(200);
-    await page.goto("/?openCalendar=1");
+    if (width < 768) {
+      await page.locator('[data-status-indicator]').click();
+      await page.getByRole("menuitem", { name: "Kalender öffnen", exact: true }).click();
+    } else await page.goto("/?openCalendar=1");
     const surface = page.locator(width < 768 ? '[data-slot="sheet-content"]' : '[data-slot="popover-content"]');
     const harness = surface.locator(".fc-view-harness");
     await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
