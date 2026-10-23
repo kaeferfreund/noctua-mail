@@ -141,7 +141,12 @@ describe("FTS-driven search candidates differential", () => {
         subject: "needle in deleted copy",
         body: "needle deleted body",
         deleted: true
-      }, 14)
+      }, 14),
+      msg("keyword-1", "thread-keyword", {
+        subject: "NOT AND OR sale",
+        body: "keyword carrier notary andes orchard",
+        from: "nora@example.test"
+      }, 15)
     ]);
     // Second account on the same physical shard reuses local message ids
     // (FTS v3 collision identity): candidate resolution must stay isolated.
@@ -228,6 +233,81 @@ describe("FTS-driven search candidates differential", () => {
       }
     });
   }
+
+  // FTS5 parses upper-case AND/OR/NOT barewords as operators; as search
+  // tokens they must be plain (prefix) terms in both modes, never a MATCH
+  // syntax error or an fts_error fallback.
+  const keywordQueries: Array<{ name: string; params: Record<string, unknown> }> = [
+    ...["NOT", "AND", "OR", "not", "and", "or", "Not", "aNd", "oR", "NEAR", "near"].map((query) => ({
+      name: `alone ${query}`,
+      params: { query }
+    })),
+    { name: "all three", params: { query: "NOT AND OR" } },
+    { name: "trailing AND", params: { query: "needle AND" } },
+    { name: "leading OR", params: { query: "OR needle" } },
+    { name: "infix OR", params: { query: "needle OR gamma" } },
+    { name: "leading NOT", params: { query: "NOT needle" } },
+    { name: "mixed case combined", params: { query: "Not sale and" } },
+    { name: "quoted keyword", params: { query: '"NOT"' } },
+    { name: "quoted query with keyword", params: { query: '"needle AND"' } },
+    { name: "NEAR group text", params: { query: "NEAR(needle)" } },
+    { name: "fields subject NOT", params: { query: "NOT", fields: ["subject"] } },
+    { name: "fields subject+body OR", params: { query: "OR keyword", fields: ["subject", "body"] } },
+    { name: "fields body AND (combined MATCH)", params: { query: "AND needle", fields: ["body"] } },
+    { name: "fields sender NOT", params: { query: "NOT", fields: ["sender"] } },
+    { name: "fields attachments AND", params: { query: "AND", fields: ["attachments"] } },
+    { name: "from filter + AND", params: { query: "from:nora AND" } },
+    { name: "in filter + OR", params: { query: "in:archive OR zebra" } },
+    { name: "thread filter + NOT", params: { query: "thread:thread-keyword NOT" } },
+    { name: "to filter + NOT", params: { query: "to:alice needle NOT" } },
+    { name: "grouped by sender", params: { query: "NOT sale", groupBy: "sender" } },
+    { name: "badges unread", params: { query: "OR", badges: ["unread"] } }
+  ];
+
+  for (const { name, params } of keywordQueries) {
+    test(`FTS5 keyword token identical, no fts_error: ${name}`, async () => {
+      const accountId = fixture.a.accountId;
+      const fallbacks: unknown[] = [];
+      const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+        if (args[0] === "[fts-search] legacy fallback") fallbacks.push(args[1]);
+      });
+      try {
+        for (const cap of [undefined, "3"]) {
+          if (cap) process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = cap;
+          try {
+            for (const page of [1, 2]) {
+              await runBoth(() =>
+                listThreads({ accountId, page, pageSize: 3, ...params } as Parameters<typeof listThreads>[0])
+              );
+              await runBoth(() =>
+                listMessages({ accountId, page, pageSize: 3, ...params } as Parameters<typeof listMessages>[0])
+              );
+            }
+          } finally {
+            delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+          }
+        }
+      } finally {
+        spy.mockRestore();
+      }
+      expect(fallbacks.filter((line) => (line as { reason?: string }).reason === "fts_error")).toEqual([]);
+    });
+  }
+
+  test("spot checks: FTS5 keyword tokens search as plain terms", async () => {
+    const accountId = fixture.a.accountId;
+    const idsFor = async (query: string, extra: Record<string, unknown> = {}) => {
+      const result = await listMessages({
+        accountId, page: 1, pageSize: 50, query, ...extra
+      } as Parameters<typeof listMessages>[0]);
+      return result.items.map((m) => m.id).sort();
+    };
+    expect(await idsFor("NOT", { fields: ["subject"] })).toEqual(["keyword-1"]);
+    expect(await idsFor("NOT")).toEqual(await idsFor("not"));
+    expect(await idsFor("AND sale")).toEqual(["keyword-1"]);
+    expect(await idsFor("sale OR", { fields: ["subject"] })).toEqual(["keyword-1"]);
+    expect(await idsFor("NOT needle")).toEqual([]);
+  });
 
   test("spot checks: key corpus queries hit the intended messages", async () => {
     const accountId = fixture.a.accountId;
