@@ -1,14 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { evidencePath, recordQa, signInQa } from "./qaRound2Session";
+
+// Leave the shell's identity/locale listener before changing its server preference.
+// Otherwise an in-flight identity refresh can race the next full navigation.
+async function setLocale(page: Page, locale: string) {
+  await page.goto("/message/window");
+  const response = await page.request.put("/api/auth/preferences", { data: { uiLocale: locale },
+    headers: { origin: new URL(page.url()).origin } });
+  expect(response.status()).toBe(200);
+}
 
 // Uses the existing synthetic shell fixture and its authenticated session.
 test("settings tabs contain wrapped labels in both locales", async ({ page }) => {
   await signInQa(page);
   const results = [];
   for (const locale of ["de", "en"]) {
-    const response = await page.request.put("/api/auth/preferences", { data: { uiLocale: locale },
-      headers: { origin: new URL(page.url()).origin } });
-    expect(response.status()).toBe(200);
+    await setLocale(page, locale);
     for (const width of [1280, 320, 360, 390]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/");
@@ -42,15 +49,14 @@ test("sidebar view rows reserve count space and contain wrapped labels", async (
   await signInQa(page);
   const results = [];
   for (const locale of ["de", "en"]) {
-    const response = await page.request.put("/api/auth/preferences", { data: { uiLocale: locale },
-      headers: { origin: new URL(page.url()).origin } });
-    expect(response.status()).toBe(200);
+    await setLocale(page, locale);
     for (const width of [1280, 390, 360, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/");
       if (width < 768) await page.getByRole("button", { name: locale === "de" ? "Seitenleiste umschalten" : "Toggle sidebar", exact: true }).click();
       const rows = page.locator("[data-view-id]");
       await expect(rows).toHaveCount(7);
+      await expect(page.locator('[data-view-id="virtual:focused"]').locator("..").locator('[data-sidebar="menu-badge"]')).toBeVisible();
       const measurements = await rows.evaluateAll(elements => elements.map(element => {
         const row = element.getBoundingClientRect();
         const label = element.querySelector("span")!.getBoundingClientRect();
@@ -90,9 +96,7 @@ test("detached folder tooltips and move notices use the picker locale", async ({
   const listPath = `/api/accounts/${accountId}/messages?folderId=${encodeURIComponent(inbox.id)}&pageSize=1`;
   const results = [];
   for (const locale of ["de", "en"]) {
-    const response = await page.request.put("/api/auth/preferences", { data: { uiLocale: locale },
-      headers: { origin: new URL(page.url()).origin } });
-    expect(response.status()).toBe(200);
+    await setLocale(page, locale);
     for (const width of [1280, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       const before = await (await page.request.get(listPath)).json();
@@ -105,16 +109,16 @@ test("detached folder tooltips and move notices use the picker locale", async ({
       await page.goto("/");
       if (width < 768) await page.getByRole("button", { name: locale === "de" ? "Seitenleiste umschalten" : "Toggle sidebar", exact: true }).click();
       await page.locator('[data-view-id^="folder:"]').click();
-      await page.locator('[data-message-list-row] [data-message-subject]').first().click();
+      const row = page.locator("[data-message-list-row]").first();
+      await row.click({ modifiers: ["Control"] });
       await page.getByRole("button", { name: locale === "de" ? /^Nachrichtenaktionen:/ : /^Message actions:/ }).click();
       await page.getByRole("menuitem", { name: locale === "de" ? "Verschieben nach" : "Move to", exact: true }).hover();
       await page.getByRole("menuitem", { name: locale === "de" ? "Mehr …" : "More...", exact: true }).click();
-      const picker = page.getByRole("dialog", { name: locale === "de" ? "In Ordner verschieben" : "Move to folder", exact: true });
+      const picker = page.getByRole("dialog", { name: locale === "de" ? "Verschieben nach …" : "Move to...", exact: true });
       const moved = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/messages/move"));
-      await picker.getByRole("button", { name: locale === "de" ? "Gesendet" : "Sent", exact: true }).click();
+      await picker.locator(`[data-folder-id=${JSON.stringify(sent.id)}]`).click();
       expect((await moved).status()).toBe(200);
-      if (width < 768) await page.getByRole("button", { name: locale === "de" ? "Seitenleiste umschalten" : "Toggle sidebar", exact: true }).click();
-      const notice = page.getByText(locale === "de" ? /Nachricht.*nach „Gesendet“ verschoben/ : /(?:Moving message to Sent|Moved message to Sent)/).first();
+      const notice = page.getByText(locale === "de" ? /Nachricht.*nach „Gesendet“ verschoben/ : /(?:Moving|Moved) (?:message|[0-9]+ messages) to Sent/).first();
       await expect(notice).toBeVisible();
       const text = await notice.innerText();
       await page.screenshot({ path: evidencePath(`i18n-move-${locale}-${width}.png`) });
