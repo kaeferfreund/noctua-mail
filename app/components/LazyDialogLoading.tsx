@@ -1,9 +1,18 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Spinner, Theme } from "@radix-ui/themes";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 
-export default function LazyDialogLoading({ label, mailboxDialog = false }: { label: string; mailboxDialog?: boolean }) {
+export default function LazyDialogLoading({ kind = "admin", mailboxDialog = false }: {
+  kind?: "admin" | "settings";
+  /** Legacy callers pass a label; the semantic kind/mailboxDialog now selects copy. */
+  label?: string;
+  mailboxDialog?: boolean;
+}) {
+  const t = useTranslations("Shell");
+  const label = mailboxDialog ? t("loading.mailbox") : t(kind);
+
   if (mailboxDialog) return (
     <Dialog open>
       <DialogContent className="sm:max-w-3xl" aria-describedby={undefined} showCloseButton={false}>
