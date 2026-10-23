@@ -11,7 +11,8 @@ it("QA-013 opts sheet content and backdrop out of motion when the user requests 
     const sheet = await page.findByRole("dialog", { name: "Synthetic sidebar" });
     const overlay = document.querySelector('[data-slot="sheet-overlay"]')!;
     for (const element of [sheet, overlay]) {
-      expect(element.classList.contains("motion-reduce:animate-none")).toBe(true);
+      expect(element.classList.contains("motion-reduce:data-open:animate-none")).toBe(true);
+      expect(element.classList.contains("motion-reduce:data-closed:animate-none")).toBe(true);
       expect(element.classList.contains("motion-reduce:transition-none")).toBe(true);
       expect(element.classList.contains("motion-reduce:duration-0")).toBe(true);
     }
