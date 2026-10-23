@@ -66,6 +66,9 @@ export function deepLinkHistoryMode(previous: DeepLinkState, next: DeepLinkState
   // Discovering its default folder enriches the existing mailbox entry.
   if (previous.accountId && !previous.folderId && next.folderId && previous.accountId === next.accountId &&
     serializeDeepLink({ ...previous, folderId: next.folderId }) === serializeDeepLink(next)) return "replace";
+  // Virtual views auto-clear once a query or badge filter takes over.
+  if (previous.view && !next.view && (next.query.trim() || next.badges.length) &&
+    serializeDeepLink({ ...previous, view: null }) === serializeDeepLink(next)) return "replace";
   const continuous = (s: DeepLinkState) => ({ ...s, query: "", messageId: "" });
   if (JSON.stringify(continuous(previous)) === JSON.stringify(continuous(next)) && (keyboard || previous.messageId === next.messageId)) return "replace";
   return "push";

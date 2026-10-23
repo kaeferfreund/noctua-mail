@@ -12,7 +12,9 @@ let returning = false;
 let listening = false;
 let deferred: Array<() => void> = [];
 
-export const isMobileOverlayPop = (event: Event) => consumedPops.has(event);
+/** Classify from current state too: a window listener may run before onPop. */
+export const isMobileOverlayPop = (event: PopStateEvent) => consumedPops.has(event) || returning ||
+  (overlays.length > 0 && overlays.at(-1)!.id !== event.state?.noctuaMobileOverlay);
 
 function pushOverlay(overlay: Overlay) {
   overlay.pushed = true;

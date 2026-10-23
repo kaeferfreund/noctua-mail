@@ -23,9 +23,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/?accountId=qa-shared"); await expect(rows(page).first()).toBeVisible();
   await expect.poll(() => search(page).get("folderId")).toBe("qa-shared:INBOX");
 });
-async function shot(page: Page, name: string) { mkdirSync(evidence, { recursive: true }); await page.screenshot({ path: `${evidence}/${name}.png`, fullPage: true }); }
-
-test("URL reader: reload, fresh login, Back to list then previous mailbox, Forward", async ({ page, browser }) => {
+async function traceHistory(page: Page) {
   await page.evaluate(() => {
     const trace: unknown[] = [];
     for (const mode of ["pushState", "replaceState"] as const) {
@@ -37,6 +35,11 @@ test("URL reader: reload, fresh login, Back to list then previous mailbox, Forwa
     }
     window.addEventListener("popstate", () => { trace.push({ mode: "popstate", url: location.href }); document.documentElement.dataset.historyTrace = JSON.stringify(trace); });
   });
+}
+async function shot(page: Page, name: string) { mkdirSync(evidence, { recursive: true }); await page.screenshot({ path: `${evidence}/${name}.png`, fullPage: true }); }
+
+test("URL reader: reload, fresh login, Back to list then previous mailbox, Forward", async ({ page, browser }) => {
+  await traceHistory(page);
   const switchWrites: string[] = [];
   page.on("request", request => { if (request.url().endsWith("/api/auth/switch-account")) switchWrites.push(request.postDataJSON().accountId); });
   await page.getByRole("button", { name: /QA Second/ }).click();
@@ -147,3 +150,95 @@ test("cold reader does not wait for a held list; warm SW notification resolves a
   await expect.poll(() => search(page).get("openMessageId")).toBe(id);
   await expect(page.locator("[data-reader-toolbar]")).toBeVisible();
 });
+
+test("390px sidebar keeps the selected mailbox and folder, with working Back/Forward", async ({ page }) => {
+  await traceHistory(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const switchWrites: string[] = [];
+  page.on("request", request => { if (request.url().endsWith("/api/auth/switch-account")) switchWrites.push(request.postDataJSON().accountId); });
+  const toggle = page.locator('[data-slot="shell-header"]').getByRole("button", { name: "Toggle sidebar", exact: true });
+  const sheet = page.getByRole("dialog", { name: "Sidebar", exact: true });
+  await toggle.click();
+  await sheet.getByRole("button", { name: /QA Second/ }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-second:INBOX");
+  await expect(rows(page).first()).toBeVisible();
+  expect(switchWrites).toEqual(["qa-second"]);
+  await toggle.click();
+  await expect(sheet.getByRole("button", { name: /QA Second/ })).toHaveAttribute("aria-current", "true");
+  await sheet.locator('[data-folder-id="qa-second:Sent"]').click();
+  await expect(sheet).toHaveCount(0);
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-second:Sent");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("QA Second / Sent");
+  await expect(rows(page).first()).toBeVisible();
+  await page.goBack();
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-second:INBOX");
+  await expect(rows(page).first()).toBeVisible();
+  await page.goBack();
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-shared:INBOX");
+  await expect(rows(page).first()).toBeVisible();
+  await page.goForward();
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-second:INBOX");
+  await expect(rows(page).first()).toBeVisible();
+  await page.goForward();
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-second:Sent");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("QA Second / Sent");
+  await expect(rows(page).first()).toBeVisible();
+});
+
+test("virtual-view filter navigation restores with Back/Forward and keeps URL updates alive", async ({ page }) => {
+  await traceHistory(page);
+  await page.locator('[data-view-id="virtual:unassigned"]').click();
+  await expect.poll(() => search(page).get("view")).toBe("virtual:unassigned");
+  await page.getByRole("button", { name: "Search filters", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Unread", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => search(page).get("filter")).toBe("unread");
+  await expect.poll(() => search(page).get("view")).toBe(null);
+  await page.goBack();
+  await expect.poll(() => search(page).get("view")).toBe("virtual:unassigned");
+  await expect(page.locator('[data-view-id="virtual:unassigned"]')).toHaveAttribute("data-active", "true");
+  expect(search(page).get("filter")).toBe(null);
+  await page.goBack();
+  await expect.poll(() => search(page).get("folderId")).toBe("qa-shared:INBOX");
+  await expect(rows(page).first()).toBeVisible();
+  await page.goForward();
+  await expect(page.locator('[data-view-id="virtual:unassigned"]')).toHaveAttribute("data-active", "true");
+  await page.goForward();
+  await expect.poll(() => search(page).get("filter")).toBe("unread");
+  await expect.poll(() => search(page).get("view")).toBe(null);
+  await page.getByRole("button", { name: "Search filters", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Unread", exact: true }).uncheck();
+  await expect.poll(() => search(page).get("filter")).toBe(null);
+  await page.goto("/?accountId=qa-shared&view=virtual:open&filter=unread");
+  await expect.poll(() => search(page).get("view")).toBe(null);
+  await page.getByRole("button", { name: "Search filters", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Unread", exact: true }).uncheck();
+  await expect.poll(() => search(page).get("filter")).toBe(null);
+});
+
+for (const action of ["Delete", "Archive"]) {
+  test(`${action} in the reader replaces its entry; Back returns to the original list`, async ({ page }) => {
+    await traceHistory(page);
+    // Use individual messages so the action targets exactly the clicked row.
+    await page.getByRole("button", { name: /^Sort & group:/ }).click();
+    await page.getByRole("menuitemradio", { name: "Off", exact: true }).click();
+    await expect(page.getByRole("button", { name: /^Sort & group:/ })).toHaveAccessibleName(/threads off/);
+    const id = await rows(page).first().getAttribute("data-message-id");
+    const listUrl = page.url();
+    await page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`).click();
+    await expect.poll(() => search(page).get("openMessageId")).toBe(id);
+    await page.locator('[data-reader-toolbar]').getByRole("button", { name: "Expand reading view", exact: true }).click();
+    await expect(page.locator('[data-reader-toolbar]')).toHaveAttribute("data-focus", "true");
+    const historyBefore = await page.evaluate(() => history.length);
+    await page.locator('[data-reader-toolbar]').getByRole("button", { name: action, exact: true }).click();
+    await expect(page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`)).toHaveCount(0);
+    await expect.poll(() => search(page).get("openMessageId")).not.toBe(id);
+    expect(await page.evaluate(() => history.length)).toBe(historyBefore);
+    await page.goBack();
+    await expect(page).toHaveURL(listUrl);
+    await expect(page.locator('[data-reader-toolbar]')).toHaveCount(0);
+    await expect(rows(page).first()).toBeVisible();
+    await expect(page.getByText(/This message was moved/)).toHaveCount(0);
+  });
+}

@@ -4814,9 +4814,9 @@ export default function MailClient({
   };
   const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
     ready: authState === "ok" && initialDataReady && initialFoldersLoadedAccountId === activeAccountId,
-    state: deepLinkState, accountIds: accounts.map(account => account.id), switchAccount,
+    state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
     applyPlace: requested => {
-      const targetView = requested.query.trim() ? null : requested.view;
+      const targetView = requested.query.trim() || requested.badges.length ? null : requested.view;
       const calendarAvailable = targetView ? targetView === "virtual:invite-deck" : requested.badges.includes("calendar");
       const target: DeepLinkState = { ...requested,
         folderId: requested.scope === "all" ? "" : accountFolders.some(folder => folder.id === requested.folderId)
@@ -5193,7 +5193,7 @@ export default function MailClient({
             activeAccountId,
             // Deep links own mailbox navigation (history + URL); the sidebar shows the
             // clicked row as pending until the returned value settles.
-            onSwitch: (accountId: string) => navigateLinkedAccount(accountId),
+            onSwitch: navigateLinkedAccount,
             onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
           views: {
