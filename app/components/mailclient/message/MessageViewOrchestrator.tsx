@@ -144,6 +144,9 @@ export type MessageViewOrchestratorHandle = {
   // expanded sibling that will collapse and shift layout, in which case
   // the scroll is deferred until after the collapse animation settles.
   getCollapsedMessages: () => Record<string, boolean>;
+  // Merges a saved collapse state back in, so a restored reader scroll
+  // anchor (Back/Forward, revisit) sees the layout it was captured in.
+  restoreCollapsedMessages: (collapsed: Record<string, boolean>) => void;
 };
 
 export type MessageViewOrchestratorHeaderInputs = {
@@ -355,7 +358,12 @@ function MessageViewOrchestratorImpl(
           return next ?? prev;
         });
       },
-      getCollapsedMessages: () => collapsedMessagesRef.current
+      getCollapsedMessages: () => collapsedMessagesRef.current,
+      restoreCollapsedMessages: (collapsed: Record<string, boolean>) => {
+        setCollapsedMessages((prev) =>
+          Object.entries(collapsed).every(([id, value]) => Boolean(prev[id]) === value) ? prev : { ...prev, ...collapsed }
+        );
+      }
     }),
     []
   );
