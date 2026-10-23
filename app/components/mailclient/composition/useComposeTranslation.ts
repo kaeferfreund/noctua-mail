@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { buildAccountComposeTranslatePath } from "@/lib/accountApiPaths";
 import { normalizeDeeplTargetLang } from "@/lib/deeplLanguages";
@@ -22,12 +23,17 @@ type ComposeTranslationStash = {
   markdown: string;
 };
 
+/** Client failures keep a code; server text stays opaque and untranslated. */
+type ComposeTranslationError =
+  | { code: "noContent" | "failed" }
+  | { serverMessage: string };
+
 type ComposeTranslationState = {
   status: ComposeTranslationStatus;
   /** The language the current "done" result was translated into. */
   translatedTo: string;
   detectedSourceLang: string;
-  error: string | null;
+  error: ComposeTranslationError | null;
   stash: ComposeTranslationStash | null;
 };
 
@@ -107,6 +113,7 @@ export function useComposeTranslation({
   stripHtml,
   apiFetch
 }: UseComposeTranslationArgs) {
+  const t = useTranslations("Compose.translation");
   const [state, setState] = useState<ComposeTranslationState>(IDLE_STATE);
   const [targetLang, setTargetLangState] = useState(readStoredTargetLang);
   // Invalidates in-flight responses on newer requests and on session resets.
@@ -150,7 +157,7 @@ export function useComposeTranslation({
     // emptiness by the text content, not the HTML.
     const emptinessProbe = tab === "html" ? htmlText : sourceText;
     if (!emptinessProbe.trim()) {
-      setState((prev) => ({ ...prev, status: "error", error: "There is no content to translate." }));
+      setState((prev) => ({ ...prev, status: "error", error: { code: "noContent" } }));
       return;
     }
     const format = tab === "html" ? "html" : "text";
@@ -171,7 +178,12 @@ export function useComposeTranslation({
         | null;
       if (isStale()) return;
       if (!res.ok || !data?.ok || typeof data.translatedText !== "string") {
-        throw new Error(data?.message ?? "Translation failed.");
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          error: data?.message ? { serverMessage: data.message } : { code: "failed" }
+        }));
+        return;
       }
       if (composeTabRef.current !== tab) {
         // The user switched tabs mid-flight. Applying now would bump the
@@ -212,8 +224,11 @@ export function useComposeTranslation({
       }));
     } catch (error) {
       if (isStale()) return;
-      const message = error instanceof Error ? error.message : "Translation failed.";
-      setState((prev) => ({ ...prev, status: "error", error: message }));
+      setState((prev) => ({
+        ...prev,
+        status: "error",
+        error: error instanceof Error && error.message ? { serverMessage: error.message } : { code: "failed" }
+      }));
     }
   }, [
     activeAccountId,
@@ -284,7 +299,7 @@ export function useComposeTranslation({
     targetLang,
     translatedTo: state.translatedTo,
     detectedSourceLang: state.detectedSourceLang,
-    error: state.error,
+    error: !state.error ? null : "code" in state.error ? t(state.error.code) : state.error.serverMessage,
     canRevert: state.stash !== null
   };
 

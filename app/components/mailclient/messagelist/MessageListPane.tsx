@@ -17,7 +17,7 @@ export default function MessageListPane({ refs, children }: MessageListPaneProps
   const { listPaneRef } = refs;
 
   return (
-    <aside className={styles.pane} ref={listPaneRef}>
+    <aside tabIndex={-1} className={styles.pane} ref={listPaneRef}>
       {children}
     </aside>
   );

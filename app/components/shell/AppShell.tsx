@@ -7,6 +7,7 @@ import { useIsMobile } from "@/app/hooks/use-mobile";
 import { useMobileNavigation } from "@/app/hooks/useMobileNavigation";
 import { MobileNavigationContext } from "./MobileNavigation";
 import ShellHeader, { type ShellHeaderProps } from "./ShellHeader";
+import styles from "./ShellPanes.module.css";
 import ShellPanes, { type ShellPanesProps } from "./ShellPanes";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import type { InAppNoticePlacement } from "@/app/components/mailclient/InAppNoticeStack";
@@ -38,11 +39,12 @@ function readSidebarCookie(): boolean {
 }
 
 export type AppShellProps = {
+  onReaderNavigate?: () => void;
   mobileNavigation?: { messageId: string | null; clearMessage: () => void };
   sidebar: ShellSidebarProps;
   header: ShellHeaderProps;
   panes: ShellPanesProps;
-  /** Compact status bar below the panes (BottomStatusBar). */
+  /** Shared compact header indicator and responsive status panels. */
   statusBar: ReactNode;
   /**
    * Fixed-position overlays that belong to the shell viewport. Dialogs and
@@ -55,11 +57,11 @@ export type AppShellProps = {
 
 /**
  * Desktop application shell (design §7.2): sidebar, header, resizable list /
- * reading / calendar panes and the status bar. Owns layout, theme and
+ * reading / calendar panes and the header status indicator. Owns layout, theme and
  * navigation state; all data state and handler bags stay in MailClient and
  * arrive as props.
  */
-export default function AppShell({ sidebar, header, panes, statusBar, overlays, notices, mobileNavigation }: AppShellProps) {
+export default function AppShell({ sidebar, header, panes, statusBar, overlays, notices, mobileNavigation, onReaderNavigate }: AppShellProps) {
   // Hydrate the saved cookie without a synchronous setState effect. Changes
   // made through SidebarProvider drive local state and update its cookie.
   const isMobile = useIsMobile();
@@ -82,17 +84,16 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
         <ShellSidebar
           {...sidebar}
           notices={noticePlacement === "sidebar" ? notices?.("sidebar") : null}
-          onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined}
+          onNavigate={isMobile ? mobileNavigation?.clearMessage : onReaderNavigate}
         />
-        <SidebarInset className="h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs">
+        <SidebarInset className={`${styles.workspace} h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs`}>
           <ShellHeader
             {...header}
             // On phones an open message covers the list, so its controls go too.
-            toolbar={isMobile && navigation.view === "thread" ? undefined : header.toolbar}
-            indicators={isMobile ? statusBar : undefined}
+            toolbar={(isMobile && navigation.view === "thread") || (!isMobile && panes.readerLayout === "focus") ? undefined : header.toolbar}
+            indicators={statusBar}
           />
           <ShellPanes {...panes} mobileView={navigation.view} />
-          {!isMobile ? statusBar : null}
         </SidebarInset>
         {noticePlacement === "floating" ? notices?.("floating") : null}
         {overlays}

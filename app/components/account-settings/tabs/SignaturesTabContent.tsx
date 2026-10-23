@@ -1,4 +1,5 @@
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { useTranslations } from "next-intl";
 
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { Button, Card, Flex, Grid, Select, Text, TextArea, TextField } from "@radix-ui/themes";
@@ -23,6 +24,7 @@ export default function SignaturesTabContent({
   onSave
 }: Props) {
   const { messages: senderMessages } = useSenderMessages();
+  const t = useTranslations("Settings");
   const signatures = editingAccount.settings?.signatures ?? [];
   const invalidTemplate = signatures.some(signature => !validSignatureTemplate(signature.body));
   const saveDisabled = !isExistingAccount || !canSave || invalidTemplate;
@@ -34,9 +36,9 @@ export default function SignaturesTabContent({
           {senderMessages.sharedTemplatesHelp}
         </Text>
         {invalidTemplate && <Text as="p" role="alert">{senderMessages.invalidTemplate}</Text>}
-        <Flex align="center" justify="between">
+        <Flex align="center" justify="between" wrap="wrap" gap="2">
           <Text size="3" weight="medium">
-            Signature list
+            {t("signatures.listTitle")}
           </Text>
           <Button
             size="1"
@@ -44,17 +46,18 @@ export default function SignaturesTabContent({
             onClick={() => {
               const next = {
                 id: crypto.randomUUID(),
-                name: "New signature",
+                // Default name is inserted into stored settings in the current UI language.
+                name: t("signatures.newName"),
                 body: ""
               };
               onUpdateSettings({ signatures: [...signatures, next] });
             }}
           >
-            Add signature
+            {t("signatures.add")}
           </Button>
         </Flex>
         <Grid columns="2" gap="3">
-          <Field label="Default signature">
+          <Field label={t("signatures.defaultSignature")}>
             <Select.Root
               value={editingAccount.settings?.defaultSignatureId || "none"}
               onValueChange={(value) =>
@@ -63,9 +66,9 @@ export default function SignaturesTabContent({
                 })
               }
             >
-              <Select.Trigger style={{ width: "100%" }} placeholder="None" />
+              <Select.Trigger style={{ width: "100%" }} placeholder={t("signatures.none")} />
               <Select.Content position="popper">
-                <Select.Item value="none">None</Select.Item>
+                <Select.Item value="none">{t("signatures.none")}</Select.Item>
                 {signatures.map((signature) => (
                   <Select.Item key={signature.id} value={signature.id}>
                     {signature.name}
@@ -77,14 +80,14 @@ export default function SignaturesTabContent({
         </Grid>
         {signatures.length === 0 ? (
           <Text size="2" color="gray">
-            No signatures yet.
+            {t("signatures.empty")}
           </Text>
         ) : (
           <Flex direction="column" gap="3">
             {signatures.map((signature) => (
               <Card key={signature.id} size="2">
                 <Flex direction="column" gap="3">
-                  <Field label="Name">
+                  <Field label={t("signatures.name")}>
                     <TextField.Root
                       value={signature.name}
                       onChange={(event) => {
@@ -95,7 +98,7 @@ export default function SignaturesTabContent({
                       }}
                     />
                   </Field>
-                  <Field label="Signature text">
+                  <Field label={t("signatures.text")}>
                     <TextArea
                       rows={8}
                       style={{ resize: "vertical" }}
@@ -125,7 +128,7 @@ export default function SignaturesTabContent({
                         });
                       }}
                     >
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </Flex>
                 </Flex>
@@ -143,10 +146,10 @@ export default function SignaturesTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          {saveDisabled ? "Close" : "Cancel"}
+          {saveDisabled ? t("close") : t("common.cancel")}
         </Button>
         <Button size="2" onClick={() => { if (!invalidTemplate) onSave(); }} disabled={saveDisabled}>
-          Save
+          {t("common.save")}
         </Button>
       </Flex>
     </Flex>

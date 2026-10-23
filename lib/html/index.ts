@@ -1,7 +1,7 @@
 // Public API for @/lib/html.
 //
 // Implementation is split across sibling files:
-//   - sanitize.ts: sanitizeHtmlForDisplay (security allowlist for the viewer)
+//   - sanitize.ts: sanitizeHtmlForDisplay / sanitizeHtmlForDisplayPair (security allowlist for the viewer)
 //   - normalize.ts: rebuild malformed markup the way an HTML5 parser would
 //   - strip.ts: escape / decode / strip helpers + stripHtmlToText
 //   - extract.ts: pull visible text, preferred document, or body out of raw HTML
@@ -15,7 +15,8 @@
 // Prefer importing from "@/lib/html" rather than the sibling files directly;
 // the re-exports here keep the surface stable for the rest of the codebase.
 
-export { sanitizeHtmlForDisplay } from "./sanitize";
+export { sanitizeHtmlForDisplay, sanitizeHtmlForDisplayPair } from "./sanitize";
+export type { SanitizedHtmlPair } from "./sanitize";
 export { normalizeHtmlStructure } from "./normalize";
 export {
   escapeHtml,
@@ -26,6 +27,7 @@ export {
 } from "./strip";
 export {
   extractVisibleHtmlText,
+  hasRenderableHtmlMedia,
   selectPreferredHtmlDocument,
   extractBodyContent,
   extractHtmlBody
@@ -48,6 +50,7 @@ export {
 export type { QuoteBoundaryCandidate, QuoteBoundaryMarkers, QuoteSizes } from "./quoteBoundary";
 export {
   FORWARDED_MESSAGE_MARKER,
+  FORWARDED_MESSAGE_MARKERS,
   QUOTE_TEXT_SCAN_LIMIT,
   hasQuoteBoundaryMarker,
   isQuoteBoundary,

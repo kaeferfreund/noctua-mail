@@ -14,6 +14,7 @@ import { Button } from "@/app/components/ui/button";
 import ShellUserMenu, { type ShellUserMenuProps } from "./ShellUserMenu";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
 import {
   Sidebar,
   useSidebar,
@@ -33,6 +34,8 @@ import FolderSidebarPane, {
   type FolderSidebarPaneProps
 } from "@/app/components/mailclient/folder/FolderSidebarPane";
 import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSidebarSection";
+import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
+import type { BuildIdentity } from "@/lib/buildVersion";
 import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 
 export type ShellSidebarProps = {
@@ -47,7 +50,7 @@ export type ShellSidebarProps = {
   sync: { isSyncing: boolean; onCheckNewMail: () => void };
   user: ShellUserMenuProps;
   brand: {
-    buildVersionLabel: string;
+    buildInfo: BuildIdentity | null;
   };
   mailboxes: {
     accounts: ShellAccount[];
@@ -65,6 +68,10 @@ export type ShellSidebarProps = {
   };
   folders: FolderSidebarPaneProps;
 };
+
+/** Active mailbox and view rows share the accent fill, which reads stronger
+ * than the neutral hover fill in both colour schemes. */
+const ACTIVE_ROW_CLASS = "data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]";
 
 export function MailboxRows({
   accounts,
@@ -93,7 +100,7 @@ export function MailboxRows({
                     ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: t(`mailboxes.watcherStates.${summary.watcher.state}`) })
                     : account.email}
                   aria-current={account.id === activeAccountId ? "true" : undefined}
-                  className={cn("data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]", summary && "pr-32")}
+                  className={cn(ACTIVE_ROW_CLASS, summary && "pr-32")}
                 >
                   <Avatar size="sm">
                     {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
@@ -130,22 +137,34 @@ export function ViewRow({ view }: { view: ShellView }) {
   const locale = useLocale();
   const t = useTranslations("Shell");
   const tv = useTranslations("Views");
+  const { isMobile, state } = useSidebar();
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
     <SidebarMenuItem className={styles.viewRow}>
+      {/* A row-bound tooltip instead of a native title: it opens beside the
+          row under the pointer or keyboard focus and stays inside the viewport.
+          It is not rendered in the phone sheet (no room beside it) or while
+          the offcanvas sidebar is collapsed (no row on screen): without a
+          preflight `[hidden]` rule the content's `hidden` attribute would not
+          hide it. `hidden: false` drops the icon-rail default attribute. */}
       <SidebarMenuButton
-        className={styles.viewButton}
+        className={cn(styles.viewButton, ACTIVE_ROW_CLASS)}
         data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
-        title={view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description })}
+        tooltip={isMobile || state === "collapsed" ? undefined : {
+          children: view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description }),
+          hidden: false,
+          collisionPadding: 8,
+          className: styles.viewTooltip
+        }}
       >
         {view.icon}
         <span className={cn(styles.viewLabel, view.emphasize && "font-semibold")}>{view.name}</span>
       </SidebarMenuButton>
       {showCount ? (
         <SidebarMenuBadge
-          className={cn("bg-sidebar-accent", styles.viewCount)}
+          className={styles.viewCount}
           title={view.countTitle ?? view.rowTitle}
           aria-label={view.countAriaLabel ?? t("mailboxes.unread", {count: view.count ?? 0})}
         >
@@ -189,14 +208,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
             <img src="/icons/logo.svg" alt="" width={28} height={28} className="size-7 rounded-md" />
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="truncate text-sm font-semibold">{DEFAULT_APP_TITLE}</span>
-              {brand.buildVersionLabel ? (
-                <span
-                  className="truncate font-mono text-2xs text-muted-foreground"
-                  title={t("build", {version: brand.buildVersionLabel})}
-                >
-                  {brand.buildVersionLabel}
-                </span>
-              ) : null}
+              <BuildInfo info={brand.buildInfo} className="truncate text-2xs text-muted-foreground tabular-nums" />
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -251,11 +263,20 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <SidebarGroup>
                 <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <SidebarMenu>
-                    {viewRows.map((view) => (
-                      <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
-                    ))}
-                  </SidebarMenu>
+                  {/* The row descriptions are plain text: closing them as soon as
+                      the pointer leaves a row means the next row's description
+                      replaces it at once, without Radix's grace area keeping the
+                      previous row's text over a neighbouring row. A pointer
+                      passing over the list opens nothing until it rests on a row;
+                      once a description is open, the neighbouring row's replaces
+                      it without a new delay. */}
+                  <TooltipProvider disableHoverableContent delayDuration={400} skipDelayDuration={150}>
+                    <SidebarMenu>
+                      {viewRows.map((view) => (
+                        <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
+                      ))}
+                    </SidebarMenu>
+                  </TooltipProvider>
                 </SidebarGroupContent>
               </SidebarGroup>
             ) : null}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Account, CalendarEvent } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { buildAccountCalendarEventsPath } from "@/lib/accountApiPaths";
-import { expandCalendarEventForRange } from "@/lib/calendarOccurrences";
 import { CALENDAR_EVENTS_UPDATED_EVENT } from "@/app/components/calendar/calendarEventsClient";
 import type { ExceptionEntry } from "./types";
 import { DEFAULT_UPCOMING_WINDOW_MS } from "./status/upcomingEntries";
@@ -65,9 +65,16 @@ export function useReminderNotifications({
     accountsRef.current = accounts;
   }, [accounts]);
 
+  // Read through a ref so reportError keeps its identity across a language
+  // switch (it feeds bootstrap/effect dependencies; see the 97dd982 regression).
+  const tn = useTranslations("Notifications");
+  const tnRef = useRef(tn);
+  useEffect(() => {
+    tnRef.current = tn;
+  }, [tn]);
   const reportError = useCallback(
     (message: string, meta?: { requestPath?: string; status?: number }) => {
-      const normalized = message?.trim() || "Unexpected error.";
+      const normalized = message?.trim() || tnRef.current("unexpectedError");
       const entry: ExceptionEntry = {
         id: makeClientId(),
         message: normalized,
@@ -78,7 +85,7 @@ export function useReminderNotifications({
       setExceptionEntries((prev) => [entry, ...prev].slice(0, 30));
       pushNotice({
         type: "error",
-        title: "Operation failed",
+        title: tnRef.current("operationFailed"),
         description: normalized.split("\n")[0]?.slice(0, 220),
         fullDetail: normalized,
         durationMs: NOTICE_TIMEOUTS.error
@@ -304,12 +311,26 @@ export function useReminderNotifications({
         | { items?: CalendarEvent[] }
         | null;
       const rawEvents = payload?.items ?? [];
+      // Occurrence expansion needs `rrule`; load it on demand, only when a
+      // fetched event actually repeats. Non-recurring events expand to
+      // themselves, matching `expandCalendarEventForRange`'s fast path.
+      // State is only set after expansion, so no unexpanded series start
+      // is ever displayed.
+      const expandCalendarEventForRange = rawEvents.some((event) =>
+        Boolean(event.recurrenceRule?.trim())
+      )
+        ? (await import("@/lib/calendarOccurrences")).expandCalendarEventForRange
+        : null;
       // Expand recurring events into per-occurrence synthetic events so the
       // popover can sort/display them by actual start time. Each occurrence
       // preserves the master event's metadata (id/uid/title/location/...)
       // but overrides startAtMs/endAtMs to the displayed occurrence.
       const expanded: CalendarEvent[] = [];
       rawEvents.forEach((event) => {
+        if (!expandCalendarEventForRange || !event.recurrenceRule?.trim()) {
+          expanded.push(event);
+          return;
+        }
         const occurrences = expandCalendarEventForRange(event, nowMs, endMs);
         occurrences.forEach((occurrence) => {
           if (occurrence.displayStartAtMs === event.startAtMs) {

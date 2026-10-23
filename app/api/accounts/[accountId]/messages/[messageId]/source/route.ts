@@ -2,10 +2,14 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
-import { getMessageSource } from "@/lib/storage";
+import { getMessageSource, statMessageSource } from "@/lib/storage";
 import { getMessageById } from "@/lib/db";
 import { requireActiveUserSession } from "@/lib/auth";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
+import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
+
+/** Private, revalidated cache, same pattern as attachment bytes. Source files are rewritten on resync, so this is not immutable. */
+export const MESSAGE_SOURCE_CACHE_CONTROL = "private, max-age=86400";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -38,6 +42,19 @@ export async function handleGetMessageSourceRequest(
       );
     }
 
+    // Validate against the stored file's stat before reading/scrubbing the
+    // source, so a matching If-None-Match skips both. The scrubbed payload
+    // derives deterministically from the file, so the file tag validates it.
+    // A DB-only fallback source (no file) keeps the previous uncached reply.
+    const fileStat = await statMessageSource(accountId, message.id);
+    const etag = fileStat ? entityTagForStat(fileStat) : null;
+    const cacheHeaders = etag
+      ? { ETag: etag, "Cache-Control": MESSAGE_SOURCE_CACHE_CONTROL }
+      : null;
+    if (etag && cacheHeaders && ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
+      return new NextResponse(null, { status: 304, headers: cacheHeaders });
+    }
+
     const storedSource = await getMessageSource(accountId, message.id);
     const fallbackSource = message.source ?? null;
     const source = storedSource ?? fallbackSource;
@@ -50,10 +67,13 @@ export async function handleGetMessageSourceRequest(
     const trimmed =
       scrubbed.length > maxChars ? `${scrubbed.slice(0, maxChars)}\n\n[truncated]` : scrubbed;
 
-    return NextResponse.json({
-      ok: true,
-      source: trimmed
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        source: trimmed
+      },
+      storedSource && cacheHeaders ? { headers: cacheHeaders } : undefined
+    );
   });
 }
 

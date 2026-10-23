@@ -6,7 +6,7 @@ import { saveMessageSource } from "@/lib/storage";
 import { dbModulePromise } from "@/lib/testDbHarness";
 
 const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
-const { handleGetMessageSourceRequest } = await import("./route");
+const { handleGetMessageSourceRequest, MESSAGE_SOURCE_CACHE_CONTROL } = await import("./route");
 
 function buildAccount(accountId: string): Account {
   return {
@@ -98,5 +98,55 @@ describe("handleGetMessageSourceRequest", () => {
     const body = (await response.json()) as { ok?: boolean; source?: string };
     expect(body.ok).toBe(true);
     expect(body.source).toBe("raw source");
+  });
+
+  test("sends a private mtime etag and answers If-None-Match with 304", async () => {
+    const accountId = `acc-source-cache-${Date.now()}`;
+    const folder = buildFolder(accountId);
+    const message = buildMessage(accountId, folder.id);
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+    await upsertMessages(accountId, folder.id, [message]);
+    await saveMessageSource(accountId, message.id, "raw source v1");
+    const cookie = await buildCookieHeader(accountId);
+
+    const sourceRequest = (headers?: HeadersInit, messageId = message.id) =>
+      handleGetMessageSourceRequest(
+        new Request("http://localhost/api/source", { headers: { cookie, ...headers } }),
+        { accountId, messageId }
+      );
+
+    const first = await sourceRequest();
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe(MESSAGE_SOURCE_CACHE_CONTROL);
+    expect(first.headers.get("cache-control")).not.toContain("immutable");
+    const etag = first.headers.get("etag");
+    expect(etag).toMatch(/^"[0-9a-f.]+-[0-9a-f]+"$/i);
+    const firstBody = (await first.json()) as { ok?: boolean; source?: string };
+    expect(firstBody.source).toBe("raw source v1");
+
+    const cached = await sourceRequest({ "if-none-match": etag ?? "" });
+    expect(cached.status).toBe(304);
+    expect(cached.headers.get("etag")).toBe(etag);
+    expect(cached.headers.get("cache-control")).toBe(MESSAGE_SOURCE_CACHE_CONTROL);
+    expect(await cached.text()).toBe("");
+
+    const listed = await sourceRequest({ "if-none-match": `W/"stale", ${etag}` });
+    expect(listed.status).toBe(304);
+
+    const missed = await sourceRequest({ "if-none-match": `"0-0"` });
+    expect(missed.status).toBe(200);
+
+    await saveMessageSource(accountId, message.id, "raw source v2 with more bytes");
+    const afterRewrite = await sourceRequest({ "if-none-match": etag ?? "" });
+    expect(afterRewrite.status).toBe(200);
+    expect(afterRewrite.headers.get("etag")).not.toBe(etag);
+    const rewrittenBody = (await afterRewrite.json()) as { source?: string };
+    expect(rewrittenBody.source).toBe("raw source v2 with more bytes");
+
+    const missing = await sourceRequest(undefined, "missing-message-id");
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("cache-control")).not.toBe(MESSAGE_SOURCE_CACHE_CONTROL);
+    expect(missing.headers.get("etag")).toBeNull();
   });
 });

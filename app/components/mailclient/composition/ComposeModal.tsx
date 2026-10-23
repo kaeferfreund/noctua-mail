@@ -1,5 +1,6 @@
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Dock, ExternalLink, X } from "lucide-react";
 import { MinusIcon } from "@radix-ui/react-icons";
@@ -96,6 +97,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
   } = useComposeContext();
 
   const { messages: senderMessages, resolve } = useSenderMessages();
+  const t = useTranslations("Compose");
   const returnFocusRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (open) returnFocusRef.current = document.activeElement as HTMLElement | null;
@@ -103,18 +105,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
 
   if (!open) return null;
 
-  const composeTitle =
-    composeMode === "edit"
-      ? "Edit draft"
-      : composeMode === "editAsNew"
-        ? "Edit as New"
-        : composeMode === "reply"
-          ? "Reply"
-          : composeMode === "replyAll"
-            ? "Reply All"
-            : composeMode === "forward"
-              ? "Forward"
-              : "New message";
+  const composeTitle = t(`modes.${composeMode}`);
 
   const close = () => {
     if (!detachedWindow) setComposeOpen(false);
@@ -148,7 +139,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             {!isMobile && <TooltipIconButton
               variant="ghost"
               size="2"
-              tooltip="Dock in thread view"
+              tooltip={t("window.dock")}
               onClick={popInCompose}
               disabled={detachingCompose || sendingMail || discardingDraft}
             >
@@ -159,8 +150,8 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
                 <TooltipIconButton
                   variant="ghost"
                   size="2"
-                  tooltip="Open in new window"
-                  aria-label="Open composer in new window"
+                  tooltip={t("window.openInNewWindow")}
+                  aria-label={t("window.openComposerInNewWindow")}
                   onClick={openComposeInNewWindow}
                   disabled={detachingCompose || sendingMail || discardingDraft}
                 >
@@ -169,7 +160,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
                 <TooltipIconButton
                   variant="ghost"
                   size="2"
-                  tooltip="Minimize composer"
+                  tooltip={t("window.minimize")}
                   onClick={minimizeCompose}
                   disabled={detachingCompose}
                 >

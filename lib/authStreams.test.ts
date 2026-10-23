@@ -1,5 +1,4 @@
 import {test,expect} from "bun:test";
-import ts from "typescript";
 import {readFileSync} from "node:fs";
 import {createAuthenticatedTestSession} from "./testAuthHarness";
 import {requireActiveUserSession} from "./auth";
@@ -14,7 +13,7 @@ test("generation commit between stream check and enqueue prevents sensitive deli
   const begin=route.indexOf("        const send = async"),end=route.indexOf("\n\n        type Session",begin);
   expect(begin).toBeGreaterThan(0);expect(end).toBeGreaterThan(begin);
   const wrapper="function sendFactory(assertStreamAuthorized,identity,stopped,controller,encoder,getImapHttpError,mailboxFailureDto,accountId,accountContext,authStream){"+route.slice(begin,end)+";return send;}";
-  const compiled=ts.transpileModule(wrapper,{compilerOptions:{target:ts.ScriptTarget.ESNext}}).outputText;
+  const compiled=new Bun.Transpiler({loader:"ts",target:"bun"}).transformSync(wrapper);
   const createSend=new Function(compiled+"\nreturn sendFactory;")();
   let delivered=0;
   const send=createSend(assertStreamAuthorized,identity,false,{enqueue:()=>{delivered++;}},new TextEncoder(),()=>null,()=>null,"synthetic",{role:"viewer"},{close:()=>{}});

@@ -1,6 +1,6 @@
 import type { CalendarReminder } from "@/lib/data";
 import { buildAccountRemindersPath } from "@/lib/accountApiPaths";
-import { normalizeReminderDateList, resolveNextReminderOccurrence } from "@/lib/reminderRecurrence";
+import { normalizeReminderDateList } from "@/lib/reminderDates";
 import { resolveCalendarTimeZoneId } from "@/lib/calendarTimezones";
 
 export const CALENDAR_REMINDERS_UPDATED_EVENT = "noctua:calendar-reminders-updated";
@@ -422,7 +422,10 @@ function isSameEvent(a: ReminderEventKey, b: ReminderEventKey) {
   );
 }
 
-function buildLocalReminder(accountId: string, input: CreateCalendarReminderInput): CalendarReminder {
+async function buildLocalReminder(
+  accountId: string,
+  input: CreateCalendarReminderInput
+): Promise<CalendarReminder> {
   const now = Date.now();
   const id = input.id?.trim() || generateId("reminder");
   const eventTitle = input.eventTitle?.trim() || "Calendar event";
@@ -436,15 +439,28 @@ function buildLocalReminder(accountId: string, input: CreateCalendarReminderInpu
   const recurrenceDates = normalizeReminderDateList(input.recurrenceDates);
   const excludedDates = normalizeReminderDateList(input.excludedDates);
   const startTimezone = normalizeReminderTimezone(input.startTimezone);
-  const nextOccurrence = resolveNextReminderOccurrence({
-    eventStartAtMs,
-    eventEndAtMs,
-    leadMinutes,
-    recurrenceRule,
-    recurrenceDates,
-    excludedDates,
-    startTimezone
-  }, now);
+  // Next-occurrence evaluation needs `rrule`; load it on demand, only for
+  // recurring events. Without a rule the resolver's result is fully
+  // covered by the `?? eventStartAtMs` / `?? start - lead` fallbacks
+  // below, and a failed chunk load lands on those same fallbacks (the
+  // server recomputes the next occurrence when the mutation syncs).
+  let nextOccurrence: { eventStartAtMs: number; triggerAtMs: number } | null = null;
+  if (recurrenceRule) {
+    try {
+      const { resolveNextReminderOccurrence } = await import("@/lib/reminderRecurrence");
+      nextOccurrence = resolveNextReminderOccurrence({
+        eventStartAtMs,
+        eventEndAtMs,
+        leadMinutes,
+        recurrenceRule,
+        recurrenceDates,
+        excludedDates,
+        startTimezone
+      }, now);
+    } catch {
+      nextOccurrence = null;
+    }
+  }
   const nextEventStartAtMs = nextOccurrence?.eventStartAtMs ?? eventStartAtMs;
   const triggerAtMs = nextOccurrence?.triggerAtMs ?? eventStartAtMs - leadMinutes * 60 * 1000;
   return {
@@ -471,12 +487,12 @@ function buildLocalReminder(accountId: string, input: CreateCalendarReminderInpu
   };
 }
 
-function applyLocalUpsert(
+async function applyLocalUpsert(
   reminders: CalendarReminder[],
   accountId: string,
   input: CreateCalendarReminderInput
 ) {
-  const localReminder = buildLocalReminder(accountId, input);
+  const localReminder = await buildLocalReminder(accountId, input);
   const event = {
     eventUid: localReminder.eventUid,
     eventTitle: localReminder.eventTitle,
@@ -744,7 +760,7 @@ export async function upsertCalendarReminder(
   input: CreateCalendarReminderInput
 ): Promise<{ reminder: CalendarReminder; replaced: boolean }> {
   const current = readReminderCache(accountId);
-  const local = applyLocalUpsert(current, accountId, input);
+  const local = await applyLocalUpsert(current, accountId, input);
   writeReminderCache(accountId, local.reminders);
   enqueueMutation(accountId, {
     id: generateId("mutation"),

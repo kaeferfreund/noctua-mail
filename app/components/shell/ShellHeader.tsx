@@ -91,10 +91,10 @@ export default function ShellHeader({ title, toolbar, search, sync, indicators }
           <PopoverContent align="end" className="w-[calc(100dvw-16px)] max-w-96"><ShellSearch {...search} /></PopoverContent>
         </Popover></div> : null}
         {indicators}
-        <Button className="hidden md:inline-flex" variant="ghost" size="icon-sm" aria-label={syncLabel} title={syncLabel}
+        {!indicators ? <Button className="hidden md:inline-flex" variant="ghost" size="icon-sm" aria-label={syncLabel} title={syncLabel}
           aria-busy={sync.isSyncing} disabled={sync.isSyncing} onClick={sync.onCheckNewMail}>
           <RefreshCw className={cn(sync.isSyncing && "animate-spin")} />
-        </Button>
+        </Button> : null}
         <div className="hidden md:block"><ThemeToggle /></div>
       </div>
     </header>

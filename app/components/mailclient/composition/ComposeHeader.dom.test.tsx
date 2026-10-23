@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { getMessages } from "@/lib/i18n/translator";
+import type { Message } from "@/lib/data";
 import { ComposeContextProvider, type ComposeContextValue } from "./ComposeContext";
 import ComposeModal from "./ComposeModal";
 
@@ -14,9 +15,9 @@ afterEach(async () => {
 
 // CSS geometry/clamping runs in the production browser matrix; happy-dom
 // protects the complete accessible text retained by that visual truncation.
-function renderHeader({ width = 320, theme = "light", enabled = true, email, displayName, locale = "en" }: {
+function renderHeader({ width = 320, theme = "light", enabled = true, email, displayName, locale = "en", inReplyToMessage = null }: {
   width?: number; theme?: "light" | "dark"; enabled?: boolean;
-  email: string; displayName: string; locale?: "de" | "en";
+  email: string; displayName: string; locale?: "de" | "en"; inReplyToMessage?: Message | null;
 }) {
   const sender = `${displayName} <${email}>`;
   let closed = 0;
@@ -25,7 +26,7 @@ function renderHeader({ width = 320, theme = "light", enabled = true, email, dis
     composeMode: "new", composeOpen: true, composeView: "modal", composeTo: "", composeCc: "", composeBcc: "", composeSubject: "",
     composeShowBcc: false, composeOpenedAt: "", activeAccountId: "synthetic", fromValue: sender,
     identities: [{ id: "long", accountId: "synthetic", email, displayName, enabled, isDefault: false, createdBy: "synthetic-user", createdAt: 0, updatedAt: 0 }], identityId: "long", onIdentityChange: noop,
-    composeDraftId: null, composeFieldsReset: 0, composeDragActive: false, composeSize: { width, height: 844 }, inReplyToMessage: null, composeInviteDraft: null,
+    composeDraftId: null, composeFieldsReset: 0, composeDragActive: false, composeSize: { width, height: 844 }, inReplyToMessage, composeInviteDraft: null,
     canSaveDraft: false, attachmentLoadState: null, draftSaving: false, draftSaveError: null, draftSavedAt: null,
     sendingMail: false, discardingDraft: false, detachingCompose: false, detachedWindow: false,
     composeModalRef: createRef(), composeResizeRef: { current: null }, composeCardRef: createRef(),
@@ -77,10 +78,10 @@ for (const locale of ["de", "en"] as const) test(`keyboard scroll area contains 
   const { view } = renderHeader({ locale, enabled: false, email: "unavailable@example.test", displayName: "Synthetic unavailable sender" });
   const messages = getMessages(locale).Compose;
   const from = view.getByLabelText(messages.from, { exact: true });
-  const to = view.getByLabelText("To:", { exact: true });
-  const subject = view.getByLabelText("Subject:", { exact: true });
+  const to = view.getByLabelText(messages.fields.to, { exact: true });
+  const subject = view.getByLabelText(messages.fields.subject, { exact: true });
   const editor = view.getByLabelText("Synthetic body");
-  const cancel = view.getByRole("button", { name: "Cancel" });
+  const cancel = view.getByRole("button", { name: messages.actions.cancel });
   // Geometry and the single active scroll ancestor are checked in Chromium.
   // Keep the footer in the same structural area, so it can scroll with the
   // fields when the keyboard leaves too little room for fixed actions.
@@ -93,3 +94,27 @@ for (const locale of ["de", "en"] as const) test(`keyboard scroll area contains 
   expect(cancel.parentElement!.parentElement!.parentElement).toBe(area);
   expect(area.contains(view.getByRole("button", { name: messages.closeComposer }))).toBe(false);
 });
+
+test("German header, window controls and footer actions use the catalog copy", () => {
+  const { view, closed } = renderHeader({ locale: "de", email: "sender@example.test", displayName: "Synthetic Sender" });
+  expect(view.getByRole("dialog", { name: "Neue Nachricht" })).toBeTruthy();
+  expect(view.getByText("Von Synthetic Sender <sender@example.test>")).toBeTruthy();
+  expect(view.getByLabelText("An:", { exact: true })).toBeTruthy();
+  expect(view.getByLabelText("Betreff:", { exact: true })).toBeTruthy();
+  expect(view.getByRole("button", { name: "Cc/Bcc anzeigen" })).toBeTruthy();
+  expect(view.getByText("Entwurf noch nicht gespeichert")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Senden" })).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Abbrechen" }));
+  fireEvent.click(view.getByRole("button", { name: "Nachrichtenfenster schließen" }));
+  expect(closed()).toBe(2);
+  expect(view.queryByText(/New message|Cancel|Send$|Draft not saved/)).toBeNull();
+});
+
+for (const [locale, label] of [["de", "Antwort auf:"], ["en", "In Reply To:"]] as const) {
+  test(`${locale}: the in-reply-to row label is UI copy while subject and sender stay verbatim`, () => {
+    const inReplyToMessage = { id: "synthetic-original", subject: "Synthetic original subject", from: "Synthetic Sender <sender@example.test>" } as Message;
+    const { view } = renderHeader({ locale, email: "sender@example.test", displayName: "Synthetic Sender", inReplyToMessage });
+    expect(view.getByText(label, { exact: true })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Synthetic original subject — Synthetic Sender <sender@example.test>" })).toBeTruthy();
+  });
+}

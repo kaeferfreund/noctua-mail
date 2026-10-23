@@ -14,14 +14,14 @@
   overflow: hidden;
 }
 
-.composeBackdrop { z-index: 9994; }
+.composeBackdrop { z-index: var(--layer-dialog); }
 
 .composeModal[role="dialog"] {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 9994;
+  z-index: var(--layer-dialog);
   box-sizing: border-box;
 }
 
@@ -492,9 +492,12 @@
   overflow-wrap: anywhere;
   text-align: left;
 }
+/* Desktop: about as wide as the From field, with a readable minimum and a cap
+   so a wide inline composer never opens a viewport-wide menu. */
 .composeFromMenu {
-  width: calc(100vw - 32px);
-  max-width: calc(100vw - 32px);
+  width: var(--radix-select-trigger-width);
+  min-width: min(280px, calc(100vw - 32px));
+  max-width: min(560px, calc(100vw - 32px));
 }
 .composeFromMenu :global(.rt-SelectItem) {
   height: auto;
@@ -512,6 +515,11 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
+  }
+
+  .composeFromMenu {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
   }
 
   .composeFromTrigger > :first-child {

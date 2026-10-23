@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, type ChangeEvent } from "react";
 import { Button, Flex, Text } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import {
   buildAccountRecipientAliasesPath,
   buildAccountRecipientAliasTransferPath
@@ -46,6 +47,7 @@ export default function RecipientAliasesTabContent({
   onAliasesChanged,
   onClose
 }: Props) {
+  const t = useTranslations("Settings");
   const request = apiFetch ?? fetch;
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -57,11 +59,11 @@ export default function RecipientAliasesTabContent({
   const readError = useCallback(async (res: Response) => {
     try {
       const data = (await res.json()) as { message?: string; error?: string };
-      return data?.message || data?.error || `Request failed (${res.status})`;
+      return data?.message || data?.error || t("recipientAliases.requestFailed", { status: res.status });
     } catch {
-      return `Request failed (${res.status})`;
+      return t("recipientAliases.requestFailed", { status: res.status });
     }
-  }, []);
+  }, [t]);
 
   const handleExport = useCallback(async () => {
     if (!accountId) return;
@@ -76,7 +78,7 @@ export default function RecipientAliasesTabContent({
       }
       const data = (await res.json()) as RecipientAliasTransferExportResponse;
       if (!data?.ok || !data.data) {
-        setError(data?.message ?? "Failed to export recipient aliases data.");
+        setError(data?.message ?? t("recipientAliases.exportFailed"));
         return;
       }
 
@@ -87,13 +89,13 @@ export default function RecipientAliasesTabContent({
       link.download = `noctua-recipient-aliases-${accountId}-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      setNotice("Mailing list aliases exported.");
+      setNotice(t("recipientAliases.exported"));
     } catch {
-      setError("Failed to export recipient aliases data.");
+      setError(t("recipientAliases.exportFailed"));
     } finally {
       setExporting(false);
     }
-  }, [accountId, readError, request]);
+  }, [accountId, readError, request, t]);
 
   const resetImportInput = useCallback(() => {
     if (importInputRef.current) {
@@ -122,7 +124,7 @@ export default function RecipientAliasesTabContent({
       }
       const data = (await res.json()) as RecipientAliasTransferImportResponse;
       if (!data?.ok || !data.summary) {
-        setError(data?.message ?? "Failed to import recipient aliases data.");
+        setError(data?.message ?? t("recipientAliases.importFailed"));
         return;
       }
 
@@ -139,23 +141,23 @@ export default function RecipientAliasesTabContent({
         message?: string;
       };
       if (!aliasesData.ok || !Array.isArray(aliasesData.aliases)) {
-        setError(aliasesData.message ?? "Failed to load recipient aliases.");
+        setError(aliasesData.message ?? t("recipientAliases.loadFailed"));
         return;
       }
 
       onAliasesChanged?.(aliasesData.aliases);
-      setNotice(`Imported ${data.summary.aliasCount} mailing list aliases.`);
+      setNotice(t("recipientAliases.imported", { count: data.summary.aliasCount }));
     } catch (importError) {
       setError(
         importError instanceof SyntaxError
-          ? "Invalid JSON file."
-          : "Failed to import recipient aliases data."
+          ? t("recipientAliases.invalidJson")
+          : t("recipientAliases.importFailed")
       );
     } finally {
       resetImportInput();
       setImporting(false);
     }
-  }, [accountId, onAliasesChanged, readError, request, resetImportInput]);
+  }, [accountId, onAliasesChanged, readError, request, resetImportInput, t]);
 
   const handleImportFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -197,9 +199,9 @@ export default function RecipientAliasesTabContent({
           style={{ display: "none" }}
         />
         <Flex direction="column" gap="4" style={{ marginBottom: "var(--space-4)" }}>
-          <Text size="3" weight="medium">Sync</Text>
+          <Text size="3" weight="medium">{t("recipientAliases.syncTitle")}</Text>
           <Text size="2" color="gray">
-            Export or import all mailing list aliases for this account.
+            {t("recipientAliases.syncHelp")}
           </Text>
           <Flex align="center" gap="2" wrap="wrap">
             <Button
@@ -208,7 +210,7 @@ export default function RecipientAliasesTabContent({
               onClick={() => void handleExport()}
               disabled={!accountId || exporting || importing}
             >
-              {exporting ? "Exporting..." : "Export"}
+              {exporting ? t("recipientAliases.exporting") : t("recipientAliases.export")}
             </Button>
             <Button
               size="1"
@@ -216,10 +218,10 @@ export default function RecipientAliasesTabContent({
               onClick={() => importInputRef.current?.click()}
               disabled={!accountId || exporting || importing}
             >
-              {importing ? "Importing..." : "Import"}
+              {importing ? t("recipientAliases.importing") : t("recipientAliases.import")}
             </Button>
             <Text size="1" color="gray">
-              Import replaces the current local mailing list alias data for this account.
+              {t("recipientAliases.importHint")}
             </Text>
           </Flex>
           {error && (
@@ -243,9 +245,9 @@ export default function RecipientAliasesTabContent({
       </div>
       <ImportReplaceConfirmDialog
         open={pendingImportFile !== null}
-        title="Import mailing list aliases?"
-        description="Importing mailing list aliases replaces all current mailing list aliases for this account."
-        confirmLabel="Import"
+        title={t("recipientAliases.importConfirmTitle")}
+        description={t("recipientAliases.importConfirmDescription")}
+        confirmLabel={t("recipientAliases.import")}
         onOpenChange={handleImportDialogOpenChange}
         onConfirm={confirmImport}
       />
@@ -254,7 +256,7 @@ export default function RecipientAliasesTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)", flexShrink: 0 }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          Close
+          {t("close")}
         </Button>
       </Flex>
     </Flex>

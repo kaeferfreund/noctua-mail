@@ -1,3 +1,37 @@
+/* Desktop workspace density is scoped to this shell. Detached windows and
+   the mobile frames keep their existing spacing and card styles. */
+@media (width >= 768px) {
+  .workspace {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .panes {
+    --shell-gutter: 0px;
+    --pane-padding-x: 12px;
+    --pane-padding-y: 12px;
+    --reader-padding-x: 16px;
+    --reader-padding-y: 16px;
+    padding: var(--shell-gutter);
+    gap: 0;
+    background: var(--card);
+  }
+  .panes > :global([data-panel]) > div {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .separator {
+    width: 1px;
+    min-width: 1px;
+    flex-shrink: 0;
+    background: var(--border);
+    z-index: 1;
+  }
+  /* Keep the visible separator one pixel; its pointer target spans 11px. */
+  .separator::after { width: 11px; }
+}
+
 @media (width < 768px) {
   .panes {
     padding: 0;
@@ -16,4 +50,10 @@
   .panes[data-mobile-view="list"] > [id="reader"] {
     display: none !important;
   }
+}
+
+@media (width >= 768px) {
+  .panes[data-reader-layout="focus"] > [id="list"],
+  .panes[data-reader-layout="focus"] > [id="list"] + [data-slot="resizable-handle"] { display: none !important; }
+  .panes[data-reader-layout="focus"] > [id="reader"] { flex: 1 1 0 !important; min-width: 0; }
 }

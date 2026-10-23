@@ -1,3 +1,5 @@
+import { isReaderRowActivation } from "@/lib/ui/readerFocus";
+import { useReaderNavigationRows } from "./useReaderNavigationRows";
 import { useTranslations } from "next-intl";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
@@ -69,6 +71,8 @@ export default function MessageCardList({
     handleMessageDragStart,
     handleMessageDragEnd,
     handleRowClick,
+    onOpenReader,
+    onNavigationRowsChange,
     handleSelectMessage,
     selectRangeTo,
     toggleMessageSelection,
@@ -129,6 +133,8 @@ export default function MessageCardList({
     mode: isCompactView ? "nested" : "flat",
     collapsedNestedMessages
   });
+
+  useReaderNavigationRows(listItems, onNavigationRowsChange);
 
   return (
     <MessageListRenderer
@@ -314,6 +320,9 @@ export default function MessageCardList({
               isAddSuggestionPending={isAddSuggestionPending}
               addSuggestionTopicColor={showAddSuggestionAction ? activeTopic?.color : null}
               onAddSuggestion={() => handleAddSuggestedThread(item.threadGroupId)}
+              onRowDoubleClick={(event) => {
+                if (isReaderRowActivation(event)) onOpenReader?.(message);
+              }}
               onRowClick={(event) => {
                 handleCollapsedThreadRootClick({
                   event,
@@ -330,7 +339,10 @@ export default function MessageCardList({
                 handleMessageRowKeyDown({
                   event,
                   messageId: message.id,
-                  onSelect: () => handleSelectMessage(message),
+                  onSelect: () => {
+                    handleSelectMessage(message);
+                    onOpenReader?.(message);
+                  },
                   selectRangeTo,
                   toggleMessageSelection
                 });

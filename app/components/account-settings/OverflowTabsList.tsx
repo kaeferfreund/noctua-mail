@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { DropdownMenu, Tabs } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 
 export type OverflowTabItem = {
   value: string;
@@ -24,7 +25,9 @@ const OVERFLOW_TRIGGER_WIDTH = 32;
  * DOM and can no longer be measured; re-measuring therefore clears the cache
  * rather than updating it in place, so the full set is remeasured together.
  */
-export default function OverflowTabsList({ tabs, activeValue, onSelect, overflowLabel = "More tabs" }: Props) {
+export default function OverflowTabsList({ tabs, activeValue, onSelect, overflowLabel: overflowLabelProp }: Props) {
+  const t = useTranslations("Settings.modal");
+  const overflowLabel = overflowLabelProp ?? t("moreTabs");
   const listRef = useRef<HTMLDivElement | null>(null);
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [availableWidth, setAvailableWidth] = useState<number | null>(null);

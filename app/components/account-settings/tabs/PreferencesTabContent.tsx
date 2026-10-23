@@ -8,6 +8,7 @@ import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/dat
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
 import { Button } from "@/app/components/ui/button";
 import MailtoHandlerSection from "@/app/components/account-settings/MailtoHandlerSection";
+import { nativeControlClass } from "@/app/components/account-settings/Field";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 
@@ -67,20 +68,20 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       {loading && <p role="status">{t("preferences.loading")}</p>}
       {Boolean(error) && <p role="alert" className="text-destructive">{formatAdminError(error, adminT, locale)}</p>}
       {saved && <p role="status">{t("preferences.saved")}</p>}
-      <fieldset disabled={loading || busy} className="grid gap-4 sm:grid-cols-2">
+      <fieldset disabled={loading || busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
         {fields.map(field => {
           const changes = patch[field.group] as Record<string, unknown> | null | undefined;
           const stored = prefs[field.group] as Record<string, unknown> | undefined;
           const value = changes && field.key in changes ? changes[field.key] : stored?.[field.key];
-          return <label key={`${field.group}.${field.key}`} className="grid gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
-            <select className="rounded-md border bg-background p-2" value={value == null ? "inherit" : String(value)} onChange={event => {
+          return <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
+            <select className={nativeControlClass} value={value == null ? "inherit" : String(value)} onChange={event => {
               const value = event.target.value;
               setSaved(false);
               setPatch(previous => ({ ...previous, [field.group]: { ...previous[field.group], [field.key]: value === "inherit" ? null : field.boolean ? value === "true" : value } }));
             }}><option value="inherit">{t("preferences.inherit")}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.literal ? option.label : t(`preferences.options.${option.label as "yes" | "no" | "threads" | "card" | "table" | "compact" | "locale" | "monday" | "sunday"}`)}</option>)}</select>
           </label>;
         })}
-        {!senderPreferences && <label className="grid gap-1 text-sm">{t("preferences.signature")}<select className="rounded-md border bg-background p-2" value={signatureValue ?? "inherit"} onChange={event => {
+        {!senderPreferences && <label className="grid min-w-0 gap-1 text-sm">{t("preferences.signature")}<select className={nativeControlClass} value={signatureValue ?? "inherit"} onChange={event => {
           setSaved(false); setPatch(previous => ({ ...previous, defaultSignatureId: event.target.value === "inherit" ? null : event.target.value }));
         }}><option value="inherit">{t("preferences.inherit")}</option><option value="">{t("preferences.noSignature")}</option>
           {signatureValue && !editingAccount.settings?.signatures?.some(signature => signature.id === signatureValue) && <option value={signatureValue}>{t("preferences.unavailableSignature")}</option>}
@@ -90,7 +91,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       {senderPreferences}
       <MailtoHandlerSection />
     </div>
-    <div className="flex justify-end gap-3 border-t pt-3"><Button variant="outline" onClick={onClose}>{t("preferences.close")}</Button>
+    <div className="flex flex-wrap justify-end gap-3 border-t pt-3"><Button variant="outline" onClick={onClose}>{t("preferences.close")}</Button>
       <Button disabled={loading || busy || !Object.keys(patch).length} onClick={() => void save()}>{busy ? t("preferences.saving") : t("preferences.save")}</Button></div>
   </div>;
 }

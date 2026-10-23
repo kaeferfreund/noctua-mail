@@ -56,3 +56,14 @@ export function normalizeSyncJobProgress(input: {
     updatedAt: typeof progress.updatedAt === "number" ? progress.updatedAt : now
   };
 }
+
+/** Keep failures actionable until a replacement job reports the same scope. */
+export function recordSyncProgress(previous: Record<string, SyncJobProgress>, progress: SyncJobProgress) {
+  const next = Object.fromEntries(Object.entries(previous).filter(([id, job]) =>
+    id === progress.jobId || job.phase !== "failed" || job.accountId !== progress.accountId || job.folderId !== progress.folderId));
+  return { ...next, [progress.jobId]: progress };
+}
+
+export function retainSyncFailure(previous: Record<string, SyncJobProgress>, fallback: SyncJobProgress) {
+  return { ...previous, [fallback.jobId]: { ...(previous[fallback.jobId] ?? fallback), phase: "failed" as const, updatedAt: fallback.updatedAt } };
+}

@@ -10,7 +10,7 @@ export default function ThreadSubject({ subject }: { subject: string }) {
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   return <div className={styles.subjectGroup}>
-    <span id={id} className={styles.subjectText} data-expanded={expanded} title={subject}>
+    <span data-mail-print="" id={id} className={styles.subjectText} data-expanded={expanded} title={subject}>
       {subject || t("noSubject")}
     </span>
     <button type="button" className={styles.subjectToggle} aria-controls={id} aria-expanded={expanded}
