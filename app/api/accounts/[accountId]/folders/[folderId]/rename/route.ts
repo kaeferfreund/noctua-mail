@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -32,6 +33,8 @@ export async function POST(request: Request, { params }: Params) {
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;
     const folders = await getFolders(accountId);
+    const folderError = await validateAccountFolders(accountId, [folderId]);
+    if (folderError) return folderError;
     const folder = folders.find((item) => item.id === folderId);
     if (!folder) {
       return NextResponse.json({ ok: false, message: "Folder not found" }, { status: 404 });

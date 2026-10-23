@@ -28,6 +28,7 @@ export function normalizeAccountSettings(settings?: AccountSettings) {
 
 type AccountSettingsSaveTab =
   | "account"
+  | "identities"
   | "signatures"
   | "preferences"
   | "categorization"
@@ -111,6 +112,7 @@ function getTabSaveSnapshot(account: Account, tab: AccountSettingsSaveTab, isAdm
         }
       };
     case "categorization":
+    case "identities":
     case "mcp":
     case "recipient-aliases":
     case "admin":

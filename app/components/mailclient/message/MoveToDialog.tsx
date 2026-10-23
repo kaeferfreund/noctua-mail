@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
+
+import { useLocale, useTranslations } from "next-intl";
 import { useState, useCallback, useMemo, useRef } from "react";
 import { X, Clock, Folder as FolderIcon } from "lucide-react";
 import { Dialog, TextField } from "@radix-ui/themes";
@@ -58,6 +60,7 @@ export default function MoveToDialog({
   folderById,
   onMove
 }: MoveToDialogProps) {
+  const locale = useLocale();
   const t = useTranslations("Reader");
   const [query, setQuery] = useState("");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
@@ -77,7 +80,7 @@ export default function MoveToDialog({
 
   function hasFolderMatch(folder: Folder): boolean {
     if (!folderQueryText) return true;
-    if (folder.name.toLowerCase().includes(folderQueryText)) return true;
+    if (folderNameMatches(folder, folderQueryText, locale)) return true;
     const children = folderTree.get(folder.id) ?? [];
     return children.some((child) => hasFolderMatch(child));
   }
@@ -158,7 +161,7 @@ export default function MoveToDialog({
                     <span className={styles.recentIcon} aria-hidden>
                       {icon ?? <FolderIcon size={14} />}
                     </span>
-                    {folder.name}
+                    {getFolderDisplayName(folder, locale)}
                   </button>
                 );
               })}

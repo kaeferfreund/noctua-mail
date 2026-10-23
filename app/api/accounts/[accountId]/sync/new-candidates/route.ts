@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -26,6 +27,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { accountId: resolvedAccountId, account, clientId } = accountContext;
+
+    const folderError = await validateAccountFolders(resolvedAccountId,
+      Array.isArray(payload.folderIds) ? payload.folderIds : []);
+    if (folderError) return folderError;
 
     const accountFolderIds = new Set(
       (await getFolders(resolvedAccountId))

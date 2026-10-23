@@ -9,6 +9,7 @@ import { createAuthenticatedTestSession } from "../testAuthHarness";
 import { createSenderIdentity, disableSenderIdentity } from "../senderIdentities";
 import { saveMessageSource } from "../storage";
 import { resolveComposeIdentity } from "../senderIdentitySelection";
+import { withDbWriteRetry } from "../dbWriteRetry";
 
 const db = await dbModulePromise;
 async function fixture() {
@@ -41,7 +42,11 @@ describe("sender identity message metadata", () => {
   });
   test("collision copies and accounts in a shared shard never inherit another copy's metadata", async () => {
     const a = await fixture(); const b = await fixture();
-    (await getDb()).prepare("UPDATE accounts SET dbPath=? WHERE id=?").run(getDefaultAccountDbPath(a.accountId), b.accountId);
+    const master = await getDb();
+    // A prior identity recompute can still be releasing its durable worker
+    // lease. Fixture setup uses the same bounded writer retry as other setup.
+    await withDbWriteRetry("senderIdentityMetadata.shareShard", () => master
+      .prepare("UPDATE accounts SET dbPath=? WHERE id=?").run(getDefaultAccountDbPath(a.accountId), b.accountId));
     await db.upsertMessages(a.accountId, a.folderId, [{ ...a.message, deliveredTo: ["a@example.test"] }]);
     await db.upsertMessages(b.accountId, b.folderId, [{ ...b.message, id: a.message.id, messageId: a.message.messageId, deliveredTo: ["b@example.test"] }]);
     expect((await db.getMessageById(a.accountId, a.message.id))?.deliveredTo).toEqual(["a@example.test"]);
