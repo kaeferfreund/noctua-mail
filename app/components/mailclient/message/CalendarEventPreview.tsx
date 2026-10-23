@@ -23,7 +23,10 @@ import {
 } from "@/lib/accountApiPaths";
 import { normalizeCalendarIcsLineEndings } from "@/lib/calendarIcs";
 import { isCalendarAttachment } from "@/lib/messageFlags";
-import { resolveNextReminderOccurrence } from "@/lib/reminderRecurrence";
+import {
+  useNextReminderOccurrenceResolver,
+  type NextReminderOccurrenceResolver
+} from "@/app/components/calendar/useLazyRecurrence";
 import {
   CALENDAR_REMINDERS_UPDATED_EVENT,
   dispatchCalendarRemindersUpdatedEvent
@@ -74,11 +77,17 @@ function parseAttendees(json?: string) {
   }
 }
 
-function resolveEventDisplayRange(event: CalendarEventPreviewType, nowMs = Date.now()) {
+function resolveEventDisplayRange(
+  event: CalendarEventPreviewType,
+  resolveNextOccurrence: NextReminderOccurrenceResolver | null,
+  nowMs = Date.now()
+) {
   if (!event.start) return { start: undefined, end: undefined, startAtMs: Number.NaN };
   const startAtMs = event.start.getTime();
-  if (!event.recurrenceRule?.trim()) return { start: event.start, end: event.end, startAtMs };
-  const next = resolveNextReminderOccurrence({
+  if (!event.recurrenceRule?.trim() || !resolveNextOccurrence) {
+    return { start: event.start, end: event.end, startAtMs };
+  }
+  const next = resolveNextOccurrence({
     eventStartAtMs: startAtMs,
     eventEndAtMs: event.end?.getTime(),
     leadMinutes: 0,
@@ -185,15 +194,28 @@ export default function CalendarEventPreview({
   const rawIcsUid = events.find((e) => (e.uid ?? "").trim().length > 0)?.uid?.trim();
   const relatedInviteUid = rawIcsUid?.trim() ?? "";
 
+  // Recurring invites need next-occurrence evaluation, which pulls in
+  // `rrule`; load it on demand once a parsed event actually repeats.
+  // While it is in flight the preview stays on its loading state below
+  // instead of grouping by the (possibly long past) series start.
+  const displayedEventsNeedRecurrence =
+    hasCurrentResult &&
+    result.events
+      .slice(0, 3)
+      .some((event) => Boolean(event.start && event.recurrenceRule?.trim()));
+  const nextOccurrenceResolver = useNextReminderOccurrenceResolver(
+    displayedEventsNeedRecurrence
+  );
+
   const groupedEvents = useMemo(() => {
     const nowMs = mountTime;
     const sourceEvents = (hasCurrentResult ? result.events : []).slice(0, 3);
     const entries = sourceEvents.map((event, index) => {
-      const displayRange = resolveEventDisplayRange(event, nowMs);
+      const displayRange = resolveEventDisplayRange(event, nextOccurrenceResolver, nowMs);
       return { event, index, displayStart: displayRange.start, displayEnd: displayRange.end, displayStartAtMs: displayRange.startAtMs };
     });
     return groupItemsByRelativeTime(entries, (e) => e.displayStartAtMs, nowMs, locale);
-  }, [hasCurrentResult, result.events, mountTime, locale]);
+  }, [hasCurrentResult, result.events, mountTime, locale, nextOccurrenceResolver]);
 
   const inviteMutationGroupByUid = useMemo(() => {
     const map = new Map<string, CalendarInviteMutationGroup>();
@@ -371,7 +393,9 @@ export default function CalendarEventPreview({
     ]
   );
 
-  const loading = !hasCurrentResult;
+  const loading =
+    !hasCurrentResult ||
+    (displayedEventsNeedRecurrence && !nextOccurrenceResolver);
   const hasError = hasCurrentResult && result.error;
 
   if (!attachment) return null;

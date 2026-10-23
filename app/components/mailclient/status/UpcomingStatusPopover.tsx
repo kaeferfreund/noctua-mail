@@ -12,10 +12,7 @@ import {
   Heading,
   Text
 } from "@radix-ui/themes";
-import {
-  buildCalendarRecurrenceSummary,
-  formatCalendarEventRange
-} from "@/lib/calendar";
+import { formatCalendarEventRange } from "@/lib/calendar";
 import { formatCalendarTimeZoneShortLabel } from "@/lib/calendarTimezones";
 import type { AccountDateFormat, CalendarEvent } from "@/lib/data";
 import {
@@ -32,6 +29,10 @@ import {
   type BottomStatusTone
 } from "./BottomStatusSection";
 import { buildUpcomingEntries, type UpcomingEntry } from "./upcomingEntries";
+import {
+  useRecurrenceSummaryBuilder,
+  type RecurrenceSummaryBuilder
+} from "@/app/components/calendar/useLazyRecurrence";
 import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
@@ -95,10 +96,17 @@ function formatEntryTimeZoneLabel(startAtMs: number, timeZone?: string) {
   return formatCalendarTimeZoneShortLabel(timeZone, new Date(startAtMs));
 }
 
-function buildEntryRecurrenceSummary(entry: UpcomingEntry, dateFormat?: AccountDateFormat) {
+function buildEntryRecurrenceSummary(
+  entry: UpcomingEntry,
+  buildSummary: RecurrenceSummaryBuilder | null,
+  dateFormat?: AccountDateFormat
+) {
+  // The builder is dynamic-imported (it pulls in `rrule`); until it lands
+  // the recurrence row is omitted rather than showing a guessed summary.
+  if (!buildSummary) return null;
   const event = entry.event;
   if (event?.recurrenceRule?.trim()) {
-    return buildCalendarRecurrenceSummary({
+    return buildSummary({
       allDay: event.allDay,
       start: new Date(event.startAtMs),
       end:
@@ -115,7 +123,7 @@ function buildEntryRecurrenceSummary(entry: UpcomingEntry, dateFormat?: AccountD
   const reminder = entry.reminder;
   if (reminder?.recurrenceRule?.trim()) {
     if (!Number.isFinite(entry.startAtMs)) return null;
-    return buildCalendarRecurrenceSummary({
+    return buildSummary({
       allDay: false,
       start: new Date(entry.startAtMs),
       startTimezone: reminder.startTimezone,
@@ -161,6 +169,14 @@ export default function UpcomingStatusPopover({
   const { entries: upcomingEntries, mergedCount } = useMemo(
     () => buildUpcomingEntries(upcomingEvents, pendingCalendarReminders),
     [upcomingEvents, pendingCalendarReminders]
+  );
+  const recurrenceSummaryBuilder = useRecurrenceSummaryBuilder(
+    open &&
+      upcomingEntries.some(
+        (entry) =>
+          Boolean(entry.event?.recurrenceRule?.trim()) ||
+          Boolean(entry.reminder?.recurrenceRule?.trim())
+      )
   );
   const nextEntry = upcomingEntries[0] ?? null;
   const upcomingStatusValue = (() => {
@@ -288,6 +304,7 @@ export default function UpcomingStatusPopover({
                       );
                       const recurrenceSummary = buildEntryRecurrenceSummary(
                         entry,
+                        recurrenceSummaryBuilder,
                         accountDateFormat
                       );
                       const displayUid = getEntryDisplayUid(entry);

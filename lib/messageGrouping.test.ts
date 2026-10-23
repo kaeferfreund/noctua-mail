@@ -2,13 +2,13 @@ import { describe, expect, it } from "bun:test";
 import {
   buildTimeGroupKey,
   buildWeekGroupKey,
-  buildInviteDeckGroupKeyFromEvent,
   buildInviteDeckGroupKeyFromBounds,
   DATE_GROUP_ORDER,
   INVITE_DECK_GROUP_BY,
   INVITE_DECK_GROUP_ORDER,
   sortGroupsForGroupBy
 } from "./messageGrouping";
+import { buildInviteDeckGroupKeyFromEvent } from "./inviteDeckGrouping";
 
 function localDateMs(year: number, monthIndex: number, day: number, hour = 0) {
   // Fixtures represent Berlin wall time, independently of the test host zone.

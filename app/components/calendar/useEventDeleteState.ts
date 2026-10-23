@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { buildAccountCalendarEventPath } from "@/lib/accountApiPaths";
-import { truncateRecurrenceBeforeOccurrence } from "@/lib/calendarSeriesTruncation";
 import type { CalendarEvent } from "@/lib/data";
 import { dispatchCalendarRemindersUpdatedEvent } from "@/app/components/mailclient/utils/calendarReminders";
 import { dispatchCalendarEventsUpdatedEvent } from "./calendarEventsClient";
@@ -75,32 +74,40 @@ export function useEventDeleteState({
           onNotice(FAILURE_MESSAGES[scope]);
           return;
         }
-        const body =
-          scope === "occurrence"
-            ? {
-                excludedDates: buildOccurrenceExcludedDates(
-                  eventSnapshot.excludedDates,
-                  resolvedOccurrenceStartAtMs
-                )
-              }
-            : (() => {
-                const truncated = truncateRecurrenceBeforeOccurrence(
-                  {
-                    // Use the rule that gated scope selection — it can come from
-                    // a different source than the snapshot's own field.
-                    recurrenceRule: recurrenceRule ?? eventSnapshot.recurrenceRule,
-                    recurrenceDates: eventSnapshot.recurrenceDates,
-                    excludedDates: eventSnapshot.excludedDates,
-                    startTimezone: eventSnapshot.startTimezone
-                  },
-                  resolvedOccurrenceStartAtMs
-                );
-                return {
-                  recurrenceRule: truncated.recurrenceRule,
-                  recurrenceDates: truncated.recurrenceDates ?? [],
-                  excludedDates: truncated.excludedDates ?? []
-                };
-              })();
+        let body: {
+          excludedDates?: number[];
+          recurrenceRule?: string;
+          recurrenceDates?: number[];
+        };
+        if (scope === "occurrence") {
+          body = {
+            excludedDates: buildOccurrenceExcludedDates(
+              eventSnapshot.excludedDates,
+              resolvedOccurrenceStartAtMs
+            )
+          };
+        } else {
+          // Series truncation needs `rrule`; load it on demand for this
+          // explicit delete action instead of on first load.
+          const { truncateRecurrenceBeforeOccurrence } =
+            await import("@/lib/calendarSeriesTruncation");
+          const truncated = truncateRecurrenceBeforeOccurrence(
+            {
+              // Use the rule that gated scope selection — it can come from
+              // a different source than the snapshot's own field.
+              recurrenceRule: recurrenceRule ?? eventSnapshot.recurrenceRule,
+              recurrenceDates: eventSnapshot.recurrenceDates,
+              excludedDates: eventSnapshot.excludedDates,
+              startTimezone: eventSnapshot.startTimezone
+            },
+            resolvedOccurrenceStartAtMs
+          );
+          body = {
+            recurrenceRule: truncated.recurrenceRule,
+            recurrenceDates: truncated.recurrenceDates ?? [],
+            excludedDates: truncated.excludedDates ?? []
+          };
+        }
         const response = await fetch(buildAccountCalendarEventPath(accountId, eventId), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
