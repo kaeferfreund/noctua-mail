@@ -180,6 +180,7 @@ test("STATUS, EXAMINE, folder CRUD, subscription and UNSELECT", async () => {
   const appended = await connection.append(path, raw);
   if (!appended || !appended.uid) throw new Error("No APPENDUID");
   const status = await connection.status(path, { messages: true, unseen: true, uidNext: true, uidValidity: true, recent: true });
+  if (!status) throw new Error("STATUS failed");
   expect(status.messages).toBe(1);
   expect(status.unseen).toBe(1);
   expect(status.uidNext).toBe(2);
@@ -264,7 +265,8 @@ test("literal-like mailbox names stay ordinary strings and APPEND stays byte-exa
     await connection.mailboxOpen(path);
     const fetched = await connection.fetchOne("1", { source: true });
     expect(fetched && fetched.source).toEqual(raw);
-    expect((await observer.status(path, { messages: true })).messages).toBe(1);
+    const status = await observer.status(path, { messages: true });
+    expect(status && status.messages).toBe(1);
     await connection.mailboxClose();
     await connection.mailboxDelete(path);
   }

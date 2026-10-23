@@ -768,6 +768,7 @@ export async function planImapNewSyncFolders(
           { mailbox: mailboxPath, ...logContext },
           () => client.status(mailboxPath, { uidNext: true, uidValidity: true })
         );
+        if (!status) throw new Error(`IMAP STATUS failed for ${mailboxPath}`);
         const uidNext = toFiniteNumber((status as { uidNext?: unknown })?.uidNext) ?? null;
         const namespaceChanged = await saveMailboxState({ accountId: account.id, folderId, mailboxPath,
           uidValidity: status.uidValidity == null ? null : String(status.uidValidity)

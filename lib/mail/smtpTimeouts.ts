@@ -28,9 +28,11 @@ function parsePositiveMs(rawValue: string | undefined, fallback: number) {
 }
 
 /**
- * Nodemailer applies `connectionTimeout` to each resolved address in turn.
- * Keeping it short prevents a dual-address SMTP endpoint from holding the
- * compose UI for several minutes when outbound SMTP is blocked upstream.
+ * Nodemailer 10.1+ uses `connectionTimeout` as one budget for DNS, every
+ * resolved address, TCP, TLS, the greeting and STARTTLS. `greetingTimeout`
+ * still caps the greeting and STARTTLS within that budget. `dnsTimeout`
+ * bounds the lookup itself. Keeping the budget short prevents a blocked
+ * SMTP endpoint from holding the compose UI open.
  */
 export function getSmtpTimeoutOptions(
   environment?: SmtpTimeoutEnvironment
