@@ -466,9 +466,14 @@ function buildSearchTokens(raw?: string | null) {
     .filter((token): token is string => Boolean(token));
 }
 
+// Upper-case barewords FTS5 parses as operators (case-sensitive). `NEAR`
+// is only an operator when followed by `(`, which never reaches the
+// bareword branch, so it stays unquoted.
+const FTS5_KEYWORD_BAREWORDS = new Set(["AND", "OR", "NOT"]);
+
 function buildFtsTokenQuery(token: string) {
   const escaped = token.replace(/"/g, '""');
-  if (/^[\p{L}\p{N}]+$/u.test(token)) return `${escaped}*`;
+  if (/^[\p{L}\p{N}]+$/u.test(token) && !FTS5_KEYWORD_BAREWORDS.has(token)) return `${escaped}*`;
   if (/[\p{L}\p{N}]/u.test(token)) return `"${escaped}"*`;
   return null;
 }
