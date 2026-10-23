@@ -138,7 +138,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
       </Sheet>
     </div> : <Popover open={openPanel !== null} onOpenChange={open => { if (!open) close(); else setOpenPanel(attentionCount > 0 ? (exceptionEntries.length ? "exception" : "process") : "process"); }}>
       <PopoverTrigger asChild>{indicator}</PopoverTrigger>
-      <PopoverContent align="end" aria-label={t("label")} className={`max-h-[calc(100dvh-5rem)] ${openPanel === "calendar" ? "w-[min(54rem,calc(100vw-2rem))]" : "w-[min(34rem,calc(100vw-2rem))]"} overflow-auto p-4`}>
+      <PopoverContent align="end" aria-label={t("label")} className={`${styles.surface} max-h-[calc(100dvh-5rem)] ${openPanel === "calendar" ? "w-[min(54rem,calc(100vw-2rem))]" : "w-[min(34rem,calc(100vw-2rem))]"} overflow-auto p-4`}>
         <Theme asChild><div className="space-y-3">
           <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-medium">{t("label")}</h2>{checkMail}</div>
           {(["process", "mail-check", "exception", "reminder"] as const).map(panel => {
