@@ -32,13 +32,20 @@ export default function AssigneeCombobox({
 }) {
   const t = useTranslations("Collaboration");
   const [open, setOpen] = useState(false);
+  const active = members.filter((m) => !m.disabled);
+  const self = active.find((m) => m.userId === me);
+  // The current user is listed once, first, as "Me (name)".
   const choices = [
     { id: null, label: t("assignee.unassigned"), search: t("assignee.unassigned") },
-    ...(me && members.some((m) => m.userId === me && !m.disabled)
-      ? [{ id: me, label: t("assignee.me"), search: t("assignee.me") }]
+    ...(self
+      ? [{
+          id: self.userId,
+          label: t("assignee.meNamed", { name: self.name || self.email }),
+          search: `${t("assignee.me")} ${self.name} ${self.email} ${self.userId}`,
+        }]
       : []),
-    ...members
-      .filter((m) => !m.disabled)
+    ...active
+      .filter((m) => m !== self)
       .map((m) => ({
         id: m.userId,
         label: m.name || m.email,
