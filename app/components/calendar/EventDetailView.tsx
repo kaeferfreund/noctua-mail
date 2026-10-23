@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { buildCalendarRecurrenceSummary, formatCalendarEventRange } from "@/lib/calendar";
+import { formatCalendarEventRange } from "@/lib/calendar";
 import type {
   CalendarInviteActionType,
   CalendarInviteUnprocessedReason
@@ -25,6 +25,7 @@ import EventInviteStatusRow from "./EventInviteStatusRow";
 import EventReminderDialog from "./EventReminderDialog";
 import EventResponseDialog from "./EventResponseDialog";
 import { useEventDeleteState } from "./useEventDeleteState";
+import { useRecurrenceSummaryBuilder } from "./useLazyRecurrence";
 import { useEventReminderState } from "./useEventReminderState";
 import { isReplyChoice, useEventResponseState } from "./useEventResponseState";
 import styles from "./EventDetailView.module.css";
@@ -161,9 +162,14 @@ export default function EventDetailView({
       )
     : "";
 
-  // Recurrence summary
-  const recurrenceSummary = recurrenceRule && resolvedStartMs
-    ? buildCalendarRecurrenceSummary({
+  // Recurrence summary. The builder is dynamic-imported (it pulls in
+  // `rrule`); until it lands the summary row is simply omitted instead of
+  // showing a guessed value.
+  const recurrenceSummaryBuilder = useRecurrenceSummaryBuilder(
+    Boolean(recurrenceRule?.trim())
+  );
+  const recurrenceSummary = recurrenceRule && resolvedStartMs && recurrenceSummaryBuilder
+    ? recurrenceSummaryBuilder({
         allDay,
         start: new Date(resolvedStartMs),
         startTimezone,

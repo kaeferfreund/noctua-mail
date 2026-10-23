@@ -4,6 +4,11 @@ import {
   resolveCalendarTimeZoneId,
   toCalendarTimeZoneWallDate
 } from "./calendarTimezones";
+import { normalizeReminderDateList } from "./reminderDates";
+
+// Re-exported so existing (server-side) importers keep resolving it from
+// here; the implementation lives in the rrule-free `reminderDates` module.
+export { normalizeReminderDateList } from "./reminderDates";
 
 export const REMINDER_DUE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -29,19 +34,6 @@ function normalizeRecurrenceRule(rule?: string) {
     return trimmed || null;
   }
   return value;
-}
-
-export function normalizeReminderDateList(values?: number[]) {
-  if (!Array.isArray(values) || values.length === 0) return undefined;
-  const next = Array.from(
-    new Set(
-      values
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value) && value > 0)
-        .map((value) => Math.round(value))
-    )
-  ).sort((a, b) => a - b);
-  return next.length > 0 ? next : undefined;
 }
 
 type RecurrenceQuery = {

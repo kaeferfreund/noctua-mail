@@ -1,6 +1,5 @@
 import { displayDayNumber } from "./i18n/format";
 import type { Message } from "./data";
-import { resolveCurrentOrNextOccurrence } from "./reminderRecurrence";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -111,12 +110,12 @@ export function sortGroupsForGroupBy<T extends { key: string }>(groups: T[], gro
   });
 }
 
-export function buildInviteDeckGroupKeyFromEvent(
-  event: InviteDeckEventTiming,
-  nowMs = Date.now()
-) {
-  return resolveCurrentOrNextOccurrence(event, nowMs) ? "UPCOMING" : "PAST";
-}
+// The recurrence-backed variant (`buildInviteDeckGroupKeyFromEvent`)
+// lives in `inviteDeckGrouping.ts`: it needs `rrule` via
+// `reminderRecurrence`, and even a re-export from here was enough for the
+// bundler to keep that graph in the main route's first load (verified
+// against production builds). Server-side callers import it from there
+// directly; this module stays recurrence-free for its client importers.
 
 export function buildInviteDeckGroupKeyFromBounds(
   event: InviteDeckEventBounds,
