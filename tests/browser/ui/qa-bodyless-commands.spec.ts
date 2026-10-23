@@ -102,5 +102,18 @@ test("bodyless commands: every guarded route accepts an empty request and keeps 
   }
   // The bodyless permanent delete really removed the message from Trash.
   expect((await page.request.get(`${account}/messages/${id(trashed)}`)).status()).toBe(404);
+  const softDeleted = async (eventId: string) =>
+    (await json(await page.request.get(`${account}/calendar/events/${id(eventId)}`)))?.event?.deletedAtMs;
+  expect(typeof await softDeleted(event)).toBe("number");
+  // Calendar "delete event" exactly as useEventDeleteState sends it from the page:
+  // DELETE with ?soft=true, no headers and no body (the browser adds Origin itself).
+  const clientEvent = (await created(page, `${account}/calendar/events`, { summary: "Bodyless synthetic client event", startAtMs: Date.now() + 2 * 86400000 })).event.id as string;
+  const clientDelete = await page.evaluate(async path => {
+    const response = await fetch(path, { method: "DELETE" });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  }, `${account}/calendar/events/${id(clientEvent)}?${new URLSearchParams({ soft: "true" })}`);
+  expect(clientDelete).toEqual({ status: 200, body: { ok: true } });
+  expect(typeof await softDeleted(clientEvent)).toBe("number");
+  results.push({ route: "DELETE /api/accounts/qa-shared/calendar/events/:eventId?soft=true (in-page client fetch)", name: "calendar event DELETE, client request", bodyless: clientDelete.status });
   recordQa("bodyless-command-matrix", results);
 });
