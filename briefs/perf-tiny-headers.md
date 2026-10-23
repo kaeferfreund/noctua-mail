@@ -222,3 +222,7 @@ perf(source), `7d31d6d` fix(config) — tip `7d31d6d752f59e7ef1507ed7cb619d4f661
 - `app/api/accounts/[accountId]/messages/[messageId]/source/route.ts` (+ test)
 - `app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts` (helper extraction only)
 - `lib/storage.ts` (`statMessageSource`)
+
+## test:ci re-run at low load (2026-10-23 11:19-11:27 UTC)
+
+Repeated `bun run test:ci` on 7d31d6d in wt-perf-headers with `nice -n 10` at load average 7-12: **2,812 unit + 462 DOM pass, 0 fail, exit 0**, no timeouts (log `/tmp/headers-testci-rerun.log`). The three timeouts of the first run were load-induced, as assumed.
