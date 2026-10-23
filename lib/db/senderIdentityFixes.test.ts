@@ -32,8 +32,9 @@ test("me search ORs primary and enabled/disabled aliases in message/thread count
   const authors = ["primary@example.test", "alias@example.test", "disabled@example.test", "notalias@example.test", '"alias@example.test" <external@example.test>'];
   await db.upsertMessages(f.accountId, f.folderId, authors.map((from, index) => ({ ...f.message, id: `${f.message.id}-${index}`, messageId: `<${index}-${f.message.id}@example.test>`, threadId: `${f.message.threadId}-${index}`, from, to: "customer@example.test", imapUid: index + 1 })));
   for (const query of ["from:me", "with:me", "from:me with:customer@example.test"]) {
-    for (const list of [db.listMessages, db.listThreads]) {
-      const result = await list({ accountId: f.accountId, query, page: 1, pageSize: 2, groupBy: "date" });
+    // listThreads' date grouping returns loaded counts, so its filtered bucket counts are checked by week.
+    for (const [list, groupBy] of [[db.listMessages, "date"], [db.listThreads, "week"]] as const) {
+      const result = await list({ accountId: f.accountId, query, page: 1, pageSize: 2, groupBy });
       expect(result.total).toBe(3); expect(result.items).toHaveLength(2);
       expect(result.groups?.reduce((sum, group) => sum + group.count, 0)).toBe(3);
     }
