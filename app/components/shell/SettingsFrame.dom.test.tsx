@@ -1,11 +1,13 @@
-import { afterEach, expect, it } from "bun:test";
+import { afterEach, beforeEach, expect, it } from "bun:test";
 import { useState } from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import SettingsFrame, { SettingsTitle } from "./SettingsFrame";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";
 import { DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
-afterEach(cleanup);
+let viewportWidth: number;
+beforeEach(() => { viewportWidth = window.innerWidth; });
+afterEach(() => { cleanup(); window.innerWidth = viewportWidth; });
 function Harness() {
   const [frame, setFrame] = useState(false), [members, setMembers] = useState(false), [confirm, setConfirm] = useState(false);
   return <><button onClick={() => setFrame(true)}>Open settings</button>
