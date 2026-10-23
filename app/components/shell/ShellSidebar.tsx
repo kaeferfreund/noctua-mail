@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { FileText, Plus, RefreshCw, SquarePen } from "lucide-react";
+import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
@@ -68,6 +68,7 @@ export function MailboxRows({
   onSwitch,
   summaries
 }: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "onSwitch" | "summaries">) {
+  const summaryById = new Map(summaries?.map(summary => [summary.accountId, summary]));
   return (
     <div className="space-y-1">
       {groupMailboxes(accounts).map((group) => (
@@ -76,14 +77,18 @@ export function MailboxRows({
             <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{group.domain}</div>
           ) : null}
           <SidebarMenu>
-            {group.accounts.map((account) => (
+            {group.accounts.map((account) => {
+              const summary = summaryById.get(account.id);
+              return (
               <SidebarMenuItem key={account.id}>
                 <SidebarMenuButton
                   isActive={account.id === activeAccountId}
                   onClick={() => onSwitch(account.id)}
-                  title={account.email}
+                  title={summary
+                    ? `${account.email}\n${summary.unread ?? "—"} unread · ${summary.assignedToMe} assigned to me · ${summary.unassignedOpen} unassigned open\nWatcher: ${summary.watcher.state}`
+                    : account.email}
                   aria-current={account.id === activeAccountId ? "true" : undefined}
-                  className="data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]"
+                  className={cn("data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]", summary && "pr-32")}
                 >
                   <Avatar size="sm">
                     {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
@@ -91,13 +96,24 @@ export function MailboxRows({
                   </Avatar>
                   <span>{mailboxLabel(account)}</span>
                 </SidebarMenuButton>
-                {summaries?.find(mailbox => mailbox.accountId === account.id)?.unread != null && (
-                  <SidebarMenuBadge aria-label={`${summaries.find(mailbox => mailbox.accountId === account.id)!.unread} unread`}>
-                    {summaries.find(mailbox => mailbox.accountId === account.id)!.unread}
+                {summary && (
+                  <SidebarMenuBadge className="right-1 w-auto gap-1.5 text-2xs">
+                    <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? "Unread count unavailable" : `${summary.unread} unread`} title="Unread">
+                      <Mail className="size-2.5" aria-hidden="true" />{summary.unread ?? "—"}
+                    </span>
+                    <span className="flex items-center gap-0.5" aria-label={`${summary.assignedToMe} assigned to me`} title="Assigned to me">
+                      <UserRound className="size-2.5" aria-hidden="true" />{summary.assignedToMe}
+                    </span>
+                    <span className="flex items-center gap-0.5" aria-label={`${summary.unassignedOpen} unassigned open`} title="Unassigned">
+                      <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
+                    </span>
+                    <span role="img" aria-label={`Watcher: ${summary.watcher.state}`} title={`Watcher: ${summary.watcher.state}`}
+                      className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
+                        summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
                   </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
-            ))}
+            ); })}
           </SidebarMenu>
         </div>
       ))}
@@ -105,7 +121,7 @@ export function MailboxRows({
   );
 }
 
-function ViewRow({ view }: { view: ShellView }) {
+export function ViewRow({ view }: { view: ShellView }) {
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
     <SidebarMenuItem>

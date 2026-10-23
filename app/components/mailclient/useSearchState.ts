@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { buildAccountMessagesPath } from "@/lib/accountApiPaths";
+import { buildAccountApiPath, buildAccountMessagesPath } from "@/lib/accountApiPaths";
 import type { Folder } from "@/lib/data";
 import {
   SEARCH_BADGE_ORDER,
@@ -147,7 +147,9 @@ export function useSearchState(options: UseSearchStateOptions) {
   const [inviteDeckTotalCount, setInviteDeckTotalCount] = useState<number | null>(null);
   const [inviteDeckUnreadCount, setInviteDeckUnreadCount] = useState<number | null>(null);
 
-  const [collabCounts, setCollabCounts] = useState<Record<string, number | null>>({});
+  const [collabCountEntry, setCollabCounts] = useState<{ accountId: string; open: number } | null>(null);
+  const collabCounts: Record<string, number | null> = collabCountEntry?.accountId === activeAccountId
+    ? { "virtual:open": collabCountEntry.open } : {};
 
   const lastFolderIdRef = useRef<string>("");
 
@@ -155,7 +157,6 @@ export function useSearchState(options: UseSearchStateOptions) {
   useEffect(() => {
     if (activeAccountId) return;
     const timer = setTimeout(() => {
-      setCollabCounts({});
       setFocusedUnreadCount(null);
       setActionQueueTodoCount(null);
       setInviteDeckTotalCount(null);
@@ -236,12 +237,10 @@ export function useSearchState(options: UseSearchStateOptions) {
         fetchCount("focused", virtualDefaultExcludedFolderIdsKey),
         fetchCount("todo", virtualDefaultExcludedFolderIdsKey),
         fetchCount("calendar", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey),
-        ...COLLAB_FOLDERS.map(folder => fetchCount(folder.queryBadges.join(","), virtualDefaultExcludedFolderIdsKey))
+        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey)
       ])
-        .then(([focusedCount, todoCount, inviteTotalCount, inviteUnreadCount, ...collabTotals]) => {
+        .then(([focusedCount, todoCount, inviteTotalCount, inviteUnreadCount]) => {
           if (controller.signal.aborted) return;
-          setCollabCounts(Object.fromEntries(COLLAB_FOLDERS.map((folder, i) => [folder.id, collabTotals[i]])));
           setFocusedUnreadCount(focusedCount);
           setActionQueueTodoCount(todoCount);
           setInviteDeckTotalCount(inviteTotalCount);
@@ -249,7 +248,6 @@ export function useSearchState(options: UseSearchStateOptions) {
         })
         .catch(() => {
           if (controller.signal.aborted) return;
-          setCollabCounts({});
           setFocusedUnreadCount(null);
           setActionQueueTodoCount(null);
           setInviteDeckTotalCount(null);
@@ -261,7 +259,26 @@ export function useSearchState(options: UseSearchStateOptions) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, collabRevision]);
+  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion]);
+
+  // The user-wide summary supplies assigned/unassigned counts. Its contract
+  // has no Open total, so retain one whole-mailbox thread count and refresh it
+  // for watcher/collaboration events without refetching the other view counts.
+  useEffect(() => {
+    if (!activeAccountId) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ page: "1", pageSize: "1", badges: "open", excludeFolderIds: "" });
+      void apiFetch(`${buildAccountApiPath(activeAccountId, "/threads")}?${params}`, { signal: controller.signal })
+        .then(async response => {
+          if (!response.ok) throw new Error("Failed to fetch count");
+          const data = await response.json() as { total: number };
+          if (!controller.signal.aborted) setCollabCounts({ accountId: activeAccountId, open: data.total });
+        })
+        .catch(() => { if (!controller.signal.aborted) setCollabCounts(null); });
+    }, 160);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [activeAccountId, apiFetch, syncCompletionVersion, collabRevision]);
 
   // Auto-clear virtual folder when conditions change
   useEffect(() => {
