@@ -12,7 +12,7 @@ export async function signInQa(page: Page) {
   for (const [url, body] of [
     ["/api/ba/sign-in/email", { email: seed.email, password: seed.password }],
     ["/api/ba/two-factor/verify-totp", { code: totpFromUri(seed.totpURI) }],
-    ["/api/auth/switch-account", { accountId: "qa-shared" }]
+    ["/api/auth/switch-account", { accountId: seed.accountId ?? "qa-shared" }]
   ] as const) {
     const result = await page.request.post(url, { data: body, headers: { origin: new URL(page.url()).origin } });
     expect(result.status()).toBe(200);

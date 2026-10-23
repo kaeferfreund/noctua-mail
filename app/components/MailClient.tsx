@@ -192,7 +192,8 @@ import {
   DEFAULT_SEARCH_BADGES,
   DEFAULT_SEARCH_FIELDS,
   useSearchState,
-  VIRTUAL_FOLDERS
+  VIRTUAL_FOLDERS,
+  getVirtualFolderLabels
 } from "./mailclient/useSearchState";
 import { useReminderNotifications } from "./mailclient/useReminderNotifications";
 import { useMessageData } from "./mailclient/useMessageData";
@@ -306,11 +307,11 @@ const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
 });
 const AdminPanel = dynamic(() => import("./admin/AdminPanel"), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Admin" />
+  loading: () => <LazyDialogLoading kind="admin" />
 });
 const CreateMailbox = dynamic(() => import("./admin/AdminMailboxes").then(module => module.CreateMailbox), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Postfach hinzufügen" mailboxDialog />
+  loading: () => <LazyDialogLoading mailboxDialog />
 });
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
@@ -381,13 +382,19 @@ type ActiveTopicSuggestionsResponse = {
   suggestions?: TopicThreadSuggestion[];
 };
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
+  const tv = useTranslations("Views");
+  const tshell = useTranslations("Shell");
+  const ts = useTranslations("Search");
+  const tl = useTranslations("List");
+  const locale = useLocale();
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -1037,8 +1044,8 @@ export default function MailClient({
     () =>
       activeVirtualFolder
         ? [activeVirtualFolder.badgeLabel]
-        : selectedSearchBadges.map((key) => getSearchBadgeLabel(key)),
-    [activeVirtualFolder, selectedSearchBadges]
+        : selectedSearchBadges.map((key) => getSearchBadgeLabel(key, ts)),
+    [activeVirtualFolder, selectedSearchBadges, ts]
   );
   const hasFilteredSearchCriteria =
     isRelatedSearch || trimmedQuery.length > 0 || effectiveSearchBadges.length > 0;
@@ -1062,41 +1069,26 @@ export default function MailClient({
     const adjusted = fields.includes("participants") ? fields.filter((field) => field !== "sender") : fields;
     return adjusted;
   }, [searchFields]);
-  const searchFieldsLabel = useMemo(() => {
-    const allEnabled =
-      searchFields.participants &&
-      searchFields.subject &&
-      searchFields.body &&
-      searchFields.attachments;
-    if (allEnabled) return "Fields: All";
+  const allSearchFields = searchFields.participants && searchFields.subject && searchFields.body && searchFields.attachments;
+  const searchFieldsCriteriaLabel = useMemo(() => {
     const selected = SEARCH_FIELD_ORDER.filter((key) => searchFields[key]);
-    const effective = selected.includes("participants")
-      ? selected.filter((key) => key !== "sender")
-      : selected;
-    if (effective.length === 0) return "Fields: All";
-    return `Fields: ${effective.map((key) => getSearchFieldLabel(key)).join(", ")}`;
-  }, [searchFields]);
-  const searchFieldsCriteriaLabel = useMemo(
-    () => searchFieldsLabel.replace(/^Fields:\s*/, ""),
-    [searchFieldsLabel]
-  );
-  const searchFieldsSummaryLabel = useMemo(() => {
-    const normalized = searchFieldsCriteriaLabel.trim();
-    if (!normalized || normalized.toLowerCase() === "all") return "in all fields";
-    return `in fields ${normalized}`;
-  }, [searchFieldsCriteriaLabel]);
+    const effective = selected.includes("participants") ? selected.filter((key) => key !== "sender") : selected;
+    return allSearchFields || effective.length === 0 ? ts("allFields") : effective.map((key) => getSearchFieldLabel(key, ts)).join(", ");
+  }, [allSearchFields, searchFields, ts]);
+  const searchFieldsLabel = ts("fieldSummary", { fields: searchFieldsCriteriaLabel });
+  const searchFieldsSummaryLabel = allSearchFields || !Object.values(searchFields).some(Boolean)
+    ? tv("allFieldsScope") : tv("fieldsScope", { fields: searchFieldsCriteriaLabel });
   const searchBadgesLabel = useMemo(() => {
     const selected = SEARCH_BADGE_ORDER.filter((key) => searchBadges[key]);
-    if (selected.length === 0) return "Filter: Any";
-    return `Filter: ${selected.map((key) => getSearchBadgeLabel(key)).join(", ")}`;
-  }, [searchBadges]);
+    return ts("badgeSummary", { badges: selected.length ? selected.map((key) => getSearchBadgeLabel(key, ts)).join(", ") : ts("noFilters") });
+  }, [searchBadges, ts]);
   const searchScopeSummaryLabel = useMemo(() => {
     if (searchScope === "all") {
-      return activeVirtualFolder ? `in ${activeVirtualFolder.name}` : "everywhere";
+      return activeVirtualFolder ? tv("viewScope", { name: activeVirtualFolder.name }) : tv("everywhereScope");
     }
-    const folderName = activeFolderId ? folderById.get(activeFolderId)?.name?.trim() : "";
-    return folderName ? `in ${folderName}` : "in current folder";
-  }, [activeFolderId, activeVirtualFolder, folderById, searchScope]);
+    const folder = activeFolderId ? folderById.get(activeFolderId) : undefined;
+    return folder ? tv("folderScope", { name: getFolderDisplayName(folder, locale) }) : tv("currentFolderScope");
+  }, [activeFolderId, activeVirtualFolder, folderById, searchScope, locale, tv]);
   const searchActive = useMemo(() => {
     const hasQuery = query.trim().length > 0;
     const hasBadges = Object.values(searchBadges).some(Boolean);
@@ -1106,22 +1098,22 @@ export default function MailClient({
     const parts: string[] = [];
     const trimmedQuery = query.trim();
     if (trimmedQuery.length > 0) {
-      parts.push(`"${trimmedQuery}"`);
+      parts.push(tv("queryCriteria", { query: trimmedQuery }));
     }
     if (trimmedQuery.length > 0) {
       parts.push(searchFieldsSummaryLabel);
     }
     if (selectedSearchBadgeLabels.length > 0) {
-      parts.push(`filter ${selectedSearchBadgeLabels.join(", ")}`);
+      parts.push(tv("filterCriteria", { badges: selectedSearchBadgeLabels.join(", ") }));
     }
     parts.push(searchScopeSummaryLabel);
     return parts.join(" · ");
-  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels]);
+  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels, tv]);
   const searchCriteriaBadges = useMemo(() => {
     const badges: { key: string; label: string }[] = [];
     const trimmedQuery = query.trim();
     if (trimmedQuery.length > 0) {
-      badges.push({ key: "query", label: `"${trimmedQuery}"` });
+      badges.push({ key: "query", label: tv("queryCriteria", { query: trimmedQuery }) });
     }
     if (trimmedQuery.length > 0) {
       badges.push({ key: "fields", label: searchFieldsSummaryLabel });
@@ -1133,10 +1125,10 @@ export default function MailClient({
     }
     badges.push({ key: "scope", label: searchScopeSummaryLabel });
     if (badges.length === 0) {
-      badges.push({ key: "all", label: "All messages" });
+      badges.push({ key: "all", label: tl("allMessages") });
     }
     return badges;
-  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels]);
+  }, [query, searchFieldsSummaryLabel, searchScopeSummaryLabel, selectedSearchBadgeLabels, tv, tl]);
   const relatedNotice = useMemo(() => {
     if (!isRelatedSearch) return "";
     const subject = relatedContext?.subject?.trim();
@@ -1914,7 +1906,7 @@ export default function MailClient({
           ? inviteDeckUnreadCount
           : null;
     return formatMailboxPageTitle({
-      folderName: activeVirtualFolder?.name ?? folder?.name,
+      folderName: activeVirtualFolder?.name ?? (folder ? getFolderDisplayName(folder, locale) : undefined),
       accountEmail: currentAccount?.email,
       unreadCount: activeVirtualFolder ? virtualUnreadCount : folder?.unreadCount
     });
@@ -1924,7 +1916,8 @@ export default function MailClient({
     currentAccount?.email,
     focusedUnreadCount,
     folderById,
-    inviteDeckUnreadCount
+    inviteDeckUnreadCount,
+    locale
   ]);
   useWindowTitle(mailboxTitle);
   const handleOpenReloginFromException = useCallback(
@@ -4078,7 +4071,8 @@ export default function MailClient({
     }));
   }, [omitBody, threadMessages]);
 
-  const activeFolderName = accountFolders.find((folder) => folder.id === activeFolderId)?.name;
+  const activeFolder = accountFolders.find((folder) => folder.id === activeFolderId);
+  const activeFolderName = activeFolder ? getFolderDisplayName(activeFolder, locale) : undefined;
 
   useEffect(() => {
     if (!activeAccountId) return;
@@ -5212,6 +5206,7 @@ export default function MailClient({
     () =>
       VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
         ...folder,
+        ...getVirtualFolderLabels(folder, tv),
         active: activeVirtualFolder?.id === folder.id,
         onSelect: () => activateVirtualFolder(folder.id),
         count:
@@ -5222,30 +5217,24 @@ export default function MailClient({
             : folder.id === "virtual:invite-deck"
               ? inviteDeckUnreadCount
               : null,
-        countLabel:
-          folder.id === "virtual:focused"
-            ? `Unread: ${focusedUnreadCount ?? 0}`
-            : folder.id === "virtual:action-queue"
-            ? `To-Do: ${actionQueueTodoCount ?? 0}`
-            : undefined,
         countAriaLabel:
           folder.id === "virtual:focused"
-            ? `${focusedUnreadCount ?? 0} unread`
+            ? tv("unreadCount", { count: focusedUnreadCount ?? 0 })
             : folder.id === "virtual:action-queue"
-            ? `${actionQueueTodoCount ?? 0} to-do`
-            : `${inviteDeckUnreadCount ?? 0} unread`,
+            ? tv("pendingCount", { count: actionQueueTodoCount ?? 0 })
+            : tv("unreadCount", { count: inviteDeckUnreadCount ?? 0 }),
         countTitle:
           folder.id === "virtual:invite-deck" &&
           typeof inviteDeckTotalCount === "number" &&
           typeof inviteDeckUnreadCount === "number"
-            ? `${folder.description} (${inviteDeckTotalCount} Messages, ${inviteDeckUnreadCount} unread)`
+            ? tv("countTitle", { description: tv(`${folder.messageKey}.description`), total: inviteDeckTotalCount, unread: inviteDeckUnreadCount })
             : undefined,
         rowTitle:
           folder.id === "virtual:invite-deck" &&
           typeof inviteDeckTotalCount === "number" &&
           typeof inviteDeckUnreadCount === "number"
-            ? `${folder.description} (${inviteDeckTotalCount} Messages, ${inviteDeckUnreadCount} unread)`
-            : `${folder.name}: ${folder.description}`,
+            ? tv("countTitle", { description: tv(`${folder.messageKey}.description`), total: inviteDeckTotalCount, unread: inviteDeckUnreadCount })
+            : tv("rowTitle", getVirtualFolderLabels(folder, tv)),
         emphasize:
           folder.id === "virtual:focused"
             ? (focusedUnreadCount ?? 0) > 0
@@ -5267,7 +5256,8 @@ export default function MailClient({
       activeVirtualFolder?.id,
       focusedUnreadCount,
       inviteDeckTotalCount,
-      inviteDeckUnreadCount
+      inviteDeckUnreadCount,
+      tv
     ]
   );
   // "Inbox" heads the sidebar's Views section (design §7.2). Only a real
@@ -5277,11 +5267,11 @@ export default function MailClient({
     const unread = inboxFolder.unreadCount ?? 0;
     return {
       id: `folder:${inboxFolder.id}`,
-      name: "Inbox",
-      description: "Incoming mail",
+      name: tv("inbox.name"),
+      description: tv("inbox.description"),
       active: !activeVirtualFolder && searchScope === "folder" && activeFolderId === inboxFolder.id,
       count: unread,
-      countAriaLabel: `${unread} unread`,
+      countAriaLabel: tv("unreadCount", { count: unread }),
       emphasize: unread > 0,
       icon: <Inbox size={13} />,
       onSelect: () => {
@@ -5297,7 +5287,8 @@ export default function MailClient({
     inboxFolder,
     searchScope,
     setActiveFolderId,
-    setSearchScope
+    setSearchScope,
+    tv
   ]);
   const isExistingAccount = Boolean(
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
@@ -5385,9 +5376,9 @@ export default function MailClient({
             // feat/collab-ui adds "Assigned to me", "Unassigned" and "Open"
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
-              ...folder, active: activeVirtualFolder?.id === folder.id,
+              ...folder, ...getVirtualFolderLabels(folder, tv), active: activeVirtualFolder?.id === folder.id,
               count: collaborationViewCount(folder.id, activeMailboxSummary),
-              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary) ?? 0} threads`, icon: <ListTodo size={13} />,
+              countAriaLabel: tshell("threadsCount", { count: collaborationViewCount(folder.id, activeMailboxSummary) ?? 0 }), icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane
@@ -5439,7 +5430,7 @@ export default function MailClient({
               query,
               searchScope,
               includeSentInEverywhere,
-              sentFolderName: sentFolderBySpecialUse?.name ?? null,
+              sentFolderName: sentFolderBySpecialUse ? getFolderDisplayName(sentFolderBySpecialUse, locale) : null,
               searchFields,
               searchBadges,
               isRelatedSearch,

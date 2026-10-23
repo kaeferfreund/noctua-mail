@@ -113,7 +113,21 @@
       "identityDefaultDisabled": "{sender} — Postfachstandard — Deaktiviert",
       "identitySignatureDefault": "Standardsignatur des Postfachs"
     },
-    "edit": "Bearbeiten"
+    "edit": "Bearbeiten",
+    "tabs": {
+      "account": "Postfach",
+      "signatures": "Signaturen",
+      "preferences": "Persönliche Einstellungen",
+      "categorization": "Kategorisierung",
+      "topics": "Themen",
+      "calendar": "Kalender",
+      "translation": "Übersetzung",
+      "recipient-aliases": "Empfänger-Aliasse",
+      "mcp": "MCP",
+      "members": "Mitglieder"
+    },
+    "accountTitle": "Postfacheinstellungen",
+    "close": "Schließen"
   },
   "Pwa": {
     "description": "Moderner Webmail-Client als Prototyp"
@@ -156,7 +170,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Meine Postfächer",
+      "mine": "Eigene Postfächer",
       "shared": "Gemeinsame Postfächer",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
@@ -169,7 +183,15 @@
       "unassigned": "{count} offen und nicht zugewiesen",
       "watcher": "Überwachung: {state}",
       "summary": "{email}\n{unread} ungelesen · {assignedToMe} mir zugewiesen · {unassignedOpen} offen und nicht zugewiesen\nÜberwachung: {state}",
-      "other": "Sonstige"
+      "other": "Sonstige",
+      "watcherStates": {
+        "disabled": "Deaktiviert",
+        "starting": "Startet",
+        "idling": "Wartet auf neue E-Mails",
+        "backoff": "Wartet auf erneuten Versuch",
+        "auth_failed": "Anmeldung fehlgeschlagen",
+        "stopped": "Angehalten"
+      }
     },
     "views": "Ansichten",
     "topics": "Themen",
@@ -181,6 +203,108 @@
     "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
+    },
+    "threadsCount": "{count, plural, one {# Thread} other {# Threads}}",
+    "refreshTitle": "Neuladen erforderlich",
+    "refreshDescription": "Eine neue Version ist verfügbar. Sie ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.",
+    "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neue Version: {version}.",
+    "refreshNow": "Jetzt neu laden",
+    "status": {
+      "activity": "Aktivität und Kalender",
+      "check": "Neue E-Mails abrufen",
+      "processes": "Prozesse",
+      "mailCheck": "E-Mail-Abruf",
+      "mailCheckStatus": "E-Mail-Abruf: {state}",
+      "reminders": "Erinnerungen",
+      "exceptions": "Fehler",
+      "exceptionCount": "Fehler ({count, number})",
+      "calendar": "Kalender",
+      "idle": "Inaktiv",
+      "polling": "Regelmäßiger Abruf",
+      "upcoming": "Bevorstehend",
+      "none": "Keine",
+      "error": "Fehler",
+      "closeProcesses": "Prozesse schließen",
+      "clearExceptions": "Fehler löschen",
+      "closeUpcoming": "Bevorstehende Termine schließen",
+      "copyError": "Fehler kopieren",
+      "noExceptions": "Keine Fehler.",
+      "relogin": "Erneut anmelden",
+      "noProcesses": "Keine aktiven Prozesse.",
+      "nothingUpcoming": "Keine bevorstehenden Termine.",
+      "preparingSync": "Synchronisierung wird vorbereitet …",
+      "recomputingThreads": "Threads werden neu berechnet …",
+      "recomputingCategories": "Kategorien werden neu berechnet …",
+      "retry": "Erneuter Versuch …",
+      "retryCount": "Erneuter Versuch ({attempt, number}/{max, number}) …",
+      "mailbox": "Postfach",
+      "syncingScope": "„{scope}“ wird synchronisiert ({mode}{percent, select, none {} other {, {percent}}}) …",
+      "syncRetryScope": "{mode}: {retry} {scope}",
+      "syncingFolders": "{more, plural, =0 {„{folder}“ wird synchronisiert …} one {„{folder}“ und # weiterer Ordner werden synchronisiert …} other {„{folder}“ und # weitere Ordner werden synchronisiert …}}",
+      "syncingMailbox": "Postfach wird synchronisiert …",
+      "openSource": "Ursprüngliche E-Mail öffnen",
+      "openCalendar": "Kalender öffnen",
+      "deleteReminder": "Erinnerung löschen",
+      "deleteReminderFailed": "Erinnerung konnte nicht gelöscht werden.",
+      "duration": "(Dauer: {duration})",
+      "reminderBefore": "Erinnerung: {lead} vorher",
+      "repeats": "Wiederholung: {summary}",
+      "upcomingSummary": "{count, number} · {title} · {dateTime}",
+      "phases": {
+        "starting": "Vorbereitung",
+        "fetching": "Abrufen",
+        "finalizing": "Abschließen",
+        "done": "Erledigt",
+        "failed": "Fehlgeschlagen",
+        "retrying": "Erneuter Versuch"
+      },
+      "modes": {
+        "full": "Vollständige Synchronisierung",
+        "recent": "Synchronisierung der letzten Nachrichten",
+        "new": "Synchronisierung neuer Nachrichten",
+        "repair": "Reparatursynchronisierung"
+      }
+    },
+    "topicPicker": {
+      "title": "Themen",
+      "empty": "Noch keine Themen. Erstelle unten ein Thema.",
+      "suggested": "Vorgeschlagen",
+      "all": "Alle Themen",
+      "name": "Themenname",
+      "shortName": "Kurzname für die Nachrichtenliste (optional)",
+      "noColor": "Keine Farbe",
+      "createAdd": "Erstellen und hinzufügen",
+      "cancel": "Abbrechen",
+      "new": "Neues Thema",
+      "apply": "Anwenden",
+      "colors": {
+        "gray": "Grau",
+        "red": "Rot",
+        "orange": "Orange",
+        "amber": "Bernstein",
+        "yellow": "Gelb",
+        "lime": "Limette",
+        "green": "Grün",
+        "teal": "Blaugrün",
+        "cyan": "Cyan",
+        "sky": "Himmelblau",
+        "blue": "Blau",
+        "indigo": "Indigo",
+        "violet": "Violett",
+        "purple": "Purpur",
+        "pink": "Rosa",
+        "brown": "Braun",
+        "crimson": "Karminrot",
+        "ruby": "Rubinrot",
+        "tomato": "Tomatenrot",
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "grass": "Grasgrün",
+        "mint": "Minze",
+        "jade": "Jade",
+        "iris": "Iris",
+        "plum": "Pflaume"
+      }
     }
   },
   "Search": {
@@ -1076,5 +1200,63 @@
       "signatureInUse": "Diese Signatur wird von einer Absenderidentität verwendet. Wähle zuerst eine andere Vorlage für diese Identität.",
       "invalidPreferences": "Prüfe deine Absendereinstellungen und die Signaturplatzhalter."
     }
+  },
+  "Views": {
+    "focused": {
+      "name": "Ungelesen & unbeantwortet",
+      "description": "Hier findest du ungelesene, unbeantwortete Nachrichten ohne Newsletter.",
+      "badgeLabel": "Ungelesen & unbeantwortet"
+    },
+    "actionQueue": {
+      "name": "Markiert & Aufgaben",
+      "description": "Hier findest du markierte Nachrichten sowie offene und erledigte Aufgaben.",
+      "badgeLabel": "Markiert oder Aufgabe"
+    },
+    "inviteDeck": {
+      "name": "Kalendereinladungen",
+      "description": "Hier findest du deine Kalendereinladungen.",
+      "badgeLabel": "Kalendereinladungen"
+    },
+    "assignedToMe": {
+      "name": "Mir zugewiesen",
+      "description": "Hier findest du Threads, die dir zugewiesen sind.",
+      "badgeLabel": "Mir zugewiesen"
+    },
+    "unassigned": {
+      "name": "Nicht zugewiesen",
+      "description": "Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.",
+      "badgeLabel": "Nicht zugewiesen"
+    },
+    "open": {
+      "name": "Offen",
+      "description": "Hier findest du Threads, die noch nicht erledigt sind.",
+      "badgeLabel": "Offen"
+    },
+    "inbox": {
+      "name": "Posteingang",
+      "description": "Hier findest du deine eingehenden Nachrichten."
+    },
+    "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "unreadLabel": "Ungelesen: {count, number}",
+    "pendingCount": "{count, plural, one {# offene Aufgabe} other {# offene Aufgaben}}",
+    "pendingLabel": "Aufgaben: {count, number}",
+    "countTitle": "{description} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
+    "rowTitle": "{name}: {description}",
+    "viewScope": "in „{name}“",
+    "everywhereScope": "überall",
+    "folderScope": "im Ordner „{name}“",
+    "currentFolderScope": "im aktuellen Ordner",
+    "allFieldsScope": "in allen Feldern",
+    "fieldsScope": "in den Feldern {fields}",
+    "filterCriteria": "Filter: {badges}",
+    "queryCriteria": "„{query}“"
+  },
+  "Folders": {
+    "inbox": "Posteingang",
+    "sent": "Gesendet",
+    "drafts": "Entwürfe",
+    "trash": "Papierkorb",
+    "spam": "Spam",
+    "archive": "Archiv"
   }
 }
