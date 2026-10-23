@@ -55,3 +55,25 @@ describe("shutdown coordinator", () => {
     expect(closed).toBe(false); expect(exits).toEqual([0]);
   });
 });
+
+test("Next-owned cleanup drains background work without exiting or closing storage", async () => {
+  const { coordinator: c, exits } = fixture();
+  const order: string[] = [];
+  c.add({ name: "workers", phase: "stop", run: () => { order.push("stop"); } });
+  c.add({ name: "leases", phase: "drain", run: () => { order.push("drain"); } });
+  c.add({ name: "db", phase: "close", run: () => { order.push("close"); } });
+  await c.shutdown("SIGTERM", { exit: false, close: false });
+  expect(c.stopping).toBe(true);
+  expect(order).toEqual(["stop", "drain"]);
+  expect(exits).toEqual([]);
+});
+
+test("Next-owned cleanup deadline cannot exit or close storage beneath HTTP requests", async () => {
+  const { coordinator: c, exits } = fixture(20);
+  let closed = false;
+  c.add({ name: "worker", phase: "drain", run: () => new Promise(() => {}) });
+  c.add({ name: "db", phase: "close", run: () => { closed = true; } });
+  await c.shutdown("SIGTERM", { exit: false, close: false });
+  expect(exits).toEqual([]);
+  expect(closed).toBe(false);
+});

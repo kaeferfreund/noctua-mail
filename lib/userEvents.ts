@@ -38,6 +38,8 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
         queue(async () => { await send({ type: "mailboxes-changed" }); });
         schedule(accountId);
       });
+      // Registration can synchronously stop this stream during shutdown.
+      if (stopped) return;
       const onAbort = () => authStream.close();
       cancel = onAbort;
       request.signal.addEventListener("abort", onAbort, { once: true });

@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 
 // Next owns server.js's config serialization; replace only its HTTP lifecycle entrypoint.
+// This checks import drift only, not Next ABI/lifecycle compatibility; run both shutdown probes on upgrades.
 const file = ".next/standalone/server.js";
 const source = await readFile(file, "utf8");
 const expected = "require('next/dist/server/lib/start-server')";
