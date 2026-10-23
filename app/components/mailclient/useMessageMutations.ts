@@ -1,7 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type React from "react";
-import { buildAccountMessageActionPath, buildAccountMessagesActionPath } from "@/lib/accountApiPaths";
-import type { Message } from "@/lib/data";
+import { buildAccountFoldersPath, buildAccountMessageActionPath, buildAccountMessagesActionPath } from "@/lib/accountApiPaths";
+import type { Folder, Message } from "@/lib/data";
 import { applyFlagsToMessage, isFlaggedMessage, hasTodoFlag, hasDoneFlag, getUnsubscribeCapability } from "./utils/messageHelpers";
 import {
   computeOptimisticMovedMessage,
@@ -9,6 +9,7 @@ import {
   resolveMoveViewTransition
 } from "./utils/messageMutation";
 import { TODO_FLAG, DONE_FLAG } from "@/lib/messageFlags";
+import { applyFolderStreamUpdates } from "./folderStreamUpdates";
 import { NOTICE_TIMEOUTS } from "./constants";
 import type { UndoMoveTarget } from "./useMessageMoveActions";
 
@@ -80,6 +81,9 @@ export function useMessageMutations({
   updateThreadCacheWithCategory,
   queueFilteredSearchRefresh
 }: UseMessageMutationsProps) {
+  const folderRefreshGeneration = useRef(0);
+  useEffect(() => () => { folderRefreshGeneration.current += 1; }, [activeAccountId]);
+
   const reconcileMessageFlags = useCallback((
     message: Message,
     flags: string[],
@@ -440,36 +444,35 @@ export function useMessageMutations({
     setPendingMessageActions
   ]);
 
-  // The per-folder unread count tracks `seen`. Some mutations toggle that
-  // flag indirectly (e.g. `answered: true` also sets `\Seen` server-side via
-  // buildFlagMutations), so we always check the seen transition rather than
-  // gating on the requested flag. Cross-folder selections aggregate per
-  // folderId before the single setFolders update.
+  // A folder:update can arrive before the mutation response. Never add a
+  // local delta to that absolute count: read committed folder counts after a
+  // seen transition instead, also covering answered/bulk and watcher-off mode.
   const applyFlagsResults = useCallback((
     pairs: Array<{ message: Message; nextFlags: string[] }>,
     source: string
   ) => {
-    const unreadDeltaByFolderId = new Map<string, number>();
+    const changedFolders = new Set<string>();
     for (const { message, nextFlags } of pairs) {
       const updatedMessage = reconcileMessageFlags(message, nextFlags, source);
-      const previousSeen = Boolean(message.seen);
-      const nextSeen = Boolean(updatedMessage.seen);
-      if (previousSeen === nextSeen) continue;
-      const delta = previousSeen ? 1 : -1;
-      unreadDeltaByFolderId.set(
-        message.folderId,
-        (unreadDeltaByFolderId.get(message.folderId) ?? 0) + delta
-      );
+      if (Boolean(message.seen) !== Boolean(updatedMessage.seen)) changedFolders.add(message.folderId);
     }
-    if (unreadDeltaByFolderId.size === 0) return;
-    setFolders((prev) =>
-      prev.map((f) => {
-        const delta = unreadDeltaByFolderId.get(f.id);
-        if (!delta) return f;
-        return { ...f, unreadCount: Math.max(0, (f.unreadCount ?? 0) + delta) };
-      })
-    );
-  }, [reconcileMessageFlags, setFolders]);
+    if (changedFolders.size === 0) return;
+    const generation = ++folderRefreshGeneration.current;
+    void (async () => {
+      try {
+        const response = await apiFetch(buildAccountFoldersPath(activeAccountId));
+        if (!response.ok) { await reportResponseError(response); return; }
+        const folders = await response.json() as Folder[];
+        if (generation !== folderRefreshGeneration.current) return;
+        const updates = folders.map(folder => ({
+          id: folder.id, unseen: folder.unreadCount, exists: folder.count
+        }));
+        setFolders(previous => applyFolderStreamUpdates(previous, updates));
+      } catch {
+        reportError("Failed to refresh folders.");
+      }
+    })();
+  }, [activeAccountId, apiFetch, reconcileMessageFlags, reportError, reportResponseError, setFolders]);
 
   const updateFlagState = useCallback(async (
     message: Message,
