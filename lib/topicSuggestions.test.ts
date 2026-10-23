@@ -1574,4 +1574,127 @@ describe("topic suggestions", () => {
     expect(late[0]?.suggestionScore).toBe(2);
     expect(late[0]?.matchCount).toBe(1);
   });
+
+  test("batched suggestions without topics in the mailbox skip the thread-signal read", async () => {
+    const accountId = uniqueAccountId("acc-topic-suggestions-no-topics");
+    const folder = buildFolder(accountId);
+    const { saveFoldersForAccount, upsertAccount, upsertMessages, withAccountDb } = await dbModulePromise;
+
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+    await upsertMessages(
+      accountId,
+      folder.id,
+      [
+        buildMessage({
+          id: "msg-no-topics",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-no-topics",
+          messageId: "<no-topics@example.com>",
+          from: "Vendor <vendor@vendor.example>",
+          fromEmail: "vendor@vendor.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 14, 0, 0)
+        }),
+        buildMessage({
+          id: "msg-vendor-history",
+          accountId,
+          folderId: folder.id,
+          threadId: "thread-vendor-history",
+          messageId: "<vendor-history@example.com>",
+          from: "Vendor <vendor@vendor.example>",
+          fromEmail: "vendor@vendor.example",
+          to: "owner@example.com",
+          dateValue: Date.UTC(2026, 2, 18, 13, 0, 0)
+        })
+      ],
+      true,
+      { recomputeThreads: false }
+    );
+
+    const statements: string[] = [];
+    const empty = await withAccountDb(accountId, async (db) => {
+      const prepare = db.prepare;
+      db.prepare = ((sql: string) => {
+        statements.push(sql);
+        return prepare.call(db, sql);
+      }) as typeof db.prepare;
+      try {
+        return await getTopicSuggestionsForThreads(accountId, ["thread-no-topics"], {
+          accountEmail: "owner@example.com"
+        });
+      } finally {
+        db.prepare = prepare;
+      }
+    });
+    expect(empty.size).toBe(0);
+    expect(statements.some((sql) => sql.includes("thread_signals"))).toBe(false);
+
+    // Nothing is remembered across calls: a topic created afterwards is used by the next call.
+    const topic = await createTopic(accountId, "Vendor", "blue");
+    await setThreadTopics(accountId, "thread-vendor-history", [topic.id]);
+    const next = await getTopicSuggestionsForThreads(accountId, ["thread-no-topics"], {
+      accountEmail: "owner@example.com"
+    });
+    expect((next.get("thread-no-topics") ?? []).map((item) => item.name)).toEqual(["Vendor"]);
+  });
+
+  test("batched suggestions for threads with identical signals match per-thread results", async () => {
+    const accountId = uniqueAccountId("acc-topic-suggestions-shared-signals");
+    const folder = buildFolder(accountId);
+    const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
+
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+    const fromVendor = (id: string, threadId: string, minute: number, from = "Vendor <vendor@vendor.example>") =>
+      buildMessage({
+        id,
+        accountId,
+        folderId: folder.id,
+        threadId,
+        messageId: `<${id}@example.com>`,
+        from,
+        fromEmail: from.replace(/^.*<|>$/g, ""),
+        to: "owner@example.com, alias@example.com",
+        dateValue: Date.UTC(2026, 2, 18, 15, minute, 0)
+      });
+    await upsertMessages(
+      accountId,
+      folder.id,
+      [
+        fromVendor("msg-shared-history", "thread-shared-history", 0),
+        fromVendor("msg-shared-learning", "thread-shared-learning", 1),
+        fromVendor("msg-shared-a", "thread-shared-a", 2),
+        fromVendor("msg-shared-b", "thread-shared-b", 3),
+        fromVendor("msg-shared-alias", "thread-shared-alias", 4, "Me <alias@example.com>"),
+        fromVendor("msg-shared-free", "thread-shared-free", 5, "Someone <someone@gmail.com>")
+      ],
+      true,
+      { recomputeThreads: false }
+    );
+    const vendor = await createTopic(accountId, "Vendor", "blue");
+    const other = await createTopic(accountId, "Other", "red");
+    await setThreadTopics(accountId, "thread-shared-history", [vendor.id]);
+    // A learning thread on the page: its own history must stay excluded from its score.
+    await setThreadTopics(accountId, "thread-shared-learning", [other.id]);
+
+    const threadIds = [
+      "thread-shared-a",
+      "thread-shared-learning",
+      "thread-shared-b",
+      "thread-shared-alias",
+      "thread-shared-free"
+    ];
+    const accountEmail = ["owner@example.com", "alias@example.com"];
+    const batched = await getTopicSuggestionsForThreads(accountId, threadIds, { accountEmail });
+    for (const threadId of threadIds) {
+      const single = await getTopicSuggestionsForThread(accountId, threadId, { accountEmail });
+      expect(batched.get(threadId) ?? []).toEqual(single);
+    }
+    expect((batched.get("thread-shared-a") ?? []).map((item) => item.name)).toEqual(["Other", "Vendor"]);
+    expect((batched.get("thread-shared-learning") ?? []).map((item) => item.name)).toEqual(["Vendor"]);
+    expect(batched.get("thread-shared-b")).not.toBe(batched.get("thread-shared-a"));
+    expect(batched.get("thread-shared-b")?.[0]).not.toBe(batched.get("thread-shared-a")?.[0]);
+  });
 });
