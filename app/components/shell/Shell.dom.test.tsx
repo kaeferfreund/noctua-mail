@@ -14,7 +14,9 @@ import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
 import ShellHeader, { ThemeToggle, type ShellHeaderProps } from "./ShellHeader";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
-import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
+import { getTranslator } from "@/lib/i18n/translator";
+import type { UiLocale } from "@/lib/i18n/config";
+import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS, VIRTUAL_FOLDERS, getVirtualFolderLabels } from "@/app/components/mailclient/useSearchState";
 
 const style = document.createElement("style");
 afterEach(() => {
@@ -36,7 +38,9 @@ function renderSidebar(
   accounts: ShellAccount[],
   onSwitch: (id: string) => void,
   onSync = () => {},
-  userOverrides: Partial<ShellSidebarProps["user"]> = {}
+  userOverrides: Partial<ShellSidebarProps["user"]> = {},
+  views: ShellSidebarProps["views"] = { inbox: null, collab: [], virtual: [] },
+  locale: UiLocale = "en"
 ) {
   const props: ShellSidebarProps = {
     brand: { buildVersionLabel: "" },
@@ -49,7 +53,7 @@ function renderSidebar(
       onShowThreadJson: () => {}, onEvictThreadCache: () => {}, onLogout: () => {},
       ...userOverrides
     },
-    views: { inbox: null, collab: [], virtual: [] },
+    views,
     topics: { topics: [], activeTopicId: null, onTopicClick: () => {} },
     folders: {
       accountFolderCount: 0, isRecomputingThreads: false, isRecomputingCategories: false,
@@ -62,7 +66,7 @@ function renderSidebar(
       handleDeleteFolderItem: async () => {}, folderSpecialIcon: () => null
     }
   };
-  return render(<Theme><SidebarProvider><ShellSidebar {...props} /></SidebarProvider></Theme>);
+  return render(<I18nTestProvider locale={locale}><Theme><SidebarProvider><ShellSidebar {...props} /></SidebarProvider></Theme></I18nTestProvider>);
 }
 
 describe("shell sidebar", () => {
@@ -266,4 +270,29 @@ describe("saved shell hydration", () => {
       container.remove(); error.mockRestore();
     }
   });
+});
+
+for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views and descriptions in ${locale}, selecting stable IDs`, () => {
+  const t = getTranslator(locale);
+  const selected: string[] = [];
+  const rows = VIRTUAL_FOLDERS.map(folder => ({
+    ...folder, ...getVirtualFolderLabels(folder, key => t(`Views.${key}`)),
+    active: false, icon: null, count: 3,
+    onSelect: () => selected.push(folder.id)
+  }));
+  const inbox = { id: "folder:synthetic-inbox", name: t("Views.inbox.name"), description: t("Views.inbox.description"), active: true, icon: null, onSelect: () => selected.push("folder:synthetic-inbox") };
+  const page = renderSidebar([], () => {}, () => {}, {}, { inbox, collab: rows.slice(0, 3), virtual: rows.slice(3) }, locale);
+  const buttons = [...page.container.querySelectorAll<HTMLButtonElement>("[data-view-id]")];
+  expect(buttons.map(button => button.textContent)).toEqual(locale === "de"
+    ? ["Posteingang", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Fokus", "Aufgaben", "Einladungen"]
+    : ["Inbox", "Assigned to me", "Unassigned", "Open", "Focused", "Action Queue", "Invite Deck"]);
+  expect(page.getByText(locale === "de" ? "Ansichten" : "Views")).toBeTruthy();
+  expect(page.getByPlaceholderText(locale === "de" ? "Ordner suchen" : "Search folders")).toBeTruthy();
+  expect(page.getByText(locale === "de" ? "0 insgesamt" : "0 total")).toBeTruthy();
+  for (const button of buttons) {
+    expect(button.title).not.toContain("undefined");
+    expect(button.title).toContain(": ");
+    fireEvent.click(button);
+  }
+  expect(selected).toEqual([inbox.id, ...VIRTUAL_FOLDERS.map(folder => folder.id)]);
 });
