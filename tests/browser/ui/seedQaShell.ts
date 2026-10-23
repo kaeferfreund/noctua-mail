@@ -5,6 +5,8 @@ import {insertUserAccountLinkRow} from '../../../lib/db/users';
 import {withAuthProof} from '../../../lib/authPolicyContext';
 import {totpFromUri} from '../../helpers/totp';
 if (!process.env.QA_SHELL_SEED_FILE || !process.env.NOCTUA_DATA_DIR?.startsWith(`${process.cwd()}/.tmp/qa-shell-`)) throw new Error('Isolated QA shell storage required');
+const imapPort=Number(process.env.QA_SHELL_IMAP_PORT), smtpPort=Number(process.env.QA_SHELL_SMTP_PORT);
+if (![imapPort,smtpPort].every(port=>Number.isInteger(port)&&port>0&&port<=65535)) throw new Error('Assigned QA fixture ports required');
 const db=await getDb(), auth=await getAuth();
 const seeds=[];
 for(const [email,role] of [['alex@example.test','admin'],['jo@example.test','user']] as const){
@@ -22,7 +24,7 @@ for(const [email,role] of [['alex@example.test','admin'],['jo@example.test','use
  await auth.api.signOut({headers:headers()});
  seeds.push({email,password,totpURI:seed.totpURI,id:result.user.id});
 }
-const account={id:'qa-shared',email:'demo@monkeydent.test',name:'QA Shared',avatar:'',ownerUserId:seeds[0].id,imap:{host:'127.0.0.1',port:3857,secure:false,user:'demo@monkeydent.test',password:'demo'},smtp:{host:'127.0.0.1',port:3858,secure:false,user:'demo@monkeydent.test',password:'demo'}};
+const account={id:'qa-shared',email:'demo@monkeydent.test',name:'QA Shared',avatar:'',ownerUserId:seeds[0].id,imap:{host:'127.0.0.1',port:imapPort,secure:false,user:'demo@monkeydent.test',password:'demo'},smtp:{host:'127.0.0.1',port:smtpPort,secure:false,user:'demo@monkeydent.test',password:'demo'}};
 persistAccountRow(db,account);
 insertUserAccountLinkRow(db,seeds[0].id,account.id,'manager');
 await Bun.write(process.env.QA_SHELL_SEED_FILE,JSON.stringify(seeds));closeAllDbConnections();
