@@ -104,6 +104,7 @@ type DeleteAssociationLookupResponse = {
 };
 
 type UseMessageDeleteActionsOptions = {
+  continueAfterRemoval?: (removedIds: string[]) => void;
   activeAccountId: string;
   activeMessageId: string;
   supportsThreads: boolean;
@@ -146,6 +147,7 @@ type UseMessageDeleteActionsOptions = {
 };
 
 export function useMessageDeleteActions({
+  continueAfterRemoval,
   activeAccountId,
   activeMessageId,
   supportsThreads,
@@ -644,7 +646,9 @@ export function useMessageDeleteActions({
           permanentlyDeletedCount += deletedIds.length;
           removedIds.push(...deletedIds);
         }
-        if (activeWasDeleted) {
+        if (continueAfterRemoval && removedIds.includes(activeMessageId)) {
+          continueAfterRemoval(removedIds);
+        } else if (activeWasDeleted) {
           if (nextActiveId) {
             const nextActiveMessage = messages.find((m) => m.id === nextActiveId) ?? null;
             setActiveMessageId(nextActiveId);
@@ -679,6 +683,8 @@ export function useMessageDeleteActions({
       }
     },
     [
+      activeMessageId,
+      continueAfterRemoval,
       clearSelectionState,
       deleteMessagesPermanently,
       findTrashFolderId,

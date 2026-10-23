@@ -15,6 +15,7 @@ import { NOTICE_TIMEOUTS } from "./constants";
 import type { UndoMoveTarget } from "./useMessageMoveActions";
 
 type UseMessageMutationsProps = {
+  continueAfterRemoval?: (removedIds: string[]) => void;
   activeAccountId: string;
   searchScope: "folder" | "all";
   viewMessage: Message | null;
@@ -59,6 +60,7 @@ type MoveReconcileParams = {
 };
 
 export function useMessageMutations({
+  continueAfterRemoval,
   activeAccountId,
   searchScope,
   viewMessage,
@@ -213,8 +215,8 @@ export function useMessageMutations({
       shouldKeepMessageInCurrentResults
     );
     if (transition.kind === "clear") {
-      setViewMessage(null);
-      setActiveMessageId("");
+      if (continueAfterRemoval) continueAfterRemoval([message.id]);
+      else { setViewMessage(null); setActiveMessageId(""); }
     } else if (transition.kind === "retarget") {
       setViewMessage(transition.nextViewMessage);
       setActiveMessageId(transition.nextActiveMessageId);
@@ -237,6 +239,7 @@ export function useMessageMutations({
     });
   }, [
     activeAccountId,
+    continueAfterRemoval,
     evictMessageCaches,
     pushNotice,
     searchScope,

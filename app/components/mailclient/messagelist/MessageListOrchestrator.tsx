@@ -1,6 +1,8 @@
+import { nextMessageAfterRemoval } from "./successfulRemoval";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
   useImperativeHandle,
@@ -177,6 +179,7 @@ export type MessageListOrchestratorMutationInputs = {
   threadScopeMessages: Message[];
   visibleMessages: VisibleMessageEntry[];
   sortedMessages: Message[];
+  navigationRows?: Message[];
   collapsedThreads: Record<string, boolean>;
   hasFilteredSearchCriteria: boolean;
   viewMessage: Message | null;
@@ -319,6 +322,20 @@ export default function MessageListOrchestrator({
     lastSelectedIdRef
   );
 
+  // Both row actions and reader actions use the renderer's unique navigation order.
+  const continueAfterRemoval = useCallback((removedIds: string[]) => {
+    const removed = new Set(removedIds);
+    if (!removed.has(mutationInputs.activeMessageId)) return;
+    const next = nextMessageAfterRemoval(
+      mutationInputs.navigationRows ?? mutationInputs.visibleMessages.map(item => item.message), removed
+    );
+    mutationInputs.setActiveMessageId(next?.id ?? "");
+    mutationInputs.setViewMessage(next);
+    if (next) selectionStore.setSelection(new Set([next.id]), next.id);
+    else selectionStore.clearSelection();
+    lastSelectedIdRef.current = next?.id ?? null;
+  }, [mutationInputs, selectionStore]);
+
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
@@ -351,6 +368,7 @@ export default function MessageListOrchestrator({
   });
 
   const { handleDeleteMessage, handleDeleteMessagesByIds } = useMessageDeleteActions({
+    continueAfterRemoval,
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
     supportsThreads: mutationInputs.supportsThreads,
@@ -408,6 +426,7 @@ export default function MessageListOrchestrator({
     toggleTodoFlag,
     toggleFlaggedFlag
   } = useMessageMutations({
+    continueAfterRemoval,
     activeAccountId: mutationInputs.activeAccountId,
     searchScope: mutationInputs.searchScope,
     viewMessage: mutationInputs.viewMessage,
