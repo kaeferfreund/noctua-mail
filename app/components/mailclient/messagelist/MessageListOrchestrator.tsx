@@ -1,9 +1,12 @@
+import { nextMessageAfterRemoval } from "./successfulRemoval";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -177,6 +180,7 @@ export type MessageListOrchestratorMutationInputs = {
   threadScopeMessages: Message[];
   visibleMessages: VisibleMessageEntry[];
   sortedMessages: Message[];
+  navigationRows?: Message[];
   collapsedThreads: Record<string, boolean>;
   hasFilteredSearchCriteria: boolean;
   viewMessage: Message | null;
@@ -319,6 +323,25 @@ export default function MessageListOrchestrator({
     lastSelectedIdRef
   );
 
+  const removalInputsRef = useRef(mutationInputs);
+  useLayoutEffect(() => { removalInputsRef.current = mutationInputs; }, [mutationInputs]);
+
+  // Both row actions and reader actions use the renderer's unique navigation order.
+  const continueAfterRemoval = useCallback((removedIds: string[], navigationRows?: Message[]) => {
+    const current = removalInputsRef.current;
+    const removed = new Set(removedIds);
+    if (!removed.has(current.activeMessageId) && !removed.has(current.viewMessage?.id ?? "")) return false;
+    const next = nextMessageAfterRemoval(
+      navigationRows ?? current.navigationRows ?? current.visibleMessages.map(item => item.message), removed
+    );
+    current.setActiveMessageId(next?.id ?? "");
+    current.setViewMessage(next);
+    if (next) selectionStore.setSelection(new Set([next.id]), next.id);
+    else selectionStore.clearSelection();
+    lastSelectedIdRef.current = next?.id ?? null;
+    return true;
+  }, [selectionStore]);
+
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
@@ -351,6 +374,8 @@ export default function MessageListOrchestrator({
   });
 
   const { handleDeleteMessage, handleDeleteMessagesByIds } = useMessageDeleteActions({
+    continueAfterRemoval,
+    navigationRows: mutationInputs.navigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
     supportsThreads: mutationInputs.supportsThreads,
@@ -408,6 +433,8 @@ export default function MessageListOrchestrator({
     toggleTodoFlag,
     toggleFlaggedFlag
   } = useMessageMutations({
+    continueAfterRemoval,
+    navigationRows: mutationInputs.navigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     searchScope: mutationInputs.searchScope,
     viewMessage: mutationInputs.viewMessage,

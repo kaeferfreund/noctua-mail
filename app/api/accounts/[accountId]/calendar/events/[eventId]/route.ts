@@ -151,7 +151,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
+  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
   const { searchParams } = new URL(request.url);
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;

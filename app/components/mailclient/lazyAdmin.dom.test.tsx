@@ -196,9 +196,13 @@ if (!scenario) {
       if (scenario === "cancel warm-up on role change") {
         expect(idleTasks.size).toBe(2);
         role = "user";
-        fireEvent.click(view.getByRole("button", { name: "Retry" }));
-        await waitFor(() => expect(view.queryByRole("button", { name: "Admin" })).toBeNull());
-        await waitFor(() => expect(idleTasks.size).toBe(1));
+        // The retry resolves identity asynchronously; flush its passive effects
+        // before checking cancellation, rather than only observing gate markup.
+        await act(async () => { fireEvent.click(view.getByRole("button", { name: "Retry" })); });
+        await waitFor(() => {
+          expect(view.queryByRole("button", { name: "Admin" })).toBeNull();
+          expect(idleTasks.size).toBe(1);
+        });
       }
       if (scenario.startsWith("non-admin") || scenario === "cancel warm-up on role change") {
         expect(view.queryByRole("button", { name: "Admin" })).toBeNull();
