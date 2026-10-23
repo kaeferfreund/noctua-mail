@@ -5,7 +5,9 @@ On desktop (at least 768 px), `MailClient` supplies a device-only `readerLayout`
 reader. Focus hides the list and its splitter; the reader fills that space while
 the folder sidebar and optional calendar remain available. Both mail panes stay
 mounted: the list selection, virtualization and splitter widths survive. Back
-restores the list scroll position and focuses the selected row without scrolling.
+restores the list scroll position and focuses the selected row without scrolling;
+if virtualization has removed that row, the list container receives focus. Every
+split-to-focus entry, including a saved-preference single click, focuses Back.
 Below 768 px, the existing single-pane view and history remain derived from
 `viewMessage` (TEAM-INBOX D11). Focus controls and shortcuts do not run there.
 
@@ -32,12 +34,18 @@ thread rows on unloaded pages. Reaching a page boundary requests the next page
 through the existing data controller, waits for the renderer's new rows, and
 continues. Pages entirely hidden by collapsed groups are skipped. A folder
 change, load error, changed selection or leaving focus cancels pending navigation.
-Delete / Entf retains the existing selection-action and successor behavior.
+Archive and Delete / Entf share successful-removal continuation: next rendered
+row, otherwise previous, otherwise back to the list. Failed commands retain the
+current message. Shortcuts appear in the applicable controls’ tooltips. The
+localized toolbar group and live counter expose a descriptive accessible position.
 
 The focus toolbar reuses the list orchestrator's archive, spam, delete, move,
 topic, flag and message-menu handlers, and the existing detached-window opener.
 Mark done/undone uses the existing keyword mutations. Printing calls
-`window.print()` with print CSS restricted to the reader. The existing thread
+`window.print()` with print CSS restricted to explicitly marked mail headers and
+message content. Unsent composers, notes, activity, collaboration controls and
+action chrome are excluded. Floating notices measure the visible reader in focus
+(including with a collapsed sidebar) and the list in split. The existing thread
 reader continues to supply subject, sender, mailbox/folder badges, date, replies,
 remote-content controls and collaboration bar.
 
@@ -101,7 +109,7 @@ A failed page blocks only the unloaded next boundary until the existing folder
 refresh clears the error. Already loaded rows stay navigable; another next click
 must never increment past a page that failed to load.
 
-Final reader-focus gates on the dedicated worktree: frozen install and unchanged
+Initial reader-focus gates (before the R2 fixes) on the dedicated worktree: frozen install and unchanged
 `bun.lock`; typecheck zero errors; the two new DOM suites repeated three times
 (45 passes, zero failures); complete `test:ci` (2,804 server tests / 304 files /
 15,327 assertions, 477 DOM tests / 60 files / 2,748 assertions, zero failures).
@@ -120,3 +128,8 @@ The final focused stress command (`test:stress` with `bunfig.dom.toml`, the two
 reader suites and the isolated lazy-admin suite) passes 72 tests with 225
 assertions, seed 1337 and three repetitions; zero failures. The final browser
 screenshots clear incidental text selection before capture.
+
+R2 adds real archive HTTP checks from both a row menu and the focus toolbar,
+archive-to-next continuation, a collapsed-sidebar delete/Undo check, saved-
+preference keyboard focus, and a print screenshot/PDF with a typed private draft.
+The R2 gate logs and report live outside product history under `../briefs/`.

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { signInQa } from "./qaRound2Session";
+import { signInQa, recordQa } from "./qaRound2Session";
 
 test.use({ locale: "en-GB" });
 const evidence = process.env.READER_FOCUS_EVIDENCE_DIR ?? "../briefs/reader-focus-evidence";
@@ -81,6 +81,7 @@ test("reader focus: Enter, toggles, j/k, sidebar reset, persistence, print and e
   await page.locator('[data-slot="sidebar"]').getByRole("button", { name: /Inbox/, exact: true }).first().click();
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
   await rows(page).first().click(); await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+  await expect(toolbar(page).getByRole("button", { name: "Back to messages", exact: true })).toBeFocused();
   await page.evaluate(() => { window.print = () => { document.body.dataset.readerPrinted = "yes"; }; });
   await toolbar(page).getByRole("button", { name: "Print message", exact: true }).click();
   expect(await page.locator("body").getAttribute("data-reader-printed")).toBe("yes");
@@ -119,4 +120,87 @@ test("reader focus: 390px keeps the existing single-pane reader and mobile back 
   await expect(panes(page)).toHaveAttribute("data-mobile-view", "list");
   await expect(rows(page).first()).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("noctua:readerLayout"))).toBe("focus");
+});
+
+test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable", async ({ page }) => {
+  await start(page);
+  const deletedId = await rows(page).first().getAttribute("data-message-id");
+  const nextId = await rows(page).nth(1).getAttribute("data-message-id");
+  await rows(page).first().dblclick();
+  await page.locator('[data-shell-action="toggle-sidebar"]').click();
+  await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute("data-state", "collapsed");
+  await toolbar(page).getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Move to Trash", exact: true }).click();
+  const undo = page.locator(".inapp-notice-stack-pane").getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toBeVisible();
+  await expect(undo).toBeInViewport({ ratio: 1 });
+  await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+  await expect(page.locator('[data-message-list-row="true"][data-active="true"]')).toHaveAttribute("data-message-id", nextId!);
+  recordQa("reader-focus-delete-notice", { deletedId, nextId, undo: await undo.boundingBox(), stack: await page.locator(".inapp-notice-stack-pane").boundingBox() });
+  await screenshot(page, "delete-visible-undo.png");
+  await undo.click();
+  await expect(page.getByText("1 message restored", { exact: true }).first()).toBeVisible();
+});
+
+test("reader focus: archive row action and toolbar use real HTTP and continue to the next rendered message", async ({ page }) => {
+  await start(page);
+  for (const surface of ["row", "toolbar"] as const) {
+    const target = rows(page).first();
+    const id = (await target.getAttribute("data-message-id"))!;
+    const original = await page.request.get(`/api/accounts/qa-shared/messages/${encodeURIComponent(id)}`);
+    expect(original.status()).toBe(200);
+    const before = (await original.json()).message;
+    const nextId = await rows(page).nth(1).getAttribute("data-message-id");
+    const responseReady = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith(`/${encodeURIComponent(id)}/archive`));
+    if (surface === "row") {
+      await target.getByRole("button", { name: "Message actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
+    } else {
+      await target.dblclick();
+      await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+      await toolbar(page).getByRole("button", { name: "Archive", exact: true }).click();
+    }
+    const response = await responseReady;
+    expect(response.status()).toBe(200);
+    expect(response.request().headers()["content-type"]).toBe("application/json");
+    expect(response.request().postDataJSON()).toEqual({});
+    const result = await response.json();
+    expect(result.action).toBe("moved");
+    const moved = await page.request.get(`/api/accounts/qa-shared/messages/${encodeURIComponent(result.messageId ?? id)}`);
+    expect(moved.status()).toBe(200);
+    const after = (await moved.json()).message;
+    expect(after.folderId).toBe(result.archiveFolderId);
+    expect(after.folderId).not.toBe(before.folderId);
+    await expect(page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`)).toHaveCount(0);
+    recordQa(`reader-focus-archive-${surface}`, { status: response.status(), id, result, from: before.folderId, to: after.folderId, nextId });
+    if (surface === "toolbar") {
+      await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+      await expect(page.locator('[data-message-list-row="true"][data-active="true"]')).toHaveAttribute("data-message-id", nextId!);
+      await expect(toolbar(page).locator('[data-reader-position]')).toHaveText(/^1 \/ \d+\+?$/);
+      await screenshot(page, "archive-next-focus.png");
+    }
+  }
+});
+
+test("reader focus: real print PDF excludes an unsent inline reply and internal controls", async ({ page }) => {
+  await start(page);
+  await rows(page).first().dblclick();
+  await expect(page.locator('[data-reader-print]').getByText("Synthetic QA round two message.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+  const draft = page.locator('[data-reader-print] textarea').first();
+  const privateText = "UNSENT SYNTHETIC PRIVATE DRAFT example.test";
+  await draft.fill(privateText);
+  await expect(draft).toHaveValue(privateText);
+  await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  await expect(draft).toBeHidden();
+  await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeHidden();
+  await expect(toolbar(page)).toBeHidden();
+  await expect(page.locator('[data-reader-print]').getByText("Synthetic QA round two message.", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-reader-print]').getByRole("button", { name: "Reply", exact: true }).first()).toBeHidden();
+  await screenshot(page, "reply-print-private-excluded.png");
+  await page.pdf({ path: path.join(evidence, "reply-print-private-excluded.pdf"), format: "A4", printBackground: true });
+  recordQa("reader-focus-print", { privateText, draftHidden: await draft.isHidden(), printableZones: await page.locator('[data-mail-print]').count() });
+  await page.emulateMedia({ media: "screen" });
+  await expect(draft).toHaveValue(privateText);
 });
