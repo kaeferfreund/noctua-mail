@@ -156,6 +156,31 @@ test("every focus entry places focus on Back; exit restores scroll with a virtua
   expect(document.activeElement).toBe(view.getByText("Synthetic row"));
 });
 
+test("exit focuses the reader's message row, also when the reader closes in the same commit", async () => {
+  function Harness({ focused, readerId }: { focused: boolean; readerId: string }) {
+    const list = useRef<HTMLDivElement>(null), savedScroll = useRef<number | null>(null);
+    useReaderFocusPlacement(focused, readerId, list, savedScroll);
+    return <><div ref={list} tabIndex={-1} data-testid="focus-list">
+      <button data-message-id="first">First row</button><button data-message-id="second">Second row</button>
+    </div>{focused && <div data-reader-toolbar=""><button>Back</button></div>}</>;
+  }
+  const frame = () => act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  const view = render(<Harness focused={false} readerId="first" />);
+  // Opening the second message and leaving at once targets that message, not an
+  // earlier selection.
+  view.rerender(<Harness focused readerId="second" />);
+  await frame();
+  expect(document.activeElement).toBe(view.getByText("Back"));
+  view.rerender(<Harness focused={false} readerId="second" />);
+  await frame();
+  expect(document.activeElement).toBe(view.getByText("Second row"));
+  view.rerender(<Harness focused readerId="first" />);
+  await frame();
+  view.rerender(<Harness focused={false} readerId="" />);
+  await frame();
+  expect(document.activeElement).toBe(view.getByText("First row"));
+});
+
 test("focus dropped by a disabled or removed control returns to Back while focused", async () => {
   function Harness({ busy, notice }: { busy: boolean; notice: boolean }) {
     const list = useRef<HTMLDivElement>(null), savedScroll = useRef<number | null>(null);
