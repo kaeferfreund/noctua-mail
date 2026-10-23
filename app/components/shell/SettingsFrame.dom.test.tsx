@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "bun:test";
 import { useState } from "react";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import SettingsFrame, { SettingsTitle } from "./SettingsFrame";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";

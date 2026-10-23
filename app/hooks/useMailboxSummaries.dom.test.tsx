@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
 import { MailboxRows, ViewRow } from "@/app/components/shell/ShellSidebar";
