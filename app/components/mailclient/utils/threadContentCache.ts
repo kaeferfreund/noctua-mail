@@ -8,6 +8,7 @@
  */
 import type { Message } from "@/lib/data";
 import { applyFlagsToMessage } from "./messageHelpers";
+import { isMessageContentUnloaded } from "@/lib/ui/messageView";
 
 export type ThreadContentMap = Record<string, Message[]>;
 
@@ -15,14 +16,14 @@ export type ThreadContentMap = Record<string, Message[]>;
  * Insert or replace a thread's message list while maintaining LRU eviction.
  * Returns the next map together with the next recency order.
  */
-export function upsertThreadInCache(
-  prev: ThreadContentMap,
+export function upsertThreadInCache<T = Message[]>(
+  prev: Record<string, T>,
   order: string[],
   threadId: string,
-  items: Message[],
+  items: T,
   limit: number
-): { next: ThreadContentMap; order: string[] } {
-  const next: ThreadContentMap = { ...prev, [threadId]: items };
+): { next: Record<string, T>; order: string[] } {
+  const next: Record<string, T> = { ...prev, [threadId]: items };
   const nextOrder = order.filter((id) => id !== threadId);
   nextOrder.push(threadId);
   while (nextOrder.length > limit) {
@@ -138,4 +139,52 @@ export function updateThreadCacheMapWithCategory(
     changed = true;
   });
   return changed ? next : prev;
+}
+
+/**
+ * Merge a page of window headers into a cached thread. Rows already cached
+ * keep their identity unless the page carries a newer copy.
+ */
+export function mergeThreadWindowItems(cached: Message[] | undefined, page: Message[]) {
+  if (!cached || cached.length === 0) return page;
+  const byId = new Map(cached.map((item) => [item.id, item]));
+  page.forEach((item) => byId.set(item.id, { ...item, groupKey: byId.get(item.id)?.groupKey ?? item.groupKey }));
+  return Array.from(byId.values()).sort(
+    (a, b) => a.dateValue - b.dateValue || a.id.localeCompare(b.id)
+  );
+}
+
+/**
+ * Overlay a separately loaded body (message detail payload) onto a header row.
+ * Header fields stay authoritative; only content and fields the header lacks
+ * come from the detail. A header that already carries content wins. Stale
+ * bodies are dropped by evicting the thread (draft saved, resync).
+ */
+export function withLoadedMessageBody(base: Message, detail?: Message | null): Message {
+  if (!detail || detail.id !== base.id) return base;
+  if (!isMessageContentUnloaded(base)) return base;
+  const merged = { ...detail } as Record<string, unknown>;
+  Object.entries(base).forEach(([key, value]) => {
+    if (value !== undefined) merged[key] = value;
+  });
+  const message = merged as Message;
+  message.body = detail.body;
+  message.htmlBody = detail.htmlBody;
+  message.contentState = detail.contentState;
+  message.hasSource = detail.hasSource;
+  // List rows carry an empty attachment placeholder; header rows carry the real list.
+  if (base.contentState === undefined) message.attachments = detail.attachments ?? base.attachments;
+  return message;
+}
+
+const loadedBodyOverlays = new WeakMap<Message, { detail: Message; merged: Message }>();
+
+/** `withLoadedMessageBody` that returns the same object while header and body are unchanged. */
+export function withLoadedMessageBodyMemo(base: Message, detail?: Message | null): Message {
+  if (!detail) return base;
+  const cached = loadedBodyOverlays.get(base);
+  if (cached?.detail === detail) return cached.merged;
+  const merged = withLoadedMessageBody(base, detail);
+  loadedBodyOverlays.set(base, { detail, merged });
+  return merged;
 }

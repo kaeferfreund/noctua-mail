@@ -18,6 +18,7 @@ import {
   listMessages,
   listRelatedMessages,
   listThreadMessages,
+  listThreadMessageWindow,
   listThreads
 } from "./db/messages";
 export {
@@ -35,8 +36,15 @@ export {
   listMessages,
   listRelatedMessages,
   listThreadMessages,
+  listThreadMessageWindow,
   listThreads
 };
+export {
+  ThreadWindowCursorError,
+  type ThreadMessageProjection,
+  type ThreadWindowInfo,
+  type ThreadWindowResult
+} from "./db/messages";
 
 export {
   deleteMessageByFolderUid,
