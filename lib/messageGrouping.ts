@@ -1,6 +1,5 @@
 import { displayDayNumber } from "./i18n/format";
 import type { Message } from "./data";
-import { resolveCurrentOrNextOccurrence } from "./reminderRecurrence";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -111,12 +110,10 @@ export function sortGroupsForGroupBy<T extends { key: string }>(groups: T[], gro
   });
 }
 
-export function buildInviteDeckGroupKeyFromEvent(
-  event: InviteDeckEventTiming,
-  nowMs = Date.now()
-) {
-  return resolveCurrentOrNextOccurrence(event, nowMs) ? "UPCOMING" : "PAST";
-}
+// The recurrence-backed variant lives in `inviteDeckGrouping.ts` (it needs
+// `rrule` via `reminderRecurrence`); re-exported here so existing
+// server-side importers keep resolving it from this module.
+export { buildInviteDeckGroupKeyFromEvent } from "./inviteDeckGrouping";
 
 export function buildInviteDeckGroupKeyFromBounds(
   event: InviteDeckEventBounds,
