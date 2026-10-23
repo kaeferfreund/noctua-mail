@@ -1,5 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
+import { folderIdBelongsToAccount, isAccountFolder } from "@/lib/folderAccount";
+
 import type { OwnAddressInput } from "@/lib/ownAddresses";
 
 import type React from "react";
@@ -153,6 +157,10 @@ export function useSyncController({
   inboxFolder,
   currentKeyRef
 }: UseSyncControllerParams) {
+  const tn = useTranslations("Notifications");
+  // Assign during render: async callbacks from the previous account can run before effects.
+  const currentAccountIdRef = useRef(activeAccountId);
+  currentAccountIdRef.current = activeAccountId;
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRecomputingThreads, setIsRecomputingThreads] = useState(false);
   const [isRecomputingCategories, setIsRecomputingCategories] = useState(false);
@@ -385,6 +393,10 @@ export function useSyncController({
   }, [accountFolders, confirmFullSyncStart]);
 
   const runSyncJob = async (payload: SyncJobRequest): Promise<SyncJobResult> => {
+    const requestAccountId = currentAccountIdRef.current;
+    if (payload.folderId != null && !folderIdBelongsToAccount(payload.accountId, payload.folderId)) {
+      throw new FullSyncDebugCancelledError("Folder does not belong to the sync account.", "folder_account_mismatch");
+    }
     const syncMode = payload.mode ?? (payload.fullSync ? "full" : "recent");
     console.info("[noctua][sync] sync requested", {
       triggerId: payload.triggerId ?? null,
@@ -397,6 +409,9 @@ export function useSyncController({
       backfillUidCount: payload.backfillUids?.length ?? 0
     });
     await requestFullSyncConfirmation(payload);
+    if (currentAccountIdRef.current !== requestAccountId) {
+      throw new FullSyncDebugCancelledError("Mailbox selection changed before sync started.", "mailbox_selection_changed");
+    }
 
     const {
       accountId,
@@ -439,8 +454,12 @@ export function useSyncController({
       if (isFullSyncDebugCancelledError(error)) {
         pushNotice({
           type: "warning",
-          title: "Full sync cancelled",
-          description: error.message,
+          title: tn("fullSyncCancelled"),
+          description: error.reasonCode === "mailbox_selection_changed"
+            ? tn("syncCancelledSelectionChanged")
+            : error.reasonCode === "folder_account_mismatch"
+              ? tn("folderAccountMismatch")
+              : tn("syncCancelledBeforeStart"),
           durationMs: 10000
         });
         return;
@@ -452,7 +471,7 @@ export function useSyncController({
       }
       reportError(error instanceof Error ? error.message : fallbackMessage);
     },
-    [notifyMailServerUnreachable, pushNotice, reportError]
+    [notifyMailServerUnreachable, pushNotice, reportError, tn]
   );
 
   const planNewSyncCandidates = async (
@@ -513,6 +532,8 @@ export function useSyncController({
     mode: SyncMode = "recent",
     options?: InternalSyncTriggerOptions
   ): Promise<SyncJobResult | null> => {
+    if (activeAccountId !== currentAccountIdRef.current ||
+        !folderIdBelongsToAccount(activeAccountId, folderId)) return null;
     const selectionKey = currentKeyRef.current;
     setSyncingFolders((prev) => new Set(prev).add(folderId));
     try {
@@ -600,6 +621,8 @@ export function useSyncController({
     mode: "new" | "repair" | "full" = "full",
     options?: SyncTriggerOptions
   ) => {
+    if (!activeAccountId || activeAccountId !== currentAccountIdRef.current) return;
+    if (folderId && !isAccountFolder(activeAccountId, folderId, accountFolders)) return;
     const selectionKey = currentKeyRef.current;
     const knownFolderIds = new Set(accountFolders.map((folder) => folder.id));
     const syncOptions: InternalSyncTriggerOptions = {
@@ -659,7 +682,9 @@ export function useSyncController({
         const accountList = await syncNewlyDetectedFolders(knownFolderIds, "full", syncOptions);
         const nextInbox = findInboxFolder(accountList, activeAccountId) ?? accountList[0];
         if (nextInbox) {
-          setActiveFolderId((prev: string) => prev || nextInbox.id);
+          if (currentAccountIdRef.current === activeAccountId) {
+            setActiveFolderId((prev: string) => folderIdBelongsToAccount(activeAccountId, prev) ? prev : nextInbox.id);
+          }
         }
         if (currentKeyRef.current === selectionKey) {
           await refreshMailboxData();
@@ -774,7 +799,7 @@ export function useSyncController({
   useEffect(() => {
     if (authState !== "ok") return;
     if (searchScope !== "folder") return;
-    if (!activeAccountId || !activeFolderId || activeVirtualFolderId) return;
+    if (!isAccountFolder(activeAccountId, activeFolderId, accountFolders) || activeVirtualFolderId) return;
     if (syncStateRef.current.isSyncing || syncStateRef.current.syncingFolders.has(activeFolderId)) {
       return;
     }
@@ -866,6 +891,7 @@ export function useSyncController({
     activeAccountId,
     activeFolderId,
     activeVirtualFolderId,
+    accountFolders,
     authState,
     searchScope,
     checkFolderConsistency,
@@ -924,7 +950,8 @@ export function useSyncController({
   // Stream / poll effect
   useEffect(() => {
     if (authState !== "ok") return;
-    if (!activeAccountId || !inboxMailboxPath) return;
+    if (!activeAccountId || !inboxMailboxPath ||
+        !isAccountFolder(activeAccountId, inboxFolder?.id, accountFolders)) return;
     let disposed = false;
     let streamReconnectTimer: number | null = null;
     let pollingIntervalMs: number | null = null;
@@ -1009,7 +1036,7 @@ export function useSyncController({
         | null
         | undefined
     ) => {
-      if (!items || items.length === 0) return;
+      if (disposed || !items || items.length === 0) return;
       const normalized = items.filter(
         (
           item
@@ -1036,7 +1063,7 @@ export function useSyncController({
       const uidsByFolder = new Map<string, number[]>();
       for (const item of externalItems) {
         const folderId = item.folderId ?? fallbackFolderId;
-        if (!folderId) continue;
+        if (!isAccountFolder(activeAccountId, folderId, accountFolders)) continue;
         const uids = uidsByFolder.get(folderId);
         if (uids) uids.push(item.uid);
         else uidsByFolder.set(folderId, [item.uid]);
@@ -1049,6 +1076,7 @@ export function useSyncController({
 
       const syncedMessages: SyncNotificationMessage[] = [];
       for (const fId of foldersToSync) {
+        if (disposed) return;
         // The stream/poll effect is intentionally long-lived; use the ref-backed
         // sync function so active-folder refreshes follow the latest list state.
         // The announced UIDs go along as an explicit fetch list: a plain "new"
@@ -1086,6 +1114,7 @@ export function useSyncController({
       let pollPath: string | undefined;
       try {
         const inboxFolderId = inboxFolderRef.current?.id;
+        if (!folderIdBelongsToAccount(activeAccountId, inboxFolderId)) return;
         const params = new URLSearchParams({
           mailbox: inboxMailboxPath
         });
@@ -1118,6 +1147,7 @@ export function useSyncController({
           });
           return;
         }
+        if (disposed) return;
         if (typeof data?.uidNext === "number" && inboxFolderId) {
           lastUidNextByFolderRef.current[inboxFolderId] = data.uidNext;
         }
@@ -1179,7 +1209,8 @@ export function useSyncController({
         },
         decision
       });
-      if (decision.kind !== "folder") return;
+      if (disposed || decision.kind !== "folder" ||
+          !isAccountFolder(activeAccountId, decision.folderId, accountFolders)) return;
       const now = Date.now();
       const { isSyncing: syncing, syncingFolders: syncingSet } = syncStateRef.current;
       const canRun = canRunFolderReconcile({
@@ -1210,7 +1241,7 @@ export function useSyncController({
         return;
       }
       const params = new URLSearchParams();
-      if (activeFolderId) {
+      if (isAccountFolder(activeAccountId, activeFolderId, accountFolders)) {
         params.set("activeFolderId", activeFolderId);
       }
       const source = new EventSource(buildAccountImapStreamPath(activeAccountId, params));
@@ -1378,7 +1409,7 @@ export function useSyncController({
     // Other values used inside (apiFetch, reportError, callbacks, etc.) are accessed via stable
     // refs or useCallback wrappers and should not re-trigger a full stream/poll reconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAccountId, activeFolderId, authState, inboxMailboxPath]);
+  }, [activeAccountId, activeFolderId, authState, inboxMailboxPath, inboxFolder?.id]);
 
   // Seed the new-mail notification dedup ring with externally-known keys
   // (e.g. RFC 5322 Message-IDs of messages we're about to restore via undo,

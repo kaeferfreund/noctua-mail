@@ -1,4 +1,4 @@
-import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
+import { authorizeOutbound, OutboundAuthorizationError, prepareOutboundAssertion } from "@/lib/outboundAuthorization";
 import { resolveSendIdentity, validateManagedReplyTo } from "@/lib/sendIdentity";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { collabActorFromSession } from "@/lib/threadCollab";
@@ -160,8 +160,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const messageId = buildMessageId(identity.email);
     let result: Awaited<ReturnType<typeof sendSmtpMessage>>;
     try {
-      const beforeSend = () => authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
-      await beforeSend();
+      const authorization = await authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
+      const beforeSend = await prepareOutboundAssertion(authorization);
+      beforeSend();
       result = await sendSmtpMessage(account, {
         to: outboundTo || undefined,
         cc: cc || undefined,

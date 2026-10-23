@@ -1,3 +1,4 @@
+import { FolderAccountMismatchError } from "../folderAccount";
 import { isWorkerStopping, workerPause } from "../server/workerLifecycle";
 import { getImapHttpError } from "@/lib/mail/imapError";
 import { drainImapConnectionPool } from "@/lib/mail/imap";
@@ -56,7 +57,7 @@ export async function runSyncJobCli(argv = process.argv) {
 
   const { clientId, ...payload } = parsed;
   const derivedMailboxPath = payload.folderId
-    ? payload.folderId.replace(`${payload.accountId}:`, "")
+    ? payload.folderId.slice(payload.accountId.length + 1)
     : "INBOX";
   const derivedMode: SyncOperationProgress["mode"] =
     payload.mode ?? (payload.fullSync ? "full" : "recent");
@@ -88,7 +89,7 @@ export async function runSyncJobCli(argv = process.argv) {
       if (isWorkerStopping()) return;
       const message = error instanceof Error ? error.message : String(error ?? "unknown error");
       const authError = getImapHttpError(error);
-      const isNonRetryable = authError !== null ||
+      const isNonRetryable = error instanceof FolderAccountMismatchError || authError !== null ||
         NON_RETRYABLE_PATTERNS.some((pattern) => message.includes(pattern));
       const isLastAttempt = attempt === MAX_ATTEMPTS;
 

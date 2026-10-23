@@ -284,7 +284,7 @@ for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views 
   const page = renderSidebar([], () => {}, () => {}, {}, { inbox, collab: rows.slice(0, 3), virtual: rows.slice(3) }, locale);
   const buttons = [...page.container.querySelectorAll<HTMLButtonElement>("[data-view-id]")];
   expect(buttons.map(button => button.textContent)).toEqual(locale === "de"
-    ? ["Posteingang", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Fokus", "Aufgaben", "Einladungen"]
+    ? ["Posteingang", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen"]
     : ["Inbox", "Assigned to me", "Unassigned", "Open", "Focused", "Action Queue", "Invite Deck"]);
   expect(page.getByText(locale === "de" ? "Ansichten" : "Views")).toBeTruthy();
   expect(page.getByPlaceholderText(locale === "de" ? "Ordner suchen" : "Search folders")).toBeTruthy();
@@ -295,4 +295,16 @@ for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views 
     fireEvent.click(button);
   }
   expect(selected).toEqual([inbox.id, ...VIRTUAL_FOLDERS.map(folder => folder.id)]);
+});
+
+for (const locale of ["de", "en"] as const) it(`uses numeric view counts with complete accessible descriptions in ${locale}`, () => {
+  const view = { id: "virtual:focused", name: locale === "de" ? "Ungelesen & unbeantwortet" : "Focused",
+    description: "Synthetic description", icon: null, active: false, count: 3, countLabel: "Legacy verbose count",
+    countAriaLabel: locale === "de" ? "3 ungelesen" : "3 unread", onSelect() {} };
+  const page = renderSidebar([], () => {}, () => {}, {}, { inbox: null, collab: [], virtual: [view] }, locale);
+  const button = page.container.querySelector('[data-view-id="virtual:focused"]')!;
+  const badge = button.parentElement!.querySelector('[data-sidebar="menu-badge"]')!;
+  expect(button.textContent).toBe(view.name);
+  expect(badge.textContent).toBe("3");
+  expect(badge.getAttribute("aria-label")).toBe(view.countAriaLabel);
 });

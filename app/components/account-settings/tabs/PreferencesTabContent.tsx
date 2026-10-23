@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import LanguageSelector from "@/app/components/i18n/LanguageSelector";
 import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
@@ -27,8 +27,8 @@ const fields: PreferenceField[] = [
   { group: "threading", key: "includeAcrossFolders", options: yesNo, boolean: true },
   { group: "notifications", key: "newMail", options: yesNo, boolean: true }
 ];
-export default function PreferencesTabContent({ editingAccount, onClose, apiFetch = fetch }: {
-  editingAccount: Account; onClose: () => void; apiFetch?: AdminFetch;
+export default function PreferencesTabContent({ editingAccount, onClose, apiFetch = fetch, senderPreferences }: {
+  editingAccount: Account; onClose: () => void; apiFetch?: AdminFetch; senderPreferences?: ReactNode;
 }) {
   const t = useTranslations("Settings");
   const adminT = useTranslations("Admin");
@@ -80,13 +80,14 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
             }}><option value="inherit">{t("preferences.inherit")}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.literal ? option.label : t(`preferences.options.${option.label as "yes" | "no" | "threads" | "card" | "table" | "compact" | "locale" | "monday" | "sunday"}`)}</option>)}</select>
           </label>;
         })}
-        <label className="grid gap-1 text-sm">{t("preferences.signature")}<select className="rounded-md border bg-background p-2" value={signatureValue ?? "inherit"} onChange={event => {
+        {!senderPreferences && <label className="grid gap-1 text-sm">{t("preferences.signature")}<select className="rounded-md border bg-background p-2" value={signatureValue ?? "inherit"} onChange={event => {
           setSaved(false); setPatch(previous => ({ ...previous, defaultSignatureId: event.target.value === "inherit" ? null : event.target.value }));
         }}><option value="inherit">{t("preferences.inherit")}</option><option value="">{t("preferences.noSignature")}</option>
           {signatureValue && !editingAccount.settings?.signatures?.some(signature => signature.id === signatureValue) && <option value={signatureValue}>{t("preferences.unavailableSignature")}</option>}
           {editingAccount.settings?.signatures?.map(signature => <option key={signature.id} value={signature.id}>{signature.name}</option>)}
-        </select></label>
+        </select></label>}
       </fieldset>
+      {senderPreferences}
       <MailtoHandlerSection />
     </div>
     <div className="flex justify-end gap-3 border-t pt-3"><Button variant="outline" onClick={onClose}>{t("preferences.close")}</Button>

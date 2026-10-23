@@ -103,15 +103,18 @@ export async function buildRawMessage(account: Account, mail: MailPayload, sende
   return raw;
 }
 
-export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => Promise<unknown>) {
+export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => void) {
   const mailOptions = buildMailOptions(mail, sender);
   const raw = await buildRawMessage(account, mail, sender);
 
-  await beforeSend?.();
   const transporter = createSmtpTransport(account);
+  const wire = { envelope: mailOptions.envelope, raw: stripBccHeader(raw) };
+  // No await between the live synchronous assertion and sendMail initiation.
+  // MIME preparation/module loading must finish before consuming authorization.
+  beforeSend?.();
   let info: unknown;
   try {
-    info = await transporter.sendMail({ envelope: mailOptions.envelope, raw: stripBccHeader(raw) });
+    info = await transporter.sendMail(wire);
   } catch (error) {
     throw markSmtpUpstreamFailure(error, sender.email);
   }
@@ -139,20 +142,16 @@ export async function sendRawSmtpMessage(
   account: Account,
   raw: Buffer | string,
   envelope: { from: string; to: string[] },
-  beforeSend?: () => Promise<unknown>
+  beforeSend?: () => void
 ) {
-  await beforeSend?.();
   const transporter = createSmtpTransport(account);
+  const wire = { envelope: { from: envelope.from, to: envelope.to }, raw };
 
+  // The assertion and irreversible send initiation share this continuation.
+  beforeSend?.();
   let info: unknown;
   try {
-    info = await transporter.sendMail({
-      envelope: {
-        from: envelope.from,
-        to: envelope.to
-      },
-      raw
-    });
+    info = await transporter.sendMail(wire);
   } catch (error) {
     throw markSmtpUpstreamFailure(error, envelope.from);
   }

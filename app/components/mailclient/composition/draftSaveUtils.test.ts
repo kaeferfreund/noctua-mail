@@ -233,3 +233,12 @@ it("identity-only changes mark the draft dirty and travel in the saved payload",
     { text: "Synthetic", markdown: undefined, html: undefined, composeFormat: "text", attachments: [] });
   expect(payload.identityId).toBe("alias");
 });
+
+
+it("autosaves an identity-only change on an existing empty draft without creating empty new drafts", () => {
+  const body = { to: "", cc: "", bcc: "", subject: "", text: "", html: undefined, attachments: [] };
+  const lastSavedHash = computeDraftHash({ ...body, identityId: "primary" });
+  expect(getDraftChangeState({ ...body, identityId: "alias", draftId: "empty-draft", lastSavedHash }).canAutoSave).toBe(true);
+  expect(getDraftChangeState({ ...body, identityId: "alias", draftId: null, lastSavedHash }).canAutoSave).toBe(false);
+  expect(getDraftChangeState({ ...body, identityId: "primary", draftId: "empty-draft", lastSavedHash }).canAutoSave).toBe(false);
+});
