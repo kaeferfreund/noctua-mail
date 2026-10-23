@@ -394,6 +394,7 @@ export async function upsertMessages(
     const replacedByHeader = new Map<string, ReplacedRow>();
     const upsertBatch = (batch: Message[], shouldDeleteAttachments: boolean) => {
       batch.forEach((message) => {
+        const prepared = preparedMessages.get(message)!;
         // Resolve the prior same copy before selecting a storage row ID. In
         // particular, a now-free base ID must not erase a shared-shard variant.
         const priorCopy = message.messageId
@@ -591,7 +592,7 @@ export async function upsertMessages(
         // stored .eml still backs.
         const sizeBytes =
           message.source !== undefined
-            ? Buffer.byteLength(message.source)
+            ? prepared.sourceSizeBytes!
             : typeof message.sizeBytes === "number" && Number.isFinite(message.sizeBytes)
               ? message.sizeBytes
               : typeof existingRow?.sizeBytes === "number"
@@ -609,7 +610,7 @@ export async function upsertMessages(
           manualCategoryState === "cleared"
             ? ["manual-category:cleared", "manual-feedback:negative"]
             : message.categorySignals;
-        const fromEmail = parseAddressEmails(message.from)[0] ?? null;
+        const fromEmail = prepared.fromEmail;
         // Attachment URLs embed the message id as a path segment
         // (/messages/<id>/attachments/<att>), so a collision variant must
         // rewrite that segment. Sanitization baked the base id into htmlBody
@@ -727,6 +728,12 @@ export async function upsertMessages(
       });
     };
 
+    // Input-only parsing and MIME sizing need neither writer lock. Repeat on
+    // each whole attempt, before the final live authorization assertion.
+    const preparedMessages = new Map(nextMessages.map(message => [message, {
+      fromEmail: parseAddressEmails(message.from)[0] ?? null,
+      sourceSizeBytes: message.source === undefined ? undefined : Buffer.byteLength(message.source)
+    }]));
     const files = await stageMessageFiles(accountId, nextMessages.map(message => ({
       source: message.source,
       attachments: (message.attachments ?? []).flatMap(attachment => {
