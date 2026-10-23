@@ -102,6 +102,13 @@ export async function listThreadMessages(
   return db.listThreadMessages(...args);
 }
 
+export async function listThreadMessageWindow(
+  ...args: Parameters<ServerDbModule["listThreadMessageWindow"]>
+) {
+  const db = await loadServerDb();
+  return db.listThreadMessageWindow(...args);
+}
+
 export async function deleteMcpToken(...args: Parameters<ServerDbModule["deleteMcpToken"]>) {
   const db = await loadServerDb();
   return db.deleteMcpToken(...args);

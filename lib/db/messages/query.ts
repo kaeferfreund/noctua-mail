@@ -16,6 +16,7 @@ import { SHARD_FTS_TABLE } from "../shardFormat";
 import { searchTokenSpellings } from "./searchSpellingVariants";
 import { simpleParser } from "mailparser";
 import { backfillMessageSenderKey } from "./senderKey";
+import { resolveStoredMessageContentState } from "../../messageContentState";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
 import { getAccountOwnAddresses } from "../senderIdentities";
@@ -3176,19 +3177,45 @@ export async function listThreads(params: {
   return { items, groups, total: inviteDeckSummary?.total ?? total, hasMore, baseCount };
 }
 
+export type ThreadMessageProjection = "full" | "headers";
+
+// Every messages column the thread reader maps, minus the content columns
+// (`body`, `htmlBody`). `sourceSha256` feeds the sender-key backfill.
+const THREAD_MESSAGE_HEADER_COLUMNS = [
+  "id", "accountId", "folderId", "mailboxPath", "imapUid", "threadId", "parentId", "messageId",
+  "inReplyTo", "references", "xForwardedMessageId", "xComposeFormat", "quotedHtmlEdited",
+  "subject", "fromAddr", "senderKey", "sourceSha256", "fromEmail", "replyToAddr", "toAddr",
+  "ccAddr", "bccAddr", "preview", "date", "dateValue", "priority", "hasSource", "unread",
+  "flags", "seen", "answered", "flagged", "deleted", "draft", "recent", "category",
+  "categoryScore", "categorySignals", "listId", "sizeBytes", "listUnsubscribe", "deliveredTo",
+  "originalTo", "senderIdentityId"
+] as const;
+
+export function threadMessageSelectColumns(projection: ThreadMessageProjection, alias = "m") {
+  if (projection === "full") return `${alias}.*`;
+  return THREAD_MESSAGE_HEADER_COLUMNS.map((column) => `${alias}."${column}"`).join(", ");
+}
+
+export { applyExcludedFolderFilters, applyVisibleMessageFilters };
+
 export async function listThreadMessages(params: {
   accountId: string;
   threadIds: string[];
   messageIds?: string[];
   groupBy?: string;
   threadDateSource?: ThreadDateSource;
+  /** `headers` omits body/htmlBody; bodies are read per message on demand. */
+  projection?: ThreadMessageProjection;
+  excludeFolderIds?: string[];
 }) {
   const {
     accountId,
     threadIds,
     messageIds = [],
     groupBy = "date",
-    threadDateSource = DEFAULT_THREAD_DATE_SOURCE
+    threadDateSource = DEFAULT_THREAD_DATE_SOURCE,
+    projection = "full",
+    excludeFolderIds = []
   } = params;
   const uniqueThreads = Array.from(
     new Set(threadIds.map((value) => value.trim()).filter(Boolean))
@@ -3200,14 +3227,14 @@ export async function listThreadMessages(params: {
     return { items: [] as Message[] };
   }
   const db = await getAccountDb(accountId);
-  const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
-  const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
 
   // All three IN (...) predicates below can receive caller-sized id
   // lists that exceed SQLite's default 999-parameter limit. Chunk each
   // at the shared QUERY_BATCH_SIZE used by other bulk queries in this
   // module.
   const QUERY_BATCH_SIZE = 400;
+  const folderArgs: string[] = [];
+  const folderWhere = applyExcludedFolderFilters("", folderArgs, excludeFolderIds.slice(0, QUERY_BATCH_SIZE));
 
   const rowsById = new Map<string, any>();
   const loadRowsBy = (column: "threadId" | "id", values: string[]) => {
@@ -3216,14 +3243,14 @@ export async function listThreadMessages(params: {
       const batchRows = db
         .prepare(
           `
-          SELECT m.*
+          SELECT ${threadMessageSelectColumns(projection)}
           FROM messages m
           WHERE m.accountId = ?
             AND m.${column} IN (${chunk.map(() => "?").join(",")})
-            AND COALESCE(m.deleted, 0) = 0
+            AND COALESCE(m.deleted, 0) = 0${folderWhere}
           `
         )
-        .all(accountId, ...chunk) as any[];
+        .all(accountId, ...chunk, ...folderArgs) as any[];
       batchRows.forEach((row) => {
         // Dedup across the two queries (and any duplicates inside a
         // chunk) keyed by message id — replaces the prior SELECT DISTINCT.
@@ -3233,7 +3260,38 @@ export async function listThreadMessages(params: {
   };
   if (uniqueThreads.length > 0) loadRowsBy("threadId", uniqueThreads);
   if (uniqueMessages.length > 0) loadRowsBy("id", uniqueMessages);
-  const rows = Array.from(rowsById.values());
+  const items = await hydrateThreadMessageRows(db, accountId, Array.from(rowsById.values()), {
+    groupBy,
+    threadDateSource,
+    projection
+  });
+  return { items };
+}
+
+/**
+ * Map `messages` rows (selected with `threadMessageSelectColumns`) to reader
+ * messages: sender-key backfill, thread sort date, attachments, invite state
+ * and group keys. Enrichment is proportional to the rows passed in.
+ */
+export async function hydrateThreadMessageRows(
+  db: any,
+  accountId: string,
+  rows: any[],
+  options: {
+    groupBy?: string;
+    threadDateSource?: ThreadDateSource;
+    projection?: ThreadMessageProjection;
+  } = {}
+): Promise<Message[]> {
+  const {
+    groupBy = "date",
+    threadDateSource = DEFAULT_THREAD_DATE_SOURCE,
+    projection = "full"
+  } = options;
+  if (rows.length === 0) return [];
+  const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
+  const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
+  const QUERY_BATCH_SIZE = 400;
   for (const row of rows) await backfillMessageSenderKey(db, row);
 
   const rowThreadIds = Array.from(
@@ -3330,8 +3388,10 @@ export async function listThreadMessages(params: {
       preview: row.preview,
       date: row.date,
       dateValue: row.dateValue,
-      body: row.body,
-      htmlBody: row.htmlBody ?? undefined,
+      body: projection === "headers" ? "" : row.body,
+      htmlBody: projection === "headers" ? undefined : row.htmlBody ?? undefined,
+      contentState:
+        projection === "headers" ? "omitted" : resolveStoredMessageContentState(row),
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
       ...hydrateIdentityMetadata(row),
@@ -3366,5 +3426,5 @@ export async function listThreadMessages(params: {
     return message;
   });
 
-  return { items };
+  return items;
 }

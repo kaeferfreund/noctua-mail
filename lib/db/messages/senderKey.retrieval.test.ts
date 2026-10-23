@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { resolveStoredMessageContentState } from "../../messageContentState";
 import { createHash } from "crypto";
 import { createCollabFixture } from "../../testThreadCollabHarness";
 import { saveMessageSource } from "../../storage";
@@ -170,7 +171,15 @@ async function observe(
   try {
     db.prepare = wrap(prepare);
     db.query = wrap(query);
-    const result = await read(f.accountId, lookup);
+    const read_ = await read(f.accountId, lookup);
+    // contentState was added to getMessageById after 620a785: check it, then
+    // compare the remaining fields with the frozen reference.
+    let result = read_;
+    if (read_ && "contentState" in read_) {
+      expect(read_.contentState).toBe(resolveStoredMessageContentState(read_));
+      const { contentState: _contentState, ...rest } = read_;
+      result = rest as typeof read_;
+    }
     const rows = ["messages", "attachments", "message_calendar_events"].map(table =>
       prepare.call(db, `SELECT * FROM ${table} ORDER BY accountId, ${table === "messages" ? "id" : table === "attachments" ? "messageId, id" : "messageId, eventUid"}`).all()
     );
