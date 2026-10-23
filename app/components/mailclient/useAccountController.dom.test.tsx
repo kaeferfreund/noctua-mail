@@ -232,7 +232,7 @@ for (const flow of ["switch", "create-self-grant-select"] as const) {
     const apiFetch: UseAccountControllerParams["apiFetch"] = async (input, init) => {
       const url = String(input);
       if (url === "/api/admin/accounts") { created = true; return json({ account: { id: "account-b" } }); }
-      if (url === "/api/admin/accounts/account-b/members") { granted = true; return json({ ok: true }); }
+      if (url === "/api/admin/accounts/account-b/members/synthetic-user") { granted = true; return json({ ok: true }); }
       if (url === "/api/auth/switch-account") {
         if (flow === "create-self-grant-select") expect(created && granted).toBe(true);
         selected = JSON.parse(String(init?.body)).accountId;
@@ -249,9 +249,11 @@ for (const flow of ["switch", "create-self-grant-select"] as const) {
     await act(async () => {
       if (flow === "create-self-grant-select") {
         await result.current.saveAccount({ id: "synthetic-draft", email: "new@example.test" } as Account);
-        await apiFetch("/api/admin/accounts/account-b/members", { method: "POST" });
+        await apiFetch("/api/admin/accounts/account-b/members/synthetic-user", { method: "PUT",
+          body: JSON.stringify({ role: "manager" }) });
         // The admin self-grant branch persists selection, then calls loadInitialData.
-        selected = "account-b";
+        await apiFetch("/api/auth/switch-account", { method: "POST",
+          body: JSON.stringify({ accountId: "account-b" }) });
         await result.current.loadInitialData();
       } else await result.current.switchAccount("account-b");
     });
