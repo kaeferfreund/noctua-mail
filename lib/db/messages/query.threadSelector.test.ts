@@ -201,6 +201,37 @@ describe("thread selector flagged EXISTS differential", () => {
     }
   });
 
+  test("baseCount seeks the page threads and counts their visible folder messages", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    let plan: string[] = [];
+    const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes("INDEXED BY idx_messages_account_thread_date")) return statement;
+      return {
+        get(...args: unknown[]) {
+          plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
+          return statement.get(...args);
+        }
+      };
+    });
+    try {
+      for (const options of [{ folderId: "inbox" }, { folderId: "archive", excludedFolderIds: ["sent"] }, { query: "needle" }]) {
+        plan = [];
+        const result = await listThreads({ accountId: fixture.a.accountId, page: 1, pageSize: 5, ...options });
+        expect(plan[0]).toContain("USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)");
+        const threadIds = new Set(result.items.map(item => item.threadId));
+        const expected = fixture.db.prepare(
+          `SELECT threadId, folderId, subject FROM messages WHERE accountId = ? AND COALESCE(deleted, 0) = 0`
+        ).all(fixture.a.accountId) as Array<{ threadId: string; folderId: string; subject: string }>;
+        expect(result.baseCount).toBe(expected.filter(row => threadIds.has(row.threadId) &&
+          (!options.folderId || row.folderId === options.folderId) &&
+          (!("query" in options) || row.subject.includes("needle"))).length);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test("shared physical shard isolates accounts with identical local message, folder and thread ids", async () => {
     expect(fixture.a.db).toBe(fixture.b.db);
     for (const accountId of [fixture.a.accountId, fixture.b.accountId]) {

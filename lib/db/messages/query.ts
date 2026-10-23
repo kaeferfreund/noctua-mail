@@ -2944,13 +2944,15 @@ export async function listThreads(params: {
     }
 
     const threadIdsForBaseCount = threadRows.map((row) => row.threadId);
+    // Seek the page's threads instead of scanning the folder (the planner
+    // picks the folder index without statistics; no ANALYZE on shards).
     const baseCountRow =
       threadIdsForBaseCount.length > 0
         ? (db
             .prepare(
               `
               SELECT COUNT(*) as count
-              FROM messages m
+              FROM messages m INDEXED BY idx_messages_account_thread_date
               WHERE ${where}
                 AND m.threadId IN (${threadIdsForBaseCount.map(() => "?").join(",")})
             `
