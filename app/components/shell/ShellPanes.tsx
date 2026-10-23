@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import mobileStyles from "./MobileFrames.module.css";
 import { Theme } from "@radix-ui/themes";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -55,6 +57,7 @@ export type ShellPanesProps = {
 };
 
 export default function ShellPanes({ list, reader, calendar, mobileView = "list", onCloseCalendar }: ShellPanesProps) {
+  const t = useTranslations("Shell");
   const isMobile = useIsMobile();
   const desktopCalendar = Boolean(calendar) && !isMobile;
   const panelIds = useMemo(() => desktopCalendar
@@ -124,7 +127,7 @@ export default function ShellPanes({ list, reader, calendar, mobileView = "list"
     </ResizablePanelGroup>
     {isMobile && calendar ? <Sheet open onOpenChange={(open) => { if (!open) onCloseCalendar?.(); }}>
       <SheetContent aria-describedby={undefined} className={mobileStyles.fullscreenSheet} showCloseButton={false}>
-        <SheetTitle className="sr-only">Calendar</SheetTitle>
+        <SheetTitle className="sr-only">{t("calendar")}</SheetTitle>
         <Theme asChild><div className="flex min-h-0 flex-1 flex-col">{calendar}</div></Theme>
       </SheetContent>
     </Sheet> : null}

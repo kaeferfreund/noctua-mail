@@ -1,4 +1,6 @@
 "use client";
+
+import { useTranslations } from "next-intl";
 import {
   Select,
   SelectContent,
@@ -6,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
-import { STATUS_LABELS, STATUS_STYLES, type ThreadStatus } from "./types";
+import { THREAD_STATUSES, STATUS_STYLES, type ThreadStatus } from "./types";
 export default function StatusSelect({
   value,
   disabled,
@@ -16,6 +18,7 @@ export default function StatusSelect({
   disabled?: boolean;
   onChange: (value: ThreadStatus) => void;
 }) {
+  const t = useTranslations("Collaboration");
   return (
     <Select
       value={value}
@@ -24,15 +27,15 @@ export default function StatusSelect({
     >
       <SelectTrigger
         size="sm"
-        aria-label="Thread status"
+        aria-label={t("status.label")}
         style={STATUS_STYLES[value]}
       >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.entries(STATUS_LABELS).map(([status, label]) => (
+        {THREAD_STATUSES.map((status) => (
           <SelectItem key={status} value={status}>
-            {label}
+            {t(`status.${status}`)}
           </SelectItem>
         ))}
       </SelectContent>

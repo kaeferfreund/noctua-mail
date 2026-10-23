@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Fragment, useSyncExternalStore, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
@@ -33,6 +35,7 @@ const subscribeMounted = () => () => {};
 const TITLE_SEPARATOR = " / ";
 
 export function ThemeToggle() {
+  const t = useTranslations("Shell");
   const { theme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribeMounted, () => true, () => false);
   const currentTheme = mounted ? theme : undefined;
@@ -40,15 +43,15 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Theme" title="Theme">
+        <Button variant="ghost" size="icon-sm" aria-label={t("theme.label")} title={t("theme.label")}>
           <span aria-hidden="true" style={{ visibility: mounted ? "visible" : "hidden", display: "contents" }}><Icon /></span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup value={currentTheme ?? "system"} onValueChange={setTheme}>
-          <DropdownMenuRadioItem value="light"><Sun />Light</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark"><Moon />Dark</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="system"><Monitor />System</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="light"><Sun />{t("theme.light")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark"><Moon />{t("theme.dark")}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="system"><Monitor />{t("theme.system")}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -56,13 +59,14 @@ export function ThemeToggle() {
 }
 
 export default function ShellHeader({ title, toolbar, search, sync, indicators }: ShellHeaderProps) {
+  const t = useTranslations("Shell");
   const isMobile = useIsMobile();
   const segments = typeof title === "string" ? [title] : title;
   const fullTitle = segments.join(TITLE_SEPARATOR);
-  const syncLabel = sync.isSyncing ? "Checking for new mail" : "Check for new mail";
+  const syncLabel = sync.isSyncing ? t("sync.checking") : t("sync.check");
   return (
     <header data-slot="shell-header" className="@container/header flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6 max-md:gap-0 max-md:px-2 max-md:[&_button]:min-h-11 max-md:[&_button]:min-w-11">
-      <SidebarTrigger className="-ml-1 size-11 md:size-7" aria-label="Toggle sidebar" />
+      <SidebarTrigger className="-ml-1 size-11 md:size-7" aria-label={t("sidebar.toggle")} />
       <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
       {/* On phones the title takes the free space so the toolbar sits with search on the right. */}
       {/* One weight and the font's own tracking for the whole path; only the
@@ -83,7 +87,7 @@ export default function ShellHeader({ title, toolbar, search, sync, indicators }
       {/* The search box gives way before the title (shrink-3) and may get narrow; the buttons never shrink. */}
       <div className="ml-auto flex min-w-0 shrink-3 items-center gap-2">
         {!isMobile ? <div className="hidden w-64 min-w-0 md:block xl:w-80"><ShellSearch {...search} /></div> : null}
-        {isMobile ? <div className="md:hidden"><Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label="Search messages"><Search /></Button></PopoverTrigger>
+        {isMobile ? <div className="md:hidden"><Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" aria-label={t("search")}><Search /></Button></PopoverTrigger>
           <PopoverContent align="end" className="w-[calc(100dvw-16px)] max-w-96"><ShellSearch {...search} /></PopoverContent>
         </Popover></div> : null}
         {indicators}
