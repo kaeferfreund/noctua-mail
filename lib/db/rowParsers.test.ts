@@ -153,7 +153,7 @@ describe("mapUserRow", () => {
       createdAt: 1700000000000,
       hasPassword: true,
       twoFactorEnabled: true,
-      disabled: true, passkeyCount: 0
+      disabled: true, passkeyCount: 0, uiLocale: null
     });
     expect(JSON.stringify(user)).not.toContain("argon2id");
   });
@@ -169,7 +169,7 @@ describe("mapUserRow", () => {
       createdAt: 1,
       hasPassword: false,
       twoFactorEnabled: false,
-      disabled: false, passkeyCount: 0
+      disabled: false, passkeyCount: 0, uiLocale: null
     });
   });
 });

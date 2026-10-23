@@ -155,6 +155,7 @@ export function ensureTableColumns(
 // the PRAGMA reads and the ALTERs a unit (see `ensureTableColumns`).
 function ensureMasterTeamColumns(db: any) {
   db.transaction(() => {
+    ensureTableColumns(db, "users", [["uiLocale", "TEXT CHECK(uiLocale IS NULL OR uiLocale IN ('de', 'en'))"]]);
     ensureTableColumns(db, "user_accounts", [
       // Links that predate roles were self-created, hence the default.
       ["role", "TEXT NOT NULL DEFAULT 'manager'"],

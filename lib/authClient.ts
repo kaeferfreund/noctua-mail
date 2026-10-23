@@ -1,4 +1,5 @@
 /** Browser-only auth boundary. Capabilities live in call/component memory, never storage. */
+import { publishLocalePreference } from "./i18n/localeEvents";
 import type { Account, User } from "./data";
 
 export type MailboxState = "enrollment" | "none" | "unselected" | "selected";
@@ -124,7 +125,11 @@ export function createAuthClient(fetcher: AuthFetch = (input, init) => fetch(inp
   return {
     me: () => request<AuthMe>("/api/auth/me"),
     methods: () => request<{ ok: true; methods: { password: boolean; passkey: boolean; imap: boolean } }>("/api/auth/methods"),
-    logout: () => request<{ ok: true }>("/api/auth/logout", undefined, undefined, "POST"),
+    logout: async () => {
+      const result = await request<{ ok: true }>("/api/auth/logout", undefined, undefined, "POST");
+      publishLocalePreference(null);
+      return result;
+    },
     switchAccount: (accountId: string) => request<{ ok: true; accountId: string }>("/api/auth/switch-account", { accountId }),
     signup: (body: SignupInput) => request<SignupResult>("/api/auth/signup", body),
     signIn: (email: string, password: string, method: "password" | "imap" = "password") => request<{ twoFactorRedirect?: boolean }>(`/api/ba/sign-in/${method === "imap" ? "imap" : "email"}`, { email, password }),

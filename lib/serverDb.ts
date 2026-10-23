@@ -200,3 +200,7 @@ export async function listSenderIdentities(...args: Parameters<ServerDbModule["l
 export async function getAccountOwnAddresses(...args: Parameters<ServerDbModule["getAccountOwnAddresses"]>) {
   return (await loadServerDb()).getAccountOwnAddresses(...args);
 }
+
+export async function setUserUiLocale(...args: Parameters<ServerDbModule["setUserUiLocale"]>) {
+  return (await loadServerDb()).setUserUiLocale(...args);
+}

@@ -1,3 +1,4 @@
+import { readAuthJson } from "./readAuthJson";
 import { NextResponse } from "next/server";
 import { requireJsonSameOrigin } from "./requestOrigin";
 import { requireActiveUserSession, forwardAuthHeaders } from "@/lib/auth";
@@ -14,7 +15,8 @@ export async function handleAuthSecurity(request: Request, action: SecurityActio
   const headers = session.responseHeaders;
   headers.set("cache-control","no-store");
   try {
-    const body: unknown = await request.json();
+    const body = await readAuthJson(request);
+    if (body instanceof NextResponse) return forwardAuthHeaders(body,headers);
     const auth = await getAuth();
     const db = await getDb();
     const source = {...session,sessionId:session.sessionId};

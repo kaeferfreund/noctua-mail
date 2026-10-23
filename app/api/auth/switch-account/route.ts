@@ -1,3 +1,4 @@
+import { readAuthJson } from "@/app/api/_helpers/readAuthJson";
 import { NextResponse } from "next/server";
 import { getAuth, setActiveAccountId } from "@/lib/betterAuth";
 import { requireActiveUserSession, requireAccountAccessOr403, withAuthResponse } from "@/lib/auth";
@@ -9,7 +10,9 @@ export async function POST(request: Request) {
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
-    const payload = await request.json().catch(() => null) as { accountId?: unknown } | null;
+    const body = await readAuthJson(request).catch(() => null);
+    if (body instanceof NextResponse) return body;
+    const payload = body as { accountId?: unknown } | null;
     const accountId = typeof payload?.accountId === "string" ? payload.accountId.trim() : "";
     if (!accountId) return NextResponse.json({ok:false,message:"Missing accountId"},{status:400});
     const access = await requireAccountAccessOr403(session, accountId);
