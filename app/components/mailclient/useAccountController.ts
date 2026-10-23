@@ -27,6 +27,7 @@ import {
   normalizeCaldavForSave,
   normalizeDeeplForSave
 } from "./utils/accountControllerHelpers";
+import type { MailboxViewCache } from "./mailboxViewCache";
 
 type SelectionView = { accountId: string; accounts: Account[] };
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -83,6 +84,8 @@ export type UseAccountControllerParams = {
   // Optional: request the next mailbox's first list page alongside the switch.
   prefetchFirstPage?: (accountId: string) => void;
   dropFirstPagePrefetch?: () => void;
+  // Optional: show a mailbox visited earlier from its cached folders at once.
+  viewCache?: MailboxViewCache;
 };
 
 export function useAccountController({
@@ -125,7 +128,8 @@ export function useAccountController({
   setEditingAccount,
   setDeletingFolderIds,
   prefetchFirstPage,
-  dropFirstPagePrefetch
+  dropFirstPagePrefetch,
+  viewCache
 }: UseAccountControllerParams) {
   const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
@@ -267,7 +271,9 @@ export function useAccountController({
   // accounts and identity are not re-read here, membership changes arrive through
   // mailboxes-changed and the session refresh. A click back to the mailbox still
   // shown while another switch runs cancels that switch: it only writes the
-  // selection, in click order, and keeps the view as it is.
+  // selection, in click order, and keeps the view as it is. A mailbox visited earlier
+  // in this tab is shown from its cached folders (and list) on the click; the switch
+  // then confirms it with the fresh folders, or reloads the server view on failure.
   const switchAccount = useCallback(
     async (nextAccountId: string) => {
       const normalizedAccountId = nextAccountId.trim();
@@ -294,35 +300,7 @@ export function useAccountController({
         setLastFolderId("");
       };
       let committed = false;
-      try {
-        const persisted = persistSelection(normalizedAccountId, () => version === switchVersion.current);
-        const foldersRead = reselect ? null : apiFetch(buildAccountFoldersPath(normalizedAccountId)).catch(() => null);
-        // Runs concurrently like the folder read; the list takes it only after the commit.
-        // A reselect commits nothing; the finally block drops a pending page.
-        if (!reselect) prefetchFirstPage?.(normalizedAccountId);
-        const response = await persisted;
-        if (version !== switchVersion.current || !response) return;
-        if (!response.ok) {
-          reportError(await readErrorMessage(response));
-          // The server denied the mailbox: drop what it no longer grants.
-          rebootstrap = response.status === 401 || response.status === 403;
-          return;
-        }
-        // The view never left this mailbox, so nothing is committed: a bootstrap that
-        // overlapped the switches cleared its ready state and reloads the server view.
-        if (reselect) return;
-        const foldersRes = await foldersRead;
-        if (version !== switchVersion.current) return;
-        if (!foldersRes?.ok) {
-          // The selection is persisted but its folders are unavailable: resolve the
-          // mailbox from the server, as the bootstrap does.
-          if (foldersRes?.status === 401 || foldersRes?.status === 403) reportError(await readErrorMessage(foldersRes));
-          else resetMailboxView();
-          rebootstrap = true;
-          return;
-        }
-        const nextFolders = await foldersRes.json() as Folder[];
-        if (version !== switchVersion.current) return;
+      const commitMailboxView = (nextFolders: Folder[]) => {
         selectedAccount.current = normalizedAccountId;
         committedSwitch.current = version;
         resetMailboxView();
@@ -334,6 +312,53 @@ export function useAccountController({
         setActiveFolderId(findInboxFolder(nextFolders, normalizedAccountId)?.id ?? nextFolders[0]?.id ?? "");
         setInitialDataReady(true);
         committed = true;
+      };
+      const isDenied = (res: Response) => res.status === 401 || res.status === 403;
+      const cachedFolders = reselect ? null : viewCache?.readFolders(normalizedAccountId) ?? null;
+      try {
+        const persisted = persistSelection(normalizedAccountId, () => version === switchVersion.current);
+        const foldersRead = reselect ? null : apiFetch(buildAccountFoldersPath(normalizedAccountId)).catch(() => null);
+        // Runs concurrently like the folder read; the list takes it only after the commit.
+        // A reselect commits nothing; the finally block drops a pending page. A cached
+        // view commits now, and its list reads its first page right away.
+        if (cachedFolders) commitMailboxView(cachedFolders);
+        else if (!reselect) prefetchFirstPage?.(normalizedAccountId);
+        const response = await persisted;
+        if (version !== switchVersion.current || !response) return;
+        if (!response.ok) {
+          reportError(await readErrorMessage(response));
+          if (isDenied(response)) viewCache?.dropAccount(normalizedAccountId);
+          // The server denied the mailbox: drop what it no longer grants. A cached view
+          // shown for a selection that was not stored is replaced by the server's view.
+          rebootstrap = isDenied(response) || cachedFolders !== null;
+          return;
+        }
+        // The view never left this mailbox, so nothing is committed: a bootstrap that
+        // overlapped the switches cleared its ready state and reloads the server view.
+        if (reselect) return;
+        const foldersRes = await foldersRead;
+        if (version !== switchVersion.current) return;
+        if (!foldersRes?.ok) {
+          // The selection is persisted but its folders are unavailable: resolve the
+          // mailbox from the server, as the bootstrap does.
+          if (foldersRes && isDenied(foldersRes)) {
+            viewCache?.dropAccount(normalizedAccountId);
+            reportError(await readErrorMessage(foldersRes));
+          } else resetMailboxView();
+          rebootstrap = true;
+          return;
+        }
+        const nextFolders = await foldersRes.json() as Folder[];
+        if (version !== switchVersion.current) return;
+        if (!cachedFolders) commitMailboxView(nextFolders);
+        else {
+          // The cached view stays; fresh folders and counts replace the cached ones, and
+          // a folder opened meanwhile stays open while it still exists.
+          setFolders(nextFolders);
+          setActiveFolderId(current => nextFolders.some(folder => folder.id === current)
+            ? current
+            : findInboxFolder(nextFolders, normalizedAccountId)?.id ?? nextFolders[0]?.id ?? "");
+        }
       } catch {
         if (version === switchVersion.current) {
           reportError("Failed to switch account.");
@@ -379,7 +404,8 @@ export function useAccountController({
       defaultSearchBadges,
       defaultSearchFields,
       prefetchFirstPage,
-      dropFirstPagePrefetch
+      dropFirstPagePrefetch,
+      viewCache
     ]
   );
 
