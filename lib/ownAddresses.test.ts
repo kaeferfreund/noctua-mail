@@ -29,3 +29,25 @@ test("RFC recipient comments, quoted names and groups preserve only actual mailb
     expect(parseAddressEmails(value)).toEqual([]);
   }
 });
+
+test("memoized parsing returns caller-owned arrays and stays correct past the cache bounds", () => {
+  const header = '"Example Person" <Person@Example.test>, other@example.test';
+  const first = parseAddressEmails(header);
+  first.push("injected@example.test");
+  first[0] = "changed@example.test";
+  expect(parseAddressEmails(header)).toEqual(["person@example.test", "other@example.test"]);
+  expect(parseAddressEmails(header)).not.toBe(parseAddressEmails(header));
+  expect(normalizeIdentityEmail("a@bad..test")).toBeNull();
+  expect(normalizeIdentityEmail("a@bad..test")).toBeNull();
+
+  const longList = Array.from({ length: 40 }, (_, index) => `"Recipient ${index}" <r${index}@example.test>`).join(", ");
+  expect(longList.length).toBeGreaterThan(512);
+  expect(parseAddressEmails(longList)).toHaveLength(40);
+  expect(parseAddressEmails(longList)[39]).toBe("r39@example.test");
+
+  for (let index = 0; index < 2_500; index++) {
+    expect(parseAddressEmails(`u${index}@example.test`)).toEqual([`u${index}@example.test`]);
+  }
+  expect(parseAddressEmails(header)).toEqual(["person@example.test", "other@example.test"]);
+  expect(isOwnAddress("U7@Example.test", ["u7@example.test"])).toBe(true);
+});
