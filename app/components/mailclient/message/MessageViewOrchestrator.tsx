@@ -37,6 +37,7 @@ import type {
 } from "./messageTranslation";
 import { translationResultKey } from "./messageTranslation";
 import { DEFAULT_DEEPL_TARGET_LANG } from "@/lib/deeplLanguages";
+import { useIsMobile } from "@/app/hooks/use-mobile";
 import {
   buildAccountMessageTopicSuggestionExplainPath,
   buildAccountMessageTranslatePath
@@ -243,6 +244,7 @@ function MessageViewOrchestratorImpl(
   ref: React.ForwardedRef<MessageViewOrchestratorHandle>
 ) {
   const t = useTranslations("Reader");
+  const isMobile = useIsMobile();
   const [noteOpen, setNoteOpen] = useState(false);
   const activityRef = useRef<HTMLElement>(null);
   const noteDraft = useInternalNoteDrafts(body.activeAccountId, header.activeMessage?.threadId);
@@ -666,9 +668,22 @@ function MessageViewOrchestratorImpl(
     showComposeInline
   ]);
 
+  const threadViewModeToggle = (
+    <SegmentedControl.Root
+      size="1"
+      value={threadViewMode}
+      onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
+      style={{ flexShrink: 0 }}
+    >
+      <SegmentedControl.Item value="compact">{t("compact")}</SegmentedControl.Item>
+      <SegmentedControl.Item value="full">{t("full")}</SegmentedControl.Item>
+    </SegmentedControl.Root>
+  );
+
   return (
     <MessageViewPane
       toolbar={header.toolbar}
+      backActions={isMobile && activeMessage ? threadViewModeToggle : null}
       header={activeMessage ? (() => {
               const rootSubject =
                 activeThread[0]?.subject ?? activeMessage?.subject ?? "";
@@ -696,15 +711,7 @@ function MessageViewOrchestratorImpl(
                   <Flex align="center" gap="3" className={paneStyles.subjectRow}>
                     <ThreadSubject key={rootSubject} subject={rootSubject} />
                     {header.mailboxLabel ? <Badge size="1" color="gray">{header.mailboxLabel}</Badge> : null}
-                    <SegmentedControl.Root
-                      size="1"
-                      value={threadViewMode}
-                      onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
-                      style={{ flexShrink: 0 }}
-                    >
-                      <SegmentedControl.Item value="compact">{t("compact")}</SegmentedControl.Item>
-                      <SegmentedControl.Item value="full">{t("full")}</SegmentedControl.Item>
-                    </SegmentedControl.Root>
+                    {isMobile ? null : threadViewModeToggle}
                   </Flex>
                   {threadTopics.length > 0 && (
                     <Flex gap="1" wrap="wrap" justify="end">
