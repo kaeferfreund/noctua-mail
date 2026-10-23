@@ -231,8 +231,9 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await passwordLogin(page, seed.email, seed.password);
   await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
   await page.getByRole("button", { name: "Verify", exact: true }).click();
-  const first = page.locator('button[data-sidebar="menu-button"][title="synthetic-mailbox-a@example.test"]');
-  const second = page.locator('button[data-sidebar="menu-button"][title="synthetic-mailbox-b@example.test"]');
+  // Summary counts enrich the tooltip asynchronously; locate the stable mailbox label.
+  const first = page.locator('button[data-sidebar="menu-button"]').filter({ has: page.getByText("synthetic-mailbox-a", { exact: true }) });
+  const second = page.locator('button[data-sidebar="menu-button"]').filter({ has: page.getByText("synthetic-mailbox-b", { exact: true }) });
   await expect(first).toHaveAttribute("aria-current", "true");
   expect((await api(page, "/api/auth/me")).body.mailboxState).toBe("selected");
   const switched = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/switch-account");
