@@ -25,3 +25,23 @@ export function getFolderDisplayName(folder: Pick<Folder, "name" | "specialUse">
 export function folderNameMatches(folder: Pick<Folder, "name" | "specialUse">, query: string, locale: UiLocale): boolean {
   return folder.name.toLowerCase().includes(query) || getFolderDisplayName(folder, locale).toLowerCase().includes(query);
 }
+
+/** Localized display path; IDs and protocol paths remain untouched. */
+export function getFolderDisplayPath(
+  id: string,
+  folderById: (id: string) => Folder | undefined,
+  locale: UiLocale,
+  accountId?: string
+): string {
+  const folder = folderById(id);
+  if (!folder) return accountId && id.startsWith(`${accountId}:`) ? id.slice(accountId.length + 1) : id;
+  const parts = [getFolderDisplayName(folder, locale)];
+  let parentId = folder.parentId;
+  while (parentId) {
+    const parent = folderById(parentId);
+    if (!parent) break;
+    parts.unshift(getFolderDisplayName(parent, locale));
+    parentId = parent.parentId;
+  }
+  return parts.join("/");
+}
