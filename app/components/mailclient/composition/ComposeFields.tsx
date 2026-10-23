@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import type { Message, RecipientSuggestion } from "@/lib/data";
@@ -84,7 +84,7 @@ function RecipientField({
 
   return (
     <div className={styles.composeGridRow}>
-      <Text size="2" weight="medium" className={styles.label}>
+      <Text as="label" htmlFor={`compose-${variant}-${focusKey}`} size="2" weight="medium" className={styles.label}>
         {label}
       </Text>
       <div className={styles.composeRow}>
@@ -205,31 +205,11 @@ export default function ComposeFields({
   getComposeToken,
   markComposeDirty
 }: ComposeFieldsProps) {
-  const [localSubject, setLocalSubject] = useState(composeSubject);
-  const [localTo, setLocalTo] = useState(composeTo);
-  const [localCc, setLocalCc] = useState(composeCc);
-  const [localBcc, setLocalBcc] = useState(composeBcc);
   const [recipientOptions, setRecipientOptions] = useState<RecipientSuggestion[]>([]);
   const [recipientQuery, setRecipientQuery] = useState("");
   const [recipientLoading, setRecipientLoading] = useState(false);
   const [recipientFocus, setRecipientFocus] = useState<RecipientFocus>(null);
   const [recipientActiveIndex, setRecipientActiveIndex] = useState(0);
-
-  useEffect(() => {
-    setLocalSubject(composeSubject);
-  }, [composeSubject]);
-
-  useEffect(() => {
-    setLocalTo(composeTo);
-  }, [composeTo]);
-
-  useEffect(() => {
-    setLocalCc(composeCc);
-  }, [composeCc]);
-
-  useEffect(() => {
-    setLocalBcc(composeBcc);
-  }, [composeBcc]);
 
   useEffect(() => {
     if (!activeAccountId) {
@@ -267,36 +247,30 @@ export default function ComposeFields({
 
   const commitSubject = (next: string) => {
     markComposeDirty();
-    setLocalSubject(next);
-    startTransition(() => setComposeSubject(next));
+    // Controlled inputs and the send/autosave snapshot share one urgent state.
+    setComposeSubject(next);
   };
 
   const commitRecipient = (
     next: string,
-    setter: React.Dispatch<React.SetStateAction<string>>,
-    setLocal: React.Dispatch<React.SetStateAction<string>>
+    setter: React.Dispatch<React.SetStateAction<string>>
   ) => {
     markComposeDirty();
-    setLocal(next);
-    startTransition(() => setter(next));
+    setter(next);
   };
 
   const pickRecipient = (
     current: string,
     selection: RecipientSuggestion,
     setter: React.Dispatch<React.SetStateAction<string>>,
-    setLocal: React.Dispatch<React.SetStateAction<string>>,
     focusKey: Exclude<RecipientFocus, null>
   ) => {
     markComposeDirty();
-    const next = applyRecipientSelection(current, selection, setter, focusKey);
-    setLocal(next);
+    applyRecipientSelection(current, selection, setter, focusKey);
     setRecipientQuery("");
   };
 
   const hasCcOrBccValue =
-    localCc.trim().length > 0 ||
-    localBcc.trim().length > 0 ||
     composeCc.trim().length > 0 ||
     composeBcc.trim().length > 0;
   const showCcBccFields = composeShowBcc || hasCcOrBccValue;
@@ -316,14 +290,14 @@ export default function ComposeFields({
   ) : null;
   const subjectRow = (
     <div className={styles.composeGridRow}>
-      <Text size="2" weight="medium" className={styles.label}>
+      <Text as="label" htmlFor={`compose-${variant}-subject`} size="2" weight="medium" className={styles.label}>
         Subject:
       </Text>
       <TextField.Root
         id={`compose-${variant}-subject`}
         name="compose_subject"
         size="2"
-        value={localSubject}
+        value={composeSubject}
         onChange={(event) => {
           commitSubject(event.target.value);
         }}
@@ -353,7 +327,7 @@ export default function ComposeFields({
         variant={variant}
         label="To:"
         focusKey="to"
-        value={localTo}
+        value={composeTo}
         placeholder="recipient@example.com"
         recipientOptions={recipientOptions}
         recipientActiveIndex={recipientActiveIndex}
@@ -362,9 +336,9 @@ export default function ComposeFields({
         setRecipientQuery={setRecipientQuery}
         setRecipientFocus={setRecipientFocus}
         setRecipientActiveIndex={setRecipientActiveIndex}
-        onChangeValue={(next) => commitRecipient(next, setComposeTo, setLocalTo)}
+        onChangeValue={(next) => commitRecipient(next, setComposeTo)}
         onPickRecipient={(current, selection) =>
-          pickRecipient(current, selection, setComposeTo, setLocalTo, "to")
+          pickRecipient(current, selection, setComposeTo, "to")
         }
         getComposeToken={getComposeToken}
         showToggle
@@ -384,7 +358,7 @@ export default function ComposeFields({
           variant={variant}
           label="Cc:"
           focusKey="cc"
-          value={localCc}
+          value={composeCc}
           placeholder="cc@example.com"
           recipientOptions={recipientOptions}
           recipientActiveIndex={recipientActiveIndex}
@@ -393,9 +367,9 @@ export default function ComposeFields({
           setRecipientQuery={setRecipientQuery}
           setRecipientFocus={setRecipientFocus}
           setRecipientActiveIndex={setRecipientActiveIndex}
-          onChangeValue={(next) => commitRecipient(next, setComposeCc, setLocalCc)}
+          onChangeValue={(next) => commitRecipient(next, setComposeCc)}
           onPickRecipient={(current, selection) =>
-            pickRecipient(current, selection, setComposeCc, setLocalCc, "cc")
+            pickRecipient(current, selection, setComposeCc, "cc")
           }
           getComposeToken={getComposeToken}
         />
@@ -405,7 +379,7 @@ export default function ComposeFields({
           variant={variant}
           label="Bcc:"
           focusKey="bcc"
-          value={localBcc}
+          value={composeBcc}
           placeholder="bcc@example.com"
           recipientOptions={recipientOptions}
           recipientActiveIndex={recipientActiveIndex}
@@ -414,9 +388,9 @@ export default function ComposeFields({
           setRecipientQuery={setRecipientQuery}
           setRecipientFocus={setRecipientFocus}
           setRecipientActiveIndex={setRecipientActiveIndex}
-          onChangeValue={(next) => commitRecipient(next, setComposeBcc, setLocalBcc)}
+          onChangeValue={(next) => commitRecipient(next, setComposeBcc)}
           onPickRecipient={(current, selection) =>
-            pickRecipient(current, selection, setComposeBcc, setLocalBcc, "bcc")
+            pickRecipient(current, selection, setComposeBcc, "bcc")
           }
           getComposeToken={getComposeToken}
         />

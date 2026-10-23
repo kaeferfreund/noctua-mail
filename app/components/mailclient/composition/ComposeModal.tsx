@@ -73,8 +73,8 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
 
   const returnFocusRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
-    if (open && isMobile) returnFocusRef.current = document.activeElement as HTMLElement | null;
-  }, [open, isMobile]);
+    if (open) returnFocusRef.current = document.activeElement as HTMLElement | null;
+  }, [open]);
 
   if (!open) return null;
 
@@ -114,7 +114,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
       >
         <div className={styles.composeHeader}>
           <div>
-            {isMobile ? <DialogPrimitive.Title asChild>{heading}</DialogPrimitive.Title> : heading}
+            <DialogPrimitive.Title asChild>{heading}</DialogPrimitive.Title>
             <Text size="2" color="gray" className={styles.composeSubtitle}>
               From {fromValue}
             </Text>
@@ -157,14 +157,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
               size="2"
               tooltip="Close composer"
               disabled={detachingCompose}
-              onClick={() => {
-                if (detachedWindow) {
-                  setComposeView("inline");
-                  return;
-                }
-                setComposeOpen(false);
-                setComposeView("inline");
-              }}
+              onClick={close}
             >
               <X size={16} />
             </TooltipIconButton>
@@ -245,19 +238,22 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
         />}
       </div>
   );
-  if (isMobile) return (
-    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) close(); }}>
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next && !detachingCompose) close(); }}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className={`modal-backdrop ${styles.composeBackdrop}`} />
         <Theme asChild>
           <DialogPrimitive.Content asChild aria-modal="true" aria-describedby={undefined}
+            onEscapeKeyDown={(event) => { if (detachingCompose) event.preventDefault(); }}
             onCloseAutoFocus={(event) => {
-              // A mobile sidebar opener unmounts as the composer opens.
-              // Its persistent header trigger is the next useful focus target.
+              // Responsive navigation and inline compose openers may unmount.
+              // Restore to the persistent compose/navigation action in that case.
               const opener = returnFocusRef.current;
               const target = opener?.isConnected && opener !== document.body
                 ? opener
-                : document.querySelector<HTMLButtonElement>('button[aria-label="Toggle sidebar"]');
+                : document.querySelector<HTMLButtonElement>(isMobile
+                  ? 'button[aria-label="Toggle sidebar"]'
+                  : 'button[aria-label="New mail"], button[aria-label="Toggle sidebar"]');
               if (target) {
                 event.preventDefault();
                 target.focus();
@@ -269,7 +265,4 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
-  return <div className={`modal-backdrop ${styles.composeBackdrop}`} onClick={(event) => {
-    if (event.target === event.currentTarget) close();
-  }}>{modal}</div>;
 }
