@@ -1,5 +1,9 @@
 import { beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { Database } from "bun:sqlite";
+import { closeSync, openSync, writeSync } from "fs";
 import { createSharedShardFixture } from "../../testSharedShardHarness";
+import { createCollabFixture } from "../../testThreadCollabHarness";
+import { closeAccountDbConnection, getAccountDb, getDb } from "../connection";
 import { listMessages, listThreads } from "./query";
 
 type Fixture = Awaited<ReturnType<typeof createSharedShardFixture>>;
@@ -412,6 +416,195 @@ describe("FTS-driven search candidates differential", () => {
       delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
       delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
       spy.mockRestore();
+    }
+  });
+});
+
+/**
+ * Corrupt-shard resilience. Each fixture is a fresh synthetic shard in the
+ * test harness temp data dir, seeded through the production write path and
+ * then broken: `dropped` drops message_fts_v3 on the live connection
+ * ("no such table"); `malformed` closes the connection, checkpoints the WAL
+ * and overwrites the root page of message_fts_v3_data so every MATCH raises
+ * SQLITE_CORRUPT ("database disk image is malformed") while the messages
+ * and attachments tables stay readable. Driven mode must produce exactly
+ * the legacy outcome — the same payload, or the same error — never an
+ * empty driven result, and log one fts_error fallback per search.
+ */
+describe("FTS-driven search on a corrupt FTS shard", () => {
+  type Corruption = "dropped" | "malformed";
+  type Outcome = { ok: true; payload: string } | { ok: false; error: string };
+  const base = Date.UTC(2026, 1, 2, 9, 0, 0);
+  const accounts = {} as Record<Corruption, string>;
+
+  async function createCorruptFtsShard(corruption: Corruption) {
+    const f = await createCollabFixture();
+    await f.api.saveFoldersForAccount(f.accountId, [
+      { id: "inbox", accountId: f.accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" },
+      { id: "empty", accountId: f.accountId, name: "Empty", count: 0 }
+    ]);
+    await f.api.upsertMessages(f.accountId, null, Array.from({ length: 6 }, (_, index) =>
+      f.message(`corrupt-thread-${index % 3}`, {
+        id: `corrupt-${index}`,
+        messageId: `<corrupt-${index}@example.test>`,
+        folderId: "inbox",
+        subject: index % 2 ? "needle status" : "weekly status",
+        body: `gamma body ${index}`,
+        from: `sender${index % 2}@example.test`,
+        dateValue: base + index * 86_400_000,
+        date: new Date(base + index * 86_400_000).toISOString(),
+        attachments: index < 2
+          ? [{ id: `corrupt-att-${index}`, filename: `invoice-${index}.pdf`, contentType: "application/pdf", size: 512, inline: false }]
+          : []
+      })
+    ));
+    const master = await getDb();
+    const { dbPath } = master.prepare("SELECT dbPath FROM accounts WHERE id = ?").get(f.accountId) as { dbPath: string };
+    if (corruption === "dropped") {
+      (await getAccountDb(f.accountId)).exec("DROP TABLE message_fts_v3");
+    } else {
+      closeAccountDbConnection(dbPath);
+      const raw = new Database(dbPath);
+      raw.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      const { rootpage } = raw
+        .prepare("SELECT rootpage FROM sqlite_master WHERE name = 'message_fts_v3_data'")
+        .get() as { rootpage: number };
+      const { page_size: pageSize } = raw.prepare("PRAGMA page_size").get() as { page_size: number };
+      raw.close();
+      const fd = openSync(dbPath, "r+");
+      try {
+        writeSync(fd, Buffer.alloc(pageSize, 0xff), 0, pageSize, (rootpage - 1) * pageSize);
+      } finally {
+        closeSync(fd);
+      }
+    }
+    // Guard the fixture: the FTS read must really fail, other tables not.
+    const db = await getAccountDb(f.accountId);
+    expect(() => db.prepare("SELECT messageId FROM message_fts_v3 WHERE message_fts_v3 MATCH 'needle*'").all())
+      .toThrow(corruption === "dropped" ? /no such table/ : /malformed/);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM messages WHERE accountId = ?").get(f.accountId)).toEqual({ n: 6 });
+    return f.accountId;
+  }
+
+  async function outcome(fn: () => Promise<unknown>): Promise<Outcome> {
+    try {
+      return { ok: true, payload: JSON.stringify(await fn()) };
+    } catch (error) {
+      const { name, code, message } = error as { name?: string; code?: string; message?: string };
+      return { ok: false, error: `${name}:${code}:${message}` };
+    }
+  }
+
+  async function runBothCaptured(fn: () => Promise<unknown>) {
+    const fallbacks: Array<Record<string, unknown>> = [];
+    const serialized: string[] = [];
+    const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      if (args[0] !== "[fts-search] legacy fallback") return;
+      fallbacks.push(args[1] as Record<string, unknown>);
+      serialized.push(JSON.stringify(args));
+    });
+    try {
+      process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH = "1";
+      let legacy: Outcome;
+      try {
+        legacy = await outcome(fn);
+      } finally {
+        delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+      }
+      expect(fallbacks).toHaveLength(0);
+      const driven = await outcome(fn);
+      expect(driven).toEqual(legacy);
+      return { driven, fallbacks, serialized };
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  beforeAll(async () => {
+    accounts.dropped = await createCorruptFtsShard("dropped");
+    accounts.malformed = await createCorruptFtsShard("malformed");
+  });
+
+  const expectedError: Record<Corruption, { code: string; text: RegExp }> = {
+    dropped: { code: "SQLITE_ERROR", text: /no such table: message_fts_v3/ },
+    malformed: { code: "SQLITE_CORRUPT", text: /database disk image is malformed/ }
+  };
+
+  for (const corruption of ["dropped", "malformed"] as const) {
+    const ftsCases: Array<{ name: string; run: (accountId: string) => Promise<unknown> }> = [
+      { name: "listThreads token", run: (accountId) => listThreads({ accountId, page: 1, pageSize: 3, query: "needle" }) },
+      { name: "listMessages token", run: (accountId) => listMessages({ accountId, page: 1, pageSize: 3, query: "needle" }) },
+      {
+        name: "listThreads combined MATCH (two tokens, body+subject)",
+        run: (accountId) => listThreads({
+          accountId, page: 1, pageSize: 3, query: "needle gamma", fields: ["subject", "body"]
+        } as Parameters<typeof listThreads>[0])
+      },
+      {
+        name: "listMessages groups by sender",
+        run: (accountId) => listMessages({ accountId, page: 1, pageSize: 3, query: "needle", groupBy: "sender" })
+      },
+      {
+        name: "listThreads groups by week",
+        run: (accountId) => listThreads({ accountId, page: 1, pageSize: 3, query: "needle", groupBy: "week" })
+      },
+      {
+        name: "listMessages mixed FTS + attachment token",
+        run: (accountId) => listMessages({ accountId, page: 1, pageSize: 3, query: "invoice", groupBy: "folder" })
+      }
+    ];
+
+    for (const { name, run } of ftsCases) {
+      test(`${corruption}: ${name} raises the legacy error, logs one fts_error`, async () => {
+        const accountId = accounts[corruption];
+        const { driven, fallbacks, serialized } = await runBothCaptured(() => run(accountId));
+        // Never an empty driven result: the legacy outcome is the error.
+        expect(driven.ok).toBe(false);
+        if (!driven.ok) expect(driven.error).toMatch(expectedError[corruption].text);
+        expect(fallbacks).toHaveLength(1);
+        expect(fallbacks[0]).toMatchObject({
+          reason: "fts_error",
+          candidateCapExceeded: false,
+          errorName: "SQLiteError",
+          errorCode: expectedError[corruption].code,
+          cap: 2000
+        });
+        expect(String(fallbacks[0].accountHash)).toMatch(/^[0-9a-f]{12}$/);
+        for (const line of serialized) {
+          for (const secret of ["needle", "gamma", "invoice", accountId, "malformed", "no such table"]) {
+            expect(line).not.toContain(secret);
+          }
+        }
+      });
+    }
+
+    test(`${corruption}: attachment-only search needs no FTS and stays identical (non-empty)`, async () => {
+      const accountId = accounts[corruption];
+      for (const run of [
+        () => listThreads({ accountId, page: 1, pageSize: 3, query: "invoice", fields: ["attachments"] } as Parameters<typeof listThreads>[0]),
+        () => listMessages({ accountId, page: 1, pageSize: 3, query: "invoice", fields: ["attachments"], groupBy: "sender" } as Parameters<typeof listMessages>[0])
+      ]) {
+        const { driven, fallbacks } = await runBothCaptured(run);
+        expect(driven.ok).toBe(true);
+        if (driven.ok) expect((JSON.parse(driven.payload) as { total: number }).total).toBe(2);
+        expect(fallbacks).toHaveLength(0);
+      }
+    });
+  }
+
+  test("malformed: a scope the legacy MATCH never reaches answers via the legacy path, not an error", async () => {
+    // The legacy subquery only runs once the outer scan yields a row, so an
+    // empty folder answers despite the corrupt FTS; the eager resolution
+    // MATCH raises, and the fallback must reproduce the legacy answer.
+    const accountId = accounts.malformed;
+    for (const run of [
+      () => listThreads({ accountId, folderId: "empty", page: 1, pageSize: 3, query: "needle", groupBy: "sender" }),
+      () => listMessages({ accountId, folderId: "empty", page: 1, pageSize: 3, query: "needle", groupBy: "week" })
+    ]) {
+      const { driven, fallbacks } = await runBothCaptured(run);
+      expect(driven.ok).toBe(true);
+      expect(fallbacks).toHaveLength(1);
+      expect(fallbacks[0]).toMatchObject({ reason: "fts_error", errorCode: "SQLITE_CORRUPT" });
     }
   });
 });

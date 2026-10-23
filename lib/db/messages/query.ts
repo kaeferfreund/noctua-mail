@@ -725,6 +725,10 @@ function parseSearchInput(
  * limit so a discarded resolution stays cheap, and a token whose own set
  * exceeds the cap is probed against the bounded intersection of the other
  * tokens with its legacy per-token clause instead of being materialized.
+ * A failing FTS statement during resolution (missing or corrupt
+ * `message_fts_v3`) also falls back to the legacy clause, so the search
+ * returns exactly what the legacy path returns — including its error —
+ * and never an empty driven result.
  * `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH=1` forces the legacy clause everywhere
  * (kill switch; also used by differential tests), and
  * `NOCTUA_FTS_DRIVEN_MAX_CANDIDATES` overrides the cap.
@@ -748,8 +752,9 @@ type SearchCandidateResolution =
  * One log line per legacy fallback of a search (resolution runs once per
  * top-level list call). Never carries user query content — no tokens, no
  * raw query, no error text that could embed them; only the reason code, a
- * hash of the account id, the cap and counts. `candidateCapExceeded` is
- * the aggregation flag for measuring cap fallovers in production logs.
+ * hash of the account id, the cap, counts and, for `fts_error`, the SQLite
+ * error name/code. `candidateCapExceeded` is the aggregation flag for
+ * measuring cap fallovers in production logs.
  */
 function logSearchFallback(params: {
   accountId: string;
@@ -761,7 +766,6 @@ function logSearchFallback(params: {
   candidateCapExceeded: boolean;
   errorName?: string;
   errorCode?: string;
-  degradedCandidateCount?: number;
 }) {
   console.warn("[fts-search] legacy fallback", {
     reason: params.reason,
@@ -772,8 +776,7 @@ function logSearchFallback(params: {
     ...(params.oversizedTokenCount !== undefined ? { oversizedTokenCount: params.oversizedTokenCount } : {}),
     ...(params.observedCandidates !== undefined ? { observedCandidates: params.observedCandidates } : {}),
     ...(params.errorName !== undefined ? { errorName: params.errorName } : {}),
-    ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {}),
-    ...(params.degradedCandidateCount !== undefined ? { degradedCandidateCount: params.degradedCandidateCount } : {})
+    ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {})
   });
 }
 
@@ -782,14 +785,64 @@ function maxFtsDrivenCandidates(): number {
   return Number.isFinite(override) && override >= 1 ? Math.floor(override) : 2000;
 }
 
+/**
+ * A statement touching the FTS v3 table failed during resolution. Keeps
+ * only the SQLite error name/code for the fallback log line — never the
+ * message, which can embed the MATCH text.
+ */
+class FtsCandidateError extends Error {
+  readonly errorName: string;
+  readonly errorCode?: string;
+
+  constructor(cause: unknown) {
+    super("FTS candidate query failed");
+    this.name = "FtsCandidateError";
+    const fields = cause as { name?: unknown; code?: unknown } | null;
+    this.errorName = typeof fields?.name === "string" ? fields.name : "Error";
+    this.errorCode = typeof fields?.code === "string" ? fields.code : undefined;
+  }
+}
+
+type SearchCandidateParams = {
+  ftsTokenQueries: string[];
+  rawQuery: string;
+  attachmentFilenameTerms: string[];
+};
+
 function resolveSearchCandidateIds(
   db: any,
   accountId: string,
-  params: {
-    ftsTokenQueries: string[];
-    rawQuery: string;
-    attachmentFilenameTerms: string[];
+  params: SearchCandidateParams
+): SearchCandidateResolution {
+  if (!params.ftsTokenQueries.length && !params.rawQuery.trim() && !params.attachmentFilenameTerms.length) {
+    return { kind: "none" };
   }
+  if (process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH === "1") return { kind: "legacy" };
+  try {
+    return resolveDrivenSearchCandidateIds(db, accountId, params);
+  } catch (error) {
+    if (!(error instanceof FtsCandidateError)) throw error;
+    // Missing/corrupt FTS: the legacy clause decides the outcome. It may
+    // still answer (e.g. its MATCH subquery is never reached when the
+    // scope has no rows) or raise the same error to the caller.
+    const tokenCount = Math.max(params.ftsTokenQueries.length, params.attachmentFilenameTerms.length);
+    logSearchFallback({
+      accountId,
+      reason: "fts_error",
+      cap: maxFtsDrivenCandidates(),
+      tokenCount,
+      candidateCapExceeded: false,
+      errorName: error.errorName,
+      errorCode: error.errorCode
+    });
+    return { kind: "legacy", fallback: { reason: "fts_error", tokenCount } };
+  }
+}
+
+function resolveDrivenSearchCandidateIds(
+  db: any,
+  accountId: string,
+  params: SearchCandidateParams
 ): SearchCandidateResolution {
   const ftsTokenQueries = params.ftsTokenQueries;
   const attachmentFilenameTerms = params.attachmentFilenameTerms;
@@ -797,14 +850,12 @@ function resolveSearchCandidateIds(
   const idQuery = params.rawQuery.trim();
   const hasIdQuery = Boolean(idQuery);
   const hasAttachmentFilenameQuery = attachmentFilenameTerms.length > 0;
-  if (!hasQuery && !hasIdQuery && !hasAttachmentFilenameQuery) return { kind: "none" };
-  if (process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH === "1") return { kind: "legacy" };
 
   const cap = maxFtsDrivenCandidates();
   const fetchLimit = cap + 1;
   const tokenCountForLog = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
   // Every reasoned legacy return goes through here so a fallback search
-  // logs exactly once (the kill-switch return above stays unlogged).
+  // logs exactly once (the kill-switch return stays unlogged).
   const legacyFallback = (fallback: {
     reason: SearchFallbackReason;
     oversizedTokenCount?: number;
@@ -823,11 +874,16 @@ function resolveSearchCandidateIds(
   };
   // Capped fetches: `truncated` means the true set exceeds the cap.
   const ftsIdsForMatch = (matchQuery: string) => {
-    const rows = db
-      .prepare(
-        `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ? LIMIT ?`
-      )
-      .all(matchQuery, accountId, fetchLimit) as Array<{ messageId: string }>;
+    let rows: Array<{ messageId: string }>;
+    try {
+      rows = db
+        .prepare(
+          `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ? LIMIT ?`
+        )
+        .all(matchQuery, accountId, fetchLimit) as Array<{ messageId: string }>;
+    } catch (error) {
+      throw new FtsCandidateError(error);
+    }
     return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
   };
   const attachmentIdsForTerm = (term: string) => {
@@ -864,13 +920,19 @@ function resolveSearchCandidateIds(
       tokenArgs.push(`%${token.attachmentTerm}%`);
     }
     if (tokenParts.length === 0 || ids.length === 0) return new Set(ids);
-    const rows = db
-      .prepare(
-        `SELECT m.id FROM messages m
-         WHERE m.accountId = ? AND m.id IN (${ids.map(() => "?").join(",")})
-           AND (${tokenParts.join(" OR ")})`
-      )
-      .all(accountId, ...ids, ...tokenArgs) as Array<{ id: string }>;
+    let rows: Array<{ id: string }>;
+    try {
+      rows = db
+        .prepare(
+          `SELECT m.id FROM messages m
+           WHERE m.accountId = ? AND m.id IN (${ids.map(() => "?").join(",")})
+             AND (${tokenParts.join(" OR ")})`
+        )
+        .all(accountId, ...ids, ...tokenArgs) as Array<{ id: string }>;
+    } catch (error) {
+      if (token.ftsTokenQuery) throw new FtsCandidateError(error);
+      throw error;
+    }
     return new Set(rows.map((row) => row.id));
   };
 
