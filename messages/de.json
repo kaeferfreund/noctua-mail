@@ -210,6 +210,10 @@
     "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neue Version: {version}.",
     "refreshNow": "Jetzt neu laden",
     "status": {
+      "build": "Build {hash} · {date}, {time}",
+      "buildUndated": "Build {hash}",
+      "buildTitle": "Commit {hash}, gebaut {time}",
+      "buildCommit": "Commit {hash}",
       "activity": "Aktivität und Kalender",
       "check": "Neue E-Mails abrufen",
       "processes": "Prozesse",

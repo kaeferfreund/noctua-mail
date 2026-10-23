@@ -1055,19 +1055,24 @@ a {
   color: var(--text);
 }
 
-.bottom-center-time {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  cursor: pointer;
-  color: var(--muted-foreground);
-  text-align: center;
+/* The fixed sections keep one line; the build label and the wide upcoming
+   section absorb a narrow bar instead of the bar growing taller. */
+.bottom-bar > .bottom-section:not(.bottom-wide) {
+  flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* In the bar's flow (not absolutely centred) so it never covers the status
+   triggers; on narrow bars it truncates and the tooltip keeps the full value. */
+.bottom-build {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
-}
-.bottom-center-time:hover {
-  color: var(--text);
 }
 
 .bottom-muted {

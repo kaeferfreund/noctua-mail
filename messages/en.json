@@ -210,6 +210,10 @@
     "refreshMandatory": "Refresh is mandatory before continuing. New build: {version}.",
     "refreshNow": "Refresh now",
     "status": {
+      "build": "Build {hash} · {date}, {time}",
+      "buildUndated": "Build {hash}",
+      "buildTitle": "Commit {hash}, built {time}",
+      "buildCommit": "Commit {hash}",
       "activity": "Activity and calendar",
       "check": "Check for new mail",
       "processes": "Processes",
