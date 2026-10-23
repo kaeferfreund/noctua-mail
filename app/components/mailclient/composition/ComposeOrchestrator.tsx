@@ -226,12 +226,7 @@ export type ComposeOrchestratorProps = {
   showComposeModal: boolean;
   showComposeMinimized: boolean;
 
-  /**
-   * Fires whenever `draftSavedAt` changes so MailClient can drive its
-   * second-by-second relative-time refresh. MailClient renders the
-   * "saved N seconds ago" indicator and needs to re-render on every
-   * tick while a saved draft exists.
-   */
+  /** Notify detached windows when a draft save completes; the label owns its clock. */
   onDraftSavedAtChange?: (timestamp: number | null) => void;
 
   /**
@@ -505,8 +500,7 @@ function ComposeOrchestratorImpl(
     composeDraftIdRef.current = composeDraftId;
   }, [composeDraftId, composeDraftIdRef]);
 
-  // Propagate `draftSavedAt` changes so MailClient can drive its
-  // "saved N seconds ago" relative-time indicator.
+  // Notify the detached-window host when the saved draft changes.
   useEffect(() => {
     onDraftSavedAtChange?.(draftSavedAt);
   }, [draftSavedAt, onDraftSavedAtChange]);

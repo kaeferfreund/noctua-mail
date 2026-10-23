@@ -42,13 +42,16 @@ function VirtualizedList<T>({
     let frame = 0;
     const update = () => {
       frame = 0;
+      // display:none reports zero height and meaningless offsets/scrollTop.
+      // Preserve the last visible window until ResizeObserver sees the reveal.
+      const nextHeight = scrollEl.clientHeight;
+      if (nextHeight <= 0 || scrollEl.getClientRects().length === 0) return;
       const containerTop = listRef.current
         ? listRef.current.getBoundingClientRect().top -
           scrollEl.getBoundingClientRect().top +
           scrollEl.scrollTop
         : 0;
       const nextTop = Math.max(0, scrollEl.scrollTop - containerTop);
-      const nextHeight = scrollEl.clientHeight;
       setScrollState((prev) =>
         prev.scrollTop === nextTop && prev.height === nextHeight
           ? prev
@@ -59,10 +62,13 @@ function VirtualizedList<T>({
       if (frame) return;
       frame = window.requestAnimationFrame(update);
     };
+    const observer = new ResizeObserver(onScroll);
+    observer.observe(scrollEl);
     update();
     scrollEl.addEventListener("scroll", onScroll);
     window.addEventListener("resize", onScroll);
     return () => {
+      observer.disconnect();
       if (frame) window.cancelAnimationFrame(frame);
       scrollEl.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
