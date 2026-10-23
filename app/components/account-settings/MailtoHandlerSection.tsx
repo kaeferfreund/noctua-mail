@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Flex, Text } from "@radix-ui/themes";
 import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
 
@@ -8,13 +9,14 @@ type Status =
   | { kind: "idle" }
   | { kind: "ok" }
   | { kind: "unsupported" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message?: string };
 
 // `mailto:` registration is a browser-wide setting, not per-account, but the
 // preferences tab is the most discoverable place to expose it. The actual
 // "set as system default" step happens in the OS — we just tell the browser
 // it's willing to handle the protocol.
 export default function MailtoHandlerSection() {
+  const t = useTranslations("Settings.mailto");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   const handleRegister = () => {
@@ -30,39 +32,36 @@ export default function MailtoHandlerSection() {
       );
       setStatus({ kind: "ok" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Registration failed.";
-      setStatus({ kind: "error", message });
+      // A browser-provided error message is kept as is; otherwise show our own copy.
+      setStatus({ kind: "error", message: err instanceof Error && err.message ? err.message : undefined });
     }
   };
 
   return (
     <Flex direction="column" gap="2">
       <Text size="3" weight="medium">
-        Default mail app
+        {t("title")}
       </Text>
       <Text size="1" color="gray">
-        Ask your browser to handle <code>mailto:</code> links with {DEFAULT_APP_TITLE}. After
-        registering, you may need to pick {DEFAULT_APP_TITLE} when your browser prompts you,
-        and then set the browser itself as the system default in your OS settings. Not supported
-        in Safari.
+        {t.rich("help", { app: DEFAULT_APP_TITLE, code: (chunks) => <code>{chunks}</code> })}
       </Text>
       <Flex align="center" gap="3" wrap="wrap">
         <Button size="2" variant="soft" onClick={handleRegister}>
-          Register as mailto: handler
+          {t("register")}
         </Button>
         {status.kind === "ok" && (
           <Text size="1" color="green">
-            Requested — check your browser for a confirmation prompt.
+            {t("requested")}
           </Text>
         )}
         {status.kind === "unsupported" && (
           <Text size="1" color="amber">
-            This browser doesn&apos;t support protocol handler registration.
+            {t("unsupported")}
           </Text>
         )}
         {status.kind === "error" && (
           <Text size="1" color="red">
-            {status.message}
+            {status.message ?? t("failed")}
           </Text>
         )}
       </Flex>

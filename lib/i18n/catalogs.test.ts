@@ -139,3 +139,10 @@ test("generated correspondence keeps user text opaque and uses recognizable Germ
     .toBe("On 01/01/2024, 13:00, Synthetic wrote:");
   expect(Object.values(de.Compose.generated.forwardFields)).toEqual(["Von", "Antwort an", "Datum", "Betreff", "An", "Cc"]);
 });
+
+test("DeepL language names are localized by stable code and English keeps the shared labels", async () => {
+  const { DEEPL_TARGET_LANGUAGES } = await import("@/lib/deeplLanguages");
+  expect(Object.keys(de.Settings.translation.languages)).toEqual(DEEPL_TARGET_LANGUAGES.map(language => language.code));
+  expect(Object.values(en.Settings.translation.languages)).toEqual(DEEPL_TARGET_LANGUAGES.map(language => language.label));
+  expect(getTranslator("de")("Settings.translation.languages.EN-US")).toBe("Englisch (amerikanisch)");
+});

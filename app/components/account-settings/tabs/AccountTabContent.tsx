@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Button, Flex, Grid, Select, Text, TextField } from "@radix-ui/themes";
 import PasswordField from "@/app/components/PasswordField";
 import Field from "@/app/components/account-settings/Field";
@@ -42,20 +43,21 @@ export default function AccountTabContent({
   onUpdateAccount,
   onRunProbe
 }: Props) {
+  const t = useTranslations("Settings");
   const saveDisabled = !canSave;
 
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Text size="2" color="gray">
-          Manage IMAP/SMTP credentials for syncing and sending.
+          {t("account.intro")}
         </Text>
         <Flex direction="column" gap="3">
           <Text size="3" weight="medium">
-            Account details
+            {t("account.details")}
           </Text>
           <Grid columns="2" gap="3">
-            <Field label="Name">
+            <Field label={t("account.name")}>
               <TextField.Root
                 value={editingAccount.name}
                 onChange={(event) =>
@@ -66,7 +68,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="Email">
+            <Field label={t("account.email")}>
               <TextField.Root
                 value={editingAccount.email}
                 onChange={(event) =>
@@ -83,19 +85,19 @@ export default function AccountTabContent({
         <Flex direction="column" gap="3">
           <Flex align="center" justify="between">
             <Text size="3" weight="medium">
-              IMAP (Incoming Server)
+              {t("account.imapTitle")}
             </Text>
             <Button size="1" variant="soft" onClick={() => onRunProbe("imap")} disabled={imapDetecting}>
-              {imapDetecting ? "Detecting..." : "Detect security"}
+              {imapDetecting ? t("account.detecting") : t("account.detect")}
             </Button>
           </Flex>
           {imapProbe && (
             <Text size="1" color="gray">
-              TLS: {imapProbe.tls ? "Yes" : "No"} · STARTTLS: {imapProbe.starttls ? "Yes" : "No"}
+              {t("account.probeResult", { tls: String(Boolean(imapProbe.tls)), starttls: String(Boolean(imapProbe.starttls)) })}
             </Text>
           )}
           <Grid columns="3fr 1fr 2fr" gap="3">
-            <Field label="IMAP host">
+            <Field label={t("account.imapHost")}>
               <TextField.Root
                 value={editingAccount.imap.host}
                 onChange={(event) =>
@@ -106,7 +108,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="IMAP port">
+            <Field label={t("account.imapPort")}>
               <TextField.Root
                 type="number"
                 value={editingAccount.imap.port}
@@ -121,7 +123,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="Security">
+            <Field label={t("account.security")}>
               <Select.Root
                 value={imapSecurity}
                 onValueChange={(value) => {
@@ -136,17 +138,17 @@ export default function AccountTabContent({
               >
                 <Select.Trigger style={{ width: "100%" }} />
                 <Select.Content position="popper">
-                  {(imapProbe?.tls ?? true) && <Select.Item value="tls">TLS (implicit)</Select.Item>}
+                  {(imapProbe?.tls ?? true) && <Select.Item value="tls">{t("account.securityTls")}</Select.Item>}
                   {(imapProbe?.starttls ?? true) && (
                     <Select.Item value="starttls">STARTTLS</Select.Item>
                   )}
-                  <Select.Item value="none">None</Select.Item>
+                  <Select.Item value="none">{t("account.securityNone")}</Select.Item>
                 </Select.Content>
               </Select.Root>
             </Field>
           </Grid>
           <Grid columns={{ initial: "1", sm: "2" }} gap="3">
-            <Field label="IMAP user">
+            <Field label={t("account.imapUser")}>
               <TextField.Root
                 value={editingAccount.imap.user}
                 onChange={(event) =>
@@ -157,7 +159,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="IMAP password">
+            <Field label={t("account.imapPassword")}>
               <PasswordField
                 value={editingAccount.imap.password}
                 onChange={(event) =>
@@ -177,19 +179,19 @@ export default function AccountTabContent({
         <Flex direction="column" gap="3">
           <Flex align="center" justify="between">
             <Text size="3" weight="medium">
-              SMTP (Outgoing Server)
+              {t("account.smtpTitle")}
             </Text>
             <Button size="1" variant="soft" onClick={() => onRunProbe("smtp")} disabled={smtpDetecting}>
-              {smtpDetecting ? "Detecting..." : "Detect security"}
+              {smtpDetecting ? t("account.detecting") : t("account.detect")}
             </Button>
           </Flex>
           {smtpProbe && (
             <Text size="1" color="gray">
-              TLS: {smtpProbe.tls ? "Yes" : "No"} · STARTTLS: {smtpProbe.starttls ? "Yes" : "No"}
+              {t("account.probeResult", { tls: String(Boolean(smtpProbe.tls)), starttls: String(Boolean(smtpProbe.starttls)) })}
             </Text>
           )}
           <Grid columns="3fr 1fr 2fr" gap="3">
-            <Field label="SMTP host">
+            <Field label={t("account.smtpHost")}>
               <TextField.Root
                 value={editingAccount.smtp.host}
                 onChange={(event) =>
@@ -200,7 +202,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="SMTP port">
+            <Field label={t("account.smtpPort")}>
               <TextField.Root
                 type="number"
                 value={editingAccount.smtp.port}
@@ -215,7 +217,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="Security">
+            <Field label={t("account.security")}>
               <Select.Root
                 value={smtpSecurity}
                 onValueChange={(value) => {
@@ -230,17 +232,17 @@ export default function AccountTabContent({
               >
                 <Select.Trigger style={{ width: "100%" }} />
                 <Select.Content position="popper">
-                  {(smtpProbe?.tls ?? true) && <Select.Item value="tls">TLS (implicit)</Select.Item>}
+                  {(smtpProbe?.tls ?? true) && <Select.Item value="tls">{t("account.securityTls")}</Select.Item>}
                   {(smtpProbe?.starttls ?? true) && (
                     <Select.Item value="starttls">STARTTLS</Select.Item>
                   )}
-                  <Select.Item value="none">None</Select.Item>
+                  <Select.Item value="none">{t("account.securityNone")}</Select.Item>
                 </Select.Content>
               </Select.Root>
             </Field>
           </Grid>
           <Grid columns={{ initial: "1", sm: "2" }} gap="3">
-            <Field label="SMTP user">
+            <Field label={t("account.smtpUser")}>
               <TextField.Root
                 value={editingAccount.smtp.user}
                 onChange={(event) =>
@@ -251,7 +253,7 @@ export default function AccountTabContent({
                 }
               />
             </Field>
-            <Field label="SMTP password">
+            <Field label={t("account.smtpPassword")}>
               <PasswordField
                 value={editingAccount.smtp.password}
                 onChange={(event) =>
@@ -277,14 +279,14 @@ export default function AccountTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
         <Button size="2" color="red" variant="soft" onClick={onDelete} disabled={!isExistingAccount || !canDelete}>
-          Delete Account
+          {t("account.delete")}
         </Button>
         <Flex gap="3" align="center">
           <Button size="2" variant="soft" color="gray" onClick={onClose}>
-            {saveDisabled ? "Close" : "Cancel"}
+            {saveDisabled ? t("close") : t("common.cancel")}
           </Button>
           <Button size="2" onClick={onSave} disabled={saveDisabled}>
-            Save
+            {t("common.save")}
           </Button>
         </Flex>
       </Flex>

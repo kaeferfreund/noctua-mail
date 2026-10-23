@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, Flex, Text, TextArea, TextField } from "@radix-ui/themes";
 import type { RecipientAlias } from "@/lib/data";
@@ -29,6 +30,7 @@ export default function RecipientAliasManager({
   onDeleteAlias,
   onCreateSuccess
 }: RecipientAliasManagerProps) {
+  const t = useTranslations("Settings");
   const [formMode, setFormMode] = useState<FormMode>(null);
   const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -101,7 +103,7 @@ export default function RecipientAliasManager({
     const trimmedName = name.trim();
     const trimmedRecipients = recipients.trim();
     if (!trimmedName || !trimmedRecipients) {
-      setError("Name and recipients are required.");
+      setError(t("recipientAliases.required"));
       return;
     }
 
@@ -120,7 +122,7 @@ export default function RecipientAliasManager({
       setName(alias.name);
       setRecipients(alias.recipients);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save recipient alias.");
+      setError(saveError instanceof Error ? saveError.message : t("recipientAliases.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -135,7 +137,7 @@ export default function RecipientAliasManager({
         cancelForm();
       }
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete recipient alias.");
+      setError(deleteError instanceof Error ? deleteError.message : t("recipientAliases.deleteFailed"));
     } finally {
       setDeletingId(null);
     }
@@ -144,7 +146,7 @@ export default function RecipientAliasManager({
   return (
     <Flex direction="column" gap="4" style={{ minHeight: 0 }}>
       <Text size="2" color="gray">
-        Save common recipient combinations under a name and reuse them from compose autocomplete.
+        {t("recipientAliases.intro")}
       </Text>
 
       {aliases.length > 0 ? (
@@ -170,7 +172,7 @@ export default function RecipientAliasManager({
                   <TooltipIconButton
                     size="2"
                     variant="ghost"
-                    tooltip="Edit alias"
+                    tooltip={t("recipientAliases.edit")}
                     onClick={() => startEdit(alias)}
                   >
                     <Pencil size={14} />
@@ -179,7 +181,7 @@ export default function RecipientAliasManager({
                     size="2"
                     variant="ghost"
                     color="red"
-                    tooltip="Delete alias"
+                    tooltip={t("recipientAliases.delete")}
                     disabled={deletingId === alias.id}
                     onClick={() => void handleDelete(alias.id)}
                   >
@@ -192,7 +194,7 @@ export default function RecipientAliasManager({
         </Card>
       ) : (
         <Text size="2" color="gray">
-          No recipient aliases yet.
+          {t("recipientAliases.empty")}
         </Text>
       )}
 
@@ -200,25 +202,25 @@ export default function RecipientAliasManager({
         <Card size="2">
           <Flex direction="column" gap="3">
             <Text size="3" weight="medium">
-              {formMode === "edit" && editingAlias ? `Edit ${editingAlias.name}` : "Create mailing list alias"}
+              {formMode === "edit" && editingAlias ? t("recipientAliases.editTitle", { name: editingAlias.name }) : t("recipientAliases.createTitle")}
             </Text>
             <Flex direction="column" gap="2">
               <Text size="2" weight="medium">
-                Name
+                {t("recipientAliases.name")}
               </Text>
               <TextField.Root
                 value={name}
-                placeholder="Mailing list alias"
+                placeholder={t("recipientAliases.namePlaceholder")}
                 onChange={(event) => setName(event.target.value)}
               />
             </Flex>
             <Flex direction="column" gap="2">
               <Text size="2" weight="medium">
-                Recipients
+                {t("recipientAliases.recipients")}
               </Text>
               <TextArea
                 value={recipients}
-                placeholder={"Name <mail@example.com>, Other Name <other@example.com>"}
+                placeholder={t("recipientAliases.recipientsPlaceholder")}
                 onChange={(event) => setRecipients(event.target.value)}
                 rows={5}
               />
@@ -230,10 +232,10 @@ export default function RecipientAliasManager({
             )}
             <Flex gap="2" justify="end">
               <Button variant="soft" color="gray" onClick={cancelForm}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button onClick={() => void handleSave()} disabled={saving}>
-                {formMode === "edit" ? "Save alias" : "Create alias"}
+                {formMode === "edit" ? t("recipientAliases.save") : t("recipientAliases.create")}
               </Button>
             </Flex>
           </Flex>
@@ -245,7 +247,7 @@ export default function RecipientAliasManager({
           onClick={startCreate}
           style={{ alignSelf: "flex-start" }}
         >
-          <Plus size={14} /> New alias
+          <Plus size={14} /> {t("recipientAliases.new")}
         </Button>
       )}
     </Flex>

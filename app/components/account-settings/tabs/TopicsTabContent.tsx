@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useTranslations } from "next-intl";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, Flex, Switch, Text, TextField } from "@radix-ui/themes";
 import {
@@ -44,14 +45,6 @@ type TopicTransferImportResponse = {
   message?: string;
 };
 
-const TOPIC_SIGNAL_LABELS: Record<TopicSuggestionSignal, string> = {
-  senderEmail: "sender",
-  senderDomain: "sender domain",
-  recipient: "recipient",
-  listId: "listId",
-  jiraProjectKey: "JIRA project"
-};
-
 export default function TopicsTabContent({
   accountId,
   isActive,
@@ -65,6 +58,7 @@ export default function TopicsTabContent({
   onSave,
   canSave
 }: Props) {
+  const t = useTranslations("Settings");
   const request = apiFetch ?? fetch;
   const saveDisabled = !isExistingAccount || !canSave;
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -90,11 +84,11 @@ export default function TopicsTabContent({
   const readError = useCallback(async (res: Response) => {
     try {
       const data = (await res.json()) as { message?: string; error?: string };
-      return data?.message || data?.error || `Request failed (${res.status})`;
+      return data?.message || data?.error || t("topics.requestFailed", { status: res.status });
     } catch {
-      return `Request failed (${res.status})`;
+      return t("topics.requestFailed", { status: res.status });
     }
-  }, []);
+  }, [t]);
 
   const loadTopics = useCallback(async () => {
     if (!accountId) return [];
@@ -138,7 +132,7 @@ export default function TopicsTabContent({
       });
       const data = await res.json();
       if (!data.ok) {
-        setError(data.message ?? "Failed to create topic");
+        setError(data.message ?? t("topics.createFailed"));
         return;
       }
       const next = [...topics, data.topic].sort((a, b) => a.name.localeCompare(b.name));
@@ -148,7 +142,7 @@ export default function TopicsTabContent({
       setNewShortName("");
       setShowCreate(false);
     } catch {
-      setError("Failed to create topic");
+      setError(t("topics.createFailed"));
     } finally {
       setSaving(false);
     }
@@ -179,7 +173,7 @@ export default function TopicsTabContent({
       });
       const data = await res.json();
       if (!data.ok) {
-        setError(data.message ?? "Failed to update topic");
+        setError(data.message ?? t("topics.updateFailed"));
         return;
       }
       const next = topics
@@ -189,7 +183,7 @@ export default function TopicsTabContent({
       onTopicsChanged?.(next);
       setEditingId(null);
     } catch {
-      setError("Failed to update topic");
+      setError(t("topics.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -207,7 +201,7 @@ export default function TopicsTabContent({
       setTopics(next);
       onTopicsChanged?.(next);
     } catch {
-      setError("Failed to delete topic");
+      setError(t("topics.deleteFailed"));
     }
   };
 
@@ -224,7 +218,7 @@ export default function TopicsTabContent({
       }
       const data = (await res.json()) as TopicTransferExportResponse;
       if (!data?.ok || !data.data) {
-        setError(data?.message ?? "Failed to export topics data.");
+        setError(data?.message ?? t("topics.exportFailed"));
         return;
       }
 
@@ -235,13 +229,13 @@ export default function TopicsTabContent({
       link.download = `noctua-topics-${accountId}-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      setNotice("Topics data exported.");
+      setNotice(t("topics.exported"));
     } catch {
-      setError("Failed to export topics data.");
+      setError(t("topics.exportFailed"));
     } finally {
       setExporting(false);
     }
-  }, [accountId, readError, request]);
+  }, [accountId, readError, request, t]);
 
   const handleRemoveSignal = useCallback(async (
     topicId: string,
@@ -270,13 +264,13 @@ export default function TopicsTabContent({
         return;
       }
       await loadTopics();
-      setNotice("Learning signal removed.");
+      setNotice(t("topics.signalRemoved"));
     } catch {
-      setError("Failed to remove learning signal.");
+      setError(t("topics.removeSignalFailed"));
     } finally {
       setRemovingSignalKey("");
     }
-  }, [accountId, loadTopics, readError, request]);
+  }, [accountId, loadTopics, readError, request, t]);
 
   const resetImportInput = useCallback(() => {
     if (importInputRef.current) {
@@ -305,21 +299,22 @@ export default function TopicsTabContent({
       }
       const data = (await res.json()) as TopicTransferImportResponse;
       if (!data?.ok || !data.summary) {
-        setError(data?.message ?? "Failed to import topics data.");
+        setError(data?.message ?? t("topics.importFailed"));
         return;
       }
       const nextTopics = await loadTopics();
       onTopicsChanged?.(nextTopics);
-      setNotice(
-        `Imported ${data.summary.topicCount} topics and ${data.summary.assignmentCount} assignments.`
-      );
+      setNotice(t("topics.imported", {
+        topicCount: data.summary.topicCount,
+        assignmentCount: data.summary.assignmentCount
+      }));
     } catch (error) {
-      setError(error instanceof SyntaxError ? "Invalid JSON file." : "Failed to import topics data.");
+      setError(error instanceof SyntaxError ? t("topics.invalidJson") : t("topics.importFailed"));
     } finally {
       resetImportInput();
       setImporting(false);
     }
-  }, [accountId, loadTopics, onTopicsChanged, readError, request, resetImportInput]);
+  }, [accountId, loadTopics, onTopicsChanged, readError, request, resetImportInput, t]);
 
   const handleImportFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -355,7 +350,7 @@ export default function TopicsTabContent({
       <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Flex direction="column" gap="4">
           <Text size="2" color="gray">
-            Topics let you group messages by project, interest, or any category you choose. Assign topics from the message menu.
+            {t("topics.intro")}
           </Text>
 
           <input
@@ -367,12 +362,12 @@ export default function TopicsTabContent({
           />
 
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">Settings</Text>
+            <Text size="3" weight="medium">{t("topics.settingsHeading")}</Text>
             <Flex direction="column" gap="2">
               <Flex asChild align="center" gap="2">
                 <label style={{ cursor: "not-allowed" }}>
                   <Switch size="1" disabled checked={false} />
-                  <Text size="2" color="gray">Write topics to IMAP messages (not supported yet)</Text>
+                  <Text size="2" color="gray">{t("topics.writeToImap")}</Text>
                 </label>
               </Flex>
               <Flex asChild align="center" gap="2">
@@ -389,16 +384,16 @@ export default function TopicsTabContent({
                       })
                     }
                   />
-                  <Text size="2">Apply topic color to message rows</Text>
+                  <Text size="2">{t("topics.colorRows")}</Text>
                 </label>
               </Flex>
             </Flex>
           </Flex>
 
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">Sync</Text>
+            <Text size="3" weight="medium">{t("topics.syncHeading")}</Text>
             <Text size="2" color="gray">
-              Export or import all local topics data for this account, including topic assignments used for learning.
+              {t("topics.syncDescription")}
             </Text>
             <Flex align="center" gap="2" wrap="wrap">
               <Button
@@ -407,7 +402,7 @@ export default function TopicsTabContent({
                 onClick={() => void handleExport()}
                 disabled={!accountId || exporting || importing}
               >
-                {exporting ? "Exporting..." : "Export"}
+                {exporting ? t("topics.exporting") : t("topics.export")}
               </Button>
               <Button
                 size="1"
@@ -415,20 +410,20 @@ export default function TopicsTabContent({
                 onClick={() => importInputRef.current?.click()}
                 disabled={!accountId || exporting || importing}
               >
-                {importing ? "Importing..." : "Import"}
+                {importing ? t("topics.importing") : t("topics.import")}
               </Button>
               <Text size="1" color="gray">
-                Import replaces the current local Topics data for this account.
+                {t("topics.importReplaces")}
               </Text>
             </Flex>
           </Flex>
 
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">Topics</Text>
+            <Text size="3" weight="medium">{t("topics.topicsHeading")}</Text>
 
             {error && <Text size="2" color="red">{error}</Text>}
             {notice && <Text size="2" color="green">{notice}</Text>}
-            {loading && <Text size="2" color="gray">Loading…</Text>}
+            {loading && <Text size="2" color="gray">{t("common.loading")}</Text>}
 
             {topics.length > 0 && (
               <Card size="2" className={styles.topicTable}>
@@ -446,15 +441,15 @@ export default function TopicsTabContent({
                           autoFocus
                         />
                         <TextField.Root
-                          placeholder="Short name for message list (optional)"
+                          placeholder={t("topics.shortNamePlaceholder")}
                           value={editShortName}
                           onChange={(e) => setEditShortName(e.target.value)}
                         />
                         <Flex align="center" gap="2" wrap="wrap">
                           <TopicColorPicker value={editColor} onChange={setEditColor} swatchSize="sm" />
                           <Flex gap="2" ml="auto">
-                            <Button size="1" variant="soft" color="gray" onClick={cancelEdit}>Cancel</Button>
-                            <Button size="1" onClick={() => handleSaveEdit(editingId)} disabled={!editName.trim() || saving} loading={saving}>Save</Button>
+                            <Button size="1" variant="soft" color="gray" onClick={cancelEdit}>{t("common.cancel")}</Button>
+                            <Button size="1" onClick={() => handleSaveEdit(editingId)} disabled={!editName.trim() || saving} loading={saving}>{t("common.save")}</Button>
                           </Flex>
                         </Flex>
                       </div>
@@ -479,13 +474,13 @@ export default function TopicsTabContent({
                         ) : null}
                       </div>
                       <span className={styles.topicRowCount}>
-                        {stat ? `${stat.threadCount} ${stat.threadCount === 1 ? "thread" : "threads"}` : ""}
+                        {stat ? t("topics.threadCount", { count: stat.threadCount }) : ""}
                       </span>
                       <Flex gap="4">
-                        <TooltipIconButton size="2" variant="ghost" onClick={() => startEdit(topic)} tooltip="Edit">
+                        <TooltipIconButton size="2" variant="ghost" onClick={() => startEdit(topic)} tooltip={t("edit")}>
                           <Pencil size={14} />
                         </TooltipIconButton>
-                        <TooltipIconButton size="2" variant="ghost" color="red" onClick={() => handleDelete(topic.id)} tooltip="Delete">
+                        <TooltipIconButton size="2" variant="ghost" color="red" onClick={() => handleDelete(topic.id)} tooltip={t("common.delete")}>
                           <Trash2 size={14} />
                         </TooltipIconButton>
                       </Flex>
@@ -496,13 +491,13 @@ export default function TopicsTabContent({
             )}
 
             {topics.length === 0 && !loading && !showCreate && (
-              <Text size="2" color="gray">No topics yet.</Text>
+              <Text size="2" color="gray">{t("topics.empty")}</Text>
             )}
 
             {showCreate ? (
               <Flex direction="column" gap="2" className={styles.createSection}>
                 <TextField.Root
-                  placeholder="Topic name"
+                  placeholder={t("topics.namePlaceholder")}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
@@ -512,7 +507,7 @@ export default function TopicsTabContent({
                   autoFocus
                 />
                 <TextField.Root
-                  placeholder="Short name for message list (optional)"
+                  placeholder={t("topics.shortNamePlaceholder")}
                   value={newShortName}
                   onChange={(e) => setNewShortName(e.target.value)}
                 />
@@ -529,23 +524,23 @@ export default function TopicsTabContent({
                         setNewShortName("");
                       }}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
-                    <Button size="1" onClick={handleCreate} disabled={!newName.trim() || saving} loading={saving}>Create</Button>
+                    <Button size="1" onClick={handleCreate} disabled={!newName.trim() || saving} loading={saving}>{t("topics.create")}</Button>
                   </Flex>
                 </Flex>
               </Flex>
             ) : (
               <Button size="1" variant="soft" onClick={() => setShowCreate(true)} style={{ alignSelf: "flex-start" }}>
-                <Plus size={12} /> New topic
+                <Plus size={12} /> {t("topics.newTopic")}
               </Button>
             )}
           </Flex>
 
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">Learning Data</Text>
+            <Text size="3" weight="medium">{t("topics.learningHeading")}</Text>
             {topicsWithSignals.length === 0 ? (
-              <Text size="2" color="gray">No learning data yet. Assign topics to messages to build up signal data.</Text>
+              <Text size="2" color="gray">{t("topics.learningEmpty")}</Text>
             ) : (
               <Card size="2">
                 <Flex direction="column" gap="1">
@@ -558,10 +553,11 @@ export default function TopicsTabContent({
                         {signals.map((s) => {
                           const signalKey = `${topic.id}\u0000${s.type}\u0000${s.value}`;
                           const removing = removingSignalKey === signalKey;
+                          const signalLabel = t(`topics.signalTypes.${s.type}`);
                           return (
                             <Flex key={`${s.type}:${s.value}`} align="start" gap="2" className={styles.signalRow}>
                               <Text size="1" color="gray" className={styles.signalText}>
-                                {TOPIC_SIGNAL_LABELS[s.type]}: {s.value} · {s.count} {s.count === 1 ? "thread" : "threads"}
+                                {t("topics.signalLine", { signal: signalLabel, value: s.value, count: s.count })}
                               </Text>
                               <TooltipIconButton
                                 size="1"
@@ -570,7 +566,7 @@ export default function TopicsTabContent({
                                 className={styles.signalRemoveButton}
                                 disabled={removing}
                                 onClick={() => void handleRemoveSignal(topic.id, s.type, s.value)}
-                                tooltip={`Remove ${TOPIC_SIGNAL_LABELS[s.type]} signal`}
+                                tooltip={t("topics.removeSignal", { signal: signalLabel })}
                               >
                                 <X size={10} />
                               </TooltipIconButton>
@@ -589,9 +585,9 @@ export default function TopicsTabContent({
 
       <ImportReplaceConfirmDialog
         open={pendingImportFile !== null}
-        title="Import topics data?"
-        description="Importing topics data replaces all current topics and topic assignments for this account."
-        confirmLabel="Import"
+        title={t("topics.importDialogTitle")}
+        description={t("topics.importDialogDescription")}
+        confirmLabel={t("topics.import")}
         onOpenChange={handleImportDialogOpenChange}
         onConfirm={confirmImport}
       />
@@ -604,10 +600,10 @@ export default function TopicsTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)", flexShrink: 0 }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          {saveDisabled ? "Close" : "Cancel"}
+          {saveDisabled ? t("close") : t("common.cancel")}
         </Button>
         <Button size="2" onClick={onSave} disabled={saveDisabled}>
-          Save
+          {t("common.save")}
         </Button>
       </Flex>
     </Flex>
