@@ -5,7 +5,9 @@ import { redactAuthUrl } from "../authRecoveryContext";
 import { assertServerRunning, installShutdownCoordinator, isShuttingDown } from "./shutdown";
 
 function redactedRequestUrl(target: string | undefined) {
-  return redactAuthUrl(URL.parse(target ?? "", "http://localhost")?.href ?? "");
+  // An origin-form target such as "//reset-password/<token>" is a path, not a scheme-relative authority.
+  const value = target?.startsWith("/") ? `http://localhost${target}` : target ?? "";
+  return redactAuthUrl(URL.parse(value, "http://localhost")?.href ?? "");
 }
 
 /** Use the bound address (including an OS-selected port) for Next's internal URL. */

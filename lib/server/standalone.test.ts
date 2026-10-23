@@ -42,28 +42,36 @@ test("launcher request and upgrade error logs redact reset capabilities", async 
     while (!output.includes("Ready on ") && Date.now() < deadline && child.exitCode === null) await Bun.sleep(10);
     const origin = output.match(/Ready on (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
     expect(origin).toBeDefined();
-    const target = "/reset-password?token=synthetic-reset-capability";
-    const response = await fetch(`${origin}${target}`, { signal: AbortSignal.timeout(2000) });
-    expect(response.status).toBe(500);
-    expect(await response.text()).toBe("Internal Server Error");
+    // Canonical link plus two non-canonical spellings that reach the same page/callback.
+    const targets = [
+      "/reset-password?token=synthetic-reset-capability",
+      "/Reset-Password/?token=synthetic-reset-capability",
+      "//api/ba/reset%2Dpassword/synthetic-reset-capability"
+    ];
     const url = new URL(origin!);
-    await new Promise<void>((resolve, reject) => {
-      const socket = connect(Number(url.port), url.hostname);
-      let received = "";
-      socket.setTimeout(2000, () => { socket.destroy(); reject(new Error("Failed upgrade socket did not close")); });
-      socket.once("connect", () => socket.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`));
-      socket.on("data", chunk => { received += chunk.toString(); });
-      socket.once("error", reject);
-      socket.once("close", () => {
-        try { expect(received).toBe(""); resolve(); } catch (error) { reject(error); }
+    for (const target of targets) {
+      const response = await fetch(`${origin}${target}`, { signal: AbortSignal.timeout(2000) });
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe("Internal Server Error");
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(Number(url.port), url.hostname);
+        let received = "";
+        socket.setTimeout(2000, () => { socket.destroy(); reject(new Error("Failed upgrade socket did not close")); });
+        socket.once("connect", () => socket.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`));
+        socket.on("data", chunk => { received += chunk.toString(); });
+        socket.once("error", reject);
+        socket.once("close", () => {
+          try { expect(received).toBe(""); resolve(); } catch (error) { reject(error); }
+        });
       });
-    });
+    }
     child.kill("SIGTERM");
     expect(await child.exited).toBe(0);
     await stdout;
     const errors = await stderr;
     expect(errors).not.toContain("synthetic-reset-capability");
-    expect(errors.match(/Failed to handle request for http:\/\/localhost\/reset-password/g)).toHaveLength(2);
+    expect(errors.match(/Failed to handle request for http:\/\/localhost\/reset-password\s/g)).toHaveLength(4);
+    expect(errors.match(/Failed to handle request for http:\/\/localhost\/api\/ba\/reset-password\/\[REDACTED\]\s/g)).toHaveLength(2);
     expect(errors).toContain("synthetic request failure");
     expect(errors).toContain("synthetic upgrade failure");
     expect(output).toContain("[shutdown] complete");
