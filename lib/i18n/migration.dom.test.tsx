@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "bun:test";
-import { cleanup, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, within } from "@testing-library/react";
 import { render, I18nTestProvider } from "./testRender";
 import StatusSelect from "@/app/components/collab/StatusSelect";
 import InternalNoteComposer from "@/app/components/collab/InternalNoteComposer";
@@ -38,8 +38,9 @@ it("renders singular/plural collaboration counts and translates an existing auth
   const error = new AuthClientError(400, "INVALID_CODE");
   const tree = (locale: "de" | "en", count: number) => <I18nTestProvider locale={locale}><ThreadCollaborationBar collab={{...controller, state: {...controller.state!, commentCount: count}}} role="viewer" onNote={() => {}} onActivity={() => {}} /><AuthError error={error} /></I18nTestProvider>;
   const page = render(tree("en", 1));
-  expect(page.getByRole("button", {name: "1 internal note"}).textContent).toBe("1 note");
+  // Phones show an icon and the bare count; wider viewports show the localized label.
+  expect(within(page.getByRole("button", {name: "1 internal note"})).getByText("1 note", {exact: true})).toBeTruthy();
   page.rerender(tree("de", 2));
-  expect(page.getByRole("button", {name: "2 interne Notizen"}).textContent).toBe("2 Notizen");
+  expect(within(page.getByRole("button", {name: "2 interne Notizen"})).getByText("2 Notizen", {exact: true})).toBeTruthy();
   expect(page.getByRole("alert").textContent).toBe("Dieser Code ist falsch. Versuche einen neuen Code.");
 });

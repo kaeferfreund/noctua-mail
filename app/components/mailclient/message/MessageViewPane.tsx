@@ -13,9 +13,11 @@ type MessageViewPaneProps = {
   children: React.ReactNode;
   header?: React.ReactNode;
   toolbar?: React.ReactNode;
+  /** Trailing controls of the phone back row (CSS shows that row below md only). */
+  backActions?: React.ReactNode;
 };
 
-export default function MessageViewPane({ children, header, toolbar }: MessageViewPaneProps) {
+export default function MessageViewPane({ children, header, toolbar, backActions }: MessageViewPaneProps) {
   const t = useTranslations("Reader");
   const back = useMobileBack();
   const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export default function MessageViewPane({ children, header, toolbar }: MessageVi
 
   return (
     <section className={styles.pane} data-reader-print="">
-      {back ? <div className={styles.mobileHeader}><Button variant="ghost" onClick={back} aria-label={t("backMessages")}><ArrowLeft size={18} />{t("back")}</Button></div> : null}
+      {back ? <div className={styles.mobileHeader}><Button variant="ghost" onClick={back} aria-label={t("backMessages")}><ArrowLeft size={18} />{t("back")}</Button>{backActions}</div> : null}
       {toolbar}
       {header && <div className={styles.threadHeader}>{header}</div>}
       <div className={styles.threadViewShell}>

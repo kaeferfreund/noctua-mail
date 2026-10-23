@@ -1379,7 +1379,9 @@
     "quotedText": "Zitierten Text ein- oder ausblenden",
     "remoteBlocked": "Externe Inhalte blockiert",
     "loadOnce": "Einmal laden",
+    "loadOnceShort": "Laden",
     "alwaysLoadSender": "Von diesem Absender immer laden",
+    "alwaysLoadSenderShort": "Immer laden",
     "unknownSender": "Der Absender ist erst bekannt, wenn die Originalnachricht verfügbar ist oder erneut synchronisiert wurde.",
     "flags": {
       "forwarded": "Weitergeleitet",
