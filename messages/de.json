@@ -1553,5 +1553,121 @@
     "trash": "Papierkorb",
     "spam": "Spam",
     "archive": "Archiv"
+  },
+  "Editor": {
+    "placeholder": "Schreib deine Nachricht …",
+    "linkPrompt": "URL eingeben",
+    "toolbar": {
+      "bold": "Fett",
+      "italic": "Kursiv",
+      "underline": "Unterstrichen",
+      "strikethrough": "Durchgestrichen",
+      "increaseTextSize": "Schrift vergrößern",
+      "decreaseTextSize": "Schrift verkleinern",
+      "clearFormatting": "Formatierung entfernen",
+      "bulletedList": "Aufzählung",
+      "numberedList": "Nummerierte Liste",
+      "removeList": "Liste entfernen",
+      "link": "Link",
+      "insertTable": "Tabelle einfügen",
+      "insertRowAbove": "Zeile oberhalb einfügen",
+      "insertRowBelow": "Zeile unterhalb einfügen",
+      "deleteRow": "Zeile löschen",
+      "insertColumnLeft": "Spalte links einfügen",
+      "insertColumnRight": "Spalte rechts einfügen",
+      "deleteColumn": "Spalte löschen",
+      "deleteTable": "Tabelle löschen",
+      "visualEditor": "Visueller Editor",
+      "sourceHtml": "HTML-Quelltext"
+    },
+    "image": {
+      "resizeHint": "Zum Skalieren eine Ecke ziehen · Doppelklick setzt zurück",
+      "resizeLabel": "Bildgröße ändern (Pfeiltasten; mit Umschalttaste in größeren Schritten)",
+      "resize": "Größe ändern"
+    },
+    "quoted": {
+      "label": "Zitierte Nachricht",
+      "show": "Zitierte Nachricht einblenden",
+      "hide": "Zitierte Nachricht ausblenden",
+      "editTitle": "Zitierte Nachricht in bearbeitbaren Text umwandeln",
+      "edit": "Bearbeiten",
+      "toggleQuoteTitle": "Zitatformatierung der zitierten Nachricht umschalten",
+      "quote": "Zitieren",
+      "unquote": "Zitat aufheben",
+      "removeImagesTitle": "Bilder aus der zitierten Nachricht entfernen",
+      "removeImages": "Bilder entfernen",
+      "removeMetaTitle": "Kopfdaten (Von, An, Cc, Datum …) der weitergeleiteten Nachricht entfernen",
+      "removeMeta": "Details entfernen",
+      "removeTitle": "Zitierte Nachricht aus der Antwort entfernen",
+      "remove": "Entfernen",
+      "includeTitle": "Originalnachricht als Zitat in die Antwort übernehmen",
+      "include": "Mit Zitat",
+      "stripImagesTitle": "Bilder aus dem zitierten HTML entfernen",
+      "imagesStripped": "Bilder bereits entfernt",
+      "stripImages": "Bilder entfernen",
+      "quoteHtmlTitle": "HTML-Zitat ein- oder ausschalten",
+      "quoteHtml": "HTML zitieren"
+    },
+    "tabs": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "text": "Text"
+    },
+    "translation": {
+      "targetLanguage": "Zielsprache der Übersetzung",
+      "translateTitle": "Nachricht mit DeepL übersetzen",
+      "translate": "Übersetzen",
+      "translating": "Wird übersetzt …",
+      "translatedTo": "Übersetzt in: {target}",
+      "translatedFromTo": "Übersetzt in: {target} · Ausgangssprache: {source}",
+      "revertTitle": "Text vor der Übersetzung wiederherstellen",
+      "revert": "Rückgängig",
+      "dismiss": "Ausblenden"
+    },
+    "signature": {
+      "chooseTitle": "Signatur auswählen",
+      "label": "Signatur",
+      "none": "Keine Signatur"
+    },
+    "attachment": {
+      "addTitle": "Anhang hinzufügen",
+      "attach": "Anhängen"
+    },
+    "loading": {
+      "composer": "Editor wird geladen …",
+      "composerFailed": "Der Editor konnte nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "markdownEditor": "Markdown-Editor wird geladen …"
+    },
+    "markdown": {
+      "keys": {
+        "ctrl": "Strg",
+        "shift": "Umschalt"
+      },
+      "headingIcon": "Überschrift {level}",
+      "commands": {
+        "bold": "Fett ({shortcut})",
+        "italic": "Kursiv ({shortcut})",
+        "strikethrough": "Durchgestrichen ({shortcut})",
+        "hr": "Trennlinie einfügen ({shortcut})",
+        "title": "Überschrift einfügen",
+        "heading": "Überschrift {level} einfügen ({shortcut})",
+        "link": "Link einfügen ({shortcut})",
+        "quote": "Zitat einfügen ({shortcut})",
+        "code": "Code einfügen ({shortcut})",
+        "codeBlock": "Codeblock einfügen ({shortcut})",
+        "comment": "Kommentar einfügen ({shortcut})",
+        "image": "Bild einfügen ({shortcut})",
+        "table": "Tabelle einfügen",
+        "unorderedList": "Aufzählung ({shortcut})",
+        "orderedList": "Nummerierte Liste ({shortcut})",
+        "checkedList": "Checkliste ({shortcut})",
+        "help": "Markdown-Hilfe öffnen",
+        "edit": "Nur Editor ({shortcut})",
+        "live": "Editor und Vorschau ({shortcut})",
+        "preview": "Nur Vorschau ({shortcut})",
+        "fullscreen": "Vollbild umschalten ({shortcut})"
+      }
+    }
   }
 }

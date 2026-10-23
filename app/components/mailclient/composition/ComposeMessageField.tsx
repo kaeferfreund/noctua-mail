@@ -11,9 +11,11 @@ import { CaretRightIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { Button, DropdownMenu, Flex, Select, Tabs, Text } from "@radix-ui/themes";
 import { Languages, Paperclip } from "lucide-react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import type { ComposeEditorHandle } from "../../ComposeEditor";
 import type { ComposeTranslationUi } from "./useComposeTranslation";
-import { DEEPL_TARGET_LANGUAGES, deeplTargetLanguageLabel } from "@/lib/deeplLanguages";
+import { DEEPL_TARGET_LANGUAGES } from "@/lib/deeplLanguages";
+import { useDeeplLanguageLabel } from "@/lib/i18n/useDeeplLanguageLabel";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import type { ComposeQuotedParts, PendingImageDrop, ComposeSignatureState } from "./composeTypes";
 import type { Attachment } from "@/lib/data";
@@ -49,8 +51,13 @@ const ComposeEditor = dynamic(async () => {
 // before showing the editor on the first Markdown-tab open.
 const ComposeMarkdownEditor = dynamic(() => import("../../ComposeMarkdownEditor"), {
   ssr: false,
-  loading: () => <div role="status">Loading Markdown editor…</div>
+  loading: () => <MarkdownEditorLoading />
 });
+
+function MarkdownEditorLoading() {
+  const t = useTranslations("Editor.loading");
+  return <div role="status">{t("markdownEditor")}</div>;
+}
 
 type ComposeTab = "text" | "html" | "markdown";
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
@@ -206,6 +213,8 @@ function ReadyComposeMessageField({
   addComposeFiles,
   addDroppedFiles
 }: ComposeMessageFieldProps) {
+  const t = useTranslations("Editor");
+  const languageLabel = useDeeplLanguageLabel();
   const hasQuotedHtml = composeQuotedHtml.trim().length > 0;
   const hasQuotedParts = Boolean(composeQuotedParts);
   const hasQuotedContent = hasQuotedHtml || hasQuotedParts;
@@ -456,13 +465,13 @@ function ReadyComposeMessageField({
           <Tabs.Root value={composeTab} onValueChange={(value) => switchComposeTab(value as ComposeTab)}>
             <Tabs.List size="1" className={threadStyles.tabsList}>
               <Tabs.Trigger value="html" className={threadStyles.tabTrigger} tabIndex={-1}>
-                HTML
+                {t("tabs.html")}
               </Tabs.Trigger>
               <Tabs.Trigger value="markdown" className={threadStyles.tabTrigger} tabIndex={-1}>
-                Markdown
+                {t("tabs.markdown")}
               </Tabs.Trigger>
               <Tabs.Trigger value="text" className={threadStyles.tabTrigger} tabIndex={-1}>
-                Text
+                {t("tabs.text")}
               </Tabs.Trigger>
             </Tabs.List>
           </Tabs.Root>
@@ -475,11 +484,11 @@ function ReadyComposeMessageField({
                 value={composeTranslation.targetLang}
                 onValueChange={onComposeTranslateLangChange}
               >
-                <Select.Trigger aria-label="Translation target language" />
+                <Select.Trigger aria-label={t("translation.targetLanguage")} />
                 <Select.Content position="popper">
                   {DEEPL_TARGET_LANGUAGES.map((language) => (
                     <Select.Item key={language.code} value={language.code}>
-                      {language.label}
+                      {languageLabel(language.code)}
                     </Select.Item>
                   ))}
                 </Select.Content>
@@ -489,7 +498,7 @@ function ReadyComposeMessageField({
                 size="1"
                 variant="soft"
                 color="gray"
-                title="Translate the message with DeepL"
+                title={t("translation.translateTitle")}
                 disabled={composeTranslation.status === "loading"}
                 onClick={() =>
                   onComposeTranslate(
@@ -501,7 +510,7 @@ function ReadyComposeMessageField({
                 tabIndex={-1}
               >
                 <Languages size={12} />
-                {composeTranslation.status === "loading" ? "Translating…" : "Translate"}
+                {composeTranslation.status === "loading" ? t("translation.translating") : t("translation.translate")}
               </Button>
             </>
           )}
@@ -512,10 +521,10 @@ function ReadyComposeMessageField({
                 size="1"
                 variant="soft"
                 color="gray"
-                title="Choose signature"
+                title={t("signature.chooseTitle")}
                 tabIndex={-1}
               >
-                {selectedSignature ? selectedSignature.name : "Signature"}
+                {selectedSignature ? selectedSignature.name : t("signature.label")}
                 <ChevronDownIcon width={14} height={14} />
               </Button>
             </DropdownMenu.Trigger>
@@ -534,7 +543,7 @@ function ReadyComposeMessageField({
                   setSignatureMenuOpen(false);
                 }}
               >
-                <DropdownMenu.RadioItem value="__none">No signature</DropdownMenu.RadioItem>
+                <DropdownMenu.RadioItem value="__none">{t("signature.none")}</DropdownMenu.RadioItem>
                 {accountSignatures.map((signature) => (
                   <DropdownMenu.RadioItem key={signature.id} value={signature.id}>
                     {signature.name}
@@ -548,12 +557,12 @@ function ReadyComposeMessageField({
             size="1"
             variant="soft"
             color="gray"
-            title="Add attachment"
+            title={t("attachment.addTitle")}
             onClick={() => composeAttachmentInputRef.current?.click()}
             tabIndex={-1}
           >
             <Paperclip size={12} />
-            Attach
+            {t("attachment.attach")}
           </Button>
           <input
             ref={composeAttachmentInputRef}
@@ -579,11 +588,14 @@ function ReadyComposeMessageField({
             <Languages size={13} />
             <Text size="1" color={composeTranslation.error ? "red" : "gray"}>
               {composeTranslation.error ??
-                `Translated to ${deeplTargetLanguageLabel(composeTranslation.translatedTo)}${
-                  composeTranslation.detectedSourceLang
-                    ? ` · from ${composeTranslation.detectedSourceLang}`
-                    : ""
-                }`}
+                (composeTranslation.detectedSourceLang
+                  ? t("translation.translatedFromTo", {
+                      target: languageLabel(composeTranslation.translatedTo),
+                      source: composeTranslation.detectedSourceLang
+                    })
+                  : t("translation.translatedTo", {
+                      target: languageLabel(composeTranslation.translatedTo)
+                    }))}
             </Text>
             {composeTranslation.canRevert && (
               <Button
@@ -591,10 +603,10 @@ function ReadyComposeMessageField({
                 size="1"
                 variant="ghost"
                 color="gray"
-                title="Restore the text from before the translation"
+                title={t("translation.revertTitle")}
                 onClick={onComposeTranslateRevert}
               >
-                Revert
+                {t("translation.revert")}
               </Button>
             )}
             {composeTranslation.error && (
@@ -605,7 +617,7 @@ function ReadyComposeMessageField({
                 color="gray"
                 onClick={onComposeTranslateDismiss}
               >
-                Dismiss
+                {t("translation.dismiss")}
               </Button>
             )}
           </Flex>
@@ -656,10 +668,10 @@ function ReadyComposeMessageField({
                 size="1"
                 color="gray"
                 variant={composeIncludeOriginal ? "solid" : "soft"}
-                title="Include the original message as a quote in the reply"
+                title={t("quoted.includeTitle")}
                 onClick={toggleIncludeOriginal}
               >
-                Include quote
+                {t("quoted.include")}
               </Button>
             </div>
           )}
@@ -762,10 +774,10 @@ function ReadyComposeMessageField({
             size="1"
             color="gray"
             variant="soft"
-            title="Include the original message as a quote in the reply"
+            title={t("quoted.includeTitle")}
             onClick={toggleIncludeOriginal}
           >
-            Include quote
+            {t("quoted.include")}
           </Button>
         </div>
       )}
@@ -780,11 +792,11 @@ function ReadyComposeMessageField({
               <button
                 type="button"
                 className={composeStyles.composeQuotedTrigger}
-                title={isQuotedExpanded ? "Hide quoted message" : "Show quoted message"}
+                title={isQuotedExpanded ? t("quoted.hide") : t("quoted.show")}
               >
                 <CaretRightIcon className={composeStyles.summaryCaret} />
                 <span className={composeStyles.summaryText}>
-                  Quoted Message
+                  {t("quoted.label")}
                 </span>
               </button>
             </Collapsible.Trigger>
@@ -794,10 +806,10 @@ function ReadyComposeMessageField({
                 size="1"
                 color="gray"
                 variant={composeIncludeOriginal ? "solid" : "soft"}
-                title="Include the original message as a quote in the reply"
+                title={t("quoted.includeTitle")}
                 onClick={toggleIncludeOriginal}
               >
-                Include quote
+                {t("quoted.include")}
               </Button>
               <span className={composeStyles.quoteActions}>
                 <Button
@@ -806,12 +818,12 @@ function ReadyComposeMessageField({
                   variant="soft"
                   color="gray"
                   title={
-                    composeStripImages ? "Images already stripped" : "Strip images from quoted HTML"
+                    composeStripImages ? t("quoted.imagesStripped") : t("quoted.stripImagesTitle")
                   }
                   disabled={!hasQuotedParts || composeStripImages}
                   onClick={handleStripImages}
                 >
-                  Strip images
+                  {t("quoted.stripImages")}
                 </Button>
                 {canRemoveForwardMeta && (
                   <Button
@@ -819,10 +831,10 @@ function ReadyComposeMessageField({
                     size="1"
                     variant="soft"
                     color="gray"
-                    title="Remove the header details (From, To, Cc, Date, ...) of the forwarded message"
+                    title={t("quoted.removeMetaTitle")}
                     onClick={handleRemoveForwardMeta}
                   >
-                    Remove details
+                    {t("quoted.removeMeta")}
                   </Button>
                 )}
                 <Button
@@ -830,11 +842,11 @@ function ReadyComposeMessageField({
                   size="1"
                   color="gray"
                   variant={composeQuoteHtml ? "solid" : "soft"}
-                  title="Toggle HTML quoting"
+                  title={t("quoted.quoteHtmlTitle")}
                   onClick={toggleQuoteHtml}
                   disabled={!hasQuotedParts}
                 >
-                  Quote HTML
+                  {t("quoted.quoteHtml")}
                 </Button>
               </span>
             </span>

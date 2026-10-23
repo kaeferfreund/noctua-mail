@@ -1553,5 +1553,121 @@
     "trash": "Trash",
     "spam": "Spam",
     "archive": "Archive"
+  },
+  "Editor": {
+    "placeholder": "Write your message…",
+    "linkPrompt": "Enter URL",
+    "toolbar": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "strikethrough": "Strikethrough",
+      "increaseTextSize": "Increase text size",
+      "decreaseTextSize": "Decrease text size",
+      "clearFormatting": "Clear formatting",
+      "bulletedList": "Bulleted list",
+      "numberedList": "Numbered list",
+      "removeList": "Remove list",
+      "link": "Link",
+      "insertTable": "Insert table",
+      "insertRowAbove": "Insert row above",
+      "insertRowBelow": "Insert row below",
+      "deleteRow": "Delete row",
+      "insertColumnLeft": "Insert column left",
+      "insertColumnRight": "Insert column right",
+      "deleteColumn": "Delete column",
+      "deleteTable": "Delete table",
+      "visualEditor": "Visual editor",
+      "sourceHtml": "Source HTML"
+    },
+    "image": {
+      "resizeHint": "Drag a corner to resize · double-click to reset",
+      "resizeLabel": "Resize image (use arrow keys; hold shift for larger steps)",
+      "resize": "Resize"
+    },
+    "quoted": {
+      "label": "Quoted message",
+      "show": "Show quoted message",
+      "hide": "Hide quoted message",
+      "editTitle": "Convert the quoted message into editable content",
+      "edit": "Edit",
+      "toggleQuoteTitle": "Toggle blockquote styling for the quoted message",
+      "quote": "Quote",
+      "unquote": "Unquote",
+      "removeImagesTitle": "Remove images from the quoted message",
+      "removeImages": "Remove images",
+      "removeMetaTitle": "Remove the header details (From, To, Cc, Date, ...) of the forwarded message",
+      "removeMeta": "Remove details",
+      "removeTitle": "Remove the quoted message from the reply",
+      "remove": "Remove",
+      "includeTitle": "Include the original message as a quote in the reply",
+      "include": "Include quote",
+      "stripImagesTitle": "Strip images from quoted HTML",
+      "imagesStripped": "Images already stripped",
+      "stripImages": "Strip images",
+      "quoteHtmlTitle": "Toggle HTML quoting",
+      "quoteHtml": "Quote HTML"
+    },
+    "tabs": {
+      "html": "HTML",
+      "markdown": "Markdown",
+      "text": "Text"
+    },
+    "translation": {
+      "targetLanguage": "Translation target language",
+      "translateTitle": "Translate the message with DeepL",
+      "translate": "Translate",
+      "translating": "Translating…",
+      "translatedTo": "Translated to {target}",
+      "translatedFromTo": "Translated to {target} · from {source}",
+      "revertTitle": "Restore the text from before the translation",
+      "revert": "Revert",
+      "dismiss": "Dismiss"
+    },
+    "signature": {
+      "chooseTitle": "Choose signature",
+      "label": "Signature",
+      "none": "No signature"
+    },
+    "attachment": {
+      "addTitle": "Add attachment",
+      "attach": "Attach"
+    },
+    "loading": {
+      "composer": "Loading composer…",
+      "composerFailed": "Could not load composer.",
+      "retry": "Retry",
+      "markdownEditor": "Loading Markdown editor…"
+    },
+    "markdown": {
+      "keys": {
+        "ctrl": "ctrl",
+        "shift": "shift"
+      },
+      "headingIcon": "Heading {level}",
+      "commands": {
+        "bold": "Add bold text ({shortcut})",
+        "italic": "Add italic text ({shortcut})",
+        "strikethrough": "Add strikethrough text ({shortcut})",
+        "hr": "Insert HR ({shortcut})",
+        "title": "Insert title",
+        "heading": "Insert Heading {level} ({shortcut})",
+        "link": "Add a link ({shortcut})",
+        "quote": "Insert a quote ({shortcut})",
+        "code": "Insert code ({shortcut})",
+        "codeBlock": "Insert Code Block ({shortcut})",
+        "comment": "Insert comment ({shortcut})",
+        "image": "Add image ({shortcut})",
+        "table": "Add table",
+        "unorderedList": "Add unordered list ({shortcut})",
+        "orderedList": "Add ordered list ({shortcut})",
+        "checkedList": "Add checked list ({shortcut})",
+        "help": "Open help",
+        "edit": "Edit code ({shortcut})",
+        "live": "Live code ({shortcut})",
+        "preview": "Preview code ({shortcut})",
+        "fullscreen": "Toggle fullscreen ({shortcut})"
+      }
+    }
   }
 }
