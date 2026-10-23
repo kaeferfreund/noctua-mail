@@ -11,6 +11,8 @@ import { Button } from "@/app/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/app/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
+import calendarFrame from "@/app/components/calendar/CalendarPopover.module.css";
+import styles from "./BottomStatusBar.module.css";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
 import type { Account, AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
 import { formatDate, formatTime } from "@/lib/i18n/format";
@@ -92,16 +94,17 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
     <p>{props.mailCheckMode === "idle" ? t("liveCheck") : t("nextCheck", { time: timestamp(props.mailCheckStatus.nextCheckAt) })}</p>
     {checkMail}
   </div>;
-  const calendar = <div className="space-y-3">
-    <Button variant="outline" size="sm" onClick={() => { props.onToggleCalendarSidebar(); close(); }}>
+  const calendar = <div className={`${styles.calendar} ${openPanel === "calendar" ? styles.calendarOpen : ""}`}>
+    <div className="flex shrink-0 flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => { props.onToggleCalendarSidebar(); close(); }}>
       {props.calendarSidebarOpen ? t("hideCalendarSidebar") : t("showCalendarSidebar")}
     </Button>
     <Button variant="ghost" size="sm" onClick={() => setOpenPanel(openPanel === "calendar" ? "reminder" : "calendar")}>
       {openPanel === "calendar" ? t("reminder.title") : t("calendar")}
     </Button>
-    {openPanel === "calendar" ? <CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
+    </div>
+    {openPanel === "calendar" ? <div className={calendarFrame.body}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
       onOpenMessage={props.onOpenCalendarMessage ? id => { props.onOpenCalendarMessage?.(id); close(); } : undefined}
-      onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /> : null}
+      onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /></div> : null}
   </div>;
   const process = <ProcessStatusPopover embedded={!isMobile} open={openPanel === "process"} onOpenChange={changePanel("process")}
     isSyncing={isSyncing} isRecomputingThreads={props.isRecomputingThreads} isRecomputingCategories={props.isRecomputingCategories}
@@ -128,7 +131,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
         <SheetContent onCloseAutoFocus={event => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined}
           side={openPanel === "calendar" ? "right" : "bottom"} className={openPanel === "calendar" ? mobileStyles.fullscreenSheet : mobileStyles.statusSheet}>
           <SheetTitle className="px-4">{openPanel === "calendar" ? t("calendar") : t("mailCheck.title")}</SheetTitle>
-          <Theme asChild><div className="min-h-0 flex-1 overflow-auto p-4">
+          <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-4">
             {openPanel === "calendar" ? calendar : <><p className="mb-3 text-sm text-muted-foreground">{t("mailCheck.description")}</p>{mailCheck}</>}
           </div></Theme>
         </SheetContent>
