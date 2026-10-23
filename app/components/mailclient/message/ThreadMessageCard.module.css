@@ -609,6 +609,7 @@
 }
 
 @media print {
-  .toCopy, .moreButton, .compactActions, .compactBadges { display: none !important; }
+  .toCopy, .moreButton, .compactActions, .compactBadges,
+  .compactSenderIcon, .metaSenderIcon { display: none !important; }
   .metaValue, .metaValueText, .toValue { overflow: visible; max-height: none; white-space: normal; }
 }
