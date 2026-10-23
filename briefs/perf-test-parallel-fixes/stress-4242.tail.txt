@@ -1,0 +1,26 @@
+# tail of stress-4242.log
+[RECOMPUTE CATEGORIES] Starting for account collab-ad274a66-7eb5-44a8-b09c-62addb430101
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+[RECOMPUTE CATEGORIES] Starting for account collab-914b04f1-f774-4f4c-90ce-db47323939b2
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+[RECOMPUTE CATEGORIES] Starting for account collab-914b04f1-f774-4f4c-90ce-db47323939b2
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+
+lib/db/senderIdentityMetadata.test.ts:
+[startup] opened storage {
+  dataDir: "/tmp/pfix-gates/tmp/mywebmail-test-db-3194027-KkD6ys",
+  dbPath: "/tmp/pfix-gates/tmp/mywebmail-test-db-3194027-KkD6ys/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+ --seed=4242
+ 8412 pass
+ 0 fail
+ 45825 expect() calls
+Ran 8412 tests across 304 files. [274.53s]

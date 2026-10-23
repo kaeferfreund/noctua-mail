@@ -1,0 +1,26 @@
+# tail of stress-1337.log
+PASS fixture draft no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture draft failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture draft SMTP rejected: no delivery, no Sent APPEND
+PASS fixture draft lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft cleanup-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture calendar failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture calendar SMTP rejected: no delivery, no Sent APPEND
+PASS fixture calendar lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture single-draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and own Sent files verified
+PASS fixture new outbound: Sent ingested and attributed without reply activity
+PASS 31 fixture send scenarios
+
+ --seed=1337
+ 8412 pass
+ 0 fail
+ 45825 expect() calls
+Ran 8412 tests across 304 files. [276.73s]

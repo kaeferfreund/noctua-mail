@@ -1,0 +1,7 @@
+start 12:54:03 load=1.80 dirs=0 sinks=0 undefined=0
+stress seed=1337 rc=0 wall=277s load_start=1.80 load_end=4.10 dirs_before=0 dirs_after=1 sinks=0  8412 pass 0 fail 
+stress seed=4242 rc=0 wall=274s load_start=4.10 load_end=4.19 dirs_before=1 dirs_after=3 sinks=0  8412 pass 0 fail 
+stress seed=9001 rc=0 wall=311s load_start=4.19 load_end=3.09 dirs_before=3 dirs_after=4 sinks=0  8412 pass 0 fail 
+test:ci rc=0 wall=385s dirs_before=4 dirs_after=2 sinks=0  2804 pass 0 fail 462 pass 0 fail 
+shared-dir fd hits: 0; shared files newer than marker: 0; undefined dir: 0
+done 13:14:51

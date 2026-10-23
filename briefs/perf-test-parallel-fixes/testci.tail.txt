@@ -1,0 +1,26 @@
+# tail of testci.log
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792761286445-13",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+ 462 pass
+ 0 fail
+ 2682 expect() calls
+Ran 462 tests across 58 files. [66.16s]
