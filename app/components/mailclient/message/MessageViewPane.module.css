@@ -104,6 +104,6 @@
     display: block !important; position: static !important; width: 100% !important;
     margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important;
   }
-  :global([data-reader-print]) { position: static; width: 100%; }
+  :global([data-reader-print]) { visibility: visible; position: static; width: 100%; }
   :global([data-reader-toolbar]), .mobileHeader { display: none !important; }
 }
