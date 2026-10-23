@@ -26,16 +26,16 @@ export async function getMessageById(accountId: string, messageId: string) {
   const db = await getAccountDb(accountId);
   const normalizedLookup = messageId.trim();
   const idLookupCandidates = buildMessageRowIdLookupCandidates(normalizedLookup);
+  // Reuse the live connection's cached read across collision candidates and opens.
+  const selectById = db.query(`SELECT * FROM messages WHERE accountId = ? AND id = ?`);
   let row: any = null;
   for (const candidateId of idLookupCandidates) {
-    row = db
-      .prepare(`SELECT * FROM messages WHERE accountId = ? AND id = ?`)
-      .get(accountId, candidateId) as any;
+    row = selectById.get(accountId, candidateId) as any;
     if (row) break;
   }
   if (!row) {
     row = db
-      .prepare(
+      .query(
         `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) = lower(?) ORDER BY dateValue DESC LIMIT 1`
       )
       .get(accountId, normalizedLookup) as any;
@@ -44,7 +44,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     const trimmed = normalizedLookup.replace(/[<>]/g, "").trim();
     if (trimmed && trimmed !== normalizedLookup) {
       row = db
-        .prepare(
+        .query(
           `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) LIKE ? ORDER BY dateValue DESC LIMIT 1`
         )
         .get(accountId, `%${trimmed.toLowerCase()}%`) as any;
@@ -66,10 +66,12 @@ export async function getMessageById(accountId: string, messageId: string) {
   }
   await backfillMessageSenderKey(db, row);
   const attachments = db
-    .prepare(`SELECT * FROM attachments WHERE accountId = ? AND messageId = ?`)
+    .query(`SELECT * FROM attachments WHERE accountId = ? AND messageId = ?`)
     .all(accountId, row.id) as any[];
   const calendarInviteData = (await getMessageCalendarInviteDataByMessageId(
-    db,
+    // This caller always has one id, so the shared batch reader has a stable SQL
+    // shape. Cache only its reads; keep its normalization and mapping unchanged.
+    { prepare: (sql: string) => db.query(sql) },
     accountId,
     [row.id]
   )).get(row.id);
