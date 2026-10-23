@@ -25,8 +25,8 @@ export const STATUS_LABELS = {
 export const STATUS_STYLES = {
   open: { background: "var(--gray-3)", color: "var(--gray-11)" },
   in_progress: { background: "var(--iris-3)", color: "var(--iris-11)" },
-  waiting: { background: "var(--amber-3)", color: "var(--amber-11)" },
-  closed: { background: "var(--green-3)", color: "var(--green-11)" },
+  waiting: { background: "var(--amber-3)", color: "var(--amber-12)" },
+  closed: { background: "var(--green-3)", color: "var(--green-12)" },
 };
 export function memberName(members: CollabMember[], userId: string) {
   const member = members.find((m) => m.userId === userId && !m.disabled);
