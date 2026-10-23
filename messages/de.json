@@ -968,6 +968,10 @@
     }
   },
   "Notifications": {
+    "fullSyncCancelled": "Vollständige Synchronisierung abgebrochen",
+    "syncCancelledSelectionChanged": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen, weil du ein anderes Postfach ausgewählt hast.",
+    "folderAccountMismatch": "Der Ordner gehört nicht zu diesem Postfach. Bitte wähle das Postfach neu aus.",
+    "syncCancelledBeforeStart": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen.",
     "region": "Benachrichtigungen",
     "dismissLabel": "Benachrichtigung schließen",
     "dismiss": "Schließen",
