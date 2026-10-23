@@ -112,4 +112,28 @@ describe("secondary startup requests", () => {
     await act(async () => { rerender({ accountId: "account-c" }); });
     expect(result.current.topicMessageCountById.size).toBe(0);
   });
+  it("never shows one mailbox's topic names under another", async () => {
+    const held = new Map<string, (res: Response) => void>();
+    const topicsOf = (id: string) => Response.json({ ok: true, topics: [{ id: `topic-${id}`, name: `Synthetic ${id}` }] });
+    const apiFetch = (input: RequestInfo | URL) => new Promise<Response>(resolve => { held.set(String(input), resolve); });
+    const { result, rerender } = renderHook(({ accountId }) => useTopics({ activeAccountId: accountId, apiFetch }),
+      { initialProps: { accountId: "account-a" } });
+    await act(async () => { held.get("/api/accounts/account-a/topics")!(topicsOf("account-a")); });
+    await waitFor(() => expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-a"]));
+    rerender({ accountId: "account-b" });
+    // Until B's topics arrive the list is empty, not A's.
+    expect(result.current.allTopics).toEqual([]);
+    rerender({ accountId: "account-a" });
+    rerender({ accountId: "account-b" });
+    // A late response for A (its request was superseded) never shows under B.
+    await act(async () => { held.get("/api/accounts/account-a/topics")!(topicsOf("account-a")); });
+    expect(result.current.allTopics).toEqual([]);
+    // A local update before B's response belongs to B only.
+    act(() => { result.current.setAllTopics(prev => [...prev, { id: "topic-new", name: "Synthetic new" } as never]); });
+    expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-new"]);
+    await act(async () => { held.get("/api/accounts/account-b/topics")!(topicsOf("account-b")); });
+    await waitFor(() => expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-b"]));
+    rerender({ accountId: "account-a" });
+    expect(result.current.allTopics).toEqual([]);
+  });
 });

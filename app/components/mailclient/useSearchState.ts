@@ -106,6 +106,15 @@ export type SearchActions = {
   activateVirtualFolder: (virtualFolderId: string) => void;
 };
 
+type VirtualFolderCounts = {
+  accountId: string;
+  focused: number | null;
+  todo: number | null;
+  inviteTotal: number | null;
+  inviteUnread: number | null;
+};
+const NO_VIRTUAL_COUNTS: VirtualFolderCounts = { accountId: "", focused: null, todo: null, inviteTotal: null, inviteUnread: null };
+
 export function useSearchState(options: UseSearchStateOptions) {
   const t = useTranslations("Views");
   const {
@@ -130,24 +139,12 @@ export function useSearchState(options: UseSearchStateOptions) {
   const [searchBadges, setSearchBadges] = useState<SearchBadgesState>(DEFAULT_SEARCH_BADGES);
   const [activeVirtualFolderId, setActiveVirtualFolderId] =
     useState<VirtualFolderDefinition["id"] | null>(null);
-  const [focusedUnreadCount, setFocusedUnreadCount] = useState<number | null>(null);
-  const [actionQueueTodoCount, setActionQueueTodoCount] = useState<number | null>(null);
-  const [inviteDeckTotalCount, setInviteDeckTotalCount] = useState<number | null>(null);
-  const [inviteDeckUnreadCount, setInviteDeckUnreadCount] = useState<number | null>(null);
+  // Keyed by mailbox: another mailbox's counts read as unknown, never as this one's.
+  const [virtualCounts, setVirtualCounts] = useState<VirtualFolderCounts>(NO_VIRTUAL_COUNTS);
+  const countsForActive = activeAccountId && virtualCounts.accountId === activeAccountId
+    ? virtualCounts : NO_VIRTUAL_COUNTS;
 
   const lastFolderIdRef = useRef<string>("");
-
-  // Reset counts when no active account
-  useEffect(() => {
-    if (activeAccountId) return;
-    const timer = setTimeout(() => {
-      setFocusedUnreadCount(null);
-      setActionQueueTodoCount(null);
-      setInviteDeckTotalCount(null);
-      setInviteDeckUnreadCount(null);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [activeAccountId]);
 
   const activeVirtualFolder = useMemo(() => {
     if (!activeVirtualFolderId) return null;
@@ -230,19 +227,13 @@ export function useSearchState(options: UseSearchStateOptions) {
         fetchCount("calendar", virtualDefaultExcludedFolderIdsKey),
         fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey)
       ])
-        .then(([focusedCount, todoCount, inviteTotalCount, inviteUnreadCount]) => {
+        .then(([focused, todo, inviteTotal, inviteUnread]) => {
           if (controller.signal.aborted) return;
-          setFocusedUnreadCount(focusedCount);
-          setActionQueueTodoCount(todoCount);
-          setInviteDeckTotalCount(inviteTotalCount);
-          setInviteDeckUnreadCount(inviteUnreadCount);
+          setVirtualCounts({ accountId: activeAccountId, focused, todo, inviteTotal, inviteUnread });
         })
         .catch(() => {
           if (controller.signal.aborted) return;
-          setFocusedUnreadCount(null);
-          setActionQueueTodoCount(null);
-          setInviteDeckTotalCount(null);
-          setInviteDeckUnreadCount(null);
+          setVirtualCounts(NO_VIRTUAL_COUNTS);
         });
     }, 160);
 
@@ -272,10 +263,10 @@ export function useSearchState(options: UseSearchStateOptions) {
     searchFields,
     searchBadges,
     activeVirtualFolderId,
-    focusedUnreadCount,
-    actionQueueTodoCount,
-    inviteDeckTotalCount,
-    inviteDeckUnreadCount,
+    focusedUnreadCount: countsForActive.focused,
+    actionQueueTodoCount: countsForActive.todo,
+    inviteDeckTotalCount: countsForActive.inviteTotal,
+    inviteDeckUnreadCount: countsForActive.inviteUnread,
     activeVirtualFolder
   };
 
