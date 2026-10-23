@@ -457,10 +457,15 @@ export async function saveDraftForAccount(params: {
     }
     sanitized.draftInvite = payload.invite ?? null;
     if (params.localFlags) sanitized.flags = appendMessageFlags(sanitized.flags, params.localFlags);
-    // Replacement and its attachment/FTS bookkeeping share the guarded writer.
-    await upsertMessages(account.id, null, [sanitized], false, { beforeWrite, replaceDraftId: existingDraft?.id });
-    draftId = sanitized.id;
-    savedMessage = sanitized;
+    const stored = await upsertMessages(account.id, null, [sanitized], false, { beforeWrite, replaceDraftId: existingDraft?.id });
+    draftId = stored.messageRowIds.get(sanitized.id) ?? sanitized.id;
+    const storedMessage = await getMessageById(account.id, draftId);
+    savedMessage = storedMessage ? {
+      ...storedMessage,
+      xComposeFormat: sanitized.xComposeFormat,
+      quotedHtmlEdited: sanitized.quotedHtmlEdited,
+      draftInvite: sanitized.draftInvite
+    } : null;
   }
 
   if (existingDraft?.imapUid && existingDraft.mailboxPath) {

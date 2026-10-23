@@ -81,7 +81,31 @@ for the shard key and migration contract.
 
 ### `sources/...` and `attachments/...` (cache, rebuildable)
 
-Contains cached raw message source and attachment binaries.
+Contains cached raw message source and attachment binaries. In these paths,
+`messageId` is the **final database row id**, including a collision suffix for
+copies sharing a Message-ID in different mailboxes/UIDs. It is not the wire
+Message-ID or the provisional base id. The pre-existing base row keeps its
+source and attachments byte-for-byte when another copy is ingested.
+
+Ingestion stages bytes under temporary names, then resolves each final row id
+and publishes its source/attachments by rename within the existing immediate
+shard transaction. The nullable `messages.sourceSha256 TEXT` column records the
+source's SHA-256 digest in that same transaction; source-less updates to a
+retained row preserve its existing digest. Publication is idempotent for the same final id and bytes.
+On a caught file/SQL failure, prior files are restored while the writer lock is
+held, newly published files are removed, and staging/backup files are cleaned.
+SQLite and files are not a single crash-atomic resource: interruption can leave
+temporary `.pending-*` files or a source inconsistent with the rolled-back row.
+These temporary files are not read as sources; a digest mismatch fails closed
+for sender-key backfill. They can be removed with the app stopped; resync
+refreshes the row and its files.
+
+Lazy sender-key backfill requires an exact final-row-id source matching that
+ownership digest. Legacy files without a digest are never trusted for sender
+permissions, even if their filename exactly matches a row. Authoritative resync
+writes both the parsed sender key and the ownership digest. Low-level cache
+rewrites (for example attachment-removal fallback) do not establish provenance;
+if they change the bytes, backfill waits for resync.
 These files are performance/availability cache for message rendering and downloads.
 
 ## Loss Impact (What Users Lose)

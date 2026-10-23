@@ -13,6 +13,15 @@ test(SCENARIOS.shellLogin, async ({ page }) => {
   await expect(page.getByText("Use my personal mailbox password")).toHaveCount(0);
   await page.getByRole("button", { name: "Sign up with an invite code" }).click();
   await expect(page.getByLabel("Invite code", { exact: true })).toBeVisible();
+  await page.getByLabel("Invite code", { exact: true }).fill("synthetic-unsubmitted-invite");
+  await page.getByLabel("Email", { exact: true }).fill("synthetic-locale@example.test");
+  await page.getByRole("combobox", { name: "Language", exact: true }).selectOption("de");
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
+  await expect(page.getByLabel("Invite code", { exact: true })).toHaveValue("synthetic-unsubmitted-invite");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("synthetic-locale@example.test");
+  await page.getByRole("combobox", { name: "Sprache", exact: true }).selectOption("automatic");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
 test(SCENARIOS.shellChallenge, async ({ page, seed }) => {
@@ -222,8 +231,9 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await passwordLogin(page, seed.email, seed.password);
   await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
   await page.getByRole("button", { name: "Verify", exact: true }).click();
-  const first = page.locator('button[title="synthetic-mailbox-a@example.test"]');
-  const second = page.locator('button[title="synthetic-mailbox-b@example.test"]');
+  // Summary counts enrich the tooltip asynchronously; locate the stable mailbox label.
+  const first = page.locator('button[data-sidebar="menu-button"]').filter({ has: page.getByText("synthetic-mailbox-a", { exact: true }) });
+  const second = page.locator('button[data-sidebar="menu-button"]').filter({ has: page.getByText("synthetic-mailbox-b", { exact: true }) });
   await expect(first).toHaveAttribute("aria-current", "true");
   expect((await api(page, "/api/auth/me")).body.mailboxState).toBe("selected");
   const switched = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/switch-account");
@@ -235,7 +245,42 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   expect(me.user.id).toBe(seed.userId);
   await page.reload();
   await expect(second).toHaveAttribute("aria-current", "true");
+  await page.getByText("Synthetic locale thread", { exact: true }).first().click();
+  await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+  const subject = page.getByPlaceholder("Subject", { exact: true });
+  await subject.fill("Synthetic unsent locale draft");
+  // A reply draft retains the open thread alongside the inline composer.
+  await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "User menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Settings", exact: true }).click();
+  await page.getByRole("tab", { name: "Preferences", exact: true }).click();
+  const language = page.getByRole("combobox", { name: "Language", exact: true });
+  await expect(language).toBeEnabled();
+  await language.selectOption("de");
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
+  expect((await api(page, "/api/auth/me")).body.user.uiLocale).toBe("de");
+  await page.getByRole("dialog", { name: "Account settings", exact: true }).getByRole("button", { name: "Close", exact: true }).first().click();
+  await expect(second).toHaveAttribute("aria-current", "true");
+  await expect(subject).toHaveValue("Synthetic unsent locale draft");
+  await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "User menu", exact: true }).click();
   await page.getByRole("menuitem", { name: "Profile & security", exact: true }).click();
   await expect(page.getByRole("heading", { name: "App password", exact: true })).toBeVisible();
+  // A fresh login must prefer the personal language over this device's English cookie.
+  await page.evaluate(async () => {
+    const response = await fetch("/api/auth/logout", {method: "POST"});
+    if (!response.ok) throw new Error("Synthetic logout failed");
+    document.cookie = "noctua-ui-locale=en; Path=/; SameSite=Lax";
+  });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await passwordLogin(page, seed.email, seed.password);
+  await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seed.totpURI));
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  // A new auth session uses the existing deterministic first-mailbox default.
+  await expect(first).toHaveAttribute("aria-current", "true");
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
 });

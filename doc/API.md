@@ -52,6 +52,18 @@ Same-origin rejection is HTTP 403 `{ok:false,code:"invalid_origin"}`; wrong medi
 415 `{ok:false,code:"json_required"}`. A nonempty comment DELETE body returns
 400 `{ok:false,code:"unexpected_body"}`.
 
+## IMAP folder events
+
+`GET /api/accounts/{accountId}/imap/stream` emits `folder:update` with an array of
+`{id, uidNext?, unseen?, exists?}`. `unseen` is the unread **count** from IMAP
+STATUS (UNSEEN); SELECT/EXAMINE's UNSEEN response is a first-unseen sequence
+number and must never populate this field. `exists` is the total message count.
+Initial connection, EXISTS and flag changes refresh watched-folder counts with
+STATUS; background polling uses STATUS for other folders. Omitted counts leave
+the client's known values unchanged. Field names and count semantics are unchanged;
+the initial event previously violated this contract. After local sync completes,
+these counts agree with `GET /api/accounts/{accountId}/folders` for synced folders.
+
 ## Mailbox summaries and user events
 
 `GET /api/me/mailboxes/summary` requires an active MFA session, without requiring a selected
@@ -63,7 +75,7 @@ mailbox. It returns `Cache-Control: no-store` and this contract (timestamps are 
   mailboxes: [{
     accountId: string, name: string, email: string,
     accessRole: "viewer" | "editor" | "manager", isOwner: boolean, shared: boolean,
-    unread: number | null, assignedToMe: number, unassignedOpen: number,
+    unread: number | null, assignedToMe: number, unassignedOpen: number, open: number,
     watcher: {
       state: "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped",
       lastEventAt?: number
@@ -80,7 +92,9 @@ the first recorded successful sync. `watcher.lastEventAt` is that sync's timesta
 when unknown. `shared` follows the account DTO's member-count definition. Collaboration
 counts are distinct live threads across mailbox folders: `assignedToMe` includes every status
 assigned to the session user; `unassignedOpen` has no assignee and status open, in_progress or
-waiting, including threads with no state row. Deleted messages and state without live messages
+waiting, including threads with no state row. `open` counts the same statuses across all live
+threads regardless of assignee, matching the whole-mailbox Open view (§7.2). Both counts are
+computed by the same SQL statement over the same distinct live threads. Deleted messages and state without live messages
 do not contribute. Counts use one indexed collaboration query per shard. These are mailbox
 badges and notifications; message browsing still selects one mailbox.
 
@@ -88,13 +102,17 @@ badges and notifications; message browsing still selects one mailbox.
 Each JSON data payload includes its event type:
 
 ```ts
-{ type: "mailbox-summary", accountId: string, unread: number | null, assignedToMe: number, unassignedOpen: number }
+{ type: "mailbox-summary", accountId: string, unread: number | null, assignedToMe: number, unassignedOpen: number, open: number, watcher: { state: "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped", lastEventAt?: number } }
 { type: "thread-collab", accountId: string, threadId: string, revision: number }
 { type: "mailboxes-changed" }
 ```
 
 Watcher state/sync invalidations and committed collaboration mutations coalesce for 250 ms
-per mailbox. A refresh sends current counts followed by each changed thread's greatest
+per mailbox, including watcher-only state transitions. `watcher` has the same semantics as
+the summary response and replaces the previous watcher object (including an omitted timestamp).
+`open` and the event `watcher` object are additive fields. Older event payloads lacking either
+field require one coordinated canonical read; current complete events apply without a GET.
+A refresh sends current counts and watcher metadata followed by each changed thread's greatest
 committed revision in that burst. Revisions belong to `(accountId,threadId)` and match REST
 state/comment revisions; **mailbox-summary has no thread revision** because its counts can
 combine multiple threads. Membership changes send `mailboxes-changed`: refetch the summary
@@ -212,6 +230,53 @@ these with feat/team-auth's account-access/context helpers when Slice 3 lands; t
 route is team-auth-owned at integration. Do not activate
 HTTP MCP until that branch supplies its token checks. feat/collab-ui consumes the routes,
 collaboration enrichment, shared Sent state, and post-send warnings.
+
+## Personal UI language
+
+`GET /api/auth/me` adds `user.uiLocale: "de" | "en" | null` to both full and
+restricted identities. Existing identity/security fields and the four-state
+`mailboxState` contract are unchanged. Null selects automatic locale resolution.
+
+`PUT /api/auth/preferences` accepts exactly `{"uiLocale":"de"}`, `{"uiLocale":"en"}`
+or `{"uiLocale":null}` and returns `{ok:true,uiLocale:"de"|"en"|null}` with
+`Cache-Control: no-store`. It requires the signed-in user's live MFA-assured
+session, even without a selected mailbox, and the shared same-origin JSON checks.
+Unknown fields (including userId), invalid locales and malformed JSON return 400
+`invalid_request`. Missing session returns 401; restricted assurance returns 403.
+Origin/media-type failures retain the existing helper's `invalid_origin` (403)
+and `json_required` (400) conventions. Auth refresh/deletion headers are forwarded.
+The endpoint only writes the current session user's Noctua `users.uiLocale`;
+Better Auth identity/security tables are untouched. Like switch-account, this
+preference mutation adds no audit event.
+
+A successful write also synchronizes the validated `noctua-ui-locale` cookie
+(Path=/, SameSite=Lax, one year; Automatic/null deletes it). Anonymous auth screens
+use this device cookie directly. Resolution is personal preference → device
+cookie → quality-weighted Accept-Language with regional variants → German.
+See [I18N.md](I18N.md) for message and formatting conventions.
+
+## Self-service auth JSON body limit
+
+The following endpoints accept at most **16 KiB (16,384 bytes)** of JSON body,
+including whitespace and UTF-8 encoding bytes (`AUTH_JSON_BODY_LIMIT` in
+`app/api/_helpers/readAuthJson.ts`):
+
+- `PUT /api/auth/preferences`
+- `POST /api/auth/switch-account`
+- `POST /api/auth/reauth`
+- `POST /api/auth/totp/replace`
+- `POST /api/auth/security/password`
+- `POST /api/auth/security/backup-codes`
+- `POST /api/auth/security/sessions/revoke`
+- `POST /api/auth/security/passkeys/rename`
+- `POST /api/auth/security/passkeys/remove`
+
+After the existing origin/media-type and session checks, oversized bodies return
+HTTP 413 `{ok:false,code:"payload_too_large"}` with `Cache-Control: no-store`
+and forwarded auth response headers. The shared reader bounds its JSON buffer
+and cancels the body stream when the limit is exceeded, including requests
+without Content-Length. Bodies exactly at the limit use the existing validation,
+proof and audit behaviour. Other endpoints retain their existing contracts.
 
 ## Sender identity send contracts (slice 2)
 

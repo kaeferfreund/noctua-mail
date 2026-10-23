@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import MembersTabContent from "./tabs/MembersTabContent";
 import PreferencesTabContent from "./tabs/PreferencesTabContent";
@@ -124,4 +125,36 @@ describe("settings tab role gating", () => {
     expect(page.queryByRole("tab", { name: "Admin" })).toBeNull();
     if (role !== "manager") expect(page.getByRole("tab", { name: "Preferences" }).getAttribute("aria-selected")).toBe("true");
   });
+});
+
+
+it("slice2b preferences: saved personal overrides round trip on remount without changing mailbox defaults", async () => {
+  let stored = { appearance: { senderIcons: false }, defaultSignatureId: "synthetic-signature" };
+  const calls: string[] = [];
+  const changed: unknown[] = [];
+  const listener = (event: Event) => changed.push((event as CustomEvent).detail);
+  window.addEventListener("noctua:account-prefs-changed", listener);
+  const defaults = JSON.stringify(account.settings);
+  const apiFetch: AdminFetch = async (input, init) => {
+    calls.push(`${init?.method ?? "GET"} ${input}`);
+    if (init?.method === "PUT") {
+      const patch = JSON.parse(String(init.body));
+      expect(patch).toEqual({ appearance: { senderIcons: true } });
+      stored = { ...stored, appearance: { ...stored.appearance, ...patch.appearance } };
+    }
+    return response({ ok: true, prefs: stored });
+  };
+  try {
+    const first = render(<PreferencesTabContent editingAccount={account} apiFetch={apiFetch} onClose={() => {}} />);
+    await waitFor(() => expect((first.getByLabelText("Show sender icons") as HTMLSelectElement).value).toBe("false"));
+    fireEvent.change(first.getByLabelText("Show sender icons"), { target: { value: "true" } });
+    fireEvent.click(first.getByRole("button", { name: "Save preferences" }));
+    await first.findByText("Preferences saved."); first.unmount();
+    const second = render(<PreferencesTabContent editingAccount={account} apiFetch={apiFetch} onClose={() => {}} />);
+    await waitFor(() => expect((second.getByLabelText("Show sender icons") as HTMLSelectElement).value).toBe("true"));
+    expect((second.getByLabelText("Default signature") as HTMLSelectElement).value).toBe("synthetic-signature");
+    expect(calls).toEqual(["GET /api/accounts/synthetic-account/prefs", "PUT /api/accounts/synthetic-account/prefs", "GET /api/accounts/synthetic-account/prefs"]);
+    expect(changed).toEqual([{ accountId: account.id, prefs: stored }]);
+    expect(JSON.stringify(account.settings)).toBe(defaults);
+  } finally { window.removeEventListener("noctua:account-prefs-changed", listener); }
 });

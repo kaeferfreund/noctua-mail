@@ -11,18 +11,63 @@ import { parseAddressEmails } from "@/lib/ownAddresses";
 // imap/ subtree.
 
 import type { Account } from "@/lib/data";
+import addressParser from "nodemailer/lib/addressparser/index.js";
+import { canonicalizeMailboxAddress, extractUnambiguousPrimaryEmail, extractUnambiguousPrimaryMailbox, formatAddress, formatMailboxAddress, splitAddressList } from "@/lib/senderIdentity";
 import type { ImapBodyStructure, ImapEnvelope, ImapEnvelopeAddress } from "./_shared";
 
 export type { ImapBodyStructure } from "./_shared";
 
 export function formatEnvelopeAddresses(addresses?: ImapEnvelopeAddress[] | null) {
   if (!addresses || addresses.length === 0) return "";
-  const parts = addresses.map((addr) => {
+  const parts: string[] = [];
+  for (const addr of addresses) {
     const email = addr?.address || (addr?.mailbox && addr?.host ? `${addr.mailbox}@${addr.host}` : "");
-    if (addr?.name && email) return `"${addr.name}" <${email}>`;
-    return addr?.name || email || "";
-  });
-  return parts.filter(Boolean).join(", ");
+    if (!email) continue; // IMAP group delimiters have no mailbox.
+    const formatted = formatAddress(addr?.name ?? "", email, true);
+    // Never discard a malformed first mailbox and promote a later one.
+    if (!formatted) return "";
+    parts.push(formatted);
+  }
+  return parts.join(", ");
+}
+
+export function formatHeaderAddresses(value?: string | null) {
+  if (!value) return "";
+  const sources = splitAddressList(value).map(extractUnambiguousPrimaryMailbox);
+  const addresses = addressParser(value, { flatten: true });
+  if (sources.length !== addresses.length || sources.some(source => !source)) return "";
+  // addressparser removes quotes and trims quoted local parts. Restore their
+  // original spelling before serialization so no mailbox characters are lost.
+  return addresses.map((address, index) => formatAddress(address.name ?? "", sources[index]!)).join(", ");
+}
+
+/** Derive identity from parsed wire data, never from a stored display string. */
+export function resolveMessageSenderKey(envelope: ImapEnvelope | undefined, headers: Map<string, string[]>) {
+  if (envelope?.from?.length) {
+    const first = envelope.from.find(address => address.address || (address.mailbox && address.host));
+    if (!first) return null;
+    const mailbox = first.address || `${first.mailbox}@${first.host}`;
+    return canonicalizeMailboxAddress(formatMailboxAddress(mailbox, true));
+  }
+  return extractUnambiguousPrimaryEmail(getHeaderValue(headers, "from"));
+}
+
+export function resolveMessageAddresses(
+  envelope: ImapEnvelope | undefined,
+  headers: Map<string, string[]>,
+  fallbackFrom: string
+) {
+  const resolve = (field: "from" | "to" | "cc" | "bcc") => {
+    if (envelope?.[field]?.length) return formatEnvelopeAddresses(envelope[field]);
+    const header = getHeaderValue(headers, field);
+    if (header !== undefined) return formatHeaderAddresses(header);
+    return field === "from" ? formatAddress("", fallbackFrom) : "";
+  };
+  return {
+    senderKey: resolveMessageSenderKey(envelope, headers),
+    from: resolve("from"), to: resolve("to"), cc: resolve("cc"), bcc: resolve("bcc"),
+    replyTo: formatHeaderAddresses(getHeaderValue(headers, "reply-to")) || undefined
+  };
 }
 
 export function normalizeEnvelopeHeaderId(value?: string | null) {
@@ -57,15 +102,15 @@ export function parseHeaderMap(raw?: Buffer) {
   const map = new Map<string, string[]>();
   if (!raw || raw.length === 0) return map;
   const unfolded: string[] = [];
-  const lines = raw.toString("utf8").split(/\r?\n\r?\n/, 1)[0].split(/\r?\n/);
-  lines.forEach((line) => {
-    if (!line) return;
+  const lines = raw.toString("utf8").split(/\r?\n/);
+  for (const line of lines) {
+    if (!line) break;
     if (/^\s/.test(line) && unfolded.length > 0) {
       unfolded[unfolded.length - 1] = `${unfolded[unfolded.length - 1]} ${line.trim()}`;
-      return;
+      continue;
     }
     unfolded.push(line);
-  });
+  }
   unfolded.forEach((line) => {
     const separator = line.indexOf(":");
     if (separator <= 0) return;

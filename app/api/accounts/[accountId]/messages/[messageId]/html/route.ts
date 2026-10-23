@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getMessageById, getUserAccountPrefs } from "@/lib/db";
 import { enforceSafeLinks } from "@/lib/html";
-import { messageHtmlCsp, remoteContentSenderKey, type RemoteContentMode } from "@/lib/html/remoteContent";
+import { messageHtmlCsp, senderAllowsRemoteContent, type RemoteContentMode } from "@/lib/html/remoteContent";
 import { requireActiveUserSession } from "@/lib/auth";
 import { formatMessageHtmlPageTitle } from "@/lib/appBranding";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
@@ -99,9 +99,8 @@ export async function GET(request: Request, { params }: Params) {
 
     const decision = new URL(request.url).searchParams.get("remoteContent");
     const prefs = await getUserAccountPrefs(access.userId, accountId);
-    const senderKey = remoteContentSenderKey(message.from);
     const mode: RemoteContentMode = decision === "allow" ||
-      (decision !== "block" && !!senderKey && prefs.remoteContent?.allowedSenders?.[senderKey] === true) ? "allow" : "block";
+      (decision !== "block" && senderAllowsRemoteContent(prefs, message.senderKey)) ? "allow" : "block";
     const html = postprocessHtml(message.htmlBody, message.attachments ?? [], mode);
     const payload = asHtmlDocument(message.subject ?? "", html);
     return new NextResponse(payload, {

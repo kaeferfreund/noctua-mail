@@ -299,7 +299,6 @@ export default function MessageListOrchestrator({
   messageListError,
   emptyListSyncing,
   activeVirtualFolderName,
-  searchScope,
   mutationInputs
 }: MessageListOrchestratorProps) {
   // Render the list with a deferred value so rapid header toggles (e.g.
@@ -572,10 +571,10 @@ export default function MessageListOrchestrator({
               ? `Failed to load messages. ${messageListError}`
               : emptyListSyncing
                 ? "Syncing messages…"
-                : activeVirtualFolderName
-                  ? `No messages in ${activeVirtualFolderName}.`
-                  : searchScope === "all"
-                    ? "No messages match this search."
+                : searchActive || isRelatedSearch
+                  ? "No messages match this search."
+                  : activeVirtualFolderName
+                    ? `No messages in ${activeVirtualFolderName}.`
                     : "No messages in this folder."}
           </div>
         )}

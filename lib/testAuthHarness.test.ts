@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { existsSync, readdirSync, readlinkSync } from "fs";
 import path from "path";
@@ -30,4 +30,42 @@ test("throwing options callback closes both harness DB handles and removes stora
   // above to prove explicit close(), then collect statements before the FD check.
   (globalThis as unknown as { Bun: { gc(force: boolean): void } }).Bun.gc(true);
   if (existsSync("/proc/self/fd")) expect(openFiles()).toEqual([]);
+});
+
+
+test("fixture user and credential inserts yield through contention without replaying committed users", async () => {
+  const f = await createTestAuthHarness();
+  const context = await f.auth.$context;
+  const original = context.internalAdapter.linkAccount.bind(context.internalAdapter);
+  let credentialAttempts = 0;
+  let unlock: ReturnType<typeof setTimeout> | undefined;
+  let locked = false;
+  const holdWriter = () => {
+    f.master.exec("BEGIN IMMEDIATE");
+    locked = true;
+    unlock = setTimeout(() => {
+      f.master.exec("ROLLBACK");
+      locked = false;
+    }, 25);
+  };
+  const link = spyOn(context.internalAdapter, "linkAccount").mockImplementation(async account => {
+    if (++credentialAttempts === 1) holdWriter();
+    return original(account);
+  });
+  try {
+    holdWriter();
+    const user = await f.createUser("contended-fixture@example.test");
+    expect(credentialAttempts).toBeGreaterThan(1);
+    expect(f.master.prepare("SELECT COUNT(*) AS n FROM auth_user WHERE email=?").get(user.email).n).toBe(1);
+    expect(f.master.prepare("SELECT COUNT(*) AS n FROM auth_account WHERE userId=? AND providerId='credential'").get(user.id).n).toBe(1);
+    expect(f.master.prepare("PRAGMA busy_timeout").get().timeout).toBe(0);
+    expect(f.database.prepare("PRAGMA busy_timeout").get().timeout).toBe(0);
+    const { session } = await f.signIn(user.email);
+    expect(session?.user.id).toBe(user.id);
+  } finally {
+    if (unlock) clearTimeout(unlock);
+    if (locked) f.master.exec("ROLLBACK");
+    link.mockRestore();
+    f.close();
+  }
 });

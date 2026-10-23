@@ -75,6 +75,7 @@ type Options = {
   refreshVersion?: number;
   onReadDenied?: (accountId: string) => void;
   sessionKey?: string;
+  currentUserId?: string | null;
 };
 const defaultFetch: ApiFetch = (...args) => fetch(...args);
 
@@ -108,10 +109,6 @@ export function useThreadCollab(
   const [memberEntry, setMemberEntry] = useState<{
     scope: string;
     members: CollabMember[];
-  } | null>(null);
-  const [meEntry, setMe] = useState<{
-    sessionKey?: string;
-    id: string | null;
   } | null>(null);
   const [errorEntry, setError] = useState<{
     key: string;
@@ -154,25 +151,9 @@ export function useThreadCollab(
     };
   }, []);
   useEffect(() => {
-    const controller = new AbortController();
-    void apiFetch("/api/auth/me", {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then(async (r) => {
-        if (!r.ok) {
-          if (!controller.signal.aborted) setMe({ sessionKey, id: null });
-          return;
-        }
-        const data = await r.json();
-        if (!controller.signal.aborted)
-          setMe({ sessionKey, id: data.user?.id ?? null });
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [apiFetch, accountId, sessionKey]);
-  useEffect(() => {
-    if (!accountId) return;
+    // Complete thread reads already carry membership. The standalone channel
+    // is needed only when the mailbox has no selected thread.
+    if (!accountId || threadId) return;
     const sequence = ++loadSequence.current;
     const controller = new AbortController();
     void apiFetch(`/api/accounts/${encodeURIComponent(accountId)}/members`, {
@@ -187,7 +168,7 @@ export function useThreadCollab(
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [accountId, memberScope, apiFetch, acceptMembers]);
+  }, [accountId, threadId, memberScope, apiFetch, acceptMembers]);
   const reload = useCallback(async () => {
     if (!accountId || !threadId) return;
     const owner = ++snapshotSequence.current;
@@ -327,7 +308,7 @@ export function useThreadCollab(
       memberEntry?.scope === memberScope
         ? memberEntry.members
         : (membersCache.current.get(memberScope) ?? []),
-    me: meEntry?.sessionKey === sessionKey ? (meEntry?.id ?? null) : null,
+    me: options.currentUserId ?? null,
     loading: Boolean(threadId && !data && errorEntry?.key !== key),
     pending: pendingKeys.has(key),
     error: errorEntry?.key === key ? errorEntry.message : null,

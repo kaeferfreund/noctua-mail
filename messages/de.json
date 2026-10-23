@@ -1,0 +1,15 @@
+{
+  "Settings": {
+    "language": {
+      "label": "Sprache",
+      "german": "Deutsch",
+      "english": "English",
+      "automatic": "Automatisch",
+      "saving": "Sprache wird gespeichert…",
+      "error": "Die Sprache konnte nicht gespeichert werden. Bitte erneut versuchen."
+    }
+  },
+  "Pwa": {
+    "description": "Moderner Webmail-Client als Prototyp"
+  }
+}

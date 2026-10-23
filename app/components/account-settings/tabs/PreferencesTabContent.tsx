@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import LanguageSelector from "@/app/components/i18n/LanguageSelector";
 import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
 import { Button } from "@/app/components/ui/button";
@@ -53,6 +54,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
   const signatureValue = patch.defaultSignatureId !== undefined ? patch.defaultSignatureId : prefs.defaultSignatureId;
   return <div className="flex h-full min-h-0 flex-col gap-4">
     <div className="min-h-0 flex-1 space-y-4 overflow-auto">
+      <LanguageSelector authenticated />
       <p className="text-sm text-muted-foreground">Personal preferences for this mailbox. Inherit uses the mailbox default; only changed preferences are saved.</p>
       {loading && <p role="status">Loading preferences…</p>}
       {error && <p role="alert" className="text-destructive">{error}</p>}

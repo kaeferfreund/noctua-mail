@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { sanitizeHtmlForDisplay } from "./sanitize";
-import { messageHtmlCsp, remoteContentSenderKey, senderAllowsRemoteContent } from "./remoteContent";
+import { messageHtmlCsp, senderAllowsRemoteContent } from "./remoteContent";
 
 const remote = "https://images.example.test/photo.png";
 const local = "/api/accounts/demo/messages/newsletter/attachments/logo";
@@ -110,12 +110,11 @@ describe("message HTML privacy", () => {
   });
 
   it("matches sender permission for the real parsed From mailbox", () => {
-    expect(remoteContentSenderKey(`  ${deceptiveFrom}  `)).toBe("actual@example.test");
-    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "actual@example.test": true } } }, deceptiveFrom)).toBe(true);
+    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "actual@example.test": true } } }, "actual@example.test")).toBe(true);
   });
 
   it("matches sender preferences by lower-cased address and keeps policies restrictive", () => {
-    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "sender@example.test": true } } }, "Synthetic <SENDER@EXAMPLE.TEST>")).toBe(true);
+    expect(senderAllowsRemoteContent({ remoteContent: { allowedSenders: { "sender@example.test": true } } }, "sender@example.test")).toBe(true);
     expect(senderAllowsRemoteContent({}, "sender@example.test")).toBe(false);
     expect(messageHtmlCsp()).toContain("default-src 'none'");
     expect(messageHtmlCsp()).not.toContain("https:");

@@ -5,14 +5,15 @@ import { hydrateIdentityMetadata } from "./identityMetadata";
  * Covers the four list/search entry points (`listMessages`, `listThreads`,
  * `listThreadMessages`, `listRelatedMessages`) and their filter/group
  * machinery. Upsert, flag, move, and delete operations live elsewhere.
- * Every function in this module reads only and does not issue writes
- * itself. `getAccountDb` may still run idempotent runtime-data ensure /
+ * Opening a thread lazily backfills missing sender keys from retained sources.
+ * `getAccountDb` may also run idempotent runtime-data ensure /
  * backfill steps (e.g. `ensureThreadLatestReceivedDateValues`) before
  * returning the connection; those writes, if any, happen inside
  * `getAccountDb`, not in this module's query logic.
  */
 import { SHARD_FTS_TABLE } from "../shardFormat";
 import { simpleParser } from "mailparser";
+import { backfillMessageSenderKey } from "./senderKey";
 import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
 import { getAccountOwnAddresses } from "../senderIdentities";
@@ -871,7 +872,7 @@ function applyBadgeFilters(where: string, args: any[], badges?: string[] | null,
       : " AND 0 = 1";
     if (options.viewerUserId) args.push(options.viewerUserId);
   }
-  if (normalized.includes("unassigned")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.assigneeUserId IS NOT NULL)`;
+  if (normalized.includes("unassigned")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND (tc.assigneeUserId IS NOT NULL OR tc.status='closed'))`;
   if (normalized.includes("open")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status='closed')`;
   for (const [badge,status] of [["closed","closed"],["in-progress","in_progress"],["waiting","waiting"]]) {
     if (normalized.includes(badge)) { where += ` AND EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status=?)`; args.push(status); }
@@ -1607,6 +1608,7 @@ export async function listRelatedMessages(params: {
         m.quotedHtmlEdited,
         m.subject,
         m.fromAddr,
+        m.senderKey,
         m.replyToAddr,
         m.toAddr,
         m.ccAddr,
@@ -1770,6 +1772,7 @@ export async function listRelatedMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -1820,6 +1823,7 @@ export async function listRelatedMessages(params: {
       threadId: row.threadId,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       to: row.toAddr,
       preview: row.preview,
@@ -2031,6 +2035,7 @@ export async function listMessages(params: {
         m.quotedHtmlEdited,
         m.subject,
         m.fromAddr,
+        m.senderKey,
         m.replyToAddr,
         m.toAddr,
         m.ccAddr,
@@ -2105,6 +2110,7 @@ export async function listMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -2350,12 +2356,6 @@ export async function listThreads(params: {
           `
           SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
           FROM threads t
-          LEFT JOIN (
-            SELECT DISTINCT m.threadId
-            FROM messages m
-            WHERE m.accountId = ? AND m.flagged = 1 AND COALESCE(m.deleted, 0) = 0
-          ) flaggedThreads
-            ON flaggedThreads.threadId = t.threadId
           WHERE t.accountId = ?
             AND EXISTS (
               SELECT 1
@@ -2365,12 +2365,16 @@ export async function listThreads(params: {
                 AND COALESCE(m.deleted, 0) = 0
             )
           ORDER BY
-            CASE WHEN flaggedThreads.threadId IS NULL THEN 0 ELSE 1 END DESC,
+            EXISTS (
+              SELECT 1 FROM messages mf
+              WHERE mf.accountId = t.accountId AND mf.flagged = 1
+                AND mf.threadId = t.threadId AND COALESCE(mf.deleted, 0) = 0
+            ) DESC,
             t.${threadDateColumn} DESC
           LIMIT ? OFFSET ?
         `
         )
-        .all(accountId, accountId, pageSize, offset) as any[];
+        .all(accountId, pageSize, offset) as any[];
     } else {
       threadRows = db
         .prepare(
@@ -2433,11 +2437,9 @@ export async function listThreads(params: {
   } else {
     const threadFilterSql = `SELECT DISTINCT m.threadId FROM messages m WHERE ${where}`;
     const flaggedOrderArgs: any[] = [];
-    let flaggedJoinSql = "";
     let threadOrderSql = `t.${threadDateColumn} DESC`;
     if (shouldPrioritizeFlaggedThreads) {
-      let flaggedWhere = "mf.accountId = ? AND mf.flagged = 1";
-      flaggedOrderArgs.push(accountId);
+      let flaggedWhere = "mf.accountId = t.accountId AND mf.flagged = 1 AND mf.threadId = t.threadId";
       flaggedWhere = applyVisibleMessageFilters(flaggedWhere, "mf");
       flaggedWhere = applyExcludedFolderFilters(
         flaggedWhere,
@@ -2445,16 +2447,8 @@ export async function listThreads(params: {
         excludedFolderIds,
         "mf"
       );
-      flaggedJoinSql = `
-        LEFT JOIN (
-          SELECT DISTINCT mf.threadId
-          FROM messages mf
-          WHERE ${flaggedWhere}
-        ) flaggedThreads
-          ON flaggedThreads.threadId = t.threadId
-      `;
       threadOrderSql =
-        `CASE WHEN flaggedThreads.threadId IS NULL THEN 0 ELSE 1 END DESC, t.${threadDateColumn} DESC`;
+        `EXISTS (SELECT 1 FROM messages mf WHERE ${flaggedWhere}) DESC, t.${threadDateColumn} DESC`;
     }
 
     threadRows = db
@@ -2462,14 +2456,13 @@ export async function listThreads(params: {
         `
         SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
         FROM threads t
-        ${flaggedJoinSql}
         WHERE t.accountId = ?
           AND t.threadId IN (${threadFilterSql})
         ORDER BY ${threadOrderSql}
         LIMIT ? OFFSET ?
       `
       )
-      .all(...flaggedOrderArgs, accountId, ...args, pageSize, offset) as any[];
+      .all(accountId, ...args, ...flaggedOrderArgs, pageSize, offset) as any[];
 
     const threadTotalRow = db
       .prepare(
@@ -2560,6 +2553,7 @@ export async function listThreads(params: {
               m.xForwardedMessageId,
               m.subject,
               m.fromAddr,
+              m.senderKey,
               m.replyToAddr,
               m.toAddr,
               m.ccAddr,
@@ -2635,6 +2629,7 @@ export async function listThreads(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,
@@ -2771,6 +2766,7 @@ export async function listThreadMessages(params: {
   if (uniqueThreads.length > 0) loadRowsBy("threadId", uniqueThreads);
   if (uniqueMessages.length > 0) loadRowsBy("id", uniqueMessages);
   const rows = Array.from(rowsById.values());
+  for (const row of rows) await backfillMessageSenderKey(db, row);
 
   const rowThreadIds = Array.from(
     new Set(
@@ -2857,6 +2853,7 @@ export async function listThreadMessages(params: {
       quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
       subject: row.subject,
       from: row.fromAddr,
+      senderKey: row.senderKey ?? null,
       fromEmail: row.fromEmail ?? undefined,
       replyTo: row.replyToAddr ?? undefined,
       to: row.toAddr,

@@ -93,7 +93,6 @@ type UseSearchStateOptions = {
   virtualDefaultExcludedFolderIdsKey: string;
   apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
   syncCompletionVersion?: number;
-  collabRevision?: number;
 };
 
 export type SearchState = {
@@ -105,7 +104,6 @@ export type SearchState = {
   actionQueueTodoCount: number | null;
   inviteDeckTotalCount: number | null;
   inviteDeckUnreadCount: number | null;
-  collabCounts: Record<string, number | null>;
   activeVirtualFolder: VirtualFolderDefinition | null;
 };
 
@@ -132,8 +130,7 @@ export function useSearchState(options: UseSearchStateOptions) {
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion,
-    collabRevision
+    syncCompletionVersion
   } = options;
 
   const trimmedQuery = query.trim();
@@ -147,15 +144,12 @@ export function useSearchState(options: UseSearchStateOptions) {
   const [inviteDeckTotalCount, setInviteDeckTotalCount] = useState<number | null>(null);
   const [inviteDeckUnreadCount, setInviteDeckUnreadCount] = useState<number | null>(null);
 
-  const [collabCounts, setCollabCounts] = useState<Record<string, number | null>>({});
-
   const lastFolderIdRef = useRef<string>("");
 
   // Reset counts when no active account
   useEffect(() => {
     if (activeAccountId) return;
     const timer = setTimeout(() => {
-      setCollabCounts({});
       setFocusedUnreadCount(null);
       setActionQueueTodoCount(null);
       setInviteDeckTotalCount(null);
@@ -236,12 +230,10 @@ export function useSearchState(options: UseSearchStateOptions) {
         fetchCount("focused", virtualDefaultExcludedFolderIdsKey),
         fetchCount("todo", virtualDefaultExcludedFolderIdsKey),
         fetchCount("calendar", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey),
-        ...COLLAB_FOLDERS.map(folder => fetchCount(folder.queryBadges.join(","), virtualDefaultExcludedFolderIdsKey))
+        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey)
       ])
-        .then(([focusedCount, todoCount, inviteTotalCount, inviteUnreadCount, ...collabTotals]) => {
+        .then(([focusedCount, todoCount, inviteTotalCount, inviteUnreadCount]) => {
           if (controller.signal.aborted) return;
-          setCollabCounts(Object.fromEntries(COLLAB_FOLDERS.map((folder, i) => [folder.id, collabTotals[i]])));
           setFocusedUnreadCount(focusedCount);
           setActionQueueTodoCount(todoCount);
           setInviteDeckTotalCount(inviteTotalCount);
@@ -249,7 +241,6 @@ export function useSearchState(options: UseSearchStateOptions) {
         })
         .catch(() => {
           if (controller.signal.aborted) return;
-          setCollabCounts({});
           setFocusedUnreadCount(null);
           setActionQueueTodoCount(null);
           setInviteDeckTotalCount(null);
@@ -261,7 +252,7 @@ export function useSearchState(options: UseSearchStateOptions) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, collabRevision]);
+  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion]);
 
   // Auto-clear virtual folder when conditions change
   useEffect(() => {
@@ -287,8 +278,7 @@ export function useSearchState(options: UseSearchStateOptions) {
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder,
-    collabCounts
+    activeVirtualFolder
   };
 
   const actions: SearchActions = {

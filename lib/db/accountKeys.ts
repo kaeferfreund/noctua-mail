@@ -21,6 +21,8 @@ export const ACCOUNT_KEY_TABLE_SQL = {
       subject TEXT NOT NULL,
       fromAddr TEXT NOT NULL,
       fromEmail TEXT,
+      senderKey TEXT,
+      sourceSha256 TEXT,
       replyToAddr TEXT,
       toAddr TEXT NOT NULL,
       ccAddr TEXT,

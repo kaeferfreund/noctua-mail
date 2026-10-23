@@ -1,5 +1,7 @@
 "use client";
 
+import { publishLocalePreference } from "@/lib/i18n/localeEvents";
+
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -135,6 +137,7 @@ export function useAccountController({
         if (version !== loadVersion.current) return;
         if (!me.ok) {
           if (me.status === 401) {
+            publishLocalePreference(null);
             lastIdentity.current = null; instanceAdmin.current = false;
             setMessages([]); setViewMessage(null); setActiveMessageId("");
             setAuthState("unauth"); setCurrentUser(null); setAccounts([]);
@@ -144,6 +147,7 @@ export function useAccountController({
         }
         const data = await me.json() as AuthMe;
         if (version !== loadVersion.current) return;
+        publishLocalePreference(data.user?.uiLocale);
         if (lastIdentity.current !== data.user?.id) {
           setMessages([]); setViewMessage(null); setActiveMessageId(""); setMessagesPage(1);
           setHasMoreMessages(true); setTotalMessages(null); setActiveFolderId("");

@@ -3,6 +3,7 @@ import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSen
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
+import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import type { ShellAccount } from "./shell/types";
@@ -10,6 +11,7 @@ import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 
 import type React from "react";
+import dynamic from "next/dynamic";
 import {
   startTransition,
   useCallback,
@@ -40,8 +42,7 @@ import MailboxGate from "./auth/MailboxGate";
 import { AuthFrame } from "./auth/AuthPrimitives";
 import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
-import AdminPanel from "./admin/AdminPanel";
-import { CreateMailbox } from "./admin/AdminMailboxes";
+import LazyDialogLoading from "./LazyDialogLoading";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
@@ -233,7 +234,8 @@ import type {
   Topic,
   TopicColor,
 } from "@/lib/data";
-import AccountSettingsModal, { type ManageTab } from "./AccountSettingsModal";
+import type { ManageTab } from "./AccountSettingsModal";
+import { deferUntilIdle } from "./mailclient/deferUntilIdle";
 import {
   buildSentMessageFromDraft,
   computeGroupMeta,
@@ -291,6 +293,19 @@ import {
 } from "@/lib/recipientLists";
 import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
+
+const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Settings" />
+});
+const AdminPanel = dynamic(() => import("./admin/AdminPanel"), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Admin" />
+});
+const CreateMailbox = dynamic(() => import("./admin/AdminMailboxes").then(module => module.CreateMailbox), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Postfach hinzufügen" mailboxDialog />
+});
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
 const LOCAL_DELETE_RECONCILE_SUPPRESS_MS = 15_000;
@@ -393,6 +408,7 @@ export default function MailClient({
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
   const [collabRevision, setCollabRevision] = useState(0);
+  const [activeCollabRevision, setActiveCollabRevision] = useState(0);
   const [messageTopicsById, setMessageTopicsById] = useState<Map<string, Topic[]>>(new Map());
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [topicPickerMessage, setTopicPickerMessage] = useState<Message | null>(null);
@@ -640,6 +656,18 @@ export default function MailClient({
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
+  useEffect(() => deferUntilIdle(() => {
+    // Speculative warm-up must not surface an unhandled rejection. A cold open
+    // still loads through next/dynamic, including when this request fails.
+    void import("./AccountSettingsModal").catch(() => {});
+  }), []);
+  useEffect(() => {
+    if (!isAdminUser) return;
+    return deferUntilIdle(() => {
+      void import("./admin/AdminPanel").catch(() => {});
+      void import("./admin/AdminMailboxes").catch(() => {});
+    });
+  }, [isAdminUser]);
   const detachedWarnings = useDetachedSendWarnings(accounts, authState === "ok" ? currentUser?.id : null);
   const [initialDataReady, setInitialDataReady] = useState(false);
   const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
@@ -906,8 +934,7 @@ export default function MailClient({
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion,
-    collabRevision
+    syncCompletionVersion
   });
 
   // Destructure search state and actions
@@ -920,8 +947,7 @@ export default function MailClient({
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder,
-    collabCounts
+    activeVirtualFolder
   } = searchState;
   const {
     setSearchScope,
@@ -2855,7 +2881,7 @@ export default function MailClient({
   useEffect(() => { invalidateThreadCollab(activeAccountId); }, [activeAccountId, authoritativeRevision, invalidateThreadCollab]);
   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
   const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
-    apiFetch, sessionKey: currentUser?.id, refreshVersion: authoritativeRevision + collabRevision,
+    apiFetch, sessionKey: currentUser?.id, currentUserId: currentUser?.id, refreshVersion: authoritativeRevision + activeCollabRevision,
     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
     onCommit: (accountId) => {
       setCollabRevision(value => value + 1);
@@ -2863,12 +2889,15 @@ export default function MailClient({
     }
   });
   const mailboxSummaries = useMailboxSummaries({
+    authState: mailboxState,
     sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
     apiFetch,
     onMailboxesChanged: () => { void loadInitialData(); },
-    onThreadChanged: accountId => {
+    onSummaryChanged: accountId => { if (accountId === activeAccountId) setCollabRevision(value => value + 1); },
+    onThreadChanged: (accountId, threadId) => {
       if (accountId !== activeAccountId) return;
       invalidateThreadCollab(accountId);
+      if (threadId === activeMessage?.threadId) setActiveCollabRevision(value => value + 1);
       setCollabRevision(value => value + 1);
       queueFilteredSearchRefresh(true);
     }
@@ -5503,10 +5532,8 @@ export default function MailClient({
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
               ...folder, active: activeVirtualFolder?.id === folder.id,
-              count: folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? null
-                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? null : collabCounts[folder.id] ?? null,
-              countAriaLabel: `${folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? 0
-                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? 0 : collabCounts[folder.id] ?? 0} threads`, icon: <ListTodo size={13} />,
+              count: collaborationViewCount(folder.id, activeMailboxSummary),
+              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary) ?? 0} threads`, icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane

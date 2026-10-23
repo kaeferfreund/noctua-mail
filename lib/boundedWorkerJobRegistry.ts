@@ -1,3 +1,5 @@
+import { assertServerRunning, isShuttingDown } from "./server/shutdown";
+import { trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { DurableSyncWorkerSemaphore } from "./durableSyncWorkerSemaphore";
 import { positiveInteger } from "./syncWorkerSemaphore";
 import { UnconfirmedWorkerExitError } from "./db/processLeases";
@@ -58,7 +60,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
     withStore(db => db.transaction(() => {
       const job = db.prepare("SELECT * FROM jobs WHERE id=?").get(id) as StoredJob | null;
       if (!job || job.status !== "running") return;
-      if (job.dirty) {
+      if (isShuttingDown() || job.dirty) {
         db.prepare("UPDATE jobs SET status='queued',dirty=0,pid=NULL,ownerPid=NULL WHERE id=?").run(id);
       } else {
         db.prepare("UPDATE jobs SET status=?,finishedAt=?,error=? WHERE id=?")
@@ -70,6 +72,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
   const pump = () => {
     if (timer) clearTimeout(timer);
     timer = undefined;
+    if (isShuttingDown()) return;
     const pending = withStore(db => db.transaction(() => {
       const now = Date.now();
       db.prepare("DELETE FROM jobs WHERE finishedAt < ?").run(now - (config.jobTtlMs ?? JOB_TTL_MS));
@@ -95,7 +98,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
           const attempt = admission.enqueue(job.id, 5, release => {
             let started!: () => void;
             startups.set(job.id, new Promise<void>(resolve => { started = resolve; }));
-            void (async () => {
+            const completion = (async () => {
               let childExit: Promise<number> | undefined;
               let stopChild: (() => void) | undefined;
               let exitConfirmed = false;
@@ -105,6 +108,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
                     ...JSON.parse(job.argsJson), "--worker-lease", job.id, admission.owner],
                   { cwd: process.cwd(), env: { ...process.env }, stdout: config.spawnStdout ?? "ignore", stderr: config.spawnStderr ?? "pipe" }
                 ));
+                trackWorker(child);
                 childExit = child.exited;
                 stopChild = () => child.kill("SIGKILL");
                 withStore(store => store.prepare("UPDATE jobs SET status='running',pid=? WHERE id=?").run(child.pid, job.id));
@@ -128,6 +132,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
                 pump();
               }
             })();
+            trackBackgroundWork(`bounded:${job.id}`, completion);
           }, job.accountId);
           admissionAttempts.set(job.id, attempt);
           continue;
@@ -138,10 +143,11 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
           const child = bun.spawn([...(config.commandPrefix ?? []), "bun", "run", config.scriptPath, job.accountId, ...JSON.parse(job.argsJson)], {
             cwd: process.cwd(), env: { ...process.env }, stdout: config.spawnStdout ?? "ignore", stderr: config.spawnStderr ?? "pipe"
           });
+          trackWorker(child);
           db.prepare("UPDATE jobs SET status='running',pid=?,ownerPid=? WHERE id=?").run(child.pid, process.pid, job.id);
           // Consume stderr immediately so a full pipe cannot deadlock the worker.
           const stderr = config.readStderrText !== false && child.stderr instanceof ReadableStream ? new Response(child.stderr).text().catch(() => "") : Promise.resolve("");
-          void child.exited.then(async (code: number) => finish(job.id, code, (await stderr).trim() || `Worker exited with code ${code}`));
+          trackBackgroundWork(`bounded:${job.id}`, child.exited.then(async (code: number) => finish(job.id, code, (await stderr).trim() || `Worker exited with code ${code}`)));
         } catch (error) {
           db.prepare("UPDATE jobs SET status='failed',finishedAt=?,error=? WHERE id=?")
             .run(now, error instanceof Error ? error.message : "Failed to start worker", job.id);
@@ -165,6 +171,7 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
     return job ? publicJob(job) : null;
   };
   const startJob = (accountId: string, args: string[] = [], invalidate = false) => {
+    assertServerRunning();
     const id = withStore(db => db.transaction(() => {
       const active = db.prepare("SELECT * FROM jobs WHERE accountId=? AND status IN ('queued','running')").get(accountId) as StoredJob | null;
       if (active) {
@@ -189,5 +196,5 @@ export function createBoundedWorkerJobRegistry(config: WorkerJobRegistryConfig) 
     admissionAttempts.delete(id);
     startups.delete(id);
   };
-  return { getJob, startJob, getLatestJob, settleJob };
+  return { getJob, startJob, getLatestJob, settleJob, resumeJobs: pump };
 }
