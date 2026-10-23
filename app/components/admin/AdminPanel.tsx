@@ -15,6 +15,7 @@ import ReauthDialog from "@/app/components/auth/ReauthDialog";
 import AdminConfirmDialog from "./AdminConfirmDialog";
 import AdminAuditLog from "./AdminAuditLog";
 import AdminMailboxes from "./AdminMailboxes";
+import { adminActionRow, adminHeaderRow } from "./adminLayout";
 import type { AdminUser, AdminInvite } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
@@ -87,11 +88,11 @@ function AdminPanelContent({ apiFetch, client, onClose, currentUserId, onAccessC
     finally { setBusy(false); }
   };
   return <SettingsFrame open onClose={() => { if (!busy) onClose(); }}><div className="flex h-full min-h-0 flex-col gap-4">
-    <div className="flex items-center justify-between"><SettingsTitle>{t("title")}</SettingsTitle><Button variant="outline" disabled={busy} onClick={onClose}>{t("close")}</Button></div>
-    <nav aria-label={t("sections")} className="flex flex-wrap gap-2">{(["users", "mailboxes", "invites", "audit"] as const).map(value => <Button key={value} variant={tab === value ? "default" : "outline"} aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
+    <div className={adminHeaderRow}><SettingsTitle>{t("title")}</SettingsTitle><Button variant="outline" disabled={busy} onClick={onClose}>{t("close")}</Button></div>
+    <nav aria-label={t("sections")} className={adminActionRow}>{(["users", "mailboxes", "invites", "audit"] as const).map(value => <Button key={value} variant={tab === value ? "default" : "outline"} aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
     <div className="min-h-0 flex-1 overflow-auto">
       {Boolean(error) && <p role="alert" className="mb-3 text-destructive">{formatAdminError(error, t, locale)}</p>}
-      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className="flex justify-between"><h3 className="font-medium">{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
+      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className="font-medium">{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
         {loading && <p role="status">{t("users.loading")}</p>}
         <table className="w-full text-left text-sm"><thead><tr><th>{t("users.nameEmail")}</th><th>{t("role")}</th><th>{t("status")}</th><th>{t("users.security")}</th><th>{t("tabs.mailboxes")}</th><th>{t("actions")}</th></tr></thead>
           <tbody>{users.map(user => <tr key={user.id} className="border-b align-top"><td className="p-2">{user.name || "—"}<div>{user.email}</div></td>
