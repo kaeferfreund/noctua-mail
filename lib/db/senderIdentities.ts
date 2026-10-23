@@ -8,7 +8,7 @@ import { getDb } from "./connection";
 
 type IdentityRow = Omit<SenderIdentity, "enabled" | "isDefault"> & { enabled: number; isDefault: number };
 export function listSenderIdentityRows(db: Database, accountId: string): SenderIdentity[] {
-  return (db.prepare(`SELECT * FROM sender_identities WHERE accountId=?
+  return (db.query(`SELECT * FROM sender_identities WHERE accountId=?
     ORDER BY isDefault DESC, email COLLATE NOCASE, id`).all(accountId) as IdentityRow[])
     .map(row => ({ ...row, enabled: !!row.enabled, isDefault: !!row.isDefault,
       replyTo: row.replyTo ?? undefined, signatureId: row.signatureId ?? undefined }));

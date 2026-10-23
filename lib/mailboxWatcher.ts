@@ -1,8 +1,9 @@
+import { findInboxFolder } from "./specialFolders";
 import { assertServerRunning, onShutdown } from "./server/shutdown";
 import { createHmac } from "crypto";
 import type { ImapFlow } from "imapflow";
 import type { Account } from "./data";
-import { getStoredAccounts, getMailboxState, saveMailboxState, recordMailboxSync, setMailboxWatcherState, type WatcherState } from "./db";
+import { getFolders, getStoredAccounts, getMailboxState, saveMailboxState, recordMailboxSync, setMailboxWatcherState, type WatcherState } from "./db";
 import { connectIdleImapClient, runImapIdleLoop } from "./mail/imap/idle";
 import { getImapConnectBlockedUntil, resetImapConnectFailureState } from "./mail/imapClientOptions";
 import { getImapHttpError } from "./mail/imapError";
@@ -146,16 +147,16 @@ export class MailboxWatcher {
       // Coalesce event bursts. An event during sync gets one more pass, so no EXISTS is lost.
       while (entry.dirty && !entry.abort.signal.aborted) {
         entry.dirty = false;
-        const folderId = `${entry.account.id}:INBOX`;
+        const folderId = findInboxFolder(await getFolders(entry.account.id), entry.account.id)?.id;
         entry.abort.signal.throwIfAborted();
         const mailbox = entry.client?.mailbox;
-        await saveMailboxState({ accountId: entry.account.id, folderId, mailboxPath: "INBOX",
+        if (folderId) await saveMailboxState({ accountId: entry.account.id, folderId, mailboxPath: "INBOX",
           uidValidity: mailbox ? String(mailbox.uidValidity) : null }, { onlyIfUidValidityChanged: true });
-        const baseline = await getMailboxState(entry.account.id, folderId);
-        const job = startSyncJob({
+        const baseline = folderId ? await getMailboxState(entry.account.id, folderId) : null;
+        const job = await startSyncJob({
           accountId: entry.account.id, folderId,
           mode: baseline?.highestUid == null ? "full" : "repair"
-        }, undefined, "watcher");
+        }, undefined, "watcher", entry.abort.signal);
         await this.waitJob(entry, job);
         entry.abort.signal.throwIfAborted();
         const client = entry.client;

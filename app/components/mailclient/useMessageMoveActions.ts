@@ -1,6 +1,7 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+import { useLocale, useTranslations } from "next-intl";
 
 import type React from "react";
 import { useCallback } from "react";
@@ -79,7 +80,7 @@ type UseMessageMoveActionsOptions = {
   includeThreadAcrossFoldersForList: boolean;
   messages: Message[];
   selectionStore: SelectionStore;
-  folderById: Map<string, { name: string }>;
+  folderById: Map<string, Pick<Folder, "name" | "specialUse">>;
   lastSelectedIdRef: React.MutableRefObject<string | null>;
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -156,6 +157,7 @@ export function useMessageMoveActions({
   markMessagesMutated,
   applyDeleteReconcileSuppression
 }: UseMessageMoveActionsOptions) {
+  const locale = useLocale();
   const tn = useTranslations("Notifications");
 
   const clearSelectionState = useCallback(() => {
@@ -367,7 +369,8 @@ export function useMessageMoveActions({
         if (clearSelectionOnSuccess && movedCount > 0) {
           clearSelectionState();
         }
-        const destinationName = folderById.get(destinationFolderId)?.name ?? tn("folder");
+        const destination = folderById.get(destinationFolderId);
+        const destinationName = destination ? getFolderDisplayName(destination, locale) : tn("folder");
         const singleTarget =
           movedCount === 1
             ? messages.find((item) => movedPreviousIds.has(item.id)) ?? null
@@ -432,6 +435,7 @@ export function useMessageMoveActions({
       apiFetch,
       clearSelectionState,
       folderById,
+      locale,
       messages,
       noticeSuccessTimeout,
       pushNotice,

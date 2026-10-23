@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { formatNumber } from "@/lib/i18n/format";
+import styles from "./ShellSidebar.module.css";
+import { useLocale, useTranslations } from "next-intl";
 
 import { useState, type ReactNode } from "react";
 import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
@@ -88,7 +90,7 @@ export function MailboxRows({
                   isActive={account.id === activeAccountId}
                   onClick={() => onSwitch(account.id)}
                   title={summary
-                    ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: summary.watcher.state })
+                    ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: t(`mailboxes.watcherStates.${summary.watcher.state}`) })
                     : account.email}
                   aria-current={account.id === activeAccountId ? "true" : undefined}
                   className={cn("data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]", summary && "pr-32")}
@@ -110,7 +112,7 @@ export function MailboxRows({
                     <span className="flex items-center gap-0.5" aria-label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} title={t("mailboxes.unassignedTitle")}>
                       <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
                     </span>
-                    <span role="img" aria-label={t("mailboxes.watcher", {state: summary.watcher.state})} title={t("mailboxes.watcher", {state: summary.watcher.state})}
+                    <span role="img" data-watcher-state={summary.watcher.state} aria-label={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})} title={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})}
                       className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
                         summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
                   </SidebarMenuBadge>
@@ -125,25 +127,29 @@ export function MailboxRows({
 }
 
 export function ViewRow({ view }: { view: ShellView }) {
+  const locale = useLocale();
   const t = useTranslations("Shell");
+  const tv = useTranslations("Views");
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem className={styles.viewRow}>
       <SidebarMenuButton
+        className={styles.viewButton}
+        data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
-        title={view.rowTitle ?? `${view.name}: ${view.description}`}
+        title={view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description })}
       >
         {view.icon}
-        <span className={cn(view.emphasize && "font-semibold")}>{view.name}</span>
+        <span className={cn(styles.viewLabel, view.emphasize && "font-semibold")}>{view.name}</span>
       </SidebarMenuButton>
       {showCount ? (
         <SidebarMenuBadge
-          className="bg-sidebar-accent"
+          className={cn("bg-sidebar-accent", styles.viewCount)}
           title={view.countTitle ?? view.rowTitle}
           aria-label={view.countAriaLabel ?? t("mailboxes.unread", {count: view.count ?? 0})}
         >
-          {view.countLabel ?? view.count}
+          {formatNumber(view.count!, locale, { notation: "compact", maximumFractionDigits: 1 })}
         </SidebarMenuBadge>
       ) : null}
     </SidebarMenuItem>

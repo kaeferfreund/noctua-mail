@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { formatEnvelopeAddresses, resolveMessageSenderKey } from "@/lib/mail/imap/parser";
 import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
 import { connectIdleImapClient, runImapIdleLoop } from "@/lib/mail/imap/idle";
@@ -47,6 +48,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { accountId, account, clientId } = accountContext;
+    const folderError = await validateAccountFolders(accountId,
+      [activeFolderId, searchParams.get("folderId")]);
+    if (folderError) return folderError;
     const logContext = { accountId, clientId };
 
     const maxIdleSessions =

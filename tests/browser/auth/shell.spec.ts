@@ -261,7 +261,8 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
   expect((await api(page, "/api/auth/me")).body.user.uiLocale).toBe("de");
-  await page.getByRole("dialog", { name: "Account settings", exact: true }).getByRole("button", { name: "Schließen", exact: true }).first().click();
+  // The settings dialog re-renders in German with the switch (Settings.accountTitle).
+  await page.getByRole("dialog", { name: "Postfacheinstellungen", exact: true }).getByRole("button", { name: "Schließen", exact: true }).first().click();
   await expect(second).toHaveAttribute("aria-current", "true");
   await expect(subject).toHaveValue("Synthetic unsent locale draft");
   await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();

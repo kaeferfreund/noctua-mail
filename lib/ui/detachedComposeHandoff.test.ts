@@ -13,6 +13,8 @@ const readySession = {
   version: 1,
   status: "ready",
   accountId: "account@example.test",
+  identityId: "synthetic-alias",
+  signatureInitialized: true,
   draftId: "draft-1",
   mode: "reply",
   sourceMessageId: "message-1",
@@ -24,6 +26,15 @@ describe("detached compose handoff parsing", () => {
   it("keeps a ready session durable for reloads", () => {
     expect(parseDetachedComposeHandoff(JSON.stringify(readySession), now)).toEqual(readySession);
     expect(parseDetachedComposeHandoff(JSON.stringify(readySession), now)).toEqual(readySession);
+  });
+
+  it("preserves account and explicit From for an empty detached session", () => {
+    const handoff = { ...readySession, mode: "new", draftId: null, sourceMessageId: null };
+    const restored = parseDetachedComposeHandoff(JSON.stringify(handoff), now);
+    expect(restored?.accountId).toBe("account@example.test"); expect(restored?.identityId).toBe("synthetic-alias");
+    expect(restored?.signatureInitialized).toBe(true);
+    expect(parseDetachedComposeHandoff(JSON.stringify({ ...handoff, signatureInitialized: "yes" }), now)).toBeNull();
+    expect(parseDetachedComposeHandoff(JSON.stringify({ ...handoff, identityId: "" }), now)).toBeNull();
   });
 
   it("accepts a preparing session and an empty new-message draft", () => {

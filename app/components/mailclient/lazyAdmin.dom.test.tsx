@@ -229,16 +229,16 @@ if (!scenario) {
       }
       if (scenario === "cold mailbox creation from mailbox gate") {
         act(() => { fireEvent.click(view.getByRole("button", { name: "Add a mailbox" })); });
-        const loading = view.getByRole("status", { name: "Postfach hinzufügen" });
+        const loading = view.getByRole("status", { name: "Add mailbox" });
         expect(loading.getAttribute("aria-busy")).toBe("true");
-        const loadingDialog = view.getByRole("dialog", { name: "Postfach hinzufügen" });
+        const loadingDialog = view.getByRole("dialog", { name: "Add mailbox" });
         expect(loadingDialog.contains(loading)).toBe(true);
         expect(loadingDialog.className).toContain("sm:max-w-3xl");
         expect(loading.className).toContain("h-[75dvh] max-h-[75dvh]");
         expect(loading.closest(".radix-themes")).toBeTruthy();
         expect(loading.querySelector(".rt-Spinner")).toBeTruthy();
         await view.findByRole("dialog", { name: "Create mailbox" }, { timeout: 5000 });
-        expect(view.queryByRole("status", { name: "Postfach hinzufügen" })).toBeNull();
+        expect(view.queryByRole("status", { name: "Add mailbox" })).toBeNull();
         expect(loaded()).toEqual([false, true, false]);
         expect(view.getByText("Creates an ownerless mailbox. Grant members after creation.")).toBeTruthy();
         fireEvent.click(view.getAllByRole("button", { name: "Close" })[0]);

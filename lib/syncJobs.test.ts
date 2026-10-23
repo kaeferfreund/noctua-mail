@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cancelWatcherSyncJobs, getSyncJob, startSyncJob } from "./syncJobs";
 import { dbModulePromise } from "./testDbHarness";
-await dbModulePromise;
+const { saveFoldersForAccount } = await dbModulePromise;
 import type { SyncPayload } from "./syncOperation";
 
 type SpawnedWorker = {
@@ -19,9 +19,13 @@ let accountSeq = 0;
 
 // The job registry is module-level and survives across tests, so every test
 // needs an account of its own — `bun test --rerun-each` replays the same file.
-const nextAccountId = (label: string) => {
+const nextAccountId = async (label: string) => {
   accountSeq += 1;
-  return `acc-${label}-${accountSeq}`;
+  const accountId = `acc-${label}-${accountSeq}`;
+  await saveFoldersForAccount(accountId,
+    ["INBOX", "Archive", "Sent", "initial", ...Array.from({ length: 10 }, (_, i) => `interactive-${i}`)]
+      .map(name => ({ id: `${accountId}:${name}`, accountId, name, count: 0 })));
+  return accountId;
 };
 
 // `spawnSyncWorker` reads `globalThis.Bun.spawn` at call time, so swapping it
@@ -91,14 +95,14 @@ afterEach(async () => {
 
 describe("sync job queue", () => {
   test("queues folder syncs independently instead of collapsing them", async () => {
-    const accountId = nextAccountId("queue-independent");
-    const running = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
-    const queuedArchive = startSyncJob({
+    const accountId = await nextAccountId("queue-independent");
+    const running = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+    const queuedArchive = await startSyncJob({
       accountId,
       folderId: `${accountId}:Archive`,
       mode: "new"
     });
-    const queuedSent = startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    const queuedSent = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
 
     await flush();
     expect(running.status).toBe("running");
@@ -117,35 +121,35 @@ describe("sync job queue", () => {
     expect(spawned[2].payload.folderId).toBe(`${accountId}:Sent`);
   });
 
-  test("joins the running job only while nothing is queued behind it", () => {
-    const accountId = nextAccountId("queue-join");
+  test("joins the running job only while nothing is queued behind it", async () => {
+    const accountId = await nextAccountId("queue-join");
     const folderId = `${accountId}:INBOX`;
-    const running = startSyncJob({ accountId, folderId, mode: "new" });
+    const running = await startSyncJob({ accountId, folderId, mode: "new" });
 
-    expect(startSyncJob({ accountId, folderId, mode: "new" }).id).toBe(running.id);
+    expect((await startSyncJob({ accountId, folderId, mode: "new" })).id).toBe(running.id);
 
-    startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
-    const afterQueueing = startSyncJob({ accountId, folderId, mode: "new" });
+    await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    const afterQueueing = await startSyncJob({ accountId, folderId, mode: "new" });
 
     expect(afterQueueing.id).not.toBe(running.id);
     expect(afterQueueing.status).toBe("queued");
     expect(afterQueueing.payload.folderId).toBe(folderId);
   });
 
-  test("returns the existing queued job for a repeated request", () => {
-    const accountId = nextAccountId("queue-dedup");
-    startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
-    const first = startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
-    const second = startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+  test("returns the existing queued job for a repeated request", async () => {
+    const accountId = await nextAccountId("queue-dedup");
+    await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+    const first = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    const second = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
 
     expect(second.id).toBe(first.id);
   });
 
   test("lets a new-mail sync overtake a queued full sweep", async () => {
-    const accountId = nextAccountId("queue-priority");
-    startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
-    const sweep = startSyncJob({ accountId, folderId: `${accountId}:Archive`, mode: "full" });
-    const urgent = startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    const accountId = await nextAccountId("queue-priority");
+    await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+    const sweep = await startSyncJob({ accountId, folderId: `${accountId}:Archive`, mode: "full" });
+    const urgent = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
 
     await finishNextWorker();
 
@@ -155,15 +159,15 @@ describe("sync job queue", () => {
   });
 
   test("retains account serialization until the monitor confirms worker exit", async () => {
-    const accountId = nextAccountId("queue-dead-worker");
-    const running = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
-    const queued = startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    const accountId = await nextAccountId("queue-dead-worker");
+    const running = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+    const queued = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
     expect(queued.status).toBe("queued");
 
     await flush();
     // Worker vanished without the monitor noticing — no pid this high can exist.
     running.pid = 2 ** 30;
-    const follow = startSyncJob({ accountId, folderId: `${accountId}:Archive`, mode: "new" });
+    const follow = await startSyncJob({ accountId, folderId: `${accountId}:Archive`, mode: "new" });
 
     expect(getSyncJob(running.id)?.status).toBe("failed");
     expect(getSyncJob(queued.id)?.status).toBe("queued");
@@ -173,10 +177,10 @@ describe("sync job queue", () => {
   });
 
   test("carries the latest client id into the promoted job", async () => {
-    const accountId = nextAccountId("queue-client");
-    startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" }, "client-a");
-    startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" }, "client-b");
-    startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" }, "client-c");
+    const accountId = await nextAccountId("queue-client");
+    await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" }, "client-a");
+    await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" }, "client-b");
+    await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" }, "client-c");
 
     await finishNextWorker();
 
@@ -187,10 +191,10 @@ describe("sync job queue", () => {
 
 describe("global sync worker budget", () => {
   test("exposes globally queued jobs and prioritizes interactive over watcher over sweeps", async () => {
-    for (let i = 0; i < 2; i += 1) startSyncJob({ accountId: nextAccountId("busy"), mode: "new" });
-    const sweep = startSyncJob({ accountId: nextAccountId("sweep"), mode: "full" });
-    const watcher = startSyncJob({ accountId: nextAccountId("watcher"), mode: "new" }, undefined, "watcher");
-    const interactive = startSyncJob({ accountId: nextAccountId("interactive"), mode: "new" });
+    for (let i = 0; i < 2; i += 1) await startSyncJob({ accountId: await nextAccountId("busy"), mode: "new" });
+    const sweep = await startSyncJob({ accountId: await nextAccountId("sweep"), mode: "full" });
+    const watcher = await startSyncJob({ accountId: await nextAccountId("watcher"), mode: "new" }, undefined, "watcher");
+    const interactive = await startSyncJob({ accountId: await nextAccountId("interactive"), mode: "new" });
     await flush();
     expect(spawned).toHaveLength(2);
     expect(getSyncJob(interactive.id)?.status).toBe("queued");
@@ -206,10 +210,10 @@ describe("global sync worker budget", () => {
   });
 
   test("an account's globally queued sweep does not hide interactive work", async () => {
-    for (let i = 0; i < 2; i += 1) startSyncJob({ accountId: nextAccountId("busy-head"), mode: "new" });
-    const id = nextAccountId("queued-head");
-    const sweep = startSyncJob({ accountId: id, folderId: `${id}:Archive`, mode: "full" });
-    const interactive = startSyncJob({ accountId: id, folderId: `${id}:INBOX`, mode: "new" });
+    for (let i = 0; i < 2; i += 1) await startSyncJob({ accountId: await nextAccountId("busy-head"), mode: "new" });
+    const id = await nextAccountId("queued-head");
+    const sweep = await startSyncJob({ accountId: id, folderId: `${id}:Archive`, mode: "full" });
+    const interactive = await startSyncJob({ accountId: id, folderId: `${id}:INBOX`, mode: "new" });
     await finishNextWorker();
     expect(interactive.status).toBe("running");
     expect(sweep.status).toBe("queued");
@@ -217,14 +221,14 @@ describe("global sync worker budget", () => {
   });
 
   test("cancels watcher work on removal without cancelling an interactive join", async () => {
-    for (let i = 0; i < 2; i += 1) startSyncJob({ accountId: nextAccountId("busy-cancel"), mode: "new" });
-    const id = nextAccountId("cancelled");
-    const cancelled = startSyncJob({ accountId: id, mode: "new" }, undefined, "watcher");
+    for (let i = 0; i < 2; i += 1) await startSyncJob({ accountId: await nextAccountId("busy-cancel"), mode: "new" });
+    const id = await nextAccountId("cancelled");
+    const cancelled = await startSyncJob({ accountId: id, mode: "new" }, undefined, "watcher");
     cancelWatcherSyncJobs(id);
     expect(cancelled.status).toBe("failed");
-    const joinedId = nextAccountId("joined-watcher");
-    const joined = startSyncJob({ accountId: joinedId, mode: "new" }, undefined, "watcher");
-    expect(startSyncJob({ accountId: joinedId, mode: "new" }).id).toBe(joined.id);
+    const joinedId = await nextAccountId("joined-watcher");
+    const joined = await startSyncJob({ accountId: joinedId, mode: "new" }, undefined, "watcher");
+    expect((await startSyncJob({ accountId: joinedId, mode: "new" })).id).toBe(joined.id);
     cancelWatcherSyncJobs(joinedId);
     expect(joined.status).toBe("queued");
     await finishNextWorker();
@@ -234,10 +238,10 @@ describe("global sync worker budget", () => {
 
 
 test("a failed watcher worker cancels queued background logins for that account", async () => {
-  const id = nextAccountId("watcher-failure");
-  const first = startSyncJob({ accountId: id, folderId: `${id}:INBOX`, mode: "new" }, undefined, "watcher");
-  const next = startSyncJob({ accountId: id, folderId: `${id}:Sent`, mode: "new" }, undefined, "watcher");
-  const last = startSyncJob({ accountId: id, folderId: `${id}:Archive`, mode: "new" }, undefined, "watcher");
+  const id = await nextAccountId("watcher-failure");
+  const first = await startSyncJob({ accountId: id, folderId: `${id}:INBOX`, mode: "new" }, undefined, "watcher");
+  const next = await startSyncJob({ accountId: id, folderId: `${id}:Sent`, mode: "new" }, undefined, "watcher");
+  const last = await startSyncJob({ accountId: id, folderId: `${id}:Archive`, mode: "new" }, undefined, "watcher");
   await flush();
   spawned[0].exit(1);
   await flush();
@@ -248,16 +252,46 @@ test("a failed watcher worker cancels queued background logins for that account"
 });
 
 test("same-account watcher cannot starve behind sustained interactive arrivals", async () => {
-  const accountId = nextAccountId("bounded-aging");
-  startSyncJob({ accountId, folderId: `${accountId}:initial`, mode: "new" });
+  const accountId = await nextAccountId("bounded-aging");
+  await startSyncJob({ accountId, folderId: `${accountId}:initial`, mode: "new" });
   await flush();
-  const watcher = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "repair" }, undefined, "watcher");
+  const watcher = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "repair" }, undefined, "watcher");
   let bypasses = 0;
   while (watcher.status === "queued" && bypasses < 10) {
-    startSyncJob({ accountId, folderId: `${accountId}:interactive-${bypasses}`, mode: "new" });
+    await startSyncJob({ accountId, folderId: `${accountId}:interactive-${bypasses}`, mode: "new" });
     await finishNextWorker();
     bypasses++;
   }
   expect(watcher.status).toBe("running");
   expect(bypasses).toBeLessThanOrEqual(9);
+});
+
+
+test("rejects a foreign or unknown folder before spawning or joining the account queue", async () => {
+  const accountId = await nextAccountId("folder-guard");
+  for (const folderId of ["synthetic-other:INBOX", `${accountId}:missing`]) {
+    await expect(startSyncJob({ accountId, folderId, mode: "full" })).rejects.toMatchObject({
+      code: "folder_account_mismatch"
+    });
+  }
+  await flush();
+  expect(spawned).toHaveLength(0);
+  const valid = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+  await expect(startSyncJob({ accountId, folderId: "synthetic-other:INBOX", mode: "full" }))
+    .rejects.toMatchObject({ code: "folder_account_mismatch" });
+  await flush();
+  expect(spawned).toHaveLength(1);
+  expect(valid.payload.folderId).toBe(`${accountId}:INBOX`);
+});
+
+
+test("watcher cancellation during folder validation prevents late queue admission", async () => {
+  const accountId = await nextAccountId("cancel-validation");
+  const abort = new AbortController();
+  const pending = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" },
+    undefined, "watcher", abort.signal);
+  abort.abort();
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  await flush();
+  expect(spawned).toHaveLength(0);
 });

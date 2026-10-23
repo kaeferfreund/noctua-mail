@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -38,6 +39,8 @@ export async function handleFolderConsistencyRequest(
       return NextResponse.json({ ok: false, message: "Missing folderId" }, { status: 400 });
     }
 
+    const folderError = await validateAccountFolders(accountId, [folderId]);
+    if (folderError) return folderError;
     const folder = (await getFolders(accountId)).find((item) => item.id === folderId);
     if (!folder) {
       return NextResponse.json({ ok: false, message: "Folder not found" }, { status: 404 });
