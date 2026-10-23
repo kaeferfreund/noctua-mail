@@ -38,7 +38,7 @@ windows do not inherit these variables. Mobile spacing and row heights are
 unchanged. Notice positioning still measures the list pane's actual right edge.
 
 Synthetic browser evidence and before/after measurements live in
-`screenshots/status-indicator/`. The density baseline was captured after the
+[briefs/status-bar-compact-evidence](/home/monkey/code/noctua-mail/briefs/status-bar-compact-evidence/). The density baseline was captured after the
 footer removal but before the density pass; the original footer separately
 occupied 28px. Verification results and merge notes follow below.
 
@@ -66,7 +66,7 @@ Frozen installation preserved `bun.lock`. Type checking reports zero errors in
 catalog parity is green with 57 new `Shell.status` keys. Lint stays at the
 supplied baseline of one existing error and 25 warnings. Production build and
 all four browser scenarios pass. Complete CI and merge results are recorded in
-`screenshots/status-indicator/verification.json`.
+[archived verification.json](/home/monkey/code/noctua-mail/briefs/status-bar-compact-evidence/verification.json).
 
 Integration dry run of implementation commit `bbcec12` against
 `origin/integration/stage` (`11dc3c5`) is clean: merge-tree exit 0, tree
@@ -81,3 +81,8 @@ zero failures. Two earlier development runs had timeouts in existing auth/lazy
 suites and a SQLite contention failure; those tests pass unchanged in the final
 complete run. No timeout, retry budget or existing assertion was relaxed.
 The implementation and validation notes are committed locally; nothing is pushed.
+
+Round 2 evidence is stored outside the source checkout at
+[briefs/status-bar-compact-evidence/round2](/home/monkey/code/noctua-mail/briefs/status-bar-compact-evidence/round2/).
+The status browser suite accepts `QA_STATUS_ARTIFACTS` for this destination;
+without it, captures stay in ignored `.tmp/qa-status-indicator`.
