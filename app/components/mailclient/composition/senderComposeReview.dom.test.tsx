@@ -385,3 +385,108 @@ for (const format of ["HTML", "Text", "Markdown"]) it(`QA-201 switching From to 
     expect(body()).not.toContain("Synthetic Jo");
   } finally { confirm.mockRestore(); }
 });
+
+const qa201Cases = [
+  { name: "HTML forward", mode: "forward", message: { ...sourceMessage, htmlBody: "<p>Original HTML</p>" } as Message, format: "HTML" },
+  { name: "Text forward", mode: "forward", message: sourceMessage, format: "Text" },
+  { name: "Text reply", mode: "reply", message: sourceMessage, format: "Text" }
+] as const;
+for (const { name, mode, message, format } of qa201Cases) it(`QA-201 switching From to an unsigned identity and back restores the signature at the start of an untouched ${name}`, async () => {
+  const confirm = spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    const sender = makeSender();
+    sender.identities.push({ id: "unsigned", accountId: "acc-test", email: "unsigned@example.test", displayName: "Unsigned", enabled: true, isDefault: false, signatureId: "" } as SenderSettings["identities"][number]);
+    const { view, handleRef } = renderCompose({ sender });
+    await act(async () => { await handleRef.current?.openCompose(mode, message); });
+    const lexical = () => view.baseElement.querySelector('[data-lexical-editor="true"]');
+    const textarea = () => view.baseElement.querySelector<HTMLTextAreaElement>('textarea[name="compose_body"]');
+    const body = () => (format === "HTML" ? lexical()?.textContent : textarea()?.value) ?? "";
+    await waitFor(() => expect(body()).toContain("Synthetic Jo / me@example.test"));
+    const initial = body();
+    expect(initial.startsWith("Regards,")).toBe(true);
+    const pick = async (label: RegExp) => {
+      fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+      fireEvent.click(await view.findByRole("option", { name: label }));
+    };
+    for (let round = 0; round < 3; round += 1) {
+      await pick(/Unsigned <unsigned@example.test>/);
+      await waitFor(() => expect(body()).not.toContain("Synthetic Jo"));
+      await pick(/Team <me@example.test>/);
+      await waitFor(() => expect(body()).toContain("Synthetic Jo / me@example.test"));
+      expect(body()).toBe(initial);
+    }
+    expect(confirm).not.toHaveBeenCalled();
+    // Text the user adds while unsigned is authored: adding a signature asks again.
+    await pick(/Unsigned <unsigned@example.test>/);
+    await waitFor(() => expect(body()).not.toContain("Synthetic Jo"));
+    if (format === "HTML") {
+      const editor = (lexical() as HTMLElement & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+      await act(async () => { editor.update(() => { $getRoot().getFirstChildOrThrow().insertBefore($createParagraphNode().append($createTextNode("Authored"))); }); });
+    } else {
+      fireEvent.change(textarea()!, { target: { value: "Authored" + textarea()!.value } });
+    }
+    await waitFor(() => expect(body()).toContain("Authored"));
+    await pick(/Team <me@example.test>/);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(body()).toContain("Authored");
+    expect(body()).not.toContain("Synthetic Jo");
+  } finally { confirm.mockRestore(); }
+});
+
+it("QA-201 an untouched Text reply opened without a signature gets the new identity's signature at the start", async () => {
+  const confirm = spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    const sender = makeSender();
+    sender.identities[0] = { ...sender.identities[0], signatureId: "" };
+    const { view, handleRef } = renderCompose({ sender });
+    await act(async () => { await handleRef.current?.openCompose("reply", sourceMessage); });
+    const textarea = () => view.baseElement.querySelector<HTMLTextAreaElement>('textarea[name="compose_body"]');
+    await waitFor(() => expect(textarea()?.value).toContain("> Original"));
+    const initial = textarea()!.value;
+    expect(initial).not.toContain("Synthetic Jo");
+    await pickAlias(view);
+    await waitFor(() => expect(textarea()?.value).toContain("Synthetic Jo / alias@example.test"));
+    expect(textarea()!.value).toBe(`Regards,\nSynthetic Jo / alias@example.test\n\n${initial}`);
+    expect(confirm).not.toHaveBeenCalled();
+  } finally { confirm.mockRestore(); }
+});
+
+it("QA-201 a reopened draft never gets a signature without asking", async () => {
+  const confirm = spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    const sender = makeSender();
+    sender.identities.push({ id: "unsigned", accountId: "acc-test", email: "unsigned@example.test", displayName: "Unsigned", enabled: true, isDefault: false, signatureId: "" } as SenderSettings["identities"][number]);
+    const { view, handleRef } = renderCompose({ sender });
+    const draft = { ...sourceMessage, id: "draft", from: "me@example.test", to: "customer@example.test", body: "Draft text\n\n> Quoted", htmlBody: "" } as Message;
+    await act(async () => { await handleRef.current?.openCompose("edit", draft); });
+    const textarea = () => view.baseElement.querySelector<HTMLTextAreaElement>('textarea[name="compose_body"]');
+    await waitFor(() => expect(textarea()?.value).toBe("Draft text\n\n> Quoted"));
+    fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+    fireEvent.click(await view.findByRole("option", { name: /Unsigned <unsigned@example.test>/ }));
+    await pickAlias(view);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(textarea()!.value).toBe("Draft text\n\n> Quoted");
+  } finally { confirm.mockRestore(); }
+});
+
+it("QA-201 text written above the signature still asks before a signature returns", async () => {
+  const confirm = spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    const sender = makeSender();
+    sender.identities.push({ id: "unsigned", accountId: "acc-test", email: "unsigned@example.test", displayName: "Unsigned", enabled: true, isDefault: false, signatureId: "" } as SenderSettings["identities"][number]);
+    const { view, handleRef } = renderCompose({ sender });
+    await act(async () => { await handleRef.current?.openCompose("forward", sourceMessage); });
+    const textarea = () => view.baseElement.querySelector<HTMLTextAreaElement>('textarea[name="compose_body"]');
+    await waitFor(() => expect(textarea()?.value).toContain("Synthetic Jo / me@example.test"));
+    fireEvent.change(textarea()!, { target: { value: "Intro\n\n" + textarea()!.value } });
+    fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+    fireEvent.click(await view.findByRole("option", { name: /Unsigned <unsigned@example.test>/ }));
+    await waitFor(() => expect(textarea()?.value).not.toContain("Synthetic Jo"));
+    expect(confirm).not.toHaveBeenCalled();
+    const unsigned = textarea()!.value;
+    fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+    fireEvent.click(await view.findByRole("option", { name: /Team <me@example.test>/ }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(textarea()!.value).toBe(unsigned);
+  } finally { confirm.mockRestore(); }
+});
