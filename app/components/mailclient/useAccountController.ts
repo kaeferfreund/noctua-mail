@@ -126,6 +126,7 @@ export function useAccountController({
   const loadVersion = useRef(0);
   const instanceAdmin = useRef(false);
   const lastIdentity = useRef<string | null>(null);
+  const selectedAccount = useRef("");
   const loadInitialData = useCallback(
     async () => {
       const version = ++loadVersion.current;
@@ -161,6 +162,14 @@ export function useAccountController({
         // Only the server's persisted selection can activate a mailbox. A list
         // of memberships is never permission to select the first one locally.
         const selected = data.mailboxState === "selected" && nextAccounts.some(account => account.id === data.accountId) ? data.accountId! : "";
+        if (selectedAccount.current !== selected) {
+          // Bootstrap is also called after admin creation/self-grant and session refresh;
+          // those paths can change accounts without going through switchAccount.
+          setActiveFolderId(""); setLastFolderId("");
+          setMessages([]); setViewMessage(null); setActiveMessageId("");
+          setMessagesPage(1); setHasMoreMessages(true); setTotalMessages(null);
+        }
+        selectedAccount.current = selected;
         setMailboxState(data.mailboxState === "selected" && !selected ? "unselected" : data.mailboxState);
         setAccounts(nextAccounts); setActiveAccountId(selected); setFolders([]);
         if (selected) {
@@ -177,7 +186,7 @@ export function useAccountController({
     },
     [apiFetch, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
       setCurrentUser, setFolders, setInitialDataReady, setInitialFoldersLoadedAccountId, setSessionTtlSeconds,
-      setMessages, setViewMessage, setActiveMessageId, setMessagesPage, setHasMoreMessages, setTotalMessages, setActiveFolderId]
+      setMessages, setViewMessage, setActiveMessageId, setMessagesPage, setHasMoreMessages, setTotalMessages, setActiveFolderId, setLastFolderId]
   );
 
   const logout = async () => {

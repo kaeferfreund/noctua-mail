@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "./folderAccount";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
@@ -29,6 +30,10 @@ export async function handleRecomputeStartRequest(
     }
     const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
+    const body = await request.json().catch(() => null) as { folderId?: unknown } | null;
+    const folderError = await validateAccountFolders(accountId, [body?.folderId,
+      new URL(request.url).searchParams.get("folderId")]);
+    if (folderError) return folderError;
     const job = startJob(accountId);
     if (job.status === "failed") {
       return NextResponse.json(

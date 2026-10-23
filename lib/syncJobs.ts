@@ -1,3 +1,4 @@
+import { assertAccountFolder } from "./folderAccountGuard";
 import { assertServerRunning, isShuttingDown } from "./server/shutdown";
 import { trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { UnconfirmedWorkerExitError } from "./db/processLeases";
@@ -659,7 +660,21 @@ function insertQueuedEntry(
   queue.splice(index, 0, entry);
 }
 
-export function startSyncJob(payload: SyncPayload, clientId?: string, source: SyncJobSource = "interactive") {
+export async function startSyncJob(
+  payload: SyncPayload,
+  clientId?: string,
+  source: SyncJobSource = "interactive",
+  signal?: AbortSignal
+): Promise<SyncJob> {
+  assertServerRunning();
+  signal?.throwIfAborted();
+  if (payload.folderId != null) await assertAccountFolder(payload.accountId, payload.folderId);
+  signal?.throwIfAborted();
+  // No awaits between inspecting and updating the account queue.
+  return enqueueSyncJob(payload, clientId, source);
+}
+
+function enqueueSyncJob(payload: SyncPayload, clientId?: string, source: SyncJobSource = "interactive"): SyncJob {
   assertServerRunning();
   const normalizedPayload = normalizeSyncPayload(payload);
   const accountId = normalizedPayload.accountId;
@@ -680,11 +695,11 @@ export function startSyncJob(payload: SyncPayload, clientId?: string, source: Sy
   const runningJob = jobs.get(existingState.runningJobId);
   if (!runningJob) {
     promoteNextQueuedJob(accountId, existingState);
-    return startSyncJob(normalizedPayload, clientId, source);
+    return enqueueSyncJob(normalizedPayload, clientId, source);
   }
   if (runningJob.status !== "running" && runningJob.status !== "queued" && !workerCompletions.has(runningJob.id)) {
     handleCompletedRunningJob(runningJob);
-    return startSyncJob(normalizedPayload, clientId, source);
+    return enqueueSyncJob(normalizedPayload, clientId, source);
   }
   if (typeof runningJob.pid === "number" && !isProcessAlive(runningJob.pid)) {
     markJobFailed(runningJob, "Sync worker process is no longer running.");

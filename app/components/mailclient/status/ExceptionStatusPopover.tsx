@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Box, Button, Flex, Text } from "@radix-ui/themes";
@@ -33,9 +35,10 @@ export default function ExceptionStatusPopover({
   exceptionEntries,
   onClearExceptions,
   formatRelativeTime,
-  reloginLabel = "Re-login",
+  reloginLabel,
   onRelogin
 }: ExceptionStatusPopoverProps) {
+  const t = useTranslations("Shell.status");
   const [selectedExceptionId, setSelectedExceptionId] = useState<string | null>(null);
   const formatAbsoluteTime = (timestamp?: number | null): string | undefined => {
     if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return undefined;
@@ -59,13 +62,13 @@ export default function ExceptionStatusPopover({
   const selectedExceptionCanRelogin = selectedException
     ? shouldOfferExceptionRelogin(selectedException.message)
     : false;
-  const exceptionStatusValue = latestException ? getExceptionSummary(latestException.message) || "Error" : "None";
+  const exceptionStatusValue = latestException ? getExceptionSummary(latestException.message) || t("error") : t("none");
   const exceptionStatusTone: BottomStatusTone = latestException ? "error" : "muted";
 
   return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Exceptions"
+    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title={t("exceptions")}
       trigger={<BottomStatusTriggerButton
-          label="Exceptions"
+          label={t("exceptions")}
           value={exceptionStatusValue}
           tone={exceptionStatusTone}
         />}
@@ -73,13 +76,13 @@ export default function ExceptionStatusPopover({
     >
         <Flex align="center" justify="between" className="popover-title exception-title">
           <Text size="1" weight="medium" className="bottom-popover-heading">
-            Exceptions
+            {t("exceptions")}
           </Text>
           <TooltipIconButton
             variant="soft"
             color="gray"
             size="1"
-            tooltip="Clear exceptions"
+            tooltip={t("clearExceptions")}
             onClick={() => {
               onClearExceptions();
               setSelectedExceptionId(null);
@@ -145,13 +148,13 @@ export default function ExceptionStatusPopover({
                   <RawTextPanel
                     text={selectedExceptionDetail}
                     copyText={selectedExceptionDetail}
-                    copyLabel="Copy error"
+                    copyLabel={t("copyError")}
                     constrainHeight={false}
                   />
                   {selectedExceptionCanRelogin && onRelogin ? (
                     <Flex justify="end">
                       <Button size="1" variant="soft" onClick={() => onRelogin(selectedException)}>
-                        {reloginLabel}
+                        {reloginLabel ?? t("relogin")}
                       </Button>
                     </Flex>
                   ) : null}
@@ -159,7 +162,7 @@ export default function ExceptionStatusPopover({
               ) : null}
             </>
           ) : (
-            <Text size="2">No exceptions.</Text>
+            <Text size="2">{t("noExceptions")}</Text>
           )}
         </Box>
     </StatusPanelFrame>

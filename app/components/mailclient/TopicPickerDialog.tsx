@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useState, useEffect } from "react";
 import { Check, Plus } from "lucide-react";
 import { Badge, Button, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
@@ -48,6 +50,7 @@ export default function TopicPickerDialog({
   onSave,
   onCreateTopic
 }: TopicPickerDialogProps) {
+  const t = useTranslations("Shell.topicPicker");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newName, setNewName] = useState("");
   const [newShortName, setNewShortName] = useState("");
@@ -112,15 +115,15 @@ export default function TopicPickerDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content maxWidth="360px" aria-describedby={undefined}>
-        <DialogTitleBar title="Topics" onClose={() => onOpenChange(false)} />
+        <DialogTitleBar title={t("title")} onClose={() => onOpenChange(false)} />
         <Flex direction="column" gap="2" mt="3">
           {allTopics.length === 0 && !showCreate && (
-            <Text size="2" color="gray">No topics yet. Create one below.</Text>
+            <Text size="2" color="gray">{t("empty")}</Text>
           )}
 
           {visibleSuggestions.length > 0 && (
             <>
-              <Text size="1" color="gray" className={styles.sectionLabel}>Suggested</Text>
+              <Text size="1" color="gray" className={styles.sectionLabel}>{t("suggested")}</Text>
               {visibleSuggestions.map((topic) => (
                 <TopicRow
                   key={topic.id}
@@ -130,7 +133,7 @@ export default function TopicPickerDialog({
                 />
               ))}
               {remainingTopics.length > 0 && (
-                <Text size="1" color="gray" className={styles.sectionLabel}>All topics</Text>
+                <Text size="1" color="gray" className={styles.sectionLabel}>{t("all")}</Text>
               )}
             </>
           )}
@@ -147,7 +150,7 @@ export default function TopicPickerDialog({
           {showCreate ? (
             <Flex direction="column" gap="2" align="center" className={styles.createSection}>
               <TextField.Root
-                placeholder="Topic name"
+                placeholder={t("name")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
@@ -158,18 +161,18 @@ export default function TopicPickerDialog({
                 style={{ width: "100%" }}
               />
               <TextField.Root
-                placeholder="Short name for message list (optional)"
+                placeholder={t("shortName")}
                 value={newShortName}
                 onChange={(e) => setNewShortName(e.target.value)}
                 style={{ width: "100%" }}
               />
               <Badge size="1" variant="soft" color={topicColorToScale(newColor) as any}>
-                {newShortName.trim() || newName.trim() || (newColor ?? "No color")}
+                {newShortName.trim() || newName.trim() || (newColor ? t(`colors.${newColor}`) : t("noColor"))}
               </Badge>
               <TopicColorPicker value={newColor} onChange={setNewColor} swatchSize="sm" />
               <Flex gap="2" justify="end" style={{ width: "100%" }}>
                 <Button size="1" onClick={handleCreateAndAdd} disabled={!newName.trim() || creating} loading={creating}>
-                  Create &amp; add
+                  {t("createAdd")}
                 </Button>
                 <Button
                   size="1"
@@ -180,23 +183,23 @@ export default function TopicPickerDialog({
                     setNewShortName("");
                   }}
                 >
-                  Cancel
+                  {t("cancel")}
                 </Button>
               </Flex>
             </Flex>
           ) : (
             <Button size="1" variant="ghost" onClick={() => setShowCreate(true)} className={styles.newTopicBtn}>
-              <Plus size={12} /> New topic
+              <Plus size={12} /> {t("new")}
             </Button>
           )}
         </Flex>
 
         <Flex gap="3" mt="4" justify="end">
           <Button variant="soft" color="gray" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button onClick={handleSave} disabled={saving || selected.size === 0} loading={saving}>
-            Apply
+            {t("apply")}
           </Button>
         </Flex>
       </Dialog.Content>

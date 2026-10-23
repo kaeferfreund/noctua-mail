@@ -174,7 +174,7 @@ try {
   const { getMailboxState } = await import("@/lib/db");
   const { startSyncJob, getSyncJob } = await import("@/lib/syncJobs");
   async function repairInbox() {
-    const repair = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "repair" });
+    const repair = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "repair" });
     await until(async () => { const job = getSyncJob(repair.id); if (job?.status === "failed") throw new Error(job.error); return job?.status === "done"; }, "UIDVALIDITY repair");
   }
   async function resetAndInject(subject: string, text: string) {
@@ -243,7 +243,7 @@ try {
   for (const mode of ["new", "full"] as const) {
     const subject = `Synthetic ${mode} reset namespace`;
     await resetAndInject(subject, `Synthetic ${mode} replacement body`);
-    const job = startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode,
+    const job = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode,
       ...(mode === "full" ? { resumeFromUid: 61 } : {}) });
     await until(async () => {
       const current = getSyncJob(job.id);

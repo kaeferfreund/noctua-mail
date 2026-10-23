@@ -43,8 +43,8 @@ if (mode === "monitor") {
     const exited = new Promise<number>(resolve => { if (starts === 1) confirmExit = resolve; else secondExit = resolve; });
     return { pid: process.pid, stdout: null, stderr: null, exited, kill: () => { kills++; } };
   };
-  const first = startSyncJob({ accountId: "synthetic-timeout-a", mode: "new" });
-  const next = startSyncJob({ accountId: "synthetic-timeout-b", mode: "new" });
+  const first = await startSyncJob({ accountId: "synthetic-timeout-a", mode: "new" });
+  const next = await startSyncJob({ accountId: "synthetic-timeout-b", mode: "new" });
   const deadline = Date.now() + 3000;
   while (kills === 0 && Date.now() < deadline) await sleep(10);
   assert.equal(kills, 1);
@@ -64,11 +64,11 @@ if (mode === "monitor") {
 
   bun.spawn = () => ({ pid: process.pid, stdout: null, stderr: null,
     exited: Promise.reject(new Error("Synthetic exit confirmation failed")), kill: () => {} });
-  const unknownExit = startSyncJob({ accountId: "synthetic-unknown-exit", mode: "new" });
+  const unknownExit = await startSyncJob({ accountId: "synthetic-unknown-exit", mode: "new" });
   while (unknownExit.status !== "failed" && Date.now() < deadline) await sleep(5);
   assert.equal(unknownExit.status, "failed");
   await sleep(30);
-  const blocked = startSyncJob({ accountId: "synthetic-blocked", mode: "new" });
+  const blocked = await startSyncJob({ accountId: "synthetic-blocked", mode: "new" });
   await sleep(50);
   assert.equal(blocked.status, "queued");
   assert.equal(db.prepare("SELECT count(*) AS n FROM sync_worker_leases").get().n, 1);
