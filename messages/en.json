@@ -226,6 +226,15 @@
       }
     },
     "mcp": {
+      "mailboxes": "Mailboxes",
+      "primaryMailboxHint": "This mailbox remains the token’s default mailbox.",
+      "permissionMode": "Permissions",
+      "tokenMailboxes": "Mailboxes: {mailboxes}",
+      "mode": {
+        "read": "Read only",
+        "drafts": "Read and create drafts (no sending)",
+        "full": "Full access (including sending)"
+      },
       "serverHeading": "MCP server",
       "endpointHint": "Use the MCP endpoint below with an <code>{header}</code> header.",
       "copyServerUrl": "Copy server URL",
