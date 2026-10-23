@@ -31,7 +31,7 @@ function FocusHarness({ mobile = false }: { mobile?: boolean }) {
   const toolbar = <ReaderToolbar layout={readerLayout} showHint={hintMessageId === "synthetic"} dismissHint={dismissHint}
     toggleLayout={() => changeLayout(readerLayout === "split" ? "focus" : "split")} back={() => changeLayout("split")}
     archive={() => {}} spam={() => {}} inSpam={false} remove={() => {}} move={() => {}} topics={() => {}} done={() => {}}
-    isDone={false} busy={false} menu={null} openWindow={() => {}} position={1} total={2} hasMore={false}
+    isDone={false} busy={false} renderMenu={() => null} openWindow={() => {}} position={1} total={2} hasMore={false}
     previous={() => {}} next={() => {}} canPrevious={false} canNext navigating={false} />;
   return <Theme><button onClick={onNavigate}>Synthetic folder</button><ShellPanes readerLayout={readerLayout}
     list={<div ref={scroll} data-testid="scroll"><div role="button" tabIndex={0} data-testid="row" data-selected={selected}
