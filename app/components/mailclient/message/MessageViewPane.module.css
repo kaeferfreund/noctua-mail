@@ -70,13 +70,14 @@
 .subjectText { flex: 1; min-width: 0; font-weight: 600; font-size: 16px; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; color: var(--gray-12); }
 .subjectToggle { display: none; }
 @media (width < 768px) {
-  .mobileHeader { display: flex; align-items: center; min-height: 44px; padding: 0 16px; border-bottom: 1px solid var(--border); }
-  .mobileHeader button { min-height: 44px; }
+  /* Back and the compact/full toggle share one row to leave room for the mail. */
+  .mobileHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 8px; border-bottom: 1px solid var(--border); }
+  .mobileHeader > button { min-height: 44px; }
+  .mobileHeader > :global(.rt-SegmentedControlRoot) { flex-shrink: 0; height: 36px; }
   .threadView { padding: 8px; }
   .threadHeader { padding: 8px; max-height: 40dvh; overflow-y: auto; }
-  .subjectRow { flex-direction: column; align-items: stretch; gap: 4px; }
-  .subjectRow > :global(.rt-SegmentedControlRoot) { align-self: flex-end; }
-  .subjectText[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .subjectRow { flex-wrap: wrap; gap: 4px; }
+  .subjectText[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .subjectToggle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-2); background: transparent; color: var(--gray-11); cursor: pointer; }
 }
 
