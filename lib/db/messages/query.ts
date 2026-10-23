@@ -872,7 +872,7 @@ function applyBadgeFilters(where: string, args: any[], badges?: string[] | null,
       : " AND 0 = 1";
     if (options.viewerUserId) args.push(options.viewerUserId);
   }
-  if (normalized.includes("unassigned")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.assigneeUserId IS NOT NULL)`;
+  if (normalized.includes("unassigned")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND (tc.assigneeUserId IS NOT NULL OR tc.status='closed'))`;
   if (normalized.includes("open")) where += ` AND NOT EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status='closed')`;
   for (const [badge,status] of [["closed","closed"],["in-progress","in_progress"],["waiting","waiting"]]) {
     if (normalized.includes(badge)) { where += ` AND EXISTS (SELECT 1 FROM thread_collab_state tc WHERE ${collabScope} AND tc.status=?)`; args.push(status); }
