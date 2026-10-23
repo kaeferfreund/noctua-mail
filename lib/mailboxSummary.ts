@@ -23,7 +23,7 @@ export function authorizeMailboxSummary(db: Database, userId: string, summary: M
 
 // One statement per shard. Historical state without live messages is excluded;
 // a live thread with no state row is open and unassigned (§6.2).
-export const COLLAB_SUMMARY_SQL = `WITH live AS MATERIALIZED (
+export const COLLAB_SUMMARY_SQL = `WITH live AS (
   SELECT threads.threadId, tc.assigneeUserId,
     (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen
   FROM (SELECT DISTINCT threadId FROM messages INDEXED BY idx_messages_live_thread_summary
@@ -34,8 +34,9 @@ export const COLLAB_SUMMARY_SQL = `WITH live AS MATERIALIZED (
     WHERE tc.accountId = ?1 AND tc.assigneeUserId = ?2
       AND EXISTS (SELECT 1 FROM messages m INDEXED BY idx_messages_live_thread_summary WHERE m.accountId = tc.accountId
         AND m.threadId = tc.threadId AND COALESCE(m.deleted, 0) = 0)) AS assignedToMe,
-  (SELECT COUNT(*) FROM live WHERE assigneeUserId IS NULL AND isOpen) AS unassignedOpen,
-  (SELECT COUNT(*) FROM live WHERE isOpen) AS open
+  COUNT(CASE WHEN assigneeUserId IS NULL AND isOpen THEN 1 END) AS unassignedOpen,
+  COUNT(CASE WHEN isOpen THEN 1 END) AS open
+FROM live
 `;
 
 /** The optional scope can only narrow the user's access (e.g. a mailbox-bound MCP token). */

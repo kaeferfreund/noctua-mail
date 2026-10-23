@@ -62,6 +62,8 @@ export function useMailboxSummaries(options: Options) {
         const result: MailboxSummaryResult = await response.json();
         if (stopped || signal.aborted || start !== generation) return;
         if (!result.ok || !Array.isArray(result.mailboxes)) throw new Error("Invalid mailbox summary");
+        // A heartbeat can precede a denied GET; only a valid snapshot recovers.
+        failures = 0;
         mailboxes = result.mailboxes;
         // Events delivered during the GET are newer than its snapshot. Overlay
         // the latest coalesced values, without invalidating the whole read.
@@ -129,7 +131,7 @@ export function useMailboxSummaries(options: Options) {
         // Attach the reader before awaiting the snapshot to avoid missing
         // events during shard reads. Either failure cancels this connection.
         await Promise.all([snapshot.catch(error => { activeStream.abort(); throw error; }),
-          readSummaryEvents(response.body, onEvent, () => { failures = 0; }).finally(() => activeStream.abort())]);
+          readSummaryEvents(response.body, onEvent, () => {}).finally(() => activeStream.abort())]);
       } catch { /* Disconnects repair through a fresh authorized connection. */ }
       finally {
         controller.signal.removeEventListener("abort", abort);
