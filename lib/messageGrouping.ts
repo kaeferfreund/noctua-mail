@@ -67,7 +67,6 @@ export function buildMessageGroupKey(
     typeof dateValueOverride === "number" && Number.isFinite(dateValueOverride)
       ? dateValueOverride
       : message.dateValue;
-  const date = new Date(displayDayNumber(effectiveDateValue) * DAY_MS);
 
   if (groupBy === "date" || groupBy === INVITE_DECK_GROUP_BY) {
     return buildTimeGroupKey(effectiveDateValue, groupBy);
@@ -78,7 +77,9 @@ export function buildMessageGroupKey(
   if (groupBy === "week") {
     return buildWeekGroupKey(effectiveDateValue);
   }
-  if (groupBy === "year") return String(date.getUTCFullYear());
+  if (groupBy === "year") {
+    return String(new Date(displayDayNumber(effectiveDateValue) * DAY_MS).getUTCFullYear());
+  }
   if (groupBy === "domain") {
     const emailMatch = message.from.match(/<([^>]+)>/);
     const email = emailMatch ? emailMatch[1] : message.from;

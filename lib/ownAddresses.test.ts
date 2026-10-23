@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { getOwnAddresses, isOwnAddress, normalizeIdentityEmail, parseAddressEmails } from "./ownAddresses";
+import { getOwnAddresses, isOwnAddress, normalizeIdentityEmail, ownAddressMatcher, parseAddressEmails } from "./ownAddresses";
 
 describe("own addresses", () => {
   test("canonical IDNA, plus tags and dots; reject lists, display syntax and controls", () => {
@@ -17,6 +17,10 @@ describe("own addresses", () => {
     expect(isOwnAddress('"Alias" <ALIAS@example.test>', own)).toBe(true);
     for (const address of ["notalias@example.test", "foreign@example.test", "reply@example.test", '"alias@example.test" <external@example.test>']) {
       expect(isOwnAddress(address, own)).toBe(false);
+    }
+    const isOwn = ownAddressMatcher(own);
+    for (const address of ['"Alias" <ALIAS@example.test>', "primary@example.test", "notalias@example.test", "foreign@example.test", null, ""]) {
+      expect(isOwn(address)).toBe(isOwnAddress(address, own));
     }
   });
 });
