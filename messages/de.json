@@ -200,7 +200,6 @@
       "title": "Befehlspalette",
       "description": "Befehl suchen …"
     },
-    "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
     },

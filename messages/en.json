@@ -200,7 +200,6 @@
       "title": "Command Palette",
       "description": "Search for a command to run..."
     },
-    "build": "Build {version}",
     "loading": {
       "mailbox": "Add mailbox"
     },
