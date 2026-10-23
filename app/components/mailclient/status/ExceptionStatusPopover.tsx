@@ -1,5 +1,8 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+import { formatDate, formatTime } from "@/lib/i18n/format";
+import type { UiLocale } from "@/lib/i18n/config";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Box, Button, Flex, Text } from "@radix-ui/themes";
@@ -18,6 +21,7 @@ import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type ExceptionStatusPopoverProps = {
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   exceptionEntries: ExceptionEntry[];
@@ -28,19 +32,22 @@ type ExceptionStatusPopoverProps = {
 };
 
 export default function ExceptionStatusPopover({
+  embedded,
   open,
   onOpenChange,
   exceptionEntries,
   onClearExceptions,
   formatRelativeTime,
-  reloginLabel = "Re-login",
+  reloginLabel,
   onRelogin
 }: ExceptionStatusPopoverProps) {
+  const t = useTranslations("Shell.status");
+  const locale = useLocale() as UiLocale;
   const [selectedExceptionId, setSelectedExceptionId] = useState<string | null>(null);
   const formatAbsoluteTime = (timestamp?: number | null): string | undefined => {
     if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return undefined;
     try {
-      return new Date(timestamp).toLocaleString();
+      return `${formatDate(timestamp, locale)} ${formatTime(timestamp, locale)}`;
     } catch {
       return undefined;
     }
@@ -59,13 +66,13 @@ export default function ExceptionStatusPopover({
   const selectedExceptionCanRelogin = selectedException
     ? shouldOfferExceptionRelogin(selectedException.message)
     : false;
-  const exceptionStatusValue = latestException ? getExceptionSummary(latestException.message) || "Error" : "None";
+  const exceptionStatusValue = latestException ? getExceptionSummary(latestException.message) || t("error") : t("none");
   const exceptionStatusTone: BottomStatusTone = latestException ? "error" : "muted";
 
   return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Exceptions"
+    <StatusPanelFrame embedded={embedded} description={t("exception.description")} open={open} onOpenChange={onOpenChange} title={t("exception.title")}
       trigger={<BottomStatusTriggerButton
-          label="Exceptions"
+          label={t("exception.title")}
           value={exceptionStatusValue}
           tone={exceptionStatusTone}
         />}
@@ -73,13 +80,13 @@ export default function ExceptionStatusPopover({
     >
         <Flex align="center" justify="between" className="popover-title exception-title">
           <Text size="1" weight="medium" className="bottom-popover-heading">
-            Exceptions
+            {t("exception.title")}
           </Text>
           <TooltipIconButton
             variant="soft"
             color="gray"
             size="1"
-            tooltip="Clear exceptions"
+            tooltip={t("clearExceptions")}
             onClick={() => {
               onClearExceptions();
               setSelectedExceptionId(null);
@@ -124,7 +131,7 @@ export default function ExceptionStatusPopover({
                         className="exception-item-time"
                         title={formatAbsoluteTime(entry.timestamp)}
                       >
-                        {formatRelativeTime(entry.timestamp)}
+                        {formatAbsoluteTime(entry.timestamp) ?? formatRelativeTime(entry.timestamp)}
                       </Text>
                     </div>
                   );
@@ -138,20 +145,20 @@ export default function ExceptionStatusPopover({
                     className="exception-meta"
                     title={formatAbsoluteTime(selectedException.timestamp)}
                   >
-                    {formatRelativeTime(selectedException.timestamp)}
+                    {formatAbsoluteTime(selectedException.timestamp) ?? formatRelativeTime(selectedException.timestamp)}
                     {selectedException.status !== undefined ? ` · ${selectedException.status}` : ""}
                     {selectedException.requestPath ? ` · ${selectedException.requestPath}` : ""}
                   </Text>
                   <RawTextPanel
                     text={selectedExceptionDetail}
                     copyText={selectedExceptionDetail}
-                    copyLabel="Copy error"
+                    copyLabel={t("copyError")}
                     constrainHeight={false}
                   />
                   {selectedExceptionCanRelogin && onRelogin ? (
                     <Flex justify="end">
                       <Button size="1" variant="soft" onClick={() => onRelogin(selectedException)}>
-                        {reloginLabel}
+                        {reloginLabel ?? t("relogin")}
                       </Button>
                     </Flex>
                   ) : null}
@@ -159,7 +166,7 @@ export default function ExceptionStatusPopover({
               ) : null}
             </>
           ) : (
-            <Text size="2">No exceptions.</Text>
+            <Text size="2">{t("exception.empty")}</Text>
           )}
         </Box>
     </StatusPanelFrame>

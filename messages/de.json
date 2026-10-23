@@ -140,6 +140,77 @@
     "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
+    },
+    "status": {
+      "label": "Aktivität und Kalender",
+      "syncing": "Synchronisiert …",
+      "attention": "{count, plural, one {# Hinweis erfordert deine Aufmerksamkeit} other {# Hinweise erfordern deine Aufmerksamkeit}}",
+      "idle": "Bereit",
+      "none": "Keine",
+      "unknown": "Noch nicht verfügbar",
+      "error": "Fehler",
+      "checkMail": "Neue E-Mails abrufen",
+      "checking": "Prüft den Posteingang …",
+      "lastCheck": "Letzte Prüfung: {time}",
+      "nextCheck": "Nächste Prüfung: {time}",
+      "liveCheck": "Neue E-Mails werden laufend gemeldet.",
+      "calendar": "Kalender öffnen",
+      "showCalendarSidebar": "Kalender-Seitenleiste einblenden",
+      "hideCalendarSidebar": "Kalender-Seitenleiste ausblenden",
+      "mailbox": "Postfach",
+      "folder": "Ordner",
+      "scope": "{mailbox} / {folder}",
+      "retry": "Erneut versuchen",
+      "details": "Details",
+      "progress": "{processed} von {total} Nachrichten verarbeitet",
+      "retryDetail": "Wiederholungen: {attempt} von {max}",
+      "threads": "Threads werden neu berechnet …",
+      "categories": "Kategorien werden neu berechnet …",
+      "clearExceptions": "Alle Fehler löschen",
+      "copyError": "Fehler kopieren",
+      "relogin": "Erneut anmelden",
+      "close": "Schließen",
+      "deleteReminderError": "Die Erinnerung konnte nicht gelöscht werden.",
+      "openSourceMail": "Ursprüngliche E-Mail öffnen",
+      "duration": "Dauer: {value}",
+      "reminderLead": "Erinnerung: {minutes} Minuten vorher",
+      "repeats": "Wiederholung: {value}",
+      "deleteReminder": "Erinnerung löschen",
+      "process": {
+        "title": "Hintergrundaufgaben",
+        "description": "Zeigt laufende Synchronisierungen, Fortschritt und neue Versuche.",
+        "empty": "Keine laufenden Hintergrundaufgaben."
+      },
+      "mailCheck": {
+        "title": "Posteingangsprüfung",
+        "description": "Zeigt die letzte und nächste Prüfung deines Posteingangs."
+      },
+      "exception": {
+        "title": "Fehler",
+        "description": "Zeigt aufgetretene Fehler mit Zeitpunkt und Details.",
+        "empty": "Keine Fehler."
+      },
+      "reminder": {
+        "title": "Demnächst",
+        "description": "Zeigt deine nächsten Termine und Erinnerungen.",
+        "empty": "Keine anstehenden Termine oder Erinnerungen."
+      },
+      "phase": {
+        "starting": "Wird vorbereitet",
+        "fetching": "Wird abgerufen",
+        "finalizing": "Wird abgeschlossen",
+        "done": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "retrying": "Erneuter Versuch"
+      },
+      "mode": {
+        "full": "Vollständige Synchronisierung",
+        "recent": "Aktuelle Nachrichten",
+        "new": "Neue Nachrichten",
+        "repair": "Abgleich"
+      },
+      "updatedAt": "Zuletzt aktualisiert: {time}",
+      "calendarEvent": "Kalendertermin"
     }
   },
   "Search": {

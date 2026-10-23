@@ -42,9 +42,6 @@
 .messageMenu :global([data-slot="dropdown-menu-sub-trigger"]),
 .messageMenu :global(.rt-DropdownMenuItem),
 .messageMenu :global(.rt-DropdownMenuSubTrigger) { min-height: 44px; }
-@media (width < 768px) {
-  .desktopStatusBar { display: none; }
-}
 
 /* A stable Dialog tree presents as a fullscreen settings sheet on phones. */
 .settingsFullscreen {

@@ -100,7 +100,7 @@ export default function ShellPanes({ list, reader, calendar, mobileView = "list"
       >
         {list}
       </ResizablePanel>
-      <ResizableHandle className="w-1 bg-transparent" />
+      <ResizableHandle className={`${styles.separator} w-1 bg-transparent`} />
       <ResizablePanel
         id={READER_PANEL_ID}
         minSize={isMobile ? 0 : 320}
@@ -111,7 +111,7 @@ export default function ShellPanes({ list, reader, calendar, mobileView = "list"
       </ResizablePanel>
       {desktopCalendar ? (
         <>
-          <ResizableHandle className="w-1 bg-transparent" />
+          <ResizableHandle className={`${styles.separator} w-1 bg-transparent`} />
           <ResizablePanel
             id={CALENDAR_PANEL_ID}
             defaultSize={400}

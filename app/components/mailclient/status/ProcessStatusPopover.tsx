@@ -1,18 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
-import { X } from "lucide-react";
-import { Badge, Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
-import type { Folder } from "@/lib/data";
+import { useLocale, useTranslations } from "next-intl";
+import type { UiLocale } from "@/lib/i18n/config";
+import { formatDate, formatTime } from "@/lib/i18n/format";
+import type { Account, Folder } from "@/lib/data";
 import type { SyncJobProgress } from "../types";
-import {
-  BottomStatusTriggerButton,
-  type BottomStatusTone
-} from "./BottomStatusSection";
+import { Button } from "@/app/components/ui/button";
 import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
-import TooltipIconButton from "@/app/components/TooltipIconButton";
+import { BottomStatusTriggerButton } from "./BottomStatusSection";
+import { syncNeedsAttention } from "./statusIndicator";
 
-type ProcessStatusPopoverProps = {
+type Props = {
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSyncing: boolean;
@@ -21,220 +20,52 @@ type ProcessStatusPopoverProps = {
   syncingFolders: Set<string>;
   syncProgressItems: SyncJobProgress[];
   accountFolders: Folder[];
+  accounts?: Pick<Account, "id" | "name">[];
+  onRetrySync?: (job: SyncJobProgress) => void;
 };
 
-const SYNC_PHASE_LABELS: Record<SyncJobProgress["phase"], string> = {
-  starting: "Preparing",
-  fetching: "Fetching",
-  finalizing: "Finalizing",
-  done: "Done",
-  failed: "Failed",
-  retrying: "Retrying"
-};
-
-const SYNC_MODE_LABELS: Record<SyncJobProgress["mode"], string> = {
-  full: "Full sync",
-  recent: "Recent sync",
-  new: "New sync",
-  repair: "Repair sync"
-};
-
-function formatSyncPercent(percent?: number) {
-  if (typeof percent !== "number" || !Number.isFinite(percent)) return "";
-  const normalized = Math.max(0, Math.min(100, percent));
-  return normalized % 1 === 0 ? `${normalized.toFixed(0)}%` : `${normalized.toFixed(1)}%`;
-}
-
-function formatSyncCount(progress: SyncJobProgress) {
-  const processed =
-    typeof progress.processed === "number" && Number.isFinite(progress.processed)
-      ? Math.max(0, Math.round(progress.processed))
-      : 0;
-  if (
-    typeof progress.estimatedTotal === "number" &&
-    Number.isFinite(progress.estimatedTotal) &&
-    progress.estimatedTotal > 0
-  ) {
-    return `${processed}/${Math.max(0, Math.round(progress.estimatedTotal))}`;
-  }
-  if (processed <= 0) return "";
-  return `${processed}`;
-}
-
-function formatRetryLabel(progress: SyncJobProgress) {
-  const { retryAttempt, maxRetries } = progress;
-  if (typeof retryAttempt === "number" && typeof maxRetries === "number") {
-    return `Retrying (${retryAttempt}/${maxRetries})…`;
-  }
-  return "Retrying…";
-}
-
-function formatSyncProgressSummary(progress: SyncJobProgress) {
-  const modeLabel = SYNC_MODE_LABELS[progress.mode] ?? "Sync";
-  if (progress.phase === "retrying") {
-    return `${modeLabel} · ${formatRetryLabel(progress)}`;
-  }
-  const countLabel = formatSyncCount(progress);
-  const percentLabel = formatSyncPercent(progress.percent);
-  const metrics = [percentLabel, countLabel].filter(Boolean).join(" · ");
-  const explicitMessage = progress.message?.trim();
-  if (explicitMessage) {
-    return metrics ? `${modeLabel} · ${explicitMessage} · ${metrics}` : `${modeLabel} · ${explicitMessage}`;
-  }
-  const phaseLabel = SYNC_PHASE_LABELS[progress.phase] ?? "Running";
-  return metrics ? `${modeLabel} · ${phaseLabel} · ${metrics}` : `${modeLabel} · ${phaseLabel}`;
-}
-
-function resolveSyncScopeLabel(progress: SyncJobProgress, folderById: Map<string, Folder>) {
-  const folderName = progress.folderId ? folderById.get(progress.folderId)?.name : undefined;
-  return folderName || progress.mailboxPath || "Mailbox";
-}
-
-export default function ProcessStatusPopover({
-  open,
-  onOpenChange,
-  isSyncing,
-  isRecomputingThreads,
-  isRecomputingCategories,
-  syncingFolders,
-  syncProgressItems,
-  accountFolders
-}: ProcessStatusPopoverProps) {
-  const folderById = useMemo(
-    () => new Map(accountFolders.map((folder) => [folder.id, folder])),
-    [accountFolders]
-  );
-  const syncingFolderItems = Array.from(syncingFolders)
-    .map((folderId) => folderById.get(folderId))
-    .filter((folder): folder is Folder => Boolean(folder));
-  const sortedSyncProgressItems = useMemo(
-    () => [...syncProgressItems].sort((left, right) => right.updatedAt - left.updatedAt),
-    [syncProgressItems]
-  );
-  const syncProgressFolderIds = useMemo(
-    () =>
-      new Set(
-        sortedSyncProgressItems
-          .map((progress) => progress.folderId)
-          .filter((folderId): folderId is string => Boolean(folderId))
-      ),
-    [sortedSyncProgressItems]
-  );
-  const fallbackSyncingFolderItems = syncingFolderItems.filter(
-    (folder) => !syncProgressFolderIds.has(folder.id)
-  );
-  const syncRows = [
-    ...sortedSyncProgressItems.map((progress) => ({
-      key: progress.jobId,
-      title: resolveSyncScopeLabel(progress, folderById),
-      detail: formatSyncProgressSummary(progress)
-    })),
-    ...fallbackSyncingFolderItems.map((folder) => ({
-      key: `fallback-${folder.id}`,
-      title: folder.name,
-      detail: "Preparing sync…"
-    }))
-  ];
-  const additionalProcessRows = [
-    isRecomputingThreads ? "Recomputing threads…" : "",
-    isRecomputingCategories ? "Recomputing categories…" : ""
-  ].filter(Boolean);
-  const activeProcessCount = syncRows.length + additionalProcessRows.length;
-  const latestSyncProgress = sortedSyncProgressItems[0] ?? null;
-  const latestSyncStatusValue = (() => {
-    if (latestSyncProgress) {
-      const scopeLabel = resolveSyncScopeLabel(latestSyncProgress, folderById);
-      const modeLabel = SYNC_MODE_LABELS[latestSyncProgress.mode] ?? "Sync";
-      if (latestSyncProgress.phase === "retrying") {
-        return `${modeLabel}: ${formatRetryLabel(latestSyncProgress)} ${scopeLabel}`;
-      }
-      // During the post-fetch finalizing tail the percent sits at 100, so
-      // surface the step message instead — that's where the spinner outlives
-      // the fetch and the user wants to know what's happening.
-      const finalizingMessage = latestSyncProgress.message?.trim();
-      if (latestSyncProgress.phase === "finalizing" && finalizingMessage) {
-        return `${scopeLabel}: ${finalizingMessage}`;
-      }
-      const percentLabel = formatSyncPercent(latestSyncProgress.percent);
-      return percentLabel
-        ? `Syncing ${scopeLabel} (${modeLabel}, ${percentLabel})`
-        : `Syncing ${scopeLabel} (${modeLabel})...`;
-    }
-    if (syncingFolderItems.length > 0) {
-      const firstFolderName = syncingFolderItems[0]?.name;
-      if (!firstFolderName) return "Syncing folder...";
-      if (syncingFolderItems.length === 1) return `Syncing ${firstFolderName}...`;
-      return `Syncing ${firstFolderName} +${syncingFolderItems.length - 1} more...`;
-    }
-    return isSyncing ? "Syncing mailbox..." : "";
-  })();
-  const processStatusItems = [
-    latestSyncStatusValue,
-    ...additionalProcessRows
-  ].filter(Boolean);
-  const processStatusValue = processStatusItems.length > 0 ? processStatusItems.join(" · ") : "Idle";
-  const processStatusTone: BottomStatusTone = processStatusItems.length > 0 ? "normal" : "muted";
-
-  return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Processes"
-      trigger={<BottomStatusTriggerButton
-          label="Processes"
-          value={processStatusValue}
-          tone={processStatusTone}
-        />}
-      contentProps={{ className: "bottom-popover bottom-popover-process",
-        side: "top",
-        align: "start",
-        sideOffset: 8, }}
-    >
-        <Flex align="center" justify="between" className="popover-title-row">
-          <Flex align="baseline" gap="3">
-            <Heading size="3" weight="medium" className="reminder-main-title">
-              Processes
-            </Heading>
-            <Badge color="gray" variant="soft" radius="full">
-              {activeProcessCount}
-            </Badge>
-          </Flex>
-          <TooltipIconButton
-            variant="ghost"
-            color="gray"
-            size="2"
-            tooltip="Close processes"
-            onClick={() => onOpenChange(false)}
-          >
-            <X size={16} />
-          </TooltipIconButton>
-        </Flex>
-        <Box className="popover-body">
-          {activeProcessCount > 0 ? (
-            <Card size="1" className="process-item-card">
-              <div className="process-list">
-                {syncRows.map((row) => (
-                  <div key={row.key} className="process-row">
-                    <Text size="2" weight="medium" className="process-row-title">
-                      {row.title}
-                    </Text>
-                    <Text size="1" color="gray" className="process-row-detail">
-                      {row.detail}
-                    </Text>
-                  </div>
-                ))}
-                {additionalProcessRows.map((row) => (
-                  <div key={row} className="process-row">
-                    <Text size="2" weight="medium" className="process-row-title">
-                      {row}
-                    </Text>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : (
-            <Flex align="center" justify="center" p="4" className="empty-state">
-              <Text size="2" color="gray">No active processes.</Text>
-            </Flex>
-          )}
-        </Box>
-    </StatusPanelFrame>
-  );
+export default function ProcessStatusPopover({ embedded, open, onOpenChange, isSyncing,
+  isRecomputingThreads, isRecomputingCategories, syncingFolders, syncProgressItems,
+  accountFolders, accounts = [], onRetrySync }: Props) {
+  const t = useTranslations("Shell.status");
+  const locale = useLocale() as UiLocale;
+  const folders = new Map(accountFolders.map(folder => [folder.id, folder]));
+  const jobs = [...syncProgressItems].sort((a, b) => b.updatedAt - a.updatedAt);
+  const fallbackFolders = [...syncingFolders].filter(id => !jobs.some(job => job.folderId === id))
+    .map(id => folders.get(id)).filter(folder => !!folder);
+  const mailboxName = (id: string) => accounts.find(account => account.id === id)?.name || t("mailbox");
+  // Protocol messages and paths can contain account IDs. Use structured phases
+  // and resolved names for the UI, including Details; never render raw job text.
+  const scopeFolder = (job: SyncJobProgress) => folders.get(job.folderId ?? "") ?? folders.get(job.mailboxPath) ?? folders.get(`${job.accountId}:${job.mailboxPath}`);
+  const scope = (job: SyncJobProgress) => t("scope", {
+    mailbox: mailboxName(job.accountId), folder: scopeFolder(job)?.name || t("folder")
+  });
+  return <StatusPanelFrame embedded={embedded} open={open} onOpenChange={onOpenChange}
+    title={t("process.title")} description={t("process.description")}
+    trigger={<BottomStatusTriggerButton label={t("process.title")} value={t("idle")} />}
+    contentProps={{ className: "bottom-popover bottom-popover-process" }}>
+    <div className="space-y-3 text-sm">
+      {!embedded ? <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>{t("close")}</Button> : null}
+      {jobs.map(job => <div key={job.jobId} className="space-y-1 break-words">
+        <p className="font-medium">{scope(job)}</p>
+        <p className="text-muted-foreground">{t(`mode.${job.mode}`)} · {t(`phase.${job.phase}`)}
+          {job.phase === "retrying" ? ` (${job.retryAttempt ?? 0}/${job.maxRetries ?? "…"})` : ""}
+          {Number.isFinite(job.percent) ? ` · ${Math.round(Math.max(0, Math.min(100, job.percent!)))}%` : ""}
+        </p>
+        {syncNeedsAttention(job) ? <div className="flex flex-wrap items-start gap-2">
+          {onRetrySync ? <Button size="sm" variant="outline" onClick={() => onRetrySync(job)}>{t("retry")}</Button> : null}
+          <details className="min-w-0 text-sm"><summary className="cursor-pointer py-1.5">{t("details")}</summary>
+            <p>{t("progress", { processed: job.processed, total: job.estimatedTotal ?? job.processed })}</p>
+            {job.maxRetries !== undefined ? <p>{t("retryDetail", { attempt: job.retryAttempt ?? 0, max: job.maxRetries })}</p> : null}
+            <p>{t("updatedAt", { time: `${formatDate(job.updatedAt, locale)} ${formatTime(job.updatedAt, locale)}` })}</p>
+          </details>
+        </div> : <p className="text-xs text-muted-foreground">{t("progress", { processed: job.processed, total: job.estimatedTotal ?? job.processed })}</p>}
+      </div>)}
+      {fallbackFolders.map(folder => <p key={folder.id}>{t("scope", { mailbox: mailboxName(folder.accountId), folder: folder.name })} · {t("phase.starting")}</p>)}
+      {isRecomputingThreads ? <p>{t("threads")}</p> : null}
+      {isRecomputingCategories ? <p>{t("categories")}</p> : null}
+      {!jobs.length && !fallbackFolders.length && !isRecomputingThreads && !isRecomputingCategories
+        ? <p className="text-muted-foreground">{isSyncing ? t("syncing") : t("process.empty")}</p> : null}
+    </div>
+  </StatusPanelFrame>;
 }

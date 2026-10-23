@@ -977,21 +977,6 @@ a {
 }
 
 
-.bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--card);
-  font-size: var(--text-2xs);
-  color: var(--muted-foreground);
-  gap: 12px;
-  min-height: 28px;
-  flex-shrink: 0;
-  position: relative;
-}
-
 .bottom-section {
   display: flex;
   align-items: center;
@@ -1052,21 +1037,6 @@ a {
 }
 
 .bottom-item {
-  color: var(--text);
-}
-
-.bottom-center-time {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  cursor: pointer;
-  color: var(--muted-foreground);
-  text-align: center;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-2xs);
-}
-.bottom-center-time:hover {
   color: var(--text);
 }
 
