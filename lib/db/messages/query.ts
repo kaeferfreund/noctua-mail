@@ -720,15 +720,23 @@ function parseSearchInput(
  * tokens are ANDed, and the whole raw query still substring-matches
  * messageId/threadId/id via the same LIKE patterns. Unselective searches
  * (candidate set above the cap) keep the legacy inline clause, where a scan
- * is the cheaper plan anyway. `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH=1` forces the
- * legacy clause everywhere (kill switch; also used by differential tests).
+ * is the cheaper plan anyway; every candidate fetch is capped at the same
+ * limit so a discarded resolution stays cheap, and a token whose own set
+ * exceeds the cap is probed against the bounded intersection of the other
+ * tokens with its legacy per-token clause instead of being materialized.
+ * `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH=1` forces the legacy clause everywhere
+ * (kill switch; also used by differential tests), and
+ * `NOCTUA_FTS_DRIVEN_MAX_CANDIDATES` overrides the cap.
  */
 type SearchCandidateResolution =
   | { kind: "none" }
   | { kind: "legacy" }
   | { kind: "ids"; ids: string[] };
 
-const MAX_FTS_DRIVEN_CANDIDATES = 2000;
+function maxFtsDrivenCandidates(): number {
+  const override = Number(process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES);
+  return Number.isFinite(override) && override >= 1 ? Math.floor(override) : 2000;
+}
 
 function resolveSearchCandidateIds(
   db: any,
@@ -748,38 +756,92 @@ function resolveSearchCandidateIds(
   if (!hasQuery && !hasIdQuery && !hasAttachmentFilenameQuery) return { kind: "none" };
   if (process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH === "1") return { kind: "legacy" };
 
-  const ftsIdsForMatch = (matchQuery: string) =>
-    (db
+  const cap = maxFtsDrivenCandidates();
+  const fetchLimit = cap + 1;
+  // Capped fetches: `truncated` means the true set exceeds the cap.
+  const ftsIdsForMatch = (matchQuery: string) => {
+    const rows = db
       .prepare(
-        `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ?`
+        `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ? LIMIT ?`
       )
-      .all(matchQuery, accountId) as Array<{ messageId: string }>).map((row) => row.messageId);
-  const attachmentIdsForTerm = (term: string) =>
-    (db
+      .all(matchQuery, accountId, fetchLimit) as Array<{ messageId: string }>;
+    return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
+  };
+  const attachmentIdsForTerm = (term: string) => {
+    const rows = db
       .prepare(
-        `SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ?`
+        `SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ? LIMIT ?`
       )
-      .all(accountId, `%${term}%`) as Array<{ messageId: string }>).map((row) => row.messageId);
+      .all(accountId, `%${term}%`, fetchLimit) as Array<{ messageId: string }>;
+    return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
+  };
+  // Legacy per-token clause restricted to an already bounded id set; used
+  // for tokens too unselective to materialize on their own.
+  const probeToken = (
+    ids: string[],
+    token: { ftsTokenQuery?: string; attachmentTerm?: string }
+  ): Set<string> => {
+    const tokenParts: string[] = [];
+    const tokenArgs: any[] = [];
+    if (token.ftsTokenQuery) {
+      tokenParts.push(
+        `(m.accountId, m.id) IN (SELECT accountId, messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ?)`
+      );
+      tokenArgs.push(token.ftsTokenQuery);
+    }
+    if (token.attachmentTerm) {
+      tokenParts.push(
+        `EXISTS (
+          SELECT 1
+          FROM attachments a
+          WHERE a.accountId = m.accountId AND a.messageId = m.id
+            AND lower(COALESCE(a.filename, '')) LIKE ?
+        )`
+      );
+      tokenArgs.push(`%${token.attachmentTerm}%`);
+    }
+    if (tokenParts.length === 0 || ids.length === 0) return new Set(ids);
+    const rows = db
+      .prepare(
+        `SELECT m.id FROM messages m
+         WHERE m.accountId = ? AND m.id IN (${ids.map(() => "?").join(",")})
+           AND (${tokenParts.join(" OR ")})`
+      )
+      .all(accountId, ...ids, ...tokenArgs) as Array<{ id: string }>;
+    return new Set(rows.map((row) => row.id));
+  };
 
   let tokenIntersection: Set<string> | null = null;
   if (hasQuery || hasAttachmentFilenameQuery) {
     if (!hasAttachmentFilenameQuery && ftsTokenQueries.length > 1) {
       // No per-token attachment mixing is possible, so the legacy token AND
       // is exactly one MATCH over the same scoped token queries.
-      tokenIntersection = new Set(ftsIdsForMatch(ftsTokenQueries.join(" AND ")));
+      const combined = ftsIdsForMatch(ftsTokenQueries.join(" AND "));
+      if (combined.truncated) return { kind: "legacy" };
+      tokenIntersection = new Set(combined.ids);
     } else {
       const tokenCount = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
+      const oversizedTokens: Array<{ ftsTokenQuery?: string; attachmentTerm?: string }> = [];
       for (let index = 0; index < tokenCount; index += 1) {
-        const tokenIds = new Set<string>();
         const ftsTokenQuery = ftsTokenQueries[index];
-        if (ftsTokenQuery) {
-          for (const id of ftsIdsForMatch(ftsTokenQuery)) tokenIds.add(id);
-        }
         const attachmentTerm = attachmentFilenameTerms[index];
-        if (attachmentTerm) {
-          for (const id of attachmentIdsForTerm(attachmentTerm)) tokenIds.add(id);
+        if (!ftsTokenQuery && !attachmentTerm) continue;
+        const tokenIds = new Set<string>();
+        let truncated = false;
+        if (ftsTokenQuery) {
+          const part = ftsIdsForMatch(ftsTokenQuery);
+          truncated = truncated || part.truncated;
+          for (const id of part.ids) tokenIds.add(id);
         }
-        if (tokenIds.size === 0 && !ftsTokenQuery && !attachmentTerm) continue;
+        if (attachmentTerm) {
+          const part = attachmentIdsForTerm(attachmentTerm);
+          truncated = truncated || part.truncated;
+          for (const id of part.ids) tokenIds.add(id);
+        }
+        if (truncated || tokenIds.size > cap) {
+          oversizedTokens.push({ ftsTokenQuery, attachmentTerm });
+          continue;
+        }
         if (tokenIntersection === null) {
           tokenIntersection = tokenIds;
         } else {
@@ -787,6 +849,15 @@ function resolveSearchCandidateIds(
           tokenIntersection = new Set([...previous].filter((id: string) => tokenIds.has(id)));
         }
         if (tokenIntersection.size === 0) break;
+      }
+      if (oversizedTokens.length > 0) {
+        // Every token oversized: the intersection could still be small, but
+        // proving that costs as much as the legacy scan it would replace.
+        if (tokenIntersection === null) return { kind: "legacy" };
+        for (const token of oversizedTokens) {
+          if (tokenIntersection.size === 0) break;
+          tokenIntersection = probeToken([...tokenIntersection], token);
+        }
       }
     }
   }
@@ -798,14 +869,18 @@ function resolveSearchCandidateIds(
       .prepare(
         `SELECT id FROM messages
          WHERE accountId = ?
-           AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?)`
+           AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?)
+         LIMIT ?`
       )
-      .all(accountId, pattern, pattern, pattern) as Array<{ id: string }>;
+      .all(accountId, pattern, pattern, pattern, fetchLimit) as Array<{ id: string }>;
+    // The candidate set is a union with these ids, so an oversized id set
+    // alone already exceeds the cap.
+    if (idRows.length > cap) return { kind: "legacy" };
     candidates = candidates ?? new Set<string>();
     for (const row of idRows) candidates.add(row.id);
   }
   if (!candidates) return { kind: "none" };
-  if (candidates.size > MAX_FTS_DRIVEN_CANDIDATES) return { kind: "legacy" };
+  if (candidates.size > cap) return { kind: "legacy" };
   return { kind: "ids", ids: [...candidates] };
 }
 
