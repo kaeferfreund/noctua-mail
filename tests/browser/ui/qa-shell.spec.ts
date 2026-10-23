@@ -138,3 +138,144 @@ test("QA-011/012/013: 44px phone header actions, reduced-motion sidebar, folder 
   await expect(page.getByText("No messages match this search.", { exact: true })).toBeVisible();
   await expect(page.getByText("No messages in this folder.", { exact: true })).toHaveCount(0);
 });
+const viewDescriptions = JSON.parse(readFileSync("messages/en.json", "utf8")).Views as Record<string, { name: string; description: string }>;
+// Every view row gets a count, with wide synthetic values (12,345 renders as "12.3K"): the
+// mailbox summary feeds the collaboration views and one-message count queries feed the
+// virtual views. The summary event stream is held open without events, so a live summary
+// cannot replace the routed counts while the rows are measured.
+async function routeViewCounts(page: Page) {
+  const collab = { assignedToMe: 3, unassignedOpen: 9111, open: 12345 };
+  const virtual: Record<string, number> = { focused: 7, todo: 48, calendar: 5, "calendar,unread": 2 };
+  await page.addInitScript(() => {
+    const fetch = window.fetch.bind(window);
+    Object.assign(window, { fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+      new URL(input instanceof Request ? input.url : String(input), location.href).pathname === "/api/me/events"
+        ? Promise.resolve(new Response(new ReadableStream(), { headers: { "content-type": "text/event-stream" } }))
+        : fetch(input, init) });
+  });
+  await page.route("**/api/me/mailboxes/summary", async route => {
+    const response = await route.fetch(), body = await response.json();
+    await route.fulfill({ response, json: { ...body, mailboxes: body.mailboxes.map((mailbox: object) => ({ ...mailbox, ...collab })) } });
+  });
+  await page.route(url => url.pathname.endsWith("/messages") && url.searchParams.get("pageSize") === "1" && url.searchParams.has("badges"), async route => {
+    const total = virtual[new URL(route.request().url()).searchParams.get("badges")!];
+    if (total === undefined) return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...await response.json(), total } });
+  });
+}
+const countedViewRows = (page: Page) => page.locator("[data-view-id]").evaluateAll(buttons =>
+  buttons.filter(button => button.parentElement!.querySelector('[data-sidebar="menu-badge"]')).length);
+test("QA-014: sidebar view rows keep the count inside the row highlight and describe the hovered row", async ({ page }) => {
+  const views = viewDescriptions;
+  const catalogKey: Record<string, string> = { "virtual:assigned-to-me": "assignedToMe", "virtual:unassigned": "unassigned", "virtual:open": "open", "virtual:focused": "focused", "virtual:action-queue": "actionQueue" };
+  const box = (el: Element) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+  await routeViewCounts(page);
+  for (const colorScheme of ["light", "dark"] as const) for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    await page.emulateMedia({ colorScheme }); await page.setViewportSize(viewport); await page.goto("/");
+    // On a fresh fixture the inbox row (and its unread count) appears once the folder list has
+    // synced; a load that rendered before that point is reloaded.
+    await expect(async () => {
+      if (await countedViewRows(page) < 7) await page.reload();
+      await expect.poll(() => countedViewRows(page), { timeout: 10000 }).toBe(7);
+    }).toPass({ timeout: 90000 });
+    const active = page.locator('[data-view-id^="folder:"][data-active="true"]');
+    await expect(active.locator("..").locator('[data-sidebar="menu-badge"]')).toBeVisible();
+    await page.mouse.move(viewport.width - 4, viewport.height - 4);
+    const rows = await page.locator("[data-view-id]").evaluateAll(buttons => buttons.map(button => {
+      const rect = (el: Element) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+      const badge = button.parentElement!.querySelector('[data-sidebar="menu-badge"]');
+      return { id: button.getAttribute("data-view-id")!, active: button.getAttribute("data-active") === "true", row: rect(button),
+        label: rect(button.querySelector("span")!), badge: badge ? rect(badge) : null, background: getComputedStyle(button).backgroundColor };
+    }));
+    const withBadge = rows.filter(row => row.badge);
+    expect(rows.map(row => row.id.startsWith("folder:") ? "inbox" : row.id)).toEqual(["inbox", "virtual:assigned-to-me", "virtual:unassigned",
+      "virtual:open", "virtual:focused", "virtual:action-queue", "virtual:invite-deck"]);
+    expect(withBadge).toHaveLength(rows.length);
+    expect(rows.find(row => row.active)!.id).toMatch(/^folder:/);
+    for (const { row, label, badge } of withBadge) {
+      // The highlighted button box spans the badge, and wrapped labels end before it.
+      expect(badge!.left).toBeGreaterThanOrEqual(row.left); expect(badge!.right).toBeLessThanOrEqual(row.right);
+      expect(badge!.top).toBeGreaterThanOrEqual(row.top); expect(badge!.bottom).toBeLessThanOrEqual(row.bottom);
+      expect(label.right).toBeLessThanOrEqual(badge!.left);
+    }
+    const activeBackground = rows.find(row => row.active)!.background;
+    const hovered = page.locator('[data-view-id="virtual:unassigned"]');
+    await hovered.hover();
+    await expect.poll(() => hovered.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+    const hoverBackground = await hovered.evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(hoverBackground).not.toBe(activeBackground);
+    await active.hover();
+    await expect.poll(() => active.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(activeBackground);
+    // The description belongs to the row under the pointer, opens beside it and stays in the viewport.
+    // The first row is re-entered right after leaving it (Unassigned, Inbox, Unassigned), which
+    // must reopen its own description rather than leave none or the previous row's.
+    for (const id of ["virtual:unassigned", "virtual:open", "virtual:focused"]) {
+      const row = page.locator(`[data-view-id="${id}"]`);
+      await row.hover();
+      const content = page.locator('[data-slot="tooltip-content"]');
+      await expect(content).toHaveCount(1);
+      await expect(content).toHaveAttribute("role", "tooltip");
+      await expect(content).toHaveText(`${views[catalogKey[id]].name}: ${views[catalogKey[id]].description}`);
+      const [rowBox, tip] = [await row.evaluate(box), await content.evaluate(box)];
+      expect(tip.left).toBeGreaterThanOrEqual(rowBox.right);
+      expect(tip.top).toBeGreaterThanOrEqual(0); expect(tip.bottom).toBeLessThanOrEqual(viewport.height);
+      expect(tip.right).toBeLessThanOrEqual(viewport.width);
+    }
+    // Keyboard focus shows the full ring inside the scrolling sidebar content.
+    await page.mouse.move(viewport.width - 4, viewport.height - 4);
+    await page.keyboard.press("Shift");
+    await hovered.focus();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(1);
+    await expect(page.getByRole("tooltip")).toHaveText(`${views.unassigned.name}: ${views.unassigned.description}`);
+    const ring = await hovered.evaluate(el => {
+      const clip = el.closest('[data-sidebar="content"]')!.getBoundingClientRect(), r = el.getBoundingClientRect();
+      return { focusVisible: el.matches(":focus-visible"), shadow: getComputedStyle(el).boxShadow, inside: r.left - 2 >= clip.left && r.right + 2 <= clip.right };
+    });
+    expect(ring.focusVisible).toBe(true); expect(ring.shadow).toContain("0px 0px 0px 2px"); expect(ring.inside).toBe(true);
+    if (viewport.width === 1440) await page.screenshot({ path: `.tmp/qa-shell-views-${colorScheme}-1440.png` });
+    console.log("QA-014", JSON.stringify({ colorScheme, width: viewport.width, activeBackground, hoverBackground, rows: withBadge.length,
+      badges: await page.locator('[data-view-id] ~ [data-sidebar="menu-badge"]').allTextContents() }));
+  }
+});
+test("QA-014: the phone sheet shows no view row description on hover or keyboard focus", async ({ page }) => {
+  const descriptions = page.locator('[data-slot="tooltip-content"]');
+  // Neither the pointer resting on a row (past the 400 ms open delay) nor keyboard focus opens
+  // a description, and the row is not described by a hidden one.
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto("/");
+  await page.locator('[data-slot="shell-header"]').getByRole("button", { name: "Toggle sidebar", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Sidebar", exact: true });
+  const row = sheet.locator('[data-view-id="virtual:unassigned"]');
+  await row.hover();
+  await expect.poll(() => row.evaluate(el => el.matches(":hover"))).toBe(true);
+  await page.waitForTimeout(800);
+  await expect(descriptions).toHaveCount(0);
+  await page.keyboard.press("Shift"); await row.focus();
+  await expect(row).toBeFocused(); expect(await row.evaluate(el => el.matches(":focus-visible"))).toBe(true);
+  await page.waitForTimeout(800);
+  await expect(descriptions).toHaveCount(0);
+  await expect(row).not.toHaveAttribute("aria-describedby");
+  await page.screenshot({ path: ".tmp/qa-shell-views-sheet-390.png" });
+});
+test("QA-014: the collapsed sidebar keeps its rows out of the tab order and shows no description", async ({ page }) => {
+  const rowDescriptions = Object.values(viewDescriptions).flatMap(view => typeof view?.description === "string" ? [view.description] : []);
+  const descriptions = page.locator('[data-slot="tooltip-content"]');
+  // The collapsed offcanvas sidebar is off screen: moving focus backwards from the toggle never
+  // lands on one of its rows or opens a detached description.
+  await expect(page.locator('[data-view-id="virtual:unassigned"]')).toBeInViewport();
+  const toggle = page.locator('[data-slot="shell-header"]').getByRole("button", { name: "Toggle sidebar", exact: true });
+  await toggle.click();
+  const container = page.locator('[data-slot="sidebar-container"]');
+  await expect(container).toHaveAttribute("inert", "");
+  await expect.poll(() => container.evaluate(el => el.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
+  await page.locator('[data-view-id="virtual:unassigned"]').focus();
+  expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[data-slot="sidebar-container"]')))).toBe(false);
+  await toggle.focus();
+  for (let step = 0; step < 30; step++) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[data-slot="sidebar-container"]')))).toBe(false);
+  }
+  await page.waitForTimeout(800);
+  expect((await descriptions.allTextContents()).filter(text => rowDescriptions.some(row => text.includes(row)))).toEqual([]);
+  await page.screenshot({ path: ".tmp/qa-shell-views-collapsed-1440.png" });
+});
