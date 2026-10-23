@@ -9,6 +9,8 @@ env:
 
 jobs:
   deploy-prod:
+    # Upstream only: the fork deploys manually using its ops runbooks.
+    if: ${{ github.repository == 'paulwellnerbou/noctua-mail' }}
     runs-on: ubuntu-latest
     environment:
       name: production
