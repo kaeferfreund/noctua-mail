@@ -198,7 +198,7 @@ if (!scenario) {
         role = "user";
         fireEvent.click(view.getByRole("button", { name: "Retry" }));
         await waitFor(() => expect(view.queryByRole("button", { name: "Admin" })).toBeNull());
-        expect(idleTasks.size).toBe(1);
+        await waitFor(() => expect(idleTasks.size).toBe(1));
       }
       if (scenario.startsWith("non-admin") || scenario === "cancel warm-up on role change") {
         expect(view.queryByRole("button", { name: "Admin" })).toBeNull();
