@@ -126,7 +126,7 @@ for (const denial of ["summary", "stream"] as const) test(`reconnect reads once;
     expect(h.sourceRequests).toHaveLength(2); expect(h.snapshots).toHaveLength(0);
     expect(h.view.getByLabelText("5 unread")).toBeTruthy();
     await act(async () => h.sources[1].close());
-    expect(retries[0].delay).toBe(2000);
+    expect(retries[0].delay).toBe(1000);
     if (denial === "stream") h.denyStream();
     await act(async () => retries.shift()!.run());
     if (denial === "summary") await act(async () => h.snapshots.shift()!(new Response(null, { status: 403 })));
@@ -273,5 +273,28 @@ test("request-count table: open 1 GET + 1 stream; 20 events 0 GETs; reconnect 1;
     expect(gets()).toBe(2);
     await h.send({ type: "mailboxes-changed" }); await h.read();
     expect(gets()).toBe(3); expect(h.sourceRequests).toHaveLength(2);
+  });
+});
+
+for (const heartbeat of [false, true]) test(`summary 401 ${heartbeat ? "with initial heartbeats" : "without stream activity"} backs off until a canonical snapshot succeeds`, async () => {
+  const h = harness();
+  // Wait before intercepting retry timers: waitFor's own timeout is also 1 s.
+  await waitFor(() => expect(h.snapshots).toHaveLength(1));
+  await withRetryTimers(async retries => {
+    const delays: number[] = [];
+    for (let connection = 0; connection < 7; connection++) {
+      expect(h.snapshots).toHaveLength(1);
+      if (heartbeat) await act(async () => h.sources[connection].enqueue(new TextEncoder().encode(": heartbeat\n\n")));
+      await act(async () => h.snapshots.shift()!(new Response(null, { status: 401 })));
+      expect(retries).toHaveLength(1);
+      delays.push(retries[0].delay);
+      await act(async () => retries.shift()!.run());
+    }
+    expect(delays).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+    expect(h.snapshots).toHaveLength(1);
+    await act(async () => h.snapshots.shift()!(response([personal, mailbox])));
+    expect(h.view.getByLabelText("2 unread")).toBeTruthy();
+    await act(async () => h.sources[7].close());
+    expect(retries.map(retry => retry.delay)).toEqual([1000]);
   });
 });
