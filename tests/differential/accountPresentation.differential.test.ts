@@ -26,11 +26,15 @@ let executions: number | null = null;
 let masterHandle: object | undefined;
 const proto = Database.prototype as any;
 const originals = { prepare: proto.prepare, query: proto.query };
+// `query()` caches statement objects on the handle beyond this module instance (e.g. `--rerun-each`),
+// so a statement is rebound to the current instance's hooks, always over its unwrapped methods.
+const wrapOwner = Symbol("differential hooks");
 function wrapStatement(db: object, stmt: any, sql: string) {
-  if (stmt.__diffWrapped) return stmt;
-  stmt.__diffWrapped = true;
-  for (const method of ["get", "all", "run", "values", "iterate"]) {
-    const original = stmt[method];
+  if (stmt.__diffOwner === wrapOwner) return stmt;
+  stmt.__diffOwner = wrapOwner;
+  const unwrapped: Record<string, unknown> = stmt.__diffUnwrapped ??= Object.fromEntries(
+    ["get", "all", "run", "values", "iterate"].map(method => [method, stmt[method]]));
+  for (const [method, original] of Object.entries(unwrapped)) {
     if (typeof original !== "function") continue;
     stmt[method] = (...args: unknown[]) => {
       const result = original.apply(stmt, args);
@@ -68,7 +72,10 @@ function afterFirst(pattern: RegExp, shard: boolean, fn: () => void) { hooks.pus
 const ROLES = ["manager", "editor", "viewer"] as const;
 let master: Database;
 let h: Awaited<ReturnType<typeof getSharedTestAuthHarness>>;
-const ACCOUNTS = Array.from({ length: 12 }, (_, i) => `diff-acct-${String(i).padStart(2, "0")}`);
+// Per-run ids keep the fixture valid under `--rerun-each` (test:stress) on the shared harness DB.
+const RUN = crypto.randomUUID().slice(0, 8);
+const ACCOUNTS = Array.from({ length: 12 }, (_, i) => `diff-${RUN}-acct-${String(i).padStart(2, "0")}`);
+const SOLO = `diff-${RUN}-solo`, PAIR = `diff-${RUN}-pair`;
 type Viewer = Awaited<ReturnType<typeof createAuthenticatedTestSession>> & { accountIds: string[] };
 const viewers: Record<string, Viewer> = {};
 let restrictedJar: { header(): string; headers(): Headers };
@@ -97,9 +104,9 @@ beforeAll(async () => {
     master.prepare(`INSERT INTO sender_identities(id,accountId,email,displayName,isDefault,enabled,createdAt,updatedAt) VALUES(?,?,?,'Alias',0,1,0,0)`)
       .run(`${id}-alias`, id, `Alias${i}@example.test`);
   }
-  const owner = await h.createUser("diff-owner@example.test", "");
+  const owner = await h.createUser(`diff-owner-${RUN}@example.test`, "");
   memberIds = [];
-  for (let i = 0; i < 6; i++) memberIds.push((await h.createUser(`diff-member-${i}@example.test`, "")).id);
+  for (let i = 0; i < 6; i++) memberIds.push((await h.createUser(`diff-member-${i}-${RUN}@example.test`, "")).id);
   master.prepare("UPDATE auth_user SET banned=1 WHERE id=?").run(memberIds[5]); // disabled member still counts
   for (const [i, id] of ACCOUNTS.entries()) {
     master.prepare("UPDATE accounts SET ownerUserId=? WHERE id=?").run(owner.id, id);
@@ -107,7 +114,7 @@ beforeAll(async () => {
   }
   // Owner also holding an explicit link (deduplicated), a link to a vanished user, an unknown role string.
   await h.addMembership(owner.id, ACCOUNTS[2], "viewer");
-  master.prepare("INSERT INTO user_accounts(userId,accountId,role) VALUES('diff-ghost-user',?,'editor')").run(ACCOUNTS[4]);
+  master.prepare("INSERT INTO user_accounts(userId,accountId,role) VALUES(?,?,'editor')").run(`diff-ghost-user-${RUN}`, ACCOUNTS[4]);
   async function viewer(key: string, accountIds: string[], ownsFirst = false) {
     const v = await createAuthenticatedTestSession() as Viewer;
     for (const [i, id] of accountIds.entries()) {
@@ -117,23 +124,23 @@ beforeAll(async () => {
     viewers[key] = Object.assign(v, { accountIds });
   }
   // Boundary of `shared` (memberCount > 1): a solo mailbox (count 1) and a pair mailbox (count 2).
-  for (const id of ["diff-solo", "diff-pair"]) await api.upsertAccount({ id, name: id, email: `${id}@example.test`, avatar: "",
+  for (const id of [SOLO, PAIR]) await api.upsertAccount({ id, name: id, email: `${id}@example.test`, avatar: "",
     imap: { host: "imap.example.test", port: 993, secure: true, user: id, password: "synthetic-imap-secret" },
     smtp: { host: "smtp.example.test", port: 465, secure: true, user: id, password: "synthetic-smtp-secret" } } as any);
-  master.prepare("UPDATE accounts SET ownerUserId=? WHERE id='diff-pair'").run(owner.id);
-  await viewer("1", ["diff-pair"]);
-  await viewer("2", ["diff-solo", ACCOUNTS[8]], true);
+  master.prepare("UPDATE accounts SET ownerUserId=? WHERE id=?").run(owner.id, PAIR);
+  await viewer("1", [PAIR]);
+  await viewer("2", [SOLO, ACCOUNTS[8]], true);
   await viewer("12", ACCOUNTS, true);
   await viewer("invalid-role", [ACCOUNTS[1], ACCOUNTS[7]]);
   master.prepare("UPDATE user_accounts SET role='superuser' WHERE userId=? AND accountId=?").run(viewers["invalid-role"].user.id, ACCOUNTS[1]);
   await viewer("disabled", ACCOUNTS.slice(1));
   master.prepare("UPDATE auth_user SET banned=1 WHERE id=?").run(viewers.disabled.user.id);
-  const restricted = await h.createUser("diff-restricted@example.test");
+  const restricted = await h.createUser(`diff-restricted-${RUN}@example.test`);
   const login = await h.signIn(restricted.email);
   await h.seedSessionSecurity(login.session!.session.id, restricted.id, "setup");
   for (const id of ACCOUNTS.slice(1)) await h.addMembership(restricted.id, id, "editor");
   restrictedJar = login.jar; restrictedId = restricted.id;
-  for (const db of [master, await getAuthDb(), ...await Promise.all([...ACCOUNTS, "diff-solo", "diff-pair"].map(id => getAccountDb(id)))]) unshadow(db);
+  for (const db of [master, await getAuthDb(), ...await Promise.all([...ACCOUNTS, SOLO, PAIR].map(id => getAccountDb(id)))]) unshadow(db);
 });
 afterAll(() => { proto.prepare = originals.prepare; proto.query = originals.query; setSystemTime(); });
 
@@ -220,7 +227,7 @@ describe("listAccessibleAccountsForUser", () => {
 });
 
 describe("listAccountMembers", () => {
-  for (const id of [ACCOUNTS[0], ACCOUNTS[2], ACCOUNTS[4], ACCOUNTS[5], ACCOUNTS[6], "diff-missing-account"]) test(`members ${id}`, async () => {
+  for (const [label, id] of [...[0, 2, 4, 5, 6].map(i => [`account ${i}`, ACCOUNTS[i]]), ["missing account", "diff-missing-account"]]) test(`members, ${label}`, async () => {
     await pair(impl => (impl === "legacy" ? legacy.legacyListAccountMembers : listAccountMembers)(id));
   });
   for (const role of ROLES) test(`role-filtered DTO for ${role}`, async () => {
