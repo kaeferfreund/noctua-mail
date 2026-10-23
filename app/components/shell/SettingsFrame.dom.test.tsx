@@ -5,6 +5,7 @@ import { Theme } from "@radix-ui/themes";
 import SettingsFrame, { SettingsTitle } from "./SettingsFrame";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";
 import { DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/app/components/ui/dropdown-menu";
 let viewportWidth: number;
 beforeEach(() => { viewportWidth = window.innerWidth; });
 afterEach(() => { cleanup(); window.innerWidth = viewportWidth; });
@@ -46,6 +47,23 @@ it("QA-009 preserves the Close button dismissal path and focus", async () => {
   const page = render(<Theme><Harness /></Theme>);
   const opener = page.getByRole("button", { name: "Open settings" }); opener.focus(); fireEvent.click(opener);
   await page.findByRole("dialog", { name: "Settings" }); fireEvent.click(page.getByRole("button", { name: "Close settings" }));
+  await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(opener));
+});
+it("QA-009 restores the persistent menu trigger after its Settings item unmounts", async () => {
+  window.innerWidth = 1440;
+  function MenuHarness() {
+    const [open, setOpen] = useState(false);
+    return <><DropdownMenu><DropdownMenuTrigger>Person menu</DropdownMenuTrigger>
+      <DropdownMenuContent><DropdownMenuItem onSelect={() => setOpen(true)}>Open preferences</DropdownMenuItem></DropdownMenuContent>
+    </DropdownMenu>{open && <SettingsFrame open onClose={() => setOpen(false)}><SettingsTitle>Preferences</SettingsTitle><button>Preference control</button></SettingsFrame>}</>;
+  }
+  const page = render(<Theme><MenuHarness /></Theme>);
+  const opener = page.getByRole("button", { name: "Person menu" });
+  opener.focus(); fireEvent.keyDown(opener, { key: "Enter" });
+  const item = await page.findByRole("menuitem", { name: "Open preferences" }); item.focus(); fireEvent.click(item);
+  const frame = await page.findByRole("dialog", { name: "Preferences" });
+  fireEvent.keyDown(frame, { key: "Escape" });
   await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
   await waitFor(() => expect(document.activeElement).toBe(opener));
 });

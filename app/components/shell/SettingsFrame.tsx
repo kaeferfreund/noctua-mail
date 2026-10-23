@@ -2,11 +2,11 @@
 
 import mobileStyles from "./MobileFrames.module.css";
 import type { ReactNode } from "react";
-import { useRef } from "react";
 import { Dialog, Theme } from "@radix-ui/themes";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import { DialogLayerContext, DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
+import { useDialogFocusRestore } from "@/app/components/ui/dialogFocus";
 
 export function SettingsTitle({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
@@ -15,11 +15,7 @@ export function SettingsTitle({ children }: { children: ReactNode }) {
 
 export default function SettingsFrame({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
   const isMobile = useIsMobile();
-  const opener = useRef<HTMLElement | null>(null);
-  const focusProps = {
-    onOpenAutoFocus: () => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; },
-    onCloseAutoFocus: (event: Event) => { event.preventDefault(); opener.current?.focus(); }
-  };
+  const focusProps = useDialogFocusRestore();
   if (isMobile) return <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
     <SheetContent {...focusProps} aria-describedby={undefined} showCloseButton={false} className={mobileStyles.fullscreenSheet}>
       <DialogLayerContext.Provider value={DIALOG_LAYERS.base}><Theme asChild><div className={mobileStyles.settingsBody}>{children}</div></Theme></DialogLayerContext.Provider>
