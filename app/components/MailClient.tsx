@@ -4391,6 +4391,8 @@ export default function MailClient({
   }, [activeAccountId, currentAccount?.caldav?.url, currentAccount?.caldav?.syncIntervalMs, initialDataReady, apiFetch]);
 
   useEffect(() => {
+    // Superseded list-completion reads are cancelled, not only ignored.
+    const controller = new AbortController();
     const loadThreadRelated = async () => {
       const requestKey = currentKeyRef.current;
       const debugBase = {
@@ -4469,7 +4471,8 @@ export default function MailClient({
             threadDateSource,
             projection: "headers",
             excludeFolderIds: [activeFolderId, ...excludedFolderIdsForThreads]
-          })
+          }),
+          signal: controller.signal
         });
         if (!res.ok) {
           logListDebug("warn", "thread-related:list-effect:error-response", {
@@ -4488,22 +4491,24 @@ export default function MailClient({
           ...debugBase,
           returnedCount: items.length
         });
-        if (currentKeyRef.current !== requestKey) {
+        if (controller.signal.aborted || currentKeyRef.current !== requestKey) {
           return;
         }
         setThreadRelatedMessages(items);
       } catch (error) {
+        if (controller.signal.aborted) return;
         logListDebug("warn", "thread-related:list-effect:exception", {
           ...debugBase,
           error: error instanceof Error ? error.message : String(error)
         });
-        if (currentKeyRef.current !== requestKey) {
+        if (controller.signal.aborted || currentKeyRef.current !== requestKey) {
           return;
         }
         setThreadRelatedMessages([]);
       }
     };
     loadThreadRelated();
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- threadRelatedCandidateIds churns with list refreshes; keying on threadRelatedCandidatesKey prevents refetch loops.
   }, [
     activeAccountId,
