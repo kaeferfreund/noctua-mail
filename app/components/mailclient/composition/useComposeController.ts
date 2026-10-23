@@ -1,8 +1,10 @@
+import { renderSignatureTemplate, replaceSignatureBlock } from "@/lib/signatureTemplates";
+import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type React from "react";
 import { useMemo } from "react";
-import type { Account, AccountDateFormat, Message } from "@/lib/data";
+import type { Account, AccountDateFormat, Message, SenderIdentity } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
-import { assembleQuotedHtml, escapeHtml } from "@/lib/html";
+import { assembleQuotedHtml } from "@/lib/html";
 import { areMarkdownConvertersReady, loadMarkdownConverters } from "@/lib/markdownConvert";
 import { buildComposePayload as buildComposePayloadFn } from "./composeContentBuilder";
 import { computeComposeInitState } from "./composeInitState";
@@ -14,6 +16,7 @@ type UseComposeControllerParams = {
   compose: ComposeState;
   currentAccount: Account | null;
   defaultSignatureId: string;
+  sender?: SenderSettings | null;
   accountDateFormat: AccountDateFormat;
   stripHtml: (value: string) => string;
   normalizeHtmlDerivedText: (value: string) => string;
@@ -27,6 +30,7 @@ export function useComposeController({
   compose,
   currentAccount,
   defaultSignatureId,
+  sender,
   accountDateFormat,
   stripHtml,
   normalizeHtmlDerivedText,
@@ -47,72 +51,25 @@ export function useComposeController({
     composeLastEditedRef
   } = compose;
 
-  const getSignatureBlocks = (body: string) => {
-    const text = body.trim();
-    if (!text) return { text: "", html: "" };
-    return {
-      text,
-      html: `<p>${escapeHtml(text).replace(/\n/g, "<br>")}</p>`
-    };
-  };
-
-  const applySignatureToCompose = (signature: { id: string; body: string } | null) => {
-    const next = signature ? getSignatureBlocks(signature.body) : { text: "", html: "" };
+  const applySignatureToCompose = (signature: { id: string; body: string } | null, selectedIdentity?: SenderIdentity) => {
+    const identity = selectedIdentity ?? sender?.identities.find(item => item.id === compose.composeIdentityId);
+    const next = signature ? { id: signature.id, ...renderSignatureTemplate(signature.body, sender?.user ?? { email: "" }, identity) } : null;
     const previous = composeSignatureRef.current;
-    if (compose.composeTab === "text") {
-      compose.setComposeBody((prev) => {
-        let base = prev;
-        if (previous?.text && base.trimEnd().endsWith(previous.text)) {
-          base = base.trimEnd().slice(0, -previous.text.length).trimEnd();
-        }
-        if (!signature || !next.text) {
-          return base;
-        }
-        const glue = base ? "\n\n" : "";
-        return `${base}${glue}${next.text}`;
-      });
-      compose.setComposeEditorReset((prev) => prev + 1);
-    } else if (compose.composeTab === "markdown") {
-      compose.setComposeMarkdown((prev) => {
-        let base = prev;
-        if (previous?.text && base.trimEnd().endsWith(previous.text)) {
-          base = base.trimEnd().slice(0, -previous.text.length).trimEnd();
-        }
-        if (!signature || !next.text) {
-          return base;
-        }
-        const glue = base ? "\n\n" : "";
-        return `${base}${glue}${next.text}`;
-      });
-      compose.setComposeEditorReset((prev) => prev + 1);
-    } else {
-      compose.setComposeHtml((prev) => {
-        let base = prev;
-        if (previous?.html && base.trimEnd().endsWith(previous.html)) {
-          base = base.trimEnd().slice(0, -previous.html.length).trimEnd();
-        }
-        if (!signature || !next.html) {
-          return base;
-        }
-        return `${base}${next.html}`;
-      });
-      compose.setComposeHtmlText((prev) => {
-        let base = prev;
-        if (previous?.text && base.trimEnd().endsWith(previous.text)) {
-          base = base.trimEnd().slice(0, -previous.text.length).trimEnd();
-        }
-        if (!signature || !next.text) {
-          return base;
-        }
-        const glue = base ? "\n\n" : "";
-        return `${base}${glue}${next.text}`;
-      });
-      compose.setComposeEditorReset((prev) => prev + 1);
-    }
+    if (!previous && !next) return true;
+    const tab = compose.composeTab;
+    const body = tab === "html" ? compose.composeHtml : tab === "markdown" ? compose.composeMarkdownRef.current : (compose.composeTextRef.current?.value ?? compose.composeBody);
+    const replacement = replaceSignatureBlock(body, tab === "html" ? previous?.html : tab === "markdown" ? previous?.markdown ?? previous?.text : previous?.text, tab === "html" ? next?.html ?? "" : tab === "markdown" ? next?.markdown ?? "" : next?.text ?? "", tab === "html" ? "" : "\n\n");
+    if (replacement.conflict && !window.confirm("The signature may have been edited. Replace signature? Edited text will be kept and the new signature added if the original block cannot be found.")) return false;
+    const value = replacement.conflict ? [body, tab === "html" ? next?.html : tab === "markdown" ? next?.markdown : next?.text].filter(Boolean).join(tab === "html" ? "" : "\n\n") : replacement.body;
+    if (tab === "html") { compose.setComposeHtml(value); compose.setComposeHtmlText(stripHtml(value)); }
+    else if (tab === "markdown") compose.setComposeMarkdown(value);
+    else compose.setComposeBody(value);
+    composeEditorInitRef.current = false;
+    compose.setComposeEditorReset(prev => prev + 1);
     composeDirtyRef.current = true;
-    composeSignatureRef.current = signature
-      ? { id: signature.id, text: next.text, html: next.html }
-      : null;
+    composeSignatureRef.current = next;
+    compose.setComposeSignatureId(next?.id ?? "");
+    return true;
   };
 
   // Cache the assembled quoted HTML across calls — buildComposePayload runs on
@@ -155,7 +112,7 @@ export function useComposeController({
     mode: ComposeMode,
     message?: Message,
     asNew = false,
-    options?: { preferredComposeTab?: ComposeTab }
+    options?: { preferredComposeTab?: ComposeTab; sender?: SenderSettings; skipSignature?: boolean }
   ) => {
     // Keep initialization synchronous: the caller applies prefill, restored
     // semantics and attachments immediately after this call. The body field
@@ -196,14 +153,22 @@ export function useComposeController({
       message,
       asNew,
       {
-        accountEmail: currentAccount?.email ?? "",
-        ownAddresses: currentAccount?.ownAddresses,
+        sender: options?.sender ?? sender ?? undefined,
+        skipSignature: options?.skipSignature,
+        accountEmail: options?.sender?.account.email ?? currentAccount?.email ?? "",
+        ownAddresses: options?.sender?.account.ownAddresses ?? currentAccount?.ownAddresses,
         accountDateFormat,
         preferredComposeTab: options?.preferredComposeTab,
         findMessageByMessageId
       },
       { stripHtml, normalizeHtmlDerivedText }
     );
+
+    compose.setComposeIdentityId(fields.identityId);
+    compose.setComposeUnavailableFrom(fields.unavailableFrom);
+    compose.setComposeSenderWarnings(fields.warnings);
+    composeSignatureRef.current = fields.signature ?? null;
+    compose.setComposeSignatureId(fields.signature?.id ?? "");
 
     // Apply fields to state
     compose.setComposeDraftId(fields.composeDraftId);

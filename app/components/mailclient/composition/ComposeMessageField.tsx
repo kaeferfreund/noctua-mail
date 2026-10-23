@@ -1,5 +1,7 @@
 "use client";
 
+import { findSerializedSignatureBlock } from "./signatureHtmlTracking";
+
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
@@ -11,7 +13,7 @@ import type { ComposeEditorHandle } from "../../ComposeEditor";
 import type { ComposeTranslationUi } from "./useComposeTranslation";
 import { DEEPL_TARGET_LANGUAGES, deeplTargetLanguageLabel } from "@/lib/deeplLanguages";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
-import type { ComposeQuotedParts, PendingImageDrop } from "./composeTypes";
+import type { ComposeQuotedParts, PendingImageDrop, ComposeSignatureState } from "./composeTypes";
 import type { Attachment } from "@/lib/data";
 import { assembleQuotedHtml, hasForwardMetaHtml, stripForwardMetaHtml } from "@/lib/html";
 import {
@@ -84,6 +86,7 @@ type ComposeMessageFieldProps = {
   composeMarkdownRef: React.MutableRefObject<string>;
   composeDirtyRef: React.MutableRefObject<boolean>;
   composeEditorInitRef: React.MutableRefObject<boolean>;
+  composeSignatureRef?: React.MutableRefObject<ComposeSignatureState | null>;
   composeLastEditedRef: React.MutableRefObject<ComposeTab>;
   composeSessionVersionRef: React.MutableRefObject<number>;
   stripHtml: (value: string) => string;
@@ -160,6 +163,7 @@ function ReadyComposeMessageField({
   composeMarkdownRef,
   composeDirtyRef,
   composeEditorInitRef,
+  composeSignatureRef,
   composeLastEditedRef,
   composeSessionVersionRef,
   stripHtml,
@@ -182,7 +186,6 @@ function ReadyComposeMessageField({
   setComposeQuotedHtmlEdited,
   setComposeQuotedParts,
   setComposeStripImages,
-  setComposeSignatureId,
   setSignatureMenuOpen,
   applySignatureToCompose,
   handleInlineImage,
@@ -465,14 +468,12 @@ function ReadyComposeMessageField({
                 value={composeSignatureId || "__none"}
                 onValueChange={(value) => {
                   if (value === "__none") {
-                    setComposeSignatureId("");
                     applySignatureToCompose(null);
                     setSignatureMenuOpen(false);
                     return;
                   }
                   const signature = accountSignatures.find((entry) => entry.id === value);
                   if (!signature) return;
-                  setComposeSignatureId(signature.id);
                   applySignatureToCompose(signature);
                   setSignatureMenuOpen(false);
                 }}
@@ -669,13 +670,18 @@ function ReadyComposeMessageField({
             onInlineImage={handleInlineImage}
             onFilesDrop={addDroppedFiles}
             onChange={(nextHtml, nextText) => {
+              const initialSignature = !composeEditorInitRef.current && composeSignatureRef?.current;
+              if (initialSignature) {
+                const serialized = findSerializedSignatureBlock(nextHtml, initialSignature.text);
+                if (serialized && composeSignatureRef) composeSignatureRef.current = { ...initialSignature, html: serialized };
+              }
               setComposeHtml(nextHtml);
               setComposeHtmlText(nextText);
               composeEditorInitRef.current = true;
               // Quoted-node syncs and editor seeding fire onChange without
               // altering the exported content — don't mark the draft dirty
               // unless the HTML or text actually changed.
-              if (nextHtml === composeHtml && nextText === composeHtmlText) {
+              if ((initialSignature && nextText === composeHtmlText) || (nextHtml === composeHtml && nextText === composeHtmlText)) {
                 return;
               }
               composeDirtyRef.current = true;

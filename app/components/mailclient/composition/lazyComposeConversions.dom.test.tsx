@@ -79,6 +79,9 @@ function renderCompose(options: RenderComposeOptions = {}) {
       : undefined;
     calls.push({ url, method: init?.method ?? "GET", body, signal: init?.signal });
 
+    if (url.endsWith("/identities")) return jsonResponse({ ok: true, identities: [{ id: "primary", accountId: "acc-test", email: "me@example.test", displayName: "Synthetic Sender", enabled: true, isDefault: true }], ownAddresses: ["me@example.test"] });
+    if (url.endsWith("/prefs")) return jsonResponse({ ok: true, prefs: {} });
+    if (url === "/api/auth/me") return jsonResponse({ ok: true, user: { id: "synthetic-user", name: "Synthetic User", email: "user@example.test" }, accounts: [{ id: "acc-test", email: "me@example.test", name: "Synthetic Mailbox", accessRole: "manager", settings: {} }] });
     if (url.endsWith("/recipient-aliases") && options.aliasResponse) return options.aliasResponse();
     if (url.includes("/attachments/") && options.attachmentResponse) {
       return options.attachmentResponse();
@@ -103,6 +106,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
 
   const props = {
     activeAccountId: "acc-test",
+    senderSettingsLoader: () => ({ account: { id: "acc-test", email: "me@example.test", accessRole: "manager", settings: {} }, identities: [{ id: "primary", accountId: "acc-test", email: "me@example.test", displayName: "Synthetic Sender", enabled: true, isDefault: true }], prefs: {}, user: { email: "user@example.test" }, warnings: [] }),
     currentAccount: null,
     accountDateFormat: "locale" as const,
     defaultSignatureId: "",

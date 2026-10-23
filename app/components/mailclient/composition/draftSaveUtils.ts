@@ -59,11 +59,16 @@ export function getDraftChangeState(input: DraftChangeStateInput) {
   const hash = computeDraftHash(input);
   const hasContent = hasDraftContent(input);
   const hasUnsavedChanges = hash !== input.lastSavedHash;
+  let identityChanged = false;
+  if (input.draftId && input.identityId !== undefined) {
+    try { identityChanged = JSON.parse(input.lastSavedHash).identityId !== input.identityId; }
+    catch { /* A missing baseline is initialized before autosave. */ }
+  }
   return {
     hash,
     hasContent,
     hasUnsavedChanges,
-    canAutoSave: hasContent && hasUnsavedChanges,
+    canAutoSave: (hasContent || identityChanged) && hasUnsavedChanges,
     canManualSave: hasUnsavedChanges && (hasContent || Boolean(input.draftId))
   };
 }

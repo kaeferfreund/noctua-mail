@@ -32,6 +32,7 @@ export default function ComposeInlineCard() {
     composeDragActive,
     detachedWindow,
     fromValue,
+    identities, identityId, identityDisabled, sendDisabled, senderMessage, onIdentityChange,
     inReplyToMessage,
     popOutCompose,
     openComposeInNewWindow,
@@ -130,6 +131,7 @@ export default function ComposeInlineCard() {
               composeShowBcc={composeShowBcc}
               activeAccountId={activeAccountId}
               fromValue={fromValue}
+              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onIdentityChange={onIdentityChange}
               inReplyToMessage={inReplyToMessage}
               onJumpToMessage={jumpToMessage}
               setComposeSubject={setComposeSubject}
@@ -168,6 +170,7 @@ export default function ComposeInlineCard() {
             setComposeView("inline");
           }}
           handleSendMail={handleSendMail}
+          sendDisabled={sendDisabled}
           formatRelativeTime={formatRelativeTime}
         />
       </article>
