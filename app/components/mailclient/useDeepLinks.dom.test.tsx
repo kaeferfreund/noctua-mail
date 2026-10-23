@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, mock, spyOn } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";
-import { useDeepLinks } from "./useDeepLinks";
+import { useDeepLinks, type DeepLinkTransaction } from "./useDeepLinks";
 import { emptyDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import type { MessageResolution } from "@/lib/navigation/resolveMessage";
 import { useMobileOverlayHistory } from "@/app/hooks/useMobileOverlayHistory";
@@ -12,11 +12,11 @@ beforeEach(() => { (window as unknown as { happyDOM: { setURL: (url: string) => 
 const restores: Array<() => void> = [];
 afterEach(() => { cleanup(); restores.splice(0).forEach(fn => fn()); window.history.replaceState(null, "", "/"); });
 const message = { id: "imap-one", accountId: "a", folderId: "a:INBOX" } as Message;
-function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {} }: {
+function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {}, onTransaction }: {
   switcher?: (id: string) => Promise<void>; resolver?: (account: string, id: string, signal: AbortSignal) => Promise<Message | null>;
   deferFolder?: boolean;
   resolution?: () => Promise<MessageResolution>; expired?: () => void;
-  notice?: (kind: string) => void;
+  notice?: (kind: string) => void; onTransaction?: (event: DeepLinkTransaction) => void;
 }) {
   const [state, setState] = useState<DeepLinkState>({ ...emptyDeepLink(), accountId: "a", folderId: "a:INBOX" });
   const version = useRef(0);
@@ -28,7 +28,7 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
     switchAccount: async id => { const epoch = ++version.current; await switcher?.(id); if (epoch === version.current) setState(old => ({ ...old, accountId: id })); },
     applyPlace: target => { const applied = { ...target, folderId: target.folderId || `${target.accountId}:INBOX`, messageId: "" }; if (deferFolder) { setState({ ...applied, folderId: "" }); setTimeout(() => setState(applied), 0); } else setState(applied); return applied; },
     onUnauthenticated: () => { setReady(false); expired?.(); },
-    resolveMessage: resolution ?? (async (account, id, signal) => { const value = await (resolver ?? (async () => message))(account, id, signal); return value ? { status: "ready", message: value } : { status: "missing" }; }), openMessage: value => setState(old => ({ ...old, messageId: value.id })), notice });
+    resolveMessage: resolution ?? (async (account, id, signal) => { const value = await (resolver ?? (async () => message))(account, id, signal); return value ? { status: "ready", message: value } : { status: "missing" }; }), openMessage: value => setState(old => ({ ...old, messageId: value.id })), notice, onTransaction });
   const { back } = useMobileNavigation(true, state.messageId || null, () => setState(old => ({ ...old, messageId: "" })), true);
   return <><output data-testid="state">{JSON.stringify(state)}</output>
     <button onClick={() => { setOverlay(false); void navigateAccount("b"); }}>Mailbox B</button><button onClick={() => navigateAccount("a")}>Mailbox A</button>
@@ -206,4 +206,27 @@ it.each(["window", "document", "body", "input"] as const)("tracks navigation key
   expect(new URLSearchParams(window.location.search).get("openMessageId")).toBe("imap-two");
   expect(pushes).toHaveBeenCalledTimes(target === "input" ? 1 : 0);
   expect(replacements).toHaveBeenCalledTimes(target === "input" ? 0 : 1);
+});
+it("gives each pushed entry its own id, keeps it on replace and reports transaction origins", async () => {
+  const events: DeepLinkTransaction[] = [];
+  const page = render(<Harness onTransaction={event => events.push(event)}
+    resolver={async account => ({ ...message, accountId: account, folderId: `${account}:INBOX` })} />); await settled();
+  await waitFor(() => expect(events.at(-1)).toEqual({ phase: "settled", origin: "initial", messageId: "" }));
+  const list = window.history.state.noctuaEntry;
+  expect(typeof list).toBe("string");
+  fireEvent.click(page.getByText("Message"));
+  const reader = window.history.state.noctuaEntry;
+  expect(reader).not.toBe(list);
+  fireEvent.change(page.getByRole("textbox"), { target: { value: "typed" } });
+  expect(window.location.search).toContain("q=typed");
+  expect(window.history.state.noctuaEntry).toBe(reader);
+  events.length = 0;
+  act(() => { window.history.replaceState({ noctuaUrl: true, noctuaEntry: list }, "", "/?accountId=a&folderId=a%3AINBOX"); window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state })); });
+  await waitFor(() => expect(events.at(-1)?.phase).toBe("settled"));
+  expect(events).toEqual([{ phase: "start", origin: "history", messageId: "" }, { phase: "settled", origin: "history", messageId: "" }]);
+  expect(window.history.state.noctuaEntry).toBe(list);
+  events.length = 0;
+  fireEvent.click(page.getByText("Notification"));
+  await waitFor(() => expect(events.at(-1)).toEqual({ phase: "settled", origin: "link", messageId: "imap-one" }));
+  expect(events[0]).toEqual({ phase: "start", origin: "link", messageId: "imap-one" });
 });
