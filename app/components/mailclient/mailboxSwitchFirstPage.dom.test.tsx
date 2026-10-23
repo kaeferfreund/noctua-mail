@@ -92,6 +92,20 @@ describe("first page alongside the mailbox switch", () => {
     expect(listCalls.some(call => call.url.startsWith("/api/accounts/account-b/") && call.url.includes("account-a"))).toBe(false);
   }, 20_000);
 
+  it("a click back to the shown mailbox aborts the requested page of the cancelled switch", async () => {
+    const { view, row, active } = await mountOnA();
+    await act(async () => { fireEvent.click(row(names["account-b"])!); });
+    await waitFor(() => expect(callsFor("account-b")).toHaveLength(1));
+    await act(async () => { fireEvent.click(row(names["account-a"])!); });
+    await act(async () => { switchGate.release(); });
+    await waitFor(() => expect(callsFor("account-b")[0].signal?.aborted).toBe(true));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+    expect(view.queryByText("Marker account-b subject")).toBeNull();
+    expect(view.queryByText("Marker account-a subject")).not.toBeNull();
+    expect(active()).toContain(names["account-a"]);
+    expect(callsFor("account-b")).toHaveLength(1);
+  }, 20_000);
+
   it("a denied switch aborts the requested page and never shows it", async () => {
     const { view, row, active } = await mountOnA();
     switchStatus = 403;
