@@ -1,4 +1,6 @@
 "use client";
+
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -28,11 +30,12 @@ export default function AssigneeCombobox({
   disabled?: boolean;
   onChange: (id: string | null) => void;
 }) {
+  const t = useTranslations("Collaboration");
   const [open, setOpen] = useState(false);
   const choices = [
-    { id: null, label: "Unassigned", search: "Unassigned" },
+    { id: null, label: t("assignee.unassigned"), search: t("assignee.unassigned") },
     ...(me && members.some((m) => m.userId === me && !m.disabled)
-      ? [{ id: me, label: "Me", search: "Me" }]
+      ? [{ id: me, label: t("assignee.me"), search: t("assignee.me") }]
       : []),
     ...members
       .filter((m) => !m.disabled)
@@ -49,13 +52,13 @@ export default function AssigneeCombobox({
           variant="outline"
           size="sm"
           role="combobox"
-          aria-label="Assignee"
+          aria-label={t("assignee.label")}
           aria-expanded={open}
           disabled={disabled}
           className="max-w-48 min-w-0"
         >
           <span className="truncate">
-            {value ? memberName(members, value) : "Unassigned"}
+            {value ? memberName(members, value, t("formerMember")) : t("assignee.unassigned")}
           </span>
           <ChevronsUpDown className="size-3 shrink-0" />
         </Button>
@@ -63,11 +66,11 @@ export default function AssigneeCombobox({
       <PopoverContent align="start" className="w-64 max-w-[calc(100vw-2rem)]">
         <Command>
           <CommandInput
-            placeholder="Search members…"
-            aria-label="Search members"
+            placeholder={t("assignee.searchPlaceholder")}
+            aria-label={t("assignee.search")}
           />
           <CommandList>
-            <CommandEmpty>No members found.</CommandEmpty>
+            <CommandEmpty>{t("assignee.noMembers")}</CommandEmpty>
             {choices.map((choice, i) => (
               <CommandItem
                 key={i}

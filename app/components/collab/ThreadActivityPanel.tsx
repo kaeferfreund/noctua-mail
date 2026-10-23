@@ -1,4 +1,7 @@
 "use client";
+
+import { useLocale, useTranslations } from "next-intl";
+import { formatDate } from "@/lib/i18n/format";
 import { useEffect, useState, type Ref } from "react";
 import type { AccountRole } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
@@ -6,7 +9,7 @@ import { MarkdownPanel } from "@/app/components/mailclient/RenderHelpers";
 import {
   memberInitials,
   memberName,
-  STATUS_LABELS,
+  THREAD_STATUSES,
   type CollabMember,
   type ThreadComment,
   type ThreadActivity,
@@ -17,32 +20,34 @@ export function focusThreadActivity(region: HTMLElement | null) {
   region?.scrollIntoView({ behavior: "smooth" });
 }
 
-function relativeTime(time: number) {
+type Translator = ReturnType<typeof useTranslations<"Collaboration">>;
+
+function relativeTime(time: number, t: Translator) {
   const seconds = Math.max(0, (Date.now() - time) / 1000);
   return seconds < 60
-    ? "just now"
+    ? t("time.justNow")
     : seconds < 3600
-      ? `${Math.floor(seconds / 60)}m ago`
+      ? t("time.minutes", {count: Math.floor(seconds / 60)})
       : seconds < 86400
-        ? `${Math.floor(seconds / 3600)}h ago`
-        : `${Math.floor(seconds / 86400)}d ago`;
+        ? t("time.hours", {count: Math.floor(seconds / 3600)})
+        : t("time.days", {count: Math.floor(seconds / 86400)});
 }
-function activityLabel(item: ThreadActivity, members: CollabMember[]) {
+function activityLabel(item: ThreadActivity, members: CollabMember[], t: Translator) {
   switch (item.type) {
     case "assigned":
-      return `Assigned to ${memberName(members, String(item.payload.assigneeUserId ?? item.payload.to ?? ""))}`;
+      return t("activity.assigned", {name: memberName(members, String(item.payload.assigneeUserId ?? item.payload.to ?? ""), t("formerMember"))});
     case "unassigned":
-      return "Removed assignee";
+      return t("activity.unassigned");
     case "status_changed":
-      return `Status: ${STATUS_LABELS[(item.payload.status ?? item.payload.to) as ThreadStatus] ?? "Updated"}`;
+      return t("activity.status", {status: THREAD_STATUSES.includes((item.payload.status ?? item.payload.to) as ThreadStatus) ? t(`status.${(item.payload.status ?? item.payload.to) as ThreadStatus}`) : t("activity.updatedStatus")});
     case "reply_sent":
-      return "Sent a reply";
+      return t("activity.reply");
     case "comment_deleted":
-      return "Deleted an internal note";
+      return t("activity.noteDeleted");
     case "comment_edited":
-      return "Edited an internal note";
+      return t("activity.noteEdited");
     default:
-      return "Updated conversation";
+      return t("activity.updated");
   }
 }
 export default function ThreadActivityPanel({
@@ -64,8 +69,11 @@ export default function ThreadActivityPanel({
   pending?: boolean;
   onDelete: (id: string) => Promise<boolean>;
 }) {
+  const t = useTranslations("Collaboration");
+  const locale = useLocale();
+  const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
   const [, tick] = useState(0);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
   useEffect(() => {
     const timer = setInterval(() => tick((t) => t + 1), 60000);
     return () => clearInterval(timer);
@@ -92,20 +100,20 @@ export default function ThreadActivityPanel({
     <section
       ref={ref}
       tabIndex={-1}
-      aria-label="Internal notes and activity"
+      aria-label={t("activity.region")}
       className="min-w-0 border-t border-border p-4"
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <h3 className="mb-3 text-sm font-semibold">Notes & activity</h3>
-      {error && <p role="alert">{error}</p>}
+      <h3 className="mb-3 text-sm font-semibold">{t("activity.title")}</h3>
+      {error && <p role="alert">{t("note.deleteFailed")}</p>}
       {!items.length && (
-        <p className="text-sm text-muted-foreground">No activity yet.</p>
+        <p className="text-sm text-muted-foreground">{t("activity.empty")}</p>
       )}
       <ol className="flex list-none flex-col gap-4 p-0">
         {items.map((item) => {
           const userId =
             item.comment?.authorUserId ?? item.activity?.actorUserId;
-          const name = userId ? memberName(members, userId) : "System";
+          const name = userId ? memberName(members, userId, t("formerMember")) : t("activity.system");
           const canDelete =
             item.comment &&
             (role === "manager" ||
@@ -123,9 +131,9 @@ export default function ThreadActivityPanel({
                   <span className="font-medium text-foreground">{name}</span>
                   <time
                     dateTime={new Date(item.time).toISOString()}
-                    title={new Date(item.time).toLocaleString()}
+                    title={dateTime(item.time)}
                   >
-                    {relativeTime(item.time)}
+                    {relativeTime(item.time, t)}
                   </time>
                   {canDelete && (
                     <Button
@@ -135,20 +143,19 @@ export default function ThreadActivityPanel({
                       disabled={pending}
                       onClick={async () => {
                         if (!(await onDelete(item.comment!.id)))
-                          setError("Could not delete note.");
-                        else setError("");
+                          setError(true);
+                        else setError(false);
                       }}
-                      aria-label={`Delete note by ${name}`}
+                      aria-label={t("note.deleteBy", {name})}
                     >
-                      Delete
-                    </Button>
+                      {t("note.delete")}</Button>
                   )}
                 </div>
                 {item.comment ? (
                   <MarkdownPanel body={item.comment.body} />
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {activityLabel(item.activity!, members)}
+                    {activityLabel(item.activity!, members, t)}
                   </p>
                 )}
               </div>

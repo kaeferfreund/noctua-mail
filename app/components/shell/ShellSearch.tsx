@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type React from "react";
 import { useId, useMemo } from "react";
 import {
@@ -106,6 +108,7 @@ function FilterGroup({ label, children }: { label: string; children: React.React
  * used to offer as three dropdown menus, now in one popover (design §7.2).
  */
 export default function ShellSearch({ state, actions }: ShellSearchProps) {
+  const t = useTranslations("Search");
   const {
     query,
     searchScope,
@@ -116,9 +119,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
     isRelatedSearch,
     activeFolderId,
     lastFolderId,
-    accountFolders,
-    searchFieldsLabel,
-    searchBadgesLabel
+    accountFolders
   } = state;
   const {
     setQuery,
@@ -163,15 +164,20 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
     }
   };
 
+  const allFields = searchFields.participants && searchFields.subject && searchFields.body && searchFields.attachments;
+  const selectedFields = SEARCH_FIELD_OPTIONS.filter(([key]) => searchFields[key] && !(key === "sender" && searchFields.participants)).map(([, label]) => t(label));
+  const selectedBadges = SEARCH_BADGE_OPTIONS.filter(([key]) => searchBadges[key]).map(([, label]) => t(label));
+  const searchFieldsLabel = t("fieldSummary", {fields: allFields || !selectedFields.length ? t("allFields") : selectedFields.join(", ")});
+  const searchBadgesLabel = t("badgeSummary", {badges: selectedBadges.join(", ") || t("noFilters")});
   const activeBadgeCount = Object.values(searchBadges).filter(Boolean).length;
   const activeFilterCount = activeBadgeCount + (searchScope === "all" ? 1 : 0);
-  const scopeLabel = searchScope === "all" ? "Everywhere" : "Current folder";
+  const scopeLabel = searchScope === "all" ? t("scope.everywhere") : t("scope.folder");
   const placeholder =
     searchScope === "all"
-      ? "Search messages everywhere"
+      ? t("placeholder.everywhere")
       : currentFolder
-        ? `Search messages in ${currentFolder.name}`
-        : "Search messages";
+        ? t("placeholder.folder", {folder: currentFolder.name})
+        : t("placeholder.messages");
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -196,8 +202,8 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
             variant="ghost"
             size="icon-xs"
             className="absolute top-1/2 right-1 -translate-y-1/2"
-            aria-label="Clear search"
-            title="Clear search"
+            aria-label={t("clear")}
+            title={t("clear")}
             onClick={() => (isRelatedSearch ? clearSearch() : setQuery(""))}
           >
             <X />
@@ -211,11 +217,11 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
             variant="outline"
             size="sm"
             disabled={isRelatedSearch}
-            aria-label="Search filters"
-            title={`${scopeLabel} · ${searchFieldsLabel} · ${searchBadgesLabel}`}
+            aria-label={t("filters")}
+            title={t("summary", {scope: scopeLabel, fields: searchFieldsLabel, badges: searchBadgesLabel})}
           >
             <SlidersHorizontal />
-            <span className="hidden lg:inline">Filters</span>
+            <span className="hidden lg:inline">{t("filterButton")}</span>
             {activeFilterCount > 0 ? (
               <Badge variant="secondary" className="h-4 min-w-4 px-1">
                 {activeFilterCount}
@@ -224,7 +230,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="max-h-(--radix-popover-content-available-height) w-80 gap-0 overflow-y-auto p-1 [&>[data-slot=separator]]:shrink-0">
-          <FilterGroup label="Scope">
+          <FilterGroup label={t("scope.title")}>
             <FilterRow
               kind="radio"
               name={scopeName}
@@ -232,7 +238,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
               checked={searchScope === "folder"}
               onSelect={() => handleScopeChange("folder")}
             >
-              <span>Current folder:</span>
+              <span>{t("scope.folderLabel")}</span>
               {currentFolder ? (
                 <Badge variant="outline" title={currentFolderPath} className="max-w-40">
                   <FolderIcon data-icon="inline-start" />
@@ -247,8 +253,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
               checked={searchScope === "all"}
               onSelect={() => handleScopeChange("all")}
             >
-              Everywhere
-            </FilterRow>
+              {t("scope.everywhere")}</FilterRow>
             {sentFolderName ? (
               <FilterRow
                 kind="checkbox"
@@ -257,12 +262,12 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
                 indented
                 onSelect={() => setIncludeSentInEverywhere((value) => !value)}
               >
-                {`Include ${sentFolderName}`}
+                {t("scope.includeSent", {folder: sentFolderName})}
               </FilterRow>
             ) : null}
           </FilterGroup>
           <Separator className="my-1" />
-          <FilterGroup label="Search in">
+          <FilterGroup label={t("fields.title")}>
             {SEARCH_FIELD_OPTIONS.map(([key, label]) => (
               <FilterRow
                 key={key}
@@ -280,12 +285,12 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
                   })
                 }
               >
-                {label}
+                {t(label)}
               </FilterRow>
             ))}
           </FilterGroup>
           <Separator className="my-1" />
-          <FilterGroup label="Filter">
+          <FilterGroup label={t("badges.title")}>
             {PRIMARY_BADGES.map(([key, label]) => (
               <FilterRow
                 key={key}
@@ -293,12 +298,12 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
                 checked={searchBadges[key]}
                 onSelect={() => setSearchBadges((prev) => ({ ...prev, [key]: !prev[key] }))}
               >
-                {label}
+                {t(label)}
               </FilterRow>
             ))}
           </FilterGroup>
           <Separator className="my-1" />
-          <FilterGroup label="Categories">
+          <FilterGroup label={t("categories")}>
             {CATEGORY_BADGE_OPTIONS.map(([key, label]) => (
               // The three categories are exclusive: selecting one clears the
               // others, selecting it again clears the category filter.
@@ -315,12 +320,12 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
                   }))
                 }
               >
-                {label}
+                {t(label)}
               </FilterRow>
             ))}
           </FilterGroup>
           <Separator className="my-1" />
-          <FilterGroup label="AI">
+          <FilterGroup label={t("ai")}>
             <FilterRow
               kind="checkbox"
               checked={searchBadges["ai-modified"]}
@@ -329,8 +334,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
               }
             >
               <Sparkles className="size-3.5" aria-hidden />
-              AI Modified
-            </FilterRow>
+              {t("badges.ai-modified")}</FilterRow>
           </FilterGroup>
         </PopoverContent>
       </Popover>

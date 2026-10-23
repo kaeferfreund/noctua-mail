@@ -1,5 +1,6 @@
 import { afterEach, expect, it, spyOn } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Sheet, SheetContent, SheetTitle } from "./sheet";
 afterEach(cleanup);
 it("QA-013 opts sheet content and backdrop out of motion when the user requests reduction", async () => {

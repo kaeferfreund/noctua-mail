@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { authClient, type NoctuaAuthClient, type Proof } from "@/lib/authClient";
@@ -11,13 +13,14 @@ export default function TwoFactorChallenge({ onAuthenticated, onBack, client = a
   onBack: () => void;
   client?: NoctuaAuthClient;
 }) {
+  const t = useTranslations("Auth");
   const [backup, setBackup] = useState(false);
   const [lostPhone, setLostPhone] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [continuation, setContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const action = useAuthAction();
   if (continuation) return <EnrollmentScreen client={client} continuation={continuation} onComplete={onAuthenticated} onLogout={async () => { await client.logout(); onBack(); }} />;
-  return <AuthFrame title={replacing ? "Replace your lost authenticator" : "Verify your sign-in"} description={replacing ? "Enter an unused replacement code. The backup code used to sign in cannot be used again." : "Enter your authenticator code to finish signing in."}>
+  return <AuthFrame title={replacing ? t("challenge.replaceTitle") : t("challenge.title")} description={replacing ? t("challenge.replaceHelp") : t("challenge.help")}>
     <form className="space-y-4" onSubmit={event => {
       event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); const code = String(data.get("code"));
       void action.run(async () => {
@@ -34,16 +37,16 @@ export default function TwoFactorChallenge({ onAuthenticated, onBack, client = a
       });
     }}>
       <fieldset disabled={action.disabled} className="space-y-4">
-        {replacing && <AuthField name="password" label="Current password" type="password" autoComplete="current-password" required />}
-        <AuthField key={`${backup}-${replacing}`} name="code" label={replacing ? "Unused replacement backup code" : backup ? "Backup code" : "Authenticator code"} inputMode={backup || replacing ? "text" : "numeric"} autoComplete="one-time-code" pattern={backup || replacing ? undefined : "[0-9]{6}"} required />
+        {replacing && <AuthField name="password" label={t("currentPassword")} type="password" autoComplete="current-password" required />}
+        <AuthField key={`${backup}-${replacing}`} name="code" label={replacing ? t("unusedBackupCode") : backup ? t("challenge.backupCode") : t("authenticatorCode")} inputMode={backup || replacing ? "text" : "numeric"} autoComplete="one-time-code" pattern={backup || replacing ? undefined : "[0-9]{6}"} required />
         <AuthError error={action.error} />
-        <Button type="submit">{action.pending ? "Verifying…" : replacing ? "Replace authenticator" : "Verify"}</Button>
+        <Button type="submit">{action.pending ? t("verifying") : replacing ? t("replaceAuthenticator") : t("challenge.verify")}</Button>
         {!replacing && <>
-          <Button type="button" variant="outline" onClick={() => { setBackup(!backup); setLostPhone(false); action.setError(null); }}>{backup ? "Use authenticator code" : "Use a backup code"}</Button>
-          <Button type="button" variant="ghost" onClick={() => { setBackup(true); setLostPhone(true); action.setError(null); }}>I lost my phone</Button>
-          {lostPhone && <p className="text-sm">First sign in with a backup code. Then use a different code to authorize replacement.</p>}
+          <Button type="button" variant="outline" onClick={() => { setBackup(!backup); setLostPhone(false); action.setError(null); }}>{backup ? t("useAuthenticator") : t("challenge.useBackup")}</Button>
+          <Button type="button" variant="ghost" onClick={() => { setBackup(true); setLostPhone(true); action.setError(null); }}>{t("challenge.lostPhone")}</Button>
+          {lostPhone && <p className="text-sm">{t("challenge.lostHelp")}</p>}
         </>}
-        <Button type="button" variant="ghost" onClick={onBack}>Back to sign in</Button>
+        <Button type="button" variant="ghost" onClick={onBack}>{t("backToLogin")}</Button>
       </fieldset>
     </form>
   </AuthFrame>;

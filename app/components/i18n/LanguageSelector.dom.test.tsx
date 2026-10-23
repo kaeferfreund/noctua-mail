@@ -75,9 +75,9 @@ test("merging refreshed locale props preserves invite form fields and its DOM id
   fireEvent.change(page.getByRole("combobox", { name: "Language" }), { target: { value: "de" } });
   page.rerender(tree("de"));
   expect(page.getByRole("combobox", { name: "Sprache" })).toBeTruthy();
-  expect(page.getByLabelText("Invite code")).toBe(invite);
+  expect(page.getByLabelText("Einladungscode")).toBe(invite);
   expect(invite.value).toBe("synthetic-invite");
-  expect((page.getByLabelText("Email") as HTMLInputElement).value).toBe("synthetic@example.test");
+  expect((page.getByLabelText("E-Mail") as HTMLInputElement).value).toBe("synthetic@example.test");
 });
 
 test("identity changes refresh the locale after login/logout without remounting the shell", () => {

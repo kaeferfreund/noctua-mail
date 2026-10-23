@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  renderHook,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { useRef, useState } from "react";
 import ThreadCollaborationBar from "./ThreadCollaborationBar";

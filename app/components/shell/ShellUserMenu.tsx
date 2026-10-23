@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { Braces, EllipsisVertical, Eraser, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import dynamic from "next/dynamic";
 import LazyDialogLoading from "@/app/components/LazyDialogLoading";
@@ -21,7 +23,7 @@ import { mailboxInitials } from "./types";
 
 const AdminPanel = dynamic(() => import("@/app/components/admin/AdminPanel"), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Admin" />
+  loading: () => <LazyDialogLoading kind="admin" />
 });
 
 export type ShellUserMenuProps = {
@@ -51,9 +53,10 @@ export default function ShellUserMenu({
   onEvictThreadCache,
   onLogout
 }: ShellUserMenuProps) {
+  const t = useTranslations("Shell");
   const { theme, setTheme } = useTheme();
   const identity = userEmail ?? "";
-  const triggerLabel = userName?.trim() || identity.split("@")[0] || "Account";
+  const triggerLabel = userName?.trim() || identity.split("@")[0] || t("account");
   const initials = mailboxInitials({ name: triggerLabel, email: identity });
 
   return (
@@ -62,7 +65,7 @@ export default function ShellUserMenu({
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" aria-label="User menu" title={identity || undefined}>
+            <SidebarMenuButton size="lg" aria-label={t("userMenu")} title={identity || undefined}>
               <Avatar size="sm">
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
@@ -74,48 +77,43 @@ export default function ShellUserMenu({
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="end" className="min-w-56">
-            <DropdownMenuLabel className="truncate">{identity || "Signed in"}</DropdownMenuLabel>
+            <DropdownMenuLabel className="truncate">{identity || t("signedIn")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onSelect={onOpenSecurity}>
                 <UserRound />
-                Profile &amp; security
+                {t("security")}
               </DropdownMenuItem>
               <DropdownMenuItem disabled={!currentAccount} onSelect={onOpenSettings}>
                 <Settings />
-                Settings
-              </DropdownMenuItem>
+                {t("settings")}</DropdownMenuItem>
               {isAdminUser ? (
                 <DropdownMenuItem onSelect={onOpenAdmin}>
                   <ShieldCheck />
-                  Admin
-                </DropdownMenuItem>
+                  {t("admin")}</DropdownMenuItem>
               ) : null}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuLabel>Developer tools</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("developer.title")}</DropdownMenuLabel>
               <DropdownMenuItem onSelect={onShowThreadJson}>
                 <Braces />
-                Show thread JSON
-              </DropdownMenuItem>
+                {t("developer.threadJson")}</DropdownMenuItem>
               <DropdownMenuItem onSelect={onEvictThreadCache}>
                 <Eraser />
-                Evict thread cache
-              </DropdownMenuItem>
+                {t("developer.evictCache")}</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <div className="md:hidden"><DropdownMenuLabel>Theme</DropdownMenuLabel>
+            <div className="md:hidden"><DropdownMenuLabel>{t("theme.label")}</DropdownMenuLabel>
               <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>
-                <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="light">{t("theme.light")}</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark">{t("theme.dark")}</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system">{t("theme.system")}</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup><DropdownMenuSeparator />
             </div>
             <DropdownMenuItem onSelect={onLogout}>
               <LogOut />
-              Log out
-            </DropdownMenuItem>
+              {t("logout")}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
