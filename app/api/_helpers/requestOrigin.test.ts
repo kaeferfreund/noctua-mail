@@ -111,14 +111,15 @@ describe("bodyless guards abandon a stalled body", () => {
       entered();
       return response;
     } });
-    const socket = connect(server.port, "127.0.0.1");
+    const port = Number(server.url.port);
+    const socket = connect(port, "127.0.0.1");
     try {
       let raw = "";
       const answered = new Promise<string>(resolve => socket.on("data", data => {
         raw += data.toString("latin1");
         if (raw.includes("\r\n\r\n")) resolve(raw.split("\r\n")[0]);
       }));
-      socket.write(`POST ${path} HTTP/1.1\r\nHost: 127.0.0.1:${server.port}\r\nOrigin: ${origin}\r\n` +
+      socket.write(`POST ${path} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nOrigin: ${origin}\r\n` +
         `Content-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n${chunks}`);
       await reached;
       jest.advanceTimersByTime(BODY_READ_TIMEOUT_MS);
