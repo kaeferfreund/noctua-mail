@@ -245,7 +245,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
               {currentFolder ? (
                 <Badge variant="outline" title={currentFolderPath} className="max-w-40">
                   <FolderIcon data-icon="inline-start" />
-                  <span className="truncate">{currentFolder.name}</span>
+                  <span className="truncate">{getFolderDisplayName(currentFolder, locale)}</span>
                 </Badge>
               ) : null}
             </FilterRow>

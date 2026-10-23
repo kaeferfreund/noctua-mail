@@ -3,19 +3,14 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { UiLocale } from "@/lib/i18n/config";
 import { useCallback, useMemo, useState } from "react";
-import { Trash2, X, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
+import { Trash2, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
 import {
-  Badge,
   Box,
   Card,
   Flex,
-  Heading,
   Text
 } from "@radix-ui/themes";
-import {
-  buildCalendarRecurrenceSummary,
-  formatCalendarEventRange
-} from "@/lib/calendar";
+import { formatCalendarEventRange } from "@/lib/calendar";
 import { formatCalendarTimeZoneShortLabel } from "@/lib/calendarTimezones";
 import type { AccountDateFormat, CalendarEvent } from "@/lib/data";
 import {
@@ -31,7 +26,11 @@ import {
   BottomStatusTriggerButton,
   type BottomStatusTone
 } from "./BottomStatusSection";
-import { buildUpcomingEntries, type UpcomingEntry } from "./upcomingEntries";
+import { buildUpcomingEntries, reminderLeadUnit, type UpcomingEntry } from "./upcomingEntries";
+import {
+  useRecurrenceSummaryBuilder,
+  type RecurrenceSummaryBuilder
+} from "@/app/components/calendar/useLazyRecurrence";
 import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
@@ -96,10 +95,17 @@ function formatEntryTimeZoneLabel(startAtMs: number, timeZone?: string) {
   return formatCalendarTimeZoneShortLabel(timeZone, new Date(startAtMs));
 }
 
-function buildEntryRecurrenceSummary(entry: UpcomingEntry, dateFormat?: AccountDateFormat) {
+function buildEntryRecurrenceSummary(
+  entry: UpcomingEntry,
+  buildSummary: RecurrenceSummaryBuilder | null,
+  dateFormat?: AccountDateFormat
+) {
+  // The builder is dynamic-imported (it pulls in `rrule`); until it lands
+  // the recurrence row is omitted rather than showing a guessed summary.
+  if (!buildSummary) return null;
   const event = entry.event;
   if (event?.recurrenceRule?.trim()) {
-    return buildCalendarRecurrenceSummary({
+    return buildSummary({
       allDay: event.allDay,
       start: new Date(event.startAtMs),
       end:
@@ -116,7 +122,7 @@ function buildEntryRecurrenceSummary(entry: UpcomingEntry, dateFormat?: AccountD
   const reminder = entry.reminder;
   if (reminder?.recurrenceRule?.trim()) {
     if (!Number.isFinite(entry.startAtMs)) return null;
-    return buildCalendarRecurrenceSummary({
+    return buildSummary({
       allDay: false,
       start: new Date(entry.startAtMs),
       startTimezone: reminder.startTimezone,
@@ -163,6 +169,14 @@ export default function UpcomingStatusPopover({
   const { entries: upcomingEntries, mergedCount } = useMemo(
     () => buildUpcomingEntries(upcomingEvents, pendingCalendarReminders),
     [upcomingEvents, pendingCalendarReminders]
+  );
+  const recurrenceSummaryBuilder = useRecurrenceSummaryBuilder(
+    open &&
+      upcomingEntries.some(
+        (entry) =>
+          Boolean(entry.event?.recurrenceRule?.trim()) ||
+          Boolean(entry.reminder?.recurrenceRule?.trim())
+      )
   );
   const nextEntry = upcomingEntries[0] ?? null;
   const upcomingStatusValue = (() => {
@@ -221,6 +235,7 @@ export default function UpcomingStatusPopover({
 
   return (
     <StatusPanelFrame embedded={embedded} description={t("reminder.description")} open={open} onOpenChange={onOpenChange} title={t("reminder.title")}
+      count={mergedCount}
       trigger={<BottomStatusTriggerButton
           label={t("reminder.title")}
           value={upcomingStatusValue}
@@ -233,27 +248,6 @@ export default function UpcomingStatusPopover({
         align: "end",
         sideOffset: 8, }}
     >
-        {!embedded ? <Flex align="center" justify="between" className="popover-title-row">
-          <Flex align="baseline" gap="3">
-            <Heading size="3" weight="medium" className="reminder-main-title">
-              {t("reminder.title")}
-            </Heading>
-            <Badge color="gray" variant="soft" radius="full">
-              {mergedCount}
-            </Badge>
-          </Flex>
-          <Flex align="center" gap="2">
-            <TooltipIconButton
-              variant="ghost"
-              color="gray"
-              size="2"
-              tooltip={t("close")}
-              onClick={() => onOpenChange(false)}
-            >
-              <X size={16} />
-            </TooltipIconButton>
-          </Flex>
-        </Flex> : null}
         <Box className="popover-body">
           {upcomingEntries.length > 0 ? (
             <div className="reminder-groups">
@@ -290,6 +284,7 @@ export default function UpcomingStatusPopover({
                       );
                       const recurrenceSummary = buildEntryRecurrenceSummary(
                         entry,
+                        recurrenceSummaryBuilder,
                         accountDateFormat
                       );
                       const displayUid = getEntryDisplayUid(entry);
@@ -366,7 +361,7 @@ export default function UpcomingStatusPopover({
                                 {reminder ? (
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Text size="1" color="gray">
-                                      {t("reminderLead", { minutes: reminder.leadMinutes })}
+                                      {t("reminderLead", reminderLeadUnit(reminder.leadMinutes))}
                                     </Text>
                                   </Flex>
                                 ) : null}

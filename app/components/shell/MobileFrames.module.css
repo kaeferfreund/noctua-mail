@@ -10,14 +10,25 @@
 }
 /* The generic Sheet close is a 28px icon; a fullscreen phone frame has room
    for the 44px target its other controls use. */
-.fullscreenSheet > [data-slot="sheet-close"] { top: 4px; right: 4px; width: 44px; height: 44px; }
-.statusSheet { max-height: 90dvh; overflow: hidden; }
+.fullscreenSheet > [data-slot="sheet-close"],
+.statusSheet > [data-slot="sheet-close"] { top: 4px; right: 4px; width: 44px; height: 44px; }
+.statusSheet { max-height: 90dvh; overflow: hidden; gap: 0; }
+/* Title row of every phone status Sheet: title and count, then the 44px close. */
+.statusSheetTitle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 56px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
 .statusContent {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   width: 100%;
   max-width: none;
-  max-height: 85dvh;
   min-height: 0;
   padding: 16px;
   box-shadow: none;

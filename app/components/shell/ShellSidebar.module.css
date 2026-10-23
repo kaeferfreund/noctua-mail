@@ -1,15 +1,28 @@
-/* Counts take real layout space so wrapped names cannot run underneath them. */
+/* View rows keep the shadcn menu-row anatomy: the button spans the whole row,
+   so its hover/active background and focus ring include the count badge, and
+   the badge sits inside the row's right padding. The row grid
+   (icon | label | count) reaches into the button through subgrid, so a
+   wrapped label ends at the count column instead of running underneath it. */
 .viewRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
   align-items: center;
 }
+.viewRow:has(> .viewCount) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
 .viewButton {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
   height: auto;
   min-height: 32px;
-  min-width: 0;
 }
 .viewButton > .viewLabel {
+  grid-column: 2;
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -17,8 +30,17 @@
 }
 .viewCount {
   position: static;
+  grid-column: 3;
+  grid-row: 1;
   margin-right: 4px;
   white-space: nowrap;
+}
+/* Row descriptions close without an exit animation. Radix keeps a closing
+   tooltip mounted until its animation ends, and a row re-entered during that
+   time closes its own reopened tooltip; moving back and forth between rows
+   would then show no description, or the previous row's fading one. */
+.viewTooltip[data-state="closed"] {
+  animation: none;
 }
 @media (width < 768px) {
   .viewButton { min-height: 44px; }

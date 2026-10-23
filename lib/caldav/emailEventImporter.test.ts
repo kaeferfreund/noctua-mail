@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import "../testDbHarness";
 
 type UpsertCalendarFields = Parameters<typeof import("../db").upsertCalendarEventByUid>[1];
 

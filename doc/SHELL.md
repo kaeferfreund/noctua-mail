@@ -178,7 +178,24 @@ All status copy is in both catalogs under `Shell.status`.
 The running build (`BuildInfo`, "Build <sha7> · <date>, <time>" in the display
 zone, full commit and ISO time in the tooltip) sits as a footer line at the
 bottom of the desktop status popover and as a label at the end of the phone
-status menu; without build data it renders nothing.
+status menu; without build data it renders nothing. The sidebar brand shows
+the same `BuildInfo` label, so both places read short commit plus Berlin time.
+
+Every phone status Sheet (Hintergrundaufgaben, Posteingangsprüfung, Demnächst,
+Fehler, Kalender) starts with the same visible title row, `StatusSheetTitle`:
+title, count where the section has one, then the Sheet's 44px icon close; the
+section description and content follow. Clear-all for Fehler is a labelled
+button in the content, not a second icon next to the close. Reminder leads use
+the largest whole unit (`reminderLeadUnit`: zu Beginn, Minuten, Stunden, Tage)
+through one ICU select/plural message.
+
+FullCalendar renders day numbers and column headers as `<a>` without `href`.
+Browsers skip them, but `tabIndex` still reports 0, so Radix FocusScope took
+one as the popover's last tabbable element and Tab left the calendar popover
+instead of wrapping. `CalendarView` sets `tabIndex = -1` on those labels when
+their cells mount (`calendarFocus.ts`), so the desktop popover loops focus in
+calendar mode exactly as in section mode, and Shift+Tab from the first control
+reaches the last event.
 
 Desktop density (768px and wider) is scoped to `ShellPanes.module.css`:
 `--shell-gutter: 0px`, `--pane-padding-x/y: 12px`, and

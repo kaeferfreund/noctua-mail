@@ -200,7 +200,6 @@
       "title": "Befehlspalette",
       "description": "Befehl suchen …"
     },
-    "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
     },
@@ -241,11 +240,10 @@
       "clearExceptions": "Alle Fehler löschen",
       "copyError": "Fehler kopieren",
       "relogin": "Erneut anmelden",
-      "close": "Schließen",
       "deleteReminderError": "Die Erinnerung konnte nicht gelöscht werden.",
       "openSourceMail": "Ursprüngliche E-Mail öffnen",
       "duration": "Dauer: {value}",
-      "reminderLead": "Erinnerung: {minutes} Minuten vorher",
+      "reminderLead": "Erinnerung: {unit, select, start {zu Beginn} day {{count, plural, one {# Tag} other {# Tage}} vorher} hour {{count, plural, one {# Stunde} other {# Stunden}} vorher} other {{count, plural, one {# Minute} other {# Minuten}} vorher}}",
       "repeats": "Wiederholung: {value}",
       "deleteReminder": "Erinnerung löschen",
       "process": {

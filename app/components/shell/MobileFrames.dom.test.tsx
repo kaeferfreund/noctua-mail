@@ -71,11 +71,28 @@ describe("mobile kept component frames", () => {
   });
   it("keeps the exception content and clear handler in the mobile Sheet", async () => {
     let cleared = 0;
-    const page = render(<Theme><ExceptionStatusPopover open onOpenChange={noop} exceptionEntries={[]}
+    const page = render(<Theme><ExceptionStatusPopover open onOpenChange={noop}
+      exceptionEntries={[{ id: "synthetic-error", message: "Synthetic error", timestamp: 1792627200000 }]}
       onClearExceptions={() => { cleared++; }} formatRelativeTime={() => "just now"} /></Theme>);
     const sheet = await page.findByRole("dialog", { name: "Errors" });
     fireEvent.click(within(sheet).getByRole("button", { name: "Clear exceptions" }));
     expect(cleared).toBe(1);
+  });
+  it("starts every status Sheet with one visible title row: title, count, icon close, then the description", async () => {
+    const page = render(<Theme><ExceptionStatusPopover open onOpenChange={noop}
+      exceptionEntries={[{ id: "synthetic-error", message: "Synthetic error", timestamp: 1792627200000 }]}
+      onClearExceptions={noop} formatRelativeTime={() => "just now"} /></Theme>);
+    const sheet = await page.findByRole("dialog", { name: "Errors" });
+    const title = sheet.querySelector<HTMLElement>('[data-slot="sheet-title"]')!;
+    expect(title.textContent).toBe("Errors");
+    expect(title.className).not.toContain("sr-only");
+    expect(title.parentElement!.querySelector('[data-slot="badge"]')!.textContent).toBe("1");
+    expect(within(sheet).getAllByText("Errors").length).toBe(1);
+    const close = within(sheet).getByRole("button", { name: "Close" });
+    expect(close.getAttribute("data-slot")).toBe("sheet-close");
+    expect(close.textContent).toBe("Close");
+    const description = within(sheet).getByText("See errors with timestamps and details.");
+    expect(title.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

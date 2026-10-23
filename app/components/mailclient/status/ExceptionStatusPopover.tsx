@@ -69,8 +69,15 @@ export default function ExceptionStatusPopover({
   const exceptionStatusValue = latestException ? getExceptionSummary(latestException.message) || t("error") : t("none");
   const exceptionStatusTone: BottomStatusTone = latestException ? "error" : "muted";
 
+  const clearExceptions = () => {
+    onClearExceptions();
+    setSelectedExceptionId(null);
+    onOpenChange(false);
+  };
+
   return (
     <StatusPanelFrame embedded={embedded} description={t("exception.description")} open={open} onOpenChange={onOpenChange} title={t("exception.title")}
+      count={exceptionEntries.length}
       trigger={<BottomStatusTriggerButton
           label={t("exception.title")}
           value={exceptionStatusValue}
@@ -78,7 +85,7 @@ export default function ExceptionStatusPopover({
         />}
       contentProps={{ className: "bottom-popover", side: "top", align: "end", sideOffset: 8, }}
     >
-        <Flex align="center" justify="between" className="popover-title exception-title">
+        {embedded ? <Flex align="center" justify="between" className="popover-title exception-title">
           <Text size="1" weight="medium" className="bottom-popover-heading">
             {t("exception.title")}
           </Text>
@@ -87,15 +94,13 @@ export default function ExceptionStatusPopover({
             color="gray"
             size="1"
             tooltip={t("clearExceptions")}
-            onClick={() => {
-              onClearExceptions();
-              setSelectedExceptionId(null);
-              onOpenChange(false);
-            }}
+            onClick={clearExceptions}
           >
             <X size={12} />
           </TooltipIconButton>
-        </Flex>
+        </Flex> : exceptionEntries.length > 0 ? <Flex justify="end" mb="3">
+          <Button size="2" variant="soft" color="gray" onClick={clearExceptions}>{t("clearExceptions")}</Button>
+        </Flex> : null}
         <Box className="popover-body">
           {exceptionEntries.length > 0 ? (
             <>
