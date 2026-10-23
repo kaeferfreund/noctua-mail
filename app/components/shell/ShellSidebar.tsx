@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { formatNumber } from "@/lib/i18n/format";
+import styles from "./ShellSidebar.module.css";
+import { useLocale, useTranslations } from "next-intl";
 
 import { useState, type ReactNode } from "react";
 import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
@@ -125,27 +127,29 @@ export function MailboxRows({
 }
 
 export function ViewRow({ view }: { view: ShellView }) {
+  const locale = useLocale();
   const t = useTranslations("Shell");
   const tv = useTranslations("Views");
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem className={styles.viewRow}>
       <SidebarMenuButton
+        className={styles.viewButton}
         data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
         title={view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description })}
       >
         {view.icon}
-        <span className={cn(view.emphasize && "font-semibold")}>{view.name}</span>
+        <span className={cn(styles.viewLabel, view.emphasize && "font-semibold")}>{view.name}</span>
       </SidebarMenuButton>
       {showCount ? (
         <SidebarMenuBadge
-          className="bg-sidebar-accent"
+          className={cn("bg-sidebar-accent", styles.viewCount)}
           title={view.countTitle ?? view.rowTitle}
           aria-label={view.countAriaLabel ?? t("mailboxes.unread", {count: view.count ?? 0})}
         >
-          {view.countLabel ?? view.count}
+          {formatNumber(view.count!, locale, { notation: "compact", maximumFractionDigits: 1 })}
         </SidebarMenuBadge>
       ) : null}
     </SidebarMenuItem>

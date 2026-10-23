@@ -1,4 +1,4 @@
-import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
+import { authorizeOutbound, OutboundAuthorizationError, prepareOutboundAssertion } from "@/lib/outboundAuthorization";
 import { listSenderIdentities } from "@/lib/serverDb";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { resolveCalendarSenderIdentity } from "@/lib/calendarParticipation";
@@ -12,7 +12,6 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import {
-  deleteCalendarParticipationOverrideForOccurrence,
   getCalendarEventById,
   getMessageById,
   markMessageCalendarInviteStatesProcessed,
@@ -144,8 +143,9 @@ export async function POST(request: Request, { params }: Params) {
         attendeeEmail = reply.attendeeEmail;
         const threadHeaders = resolveCalendarReplyThreadHeaders(sourceMessage);
         const messageId = `<${randomUUID()}@${accountContext.account.email.split("@")[1] || "example.invalid"}>`;
-        const beforeSend = () => authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
-        await beforeSend();
+        const authorization = await authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
+        const beforeSend = await prepareOutboundAssertion(authorization);
+        beforeSend();
         const result = await sendSmtpMessage(accountContext.account, {
           messageId,
           to: reply.to,
@@ -166,7 +166,8 @@ export async function POST(request: Request, { params }: Params) {
           actor: collabActorFromSession(accountContext.session, accountContext.clientId), clientId: accountContext.clientId, ...threadHeaders });
       }
 
-      if (!sendReply) await authorizeOutbound({ request }, { accountId, minRole: "editor" });
+      // Accepted SMTP owns post-send persistence even if membership later changes.
+      const beforeWrite = sendReply ? undefined : () => authorizeOutbound({ request }, { accountId, minRole: "editor" });
       let updatedEvent = event;
       if (effectiveScope === "series") {
         updatedEvent = {
@@ -179,21 +180,14 @@ export async function POST(request: Request, { params }: Params) {
             event.sourceType === "caldav" && event.remoteHref ? Date.now() : event.pendingRemoteSync,
           updatedAtMs: Date.now()
         };
-        await upsertCalendarEvent(accountId, updatedEvent);
-        if (Number.isFinite(occurrenceStartAtMs)) {
-          await deleteCalendarParticipationOverrideForOccurrence(
-            accountId,
-            event.eventUid,
-            occurrenceStartAtMs
-          );
-        }
+        await upsertCalendarEvent(accountId, updatedEvent, beforeWrite, occurrenceStartAtMs);
       } else {
         await upsertCalendarParticipationOverride(accountId, {
           eventUid: event.eventUid,
           occurrenceStartAtMs: occurrenceStartAtMs!,
           partstat,
           attendeeEmail
-        });
+        }, beforeWrite);
       }
 
       const participation = await resolveCalendarParticipation(

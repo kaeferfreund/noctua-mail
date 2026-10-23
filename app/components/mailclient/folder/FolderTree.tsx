@@ -1,4 +1,4 @@
-import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
+import { getFolderDisplayPath, folderNameMatches } from "@/lib/i18n/folderNames";
 import { useLocale } from "next-intl";
 import type React from "react";
 import type { Folder } from "@/lib/data";
@@ -63,17 +63,8 @@ export default function FolderTree({ state, actions }: FolderTreeProps) {
     return children.some((child) => hasFolderMatch(child));
   };
 
-  const folderPathLabel = (folder: Folder) => {
-    const parts = [getFolderDisplayName(folder, locale)];
-    let parentId = folder.parentId ?? null;
-    while (parentId) {
-      const parent = folderById.get(parentId);
-      if (!parent) break;
-      parts.unshift(getFolderDisplayName(parent, locale));
-      parentId = parent.parentId ?? null;
-    }
-    return parts.join("/");
-  };
+  const folderPathLabel = (folder: Folder) =>
+    getFolderDisplayPath(folder.id, id => folderById.get(id), locale);
 
   return (
     <>

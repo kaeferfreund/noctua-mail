@@ -1,0 +1,302 @@
+{
+  "basis": "Two-run means, matching r4 review; individual paired results also reported.",
+  "variants": {
+    "baseline": [
+      "base-7",
+      "base-8"
+    ],
+    "r4": [
+      "r4-3",
+      "r4-4"
+    ],
+    "r5": [
+      "r5-11",
+      "r5-12"
+    ]
+  },
+  "means": {
+    "baseline": {
+      "draftSaves": 1767.5,
+      "draftFailures": 0,
+      "retryExhaustions": 1,
+      "authBusy": 193,
+      "syncACompleted": 166.5,
+      "syncBCompleted": 177.5,
+      "syncFailures": 0,
+      "watcherActive": 98
+    },
+    "r4": {
+      "draftSaves": 1427,
+      "draftFailures": 0,
+      "retryExhaustions": 9.5,
+      "authBusy": 472,
+      "syncACompleted": 41.5,
+      "syncBCompleted": 51,
+      "syncFailures": 9,
+      "watcherActive": 38.5
+    },
+    "r5": {
+      "draftSaves": 2310,
+      "draftFailures": 0,
+      "retryExhaustions": 0,
+      "authBusy": 187.5,
+      "syncACompleted": 227,
+      "syncBCompleted": 240.5,
+      "syncFailures": 0,
+      "watcherActive": 120
+    }
+  },
+  "targets": {
+    "draftSaves": {
+      "baselineMean": 1767.5,
+      "r5Mean": 2310,
+      "metOnTwoRunMeans": true,
+      "rule": ">=90% of baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "draftFailures": {
+      "baselineMean": 0,
+      "r5Mean": 0,
+      "metOnTwoRunMeans": true,
+      "rule": "zero",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "retryExhaustions": {
+      "baselineMean": 1,
+      "r5Mean": 0,
+      "metOnTwoRunMeans": true,
+      "rule": "<=baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "authBusy": {
+      "baselineMean": 193,
+      "r5Mean": 187.5,
+      "metOnTwoRunMeans": true,
+      "rule": "<=baseline",
+      "perPairMet": [
+        false,
+        true
+      ]
+    },
+    "syncACompleted": {
+      "baselineMean": 166.5,
+      "r5Mean": 227,
+      "metOnTwoRunMeans": true,
+      "rule": ">=90% of baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "syncBCompleted": {
+      "baselineMean": 177.5,
+      "r5Mean": 240.5,
+      "metOnTwoRunMeans": true,
+      "rule": ">=90% of baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "syncFailures": {
+      "baselineMean": 0,
+      "r5Mean": 0,
+      "metOnTwoRunMeans": true,
+      "rule": "<=baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    },
+    "watcherActive": {
+      "baselineMean": 98,
+      "r5Mean": 120,
+      "metOnTwoRunMeans": true,
+      "rule": ">=90% of baseline",
+      "perPairMet": [
+        true,
+        true
+      ]
+    }
+  },
+  "caveat": "Auth BUSY is 193 vs 188 in pair one and 182 vs 198 in pair two; mean meets target, both individual pairs do not. Shared-host loads are uncontrolled. Feature-branch measurements do not validate the unresolved stage merge.",
+  "loads": {
+    "base-7": {
+      "start": [
+        4.47,
+        4.92,
+        4.67
+      ],
+      "end": [
+        7.41,
+        5.6,
+        4.92
+      ]
+    },
+    "base-8": {
+      "start": [
+        5.37,
+        5.39,
+        4.98
+      ],
+      "end": [
+        7.79,
+        6.17,
+        5.28
+      ]
+    },
+    "r4-3": {
+      "start": [
+        3.94,
+        4.3,
+        5.06
+      ],
+      "end": [
+        3.81,
+        4.17,
+        4.97
+      ]
+    },
+    "r4-4": {
+      "start": [
+        3.51,
+        3.87,
+        4.66
+      ],
+      "end": [
+        2.59,
+        3.56,
+        4.5
+      ]
+    },
+    "r5-11": {
+      "start": [
+        5.26,
+        5.28,
+        4.84
+      ],
+      "end": [
+        6.05,
+        5.53,
+        4.95
+      ]
+    },
+    "r5-12": {
+      "start": [
+        4.99,
+        5.34,
+        4.92
+      ],
+      "end": [
+        5.5,
+        5.5,
+        5
+      ]
+    }
+  },
+  "holdTimesMs": {
+    "base-7": {
+      "guard": null,
+      "allExplicitMaster": {
+        "n": 5274,
+        "p50": 0.3003,
+        "p95": 3.8796,
+        "p99": 8.3176,
+        "max": 101.0273,
+        "total": 8440.195
+      }
+    },
+    "base-8": {
+      "guard": null,
+      "allExplicitMaster": {
+        "n": 5462,
+        "p50": 0.2737,
+        "p95": 4.401,
+        "p99": 8.5878,
+        "max": 117.92,
+        "total": 8343.723
+      }
+    },
+    "r4-3": {
+      "guard": {
+        "n": 1444,
+        "p50": 11.0259,
+        "p95": 11.7125,
+        "p99": 18.1385,
+        "max": 238.7562,
+        "total": 16617.217
+      },
+      "allExplicitMaster": {
+        "n": 9876,
+        "p50": 0.2311,
+        "p95": 11.1264,
+        "p99": 11.7669,
+        "max": 238.7562,
+        "total": 25151.87
+      }
+    },
+    "r4-4": {
+      "guard": {
+        "n": 1410,
+        "p50": 11.0084,
+        "p95": 11.9778,
+        "p99": 14.6086,
+        "max": 49.4458,
+        "total": 15859.942
+      },
+      "allExplicitMaster": {
+        "n": 8407,
+        "p50": 0.3033,
+        "p95": 11.1161,
+        "p99": 11.8702,
+        "max": 49.4457,
+        "total": 22508.908
+      }
+    },
+    "r5-11": {
+      "guard": {
+        "n": 2239,
+        "p50": 0.8949,
+        "p95": 1.2166,
+        "p99": 4.4202,
+        "max": 16.6013,
+        "total": 2266.642
+      },
+      "allExplicitMaster": {
+        "n": 4766,
+        "p50": 0.9932,
+        "p95": 4.0608,
+        "p99": 7.8243,
+        "max": 76.5745,
+        "total": 8837.974
+      }
+    },
+    "r5-12": {
+      "guard": {
+        "n": 2381,
+        "p50": 0.8564,
+        "p95": 1.1137,
+        "p99": 3.5221,
+        "max": 32.949,
+        "total": 2274.032
+      },
+      "allExplicitMaster": {
+        "n": 5033,
+        "p50": 0.9509,
+        "p95": 3.5377,
+        "p99": 6.1149,
+        "max": 62.8739,
+        "total": 8335.887
+      }
+    }
+  }
+}

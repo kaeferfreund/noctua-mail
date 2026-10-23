@@ -14,6 +14,15 @@
   resize: vertical;
 }
 
+@media (width < 768px) {
+  .composeWritingHtml {
+    /* Let the toolbar and editable minimum determine the space reservation,
+       rather than the desktop editor's preferred 440px flex basis. */
+    flex-basis: 0;
+    min-height: min-content;
+  }
+}
+
 .composeWritingText {
   resize: vertical;
 }

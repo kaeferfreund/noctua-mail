@@ -67,10 +67,22 @@ describe("message catalogs", () => {
   }
 });
 
+test("admin self-grant copy is explicit in both locales and uses German mailbox roles", () => {
+  const t = getTranslator("de");
+  expect(t("Admin.mailboxes.selfGrantTitle")).toBe("Dir selbst Zugriff geben?");
+  expect(t("Admin.mailboxes.noMembers")).toBe("Noch keine Mitglieder – niemand sieht dieses Postfach");
+  expect((["manager", "editor", "viewer"] as const).map(role => t(`Admin.roles.${role}`))).toEqual(["Verwalter", "Bearbeiter", "Leser"]);
+  for (const locale of ["de", "en"] as const) {
+    const translate = getTranslator(locale);
+    for (const key of ["selfGrantTitle", "selfGrantHelp", "grantAccess", "later", "noMembers"] as const) {
+      expect(translate(`Admin.mailboxes.${key}`)).not.toBe(`Admin.mailboxes.${key}`);
+    }
+  }
+});
 
 test("views use reviewed German copy, independent of admin invitations and protocol IDs", () => {
   expect(Object.values(de.Views).filter(value => typeof value === "object").map(view => view.name)).toEqual([
-    "Fokus", "Aufgaben", "Einladungen", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Posteingang"
+    "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Posteingang"
   ]);
   const t = getTranslator("de");
   expect(t("Views.actionQueue.description")).toContain("erledigte Aufgaben");
@@ -98,4 +110,21 @@ test("both catalogs preserve the same ICU argument and rich-tag names", () => {
   for (const [key, message] of Object.entries(leaves(de))) {
     expect(argumentsIn(message), key).toEqual(argumentsIn(english[key]));
   }
+});
+
+
+test("round-two copy follows the reviewed leaf values and folder plural grammar", () => {
+  const t = getTranslator("de");
+  expect(t("Settings.tabs.account")).toBe("Postfach");
+  expect(t("Views.focused.badgeLabel")).toBe("Ungelesen & unbeantwortet");
+  expect(t("Views.focused.description")).toContain("ohne Newsletter");
+  expect(t("Views.unassigned.description")).toBe("Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.");
+  expect(t("Shell.status.mode.recent")).toBe("Synchronisierung der letzten Nachrichten");
+  expect(t("Shell.refreshDescription")).toBe("Eine neue Version ist verfügbar. Sie ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.");
+  expect(t("Shell.refreshMandatory", { version: "synthetic-version" })).toBe("Lade die Seite neu, bevor du fortfährst. Neue Version: synthetic-version.");
+  for (const [count, expected] of [
+    [1, "1 Hinweis erfordert deine Aufmerksamkeit"],
+    [2, "2 Hinweise erfordern deine Aufmerksamkeit"]
+  ] as const) expect(t("Shell.status.attention", { count })).toBe(expected);
+  expect(getTranslator("en")("Shell.loading.mailbox")).toBe("Add mailbox");
 });

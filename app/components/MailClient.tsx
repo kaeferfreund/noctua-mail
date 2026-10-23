@@ -1,4 +1,11 @@
 "use client";
+
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { useStartupSync } from "./mailclient/useStartupSync";
+import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
+import { isAccountFolder } from "@/lib/folderAccount";
+import { findInboxFolder } from "@/lib/specialFolders";
+
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
@@ -293,7 +300,6 @@ import {
   normalizeRecipientListForComparison,
   replaceLastRecipientToken
 } from "@/lib/recipientLists";
-import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 
 const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
@@ -378,6 +384,7 @@ type ActiveTopicSuggestionsResponse = {
 };
 
 import { useLocale, useTranslations } from "next-intl";
+import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 export default function MailClient({
@@ -389,6 +396,7 @@ export default function MailClient({
   const ts = useTranslations("Search");
   const tl = useTranslations("List");
   const locale = useLocale();
+  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -415,6 +423,7 @@ export default function MailClient({
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
+  const { messages: senderMessages } = useSenderMessages();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
@@ -495,68 +504,7 @@ export default function MailClient({
   const activeTopicSuggestionCacheKey =
     activeAccountId && activeTopicId ? `${activeAccountId}:${activeTopicId}` : "";
 
-  const readErrorMessage = useCallback(async (res: Response) => {
-    const responsePath = (() => {
-      if (!res.url) return null;
-      try {
-        const url = new URL(res.url);
-        return `${url.pathname}${url.search}`;
-      } catch {
-        return null;
-      }
-    })();
-    const withRequestPath = (message: string) => {
-      if (!responsePath) return message;
-      const normalized = message.trim();
-      if (!normalized) return message;
-      const statusOnly = normalized === String(res.status);
-      const statusPrefix = normalized.startsWith(`${res.status}`);
-      const statusTextOnly =
-        res.statusText && normalized.toLowerCase() === res.statusText.toLowerCase();
-      const requestFailedOnly = normalized === `Request failed (${res.status})`;
-      if (statusOnly || statusPrefix || statusTextOnly || requestFailedOnly) {
-        return `${normalized} ${responsePath}`.trim();
-      }
-      return message;
-    };
-    try {
-      const data = (await res.json()) as {
-        message?: string;
-        error?: string;
-        stack?: string;
-        details?: string;
-        code?: string;
-        accountId?: string;
-        reauthRequired?: boolean;
-        repairAllowed?: boolean;
-      };
-      const resolvedAccountId =
-        data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
-      if (data?.code === "mailbox_credentials_invalid") {
-        if (data.repairAllowed && resolvedAccountId) {
-          setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
-          return "Mailbox credentials need repair.";
-        }
-        setReloginAccountId("");
-        return "Mailbox unavailable; contact a manager.";
-      }
-      // Personal auth 401 is logout. Form proof/permission failures use 403.
-      if (res.status === 401 && !responsePath?.startsWith("/api/ba/")) setAuthState("unauth");
-      const parts = [data?.message, data?.error, data?.details, data?.stack].filter(
-        (value) => value && typeof value === "string"
-      ) as string[];
-      if (parts.length) return withRequestPath(parts.join("\n"));
-    } catch {
-      // ignore
-    }
-    try {
-      const text = await res.text();
-      if (text) return withRequestPath(text.slice(0, 2000));
-    } catch {
-      // ignore
-    }
-    return withRequestPath(`Request failed (${res.status})`);
-  }, []);
+  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription });
 
   const {
     exceptionEntries,
@@ -580,6 +528,8 @@ export default function MailClient({
     apiFetch
   });
 
+  const activeAccountIdRef = useRef(activeAccountId);
+  activeAccountIdRef.current = activeAccountId;
   const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
     const targetAccountId = accountIdOverride?.trim() || activeAccountId;
     if (!targetAccountId) {
@@ -590,7 +540,7 @@ export default function MailClient({
       const foldersRes = await apiFetch(buildAccountFoldersPath(targetAccountId));
       if (foldersRes.ok) {
         const nextFolders = (await foldersRes.json()) as Folder[];
-        setFolders(nextFolders);
+        if (activeAccountIdRef.current === targetAccountId) setFolders(nextFolders);
         return nextFolders;
       } else {
         reportError(await readErrorMessage(foldersRes));
@@ -664,7 +614,6 @@ export default function MailClient({
   const [bulkContextMenuSelection, setBulkContextMenuSelection] = useState<string[]>([]);
   const bulkContextMenuReturnFocusRef = useRef<HTMLElement | null>(null);
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
-  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
   useEffect(() => deferUntilIdle(() => {
@@ -4327,84 +4276,20 @@ export default function MailClient({
     return () => window.clearInterval(timer);
   }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
 
-  // Initial sync on login (once per session per account). For existing accounts,
-  // sync only the active folder first so new mail appears before any broader repair work.
   useEffect(() => {
-    if (!initialDataReady || !activeAccountId) return;
-    if (initialFoldersLoadedAccountId !== activeAccountId) return;
+    let active = true;
+    const refreshSenders = () => { void apiFetch("/api/accounts", { cache: "no-store" }).then(async response => {
+      if (response.ok) { const refreshedAccounts = await response.json(); if (active) setAccounts(refreshedAccounts); }
+    }).catch(() => reportError(senderMessages.identityRefreshFailed)); };
+    window.addEventListener("noctua:sender-settings-changed", refreshSenders);
+    return () => { active = false; window.removeEventListener("noctua:sender-settings-changed", refreshSenders); };
+  }, [apiFetch, reportError, currentUser?.id, senderMessages.identityRefreshFailed]);
 
-    const hasAccountFolders = accountFolders.length > 0;
-
-    // For returning users, wait until the active folder is selected before starting
-    // sync, so the syncAccount closure captures the correct activeFolderId. Without
-    // this guard, activeFolderId is "" when the effect first fires (it gets set by a
-    // sibling effect that runs in the same flush), causing refreshMailboxData() to be
-    // skipped after sync completes and the user sees stale mail.
-    if (hasAccountFolders && !activeFolderId) return;
-
-    const syncStatus =
-      initialSyncStatusRef.current[activeAccountId] ?? readInitialSyncSessionStatus(activeAccountId);
-    if (syncStatus === "running" || syncStatus === "done") return;
-
-    initialSyncStatusRef.current[activeAccountId] = "running";
-    writeInitialSyncSessionStatus(activeAccountId, "running");
-    const accountId = activeAccountId;
-    const startupDecision = decideStartupSync({
-      hasAccountFolders,
-      activeFolderId
-    });
-    const startupTriggerId = logSyncPolicyCall({
-      caller: "startup",
-      policy: "decideStartupSync",
-      accountId: activeAccountId,
-      folderId: activeFolderId || null,
-      input: {
-        hasAccountFolders,
-        activeFolderId
-      },
-      decision: startupDecision
-    });
-    if (startupDecision.kind === "skip") {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-    const syncPromise =
-      startupDecision.kind === "account"
-        ? syncAccountRef.current?.(undefined, startupDecision.mode, {
-            fullSyncReason: startupDecision.reason,
-            triggerId: startupTriggerId
-          })
-        : startupDecision.mode === "new" || startupDecision.mode === "repair" || startupDecision.mode === "full"
-          ? syncAccountRef.current?.(startupDecision.folderId, startupDecision.mode, {
-              fullSyncReason: startupDecision.reason,
-              triggerId: startupTriggerId
-            })
-          : undefined;
-    if (!syncPromise) {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-
-    void syncPromise
-      .then(() => {
-        initialSyncStatusRef.current[accountId] = "done";
-        writeInitialSyncSessionStatus(accountId, "done");
-      })
-      .catch(() => {
-        delete initialSyncStatusRef.current[accountId];
-        writeInitialSyncSessionStatus(accountId, null);
-      });
-  }, [
-    activeAccountId,
-    accountFolders.length,
-    initialDataReady,
-    initialFoldersLoadedAccountId,
-    activeFolderId,
-    readInitialSyncSessionStatus,
-    writeInitialSyncSessionStatus
-  ]);
+  useStartupSync({
+    initialDataReady, activeAccountId, initialFoldersLoadedAccountId, accountFolders,
+    activeFolderId, initialSyncStatusRef, readInitialSyncSessionStatus,
+    writeInitialSyncSessionStatus, syncAccountRef
+  });
 
   // CalDAV periodic sync
   useEffect(() => {
@@ -4926,16 +4811,17 @@ export default function MailClient({
     if (prevAccountIdRef.current !== activeAccountId) {
       prevAccountIdRef.current = activeAccountId;
       composeHandleRef.current?.resetSession();
+      setLastFolderId("");
       if (searchScope === "all") {
         setActiveFolderId("");
       } else {
-        setActiveFolderId(accountFolders[0]?.id ?? "");
+        setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
       }
       return;
     }
     if (searchScope === "all") return;
-    if (!activeFolderId) {
-      setActiveFolderId(accountFolders[0]?.id ?? "");
+    if (!isAccountFolder(activeAccountId, activeFolderId, accountFolders)) {
+      setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
     }
   }, [accountFolders, activeAccountId, activeFolderId, searchScope]);
 
@@ -5301,52 +5187,17 @@ export default function MailClient({
     window.addEventListener("storage", handleDetachedComposeEvent);
     return () => window.removeEventListener("storage", handleDetachedComposeEvent);
   }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice]);
-  // Auto-repair empty folders: if a folder shows no messages after loading,
-  // check if raw messages exist in DB (threading issue → recompute) or not (missing → sync).
-  useEffect(() => {
-    if (searchScope !== "folder" || !activeFolderId || !activeAccountId) return;
-    // Wait for the first real list response for this key before deciding the folder
-    // is unexpectedly empty. On initial refresh there is a short window where the
-    // list is empty simply because page 1 has not hydrated yet.
-    if (totalMessages === null) return;
-    if (listLoading || emptyListSyncing || isRecomputingThreads) return;
-    if (filteredMessages.length > 0) return;
-    if (autoRepairAttemptedFolderIdsRef.current.has(activeFolderId)) return;
-    autoRepairAttemptedFolderIdsRef.current.add(activeFolderId);
-    const folderId = activeFolderId;
-    const accountId = activeAccountId;
-    void (async () => {
-      try {
-        const params = new URLSearchParams({
-          folderId,
-          pageSize: "1"
-        });
-        const res = await apiFetch(buildAccountMessagesPath(accountId, params));
-        if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (typeof data?.total === "number" && data.total > 0) {
-          await recomputeThreadsRef.current();
-        } else {
-          await syncFolderWithBackgroundRef.current(folderId, true, "full", {
-            fullSyncReason:
-              "Auto-repair requested full sync because the folder list is empty and no raw messages were found in the DB."
-          });
-        }
-      } catch {
-        // silently ignore auto-repair errors
-      }
-    })();
-  }, [
-    searchScope,
-    activeFolderId,
-    activeAccountId,
+  useEmptyFolderRepair({
+    accountId: activeAccountId,
+    folderId: activeFolderId,
+    accountFolders,
+    enabled: searchScope === "folder" && totalMessages !== null &&
+      !listLoading && !emptyListSyncing && !isRecomputingThreads && filteredMessages.length === 0,
     apiFetch,
-    listLoading,
-    emptyListSyncing,
-    isRecomputingThreads,
-    filteredMessages.length,
-    totalMessages
-  ]);
+    attemptedFolderIdsRef: autoRepairAttemptedFolderIdsRef,
+    recomputeThreadsRef,
+    syncFolderRef: syncFolderWithBackgroundRef
+  });
 
 
   const rootFolders = accountFolders.filter((folder) => !folder.parentId);
@@ -5365,12 +5216,6 @@ export default function MailClient({
             : folder.id === "virtual:invite-deck"
               ? inviteDeckUnreadCount
               : null,
-        countLabel:
-          folder.id === "virtual:focused"
-            ? tv("unreadLabel", { count: focusedUnreadCount ?? 0 })
-            : folder.id === "virtual:action-queue"
-            ? tv("pendingLabel", { count: actionQueueTodoCount ?? 0 })
-            : undefined,
         countAriaLabel:
           folder.id === "virtual:focused"
             ? tv("unreadCount", { count: focusedUnreadCount ?? 0 })
@@ -5460,8 +5305,8 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
-    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
-    {adminOpen && <AdminPanel isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
+    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
+    {adminOpen && <AdminPanel isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </>;
   if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
@@ -5944,7 +5789,16 @@ export default function MailClient({
           isExistingAccount={isExistingAccount}
           onClose={() => setManageOpen(false)}
           onTabChange={setManageTab}
-          onSave={manageTab === "account" ? saveAccount : saveAccountSettings}
+          onSave={manageTab === "account" ? saveAccount : manageTab === "signatures" ? async account => {
+            const response = await apiFetch(`/api/accounts/${encodeURIComponent(account.id)}/settings`, {
+              method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ settings: { signatures: account.settings?.signatures ?? [], defaultSignatureId: account.settings?.defaultSignatureId ?? "" }, teamDefaults: true })
+            });
+            if (!response.ok) { reportError(await readErrorMessage(response)); return; }
+            const { notifySenderSettingsChanged } = await import("@/lib/ui/senderSettings");
+            notifySenderSettingsChanged(account.id);
+            setManageOpen(false);
+          } : saveAccountSettings}
           onDelete={() => deleteAccount(editingAccount.id)}
           isAdminUser={isAdminUser}
           onNotifySuccess={(title, description) => {

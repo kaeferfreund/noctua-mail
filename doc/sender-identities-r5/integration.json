@@ -1,0 +1,28 @@
+{
+  "command": "git merge-tree --write-tree origin/integration/stage HEAD",
+  "stage": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+  "candidate": "88c42f64c62208cad0d50016f004734b226424da",
+  "exit": 1,
+  "tree": "f68ed75a0a0442781af72e8fc79cb555b693d096",
+  "conflicts": [
+    {
+      "file": "lib/db/messages/upsert.ts",
+      "blocks": [
+        {
+          "mergedLine": 256,
+          "resolution": "Keep stage prepareFtsIdentityWriter and deleteFts = ftsWriter.remove; omit v2 plannedFtsRows/prepareFtsDeletes/direct insert statements. Keep the stage import and indexed scope deletes."
+        },
+        {
+          "mergedLine": 694,
+          "resolution": "Keep stage ftsWriter.insert(accountId, rowId, ftsRowid, [. Preserve its auto-merged lookup/remove before insertMessage; omit second deletion and raw FTS insert."
+        },
+        {
+          "mergedLine": 709,
+          "resolution": "Keep stage ]);. Omit plannedFtsRows update; v3 maintains identity allocation and reuse."
+        }
+      ],
+      "followup": "Remove auto-merged dangling prepareFtsDeletes callback argument. Retain authorizedWrite wrapper, live assertion, shard-first order, master exclusion through COMMIT and rollback probes. Adapt direct FTS test setup to v3 identity invariants if required."
+    }
+  ],
+  "mergedValidation": "Required on round-9 resolved merge; no unresolved merge is certified by feature-branch gates."
+}

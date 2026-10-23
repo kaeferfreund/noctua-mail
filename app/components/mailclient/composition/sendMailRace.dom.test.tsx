@@ -6,6 +6,7 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
+import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type { Message } from "@/lib/data";
 import ComposeOrchestrator from "./ComposeOrchestrator";
 
@@ -20,6 +21,7 @@ afterEach(async () => {
 type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSignal | null };
 
 type RenderComposeOptions = {
+  sender?: SenderSettings;
   isMobile?: boolean;
   followComposeOpen?: boolean;
   onOutcome?: (outcome: string, id: string | null, warnings?: string[]) => void;
@@ -104,6 +106,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
 
   const props = {
     activeAccountId: "acc-test",
+    senderSettingsLoader: (_: unknown, accountId: string) => options.sender ?? ({ account: { id: accountId, email: "me@example.test", accessRole: "manager", settings: {} }, identities: [{ id: "primary", accountId, email: "me@example.test", displayName: "Synthetic Sender", enabled: true, isDefault: true }], prefs: {}, user: { email: "user@example.test" }, warnings: [] }),
     currentAccount: null,
     accountDateFormat: "locale" as const,
     defaultSignatureId: "",
@@ -258,7 +261,7 @@ describe("send while a draft save is still in flight", () => {
   it("surfaces an SMTP timeout and re-enables Send after the request fails", async () => {
     const errors: string[] = [];
     const timeoutMessage =
-      "Timed out while connecting to the outgoing mail server. Check the SMTP server and firewall settings, then try again.";
+      "Connecting to the mail provider timed out. Keep this draft and try again later.";
     const { view, handleRef, draftSaveGate, sendButton, countSmtpSends } = renderCompose({
       smtpResponse: new Response(
         JSON.stringify({
@@ -359,6 +362,7 @@ describe("detached compose semantics", () => {
     const draft = {
       ...source,
       id: "draft-forward-1",
+      from: "me@example.test",
       folderId: "folder-drafts",
       draft: true,
       to: "recipient@example.test",
@@ -581,7 +585,7 @@ describe("mobile compose", () => {
     try {
       await act(async () => { await handleRef.current?.openCompose("new"); });
       expect(view.getByText("New message")).toBeTruthy();
-      expect((view.getByRole("textbox", { name: "From:" }) as HTMLInputElement).value).toBe("me@example.test");
+      expect(view.getByRole("combobox", { name: "From:" }).textContent).toContain("me@example.test");
       for (const requested of ["inline", "minimized"] as const) {
         act(() => handleRef.current?.setComposeView(requested));
         expect(view.getByText("New message")).toBeTruthy();
@@ -652,9 +656,10 @@ describe("shell shortcut in composers", () => {
           expect(element).not.toBeNull();
           return element!;
         });
-        const from = view.getByRole("textbox", { name: "From:" }) as HTMLInputElement;
-        expect(from.value).toBe("me@example.test");
-        expect(from.readOnly).toBe(true);
+        const from = view.getByRole("combobox", { name: "From:" }) as HTMLButtonElement;
+        expect(from.textContent).toContain("me@example.test");
+        expect(from.disabled).toBe(false);
+        expect(from.tagName).toBe("BUTTON");
         const recipient = view.baseElement.querySelector<HTMLInputElement>(`#compose-${variant}-to`)!;
         for (const target of [editor, recipient]) {
           act(() => target.focus());
@@ -894,4 +899,66 @@ describe("compose QA regressions", () => {
       } finally { cleanup(); opener.remove(); }
     });
   }
+});
+
+
+describe("sender identity compose integration", () => {
+  const sender = (): SenderSettings => ({ account: { id: "acc-test", email: "me@example.test", ownAddresses: ["me@example.test", "alias@example.test"], accessRole: "manager", settings: { signatures: [{ id: "team", name: "Team", body: "Regards,\n{{user.name}} / {{identity.email}}" }], defaultSignatureId: "team" } } as SenderSettings["account"],
+    identities: [{ id: "primary", accountId: "acc-test", email: "me@example.test", displayName: "Team", enabled: true, isDefault: true }, { id: "alias", accountId: "acc-test", email: "alias@example.test", displayName: "Alias", enabled: true, isDefault: false }] as SenderSettings["identities"], prefs: {}, user: { name: "Synthetic Jo", email: "jo@example.test" }, warnings: [] });
+  const draft = { id: "identity-draft", accountId: "acc-test", folderId: "drafts", threadId: "thread", from: "me@example.test", to: "recipient@example.test", subject: "Synthetic identity draft", body: "Existing authored body", htmlBody: "", xComposeFormat: "text", senderIdentityId: "primary", dateValue: 1, attachments: [] } as unknown as Message;
+  it("identity-only change autosaves the new sender and survives minimize/modal restore", async () => {
+    const { view, handleRef, calls } = renderCompose({ sender: { ...sender(), prefs: { defaultSignatureId: "" } }, holdDraftSaves: false });
+    await act(async () => { await handleRef.current?.openCompose("edit", draft); });
+    fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+    fireEvent.click(await view.findByRole("option", { name: /Alias <alias@example.test>/ }));
+    await waitFor(() => expect(calls.find(call => call.url.endsWith("/drafts/save"))?.body).toMatchObject({ identityId: "alias", text: "Existing authored body" }), { timeout: 5000 });
+    act(() => { handleRef.current?.setComposeView("minimized"); });
+    act(() => { handleRef.current?.setComposeView("modal"); });
+    expect(view.getByRole("combobox", { name: "From:" }).textContent).toContain("alias@example.test");
+  });
+  it("preserves an edited signature on From change unless replacement is confirmed", async () => {
+    const confirm = spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      const { view, handleRef } = renderCompose({ sender: sender(), holdDraftSaves: false });
+      // A text-only reply shares the same initialization and signature ref as HTML/Markdown.
+      await act(async () => { await handleRef.current?.openCompose("reply", { ...draft, id: "source", from: "customer@example.test", to: "me@example.test", body: "Original", xComposeFormat: undefined }); });
+      const editor = view.baseElement.querySelector<HTMLTextAreaElement>("textarea[name=compose_body]") ?? view.baseElement.querySelector<HTMLTextAreaElement>("textarea");
+      expect(editor).not.toBeNull(); expect(editor!.value.match(/Synthetic Jo/g)).toHaveLength(1);
+      fireEvent.change(editor!, { target: { value: editor!.value.replace("Synthetic Jo", "Synthetic Jo, edited") } });
+      fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+      fireEvent.click(await view.findByRole("option", { name: /Alias <alias@example.test>/ }));
+      await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+      expect(editor!.value).toContain("Synthetic Jo, edited / me@example.test"); expect(editor!.value).not.toContain("Synthetic Jo / alias@example.test");
+      expect(view.getByRole("combobox", { name: "From:" }).textContent).toContain("alias@example.test");
+    } finally { confirm.mockRestore(); }
+  });
+  it("replaces the unchanged Lexical signature without confirmation after initial serialization", async () => {
+    const confirm = spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      const { view, handleRef } = renderCompose({ sender: sender(), holdDraftSaves: false });
+      await act(async () => { await handleRef.current?.openCompose("new"); });
+      await waitFor(() => expect(view.baseElement.querySelector('[data-lexical-editor="true"]')?.textContent).toContain("Synthetic Jo / me@example.test"));
+      // Let the first export synchronize the signature ref before choosing From.
+      await act(async () => { await new Promise(resolve => requestAnimationFrame(() => resolve(undefined))); });
+      fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+      fireEvent.click(await view.findByRole("option", { name: /Alias <alias@example.test>/ }));
+      await waitFor(() => expect(view.baseElement.querySelector('[data-lexical-editor="true"]')?.textContent).toContain("Synthetic Jo / alias@example.test"));
+      expect(confirm).not.toHaveBeenCalled();
+      expect(view.baseElement.querySelector('[data-lexical-editor="true"]')?.textContent?.match(/Synthetic Jo/g)).toHaveLength(1);
+    } finally { confirm.mockRestore(); }
+  });
+  it("does not reinsert a removed signature when an empty session is detached", async () => {
+    const { view, handleRef } = renderCompose({ sender: sender(), detachedWindow: true, holdDraftSaves: false });
+    await act(async () => { await handleRef.current?.openDetachedCompose(null, { mode: "new", sourceMessage: null, identityId: "alias", signatureInitialized: true }); });
+    expect(view.getByRole("combobox", { name: "From:" }).textContent).toContain("alias@example.test");
+    await waitFor(() => expect(view.baseElement.querySelector('[data-lexical-editor="true"]')).not.toBeNull());
+    expect(view.baseElement.querySelector('[data-lexical-editor="true"]')?.textContent).not.toContain("Synthetic Jo");
+  });
+  it("restores a detached empty composer's captured account and identity", async () => {
+    const { view, handleRef } = renderCompose({ sender: sender(), detachedWindow: true, holdDraftSaves: false });
+    await act(async () => { await handleRef.current?.openDetachedCompose(null, { mode: "new", sourceMessage: null, identityId: "alias" }); });
+    expect(view.getByRole("combobox", { name: "From:" }).textContent).toContain("alias@example.test");
+    const editor = await waitFor(() => { const editor = view.baseElement.querySelector<HTMLElement>('[data-lexical-editor="true"]'); expect(editor).not.toBeNull(); return editor!; });
+    expect(editor.textContent).toContain("Synthetic Jo / alias@example.test");
+  });
 });
