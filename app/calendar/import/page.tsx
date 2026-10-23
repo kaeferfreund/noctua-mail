@@ -80,7 +80,7 @@ export default function CalendarImportPage() {
         // anything failed, stay on this page so the user actually sees the
         // error message instead of losing it under a navigation.
         if (importedEventCount > 0 && errors.length === 0) {
-          router.replace("/?openCalendar=1");
+          router.replace("/?panel=calendar");
         } else if (importedEventCount > 0) {
           const eventLabel = importedEventCount === 1 ? "1 event" : `${importedEventCount} events`;
           const failureLabel = errors.length === 1 ? "1 failure" : `${errors.length} failures`;
