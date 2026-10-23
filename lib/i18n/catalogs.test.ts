@@ -2,7 +2,9 @@ import { describe, expect, test, it } from "bun:test";
 import { parse } from "@formatjs/icu-messageformat-parser";
 import de from "@/messages/de.json";
 import en from "@/messages/en.json";
+import { createTranslator } from "next-intl";
 import { catalogs, getTranslator } from "./translator";
+import { timeZone } from "./config";
 
 function leaves(value: Record<string, unknown>, prefix = ""): Record<string, string> {
   return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
@@ -129,4 +131,17 @@ test("round-two copy follows the reviewed leaf values and folder plural grammar"
     [2, "„Posteingang“ und 2 weitere Ordner werden synchronisiert …"]
   ] as const) expect(t("Shell.status.syncingFolders", { folder: "Posteingang", more })).toBe(expected);
   expect(getTranslator("en")("Shell.loading.mailbox")).toBe("Add mailbox");
+});
+
+test("getTranslator reuses one translator per locale with unchanged output", () => {
+  expect(getTranslator("de")).toBe(getTranslator("de"));
+  expect(getTranslator("en")).toBe(getTranslator("en"));
+  expect(getTranslator("de")).not.toBe(getTranslator("en"));
+  const values = { path: "Projekte/Kunden", total: 1250, unread: 3 };
+  for (const locale of ["de", "en"] as const) {
+    const fresh = createTranslator({ locale, messages: catalogs[locale], timeZone });
+    expect(getTranslator(locale)("List.folderCountTitle", values)).toBe(fresh("List.folderCountTitle", values));
+    expect(getTranslator(locale)("List.me")).toBe(fresh("List.me"));
+  }
+  expect(getTranslator("de")("List.me")).not.toBe(getTranslator("en")("List.me"));
 });
