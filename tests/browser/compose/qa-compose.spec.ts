@@ -45,8 +45,8 @@ async function signIn(page: Page, person?: {email:string;password:string;totpURI
   await page.reload();
   await expect(page.getByRole('button', {name:'Toggle sidebar',exact:true})).toBeVisible();
 }
-async function openCompose(page: Page) {
-  await page.getByRole('button', {name:'New mail',exact:true}).click();
+async function openCompose(page: Page, newMail = 'New mail') {
+  await page.getByRole('button', {name:newMail,exact:true}).click();
   await expect(page.getByLabel('Subject:',{exact:true})).toBeVisible();
   await expect(page.locator('[data-lexical-editor="true"]')).toBeVisible();
 }
@@ -315,7 +315,10 @@ for (const locale of ['de', 'en'] as const) {
     const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
     const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
     const headers={origin:new URL(page.url()).origin};
-    const copy=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8')).Compose;
+    const catalog=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8'));
+    const copy=catalog.Compose;
+    // Shell and reader chrome follow the UI language; compose field labels are not localized yet.
+    const chrome={toggleSidebar:catalog.Shell.sidebar.toggle as string,newMail:catalog.Shell.compose.new as string,drafts:catalog.Folders.drafts as string,editDraft:catalog.Reader.editDraft as string};
     expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:locale}})).status()).toBe(200);
     const longName='Synthetic Long Display Name NNNNNNNNNNNN';
     const longEmail=`${'a'.repeat(47)}@example.test`;
@@ -337,8 +340,8 @@ for (const locale of ['de', 'en'] as const) {
       expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:sender.id,signatureOverride:''}})).status()).toBe(200);
       await page.goto('/');
       await expect(page.locator('html')).toHaveAttribute('lang',locale);
-      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-      await openCompose(page);
+      await page.getByRole('button',{name:chrome.toggleSidebar,exact:true}).click();
+      await openCompose(page,chrome.newMail);
       await expect(page.getByLabel(copy.from,{exact:true})).toContainText(sender.email);
       subject=`Synthetic editor space ${locale} ${state} ${Date.now()}`;
       const saved=page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
@@ -350,10 +353,10 @@ for (const locale of ['de', 'en'] as const) {
     }
     async function reopen() {
       await page.goto('/');
-      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-      await page.getByRole('button',{name:/Drafts/}).first().click();
+      await page.getByRole('button',{name:chrome.toggleSidebar,exact:true}).click();
+      await page.getByRole('button',{name:new RegExp(chrome.drafts)}).first().click();
       await page.getByText(subject,{exact:true}).first().click();
-      await page.getByRole('button',{name:'Edit draft',exact:true}).click();
+      await page.getByRole('button',{name:chrome.editDraft,exact:true}).click();
       await expect(page.getByLabel('Subject:',{exact:true})).toHaveValue(subject);
     }
     async function matrix(sender:{email:string;displayName:string},state:string) {
