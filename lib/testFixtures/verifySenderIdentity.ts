@@ -1,5 +1,7 @@
 // A child process isolates wrapper mocks from the randomized suite's module graph.
 import assert from "node:assert/strict";
+import { createServer } from "node:net";
+import { once } from "node:events";
 import { mock } from "bun:test";
 import { simpleParser } from "mailparser";
 import { dbModulePromise } from "../testDbHarness";
@@ -156,6 +158,36 @@ try {
     sourceType: "email" as const, myAttendeeEmail: alias.email, createdAtMs: Date.now(), updatedAtMs: Date.now(), organizer: "Organizer <organizer@example.test>",
     rawIcs: ["BEGIN:VCALENDAR", "VERSION:2.0", "METHOD:REQUEST", "BEGIN:VEVENT", `UID:${eventId}`, "DTSTART:20261023T100000Z", "SUMMARY:Synthetic", "ORGANIZER:mailto:organizer@example.test", `ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:${alias.email}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n") };
   await api.upsertCalendarEvent(accountId, event);
+  // Real nodemailer CONN/EPROTOCOL failure, including the review's private greeting.
+  const protocolSink = createServer(socket => {
+    socket.on("error", () => {});
+    socket.end("554 5.7.1 synthetic-provider-private-detail\r\n");
+  });
+  protocolSink.listen(0, "127.0.0.1");
+  await once(protocolSink, "listening");
+  const protocolPort = (protocolSink.address() as { port: number }).port;
+  const workingSmtp = account.smtp;
+  try {
+    await api.upsertAccount({ ...account, smtp: { ...workingSmtp, port: protocolPort } });
+    for (const [name, run] of [
+      ["direct", () => direct(request({ ...outbound, identityId: alias.id }), params())],
+      ["draft", () => sendDraft(request({}), params({ draftId }))],
+      ["calendar", () => respond(request({ partstat: "ACCEPTED", identityId: alias.id }), params({ eventId }))]
+    ] as const) {
+      const before = [appendCalls, deleteCalls, sink.received.length];
+      const response = await run();
+      assert.equal(response.status, 502, await response.clone().text());
+      const body = await response.json();
+      assert.equal(body.code, "smtp_upstream_error");
+      assert.ok(!JSON.stringify(body).includes("synthetic-provider-private-detail"));
+      assert.deepEqual([appendCalls, deleteCalls, sink.received.length], before);
+      assert.ok(await api.getMessageById(accountId, draftId));
+      console.log(`PASS private SMTP greeting sanitized: ${name}`);
+    }
+  } finally {
+    await api.upsertAccount({ ...account, smtp: workingSmtp });
+    await new Promise<void>((resolve, reject) => protocolSink.close(error => error ? reject(error) : resolve()));
+  }
   for (const auth of [viewer, outsider]) {
     await rejected(() => direct(request({ ...outbound, identityId: alias.id }, auth), params()), 403);
     await rejected(() => save(request({ ...outbound, identityId: alias.id }, auth), params()), 403);

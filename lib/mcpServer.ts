@@ -1,3 +1,4 @@
+import { authorizeOutbound } from "./outboundAuthorization";
 import { resolveComposeIdentity } from "./senderIdentitySelection";
 import { createSenderIdentityWithRecompute, updateSenderIdentity, SenderIdentityError } from "./senderIdentities";
 import { getIdentityRecomputeJob } from "./threadRecomputeJobs";
@@ -842,7 +843,8 @@ async function createDraftMessage(
     accountId: context.accountId,
     clientId: `mcp:${context.tokenRecord.id}`,
     payload,
-    actor: mcpActor(context)
+    actor: mcpActor(context),
+    authorization: { tokenId: context.tokenRecord.id }
   });
 
   let message = result.message;
@@ -1171,7 +1173,8 @@ export async function executeMcpHttpRequest(params: {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => {
       const { accountId: _accountId, ...input } = args; void _accountId;
-      return buildToolResult("Sender identity created.", { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, mcpActor(ctx)) });
+      return buildToolResult("Sender identity created.", { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, { ...mcpActor(ctx),
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) });
     });
   });
   server.registerTool("update_sender_identity", {
@@ -1184,7 +1187,8 @@ export async function executeMcpHttpRequest(params: {
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => buildToolResult("Sender identity updated.", { ok: true,
-      identity: await updateSenderIdentity(ctx.accountId, args.identityId, args.patch, mcpActor(ctx)) }));
+      identity: await updateSenderIdentity(ctx.accountId, args.identityId, args.patch, { ...mcpActor(ctx),
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) }));
   });
   server.registerTool("get_sender_preferences", {
     description: "Read the token creator's own sender preferences for this mailbox.",
@@ -1203,7 +1207,11 @@ export async function executeMcpHttpRequest(params: {
       if (args.patch.defaultSignatureId && !ctx.account.settings?.signatures?.some(item => item.id === args.patch.defaultSignatureId)) {
         throw new SenderIdentityError("invalid_preferences", 400, "Choose a signature template from this mailbox");
       }
-      const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch);
+      if (args.patch.defaultIdentityId && !(await listSenderIdentities(ctx.accountId)).some(identity => identity.id === args.patch.defaultIdentityId && identity.enabled)) {
+        throw new InvalidAccountPreferencesError();
+      }
+      const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch,
+        () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", identity: args.patch.defaultIdentityId ?? undefined }));
       return buildToolResult("Sender preferences saved.", { ok: true, prefs: senderPrefs(prefs) });
     });
   });

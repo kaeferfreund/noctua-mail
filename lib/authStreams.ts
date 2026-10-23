@@ -16,7 +16,11 @@ const streams = globals[key] ??= new Set<Entry>();
 
 /** Delivery runs synchronously in the final DB snapshot; awaiting a check alone is unsafe. */
 export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliver?: (db: Database) => void): Promise<void> {
-  const db = await getDb();
+  assertStreamAuthorizedRow(await getDb(), identity, deliver);
+}
+
+/** Same policy for callers already holding a master write transaction. */
+export function assertStreamAuthorizedRow(db: Database, identity: AuthStreamIdentity, deliver?: (db: Database) => void): void {
   db.transaction(() => {
   const now = Date.now();
   const row = db.prepare(`SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s

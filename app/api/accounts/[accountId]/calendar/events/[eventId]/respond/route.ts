@@ -1,3 +1,4 @@
+import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { listSenderIdentities } from "@/lib/serverDb";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { resolveCalendarSenderIdentity } from "@/lib/calendarParticipation";
@@ -143,6 +144,8 @@ export async function POST(request: Request, { params }: Params) {
         attendeeEmail = reply.attendeeEmail;
         const threadHeaders = resolveCalendarReplyThreadHeaders(sourceMessage);
         const messageId = `<${randomUUID()}@${accountContext.account.email.split("@")[1] || "example.invalid"}>`;
+        const beforeSend = () => authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
+        await beforeSend();
         const result = await sendSmtpMessage(accountContext.account, {
           messageId,
           to: reply.to,
@@ -157,12 +160,13 @@ export async function POST(request: Request, { params }: Params) {
               content: Buffer.from(reply.ics, "utf8")
             }
           ]
-        }, identity);
+        }, identity, beforeSend);
 
         sentResult = await completeSend({ account: accountContext.account, raw: result.raw, messageId,
           actor: collabActorFromSession(accountContext.session, accountContext.clientId), clientId: accountContext.clientId, ...threadHeaders });
       }
 
+      if (!sendReply) await authorizeOutbound({ request }, { accountId, minRole: "editor" });
       let updatedEvent = event;
       if (effectiveScope === "series") {
         updatedEvent = {
@@ -224,6 +228,7 @@ export async function POST(request: Request, { params }: Params) {
     } catch (error) {
       if (sentResult) return NextResponse.json({ ok: true, identityId, ...sentResult,
         postSendWarning: "RSVP email sent, but saving local calendar participation failed. Do not send it again." });
+      if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
         accountId,

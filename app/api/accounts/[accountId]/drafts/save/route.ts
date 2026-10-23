@@ -1,3 +1,4 @@
+import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { saveDraftSchema } from "@/lib/draftSchemas";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { collabActorFromSession } from "@/lib/threadCollab";
@@ -28,6 +29,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     try {
       const result = await saveDraftForAccount({
         account,
+        authorization: { request },
         accountId: resolvedAccountId,
         clientId: clientId ?? "",
         payload,
@@ -35,6 +37,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       });
       return NextResponse.json({ ok: true, identityId: result.identityId, draftId: result.draftId, message: result.message });
     } catch (error) {
+      if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       if (error instanceof DraftSaveError) {
         return NextResponse.json(

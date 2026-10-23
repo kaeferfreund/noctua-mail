@@ -221,6 +221,21 @@ its token creator's current membership at every tool call. Mailbox owners, trans
 credentials, shared Sent location and `sent_by.userId` retain their existing meanings;
 `sent_by.userId` is the person pressing Send, including another person's shared draft.
 
+Authorization is repeated at the **final boundary**, immediately before the first
+SMTP connection/send, draft replacement/APPEND, calendar participation write, or
+MCP preference/identity write. The shared `lib/outboundAuthorization.ts` helper
+re-resolves session/token liveness, security generation, enabled user and current
+mailbox membership/minimum role. A selected sending/default identity must still be
+enabled in the same mailbox; a changed From/name/Reply-To configuration requires
+review (`draft_identity_changed`). MIME composition and module loading cannot reuse
+an earlier authorization decision: transports recheck after preparation. DB write
+retries repeat the check inside the write transaction. Revocation/downgrade returns the existing 401/403 shapes;
+identity invalidation returns 409, with zero outbound or mailbox mutations.
+Viewer remains sufficient for own MCP preferences; manager identity management can
+edit/re-enable disabled identities. Local-only RSVP (`sendReply:false`) also checks
+before its first calendar write. After SMTP acceptance, Sent persistence, `sent_by`
+and cleanup proceed independently of later revocation and retain success/warnings.
+
 - `POST /api/accounts/{accountId}/smtp/send` accepts optional `identityId` alongside
   its existing compose fields. `from` and `envelopeFrom` are rejected. Explicit IDs
   must belong to this mailbox and be enabled. Omission selects using the requester's
@@ -275,7 +290,8 @@ Tagged SMTP transport errors use the same mapper on direct/draft/calendar routes
 | 422 | `smtp_message_rejected` | Other permanent DATA/message rejection, with `smtpResponseCode`. |
 | 502 | `smtp_temporary_failure` | SMTP 4xx; retry later, with `smtpResponseCode`. |
 | 502 | `smtp_configuration_error` | SMTP authentication/configuration drift; a manager must review settings. |
-| 502 | `smtp_connection_failed` | Connection/TLS failure; existing contract. |
+| 502 | `smtp_connection_failed` | Connection/TLS/DNS/socket failure (`ECONNECTION`, `ESOCKET`, `EDNS`, `ETLS` and system connection errors). |
+| 502 | `smtp_upstream_error` | Protocol/greeting rejection (`EPROTOCOL`) and every otherwise unclassified tagged SMTP failure, including `EENVELOPE`/`EMESSAGE` without a classifiable response. Fixed sanitized message; no raw provider detail. |
 | 504 | `smtp_connection_timeout`, `smtp_greeting_timeout`, `smtp_server_timeout` | Existing timeout stages and delivery-uncertainty guidance. |
 
 Responses never expose raw provider transcripts, credentials or message bodies.

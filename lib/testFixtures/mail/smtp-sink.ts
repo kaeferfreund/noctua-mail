@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { options } from "./cli";
 import { demoPass, demoUser } from "./seed";
 export type ReceivedMail = { from: string; to: string[]; source: Buffer; file: string };
-export type SmtpOptions = { host?: string; port?: number; user?: string; pass?: string; out?: string; deliver?: (source: Buffer) => void | Promise<void>; rejectRecipient?: (address: string) => string | undefined };
+export type SmtpOptions = { onConnection?: () => void; host?: string; port?: number; user?: string; pass?: string; out?: string; deliver?: (source: Buffer) => void | Promise<void>; rejectRecipient?: (address: string) => string | undefined };
 export async function startSmtpSink(config: SmtpOptions = {}) {
   const user = config.user ?? demoUser;
   const pass = config.pass ?? demoPass;
@@ -15,6 +15,7 @@ export async function startSmtpSink(config: SmtpOptions = {}) {
   const received: ReceivedMail[] = [];
   const sockets = new Set<Socket>();
   const server = createServer(socket => {
+    config.onConnection?.();
     sockets.add(socket);
     let buffer = "";
     let authenticated = false;
