@@ -51,7 +51,7 @@ export default function manifest(): MetadataRoute.Manifest {
     protocol_handlers: [
       {
         protocol: "mailto",
-        url: "/?mailto=%s"
+        url: "/?c=%s"
       }
     ]
   };
