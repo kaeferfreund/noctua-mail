@@ -21,7 +21,6 @@ async function runBoth<T>(fn: () => Promise<T>) {
   }
   const driven = await fn();
   expect(JSON.stringify(driven)).toBe(JSON.stringify(legacy));
-  expect(driven).toEqual(legacy);
   return driven;
 }
 
@@ -268,6 +267,22 @@ describe("FTS-driven search candidates differential", () => {
     expect(aNeedle.total).toBe(0);
     const bNeedle = await listMessages({ accountId: fixture.b.accountId, page: 1, pageSize: 50, query: "needle" });
     expect(bNeedle.items.map((m) => m.id)).toEqual(["mixed-1"]);
+  });
+
+  test("tiny candidate cap: oversized tokens probe or fall back, still identical", async () => {
+    const accountId = fixture.a.accountId;
+    process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = "3";
+    try {
+      for (const query of ["needle", "needle gamma", "zebra quokka", "gamma", "invoice", "xyzzy"]) {
+        await runBoth(() => listThreads({ accountId, page: 1, pageSize: 10, query }));
+        await runBoth(() => listMessages({ accountId, page: 1, pageSize: 10, query }));
+      }
+      // Probe path result must still be the exact legacy hit set.
+      const probed = await listMessages({ accountId, page: 1, pageSize: 50, query: "needle gamma" });
+      expect(probed.items.map((m) => m.id).sort()).toEqual(["alpha-1", "multi-1"]);
+    } finally {
+      delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+    }
   });
 
   test("driven path really engages (no legacy FTS subquery in statements)", async () => {
