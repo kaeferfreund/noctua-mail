@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, mock, spyOn } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { useDeepLinks, type DeepLinkTransaction } from "./useDeepLinks";
-import { emptyDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
+import { emptyDeepLink, parseDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import type { MessageResolution } from "@/lib/navigation/resolveMessage";
 import { useMobileOverlayHistory } from "@/app/hooks/useMobileOverlayHistory";
 import type { Message } from "@/lib/data";
@@ -47,17 +47,17 @@ async function pop(url: string) {
   act(() => { window.history.replaceState({ noctuaUrl: true }, "", url); window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state })); });
   await act(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
 }
-it("restores initial legacy message, canonicalizes once, seeds list Back and preserves Next metadata", async () => {
-  window.history.replaceState({ __NA: true }, "", "/?accountId=a&messageId=%3Cone%40example.test%3E");
+it("restores initial RFC message, canonicalizes once, seeds list Back and preserves Next metadata", async () => {
+  window.history.replaceState({ __NA: true }, "", "/?a=~a&m=~%3Cone%40example.test%3E");
   const resolver = mock(async () => message);
   const pushes = spyOn(window.history, "pushState"); restores.push(() => pushes.mockRestore());
   const page = render(<Harness resolver={resolver} />); await settled();
-  await waitFor(() => expect(window.location.search).toContain("openMessageId=imap-one"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).messageId).toBe("imap-one"));
   expect(resolver).toHaveBeenCalledTimes(1); expect(pushes).toHaveBeenCalledTimes(1);
   expect(window.history.state.__NA).toBe(true);
   const back = spyOn(window.history, "back").mockImplementation(() => {}); restores.push(() => back.mockRestore());
   fireEvent.click(page.getByText("Back")); expect(back).toHaveBeenCalledTimes(1);
-  await pop("/?accountId=a&folderId=a%3AINBOX");
+  await pop("/?a=~a&f=INBOX");
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":""'));
 });
 it("writes user places once, replaces search typing and restores popstate without pushing", async () => {
@@ -67,28 +67,28 @@ it("writes user places once, replaces search typing and restores popstate withou
   fireEvent.click(page.getByText("Message")); expect(pushes).toHaveBeenCalledTimes(1);
   fireEvent.change(page.getByRole("textbox"), { target: { value: "typed" } });
   expect(window.location.search).toContain("q=typed"); expect(pushes).toHaveBeenCalledTimes(1); expect(replacements).toHaveBeenCalledTimes(1);
-  await pop("/?accountId=b&folderId=b%3AINBOX");
+  await pop("/?a=~b&f=INBOX");
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"accountId":"b"'));
   expect(pushes).toHaveBeenCalledTimes(1);
 });
 it("forbidden mailbox never resolves its message, missing messages finish on the folder", async () => {
-  window.history.replaceState(null, "", "/?accountId=secret&openMessageId=private");
+  window.history.replaceState(null, "", "/?a=~secret&m=~private");
   const resolver = mock(async () => null); const notice = mock(() => {});
   render(<Harness resolver={resolver} notice={notice} />); await settled();
   expect(resolver).not.toHaveBeenCalled(); expect(notice).toHaveBeenCalledWith("forbidden");
   expect(window.location.search).not.toContain("secret");
-  await pop("/?accountId=a&folderId=a%3AINBOX&openMessageId=deleted");
+  await pop("/?a=~a&f=INBOX&m=~deleted");
   await waitFor(() => expect(notice).toHaveBeenCalledWith("missing"));
-  await waitFor(() => expect(window.location.search).not.toContain("openMessageId"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).messageId).toBe(""));
 });
 it("cancels stale message loads when Back arrives; last account navigation wins A → B → A", async () => {
   let finishMessage: (value: Message) => void = () => {};
   const resolver = mock((_a: string, _id: string, _signal: AbortSignal) => new Promise<Message>(resolve => { finishMessage = resolve; }));
   const page = render(<Harness resolver={resolver} />); await settled();
-  await pop("/?accountId=a&openMessageId=imap-one");
+  await pop("/?a=~a&m=~imap-one");
   await waitFor(() => expect(resolver).toHaveBeenCalledTimes(1));
   const signal = resolver.mock.calls[0][2];
-  await pop("/?accountId=a");
+  await pop("/?a=~a");
   await act(async () => { finishMessage(message); });
   expect(signal.aborted).toBe(true);
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":""'));
@@ -97,41 +97,41 @@ it("cancels stale message loads when Back arrives; last account navigation wins 
   const next = render(<Harness switcher={id => { switchCalls.push(id); return id === "b" ? new Promise<void>(resolve => { finishSwitch = resolve; }) : Promise.resolve(); }} />);
   await settled(); await waitFor(() => expect(switchCalls).toContain("a"));
   fireEvent.click(next.getByText("Mailbox B")); await waitFor(() => expect(switchCalls).toContain("b"));
-  await pop("/?accountId=a"); await waitFor(() => expect(switchCalls.filter(id => id === "a").length).toBe(2));
+  await pop("/?a=~a"); await waitFor(() => expect(switchCalls.filter(id => id === "a").length).toBe(2));
   // The real account controller cancels the superseded switch; assert that URL
   // orchestration issued the cancelling reselect while B was still in flight.
-  expect(new URLSearchParams(window.location.search).get("accountId")).toBe("a");
+  expect(parseDeepLink(window.location.search).accountId).toBe("a");
   await act(async () => { finishSwitch(); });
   await waitFor(() => expect(next.getByTestId("state").textContent).toContain('"accountId":"a"'));
-  expect(window.location.search).not.toContain("accountId=b");
+  expect(parseDeepLink(window.location.search).accountId).not.toBe("b");
 });
 
 it("retains an expired-session destination until authentication resumes; network failure never reports missing", async () => {
-  window.history.replaceState(null, "", "/?accountId=a&openMessageId=imap-one");
+  window.history.replaceState(null, "", "/?a=~a&m=~imap-one");
   const expired = mock(() => {}); const notice = mock(() => {});
   const result = mock<() => Promise<MessageResolution>>(async () => ({ status: "unauthenticated" }));
   const page = render(<Harness resolution={result} expired={expired} notice={notice} />);
   await waitFor(() => expect(expired).toHaveBeenCalledTimes(1));
-  expect(window.location.search).toContain("openMessageId=imap-one"); expect(notice).not.toHaveBeenCalled();
+  expect(parseDeepLink(window.location.search).messageId).toBe("imap-one"); expect(notice).not.toHaveBeenCalled();
   result.mockImplementation(async () => ({ status: "ready", message }));
   fireEvent.click(page.getByText("Ready")); await settled();
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":"imap-one"'));
   result.mockImplementation(async () => { throw new TypeError("offline"); });
-  await pop("/?accountId=a&openMessageId=retry-message");
+  await pop("/?a=~a&m=~retry-message");
   await waitFor(() => expect(notice).toHaveBeenCalledWith("failed"));
   expect(notice).not.toHaveBeenCalledWith("missing");
-  expect(window.location.search).toContain("openMessageId=retry-message");
+  expect(parseDeepLink(window.location.search).messageId).toBe("retry-message");
 });
 it("shares the warm notification destination lifecycle, while transient overlays intercept Back before the reader", async () => {
   const page = render(<Harness resolver={async account => ({ ...message, accountId: account, folderId: `${account}:INBOX` })} />); await settled();
   fireEvent.click(page.getByText("Notification"));
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"accountId":"b"'));
-  await waitFor(() => expect(window.location.search).toContain("openMessageId=imap-one"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).messageId).toBe("imap-one"));
   fireEvent.click(page.getByText("Show overlay")); expect(page.getByTestId("overlay").textContent).toBe("true");
-  await pop("/?accountId=b&folderId=b%3AINBOX&openMessageId=imap-one");
+  await pop("/?a=~b&f=INBOX&m=~imap-one");
   expect(page.getByTestId("overlay").textContent).toBe("false");
   expect(page.getByTestId("state").textContent).toContain('"messageId":"imap-one"');
-  await pop("/?accountId=b&folderId=b%3AINBOX");
+  await pop("/?a=~b&f=INBOX");
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":""'));
 });
 
@@ -139,7 +139,7 @@ it("uses exactly one account entry followed by one message entry across real Bac
   const page = render(<Harness resolver={async account => ({ ...message, accountId: account })} />); await settled();
   const pushes = spyOn(window.history, "pushState"); restores.push(() => pushes.mockRestore());
   fireEvent.click(page.getByText("Mailbox B"));
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get("folderId")).toBe("b:INBOX"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("b:INBOX"));
   expect(pushes).toHaveBeenCalledTimes(1);
   fireEvent.click(page.getByText("Message")); expect(pushes).toHaveBeenCalledTimes(2);
   act(() => window.history.back());
@@ -158,10 +158,10 @@ it("waits for all adapter state slices before canonicalizing a mailbox switch", 
   const page = render(<Harness deferFolder />); await settled();
   const pushes = spyOn(window.history, "pushState"); restores.push(() => pushes.mockRestore());
   fireEvent.click(page.getByText("Mailbox B"));
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get("folderId")).toBe("b:INBOX"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("b:INBOX"));
   expect(pushes).toHaveBeenCalledTimes(1);
   act(() => window.history.back());
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get("accountId")).toBe("a"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).accountId).toBe("a"));
   expect(pushes).toHaveBeenCalledTimes(1);
 });
 
@@ -171,18 +171,18 @@ it("replaces a removed reader with its continuation so Back returns to the origi
   fireEvent.click(page.getByText("Message"));
   expect(pushes).toHaveBeenCalledTimes(1);
   fireEvent.click(page.getByText("Remove message"));
-  expect(new URLSearchParams(window.location.search).get("openMessageId")).toBe("imap-two");
+  expect(parseDeepLink(window.location.search).messageId).toBe("imap-two");
   expect(pushes).toHaveBeenCalledTimes(1);
   act(() => window.history.back());
   await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":""'));
-  expect(new URLSearchParams(window.location.search).get("folderId")).toBe("a:INBOX");
+  expect(parseDeepLink(window.location.search).folderId).toBe("a:INBOX");
 });
 
 it("publishes a folder picked in a sheet after its own Back has settled", async () => {
   const page = render(<Harness />); await settled();
   fireEvent.click(page.getByText("Show overlay"));
   fireEvent.click(page.getByText("Folder Sent"));
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get("folderId")).toBe("a:Sent"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("a:Sent"));
   expect(page.getByTestId("state").textContent).toContain('"folderId":"a:Sent"');
 });
 
@@ -190,7 +190,7 @@ it("settles a mailbox picked while its sidebar sheet closes with Back", async ()
   const page = render(<Harness />); await settled();
   fireEvent.click(page.getByText("Show overlay"));
   fireEvent.click(page.getByText("Mailbox B"));
-  await waitFor(() => expect(new URLSearchParams(window.location.search).get("folderId")).toBe("b:INBOX"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("b:INBOX"));
   expect(page.getByTestId("state").textContent).toContain('"accountId":"b"');
 });
 
@@ -203,7 +203,7 @@ it.each(["window", "document", "body", "input"] as const)("tracks navigation key
   fireEvent.keyDown(eventTarget, { key: "j" });
   // Simulate the reader's subsequent selection without a pointerdown resetting the keyboard flag.
   fireEvent.click(page.getByText("Next message"));
-  expect(new URLSearchParams(window.location.search).get("openMessageId")).toBe("imap-two");
+  expect(parseDeepLink(window.location.search).messageId).toBe("imap-two");
   expect(pushes).toHaveBeenCalledTimes(target === "input" ? 1 : 0);
   expect(replacements).toHaveBeenCalledTimes(target === "input" ? 0 : 1);
 });
@@ -221,7 +221,7 @@ it("gives each pushed entry its own id, keeps it on replace and reports transact
   expect(window.location.search).toContain("q=typed");
   expect(window.history.state.noctuaEntry).toBe(reader);
   events.length = 0;
-  act(() => { window.history.replaceState({ noctuaUrl: true, noctuaEntry: list }, "", "/?accountId=a&folderId=a%3AINBOX"); window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state })); });
+  act(() => { window.history.replaceState({ noctuaUrl: true, noctuaEntry: list }, "", "/?a=~a&f=INBOX"); window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state })); });
   await waitFor(() => expect(events.at(-1)?.phase).toBe("settled"));
   expect(events).toEqual([{ phase: "start", origin: "history", messageId: "" }, { phase: "settled", origin: "history", messageId: "" }]);
   expect(window.history.state.noctuaEntry).toBe(list);

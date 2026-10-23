@@ -2,6 +2,15 @@ const REMINDER_SYNC_TAG = "noctua-reminders";
 const REMINDER_META_CACHE = "noctua-reminder-meta-v1";
 const REMINDER_META_URL = "/__noctua/reminder-meta";
 
+// Same codec as lib/navigation/deepLinks.ts; kept standalone for this classic
+// (unbundled) worker. deepLinks.test.ts checks the worker against the serializer.
+function encodeDeepLinkId(id, prefix) {
+  const hex = id.match(new RegExp(`^${prefix}-([0-9a-f]{24})$`))?.[1];
+  if (!hex) return `~${id}`;
+  const bytes = hex.match(/../g).map(byte => String.fromCharCode(parseInt(byte, 16))).join("");
+  return btoa(bytes).replace(/\+/g, "-").replace(/\//g, "_");
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
@@ -144,11 +153,9 @@ async function processReminderNotifications(source) {
         bodyParts.push(reminder.eventLocation);
       }
       const params = new URLSearchParams();
-      if (reminder.accountId) {
-        params.set("accountId", reminder.accountId);
-      }
+      params.set("a", encodeDeepLinkId(reminder.accountId ?? accountId, "acc"));
       if (reminder.messageId) {
-        params.set("messageId", reminder.messageId);
+        params.set("m", encodeDeepLinkId(reminder.messageId, "imap"));
       }
       const query = params.toString();
       const targetUrl = query ? `/?${query}` : "/";
@@ -157,11 +164,7 @@ async function processReminderNotifications(source) {
         tag: `calendar-reminder-${reminder.id}`,
         icon: "/icon.png",
         badge: "/favicon.png",
-        data: {
-          url: targetUrl,
-          messageId: reminder.messageId,
-          accountId: reminder.accountId ?? accountId
-        }
+        data: { url: targetUrl }
       });
       delivered[reminder.id] = reminder.triggerAtMs;
       changed = true;
@@ -235,10 +238,7 @@ self.addEventListener("periodicsync", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = event.notification?.data?.url || "/";
-  const targetMessageId = event.notification?.data?.messageId || null;
   const target = new URL(targetUrl, self.location.origin);
-  const targetAccountId =
-    event.notification?.data?.accountId || target.searchParams.get("accountId") || null;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
       for (const client of clients) {
@@ -250,8 +250,6 @@ self.addEventListener("notificationclick", (event) => {
         if ("postMessage" in client) {
           client.postMessage({
             type: "noctua:notification-open",
-            messageId: targetMessageId,
-            accountId: targetAccountId,
             url: targetUrl
           });
         }
