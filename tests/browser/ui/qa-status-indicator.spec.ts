@@ -46,7 +46,9 @@ test.beforeAll(async ({ browser }) => {
   // seed deliberately begins without cached folders/messages.
   await page.goto("/");
   await expect(page.locator('#list [data-message-list-row]').first()).toBeVisible({ timeout: 120000 });
-  cookies = await context.cookies(); await context.close();
+  cookies = await context.cookies();
+  if (process.env.QA_STATUS_STORAGE_STATE) await context.storageState({ path: process.env.QA_STATUS_STORAGE_STATE });
+  await context.close();
 });
 test.beforeEach(async ({ page }) => {
   await page.context().addCookies(cookies);
@@ -223,6 +225,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     const harness = surface.locator(".fc-view-harness");
     await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
     const harnessHeight = await harness.evaluate(element => element.getBoundingClientRect().height);
+    await page.screenshot({ animations: "disabled", path: `${artifacts}/calendar-${width}.png` });
     const add = surface.locator(".fc-addEvent-button");
     await add.click();
     const create = page.getByRole("dialog", { name: "New Event", exact: true });
@@ -240,6 +243,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     const pickerLayer = await picker.locator("xpath=ancestor::*[contains(@class, 'rt-PopperContent')]").evaluate(element => Number(getComputedStyle(element).zIndex));
     expect(pickerLayer).toBeGreaterThan(dialogLayer);
     await page.keyboard.press("Escape");
+    await page.screenshot({ animations: "disabled", path: `${artifacts}/calendar-create-${width}.png` });
     await create.getByRole("button", { name: "Create", exact: true }).click();
     await expect(create).toHaveCount(0);
     await expect(add).toBeFocused();
@@ -252,7 +256,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     await edit.getByRole("button", { name: "Save", exact: true }).click();
     await expect(edit).toHaveCount(0);
     await expect(editButton).toBeFocused();
-    await expect(surface.getByText(`${summary} edited`, { exact: true })).toBeVisible();
+    await expect(surface.getByRole("heading", { name: `${summary} edited`, exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(surface).toHaveCount(0);
     await expect(page.locator('[data-status-indicator]')).toBeFocused();
