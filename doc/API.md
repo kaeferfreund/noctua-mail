@@ -236,3 +236,26 @@ A successful write also synchronizes the validated `noctua-ui-locale` cookie
 use this device cookie directly. Resolution is personal preference → device
 cookie → quality-weighted Accept-Language with regional variants → German.
 See [I18N.md](I18N.md) for message and formatting conventions.
+
+## Self-service auth JSON body limit
+
+The following endpoints accept at most **16 KiB (16,384 bytes)** of JSON body,
+including whitespace and UTF-8 encoding bytes (`AUTH_JSON_BODY_LIMIT` in
+`app/api/_helpers/readAuthJson.ts`):
+
+- `PUT /api/auth/preferences`
+- `POST /api/auth/switch-account`
+- `POST /api/auth/reauth`
+- `POST /api/auth/totp/replace`
+- `POST /api/auth/security/password`
+- `POST /api/auth/security/backup-codes`
+- `POST /api/auth/security/sessions/revoke`
+- `POST /api/auth/security/passkeys/rename`
+- `POST /api/auth/security/passkeys/remove`
+
+After the existing origin/media-type and session checks, oversized bodies return
+HTTP 413 `{ok:false,code:"payload_too_large"}` with `Cache-Control: no-store`
+and forwarded auth response headers. The shared reader bounds its JSON buffer
+and cancels the body stream when the limit is exceeded, including requests
+without Content-Length. Bodies exactly at the limit use the existing validation,
+proof and audit behaviour. Other endpoints retain their existing contracts.

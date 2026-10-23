@@ -1,3 +1,4 @@
+import { readAuthJson } from "@/app/api/_helpers/readAuthJson";
 import { NextResponse } from "next/server";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
@@ -10,7 +11,8 @@ export async function PUT(request: Request) {
   const session = await requireActiveUserSession(request);
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
-    const payload = await request.json().catch(() => null);
+    const payload = await readAuthJson(request).catch(() => null);
+    if (payload instanceof NextResponse) return payload;
     if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
       Object.keys(payload).length !== 1 || !("uiLocale" in payload) ||
       (payload.uiLocale !== null && !isUiLocale(payload.uiLocale))) {
