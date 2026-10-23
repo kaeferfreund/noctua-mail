@@ -5706,7 +5706,7 @@ export default function MailClient({
                   }}
                   isDone={hasDoneFlag(activeMessage)}
                   busy={pendingMessageActions.has(activeMessage.id)}
-                  menu={renderMessageMenu(activeMessage, "thread")}
+                  renderMenu={() => renderMessageMenu(activeMessage, "thread")}
                   openWindow={() => handleOpenInNewWindow(activeMessage)}
                   position={readerNavigation.position}
                   total={readerNavigation.total}
