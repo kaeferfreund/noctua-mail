@@ -356,8 +356,14 @@ export function useMessageData({
         if (prefetched) {
           load.controller.signal.addEventListener("abort", () => prefetched.controller.abort(), { once: true });
         }
-        const messagesRes = await (prefetched?.response ?? apiFetch(url, { signal: load.controller.signal }));
+        let messagesRes = await (prefetched?.response ?? apiFetch(url, { signal: load.controller.signal }));
         if (load.controller.signal.aborted) return;
+        // A cold mailbox's folders may not exist when the speculative read starts.
+        // Only successful prefetches replace the regular load after the switch commits.
+        if (prefetched && !messagesRes.ok) {
+          messagesRes = await apiFetch(url, { signal: load.controller.signal });
+          if (load.controller.signal.aborted) return;
+        }
         if (messagesRes.ok) {
           const data = (await messagesRes.json()) as {
             items: Message[];

@@ -135,6 +135,25 @@ describe("first page requested alongside a mailbox switch", () => {
     expect(h.errors).toEqual([]);
   });
 
+  it.each([false, true])("loads after the switch when the speculative inbox read fails (settled before commit: %s)", async settledBeforeCommit => {
+    const h = await loadedOnA();
+    act(() => { h.result.current.prefetchFirstPage("account-b"); });
+    const prefetched = h.pending("account-b")[0];
+    const missingFolder = () => Response.json({ code: "folder_account_mismatch" }, { status: 400 });
+    // The folder GET creates a cold mailbox's folders while its speculative list read runs.
+    if (settledBeforeCommit) await h.release(prefetched, missingFolder());
+    h.rerender({ accountId: "account-b" });
+    if (!settledBeforeCommit) await h.release(prefetched, missingFolder());
+    await waitFor(() => expect(h.pending("account-b")).toHaveLength(1));
+    const committedRead = h.pending("account-b")[0];
+    expect(committedRead).not.toBe(prefetched);
+    expect(folderParam(committedRead)).toBe("account-b:INBOX");
+    await h.release(committedRead, page("account-b", 1, false));
+    await waitFor(() => expect(h.result.current.messages.map(message => message.id)).toEqual(["account-b-m1", "account-b-m2"]));
+    expect(h.result.current.messageListError).toBeNull();
+    expect(h.errors).toEqual([]);
+  });
+
   it("is never shown under the current mailbox and is aborted when the next view asks for another URL", async () => {
     const h = await loadedOnA();
     act(() => { h.result.current.prefetchFirstPage("account-b"); });
