@@ -131,10 +131,9 @@ export const renderSourcePanel = (
 
 export const renderMarkdownPanel = (
   body: string | undefined,
-  messageId: string,
-  messageFontScale: Record<string, number>
+  fontScale: number
 ) => (
-  <MarkdownPanel body={body} fontScale={messageFontScale[messageId] ?? 1} />
+  <MarkdownPanel body={body} fontScale={fontScale} />
 );
 
 export const folderSpecialIcon = (folder: Folder) => {
