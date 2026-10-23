@@ -1,5 +1,6 @@
 import type { Message } from "@/lib/data";
 import type { ListItem } from "@/app/components/mailclient/messagelist/listModel";
+import { isTooltipEscape } from "@/lib/ui/tooltipEscape";
 
 export type ReaderLayout = "split" | "focus";
 export const READER_LAYOUT_KEY = "noctua:readerLayout";
@@ -33,7 +34,7 @@ export function readerNavigation(rows: Message[], id: string, direction: -1 | 1,
   return rows[index + direction] ?? (direction === 1 && hasMore ? "load" : null);
 }
 export function readerShortcut(event: KeyboardEvent): "back" | "toggle" | "next" | "previous" | null {
-  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return null;
+  if ((event.defaultPrevented && !isTooltipEscape(event)) || event.ctrlKey || event.metaKey || event.altKey) return null;
   const target = event.target;
   if (target instanceof HTMLElement && target.isContentEditable) return null;
   if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]')) return null;
