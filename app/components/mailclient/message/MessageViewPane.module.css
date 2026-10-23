@@ -82,7 +82,10 @@
 
 @media print {
   :global(body:has([data-reader-print]) *) { visibility: hidden; }
-  :global([data-reader-print]), :global([data-reader-print] *) { visibility: visible !important; }
+  /* Only mail headers/content opt into print. Prune unrelated subtrees so
+     private drafts and collaboration UI cannot leave content or blank pages. */
+  :global([data-mail-print]), :global([data-mail-print] *) { visibility: visible !important; }
+  :global([data-reader-print] *:not([data-mail-print]):not([data-mail-print] *):not(:has([data-mail-print]))) { display: none !important; }
   :global(body:has([data-reader-print])), :global(body:has([data-reader-print]) [data-shell]),
   :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
   :global(body:has([data-reader-print]) [data-group]),
