@@ -5,7 +5,7 @@
       "german": "Deutsch",
       "english": "English",
       "automatic": "Automatisch",
-      "saving": "Sprache wird gespeichert…",
+      "saving": "Sprache wird gespeichert …",
       "error": "Die Sprache konnte nicht gespeichert werden. Bitte erneut versuchen."
     },
     "members": {
@@ -25,7 +25,7 @@
       "remove": "Entfernen",
       "find": "Benutzer finden",
       "search": "Benutzer suchen",
-      "searchHelp": "Bis zu 100 aktivierte Benutzer ohne Mitgliedschaft. Suche nach Name oder E-Mail.",
+      "searchHelp": "Bis zu 100 aktivierte Benutzer ohne Mitgliedschaft. Suche nach Namen oder E-Mail-Adressen.",
       "addEnabled": "Vorhandenen aktivierten Benutzer hinzufügen",
       "choose": "Benutzer auswählen",
       "newRole": "Rolle des neuen Mitglieds",
@@ -65,13 +65,13 @@
         "card": "Karten",
         "table": "Tabelle",
         "compact": "Kompakt",
-        "locale": "Systemsprache"
+        "locale": "Regionales Systemformat"
       }
     },
     "roles": {
-      "viewer": "Lesen",
-      "editor": "Bearbeiten",
-      "manager": "Verwalten"
+      "viewer": "Leser",
+      "editor": "Bearbeiter",
+      "manager": "Verwalter"
     }
   },
   "Pwa": {
@@ -116,7 +116,7 @@
     "drafts": "Entwürfe",
     "mailboxes": {
       "mine": "Meine Postfächer",
-      "shared": "Geteilte Postfächer",
+      "shared": "Gemeinsame Postfächer",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
       "unreadUnavailable": "Anzahl ungelesener E-Mails nicht verfügbar",
@@ -176,7 +176,7 @@
       "attachments": "Anhänge",
       "newsletter": "📰 Newsletter",
       "notification": "🔔 Benachrichtigungen",
-      "transactional": "🧾 Transaktionen",
+      "transactional": "🧾 Transaktions-E-Mails",
       "ai-modified": "KI-bearbeitet"
     },
     "categories": "Kategorien",
@@ -209,7 +209,7 @@
       "copyFailed": "Kopieren nicht möglich. Sichere die Codes manuell oder lade sie herunter.",
       "copy": "Codes kopieren",
       "download": "Codes herunterladen",
-      "saved": "Ich habe meine Ersatzcodes gesichert"
+      "saved": "Ersatzcodes gesichert"
     },
     "login": {
       "signupTitle": "Konto erstellen",
@@ -222,9 +222,9 @@
       "create": "Konto erstellen",
       "signIn": "Anmelden",
       "passkey": "Mit Passkey anmelden",
-      "useMailboxPassword": "Mein persönliches Postfach-Passwort verwenden",
+      "useMailboxPassword": "Postfach-Passwort verwenden",
       "useAppPassword": "Mein App-Passwort verwenden",
-      "invite": "Mit Einladungscode registrieren"
+      "invite": "Mit Einladung registrieren"
     },
     "inviteCode": "Einladungscode",
     "email": "E-Mail",
@@ -244,14 +244,14 @@
       "ready": "Authenticator bereit",
       "saveCodes": "Ersatzcodes sichern",
       "title": "Authenticator einrichten",
-      "help": "Ein Authenticator schützt dein Konto und ist erforderlich. Nach der Einrichtung kannst du deine Postfächer öffnen.",
+      "help": "Eine Authenticator-App ist zum Schutz deines Kontos erforderlich. Nach der Einrichtung kannst du deine Postfächer öffnen.",
       "restartHelp": "Wurde die Einrichtung unterbrochen oder die Seite neu geladen, bestätige deine Identität erneut und beginne von vorn.",
       "start": "Einrichtung starten",
       "scanHelp": "Scanne diesen QR-Code mit deinem Authenticator oder gib den Einrichtungsschlüssel manuell ein.",
       "qrAlt": "QR-Code zur Authenticator-Einrichtung",
       "secret": "Einrichtungsschlüssel",
       "verify": "Authenticator bestätigen",
-      "restart": "Identität erneut bestätigen und neu beginnen",
+      "restart": "Einrichtung neu starten",
       "passkeyHelp": "Du kannst auch einen Passkey mit deiner Geräte-PIN, deinem Fingerabdruck oder deiner Gesichtserkennung hinzufügen.",
       "addPasskey": "Passkey hinzufügen",
       "continue": "Weiter zu Noctua",
@@ -269,7 +269,7 @@
     "security": {
       "title": "Profil & Sicherheit",
       "help": "Deine Sicherheitseinstellungen gelten für dein persönliches Konto in allen Postfächern.",
-      "retry": "Sicherheitseinstellungen erneut laden",
+      "retry": "Erneut laden",
       "loading": "Sicherheitseinstellungen werden geladen …",
       "reauthHelp": "Melde dich erneut an, um die Prüfung abzuschließen. Wenn dein Authenticator wiederhergestellt werden muss, wende dich an deine Administration.",
       "passwordChanged": "Passwort geändert. Andere Sitzungen wurden abgemeldet.",
@@ -308,7 +308,7 @@
       "help": "Bestätige deine Identität erneut für diese Änderung. Die Bestätigung gilt nur einmal.",
       "incomplete": "Identitätsprüfung unvollständig",
       "passkey": "Mit Passkey bestätigen",
-      "unusedCode": "Unbenutzten Ersatzcode verwenden",
+      "unusedCode": "Mit unbenutztem Ersatzcode",
       "backupHelp": "Verwende einen anderen Code als bei der Anmeldung. Dieser Code wird beim Austausch verbraucht.",
       "loginAgain": "Erneut anmelden",
       "continue": "Bestätigen und weiter"
@@ -371,8 +371,8 @@
       "label": "Thread-Status",
       "open": "Offen",
       "in_progress": "In Bearbeitung",
-      "waiting": "Wartend",
-      "closed": "Abgeschlossen"
+      "waiting": "Wartet",
+      "closed": "Erledigt"
     },
     "note": {
       "saveFailed": "Die Notiz konnte nicht gespeichert werden. Dein Text bleibt erhalten.",
@@ -385,9 +385,9 @@
       "delete": "Löschen"
     },
     "activity": {
-      "region": "Interne Notizen und Aktivitäten",
-      "title": "Notizen & Aktivitäten",
-      "empty": "Noch keine Aktivitäten.",
+      "region": "Interne Notizen und Verlauf",
+      "title": "Notizen & Verlauf",
+      "empty": "Noch keine Einträge im Verlauf.",
       "system": "System",
       "assigned": "Zugewiesen an {name}",
       "unassigned": "Zuweisung entfernt",
@@ -396,7 +396,7 @@
       "reply": "Antwort gesendet",
       "noteDeleted": "Interne Notiz gelöscht",
       "noteEdited": "Interne Notiz bearbeitet",
-      "updated": "Unterhaltung aktualisiert"
+      "updated": "Thread aktualisiert"
     },
     "time": {
       "justNow": "gerade eben",
@@ -464,7 +464,7 @@
       "totp": "TOTP: {value}",
       "passkeys": "Passkeys: {value}",
       "roleFor": "Rolle für {email}",
-      "reassign": "Eigene Postfächer übertragen an",
+      "reassign": "Postfächer dieses Benutzers übertragen an",
       "chooseEnabled": "Aktivierten Benutzer auswählen",
       "verified": "Ich habe die Identität dieser Person außerhalb der App geprüft. Links zur Wiederherstellung werden persönlich übergeben, niemals per E-Mail.",
       "passkey": "Passkey",
@@ -522,9 +522,9 @@
     "roles": {
       "user": "Benutzer",
       "admin": "Administrator",
-      "viewer": "Lesen",
-      "editor": "Bearbeiten",
-      "manager": "Verwalten"
+      "viewer": "Leser",
+      "editor": "Bearbeiter",
+      "manager": "Verwalter"
     },
     "errors": {
       "lastAdmin": "Der letzte aktivierte Administrator kann nicht geändert werden.",
@@ -535,7 +535,7 @@
       "selfRole": "Du kannst deine eigene Rolle nicht ändern.",
       "targetDisabled": "Wähle einen aktivierten Benutzer mit abgeschlossener Einrichtung.",
       "targetMissing": "Dieser Benutzer existiert nicht mehr. Aktualisiere die Benutzerliste.",
-      "aboveManager": "Wähle für den Postfachzugriff Lesen, Bearbeiten oder Verwalten.",
+      "aboveManager": "Wähle für den Postfachzugriff die Rolle Leser, Bearbeiter oder Verwalter.",
       "notMember": "Dieser Benutzer ist kein Postfachmitglied mehr. Aktualisiere die Mitgliederliste.",
       "lastManager": "Die letzte aktivierte Person mit Verwaltungsrechten kann nicht entfernt oder herabgestuft werden.",
       "reauth": "Bestätige deine Identität erneut für diese Aktion.",
