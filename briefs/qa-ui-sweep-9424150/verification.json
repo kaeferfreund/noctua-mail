@@ -1,0 +1,64 @@
+{
+  "verification": {
+    "QA-001": "FIXED",
+    "QA-002": "FIXED",
+    "QA-003": "FIXED",
+    "QA-004": "FIXED",
+    "QA-005": "FIXED",
+    "QA-006": "FIXED",
+    "QA-007": "FIXED",
+    "QA-008": "FIXED",
+    "QA-009": "FIXED",
+    "QA-010": "FIXED",
+    "QA-011": "FIXED",
+    "QA-012": "FIXED",
+    "QA-013": "FIXED",
+    "QA-014": "FIXED"
+  },
+  "verification_scope": "Original exact reproduction cases; related expanded failures are QA-101 and QA-102.",
+  "new_findings_counts": {
+    "P1": 0,
+    "P2": 2,
+    "P3": 1
+  },
+  "top5": [
+    {
+      "id": "QA-103",
+      "priority": "P2",
+      "title": "Translation tab replaces mail UI with page error"
+    },
+    {
+      "id": "QA-101",
+      "priority": "P2",
+      "title": "Mark as read decrements visible folder counts twice"
+    },
+    {
+      "id": "QA-102",
+      "priority": "P3",
+      "title": "Nested mailbox form loses unsent state at mobile breakpoint"
+    }
+  ],
+  "paths": {
+    "report": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150.md",
+    "screenshots": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/",
+    "evidence": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/evidence.json",
+    "machine_readable": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/verification.json"
+  },
+  "artifacts": {
+    "png_count": 56,
+    "max_png_bytes": 267762,
+    "png_crc_validated": true
+  },
+  "worktree": {
+    "path": "/home/monkey/code/noctua-mail/wt-qa-sweep2",
+    "commit": "9424150f5aa0a446ed9bc03ed199e6825129467d",
+    "branch": "qa/ui-sweep-9424150",
+    "clean": true
+  },
+  "cleanup": {
+    "scratch_removed": true,
+    "owned_processes_stopped": true,
+    "assigned_ports_free": true
+  },
+  "finished_at": "2026-10-23T04:19:49.848627+00:00"
+}

@@ -1,0 +1,3686 @@
+[
+  {
+    "id": "locale-login",
+    "time": "2026-10-23T03:53:31.420Z",
+    "states": [
+      {
+        "language": "de",
+        "email": "alex@example.test",
+        "passwordPreserved": true
+      },
+      {
+        "language": "en",
+        "email": "alex@example.test",
+        "passwordPreserved": true
+      }
+    ]
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:31.698Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "login-1440-light.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:31.918Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "login-1440-dark.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:32.158Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "login-1280-light.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:32.323Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "login-1280-dark.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:32.709Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "login-834-light.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:33.047Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "login-834-dark.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:33.303Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "login-390-light.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:33.488Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "login-390-dark.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:33.656Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "login-360-light.png"
+  },
+  {
+    "id": "login-matrix",
+    "time": "2026-10-23T03:53:33.893Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "login-360-dark.png"
+  },
+  {
+    "id": "login",
+    "time": "2026-10-23T03:53:36.493Z",
+    "keyboard": true,
+    "me": 200
+  },
+  {
+    "id": "QA-006-initial",
+    "time": "2026-10-23T03:54:00.426Z",
+    "folders": [
+      {
+        "id": "qa-shared:INBOX",
+        "name": "INBOX",
+        "accountId": "qa-shared",
+        "count": 300,
+        "specialUse": "\\Inbox",
+        "flags": [
+          "\\HasNoChildren"
+        ],
+        "delimiter": "/",
+        "unreadCount": 110
+      },
+      {
+        "id": "qa-shared:Sent",
+        "name": "Sent",
+        "accountId": "qa-shared",
+        "count": 0,
+        "specialUse": "\\Sent",
+        "flags": [
+          "\\HasNoChildren",
+          "\\Sent"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Drafts",
+        "name": "Drafts",
+        "accountId": "qa-shared",
+        "count": 0,
+        "specialUse": "\\Drafts",
+        "flags": [
+          "\\HasNoChildren",
+          "\\Drafts"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Archive",
+        "name": "Archive",
+        "accountId": "qa-shared",
+        "count": 0,
+        "specialUse": "\\Archive",
+        "flags": [
+          "\\HasNoChildren",
+          "\\Archive"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Junk",
+        "name": "Junk",
+        "accountId": "qa-shared",
+        "count": 0,
+        "specialUse": "\\Junk",
+        "flags": [
+          "\\HasNoChildren",
+          "\\Junk"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Trash",
+        "name": "Trash",
+        "accountId": "qa-shared",
+        "count": 0,
+        "specialUse": "\\Trash",
+        "flags": [
+          "\\HasNoChildren",
+          "\\Trash"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Projekte",
+        "name": "Projekte",
+        "accountId": "qa-shared",
+        "count": 0,
+        "flags": [
+          "\\HasChildren"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      },
+      {
+        "id": "qa-shared:Projekte/Website",
+        "name": "Website",
+        "parentId": "qa-shared:Projekte",
+        "accountId": "qa-shared",
+        "count": 0,
+        "flags": [
+          "\\HasNoChildren"
+        ],
+        "delimiter": "/",
+        "unreadCount": 0
+      }
+    ],
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792727640294,
+      "mailboxes": [
+        {
+          "accountId": "qa-private",
+          "name": "QA Private",
+          "email": "private@example.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 110,
+          "assignedToMe": 0,
+          "unassignedOpen": 252,
+          "open": 252,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792727617328
+          }
+        },
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 110,
+          "assignedToMe": 0,
+          "unassignedOpen": 252,
+          "open": 252,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792727618956
+          }
+        }
+      ]
+    },
+    "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n110\n0\n252\nQS\nQA Shared\n110\n0\n252\nViews\nInbox\n110\nAssigned to me\nUnassigned\n252\nOpen\n252\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n110\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test",
+    "screenshot": "unread-initial-1440-dark.png"
+  },
+  {
+    "id": "QA-001",
+    "time": "2026-10-23T03:54:11.401Z",
+    "run": 0,
+    "initial": "QA keyboard fixture delivery",
+    "retry": "QA keyboard fixture delivery",
+    "saved": "QA keyboard fixture delivery",
+    "payloadSubject": "QA keyboard fixture delivery",
+    "status": 200,
+    "smtpFiles": 1,
+    "smtpExact": true
+  },
+  {
+    "id": "QA-001",
+    "time": "2026-10-23T03:54:18.670Z",
+    "run": 1,
+    "initial": "QA keyboard fixture delivery",
+    "retry": "QA keyboard fixture delivery",
+    "saved": "QA keyboard fixture delivery",
+    "payloadSubject": "QA keyboard fixture delivery",
+    "status": 200,
+    "smtpFiles": 1,
+    "smtpExact": true
+  },
+  {
+    "id": "QA-001",
+    "time": "2026-10-23T03:54:25.516Z",
+    "run": 2,
+    "initial": "QA keyboard fixture delivery",
+    "retry": "QA keyboard fixture delivery",
+    "saved": "QA keyboard fixture delivery",
+    "payloadSubject": "QA keyboard fixture delivery",
+    "status": 200,
+    "smtpFiles": 1,
+    "smtpExact": true
+  },
+  {
+    "id": "QA-001",
+    "time": "2026-10-23T03:54:32.432Z",
+    "run": 3,
+    "initial": "QA keyboard fixture delivery",
+    "retry": "QA keyboard fixture delivery",
+    "saved": "QA keyboard fixture delivery",
+    "payloadSubject": "QA keyboard fixture delivery",
+    "status": 200,
+    "smtpFiles": 1,
+    "smtpExact": true
+  },
+  {
+    "id": "QA-001",
+    "time": "2026-10-23T03:54:39.171Z",
+    "run": 4,
+    "initial": "QA keyboard fixture delivery",
+    "retry": "QA keyboard fixture delivery",
+    "saved": "QA keyboard fixture delivery",
+    "payloadSubject": "QA keyboard fixture delivery",
+    "status": 200,
+    "smtpFiles": 1,
+    "smtpExact": true
+  },
+  {
+    "id": "QA-002",
+    "time": "2026-10-23T03:54:43.580Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "send": {
+      "x": 288.734375,
+      "y": 724,
+      "width": 59.265625,
+      "height": 44
+    },
+    "hit": true,
+    "footer": {
+      "width": 336,
+      "scrollWidth": 336
+    },
+    "screenshot": "compose-360-light.png"
+  },
+  {
+    "id": "QA-007-compose",
+    "time": "2026-10-23T03:54:43.589Z",
+    "width": 360,
+    "theme": "light",
+    "labels": [
+      {
+        "type": "text",
+        "placeholder": "",
+        "labels": [
+          "From:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "recipient@example.com",
+        "labels": [
+          "To:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "Subject",
+        "labels": [
+          "Subject:"
+        ],
+        "aria": null
+      }
+    ]
+  },
+  {
+    "id": "QA-002",
+    "time": "2026-10-23T03:54:47.980Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "send": {
+      "x": 288.734375,
+      "y": 724,
+      "width": 59.265625,
+      "height": 44
+    },
+    "hit": true,
+    "footer": {
+      "width": 336,
+      "scrollWidth": 336
+    },
+    "screenshot": "compose-360-dark.png"
+  },
+  {
+    "id": "QA-007-compose",
+    "time": "2026-10-23T03:54:47.986Z",
+    "width": 360,
+    "theme": "dark",
+    "labels": [
+      {
+        "type": "text",
+        "placeholder": "",
+        "labels": [
+          "From:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "recipient@example.com",
+        "labels": [
+          "To:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "Subject",
+        "labels": [
+          "Subject:"
+        ],
+        "aria": null
+      }
+    ]
+  },
+  {
+    "id": "QA-002",
+    "time": "2026-10-23T03:54:52.447Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "send": {
+      "x": 318.734375,
+      "y": 788,
+      "width": 59.265625,
+      "height": 44
+    },
+    "hit": true,
+    "footer": {
+      "width": 366,
+      "scrollWidth": 366
+    },
+    "screenshot": "compose-390-light.png"
+  },
+  {
+    "id": "QA-007-compose",
+    "time": "2026-10-23T03:54:52.454Z",
+    "width": 390,
+    "theme": "light",
+    "labels": [
+      {
+        "type": "text",
+        "placeholder": "",
+        "labels": [
+          "From:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "recipient@example.com",
+        "labels": [
+          "To:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "Subject",
+        "labels": [
+          "Subject:"
+        ],
+        "aria": null
+      }
+    ]
+  },
+  {
+    "id": "QA-002",
+    "time": "2026-10-23T03:54:56.900Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "send": {
+      "x": 318.734375,
+      "y": 788,
+      "width": 59.265625,
+      "height": 44
+    },
+    "hit": true,
+    "footer": {
+      "width": 366,
+      "scrollWidth": 366
+    },
+    "screenshot": "compose-390-dark.png"
+  },
+  {
+    "id": "QA-007-compose",
+    "time": "2026-10-23T03:54:56.908Z",
+    "width": 390,
+    "theme": "dark",
+    "labels": [
+      {
+        "type": "text",
+        "placeholder": "",
+        "labels": [
+          "From:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "recipient@example.com",
+        "labels": [
+          "To:"
+        ],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "placeholder": "Subject",
+        "labels": [
+          "Subject:"
+        ],
+        "aria": null
+      }
+    ]
+  },
+  {
+    "id": "QA-003",
+    "time": "2026-10-23T03:55:40.267Z",
+    "status": 201,
+    "postCount": 1,
+    "payload": {
+      "label": "Synthetic QA token",
+      "ttlSeconds": 15552000
+    },
+    "ttlSeconds": 15552000,
+    "secretVisible": true,
+    "secretAfterReopen": 0,
+    "metadataVisible": true,
+    "error": 0,
+    "screenshot": "mcp-metadata-1440-dark.png"
+  },
+  {
+    "id": "QA-009",
+    "time": "2026-10-23T03:55:40.928Z",
+    "remainingDialogs": 0,
+    "focus": "User menu"
+  },
+  {
+    "id": "QA-004",
+    "time": "2026-10-23T03:55:44.594Z",
+    "hit": true,
+    "memberLayer": "9996",
+    "confirmLayer": "9997",
+    "pointerAdd": true,
+    "pointerRoleChange": true,
+    "confirmDismissed": true,
+    "roleFocus": false,
+    "memberDismissed": true,
+    "manageFocus": false,
+    "userConfirmCancelled": true
+  },
+  {
+    "id": "QA-007-mailbox",
+    "time": "2026-10-23T03:55:45.030Z",
+    "nameLocator": 1,
+    "inputs": [
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "number",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "password",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "number",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "text",
+        "labels": [],
+        "aria": null
+      },
+      {
+        "type": "password",
+        "labels": [],
+        "aria": null
+      }
+    ],
+    "screenshot": "mailbox-dialog-1440-dark.png"
+  },
+  {
+    "id": "QA-014",
+    "time": "2026-10-23T03:55:47.803Z",
+    "before": 1,
+    "after": 1,
+    "nameAfter": "Synthetic unsent invite",
+    "nameReturned": "Synthetic unsent invite"
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:16.158Z",
+    "theme": "light",
+    "status": "Open",
+    "fg": "rgb(100, 100, 100)",
+    "bg": "rgb(240, 240, 240)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 5.192623781694192
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:17.010Z",
+    "theme": "light",
+    "status": "In progress",
+    "fg": "rgb(87, 83, 198)",
+    "bg": "rgb(240, 241, 254)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 5.4130593017836075
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:18.036Z",
+    "theme": "light",
+    "status": "Waiting",
+    "fg": "rgb(79, 52, 34)",
+    "bg": "rgb(255, 247, 194)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 10.469924649745249
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:19.208Z",
+    "theme": "light",
+    "status": "Closed",
+    "fg": "rgb(25, 59, 45)",
+    "bg": "rgb(230, 246, 235)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 10.996243944234957
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:21.174Z",
+    "theme": "dark",
+    "status": "Open",
+    "fg": "rgb(180, 180, 180)",
+    "bg": "rgb(34, 34, 34)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 7.673325233217725
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:22.631Z",
+    "theme": "dark",
+    "status": "In progress",
+    "fg": "rgb(177, 169, 255)",
+    "bg": "rgb(32, 34, 72)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 7.218235162669999
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:23.832Z",
+    "theme": "dark",
+    "status": "Waiting",
+    "fg": "rgb(255, 231, 179)",
+    "bg": "rgb(48, 32, 8)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 12.976098416721003
+  },
+  {
+    "id": "QA-010",
+    "time": "2026-10-23T03:56:25.516Z",
+    "theme": "dark",
+    "status": "Closed",
+    "fg": "rgb(177, 241, 203)",
+    "bg": "rgb(19, 45, 33)",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "ratio": 11.448311482977646
+  },
+  {
+    "id": "QA-005",
+    "time": "2026-10-23T03:56:28.527Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "clamp": "3",
+    "collapsed": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 360,
+        "height": 312,
+        "top": 92,
+        "right": 360,
+        "bottom": 404,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 404,
+        "width": 360,
+        "height": 376,
+        "top": 404,
+        "right": 360,
+        "bottom": 780,
+        "left": 0
+      },
+      "scrollHeight": 321,
+      "clientHeight": 311,
+      "viewport": 780
+    },
+    "expanded": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 360,
+        "height": 312,
+        "top": 92,
+        "right": 360,
+        "bottom": 404,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 404,
+        "width": 360,
+        "height": 376,
+        "top": 404,
+        "right": 360,
+        "bottom": 780,
+        "left": 0
+      },
+      "scrollHeight": 567,
+      "clientHeight": 311,
+      "viewport": 780
+    }
+  },
+  {
+    "id": "QA-005",
+    "time": "2026-10-23T03:56:29.142Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "clamp": "3",
+    "collapsed": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 360,
+        "height": 312,
+        "top": 92,
+        "right": 360,
+        "bottom": 404,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 404,
+        "width": 360,
+        "height": 376,
+        "top": 404,
+        "right": 360,
+        "bottom": 780,
+        "left": 0
+      },
+      "scrollHeight": 321,
+      "clientHeight": 311,
+      "viewport": 780
+    },
+    "expanded": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 360,
+        "height": 312,
+        "top": 92,
+        "right": 360,
+        "bottom": 404,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 404,
+        "width": 360,
+        "height": 376,
+        "top": 404,
+        "right": 360,
+        "bottom": 780,
+        "left": 0
+      },
+      "scrollHeight": 567,
+      "clientHeight": 311,
+      "viewport": 780
+    }
+  },
+  {
+    "id": "QA-005",
+    "time": "2026-10-23T03:56:29.836Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "clamp": "3",
+    "collapsed": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 390,
+        "height": 322.171875,
+        "top": 92,
+        "right": 390,
+        "bottom": 414.171875,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 414.171875,
+        "width": 390,
+        "height": 429.828125,
+        "top": 414.171875,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "scrollHeight": 321,
+      "clientHeight": 321,
+      "viewport": 844
+    },
+    "expanded": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 390,
+        "height": 337.59375,
+        "top": 92,
+        "right": 390,
+        "bottom": 429.59375,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 429.59375,
+        "width": 390,
+        "height": 414.40625,
+        "top": 429.59375,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "scrollHeight": 545,
+      "clientHeight": 337,
+      "viewport": 844
+    }
+  },
+  {
+    "id": "QA-005",
+    "time": "2026-10-23T03:56:30.461Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "clamp": "3",
+    "collapsed": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 390,
+        "height": 322.171875,
+        "top": 92,
+        "right": 390,
+        "bottom": 414.171875,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 414.171875,
+        "width": 390,
+        "height": 429.828125,
+        "top": 414.171875,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "scrollHeight": 321,
+      "clientHeight": 321,
+      "viewport": 844
+    },
+    "expanded": {
+      "header": {
+        "x": 0,
+        "y": 92,
+        "width": 390,
+        "height": 337.59375,
+        "top": 92,
+        "right": 390,
+        "bottom": 429.59375,
+        "left": 0
+      },
+      "message": {
+        "x": 0,
+        "y": 429.59375,
+        "width": 390,
+        "height": 414.40625,
+        "top": 429.59375,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "scrollHeight": 545,
+      "clientHeight": 337,
+      "viewport": 844
+    }
+  },
+  {
+    "id": "QA-008",
+    "time": "2026-10-23T03:57:09.658Z",
+    "modal": "true",
+    "tabInside": 30,
+    "tabTotal": 30,
+    "remaining": 1,
+    "focus": "Close composer"
+  },
+  {
+    "id": "QA-007-extra",
+    "time": "2026-10-23T03:57:34.980Z",
+    "inputs": [
+      {
+        "placeholder": "Search folders",
+        "labels": [],
+        "labelledby": null
+      },
+      {
+        "placeholder": "Search messages in INBOX",
+        "labels": [],
+        "labelledby": null
+      },
+      {
+        "placeholder": "",
+        "labels": [
+          "From:"
+        ],
+        "labelledby": null
+      },
+      {
+        "placeholder": "recipient@example.com",
+        "labels": [
+          "To:"
+        ],
+        "labelledby": null
+      },
+      {
+        "placeholder": "Subject",
+        "labels": [
+          "Subject:"
+        ],
+        "labelledby": null
+      }
+    ]
+  },
+  {
+    "id": "locale-preferences",
+    "time": "2026-10-23T03:58:00.948Z",
+    "states": [
+      {
+        "lang": "de",
+        "dialogCount": 1,
+        "layout": "compact",
+        "locale": "de"
+      },
+      {
+        "lang": "en",
+        "dialogCount": 1,
+        "layout": "compact",
+        "locale": "en"
+      }
+    ],
+    "subject": "Synthetic preserved draft — Grüße",
+    "to": "recipient@example.test",
+    "body": "Synthetic preserved body",
+    "accountId": "qa-shared"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:01.897Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "list-1440-light.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:02.395Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "list-1440-dark.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:02.911Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "list-1280-light.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:03.431Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "list-1280-dark.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:04.230Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "list-834-light.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:04.691Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "list-834-dark.png"
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:05.288Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "list-390-light.png"
+  },
+  {
+    "id": "QA-011",
+    "time": "2026-10-23T03:58:05.455Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "actions": [
+      {
+        "name": "/^View:/",
+        "box": {
+          "x": 150,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Sort & group:/",
+        "box": {
+          "x": 198,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Message actions:/",
+        "box": {
+          "x": 242,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": false
+      },
+      {
+        "name": "/^Search messages$/",
+        "box": {
+          "x": 286,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Activity and calendar$/",
+        "box": {
+          "x": 338,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      }
+    ]
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:05.852Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "list-390-dark.png"
+  },
+  {
+    "id": "QA-011",
+    "time": "2026-10-23T03:58:06.028Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "actions": [
+      {
+        "name": "/^View:/",
+        "box": {
+          "x": 150,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Sort & group:/",
+        "box": {
+          "x": 198,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Message actions:/",
+        "box": {
+          "x": 242,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": false
+      },
+      {
+        "name": "/^Search messages$/",
+        "box": {
+          "x": 286,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Activity and calendar$/",
+        "box": {
+          "x": 338,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      }
+    ]
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:06.532Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "overflow": 0,
+    "screenshot": "list-360-light.png"
+  },
+  {
+    "id": "QA-011",
+    "time": "2026-10-23T03:58:06.679Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "actions": [
+      {
+        "name": "/^View:/",
+        "box": {
+          "x": 120,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Sort & group:/",
+        "box": {
+          "x": 168,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Message actions:/",
+        "box": {
+          "x": 212,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": false
+      },
+      {
+        "name": "/^Search messages$/",
+        "box": {
+          "x": 256,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Activity and calendar$/",
+        "box": {
+          "x": 308,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      }
+    ]
+  },
+  {
+    "id": "shell-matrix",
+    "time": "2026-10-23T03:58:07.083Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "overflow": 0,
+    "screenshot": "list-360-dark.png"
+  },
+  {
+    "id": "QA-011",
+    "time": "2026-10-23T03:58:07.213Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "actions": [
+      {
+        "name": "/^View:/",
+        "box": {
+          "x": 120,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Sort & group:/",
+        "box": {
+          "x": 168,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Message actions:/",
+        "box": {
+          "x": 212,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": false
+      },
+      {
+        "name": "/^Search messages$/",
+        "box": {
+          "x": 256,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      },
+      {
+        "name": "/^Activity and calendar$/",
+        "box": {
+          "x": 308,
+          "y": 1.5,
+          "width": 44,
+          "height": 44
+        },
+        "hit": true
+      }
+    ]
+  },
+  {
+    "id": "QA-013",
+    "time": "2026-10-23T03:58:07.856Z",
+    "css": {
+      "animation": "none",
+      "duration": "0s",
+      "transition": "0s"
+    },
+    "screenshot": "reduced-motion-sidebar-390-dark.png"
+  },
+  {
+    "id": "QA-012",
+    "time": "2026-10-23T03:58:08.747Z",
+    "matches": 1,
+    "wrong": 0,
+    "screenshot": "search-empty-390-dark.png"
+  },
+  {
+    "id": "QA-008-exact",
+    "time": "2026-10-23T03:58:57.968Z",
+    "tabs": [
+      {
+        "name": "Dock in thread view",
+        "role": null
+      },
+      {
+        "name": "Open composer in new window",
+        "role": null
+      },
+      {
+        "name": "Minimize composer",
+        "role": null
+      },
+      {
+        "name": "Close composer",
+        "role": null
+      },
+      {
+        "name": "",
+        "role": null
+      },
+      {
+        "name": "",
+        "role": null
+      },
+      {
+        "name": "Show Cc and Bcc",
+        "role": null
+      },
+      {
+        "name": "",
+        "role": null
+      }
+    ],
+    "tipBefore": [],
+    "after8": 0,
+    "afterSendEscape": 0,
+    "focus": "New mail"
+  },
+  {
+    "id": "jo-access",
+    "time": "2026-10-23T03:59:01.523Z",
+    "login": 200,
+    "totp": 200,
+    "accounts": [
+      {
+        "id": "qa-shared",
+        "role": "editor",
+        "shared": true
+      }
+    ],
+    "private": 403
+  },
+  {
+    "id": "collab-assigned",
+    "time": "2026-10-23T03:59:07.722Z",
+    "before": {
+      "ok": true,
+      "generatedAt": 1792727941608,
+      "mailboxes": [
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "editor",
+          "isOwner": false,
+          "shared": true,
+          "unread": 110,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792727941418
+          }
+        }
+      ]
+    },
+    "after": {
+      "ok": true,
+      "generatedAt": 1792727947626,
+      "mailboxes": [
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "editor",
+          "isOwner": false,
+          "shared": true,
+          "unread": 110,
+          "assignedToMe": 1,
+          "unassignedOpen": 256,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792727941418
+          }
+        }
+      ]
+    },
+    "liveWithoutReload": true,
+    "screenshot": "collab-jo-assigned-1440-light.png"
+  },
+  {
+    "id": "collab-status-note",
+    "time": "2026-10-23T03:59:10.348Z",
+    "statusLive": true,
+    "noteLive": true,
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792727950070,
+      "mailboxes": [
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "editor",
+          "isOwner": false,
+          "shared": true,
+          "unread": 110,
+          "assignedToMe": 1,
+          "unassignedOpen": 256,
+          "open": 256,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792727941418
+          }
+        }
+      ]
+    },
+    "events": {
+      "status": 200,
+      "events": [
+        ": heartbeat",
+        "event: mailbox-summary\ndata: {\"type\":\"mailbox-summary\",\"accountId\":\"qa-shared\",\"unread\":110,\"assignedToMe\":1,\"unassignedOpen\":256,\"open\":257,\"watcher\":{\"state\":\"idling\",\"lastEventAt\":1792727941418}}",
+        "event: thread-collab\ndata: {\"type\":\"thread-collab\",\"accountId\":\"qa-shared\",\"threadId\":\"<qa-sweep2-0@example.test>\",\"revision\":9}",
+        "event: mailbox-summary\ndata: {\"type\":\"mailbox-summary\",\"accountId\":\"qa-shared\",\"unread\":110,\"assignedToMe\":1,\"unassignedOpen\":256,\"open\":257,\"watcher\":{\"state\":\"idling\",\"lastEventAt\":1792727941418}}",
+        "event: thread-collab\ndata: {\"type\":\"thread-collab\",\"accountId\":\"qa-shared\",\"threadId\":\"<qa-sweep2-0@example.test>\",\"revision\":10}",
+        "event: mailbox-summary\ndata: {\"type\":\"mailbox-summary\",\"accountId\":\"qa-shared\",\"unread\":110,\"assignedToMe\":1,\"unassignedOpen\":256,\"open\":256,\"watcher\":{\"state\":\"idling\",\"lastEventAt\":1792727941418}}",
+        "event: thread-collab\ndata: {\"type\":\"thread-collab\",\"accountId\":\"qa-shared\",\"threadId\":\"<qa-sweep2-0@example.test>\",\"revision\":11}"
+      ]
+    },
+    "screenshot": "collab-closed-note-1440-light.png"
+  },
+  {
+    "id": "view-open",
+    "time": "2026-10-23T04:00:28.773Z",
+    "removedOnClosed": true
+  },
+  {
+    "id": "view-unassigned",
+    "time": "2026-10-23T04:00:31.149Z",
+    "appearedUnassigned": true,
+    "removedAssigned": true
+  },
+  {
+    "id": "view-assigned",
+    "time": "2026-10-23T04:00:32.723Z",
+    "removedReassigned": true
+  },
+  {
+    "id": "QA-006-mark",
+    "time": "2026-10-23T04:00:37.705Z",
+    "before": 110,
+    "folders": {
+      "id": "qa-shared:INBOX",
+      "name": "INBOX",
+      "accountId": "qa-shared",
+      "count": 300,
+      "specialUse": "\\Inbox",
+      "flags": [
+        "\\HasNoChildren"
+      ],
+      "delimiter": "/",
+      "unreadCount": 109
+    },
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792728037510,
+      "mailboxes": [
+        {
+          "accountId": "qa-private",
+          "name": "QA Private",
+          "email": "private@example.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728037082
+          }
+        },
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": true,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728036983
+          }
+        }
+      ]
+    },
+    "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n110\n0\n257\nShared mailboxes\nQS\nQA Shared\n110\n0\n257\nViews\nInbox\n108\nAssigned to me\nUnassigned\n257\nOpen\n257\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test",
+    "screenshot": "unread-after-mark-1440-dark.png"
+  },
+  {
+    "id": "QA-006-reload",
+    "time": "2026-10-23T04:00:39.475Z",
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792728039089,
+      "mailboxes": [
+        {
+          "accountId": "qa-private",
+          "name": "QA Private",
+          "email": "private@example.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728038187
+          }
+        },
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": true,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728038096
+          }
+        }
+      ]
+    },
+    "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n109\n0\n257\nShared mailboxes\nQS\nQA Shared\n109\n0\n257\nViews\nInbox\n109\nAssigned to me\nUnassigned\n257\nOpen\n257\nFocused\nUnread: 109\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n109\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+  },
+  {
+    "id": "QA-006-resync",
+    "time": "2026-10-23T04:01:16.539Z",
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792728076513,
+      "mailboxes": [
+        {
+          "accountId": "qa-private",
+          "name": "QA Private",
+          "email": "private@example.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728039275
+          }
+        },
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": true,
+          "unread": 109,
+          "assignedToMe": 0,
+          "unassignedOpen": 257,
+          "open": 257,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728039976
+          }
+        }
+      ]
+    },
+    "folders": {
+      "id": "qa-shared:INBOX",
+      "name": "INBOX",
+      "accountId": "qa-shared",
+      "count": 300,
+      "specialUse": "\\Inbox",
+      "flags": [
+        "\\HasNoChildren"
+      ],
+      "delimiter": "/",
+      "unreadCount": 109
+    }
+  },
+  {
+    "id": "QA-006-new",
+    "time": "2026-10-23T04:01:18.886Z",
+    "injectStatus": 200,
+    "elapsedMs": 2127,
+    "summary": {
+      "ok": true,
+      "generatedAt": 1792728078691,
+      "mailboxes": [
+        {
+          "accountId": "qa-private",
+          "name": "QA Private",
+          "email": "private@example.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": false,
+          "unread": 110,
+          "assignedToMe": 0,
+          "unassignedOpen": 258,
+          "open": 258,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728078469
+          }
+        },
+        {
+          "accountId": "qa-shared",
+          "name": "QA Shared",
+          "email": "demo@monkeydent.test",
+          "accessRole": "manager",
+          "isOwner": true,
+          "shared": true,
+          "unread": 110,
+          "assignedToMe": 0,
+          "unassignedOpen": 258,
+          "open": 258,
+          "watcher": {
+            "state": "idling",
+            "lastEventAt": 1792728078534
+          }
+        }
+      ]
+    },
+    "folders": {
+      "id": "qa-shared:INBOX",
+      "name": "INBOX",
+      "accountId": "qa-shared",
+      "count": 301,
+      "specialUse": "\\Inbox",
+      "flags": [
+        "\\HasNoChildren"
+      ],
+      "delimiter": "/",
+      "unreadCount": 110
+    },
+    "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n109\n0\n257\nShared mailboxes\nQS\nQA Shared\n109\n0\n257\nViews\nInbox\n110\nAssigned to me\nUnassigned\n257\nOpen\n257\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n110\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test",
+    "screenshot": "unread-after-new-1440-dark.png"
+  },
+  {
+    "id": "unread-mark-repro",
+    "time": "2026-10-23T04:01:31.935Z",
+    "beforeMark": 110,
+    "requests": [
+      {
+        "path": "/api/accounts/qa-shared/messages/imap-e21e16248353d4c34fe042af/flags",
+        "payload": {
+          "flag": "seen",
+          "value": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "afterMs": 3,
+        "folderAPI": 109,
+        "summary": 109,
+        "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n110\n0\n258\nShared mailboxes\nQS\nQA Shared\n110\n0\n258\nViews\nInbox\n108\nAssigned to me\nUnassigned\n258\nOpen\n258\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+      },
+      {
+        "afterMs": 762,
+        "folderAPI": 109,
+        "summary": 109,
+        "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n110\n0\n258\nShared mailboxes\nQS\nQA Shared\n110\n0\n258\nViews\nInbox\n108\nAssigned to me\nUnassigned\n258\nOpen\n258\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+      },
+      {
+        "afterMs": 1810,
+        "folderAPI": 109,
+        "summary": 109,
+        "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n109\n0\n258\nShared mailboxes\nQS\nQA Shared\n110\n0\n258\nViews\nInbox\n108\nAssigned to me\nUnassigned\n258\nOpen\n258\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+      },
+      {
+        "afterMs": 5368,
+        "folderAPI": 109,
+        "summary": 109,
+        "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n109\n0\n258\nShared mailboxes\nQS\nQA Shared\n109\n0\n258\nViews\nInbox\n108\nAssigned to me\nUnassigned\n258\nOpen\n258\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+      },
+      {
+        "afterMs": 10410,
+        "folderAPI": 109,
+        "summary": 109,
+        "sidebar": "Noctua Mail\nCompose\nMy mailboxes\nQP\nQA Private\n109\n0\n258\nShared mailboxes\nQS\nQA Shared\n109\n0\n258\nViews\nInbox\n108\nAssigned to me\nUnassigned\n258\nOpen\n258\nFocused\nUnread: 110\nAction Queue\nInvite Deck\n1\nFolders\n8 total\nINBOX\n108\nSent\nDrafts\nArchive\nJunk\nTrash\nProjekte\nWebsite\nSA\nSynthetic Alex\nalex@example.test"
+      }
+    ],
+    "screenshot": "unread-mark-settled-1440-dark.png"
+  },
+  {
+    "id": "admin-create-breakpoint",
+    "time": "2026-10-23T04:01:51.489Z",
+    "createDialogs": 0,
+    "adminStillOpen": 1,
+    "name": null,
+    "screenshot": "admin-create-breakpoint-390-dark.png"
+  },
+  {
+    "id": "admin-create-reopened",
+    "time": "2026-10-23T04:01:51.644Z",
+    "name": ""
+  },
+  {
+    "id": "security-stale",
+    "time": "2026-10-23T04:07:17.668Z",
+    "message": [
+      "Please sign in again before changing security settings."
+    ],
+    "me": 200
+  },
+  {
+    "id": "passkey-enroll",
+    "time": "2026-10-23T04:07:21.526Z",
+    "keyShown": true,
+    "focusInside": 15,
+    "total": 15,
+    "me": 200,
+    "screenshot": "security-passkey-1440-dark.png"
+  },
+  {
+    "id": "passkey-login",
+    "time": "2026-10-23T04:07:22.921Z",
+    "me": 200,
+    "mailboxState": "selected"
+  },
+  {
+    "id": "attachment-download",
+    "time": "2026-10-23T04:09:44.764Z",
+    "status": 200,
+    "bytes": 1473,
+    "pdf": "%PDF-1.4",
+    "filename": "Rechnung-Demo.pdf",
+    "screenshot": "attachment-invoice-1440-dark.png"
+  },
+  {
+    "id": "layout",
+    "time": "2026-10-23T04:09:46.389Z",
+    "label": "Compact",
+    "listVisible": true
+  },
+  {
+    "id": "layout",
+    "time": "2026-10-23T04:09:47.111Z",
+    "label": "Cards",
+    "listVisible": true
+  },
+  {
+    "id": "layout",
+    "time": "2026-10-23T04:09:47.787Z",
+    "label": "Table",
+    "listVisible": true
+  },
+  {
+    "id": "layout",
+    "time": "2026-10-23T04:09:48.535Z",
+    "label": "Threads",
+    "listVisible": true
+  },
+  {
+    "id": "html-remote",
+    "time": "2026-10-23T04:09:51.349Z",
+    "requestsBefore": 0,
+    "requestsAfter": 1,
+    "frameCount": 2,
+    "screenshot": "html-remote-1440-dark.png"
+  },
+  {
+    "id": "compose-fields-state",
+    "time": "2026-10-23T04:10:01.827Z",
+    "typed": [
+      {
+        "label": "To:",
+        "value": "recipient@example.test",
+        "labels": [
+          "To:"
+        ]
+      },
+      {
+        "label": "Cc:",
+        "value": "copy@example.test",
+        "labels": [
+          "Cc:"
+        ]
+      },
+      {
+        "label": "Bcc:",
+        "value": "hidden@example.test",
+        "labels": [
+          "Bcc:"
+        ]
+      },
+      {
+        "label": "Subject:",
+        "value": "QA all fields — Grüße café",
+        "labels": [
+          "Subject:"
+        ]
+      }
+    ],
+    "preserved": [
+      {
+        "label": "To:",
+        "value": "recipient@example.test"
+      },
+      {
+        "label": "Cc:",
+        "value": "copy@example.test"
+      },
+      {
+        "label": "Bcc:",
+        "value": "hidden@example.test"
+      },
+      {
+        "label": "Subject:",
+        "value": "QA all fields — Grüße café"
+      }
+    ],
+    "threadKept": 0,
+    "screenshot": "compose-fields-1440-dark.png"
+  },
+  {
+    "id": "compose-fields-send",
+    "time": "2026-10-23T04:10:02.370Z",
+    "status": 200,
+    "to": "recipient@example.test",
+    "cc": "copy@example.test",
+    "bcc": "hidden@example.test",
+    "subject": "QA all fields — Grüße café",
+    "attachments": 1,
+    "captures": 1,
+    "hasAttachment": true
+  },
+  {
+    "id": "admin-create-breakpoint-repeat",
+    "time": "2026-10-23T04:11:30.764Z",
+    "remaining": 0,
+    "admin": 1
+  },
+  {
+    "id": "mobile-back",
+    "time": "2026-10-23T04:13:31.829Z",
+    "readerToList": true,
+    "browserBackDismissedSheet": true
+  },
+  {
+    "id": "locale-reader",
+    "time": "2026-10-23T04:14:08.084Z",
+    "headerSame": true,
+    "accountId": "qa-shared",
+    "selectedRows": 0
+  },
+  {
+    "id": "QA-006-sync-job",
+    "time": "2026-10-23T04:14:08.103Z",
+    "http": 200,
+    "status": "done",
+    "phase": "done"
+  },
+  {
+    "id": "mcp-delete-ui",
+    "time": "2026-10-23T04:17:34.612Z",
+    "deleteStatuses": [
+      200,
+      200
+    ],
+    "remaining": 0
+  },
+  {
+    "id": "viewer-role",
+    "time": "2026-10-23T04:17:47.579Z",
+    "downgrade": 200,
+    "adminMenu": 0,
+    "tabs": [
+      "Preferences",
+      "Categorization",
+      "Topics",
+      "Recipient Aliases"
+    ],
+    "mcpAPI": 403,
+    "me": 200
+  },
+  {
+    "id": "editor-restored",
+    "time": "2026-10-23T04:17:47.604Z",
+    "status": 200
+  },
+  {
+    "id": "browser-version",
+    "time": "2026-10-23T04:17:47.605Z",
+    "version": "145.0.7632.0"
+  },
+  {
+    "id": "browser-cleanup",
+    "time": "2026-10-23T04:18:14.592Z",
+    "contextsClosed": 1
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:04:57.310Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "light",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 336.31744384765625,
+        "y": 109.98443603515625,
+        "width": 767.3651733398438,
+        "height": 680.0311279296875
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5p_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5q_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5r_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5s_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5v_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_60_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_62_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_63_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_66_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_67_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:01.681Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "light",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:05.141Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "dark",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 339.79345703125,
+        "y": 113.06485748291016,
+        "width": 760.4130859375,
+        "height": 673.8702621459961
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5p_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5q_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5r_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5s_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5v_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_60_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_62_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_63_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_66_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_67_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:09.391Z",
+    "width": 1440,
+    "height": 900,
+    "theme": "dark",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:12.844Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "light",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 264.1425476074219,
+        "y": 64.40377044677734,
+        "width": 751.7149353027344,
+        "height": 591.1924819946289
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5d_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5e_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5f_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5g_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5j_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_5k_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5m_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5n_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5q_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_5r_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:16.838Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "light",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:20.203Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "dark",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 980,
+          "scroll": 980
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 259.7873840332031,
+        "y": 60.978614807128906,
+        "width": 760.4252624511719,
+        "height": 598.0427474975586
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5d_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5e_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5f_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5g_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5j_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_5k_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5m_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_5n_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_5q_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_5r_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:24.188Z",
+    "width": 1280,
+    "height": 720,
+    "theme": "dark",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:27.535Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "light",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 36.79424285888672,
+        "y": 219.0655517578125,
+        "width": 760.411506652832,
+        "height": 673.868896484375
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_65_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_66_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_67_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_68_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6b_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6c_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6e_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6f_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6i_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:31.675Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "light",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:35.201Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "dark",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 784,
+          "scroll": 784
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 36.78089904785156,
+        "y": 219.05372619628906,
+        "width": 760.4382171630859,
+        "height": 673.8925628662109
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_65_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_66_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_67_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_68_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6b_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6c_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6e_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6f_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6i_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:39.142Z",
+    "width": 834,
+    "height": 1112,
+    "theme": "dark",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:43.163Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 17.7686710357666,
+        "y": 76.94347381591797,
+        "width": 354.4626522064209,
+        "height": 690.1130447387695
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6d_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6e_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6f_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6g_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6k_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6m_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6n_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6q_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6r_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:47.397Z",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:51.251Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 390,
+          "scroll": 390
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 17.7686710357666,
+        "y": 76.94347381591797,
+        "width": 354.4626522064209,
+        "height": 690.1130447387695
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6a_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6b_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6c_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6d_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6g_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6h_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6k_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6n_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6o_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:05:55.691Z",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:05:59.887Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 19.47286033630371,
+        "y": 72.3716049194336,
+        "width": 321.0542697906494,
+        "height": 635.2568130493164
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_66_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_67_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_68_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_69_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6c_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6d_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6f_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6g_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6k_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:06:04.279Z",
+    "width": 360,
+    "height": 780,
+    "theme": "light",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  },
+  {
+    "id": "admin-matrix",
+    "time": "2026-10-23T04:06:08.208Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "sections": [
+      {
+        "name": "Users",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Mailboxes",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Invites",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      },
+      {
+        "name": "Audit",
+        "alerts": [],
+        "overflow": {
+          "client": 360,
+          "scroll": 360
+        }
+      }
+    ],
+    "create": {
+      "box": {
+        "x": 19.467905044555664,
+        "y": 72.36180114746094,
+        "width": 321.06419944763184,
+        "height": 635.2763824462891
+      },
+      "labels": [
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6c_",
+          "name": "Name"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6d_",
+          "name": "Email"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6e_",
+          "name": "IMAP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6f_",
+          "name": "IMAP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6i_",
+          "name": "IMAP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6j_",
+          "name": "IMAP password"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6l_",
+          "name": "SMTP host"
+        },
+        {
+          "type": "number",
+          "id": "",
+          "labelledby": "_r_6m_",
+          "name": "SMTP port"
+        },
+        {
+          "type": "text",
+          "id": "",
+          "labelledby": "_r_6p_",
+          "name": "SMTP user"
+        },
+        {
+          "type": "password",
+          "id": "",
+          "labelledby": "_r_6q_",
+          "name": "SMTP password"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settings-matrix",
+    "time": "2026-10-23T04:06:13.084Z",
+    "width": 360,
+    "height": 780,
+    "theme": "dark",
+    "tabs": [
+      {
+        "name": "Account",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Signatures",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Preferences",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Categorization",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Topics",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Calendar",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Recipient Aliases",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "MCP",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Members",
+        "alerts": [],
+        "fallback": 0
+      },
+      {
+        "name": "Translation",
+        "alerts": [],
+        "fallback": 1
+      }
+    ]
+  }
+]

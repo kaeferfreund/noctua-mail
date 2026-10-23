@@ -1,0 +1,23 @@
+{
+  "roots": {
+    "app": 1551788,
+    "fixture": 1536831,
+    "browser": 1541319,
+    "driver": 1629142
+  },
+  "owned_pids": [
+    1536831,
+    1541319,
+    1541430,
+    1541465,
+    1541466,
+    1541479,
+    1541505,
+    1551788,
+    1629142
+  ],
+  "remaining_running_pids": [],
+  "owned_processes_stopped": true,
+  "scratch_removed": true,
+  "assigned_ports_free": true
+}
