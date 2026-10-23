@@ -2,11 +2,18 @@ import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import React from "react";
+import dynamic from "next/dynamic";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import { SidebarProvider } from "../ui/sidebar";
+import LazyDialogLoading from "../LazyDialogLoading";
+
+const AdminPanel = dynamic(() => import("../admin/AdminPanel"), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Admin" />
+});
 
 const scenario = process.env.NOCTUA_LAZY_ADMIN_TEST;
 const scenarios = [
@@ -16,7 +23,9 @@ const scenarios = [
   "cold admin from user menu without a mailbox",
   "admin idle warm-up",
   "cancel warm-up on unmount",
-  "cancel warm-up on role change"
+  "cancel warm-up on role change",
+  "QA-014 desktop to mobile preserves unsent invite",
+  "QA-014 mobile to desktop preserves unsent invite"
 ];
 
 // Match lazyAccountSettings.dom.test.tsx: independent Bun processes keep the
@@ -47,6 +56,14 @@ if (!scenario) {
     const originalCancelIdle = window.cancelIdleCallback;
     const originalFetch = globalThis.fetch;
     const originalEventSource = globalThis.EventSource;
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    const breakpointScenario = scenario.startsWith("QA-014");
+    const startsMobile = scenario.includes("mobile to desktop");
+    if (breakpointScenario) {
+      window.innerWidth = startsMobile ? 390 : 1440;
+      window.innerHeight = startsMobile ? 844 : 900;
+    }
     const calls: string[] = [];
     window.requestIdleCallback = callback => {
       const id = ++nextIdleId;
@@ -63,10 +80,17 @@ if (!scenario) {
       calls.push(url);
       if (url === "/api/auth/me") return Response.json({
         user: { id: "synthetic-user", email: "user@example.test", role },
-        accounts: [], accountId: null, mailboxState: "none"
+        accounts: breakpointScenario ? [{ id: "synthetic-account", name: "Synthetic mailbox", email: "user@example.test",
+          accessRole: "manager", settings: {},
+          imap: { host: "imap.example.test", port: 993, secure: true, user: "user@example.test", password: "" },
+          smtp: { host: "smtp.example.test", port: 465, secure: true, user: "user@example.test", password: "" } }] : [],
+        accountId: breakpointScenario ? "synthetic-account" : null, mailboxState: breakpointScenario ? "selected" : "none"
       });
+      if (url.endsWith("/folders")) return Response.json([{
+        id: "synthetic-inbox", accountId: "synthetic-account", name: "Inbox", path: "INBOX", specialUse: "\\Inbox"
+      }]);
       return Response.json({ ok: true, users: [], accounts: [], items: [], messages: [],
-        total: 0, hasMore: false, topics: [], aliases: [], members: [], mailboxes: [], prefs: {} });
+        total: 0, hasMore: false, topics: [], aliases: [], members: [], mailboxes: [], invites: [], prefs: {} });
     }) as typeof fetch;
     const flushIdle = async () => {
       await act(async () => {
@@ -90,13 +114,20 @@ if (!scenario) {
       const { default: MailClient } = await import("../MailClient");
       const { default: ShellUserMenu } = await import("../shell/ShellUserMenu");
       expectCold();
-      const menu = (isAdminUser: boolean) => (
+      // A stable owner supplies the same callback contract as MailClient, even
+      // without a selected mailbox. The menu itself must never mount a panel.
+      function Menu({ isAdminUser }: { isAdminUser: boolean }) {
+        const [open, setOpen] = React.useState(false);
+        return (
         <ThemeProvider attribute="class"><Theme><SidebarProvider>
           <ShellUserMenu userEmail="user@example.test" currentAccount={null} isAdminUser={isAdminUser}
-            onOpenSettings={() => {}} onOpenAdmin={() => {}} onShowThreadJson={() => {}}
+            onOpenSettings={() => {}} onOpenAdmin={() => setOpen(true)} onShowThreadJson={() => {}}
             onEvictThreadCache={() => {}} onLogout={() => {}} />
+          {open && isAdminUser && <AdminPanel isAdminUser={isAdminUser} onClose={() => setOpen(false)} />}
         </SidebarProvider></Theme></ThemeProvider>
-      );
+        );
+      }
+      const menu = (isAdminUser: boolean) => <Menu isAdminUser={isAdminUser} />;
       const openMenu = (view: ReturnType<typeof render>) => {
         fireEvent.pointerDown(view.getByRole("button", { name: "User menu" }), { button: 0, ctrlKey: false });
       };
@@ -122,6 +153,33 @@ if (!scenario) {
       }
 
       const view = render(<ThemeProvider attribute="class"><Theme><MailClient /></Theme></ThemeProvider>);
+      if (breakpointScenario) {
+        if (startsMobile) fireEvent.click(await view.findByRole("button", { name: "Toggle sidebar" }));
+        await view.findByRole("button", { name: "User menu" });
+        openMenu(view);
+        fireEvent.click(await view.findByRole("menuitem", { name: "Admin" }));
+        await view.findByRole("dialog", { name: "Admin" }, { timeout: 5000 });
+        expect(view.getAllByRole("button", { name: "Close admin" })).toHaveLength(1);
+        fireEvent.click(view.getByRole("button", { name: "Invites" }));
+        const name = await view.findByLabelText("Name", { exact: true });
+        fireEvent.change(name, { target: { value: "Synthetic unsent invite" } });
+        await act(async () => {
+          window.innerWidth = startsMobile ? 1440 : 390;
+          window.innerHeight = startsMobile ? 900 : 844;
+          window.dispatchEvent(new Event("resize"));
+        });
+        await waitFor(() => {
+          const admin = view.getByRole("dialog", { name: "Admin" });
+          expect(admin.getAttribute("data-slot")).toBe(startsMobile ? null : "sheet-content");
+          expect(view.getAllByRole("button", { name: "Close admin" })).toHaveLength(1);
+          expect(view.getByRole("button", { name: "Invites" }).getAttribute("aria-pressed")).toBe("true");
+          expect((view.getByLabelText("Name", { exact: true }) as HTMLInputElement).value).toBe("Synthetic unsent invite");
+        });
+        expect(calls.filter(url => url === "/api/admin/users")).toHaveLength(1);
+        fireEvent.click(view.getByRole("button", { name: "Close admin" }));
+        await waitFor(() => expect(view.queryByRole("dialog", { name: "Admin" })).toBeNull());
+        return;
+      }
       await view.findByRole("heading", { name: "No mailbox yet" });
       await waitFor(() => expect(idleTasks.size).toBe(role === "admin" ? 2 : 1));
       expectCold();
@@ -196,6 +254,8 @@ if (!scenario) {
       window.cancelIdleCallback = originalCancelIdle;
       globalThis.fetch = originalFetch;
       globalThis.EventSource = originalEventSource;
+      window.innerWidth = originalWidth;
+      window.innerHeight = originalHeight;
     }
   }, 15000);
 }
