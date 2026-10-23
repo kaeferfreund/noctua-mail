@@ -3,6 +3,7 @@ import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessage
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { compressedJsonResponse } from "@/app/api/_helpers/compressedJson";
 import {
   getAccountIdFromParams,
   requireAccountContext,
@@ -94,7 +95,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
 
-    return NextResponse.json({
+    return compressedJsonResponse(request, {
       items: data.items.map(slimThreadListItem),
       groups: data.groups,
       total: data.total,
