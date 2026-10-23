@@ -4,6 +4,7 @@ import type { ComposePayload } from "./composeContentBuilder";
 import type { ComposeReplyHeaders, DraftSavePayload } from "./composeTypes";
 
 type DraftEnvelopeFields = {
+  identityId?: string;
   to: string;
   cc: string;
   bcc: string;
@@ -36,6 +37,7 @@ function buildAttachmentHash(attachments: Attachment[]): string {
 
 export function computeDraftHash(input: DraftHashInput): string {
   return JSON.stringify({
+    ...(input.identityId !== undefined ? { identityId: input.identityId } : {}),
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,
@@ -77,6 +79,7 @@ export function buildDraftSavePayload(
       ? undefined
       : (composePayload.html ?? "");
   return {
+    ...(input.identityId !== undefined ? { identityId: input.identityId } : {}),
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,

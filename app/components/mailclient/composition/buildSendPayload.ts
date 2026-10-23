@@ -7,6 +7,7 @@ import type { ComposeMode, ComposeReplyHeaders, SendInvitePayload } from "./comp
 // ---------------------------------------------------------------------------
 
 export type SendPayloadInput = {
+  identityId?: string;
   composeTo: string;
   composeCc: string;
   composeBcc: string;
@@ -24,6 +25,7 @@ export type SendPayloadInput = {
 };
 
 export type SmtpPayload = {
+  identityId?: string;
   to: string;
   cc: string;
   bcc: string;
@@ -58,8 +60,7 @@ export function buildSendPayload(mode: ComposeMode, input: SendPayloadInput): Sm
     invite,
     composeFormat,
     composeReplyHeaders,
-    composeReplyMessage,
-    accountFromValue
+    composeReplyMessage
   } = input;
 
   // Fall back to headers derived from the reply message when no explicit
@@ -78,16 +79,9 @@ export function buildSendPayload(mode: ComposeMode, input: SendPayloadInput): Sm
 
   const shouldThread = shouldThreadComposeForMode(mode);
 
-  // Reply-To: only set for reply/replyAll, and only when it differs from From.
-  const replyToHeader = mode === "reply" || mode === "replyAll" ? accountFromValue : "";
-  const normalizedReplyTo =
-    replyToHeader &&
-    accountFromValue &&
-    replyToHeader.trim().toLowerCase() === accountFromValue.trim().toLowerCase()
-      ? ""
-      : replyToHeader;
 
   return {
+    ...(input.identityId !== undefined ? { identityId: input.identityId } : {}),
     to: composeTo,
     cc: composeCc,
     bcc: composeBcc,
@@ -100,7 +94,7 @@ export function buildSendPayload(mode: ComposeMode, input: SendPayloadInput): Sm
     composeFormat,
     inReplyTo: shouldThread ? replyHeaders.inReplyTo : undefined,
     references: shouldThread ? replyHeaders.references : undefined,
-    replyTo: normalizedReplyTo,
+    replyTo: "",
     xForwardedMessageId: mode === "forward" ? replyHeaders.xForwardedMessageId : undefined
   };
 }

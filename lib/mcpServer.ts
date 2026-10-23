@@ -1,3 +1,9 @@
+import { authorizeOutbound } from "./outboundAuthorization";
+import { resolveComposeIdentity } from "./senderIdentitySelection";
+import { createSenderIdentityWithRecompute, updateSenderIdentity, SenderIdentityError } from "./senderIdentities";
+import { getIdentityRecomputeJob } from "./threadRecomputeJobs";
+import { accountPrefsPatchSchema } from "./accountPrefs";
+import { getUserAccountPrefs, mergeUserAccountPrefs, listSenderIdentities, InvalidAccountPreferencesError } from "./serverDb";
 import { getUserMailboxSummary } from "@/lib/mailboxSummary";
 import { listAccessibleAccountsForUser, listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
@@ -31,6 +37,7 @@ import {
   updateMessageFlags
 } from "@/lib/serverDb";
 import {
+  DraftSaveError,
   buildDraftInputForMode,
   saveDraftForAccount,
   type DraftCreateMode
@@ -178,6 +185,7 @@ const MESSAGE_ID_SCHEMA = {
 };
 
 const CREATE_DRAFT_MESSAGE_SCHEMA = {
+  identityId: z.string().min(1).max(256).optional(),
   ...ACCOUNT_ID_ARG,
   mode: z.enum(["new", "reply", "forward"]).optional(),
   messageId: z.string().trim().optional(),
@@ -331,6 +339,40 @@ const SEARCH_MESSAGES_OUTPUT_SCHEMA = {
   mode: z.enum(["search", "related", "thread-related"]),
   relatedSubject: z.string().optional()
 };
+
+const SENDER_IDENTITY_SCHEMA = z.object({ id: z.string(), accountId: z.string(), email: z.string(), displayName: z.string(),
+  replyTo: z.string().optional(), signatureId: z.string().optional(), isDefault: z.boolean(), enabled: z.boolean(),
+  createdBy: z.string().nullable(), createdAt: z.number(), updatedAt: z.number() });
+const IDENTITY_JOB_SCHEMA = z.object({ id: z.string(), accountId: z.string(), status: z.enum(["queued", "running", "done", "failed"]),
+  startedAt: z.number(), finishedAt: z.number().optional(), error: z.string().optional(), pid: z.number().optional() }).nullable();
+const SENDER_PREFS_SCHEMA = z.object({ defaultIdentityId: z.string().optional(), defaultSignatureId: z.string().optional(), signatureOverride: z.string().optional() });
+function senderPrefs(prefs: import("./data").UserAccountPrefs) {
+  return { defaultIdentityId: prefs.defaultIdentityId, defaultSignatureId: prefs.defaultSignatureId, signatureOverride: prefs.signatureOverride };
+}
+function senderToolOutput(shape: Record<string, z.ZodType>) {
+  const variants = z.discriminatedUnion("ok", [z.object({ ok: z.literal(true), ...shape }),
+    z.object({ ok: z.literal(false), code: z.string(), message: z.string() })]);
+  // The MCP SDK advertises only object roots. Keep that root while publishing
+  // and validating the same discriminated variants in JSON Schema and Zod.
+  const optionalShape = Object.fromEntries(Object.entries(shape).map(([key, schema]) => [key, schema.optional()]));
+  return z.object({ ok: z.boolean(), ...optionalShape, code: z.string().optional(),
+    message: shape.message ? z.union([shape.message, z.string()]).optional() : z.string().optional() })
+    .superRefine((value, context) => {
+      const parsed = variants.safeParse(value);
+      if (!parsed.success) context.addIssue({ code: "custom", message: "Expected a sender success or domain-error result" });
+    }).meta({ anyOf: z.toJSONSchema(variants).oneOf ?? z.toJSONSchema(variants).anyOf });
+}
+
+async function senderToolCall(run: () => Promise<ReturnType<typeof buildToolResult>>) {
+  try { return await run(); }
+  catch (error) {
+    if (error instanceof SenderIdentityError || error instanceof InvalidAccountPreferencesError || error instanceof DraftSaveError) {
+      const code = error instanceof SenderIdentityError ? error.code : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
+      return { ...buildToolResult(error.message, { ok: false, code, message: error.message }), isError: true };
+    }
+    throw error;
+  }
+}
 
 async function resolveAccountContext(
   baseContext: McpAccountContext,
@@ -774,6 +816,7 @@ async function searchMessages(
 async function createDraftMessage(
   context: McpAccountContext,
   args: {
+    identityId?: string;
     mode?: DraftCreateMode;
     messageId?: string;
     to?: string;
@@ -799,7 +842,9 @@ async function createDraftMessage(
     account: context.account,
     accountId: context.accountId,
     clientId: `mcp:${context.tokenRecord.id}`,
-    payload
+    payload,
+    actor: mcpActor(context),
+    authorization: { tokenId: context.tokenRecord.id }
   });
 
   let message = result.message;
@@ -813,6 +858,7 @@ async function createDraftMessage(
     ok: true,
     mode: args.mode ?? "new",
     referenceMessageId: args.messageId?.trim() || null,
+    identityId: result.identityId,
     draftId: result.draftId,
     message
   };
@@ -1089,39 +1135,86 @@ export async function executeMcpHttpRequest(params: {
     }
   );
 
-  server.tool(
-    "create_draft_message",
-    "Create a draft message. Supports new drafts, replies, and forwards.",
-    CREATE_DRAFT_MESSAGE_SCHEMA,
-    async (args: {
-      accountId?: string;
-      mode?: DraftCreateMode;
-      messageId?: string;
-      to?: string;
-      cc?: string;
-      bcc?: string;
-      subject?: string;
-      text?: string;
-      markdown?: string;
-      html?: string;
-      composeFormat?: "text" | "html" | "markdown";
-      quotedHtmlEdited?: boolean;
-      attachments?: Array<{
-        filename: string;
-        contentType: string;
-        inline?: boolean;
-        cid?: string;
-        dataUrl?: string;
-      }>;
-    }) => {
-      const ctx = await resolveAccountContext(context, args.accountId, "editor");
+  server.registerTool("create_draft_message", {
+    description: "Create a draft message. Supports new drafts, replies, and forwards. identityId selects an enabled sender in this mailbox.",
+    inputSchema: z.object(CREATE_DRAFT_MESSAGE_SCHEMA).strict(),
+    outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), referenceMessageId: z.string().nullable(),
+      identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable() })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "editor");
+    return senderToolCall(async () => {
       const result = await createDraftMessage(ctx, args);
-      return buildToolResult(
-        `Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`,
-        result
-      );
-    }
-  );
+      return buildToolResult(`Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`, result);
+    });
+  });
+
+  server.registerTool("list_sender_identities", {
+    description: "List this mailbox's configured sender identities and the token creator's effective default.",
+    inputSchema: z.object(ACCOUNT_ID_ARG).strict(),
+    outputSchema: senderToolOutput({ identities: z.array(SENDER_IDENTITY_SCHEMA), defaultIdentityId: z.string().optional(),
+      effectiveDefaultIdentityId: z.string().optional(), ownAddresses: z.array(z.string()), warnings: z.array(z.string()), recomputeJob: IDENTITY_JOB_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    const identities = await listSenderIdentities(ctx.accountId);
+    const prefs = await getUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId);
+    const resolved = resolveComposeIdentity({ accountId: ctx.accountId, identities, prefs });
+    return buildToolResult("Sender identities.", { ok: true, identities,
+      defaultIdentityId: identities.find(item => item.isDefault)?.id,
+      effectiveDefaultIdentityId: resolved.identity?.id, ownAddresses: getOwnAddresses(ctx.account, identities),
+      warnings: resolved.warnings, recomputeJob: getIdentityRecomputeJob(ctx.accountId) });
+  });
+  server.registerTool("create_sender_identity", {
+    description: "Configure a sender identity in this mailbox (manager). Does not verify provider send-as permission.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, email: z.string().max(254), displayName: z.string().max(256),
+      replyTo: z.string().max(254).optional(), signatureId: z.string().min(1).max(256).optional(),
+      isDefault: z.boolean().optional(), enabled: z.boolean().optional() }).strict(),
+    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA, recomputeJob: IDENTITY_JOB_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "manager");
+    return senderToolCall(async () => {
+      const { accountId: _accountId, ...input } = args; void _accountId;
+      return buildToolResult("Sender identity created.", { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, { ...mcpActor(ctx),
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) });
+    });
+  });
+  server.registerTool("update_sender_identity", {
+    description: "Update or soft-disable a sender identity in this mailbox (manager). Address is immutable.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, identityId: z.string().min(1).max(256), patch: z.object({
+      displayName: z.string().max(256).optional(), replyTo: z.string().max(254).nullable().optional(),
+      signatureId: z.string().min(1).max(256).nullable().optional(), isDefault: z.boolean().optional(), enabled: z.boolean().optional()
+    }).strict() }).strict(),
+    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "manager");
+    return senderToolCall(async () => buildToolResult("Sender identity updated.", { ok: true,
+      identity: await updateSenderIdentity(ctx.accountId, args.identityId, args.patch, { ...mcpActor(ctx),
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) }));
+  });
+  server.registerTool("get_sender_preferences", {
+    description: "Read the token creator's own sender preferences for this mailbox.",
+    inputSchema: z.object(ACCOUNT_ID_ARG).strict(), outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    return buildToolResult("Sender preferences.", { ok: true, prefs: senderPrefs(await getUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId)) });
+  });
+  server.registerTool("set_sender_preferences", {
+    description: "Patch the token creator's own sender preferences. Null restores inheritance; empty signature means none.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, patch: accountPrefsPatchSchema.pick({ defaultIdentityId: true, defaultSignatureId: true, signatureOverride: true }) }).strict(),
+    outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    return senderToolCall(async () => {
+      if (args.patch.defaultSignatureId && !ctx.account.settings?.signatures?.some(item => item.id === args.patch.defaultSignatureId)) {
+        throw new SenderIdentityError("invalid_preferences", 400, "Choose a signature template from this mailbox");
+      }
+      if (args.patch.defaultIdentityId && !(await listSenderIdentities(ctx.accountId)).some(identity => identity.id === args.patch.defaultIdentityId && identity.enabled)) {
+        throw new InvalidAccountPreferencesError();
+      }
+      const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch,
+        () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", identity: args.patch.defaultIdentityId ?? undefined }));
+      return buildToolResult("Sender preferences saved.", { ok: true, prefs: senderPrefs(prefs) });
+    });
+  });
 
   server.tool(
     "flag_message",

@@ -1,3 +1,4 @@
+import type { ResolvedSender } from "../sendIdentity";
 import { randomUUID } from "crypto";
 import type { Account, CalendarEvent, CalendarParticipationStatus } from "@/lib/data";
 import type { ComposeInvitePayload } from "@/lib/composeInvite";
@@ -15,6 +16,7 @@ type InviteAttendee = {
 
 type SentInviteBuildInput = {
   account: Account;
+  sender: ResolvedSender;
   invite: ComposeInvitePayload;
   subject: string;
   to: string;
@@ -59,9 +61,9 @@ function formatEventDate(value: number, allDay: boolean) {
   return formatUtcDateTime(date);
 }
 
-function organizerLabel(account: Account) {
-  const name = account.name?.trim();
-  return name ? `${name} <${account.email}>` : account.email;
+function organizerLabel(sender: ResolvedSender) {
+  const name = sender.displayName.trim();
+  return name ? `${name} <${sender.email}>` : sender.email;
 }
 
 function normalizeInviteSummary(subject: string) {
@@ -75,8 +77,8 @@ function serializeAttendees(attendees: InviteAttendee[]) {
   return labels.length > 0 ? JSON.stringify(labels) : undefined;
 }
 
-function buildInviteAttendees(account: Account, to: string, cc?: string) {
-  const accountEmail = normalizeEmail(account.email);
+function buildInviteAttendees(sender: ResolvedSender, to: string, cc?: string) {
+  const accountEmail = normalizeEmail(sender.email);
   const attendeesByEmail = new Map<string, InviteAttendee>();
   const addEntries = (value: string | undefined, role: InviteAttendee["role"]) => {
     for (const entry of splitRecipientEntries(value)) {
@@ -122,13 +124,13 @@ function buildInviteAttendees(account: Account, to: string, cc?: string) {
 
 function buildInviteIcs(params: {
   uid: string;
-  account: Account;
+  sender: ResolvedSender;
   invite: ComposeInvitePayload;
   summary: string;
   descriptionText: string;
   attendees: InviteAttendee[];
 }) {
-  const { uid, account, invite, summary, descriptionText, attendees } = params;
+  const { uid, sender, invite, summary, descriptionText, attendees } = params;
   const now = new Date();
   const lines = [
     "BEGIN:VCALENDAR",
@@ -161,7 +163,7 @@ function buildInviteIcs(params: {
   if (invite.recurrenceRule?.trim()) {
     lines.push(`RRULE:${invite.recurrenceRule.trim().replace(/[\r\n]/g, "")}`);
   }
-  lines.push(`ORGANIZER;CN=${escapeIcsText(account.name?.trim() || account.email)}:mailto:${account.email}`);
+  lines.push(`ORGANIZER;CN=${escapeIcsText(sender.displayName.trim() || sender.email)}:mailto:${sender.email}`);
   attendees.forEach((attendee) => {
     const params = [
       `CN=${escapeIcsText(attendee.name?.trim() || attendee.email)}`,
@@ -176,13 +178,13 @@ function buildInviteIcs(params: {
 }
 
 export function buildSentInvite(input: SentInviteBuildInput): SentInviteBuildResult {
-  const { account, invite, subject, to, cc, descriptionText } = input;
+  const { account, sender, invite, subject, to, cc, descriptionText } = input;
   const summary = normalizeInviteSummary(subject);
-  const uid = `${randomUUID()}@${account.email.split("@")[1] || "noctua.local"}`;
-  const { attendees, selfAttendeeEmail, onlySelfInvite } = buildInviteAttendees(account, to, cc);
+  const uid = `${randomUUID()}@${sender.email.split("@")[1] || "noctua.local"}`;
+  const { attendees, selfAttendeeEmail, onlySelfInvite } = buildInviteAttendees(sender, to, cc);
   const ics = buildInviteIcs({
     uid,
-    account,
+    sender,
     invite,
     summary,
     descriptionText,
@@ -200,7 +202,7 @@ export function buildSentInvite(input: SentInviteBuildInput): SentInviteBuildRes
     endAtMs: invite.endAtMs,
     allDay: invite.allDay,
     recurrenceRule: invite.recurrenceRule?.trim() || undefined,
-    organizer: organizerLabel(account),
+    organizer: organizerLabel(sender),
     attendees: serializeAttendees(attendees),
     myAttendeeEmail: selfAttendeeEmail,
     myPartstat: selfAttendeeEmail ? "ACCEPTED" : undefined,
