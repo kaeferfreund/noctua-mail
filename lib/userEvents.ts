@@ -30,7 +30,7 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
         for (const cleanup of cleanups) cleanup();
         try { controller.close(); } catch { /* Reader already cancelled. */ }
       };
-      const authStream = registerAuthStream(session, stop, accountId => {
+      const authStream = registerAuthStream(session, () => { stop(); return work; }, accountId => {
         // Tell the client to refetch the authoritative list, without disclosing
         // a revoked mailbox id or sending its previous counts.
         const batch = pending.get(accountId);
@@ -38,6 +38,8 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
         queue(async () => { await send({ type: "mailboxes-changed" }); });
         schedule(accountId);
       });
+      // Registration can synchronously stop this stream during shutdown.
+      if (stopped) return;
       const onAbort = () => authStream.close();
       cancel = onAbort;
       request.signal.addEventListener("abort", onAbort, { once: true });

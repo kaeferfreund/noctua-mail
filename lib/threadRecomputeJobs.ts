@@ -28,3 +28,6 @@ export function getIdentityRecomputeJob(accountId: string) {
 }
 
 export const settleIdentityRecomputeAdmission = identityRecomputeJobs.settleJob;
+
+/** Resume durable identity scans left queued by an orderly server shutdown. */
+export const resumeIdentityRecomputeJobs = identityRecomputeJobs.resumeJobs;

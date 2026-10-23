@@ -1,3 +1,4 @@
+import { onShutdown } from "../server/shutdown";
 import { registerOwnAddressSql } from "./ownAddressSql";
 import path from "path";
 import { mkdirSync, promises as fs } from "fs";
@@ -283,9 +284,9 @@ export function closeAllDbConnections() {
 function registerDbShutdownHooks() {
   if (shutdownHooksRegistered) return;
   shutdownHooksRegistered = true;
-  process.once("SIGINT", closeAllDbConnections);
-  process.once("SIGTERM", closeAllDbConnections);
+  onShutdown("db:close", "close", closeAllDbConnections);
   process.once("beforeExit", closeAllDbConnections);
+  process.once("exit", closeAllDbConnections);
 }
 
 export async function getDb() {
