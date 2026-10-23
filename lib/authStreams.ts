@@ -31,7 +31,8 @@ export async function assertStreamAuthorized(identity: AuthStreamIdentity, deliv
 export function assertStreamAuthorizedRow(db: Database, identity: AuthStreamIdentity, deliver?: (db: Database) => void): void {
   db.transaction(() => {
   const now = Date.now();
-  const row = db.prepare(`SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s
+  // Cache the compiled statement, never its result or authorization snapshot.
+  const row = db.query(`SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s
     JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id
     JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
     JOIN auth_security_state st ON st.userId=s.userId
