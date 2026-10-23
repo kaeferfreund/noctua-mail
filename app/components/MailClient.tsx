@@ -4887,7 +4887,7 @@ export default function MailClient({
       setAdminOpen(Boolean(target.admin && isAdminUser)); setAdminSection(target.admin ?? "users");
       setSecurityOpen(target.security); setOpenBottomStatusPanel(target.panel); setCalendarSidebarOpen(target.calendar);
       if (target.compose && (!composeOpen || composeMode !== "new")) {
-        const raw = new URLSearchParams(window.location.search).get("mailto");
+        const raw = new URLSearchParams(window.location.search).get("c");
         composeHandleRef.current?.openCompose("new", undefined, false, raw ? parseMailto(raw) : undefined);
       } else if (!target.compose && composeOpen) {
         // Keep unsent content in the existing minimized composer when navigating Back.
