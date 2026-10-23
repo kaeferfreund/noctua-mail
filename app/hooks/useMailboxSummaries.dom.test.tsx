@@ -27,6 +27,7 @@ function harness() {
   let mailboxChanges = 0;
   const threadChanges: string[] = [];
   const summaryChanges: string[] = [];
+  const observedRows: UserMailboxSummary[][] = [];
   const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push(String(input));
     if (String(input).endsWith("/summary")) return new Promise<Response>((resolve, reject) => {
@@ -45,6 +46,7 @@ function harness() {
   function View({ sessionKey, authState = "selected" }: { sessionKey: string | null; authState?: MailboxState | null }) {
     const t = useTranslations("Views");
     const rows = useMailboxSummaries({ sessionKey, authState, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
+    observedRows.push(rows);
     return <Theme><TooltipProvider><SidebarProvider><output>{JSON.stringify(rows)}</output>
       <MailboxRows accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
       <ul>{COLLAB_FOLDERS.map(folder => {
@@ -61,9 +63,48 @@ function harness() {
     await waitFor(() => expect(snapshots.length).toBeGreaterThan(0));
     await act(async () => snapshots.shift()!(response(rows)));
   };
-  return { view, requests, sources, sourceRequests, snapshots, send, read, View, threadChanges, summaryChanges,
+  return { view, requests, sources, sourceRequests, snapshots, send, read, View, threadChanges, summaryChanges, observedRows,
     changes: () => mailboxChanges, denyStream: (status = 403) => { streamStatus = status; } };
 }
+
+test("20 equal mailbox events do not render the sidebar and still deliver authoritative invalidations", async () => {
+  const h = harness(); await h.read();
+  const rows = h.observedRows.at(-1)!;
+  const renders = h.observedRows.length;
+  for (let i = 0; i < 20; i++) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId,
+    unread: mailbox.unread, assignedToMe: mailbox.assignedToMe, unassignedOpen: mailbox.unassignedOpen,
+    open: mailbox.open, watcher: { ...mailbox.watcher } });
+  expect(h.observedRows.length - renders).toBe(0);
+  expect(h.observedRows.at(-1)).toBe(rows);
+  expect(h.summaryChanges).toHaveLength(20);
+  expect(h.snapshots).toHaveLength(0);
+  await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 7,
+    assignedToMe: mailbox.assignedToMe, unassignedOpen: mailbox.unassignedOpen, open: mailbox.open, watcher: mailbox.watcher });
+  expect(h.view.getByLabelText("7 unread")).toBeTruthy();
+  expect(h.observedRows.at(-1)?.[0]).toBe(rows[0]);
+  expect(h.observedRows.at(-1)?.[1]).not.toBe(rows[1]);
+  h.view.rerender(<h.View sessionKey="synthetic-session-b" />);
+  expect(h.observedRows.at(-1)).toEqual([]);
+  await h.read();
+  expect(h.observedRows.at(-1)?.[0]).not.toBe(rows[0]);
+  expect(h.observedRows.at(-1)?.[1]).not.toBe(rows[1]);
+});
+
+test("equal reconnect snapshots retain rows, while membership invalidation clears all reuse", async () => {
+  const h = harness(); await h.read();
+  const rows = h.observedRows.at(-1)!;
+  await withRetryTimers(async retries => {
+    await act(async () => h.sources[0].close());
+    await act(async () => retries.shift()!.run());
+    await h.read();
+    expect(h.observedRows.at(-1)).toBe(rows);
+    await h.send({ type: "mailboxes-changed" });
+    expect(h.observedRows.at(-1)).toEqual([]);
+    await h.read([{ ...mailbox, accessRole: "editor" }]);
+    expect(h.observedRows.at(-1)?.[0]).not.toBe(rows[1]);
+    expect(h.observedRows.at(-1)?.[0].accessRole).toBe("editor");
+  });
+});
 
 test("sidebar shows inactive and personal badges and view counts; burst SSE applies without full reads", async () => {
   const h = harness(); await h.read();
