@@ -1409,6 +1409,8 @@
     }
   },
   "Notifications": {
+    "operationFailed": "Operation failed",
+    "unexpectedError": "Unexpected error.",
     "fullSyncCancelled": "Full sync cancelled",
     "syncCancelledSelectionChanged": "Full sync was cancelled before starting because you selected another mailbox.",
     "folderAccountMismatch": "The folder does not belong to this mailbox. Please select the mailbox again.",
