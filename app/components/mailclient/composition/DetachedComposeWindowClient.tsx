@@ -233,12 +233,12 @@ export default function DetachedComposeWindowClient({
     if (status !== "ready" || !account || openedRef.current || !composeHandleRef.current) return;
     openedRef.current = true;
     void composeHandleRef.current
-      .openDetachedCompose(draft, { mode: handoff.mode, sourceMessage })
+      .openDetachedCompose(draft, { mode: handoff.mode, sourceMessage, identityId: handoff.identityId, signatureInitialized: handoff.signatureInitialized })
       .catch((openError) => {
         setError(openError instanceof Error ? openError.message : "Failed to initialize composer.");
         setStatus("error");
       });
-  }, [account, draft, handoff.mode, sourceMessage, status]);
+  }, [account, draft, handoff.mode, handoff.identityId, handoff.signatureInitialized, sourceMessage, status]);
 
   const handleComposeMirrorChange = useCallback((mirror: ComposeMirror) => {
     composeMirrorRef.current = mirror;

@@ -16,6 +16,9 @@ import type {
 } from "./composeTypes";
 
 export function useComposeState() {
+  const [composeIdentityId, setComposeIdentityId] = useState<string>();
+  const [composeUnavailableFrom, setComposeUnavailableFrom] = useState<string>();
+  const [composeSenderWarnings, setComposeSenderWarnings] = useState<string[]>([]);
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeView, setComposeView] = useState<ComposeView>("inline");
   const [composeDraftId, setComposeDraftId] = useState<string | null>(null);
@@ -97,6 +100,9 @@ export function useComposeState() {
   const composeLastEditedRef = useRef<ComposeTab>("html");
 
   return {
+    composeIdentityId, setComposeIdentityId,
+    composeUnavailableFrom, setComposeUnavailableFrom,
+    composeSenderWarnings, setComposeSenderWarnings,
     composeOpen,
     setComposeOpen,
     composeView,

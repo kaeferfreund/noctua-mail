@@ -38,6 +38,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
     composeDragActive,
     detachedWindow,
     fromValue,
+    identities, identityId, identityDisabled, sendDisabled, senderMessage, onIdentityChange,
     composeSize,
     inReplyToMessage,
     composeModalRef,
@@ -175,6 +176,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             composeOpenedAt={composeOpenedAt}
             activeAccountId={activeAccountId}
             fromValue={fromValue}
+              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onIdentityChange={onIdentityChange}
             inReplyToMessage={inReplyToMessage}
             onJumpToMessage={jumpToMessage}
             setComposeSubject={setComposeSubject}
@@ -212,6 +214,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             setComposeView("inline");
           }}
           handleSendMail={handleSendMail}
+          sendDisabled={sendDisabled}
           formatRelativeTime={formatRelativeTime}
         />
         {!isMobile && <div

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { Button, Text, TextField } from "@radix-ui/themes";
-import type { Message, RecipientSuggestion } from "@/lib/data";
+import { Button, Select, Text, TextField } from "@radix-ui/themes";
+import type { Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
 import InReplyToReferenceRow from "../InReplyToReferenceRow";
 import styles from "./Compose.module.css";
 
@@ -17,6 +17,11 @@ type ComposeFieldsProps = {
   composeOpenedAt?: string;
   activeAccountId: string | null;
   fromValue?: string;
+  identities?: SenderIdentity[];
+  identityId?: string;
+  identityDisabled?: boolean;
+  senderMessage?: string | null;
+  onIdentityChange?: (id: string) => void;
   inReplyToMessage?: Message | null;
   onJumpToMessage?: (messageId: string) => void;
   setComposeSubject: React.Dispatch<React.SetStateAction<string>>;
@@ -193,6 +198,7 @@ export default function ComposeFields({
   composeShowBcc,
   activeAccountId,
   fromValue,
+  identities = [], identityId, identityDisabled = false, senderMessage, onIdentityChange,
   inReplyToMessage,
   onJumpToMessage,
   setComposeSubject,
@@ -310,13 +316,18 @@ export default function ComposeFields({
       <Text as="label" htmlFor={`compose-${variant}-from`} size="2" weight="medium" className={styles.label}>
         From:
       </Text>
-      <TextField.Root
-        id={`compose-${variant}-from`}
-        name="compose_from"
-        size="2"
-        value={fromValue ?? ""}
-        readOnly
-      />
+      <div className={styles.composeInputWrap}>
+        <Select.Root value={identityId || "__unavailable"} disabled={identityDisabled || !onIdentityChange} onValueChange={id => { markComposeDirty(); onIdentityChange?.(id); }}>
+          <Select.Trigger id={`compose-${variant}-from`} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} style={{ width: "100%" }} />
+          <Select.Content position="popper">
+            {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? `${fromValue} — unavailable` : "Choose a sender"}</Select.Item>}
+            {identities.filter(identity => identity.enabled).map(identity => <Select.Item key={identity.id} value={identity.id}>
+              {identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email}{identity.isDefault ? " (mailbox default)" : ""}
+            </Select.Item>)}
+          </Select.Content>
+        </Select.Root>
+        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} <a href={`#compose-${variant}-from`}>Review From</a></Text>}
+      </div>
     </div>
   );
 

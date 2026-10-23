@@ -10,6 +10,8 @@ export const DETACHED_COMPOSE_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 type DetachedComposeSessionBase = {
   version: 1;
   accountId: string;
+  identityId?: string;
+  signatureInitialized?: boolean;
   ownerUserId?: string;
   mode: ComposeMode;
   sourceMessageId: string | null;
@@ -96,6 +98,8 @@ export function parseDetachedComposeHandoff(
       !parsed ||
       parsed.version !== 1 ||
       (parsed.ownerUserId !== undefined && (typeof parsed.ownerUserId !== "string" || !parsed.ownerUserId.trim())) ||
+      (parsed.signatureInitialized !== undefined && typeof parsed.signatureInitialized !== "boolean") ||
+      (parsed.identityId !== undefined && (typeof parsed.identityId !== "string" || !parsed.identityId || parsed.identityId.length > 256)) ||
       typeof parsed.accountId !== "string" ||
       !parsed.accountId.trim() ||
       !isComposeMode(parsed.mode) ||
