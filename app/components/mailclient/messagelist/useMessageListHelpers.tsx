@@ -1,3 +1,4 @@
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { useLocale } from "next-intl";
 import { useCallback } from "react";
 import type React from "react";
@@ -30,8 +31,20 @@ export function useMessageListHelpers({
   );
 
   const threadPathById = useCallback(
-    (id: string) => id.replace(`${activeAccountId}:`, ""),
-    [activeAccountId]
+    (id: string) => {
+      const folder = folderById(id);
+      if (!folder) return id.replace(`${activeAccountId}:`, "");
+      const parts = [getFolderDisplayName(folder, locale)];
+      let parentId = folder.parentId;
+      while (parentId) {
+        const parent = folderById(parentId);
+        if (!parent) break;
+        parts.unshift(getFolderDisplayName(parent, locale));
+        parentId = parent.parentId;
+      }
+      return parts.join("/");
+    },
+    [activeAccountId, folderById, locale]
   );
 
   const renderSelectIndicators = useCallback(

@@ -362,9 +362,10 @@ it("collaboration sidebar definitions activate their server badge filter; summar
           {COLLAB_FOLDERS.map((f) => (
             <button
               key={f.id}
+              data-view-id={f.id}
               onClick={() => actions.activateVirtualFolder(f.id)}
             >
-              {f.name}
+              {f.id}
             </button>
           ))}
         </nav>
@@ -379,7 +380,7 @@ it("collaboration sidebar definitions activate their server badge filter; summar
   }
   const view = render(<Harness />);
   for (const folder of COLLAB_FOLDERS) {
-    fireEvent.click(view.getByRole("button", { name: folder.name }));
+    fireEvent.click(view.container.querySelector<HTMLButtonElement>(`[data-view-id="${folder.id}"]`)!);
     expect(view.getByTestId("filter").textContent).toBe(
       folder.queryBadges.join(","),
     );
