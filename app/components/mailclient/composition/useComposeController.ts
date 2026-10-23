@@ -1,4 +1,5 @@
-import { renderSignatureTemplate, replaceSignatureBlock } from "@/lib/signatureTemplates";
+import { senderMessages } from "@/lib/senderMessages";
+import { prepareSignatureTemplate, renderSignatureTemplate, replaceSignatureBlock } from "@/lib/signatureTemplates";
 import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type React from "react";
 import { useMemo } from "react";
@@ -44,26 +45,40 @@ export function useComposeController({
   const {
     composeDirtyRef,
     composeSignatureRef,
+    composeEditorSnapshotRef,
     lastDraftHashRef,
     currentDraftHashRef,
     composeBaselineHashRef,
     composeEditorInitRef,
-    composeLastEditedRef
+    composeLastEditedRef,
+    composeBodyDebounceRef,
+    composeMarkdownRef
   } = compose;
 
   const applySignatureToCompose = (signature: { id: string; body: string } | null, selectedIdentity?: SenderIdentity) => {
     const identity = selectedIdentity ?? sender?.identities.find(item => item.id === compose.composeIdentityId);
-    const next = signature ? { id: signature.id, ...renderSignatureTemplate(signature.body, sender?.user ?? { email: "" }, identity) } : null;
+    const prepared = signature ? prepareSignatureTemplate(signature.body) : null;
+    const next = signature ? { id: signature.id, ...renderSignatureTemplate(prepared!.body, sender?.user ?? { email: "" }, identity) } : null;
+    const snapshot = compose.composeTab === "html" ? composeEditorSnapshotRef.current?.() : undefined;
     const previous = composeSignatureRef.current;
     if (!previous && !next) return true;
     const tab = compose.composeTab;
-    const body = tab === "html" ? compose.composeHtml : tab === "markdown" ? compose.composeMarkdownRef.current : (compose.composeTextRef.current?.value ?? compose.composeBody);
+    const body = tab === "html" ? snapshot?.html ?? compose.composeHtml : tab === "markdown" ? compose.composeMarkdownRef.current : (compose.composeTextRef.current?.value ?? compose.composeBody);
     const replacement = replaceSignatureBlock(body, tab === "html" ? previous?.html : tab === "markdown" ? previous?.markdown ?? previous?.text : previous?.text, tab === "html" ? next?.html ?? "" : tab === "markdown" ? next?.markdown ?? "" : next?.text ?? "", tab === "html" ? "" : "\n\n");
-    if (replacement.conflict && !window.confirm("The signature may have been edited. Replace signature? Edited text will be kept and the new signature added if the original block cannot be found.")) return false;
+    if (replacement.conflict && !window.confirm(next ? senderMessages.confirmKeepEditedSignature : senderMessages.confirmKeepEditedWithoutSignature)) return false;
     const value = replacement.conflict ? [body, tab === "html" ? next?.html : tab === "markdown" ? next?.markdown : next?.text].filter(Boolean).join(tab === "html" ? "" : "\n\n") : replacement.body;
+    // A signature change is a body edit in the current representation. Cancel
+    // delayed keystrokes so they cannot overwrite it after a format switch.
+    if (composeBodyDebounceRef.current) {
+      clearTimeout(composeBodyDebounceRef.current);
+      composeBodyDebounceRef.current = null;
+    }
+    composeLastEditedRef.current = tab;
+    if (tab === "markdown") composeMarkdownRef.current = value;
     if (tab === "html") { compose.setComposeHtml(value); compose.setComposeHtmlText(stripHtml(value)); }
     else if (tab === "markdown") compose.setComposeMarkdown(value);
     else compose.setComposeBody(value);
+    if (prepared?.warnings.length) compose.setComposeSenderWarnings(previous => [...new Set([...previous, ...prepared.warnings])]);
     composeEditorInitRef.current = false;
     compose.setComposeEditorReset(prev => prev + 1);
     composeDirtyRef.current = true;

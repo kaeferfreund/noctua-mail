@@ -1,3 +1,4 @@
+import { senderMessages } from "@/lib/senderMessages";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -135,7 +136,7 @@ export default function AccountSettingsModal({
   const tabItems = useMemo<OverflowTabItem[]>(() => {
     const items: OverflowTabItem[] = [
       { value: "account", label: "Account" },
-      { value: "identities", label: "Identities", disabled: !isExistingAccount },
+      { value: "identities", label: senderMessages.identitiesTitle, disabled: !isExistingAccount },
       { value: "signatures", label: "Signatures", disabled: !isExistingAccount },
       { value: "preferences", label: "Preferences", disabled: !isExistingAccount },
       { value: "categorization", label: "Categorization", disabled: !isExistingAccount },

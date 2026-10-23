@@ -1,17 +1,18 @@
+import { senderMessages } from "@/lib/senderMessages";
 const messages: Record<string, string> = {
-  identity_unavailable: "This From address is unavailable. Choose an enabled sender and save the draft.",
-  identity_not_found: "This From address is unavailable. Choose an enabled sender and save the draft.",
-  draft_identity_changed: "The saved sender details changed. Review From and save the draft before sending.",
-  smtp_sender_rejected: "The mail provider rejected this From address. Choose another sender or ask a mailbox manager to review it.",
-  smtp_recipient_rejected: "The mail provider rejected a recipient. Review To, Cc and Bcc before trying again.",
-  smtp_message_rejected: "The mail provider rejected this message. Review its content and attachments.",
-  smtp_temporary_failure: "The mail provider is temporarily unavailable. Keep this draft and try again later.",
-  smtp_configuration_error: "Sending is unavailable. Ask a mailbox manager to review the mail configuration.",
-  smtp_connection_failed: "Could not connect to the mail provider. Keep this draft and try again later.",
-  smtp_upstream_error: "The mail provider could not process this message. Keep this draft and contact a mailbox manager.",
-  smtp_connection_timeout: "Connecting to the mail provider timed out. Keep this draft and try again later.",
-  smtp_greeting_timeout: "The mail provider did not respond in time. Keep this draft and try again later.",
-  smtp_server_timeout: "The mail provider timed out. Delivery may have succeeded; check Sent and with the recipient before sending again."
+  identity_unavailable: senderMessages.identityUnavailable,
+  identity_not_found: senderMessages.identityUnavailable,
+  draft_identity_changed: senderMessages.draftIdentityChanged,
+  smtp_sender_rejected: senderMessages.senderRejected,
+  smtp_recipient_rejected: senderMessages.recipientRejected,
+  smtp_message_rejected: senderMessages.messageRejected,
+  smtp_temporary_failure: senderMessages.providerTemporary,
+  smtp_configuration_error: senderMessages.providerConfiguration,
+  smtp_connection_failed: senderMessages.providerConnection,
+  smtp_upstream_error: senderMessages.providerFailure,
+  smtp_connection_timeout: senderMessages.connectionTimeout,
+  smtp_greeting_timeout: senderMessages.greetingTimeout,
+  smtp_server_timeout: senderMessages.deliveryUncertain
 };
 export async function readSenderError(response: Response, fallback: (response: Response) => Promise<string>) {
   const data = await response.clone().json().catch(() => null) as { code?: string } | null;

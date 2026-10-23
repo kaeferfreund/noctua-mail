@@ -1,3 +1,4 @@
+import { senderMessages } from "@/lib/senderMessages";
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { Button, Card, Flex, Grid, Select, Text, TextArea, TextField } from "@radix-ui/themes";
 import Field from "@/app/components/account-settings/Field";
@@ -28,9 +29,9 @@ export default function SignaturesTabContent({
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Text size="2" color="gray">
-          Manage shared mailbox templates. Personal signature overrides are in Preferences. Supported placeholders: {"{{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}"}.
+          {senderMessages.sharedTemplatesHelp}
         </Text>
-        {invalidTemplate && <Text as="p" role="alert">Use only the supported signature placeholders (maximum 8 KiB).</Text>}
+        {invalidTemplate && <Text as="p" role="alert">{senderMessages.invalidTemplate}</Text>}
         <Flex align="center" justify="between">
           <Text size="3" weight="medium">
             Signature list
@@ -142,7 +143,7 @@ export default function SignaturesTabContent({
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
           {saveDisabled ? "Close" : "Cancel"}
         </Button>
-        <Button size="2" onClick={onSave} disabled={saveDisabled}>
+        <Button size="2" onClick={() => { if (!invalidTemplate) onSave(); }} disabled={saveDisabled}>
           Save
         </Button>
       </Flex>

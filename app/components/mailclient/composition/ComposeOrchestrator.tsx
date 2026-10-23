@@ -1,5 +1,7 @@
 "use client";
 
+import { senderMessages } from "@/lib/senderMessages";
+
 import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
 import { resolveSignatureTemplate } from "@/lib/signatureTemplates";
 import { readSenderError } from "./senderErrors";
@@ -322,6 +324,7 @@ function ComposeOrchestratorImpl(
 ) {
   const [sender, setSender] = useState<SenderSettings | null>(null);
   const [senderLoading, setSenderLoading] = useState(true);
+  const [retrySender, setRetrySender] = useState<(() => void) | null>(null);
   const [senderError, setSenderError] = useState<string | null>(null);
   const signatureConfigKey = JSON.stringify([accountSignatures, defaultSignatureId]);
   const composeState = useComposeState();
@@ -334,9 +337,9 @@ function ComposeOrchestratorImpl(
       setSenderLoading(true);
       try {
         const snapshot = await senderSettingsLoader(apiFetch, activeAccountId);
-        if (active) { setSender(snapshot); setSenderError(null); }
+        if (active) { setSender(snapshot); setSenderError(null); setRetrySender(null); }
       } catch (error) {
-        if (active) { setSender(null); setSenderError(error instanceof Error ? error.message : "Could not load sender identities."); }
+        if (active) { setSender(null); setSenderError(error instanceof Error ? error.message : senderMessages.identityLoadFailed); setRetrySender(() => () => { if (active) void refresh(); }); }
       } finally { if (active) setSenderLoading(false); }
     };
     const storageRefresh = (event: StorageEvent) => {
@@ -946,7 +949,7 @@ function ComposeOrchestratorImpl(
     // re-rendered.
     if (sendingMailRef.current || deliveredRef.current) return;
     if (senderLoading || sender?.account.id !== activeAccountId || !senderCanCompose || !sender.identities.some(item => item.id === composeIdentityId && item.enabled)) {
-      setSenderError("Choose an enabled From address before sending."); return;
+      setSenderError(senderMessages.chooseEnabledSender); return;
     }
     setSenderError(null);
     if (attachmentLoadState) {
@@ -1186,88 +1189,93 @@ function ComposeOrchestratorImpl(
       composeScopeRef.current.ownerUserId !== ownerUserId ||
       composeSessionVersionRef.current !== initSessionVersion;
 
-    setSenderLoading(true);
-    let snapshot: SenderSettings;
     try {
-      const request = senderSettingsLoader(apiFetch, activeAccountId);
-      snapshot = request instanceof Promise ? await request : request;
-      if (isStale()) return;
-      if (ownerUserId && snapshot.user.id !== ownerUserId) return;
-      if (restoredIdentityId) snapshot = { ...snapshot, prefs: { ...snapshot.prefs, defaultIdentityId: restoredIdentityId } };
-      setSender(snapshot); setSenderError(null);
-    } catch (error) {
-      if (!isStale()) { setSender(null); setSenderError(error instanceof Error ? error.message : "Could not load sender identities."); }
-      throw error;
-    } finally { if (!isStale()) setSenderLoading(false); }
-
-    // Reset the delivery receipt only in the same batch that replaces all fields.
-    const openInitializedCompose = (source?: Message, options?: Parameters<typeof openComposeInternal>[3]) => {
-      openComposeInternal(mode, source, asNew, { ...options, sender: snapshot, skipSignature });
-      initSessionVersion = composeSessionVersionRef.current;
-      deliveredRef.current = false;
-      setDeliveredWarnings([]);
-    };
-    abortComposeAttachmentLoads();
-    resetComposeTranslation();
-    if (!message) {
-      openInitializedCompose();
-      if (prefill) applyComposePrefill(prefill);
-      return true;
-    }
-
-    const preferredComposeTab = getPreferredComposeTab(message.id);
-
-    const getComposeSourceMessage = (clickedMessage: Message) => {
-      const cachedMessage = messageById.get(clickedMessage.id);
-      if (!cachedMessage) return clickedMessage;
-
-      const scoreMessage = (candidate: Message) =>
-        (hasHtmlContent(candidate.htmlBody) ? 2 : 0) +
-        ((candidate.body ?? "").trim().length > 0 ? 1 : 0);
-
-      return scoreMessage(clickedMessage) >= scoreMessage(cachedMessage)
-        ? clickedMessage
-        : cachedMessage;
-    };
-
-    const hydrateDraftComposeMetadata = async (msg: Message) => {
-      if (!isDraftMessage(msg)) return msg;
-      if (msg.draftInvite) return msg;
-      const source = msg.source ?? (msg.hasSource
-        ? await apiFetch(buildAccountMessageSourcePath(msg.accountId, msg.id))
-            .then(async (response) => {
-              if (!response.ok) return "";
-              const data = (await response.json().catch(() => null)) as { source?: string } | null;
-              return data?.source ?? "";
-            })
-            .catch(() => "")
-        : "");
-      const draftInvite = source ? extractComposeInviteDraftFromSource(source) : null;
-      return draftInvite ? { ...msg, source, draftInvite } : msg;
-    };
-
-    const afterOpen = async (msg: Message) => {
-      const messageWithDraftMetadata = await hydrateDraftComposeMetadata(msg);
-      if (isStale()) return;
-      if (mode === "edit" || mode === "forward") {
-        const {
-          attachments,
-          deferred,
-          message: hydratedMessage
-        } = await loadComposeSourceAttachments(messageWithDraftMetadata);
+      setSenderLoading(true);
+      setSenderError(null);
+      setRetrySender(null);
+      let snapshot: SenderSettings;
+      try {
+        const request = senderSettingsLoader(apiFetch, activeAccountId);
+        snapshot = request instanceof Promise ? await request : request;
         if (isStale()) return;
-        openInitializedCompose(hydratedMessage, { preferredComposeTab });
-        setComposeAttachments(attachments);
-        startComposeAttachmentLoads(messageWithDraftMetadata, deferred);
+        if (ownerUserId && snapshot.user.id !== ownerUserId) return;
+        if (restoredIdentityId) snapshot = { ...snapshot, prefs: { ...snapshot.prefs, defaultIdentityId: restoredIdentityId } };
+        setSender(snapshot); setSenderError(null);
+      } catch (error) {
+        if (!isStale()) {
+          setSender(null); setSenderError(error instanceof Error ? error.message : senderMessages.identityLoadFailed);
+          setRetrySender(() => () => { if (!isStale()) void openCompose(mode, message, asNew, prefill, restoredIdentityId, skipSignature); });
+        }
+        throw error;
+      } finally { if (!isStale()) setSenderLoading(false); }
+
+      // Reset the delivery receipt only in the same batch that replaces all fields.
+      const openInitializedCompose = (source?: Message, options?: Parameters<typeof openComposeInternal>[3]) => {
+        openComposeInternal(mode, source, asNew, { ...options, sender: snapshot, skipSignature });
+        initSessionVersion = composeSessionVersionRef.current;
+        deliveredRef.current = false;
+        setDeliveredWarnings([]);
+      };
+      abortComposeAttachmentLoads();
+      resetComposeTranslation();
+      if (!message) {
+        openInitializedCompose();
+        if (prefill) applyComposePrefill(prefill);
         return true;
       }
 
-      if (isStale()) return;
-      openInitializedCompose(messageWithDraftMetadata, { preferredComposeTab });
-      return true;
-    };
+      const preferredComposeTab = getPreferredComposeTab(message.id);
 
-    try {
+      const getComposeSourceMessage = (clickedMessage: Message) => {
+        const cachedMessage = messageById.get(clickedMessage.id);
+        if (!cachedMessage) return clickedMessage;
+
+        const scoreMessage = (candidate: Message) =>
+          (hasHtmlContent(candidate.htmlBody) ? 2 : 0) +
+          ((candidate.body ?? "").trim().length > 0 ? 1 : 0);
+
+        return scoreMessage(clickedMessage) >= scoreMessage(cachedMessage)
+          ? clickedMessage
+          : cachedMessage;
+      };
+
+      const hydrateDraftComposeMetadata = async (msg: Message) => {
+        if (!isDraftMessage(msg)) return msg;
+        if (msg.draftInvite) return msg;
+        const source = msg.source ?? (msg.hasSource
+          ? await apiFetch(buildAccountMessageSourcePath(msg.accountId, msg.id))
+              .then(async (response) => {
+                if (!response.ok) return "";
+                const data = (await response.json().catch(() => null)) as { source?: string } | null;
+                return data?.source ?? "";
+              })
+              .catch(() => "")
+          : "");
+        const draftInvite = source ? extractComposeInviteDraftFromSource(source) : null;
+        return draftInvite ? { ...msg, source, draftInvite } : msg;
+      };
+
+      const afterOpen = async (msg: Message) => {
+        const messageWithDraftMetadata = await hydrateDraftComposeMetadata(msg);
+        if (isStale()) return;
+        if (mode === "edit" || mode === "forward") {
+          const {
+            attachments,
+            deferred,
+            message: hydratedMessage
+          } = await loadComposeSourceAttachments(messageWithDraftMetadata);
+          if (isStale()) return;
+          openInitializedCompose(hydratedMessage, { preferredComposeTab });
+          setComposeAttachments(attachments);
+          startComposeAttachmentLoads(messageWithDraftMetadata, deferred);
+          return true;
+        }
+
+        if (isStale()) return;
+        openInitializedCompose(messageWithDraftMetadata, { preferredComposeTab });
+        return true;
+      };
+
       const resolved = getComposeSourceMessage(message);
       const hasText = Boolean((resolved.body ?? "").trim());
       const hasHtml = hasHtmlContent(resolved.htmlBody);
@@ -1291,10 +1299,12 @@ function ComposeOrchestratorImpl(
     mode: ComposeMode,
     message?: Message,
     asNew = false,
-    prefill?: ComposeOpenPrefill
+    prefill?: ComposeOpenPrefill,
+    restoredIdentityId?: string,
+    skipSignature = false
   ) => {
     try {
-      await initializeCompose(mode, message, asNew, prefill);
+      await initializeCompose(mode, message, asNew, prefill, restoredIdentityId, skipSignature);
     } catch (error) {
       console.error("[noctua] failed to open composer:", error);
       reportError(
@@ -1437,6 +1447,7 @@ function ComposeOrchestratorImpl(
       composeDirtyRef={composeDirtyRef}
       composeEditorInitRef={composeEditorInitRef}
       composeSignatureRef={compose.composeSignatureRef}
+      composeEditorSnapshotRef={compose.composeEditorSnapshotRef}
       composeLastEditedRef={composeLastEditedRef}
       composeSessionVersionRef={composeSessionVersionRef}
       stripHtml={stripHtml}
@@ -1526,7 +1537,8 @@ function ComposeOrchestratorImpl(
     identityId: composeIdentityId,
     identityDisabled: senderLoading || !senderCanCompose || sendingMail || draftSaving,
     sendDisabled: senderLoading || !senderCanCompose || !sender?.identities.some(item => item.id === composeIdentityId && item.enabled),
-    senderMessage: senderError ?? draftSaveError ?? (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? "This draft's From address is unavailable. Choose an enabled sender and save the draft." : compose.composeSenderWarnings.join(" ")),
+    onSenderRetry: senderError && !senderLoading ? retrySender ?? undefined : undefined,
+    senderMessage: senderError ?? draftSaveError ?? (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? senderMessages.unavailableDraft : compose.composeSenderWarnings.join(" ")),
     onIdentityChange: (id) => {
       const identity = sender?.identities.find(item => item.id === id && item.enabled);
       if (!identity || sendingMail || !senderCanCompose) return;
@@ -1603,6 +1615,8 @@ function ComposeOrchestratorImpl(
         />
       ),
       resetSession: () => {
+        setRetrySender(null);
+        setSenderError(null);
         composeInitRef.current = { token: composeInitRef.current.token + 1, key: null };
         sendOperationRef.current = null;
         deliveredRef.current = false;
@@ -1618,6 +1632,9 @@ function ComposeOrchestratorImpl(
 
   return (
     <ComposeContextProvider value={contextValue}>
+      {senderError && retrySender && !composeOpen && <div role="alert">
+        {senderError} <button type="button" disabled={senderLoading} onClick={retrySender}>{senderMessages.retrySender}</button>
+      </div>}
       <ComposeModal isMobile={isMobile} open={isMobile ? composeOpen : showComposeModal} />
       <ComposeMinimized open={!isMobile && showComposeMinimized} />
       {!isMobile && inlineSlotEl &&

@@ -131,14 +131,14 @@
 
 .composeGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   width: 100%;
 }
 
 .composeGridRow {
   display: grid;
-  grid-template-columns: 84px 1fr;
+  grid-template-columns: 84px minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
 }
@@ -150,6 +150,7 @@
 }
 
 .composeInputWrap {
+  min-width: 0;
   position: relative;
   flex: 1;
 }
@@ -464,4 +465,27 @@
   .composeActions > button { min-width: 44px; min-height: 44px; }
   .composeResizer { display: none; }
   .composeHeader { padding: 12px; }
+}
+
+.composeFromTrigger {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 36px;
+}
+.composeFromTrigger > :first-child {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.composeFromMenu {
+  width: calc(100vw - 32px);
+  max-width: calc(100vw - 32px);
+}
+.composeFromMenu :global(.rt-SelectItem) {
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

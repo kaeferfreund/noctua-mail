@@ -14,7 +14,8 @@ const scenarios = [
   "QA-002 Send stays visible after autosave at 360px",
   "QA-002 Send stays visible after autosave at 390px",
   "QA-008 desktop modal contains keyboard focus and restores its opener",
-  "sender identities: personal From, signature replacement, saved draft reopen and mobile From"
+  "sender identities: personal From, signature replacement, saved draft reopen and mobile From",
+  "QA-002 Send stays visible after autosave at 320px"
 ];
 test.beforeEach(async ({page}, info) => {
   const index=scenarios.indexOf(info.title);
@@ -44,6 +45,31 @@ async function openCompose(page: Page) {
   await page.getByRole('button', {name:'New mail',exact:true}).click();
   await expect(page.getByLabel('Subject:',{exact:true})).toBeVisible();
   await expect(page.locator('[data-lexical-editor="true"]')).toBeVisible();
+}
+
+// Review P2-D: visibility alone misses clipped controls and oversized popovers.
+async function assertFromBounds(page: Page) {
+  const from = page.getByLabel('From:', {exact:true});
+  const viewport = page.viewportSize()!;
+  const control = await from.boundingBox();
+  expect(control).not.toBeNull();
+  expect(control!.x).toBeGreaterThanOrEqual(0);
+  expect(control!.x + control!.width).toBeLessThanOrEqual(viewport.width);
+  expect(control!.height).toBeGreaterThanOrEqual(36);
+  expect(await from.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.right - 12, r.y + r.height / 2)); })).toBe(true);
+  await from.click();
+  await expect.poll(async () => Math.round((await page.getByRole('listbox').boundingBox())!.width)).toBe(viewport.width - 32);
+  const menu = await page.getByRole('listbox').boundingBox();
+  expect(menu).not.toBeNull();
+  expect(menu!.x).toBeGreaterThanOrEqual(16);
+  expect(menu!.x + menu!.width).toBeLessThanOrEqual(viewport.width - 16);
+  for (const option of await page.getByRole('option').all()) {
+    const box = await option.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+  }
+  console.log(JSON.stringify({finding:'P2-D',viewport,control,menu}));
+  await page.keyboard.press('Escape');
 }
 
 // Real zero-delay keyboard events, autosave, send request and captured SMTP.
@@ -81,13 +107,14 @@ test('QA-001 rapid subject remains intact through autosave and SMTP', async ({pa
   }
 });
 
-for(const viewport of [{width:360,height:780},{width:390,height:844}]) {
+for(const viewport of [{width:320,height:740},{width:360,height:780},{width:390,height:844}]) {
   test(`QA-002 Send stays visible after autosave at ${viewport.width}px`, async ({page})=>{
     await page.setViewportSize(viewport);
     await signIn(page);
     // The responsive sidebar owns the mobile New mail action.
     await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
     await openCompose(page);
+    await assertFromBounds(page);
     await page.getByLabel('To:',{exact:true}).fill('recipient@example.test');
     await page.getByLabel('Subject:',{exact:true}).fill('Synthetic mobile autosave');
     await page.locator('[data-lexical-editor="true"]').fill('Synthetic mobile body');
@@ -181,6 +208,19 @@ test('sender identities: personal From, signature replacement, saved draft reope
   await expect(from).toContainText('demo@monkeydent.test');
   await expect(editor).toContainText('demo@monkeydent.test');
   await expect(editor).not.toContainText(aliasEmail);
+  // Programmatic From changes remain authoritative across editor formats.
+  for (const format of ['Text', 'Markdown']) {
+    await page.getByRole('tab',{name:format,exact:true}).click();
+    await from.click();
+    await page.getByRole('option',{name:new RegExp(aliasEmail.replace(/\./g,'\\.'))}).click();
+    await page.getByRole('tab',{name:'HTML',exact:true}).click();
+    await expect(editor).toContainText(aliasEmail);
+    await expect(editor).not.toContainText('demo@monkeydent.test');
+    expect((await editor.innerText()).match(/Synthetic Alex/g)).toHaveLength(1);
+    await from.click();
+    await page.getByRole('option',{name:/demo@monkeydent.test/}).click();
+    await expect(editor).not.toContainText(aliasEmail);
+  }
   expect(dialogs).toEqual([]);
   expect((await editor.innerText()).match(/Synthetic Alex/g)).toHaveLength(1);
   await page.getByLabel('To:',{exact:true}).fill('recipient@example.test');
@@ -213,6 +253,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
   await openCompose(page);
   await expect(page.getByLabel('From:',{exact:true})).toBeVisible();
   await expect(page.getByLabel('From:',{exact:true})).toContainText(aliasEmail);
+  await assertFromBounds(page);
   await expect(page.getByRole('button',{name:'Send',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
   // Sending the saved draft uses the server's saved identity contract.

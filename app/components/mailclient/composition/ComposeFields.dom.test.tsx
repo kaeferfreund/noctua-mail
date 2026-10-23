@@ -40,7 +40,7 @@ describe("compose From control", () => {
     const { view } = fields("inline", { identityId: "unknown", fromValue: "old@example.test", senderMessage: "Choose an enabled sender and save the draft." });
     expect(view.getByLabelText("From:").textContent).toContain("old@example.test — unavailable");
     expect(view.getByRole("alert").textContent).toContain("Choose an enabled sender");
-    expect(view.getByRole("link", { name: "Review From" }).getAttribute("href")).toBe("#compose-inline-from");
+    expect(view.getByRole("link", { name: "Review sender" }).getAttribute("href")).toBe("#compose-inline-from");
   });
   test("viewer From selection and send are disabled", () => {
     const { view } = fields("modal", { identityDisabled: true });
@@ -48,4 +48,24 @@ describe("compose From control", () => {
     const actions = render(<Theme><ComposeActions composeDraftId={null} composeOpen canSaveDraft={false} draftSaving={false} draftSaveError={null} draftSavedAt={null} sendingMail={false} discardingDraft={false} sendDisabled handleDiscardDraft={() => {}} handleSaveDraft={() => {}} handleCancel={() => {}} handleSendMail={() => { throw Error("viewer sent"); }} formatRelativeTime={() => ""} /></Theme>);
     expect((actions.getByRole("button", { name: /^Send$/ }) as HTMLButtonElement).disabled).toBe(true);
   });
+});
+
+for (const width of [320, 360, 390]) test(`P2-D ${width}px: long From options and unavailable labels remain accessible`, async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(window, "innerWidth");
+  Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: width });
+  try {
+    const identity = { ...identities[0], displayName: "Synthetic very long shared mailbox display name for mobile" };
+    const { view, selected } = fields("modal", { identities: [identity, identities[1]] });
+    const trigger = view.getByLabelText("From:", { exact: true });
+    expect(trigger.textContent).toContain(identity.email);
+    fireEvent.click(trigger);
+    const option = await view.findByRole("option", { name: /very long shared mailbox/ });
+    expect(option.textContent).toContain(identity.email);
+    expect(view.getByRole("listbox")).toBeTruthy();
+    fireEvent.click(await view.findByRole("option", { name: /Synthetic alias/ }));
+    expect(selected()).toBe("alias");
+    cleanup();
+    const stale = fields("modal", { identityId: "old", fromValue: "unavailable-synthetic-sender@example.test" });
+    expect(stale.view.getByLabelText("From:").textContent).toContain("unavailable-synthetic-sender@example.test — unavailable");
+  } finally { if (descriptor) Object.defineProperty(window, "innerWidth", descriptor); else Reflect.deleteProperty(window, "innerWidth"); }
 });
