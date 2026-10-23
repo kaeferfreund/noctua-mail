@@ -3,11 +3,17 @@ import type { UserEvent } from "@/lib/userEvents";
 
 export const summaryReconnectDelay = (failures: number) => Math.min(30_000, 1_000 * 2 ** Math.min(failures, 5));
 
+// Older servers omit the additive fields; a canonical read repairs their metadata.
+export type MailboxSummaryUpdate = Omit<Extract<UserEvent, { type: "mailbox-summary" }>, "watcher" | "open"> &
+  Partial<Pick<Extract<UserEvent, { type: "mailbox-summary" }>, "watcher" | "open">>;
+export const hasSummaryMetadata = (update: MailboxSummaryUpdate) => update.watcher !== undefined && Number.isFinite(update.open);
+
 /** Unknown mailboxes need metadata from a canonical read; known counts are absolute. */
-export function applyMailboxSummary(mailboxes: UserMailboxSummary[], update: Extract<UserEvent, { type: "mailbox-summary" }>) {
+export function applyMailboxSummary(mailboxes: UserMailboxSummary[], update: MailboxSummaryUpdate) {
   if (!mailboxes.some(mailbox => mailbox.accountId === update.accountId)) return null;
   return mailboxes.map(mailbox => mailbox.accountId === update.accountId
-    ? { ...mailbox, unread: update.unread, assignedToMe: update.assignedToMe, unassignedOpen: update.unassignedOpen }
+    ? { ...mailbox, unread: update.unread, assignedToMe: update.assignedToMe, unassignedOpen: update.unassignedOpen,
+      ...(update.open === undefined ? {} : { open: update.open }), ...(update.watcher === undefined ? {} : { watcher: update.watcher }) }
     : mailbox);
 }
 
@@ -48,9 +54,9 @@ export async function readSummaryEvents(body: ReadableStream<Uint8Array>, onEven
   }
 }
 
-/** Open is not present in the summary contract; its existing thread total stays separate. */
-export function collaborationViewCount(id: string, summary: UserMailboxSummary | undefined, openCount: number | null) {
+/** Collaboration views use distinct whole-mailbox thread counts from one summary. */
+export function collaborationViewCount(id: string, summary: UserMailboxSummary | undefined) {
   if (id === "virtual:assigned-to-me") return summary?.assignedToMe ?? null;
   if (id === "virtual:unassigned") return summary?.unassignedOpen ?? null;
-  return summary ? openCount : null;
+  return id === "virtual:open" ? summary?.open ?? null : null;
 }

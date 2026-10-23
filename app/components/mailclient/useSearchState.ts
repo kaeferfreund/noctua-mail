@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { buildAccountApiPath, buildAccountMessagesPath } from "@/lib/accountApiPaths";
+import { buildAccountMessagesPath } from "@/lib/accountApiPaths";
 import type { Folder } from "@/lib/data";
 import {
   SEARCH_BADGE_ORDER,
@@ -93,7 +93,6 @@ type UseSearchStateOptions = {
   virtualDefaultExcludedFolderIdsKey: string;
   apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
   syncCompletionVersion?: number;
-  collabRevision?: number;
 };
 
 export type SearchState = {
@@ -105,7 +104,6 @@ export type SearchState = {
   actionQueueTodoCount: number | null;
   inviteDeckTotalCount: number | null;
   inviteDeckUnreadCount: number | null;
-  collabCounts: Record<string, number | null>;
   activeVirtualFolder: VirtualFolderDefinition | null;
 };
 
@@ -132,8 +130,7 @@ export function useSearchState(options: UseSearchStateOptions) {
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion,
-    collabRevision
+    syncCompletionVersion
   } = options;
 
   const trimmedQuery = query.trim();
@@ -146,10 +143,6 @@ export function useSearchState(options: UseSearchStateOptions) {
   const [actionQueueTodoCount, setActionQueueTodoCount] = useState<number | null>(null);
   const [inviteDeckTotalCount, setInviteDeckTotalCount] = useState<number | null>(null);
   const [inviteDeckUnreadCount, setInviteDeckUnreadCount] = useState<number | null>(null);
-
-  const [collabCountEntry, setCollabCounts] = useState<{ accountId: string; open: number } | null>(null);
-  const collabCounts: Record<string, number | null> = collabCountEntry?.accountId === activeAccountId
-    ? { "virtual:open": collabCountEntry.open } : {};
 
   const lastFolderIdRef = useRef<string>("");
 
@@ -261,25 +254,6 @@ export function useSearchState(options: UseSearchStateOptions) {
     };
   }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion]);
 
-  // The user-wide summary supplies assigned/unassigned counts. Its contract
-  // has no Open total, so retain one whole-mailbox thread count and refresh it
-  // for watcher/collaboration events without refetching the other view counts.
-  useEffect(() => {
-    if (!activeAccountId) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ page: "1", pageSize: "1", badges: "open", excludeFolderIds: "" });
-      void apiFetch(`${buildAccountApiPath(activeAccountId, "/threads")}?${params}`, { signal: controller.signal })
-        .then(async response => {
-          if (!response.ok) throw new Error("Failed to fetch count");
-          const data = await response.json() as { total: number };
-          if (!controller.signal.aborted) setCollabCounts({ accountId: activeAccountId, open: data.total });
-        })
-        .catch(() => { if (!controller.signal.aborted) setCollabCounts(null); });
-    }, 160);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [activeAccountId, apiFetch, syncCompletionVersion, collabRevision]);
-
   // Auto-clear virtual folder when conditions change
   useEffect(() => {
     if (!activeVirtualFolderId) return;
@@ -304,8 +278,7 @@ export function useSearchState(options: UseSearchStateOptions) {
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder,
-    collabCounts
+    activeVirtualFolder
   };
 
   const actions: SearchActions = {

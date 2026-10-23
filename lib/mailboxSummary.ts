@@ -8,7 +8,7 @@ import { getMailboxSummaries, type WatcherState } from "./db/mailboxSummary";
 export type UserMailboxSummary = {
   accountId: string; name: string; email: string; accessRole: AccountRole;
   isOwner: boolean; shared: boolean; unread: number | null;
-  assignedToMe: number; unassignedOpen: number;
+  assignedToMe: number; unassignedOpen: number; open: number;
   watcher: { state: WatcherState; lastEventAt?: number };
 };
 export type MailboxSummaryResult = { ok: true; mailboxes: UserMailboxSummary[]; generatedAt: number };
@@ -23,16 +23,20 @@ export function authorizeMailboxSummary(db: Database, userId: string, summary: M
 
 // One statement per shard. Historical state without live messages is excluded;
 // a live thread with no state row is open and unassigned (§6.2).
-export const COLLAB_SUMMARY_SQL = `SELECT
+export const COLLAB_SUMMARY_SQL = `WITH live AS MATERIALIZED (
+  SELECT threads.threadId, tc.assigneeUserId,
+    (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen
+  FROM (SELECT DISTINCT threadId FROM messages INDEXED BY idx_messages_live_thread_summary
+    WHERE accountId = ?1 AND COALESCE(deleted, 0) = 0) threads
+  LEFT JOIN thread_collab_state tc ON tc.accountId = ?1 AND tc.threadId = threads.threadId
+) SELECT
   (SELECT COUNT(*) FROM thread_collab_state tc
     WHERE tc.accountId = ?1 AND tc.assigneeUserId = ?2
       AND EXISTS (SELECT 1 FROM messages m INDEXED BY idx_messages_live_thread_summary WHERE m.accountId = tc.accountId
         AND m.threadId = tc.threadId AND COALESCE(m.deleted, 0) = 0)) AS assignedToMe,
-  (SELECT COUNT(*) FROM
-    (SELECT DISTINCT threadId FROM messages INDEXED BY idx_messages_live_thread_summary WHERE accountId = ?1 AND COALESCE(deleted, 0) = 0) live
-    LEFT JOIN thread_collab_state tc ON tc.accountId = ?1 AND tc.threadId = live.threadId
-    WHERE tc.assigneeUserId IS NULL AND (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting'))
-  ) AS unassignedOpen`;
+  (SELECT COUNT(*) FROM live WHERE assigneeUserId IS NULL AND isOpen) AS unassignedOpen,
+  (SELECT COUNT(*) FROM live WHERE isOpen) AS open
+`;
 
 /** The optional scope can only narrow the user's access (e.g. a mailbox-bound MCP token). */
 export async function getUserMailboxSummary(userId: string, scope?: readonly string[]): Promise<MailboxSummaryResult> {
@@ -41,7 +45,7 @@ export async function getUserMailboxSummary(userId: string, scope?: readonly str
   for (const { account, role, isOwner, memberCount } of accounts) {
     const db = await getAccountDb(account.id);
     const [summary] = await getMailboxSummaries([account.id]);
-    const counts = db.prepare(COLLAB_SUMMARY_SQL).get(account.id, userId) as { assignedToMe: number; unassignedOpen: number };
+    const counts = db.prepare(COLLAB_SUMMARY_SQL).get(account.id, userId) as { assignedToMe: number; unassignedOpen: number; open: number };
     mailboxes.push({
       accountId: account.id, name: account.name, email: account.email, accessRole: role,
       isOwner, shared: memberCount > 1,
