@@ -5790,6 +5790,7 @@ export default function MailClient({
               activeVirtualFolderName={activeVirtualFolder?.name}
               searchScope={searchScope}
               mutationInputs={{
+                navigationRows: readerRows,
                 activeAccountId,
                 activeMessageId,
                 activeFolderId,

@@ -1,9 +1,10 @@
 import { afterEach, expect, it } from "bun:test";
 import { createRef } from "react";
-import { cleanup } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
-import MessageListOrchestrator, { type MessageListOrchestratorProps } from "./MessageListOrchestrator";
+import type { Message } from "@/lib/data";
+import MessageListOrchestrator, { type MessageListHandle, type MessageListOrchestratorProps } from "./MessageListOrchestrator";
 const noop = () => {};
 afterEach(cleanup);
 function props(scope: "folder" | "all", searchActive: boolean): MessageListOrchestratorProps {
@@ -68,4 +69,26 @@ it("QA-012 preserves ordinary folder, syncing, related search, and failure state
   expect(page.getByText("Syncing messages…")).toBeTruthy();
   page.rerender(<Theme><MessageListOrchestrator {...input} searchActive messageListError="Synthetic failure" /></Theme>);
   expect(page.getByText("Failed to load messages. Synthetic failure")).toBeTruthy();
+});
+
+for (const scenario of ["next", "previous", "end", "failed"] as const) it(`archive continuation: ${scenario}`, async () => {
+  const input = props("folder", false);
+  const messages = ["c", "a", "b"].map(id => ({ id, accountId: "synthetic", folderId: "synthetic:INBOX" }) as Message);
+  const active = scenario === "previous" ? messages[2] : messages[1];
+  const handle = { current: null as MessageListHandle | null };
+  let selected: Message | null = active;
+  let activeId = active.id;
+  Object.assign(input.mutationInputs, {
+    messages, viewMessage: active, activeMessageId: active.id,
+    navigationRows: scenario === "end" ? [active] : messages,
+    shouldKeepMessageInCurrentResults: () => false,
+    setViewMessage: (message: Message | null) => { selected = message; },
+    setActiveMessageId: (id: string) => { activeId = id; },
+    apiFetch: async () => Response.json({ action: "moved", archiveFolderId: "synthetic:Archive" }, { status: scenario === "failed" ? 500 : 200 })
+  });
+  render(<Theme><MessageListOrchestrator {...input} listHandleRef={handle} /></Theme>);
+  await act(async () => { await handle.current!.handleArchiveMessage(active); });
+  const expected = scenario === "next" ? messages[2] : scenario === "previous" ? messages[1] : scenario === "failed" ? active : null;
+  expect(selected as Message | null).toBe(expected);
+  expect(activeId).toBe(expected?.id ?? "");
 });
