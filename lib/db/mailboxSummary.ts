@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { getAccountDb } from "./connection";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { teamFeaturesSupported } from "../teamFeatures";
@@ -11,26 +12,28 @@ export type MailboxSummary = {
   watcherState: WatcherState;
 };
 
+/** One mailbox's summary row on its already opened shard handle. Caller supplies an authorized id. */
+export function readMailboxSummaryRow(db: Database, accountId: string): MailboxSummary {
+  const row = db.prepare(`
+    SELECT COUNT(*) AS unreadInbox FROM messages
+    WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0
+      AND folderId IN (SELECT id FROM folders WHERE accountId = ?
+        AND (lower(specialUse) = '\\inbox' OR lower(id) = lower(?)))
+  `).get(accountId, accountId, `${accountId}:INBOX`) as { unreadInbox: number };
+  const state = db.prepare(`SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?`)
+    .get(accountId) as { lastSyncAt: number | null; watcherState: WatcherState } | undefined;
+  return {
+    accountId, unreadInbox: row.unreadInbox,
+    lastSyncAt: state?.lastSyncAt ?? null,
+    watcherState: process.env.NOCTUA_MAILBOX_WATCHER === "1" && teamFeaturesSupported()
+      ? state?.watcherState ?? "starting" : "disabled"
+  };
+}
+
 /** Callers MUST supply authorized account ids; this never enumerates the master DB. */
 export async function getMailboxSummaries(accountIds: readonly string[]): Promise<MailboxSummary[]> {
   const summaries: MailboxSummary[] = [];
-  for (const accountId of new Set(accountIds)) {
-    const db = await getAccountDb(accountId);
-    const row = db.prepare(`
-      SELECT COUNT(*) AS unreadInbox FROM messages
-      WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0
-        AND folderId IN (SELECT id FROM folders WHERE accountId = ?
-          AND (lower(specialUse) = '\\inbox' OR lower(id) = lower(?)))
-    `).get(accountId, accountId, `${accountId}:INBOX`) as { unreadInbox: number };
-    const state = db.prepare(`SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?`)
-      .get(accountId) as { lastSyncAt: number | null; watcherState: WatcherState } | undefined;
-    summaries.push({
-      accountId, unreadInbox: row.unreadInbox,
-      lastSyncAt: state?.lastSyncAt ?? null,
-      watcherState: process.env.NOCTUA_MAILBOX_WATCHER === "1" && teamFeaturesSupported()
-        ? state?.watcherState ?? "starting" : "disabled"
-    });
-  }
+  for (const accountId of new Set(accountIds)) summaries.push(readMailboxSummaryRow(await getAccountDb(accountId), accountId));
   return summaries;
 }
 

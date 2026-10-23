@@ -1,9 +1,9 @@
 import type { Database } from "bun:sqlite";
 import type { AccountRole } from "./data";
-import { listAccessibleAccountsForUser } from "./accountAccess";
-import { resolveAccountRoleRow } from "./db/accountAccess";
+import { readAccountAccess } from "./accountAccess";
+import { resolveAccountRoleRows } from "./db/accountAccess";
 import { getAccountDb, getDb } from "./db/connection";
-import { getMailboxSummaries, type WatcherState } from "./db/mailboxSummary";
+import { readMailboxSummaryRow, type WatcherState } from "./db/mailboxSummary";
 
 export type UserMailboxSummary = {
   accountId: string; name: string; email: string; accessRole: AccountRole;
@@ -15,8 +15,9 @@ export type MailboxSummaryResult = { ok: true; mailboxes: UserMailboxSummary[]; 
 
 /** Synchronous projection for a final authorized DB snapshot, immediately before serialization. */
 export function authorizeMailboxSummary(db: Database, userId: string, summary: MailboxSummaryResult): MailboxSummaryResult {
+  const roles = resolveAccountRoleRows(db, userId, summary.mailboxes.map(mailbox => mailbox.accountId));
   return { ...summary, mailboxes: summary.mailboxes.flatMap(mailbox => {
-    const role = resolveAccountRoleRow(db, userId, mailbox.accountId);
+    const role = roles.get(mailbox.accountId);
     return role ? [{ ...mailbox, accessRole: role }] : [];
   }) };
 }
@@ -41,11 +42,12 @@ FROM live
 
 /** The optional scope can only narrow the user's access (e.g. a mailbox-bound MCP token). */
 export async function getUserMailboxSummary(userId: string, scope?: readonly string[]): Promise<MailboxSummaryResult> {
-  const accounts = (await listAccessibleAccountsForUser(userId)).filter(({ account }) => !scope || scope.includes(account.id));
+  // The scope narrows the candidate read itself, so an event for a foreign mailbox costs one statement.
+  const { entries } = readAccountAccess(await getDb(), userId, { scope, identities: false });
   const mailboxes: UserMailboxSummary[] = [];
-  for (const { account, role, isOwner, memberCount } of accounts) {
+  for (const { account, role, isOwner, memberCount } of entries) {
     const db = await getAccountDb(account.id);
-    const [summary] = await getMailboxSummaries([account.id]);
+    const summary = readMailboxSummaryRow(db, account.id);
     const counts = db.prepare(COLLAB_SUMMARY_SQL).get(account.id, userId) as { assignedToMe: number; unassignedOpen: number; open: number };
     mailboxes.push({
       accountId: account.id, name: account.name, email: account.email, accessRole: role,
