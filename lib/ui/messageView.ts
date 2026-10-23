@@ -8,23 +8,13 @@ import {
   DONE_FLAG
 } from "@/lib/messageFlags";
 import { extractVisibleHtmlText, selectPreferredHtmlDocument } from "@/lib/html";
+import { hasHtmlContent, hasTextContent } from "@/lib/messageContentState";
+
+export { hasHtmlContent, hasTextContent };
 
 export type ImapFlagBadge = { label: string; kind: string };
 
 type MessageContentState = Pick<Message, "body" | "htmlBody" | "hasSource" | "mailboxPath" | "imapUid">;
-
-export function hasTextContent(body?: string | null) {
-  return typeof body === "string" && body.length > 0;
-}
-
-export function hasHtmlContent(html?: string) {
-  if (!html) return false;
-  const trimmed = selectPreferredHtmlDocument(html);
-  if (!trimmed || trimmed === "0") return false;
-  if (/<(img|table|svg|video|iframe|canvas|object|embed)\b/i.test(trimmed)) return true;
-  const textOnly = extractVisibleHtmlText(trimmed);
-  return textOnly.length > 0;
-}
 
 export function needsMessageContentHydration(message?: MessageContentState | null) {
   if (!message) return false;
