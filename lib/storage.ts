@@ -347,6 +347,24 @@ export async function getMessageSourceBuffer(accountId: string, messageId: strin
   return null;
 }
 
+export async function statMessageSource(
+  accountId: string,
+  messageId: string
+): Promise<{ size: number; mtimeMs: number } | null> {
+  await ensureSourcesDir();
+  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  for (const candidateId of candidates) {
+    try {
+      const stat = await fs.stat(sourceFilePath(accountId, candidateId));
+      if (!stat.isFile()) continue;
+      return { size: stat.size, mtimeMs: stat.mtimeMs };
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
+}
+
 export async function saveAttachmentData(
   accountId: string,
   messageId: string,

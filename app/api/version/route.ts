@@ -8,6 +8,11 @@ import { getBuildVersionFilePath } from "@/lib/buildVersionFile";
  * `useReminderNotifications.ts` so the client can prompt a reload when a
  * new build ships. `force-dynamic` + `no-store` because we *want* stale
  * clients to see the new label immediately after a deploy.
+ *
+ * The build-version file is read once per process and memoized: it is
+ * written at build time, so a deploy always restarts the process and the
+ * first poll after the restart reads the new file. A file changed without
+ * a process restart is not picked up.
  */
 
 export const dynamic = "force-dynamic";
@@ -32,8 +37,21 @@ const readBuildVersionFile = async (): Promise<BuildVersionPayload | null> => {
   }
 };
 
+let buildVersionPayloadPromise: Promise<BuildVersionPayload | null> | null = null;
+
+export function loadBuildVersionPayload(
+  reader: () => Promise<BuildVersionPayload | null> = readBuildVersionFile
+) {
+  buildVersionPayloadPromise ??= reader();
+  return buildVersionPayloadPromise;
+}
+
+export function resetBuildVersionPayloadCacheForTests() {
+  buildVersionPayloadPromise = null;
+}
+
 export async function GET() {
-  const buildVersionPayload = await readBuildVersionFile();
+  const buildVersionPayload = await loadBuildVersionPayload();
   const buildVersionLabel = buildVersionPayload?.buildVersionLabel ?? getBuildVersionLabel();
   return NextResponse.json(
     {
