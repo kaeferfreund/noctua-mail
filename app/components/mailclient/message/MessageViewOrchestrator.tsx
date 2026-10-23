@@ -13,6 +13,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState
 } from "react";
@@ -23,11 +24,10 @@ import MessageViewPane from "./MessageViewPane";
 import ThreadSubject from "./ThreadSubject";
 import paneStyles from "./MessageViewPane.module.css";
 import ThreadView from "./ThreadView";
-import type { ThreadMessageCardProps } from "./ThreadMessageCard";
+import type { ThreadViewCardProps } from "./ThreadView";
 import ThreadTopicSuggestionsRow from "./ThreadTopicSuggestionsRow";
 import TopicBadge from "../TopicBadge";
 import threadViewStyles from "./ThreadView.module.css";
-import { renderMarkdownPanel as renderMarkdownPanelHelper } from "../RenderHelpers";
 import type { ComposeOrchestratorHandle } from "../composition/ComposeOrchestrator";
 import type { ComposeMode } from "../composition/composeTypes";
 import type { MessageTab, TopicSuggestionExplanation } from "./types";
@@ -67,9 +67,8 @@ import {
  * with the `adjustMessageZoom` / `resetMessageZoom` setters. The maps
  * are read and mutated only by `ThreadMessageCard` rows rendered in
  * this subtree, so the orchestrator merges them and their setters into
- * `messageCardProps` alongside `threadViewMode`. It also builds the
- * `renderMarkdownPanel` closure locally because the closure's only
- * input is `messageFontScale` and its only consumer is the same card.
+ * `messageCardProps` alongside `threadViewMode`. ThreadView selects each
+ * card's scalar font scale; the card renders its MarkdownPanel locally.
  * The shell-level `evictMessageCaches` helper clears per-id entries
  * from both maps via the `evictZoomAndFontScale` method exposed on
  * `MessageViewOrchestratorHandle`.
@@ -208,11 +207,10 @@ export type MessageViewOrchestratorBodyInputs = {
   // pass it; `messageByMessageId` is merged in too — the orchestrator
   // enhances the base map supplied above with entries from
   // `activeThread` so "In Reply To" links resolve when viewing from any
-  // folder (e.g. Drafts); the font-scale / zoom / markdown-render props
+  // folder (e.g. Drafts); the font-scale / zoom props
   // are merged in from orchestrator-local state.
   messageCardProps: Omit<
-    ThreadMessageCardProps,
-    | "message"
+    ThreadViewCardProps,
     | "threadViewMode"
     | "messageByMessageId"
     | "messageFontScale"
@@ -220,7 +218,6 @@ export type MessageViewOrchestratorBodyInputs = {
     | "messageZoom"
     | "adjustMessageZoom"
     | "resetMessageZoom"
-    | "renderMarkdownPanel"
     | "messageTabs"
     | "setMessageTabs"
     | "collapsedMessages"
@@ -284,12 +281,6 @@ function MessageViewOrchestratorImpl(
   // focus change applies exactly one sibling-collapse sweep even as the
   // user expands individual siblings afterwards.
   const composeThreadCollapseKeyRef = useRef("");
-
-  const renderMarkdownPanel = useCallback(
-    (markdownBody: string | undefined, messageId: string) =>
-      renderMarkdownPanelHelper(markdownBody, messageId, messageFontScale),
-    [messageFontScale]
-  );
 
   const adjustMessageZoom = useCallback((messageId: string, delta: number) => {
     setMessageZoom((prev) => {
@@ -394,6 +385,18 @@ function MessageViewOrchestratorImpl(
     messageByMessageId,
     messageCardProps
   } = body;
+
+  // Local display-state updates must not recreate the reply lookup. Cards
+  // receive only their resolved target, so unrelated sibling updates stay local.
+  const enhancedMessageByMessageId = useMemo(() => {
+    const lookup = new Map(messageByMessageId);
+    activeThread.forEach((message) => {
+      if (message.messageId && message.accountId === activeAccountId) {
+        lookup.set(message.messageId, message);
+      }
+    });
+    return lookup;
+  }, [messageByMessageId, activeThread, activeAccountId]);
 
   const [topicSuggestionExplanationOpen, setTopicSuggestionExplanationOpen] = useState(false);
   const [topicSuggestionExplanationLoading, setTopicSuggestionExplanationLoading] = useState(false);
@@ -668,6 +671,19 @@ function MessageViewOrchestratorImpl(
     showComposeInline
   ]);
 
+  const threadCardProps = useMemo<ThreadViewCardProps>(() => ({
+    ...messageCardProps,
+    messageByMessageId: enhancedMessageByMessageId,
+    threadViewMode, messageFontScale, setMessageFontScale,
+    messageZoom, adjustMessageZoom, resetMessageZoom,
+    messageTabs, setMessageTabs, collapsedMessages, setCollapsedMessages,
+    messageTranslations, onShowTranslation: showTranslation,
+    onHideTranslation: hideTranslation, onChangeTranslationLang: changeTranslationLang
+  }), [messageCardProps, enhancedMessageByMessageId, threadViewMode,
+    messageFontScale, messageZoom, adjustMessageZoom, resetMessageZoom,
+    messageTabs, collapsedMessages, messageTranslations,
+    showTranslation, hideTranslation, changeTranslationLang]);
+
   const threadViewModeToggle = (
     <SegmentedControl.Root
       size="1"
@@ -751,15 +767,6 @@ function MessageViewOrchestratorImpl(
           const renderComposeCard = (wrapperClassName?: string) =>
             composeHandleRef.current?.renderInlineCard(wrapperClassName) ?? null;
 
-          // Enhance messageByMessageId with messages from activeThread
-          // (so "In Reply To" links work when viewing from any folder, e.g., Drafts)
-          const enhancedMessageByMessageId = new Map(messageByMessageId);
-          activeThread.forEach((message) => {
-            if (message.messageId && message.accountId === activeAccountId) {
-              enhancedMessageByMessageId.set(message.messageId, message);
-            }
-          });
-
           return (
             <>
               {inlineComposePlacement.showComposeAtTop &&
@@ -777,25 +784,7 @@ function MessageViewOrchestratorImpl(
                 renderComposeInlineCard={
                   inlineComposePlacement.composeReplyMessageId ? renderComposeCard : null
                 }
-                messageCardProps={{
-                  ...messageCardProps,
-                  messageByMessageId: enhancedMessageByMessageId,
-                  threadViewMode,
-                  messageFontScale,
-                  setMessageFontScale,
-                  messageZoom,
-                  adjustMessageZoom,
-                  resetMessageZoom,
-                  renderMarkdownPanel,
-                  messageTabs,
-                  setMessageTabs,
-                  collapsedMessages,
-                  setCollapsedMessages,
-                  messageTranslations,
-                  onShowTranslation: showTranslation,
-                  onHideTranslation: hideTranslation,
-                  onChangeTranslationLang: changeTranslationLang
-                }}
+                messageCardProps={threadCardProps}
               />
               {activeMessage?.threadId && header.collab && <ThreadActivityPanel ref={activityRef}
                 comments={header.collab.controller.comments} activity={header.collab.controller.activity}

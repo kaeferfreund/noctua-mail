@@ -36,6 +36,7 @@ import {
   buildMessageGroupKey,
   buildInviteDeckGroupKeyFromBounds,
   buildTimeGroupKey,
+  DATE_GROUP_ORDER,
   EVENT_GROUP_BY,
   INVITE_DECK_GROUP_BY,
   sortGroupsForGroupBy
@@ -602,6 +603,11 @@ function hasAddressSearchFilters(filters: AddressSearchFilters) {
     (filters.recipientTerms?.length ?? 0) > 0 ||
     (filters.participantTerms?.length ?? 0) > 0
   );
+}
+
+/** Own addresses only resolve "from:me" / "with:me": an empty query never reads them. */
+async function getSearchOwnAddresses(accountId: string, query?: string | null) {
+  return query?.trim() ? getAccountOwnAddresses(accountId) : [];
 }
 
 function parseSearchInput(
@@ -1430,7 +1436,7 @@ async function getGroupCounts(params: {
   } =
     params;
   const db = await getAccountDb(accountId);
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -1685,7 +1691,7 @@ async function getTotalCount(params: {
     participants
   } =
     params;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -1775,6 +1781,24 @@ async function getTotalCount(params: {
     )
     .get(...args) as { count: number };
   return row?.count ?? 0;
+}
+
+/**
+ * Group meta for the thread list's "date" grouping without a count query.
+ * The client shows the loaded rows per date bucket, never these counts (the
+ * SQL buckets in getThreadGroupCounts use host-local day boundaries, see
+ * buildGroupedMessages). Every bucket is listed, so the client keeps the
+ * collapse state of buckets that are not on the loaded pages.
+ */
+function getLoadedDateGroups(items: Message[]): GroupMeta[] {
+  const counts = new Map<string, number>();
+  items.forEach((item) => {
+    if (item.groupKey) counts.set(item.groupKey, (counts.get(item.groupKey) ?? 0) + 1);
+  });
+  return groupsFromRows(
+    DATE_GROUP_ORDER.map((key) => ({ key, count: counts.get(key) ?? 0 })),
+    "date"
+  );
 }
 
 async function getThreadGroupCounts(params: {
@@ -2331,7 +2355,7 @@ export async function listMessages(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -2649,7 +2673,7 @@ export async function listThreads(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
   const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
   const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
 
@@ -2925,13 +2949,15 @@ export async function listThreads(params: {
     }
 
     const threadIdsForBaseCount = threadRows.map((row) => row.threadId);
+    // Seek the page's threads instead of scanning the folder (the planner
+    // picks the folder index without statistics; no ANALYZE on shards).
     const baseCountRow =
       threadIdsForBaseCount.length > 0
         ? (db
             .prepare(
               `
               SELECT COUNT(*) as count
-              FROM messages m
+              FROM messages m INDEXED BY idx_messages_account_thread_date
               WHERE ${where}
                 AND m.threadId IN (${threadIdsForBaseCount.map(() => "?").join(",")})
             `
@@ -3043,6 +3069,8 @@ export async function listThreads(params: {
     messagesRows.map((row) => String(row.id ?? ""))
   );
 
+  // Date-sensitive keys depend only on the thread date: derive them once per thread.
+  const threadDateGroupKeyByThreadId = new Map<string, string>();
   const items: Message[] = messagesRows.map((row) => {
     const calendarInviteData = calendarInviteDataByMessageId.get(row.id);
     const message: Message = {
@@ -3097,14 +3125,19 @@ export async function listThreads(params: {
     };
     const threadDateValue = threadDateValueByThreadId.get(message.threadId);
     message.threadSortDateValue = threadDateValue ?? message.dateValue;
+    let threadDateGroupKey: string | undefined;
+    if (isThreadDateSensitiveGroupBy(groupBy) && threadDateValue !== undefined) {
+      threadDateGroupKey = threadDateGroupKeyByThreadId.get(message.threadId);
+      if (threadDateGroupKey === undefined) {
+        threadDateGroupKey = buildGroupKey(message, groupBy, threadDateValue);
+        threadDateGroupKeyByThreadId.set(message.threadId, threadDateGroupKey);
+      }
+    }
     message.groupKey =
       eventGroupsByMessageId.get(message.id)?.key ??
       inviteDeckThreadGroupsByMessageId.get(message.id) ??
-      buildGroupKey(
-        message,
-        groupBy,
-        isThreadDateSensitiveGroupBy(groupBy) ? threadDateValue : undefined
-      );
+      threadDateGroupKey ??
+      buildGroupKey(message, groupBy);
     return message;
   });
 
@@ -3112,30 +3145,32 @@ export async function listThreads(params: {
     inviteDeckSummary?.groups ??
     (await (groupBy === EVENT_GROUP_BY
       ? getEventGroupCounts({ db, where, args }).then((rows) => groupsFromRows(rows, groupBy))
-      : isThreadDateSensitiveGroupBy(groupBy)
-        ? getThreadGroupCounts({
-            db,
-            accountId,
-            where,
-            args,
-            groupBy,
-            threadDateColumn
-          })
-        : getGroupCounts({
-            accountId,
-            folderId,
-            query: query ?? undefined,
-            groupBy,
-            fields,
-            badges,
-            viewerUserId,
-            attachmentsOnly,
-            excludedFolderIds,
-            from,
-            recipients,
-            participants,
-            searchCandidates
-          })));
+      : groupBy === "date"
+        ? getLoadedDateGroups(items)
+        : isThreadDateSensitiveGroupBy(groupBy)
+          ? getThreadGroupCounts({
+              db,
+              accountId,
+              where,
+              args,
+              groupBy,
+              threadDateColumn
+            })
+          : getGroupCounts({
+              accountId,
+              folderId,
+              query: query ?? undefined,
+              groupBy,
+              fields,
+              badges,
+              viewerUserId,
+              attachmentsOnly,
+              excludedFolderIds,
+              from,
+              recipients,
+              participants,
+              searchCandidates
+            })));
 
   const hasMore = offset + threadRows.length < threadTotal;
   return { items, groups, total: inviteDeckSummary?.total ?? total, hasMore, baseCount };

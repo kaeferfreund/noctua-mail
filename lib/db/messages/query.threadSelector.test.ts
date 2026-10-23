@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { createSharedShardFixture } from "../../testSharedShardHarness";
+import { getDb } from "../connection";
 import { updateThreadCollabState } from "../threadCollab";
 import { listThreads } from "./query";
 
@@ -171,6 +172,85 @@ describe("thread selector flagged EXISTS differential", () => {
   test("date and non-date grouping retain the complete payload and counts", async () => {
     for (const groupBy of ["none", "week", "year", "sender", "folder"]) {
       await differential({ groupBy }, true);
+    }
+  });
+
+  test("date grouping lists every bucket with loaded counts without a bucket count query", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const statements: string[] = [];
+    const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      statements.push(sql);
+      return prepare(sql);
+    });
+    try {
+      for (const folderId of [undefined, "inbox"]) {
+        statements.length = 0;
+        const result = await listThreads({ accountId: fixture.a.accountId, folderId, page: 1, pageSize: 5, groupBy: "date" });
+        expect(result.items.length).toBeGreaterThan(0);
+        expect(result.groups?.map(group => group.key)).toEqual(["Today", "Yesterday", "This Week", "Older"]);
+        for (const group of result.groups ?? []) {
+          expect(group.count).toBe(result.items.filter(item => item.groupKey === group.key).length);
+        }
+        expect(statements.some(sql => sql.includes("THEN 'Today'"))).toBe(false);
+      }
+      statements.length = 0;
+      const week = await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "week" });
+      expect(statements.some(sql => sql.includes("strftime('%Y-W%W'"))).toBe(true);
+      expect((week.groups ?? []).reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(week.items.length);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("baseCount seeks the page threads and counts their visible folder messages", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    let plan: string[] = [];
+    const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes("INDEXED BY idx_messages_account_thread_date")) return statement;
+      return {
+        get(...args: unknown[]) {
+          plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
+          return statement.get(...args);
+        }
+      };
+    });
+    try {
+      for (const options of [{ folderId: "inbox" }, { folderId: "archive", excludedFolderIds: ["sent"] }, { query: "needle" }]) {
+        plan = [];
+        const result = await listThreads({ accountId: fixture.a.accountId, page: 1, pageSize: 5, ...options });
+        expect(plan[0]).toContain("USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)");
+        const threadIds = new Set(result.items.map(item => item.threadId));
+        const expected = fixture.db.prepare(
+          `SELECT threadId, folderId, subject FROM messages WHERE accountId = ? AND COALESCE(deleted, 0) = 0`
+        ).all(fixture.a.accountId) as Array<{ threadId: string; folderId: string; subject: string }>;
+        expect(result.baseCount).toBe(expected.filter(row => threadIds.has(row.threadId) &&
+          (!options.folderId || row.folderId === options.folderId) &&
+          (!("query" in options) || row.subject.includes("needle"))).length);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("an empty query does not read the own addresses; from:me still does", async () => {
+    const master = await getDb();
+    const query = master.query.bind(master);
+    let identityReads = 0;
+    const spy = spyOn(master, "query").mockImplementation((sql: string) => {
+      if (sql.includes("sender_identities")) identityReads++;
+      return query(sql);
+    });
+    const reads = async (search: string) => {
+      identityReads = 0;
+      await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "sender", query: search });
+      return identityReads;
+    };
+    try {
+      // listThreads, its total count and its sender group counts each resolve "me".
+      expect((await reads("from:me")) - (await reads(" "))).toBe(3);
+    } finally {
+      spy.mockRestore();
     }
   });
 

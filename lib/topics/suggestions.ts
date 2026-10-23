@@ -1,4 +1,4 @@
-import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
+import { ownAddressList, ownAddressMatcher, type OwnAddressInput } from "@/lib/ownAddresses";
 import { withAccountDb } from "../db";
 import type { Topic, TopicSuggestionSignal } from "../data";
 import { TOPIC_SUGGESTION_SIGNALS } from "../data";
@@ -108,34 +108,49 @@ function topicSuggestionSignalEntries(signals: TopicSuggestionSignals): TopicSig
   ];
 }
 
-function shouldIgnoreTopicSuggestionSignal(
-  entry: Pick<TopicSignalEntry, "type" | "value">,
-  options?: {
-    accountEmail?: OwnAddressInput;
-  }
-) {
-  const ownAddresses = ownAddressList(options?.accountEmail);
-  const value = entry.value.trim();
-  if (!value) return true;
+type TopicSuggestionSignalIgnore = (entry: Pick<TopicSignalEntry, "type" | "value">) => boolean;
 
-  if (entry.type === "senderEmail") {
-    const normalizedEmail = value.toLowerCase();
-    if (isOwnAddress(normalizedEmail, ownAddresses)) {
+/**
+ * Decides which signals never count for suggestions (own addresses, free-mail
+ * senders). Built once per call: the own addresses are normalized once and
+ * each (type, value) is decided once. Not shared across requests.
+ */
+function createTopicSuggestionSignalIgnore(options?: {
+  accountEmail?: OwnAddressInput;
+}): TopicSuggestionSignalIgnore {
+  const isOwn = ownAddressMatcher(ownAddressList(options?.accountEmail));
+  const decisions = new Map<string, boolean>();
+  const decide = (entry: Pick<TopicSignalEntry, "type" | "value">) => {
+    const value = entry.value.trim();
+    if (!value) return true;
+
+    if (entry.type === "senderEmail") {
+      const normalizedEmail = value.toLowerCase();
+      if (isOwn(normalizedEmail)) {
+        return true;
+      }
+      const domain = normalizedEmail.split("@")[1] ?? "";
+      return isFreeMailDomain(domain);
+    }
+
+    if (entry.type === "senderDomain") {
+      return isFreeMailDomain(value.toLowerCase());
+    }
+
+    if (entry.type === "recipient" && isOwn(value)) {
       return true;
     }
-    const domain = normalizedEmail.split("@")[1] ?? "";
-    return isFreeMailDomain(domain);
-  }
 
-  if (entry.type === "senderDomain") {
-    return isFreeMailDomain(value.toLowerCase());
-  }
-
-  if (entry.type === "recipient" && isOwnAddress(value, ownAddresses)) {
-    return true;
-  }
-
-  return false;
+    return false;
+  };
+  return (entry) => {
+    const key = topicSuggestionSignalKey(entry.type, entry.value);
+    const known = decisions.get(key);
+    if (known !== undefined) return known;
+    const decision = decide(entry);
+    decisions.set(key, decision);
+    return decision;
+  };
 }
 
 function normalizeTopicSuggestionSignals(
@@ -144,25 +159,24 @@ function normalizeTopicSuggestionSignals(
     accountEmail?: OwnAddressInput;
   }
 ): TopicSuggestionSignals {
+  const shouldIgnore = createTopicSuggestionSignalIgnore(options);
   return topicSuggestionSignalsFromEntries(
     collectTopicSignalEntries([signals], {
       excludeAccountEmail: options?.accountEmail ?? null
-    }).filter((entry) => !shouldIgnoreTopicSuggestionSignal(entry, options)),
+    }).filter((entry) => !shouldIgnore(entry)),
     signals.threadId
   );
 }
 
 function topicSuggestionEntriesFromThreadSignalRows(
   rows: Array<Pick<TopicThreadSignalRow, "signalType" | "signalValue">>,
-  options?: {
-    accountEmail?: OwnAddressInput;
-  }
+  shouldIgnore: TopicSuggestionSignalIgnore
 ): TopicSignalEntry[] {
   return rows.flatMap((row) => {
     const type = (row.signalType ?? "").trim() as TopicSuggestionSignal;
     const value = (row.signalValue ?? "").trim();
     if (!TOPIC_SUGGESTION_SIGNALS.includes(type) || !value) return [];
-    if (shouldIgnoreTopicSuggestionSignal({ type, value }, options)) {
+    if (shouldIgnore({ type, value })) {
       return [];
     }
     return [{ type, value }];
@@ -187,6 +201,7 @@ function getTopicSuggestionSignalsForThreadsFromDb(
     result.set(threadId, topicSuggestionSignalsFromEntries([], threadId));
   });
 
+  const shouldIgnore = createTopicSuggestionSignalIgnore(options);
   const placeholders = normalizedThreadIds.map(() => "?").join(",");
   const rows = db
     .prepare(
@@ -205,7 +220,7 @@ function getTopicSuggestionSignalsForThreadsFromDb(
     result.set(
       activeThreadId,
       topicSuggestionSignalsFromEntries(
-        topicSuggestionEntriesFromThreadSignalRows(activeRows, options),
+        topicSuggestionEntriesFromThreadSignalRows(activeRows, shouldIgnore),
         activeThreadId
       )
     );
@@ -613,12 +628,32 @@ function getTopicSuggestionsForThreadSignalBatch(
     });
   }
 
+  // Page threads often share the same signals (one sender, one list). Their
+  // score only differs when the thread itself is a learning thread, so the
+  // result is reused per signal-key sequence for every other thread.
+  const learningThreadIds = new Set<string>();
+  rowsBySignalKey.forEach((rows) =>
+    rows.forEach((row) => learningThreadIds.add((row.learningThreadId ?? "").trim()))
+  );
+  const suggestionsBySignalKeys = new Map<string, Topic[]>();
+
   const result = new Map<string, Topic[]>();
   threadIds.forEach((threadId) => {
     const signals = signalsByThreadId.get(threadId);
     const keys = signalKeysByThreadId.get(threadId);
     if (!signals || !keys || keys.size === 0) return;
     const excludeThreadId = (signals.threadId ?? "").trim();
+    const memoKey =
+      excludeThreadId && learningThreadIds.has(excludeThreadId)
+        ? null
+        : Array.from(keys).join("\u0001");
+    const memoized = memoKey === null ? undefined : suggestionsBySignalKeys.get(memoKey);
+    if (memoized) {
+      if (memoized.length > 0) {
+        result.set(threadId, memoized.map((topic) => ({ ...topic })));
+      }
+      return;
+    }
     const byTopicId = new Map<
       string,
       { topic: Topic; threadScores: Map<string, number> }
@@ -663,6 +698,9 @@ function getTopicSuggestionsForThreadSignalBatch(
       if (countDiff !== 0) return countDiff;
       return compareSqliteText(left.name, right.name);
     });
+    if (memoKey !== null) {
+      suggestionsBySignalKeys.set(memoKey, suggestions);
+    }
     if (suggestions.length > 0) {
       result.set(threadId, suggestions);
     }
@@ -684,6 +722,11 @@ export async function getTopicSuggestionsForThreads(
   if (normalizedThreadIds.length === 0) return new Map();
 
   return withAccountDb(accountId, (db) => {
+    // Suggestions only come from learning signals of existing topics: a
+    // mailbox without topics cannot match, so skip reading its signals.
+    if (!db.prepare(`SELECT 1 FROM topics WHERE accountId = ? LIMIT 1`).get(accountId)) {
+      return new Map<string, Topic[]>();
+    }
     const signalsByThreadId = getTopicSuggestionSignalsForThreadsFromDb(
       db,
       accountId,

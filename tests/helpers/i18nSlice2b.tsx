@@ -45,19 +45,19 @@ export function reviewListProps(): Omit<MessageListViewProps, "view"> {
 
 export function reviewReaderProps(): ComponentProps<typeof ThreadMessageCard> {
   return {
-    message: syntheticReviewMessage, messageRefs: { current: new Map() }, pendingMessageActions: new Set(),
+    message: syntheticReviewMessage, messageRefs: { current: new Map() }, actionPending: false,
     includeThreadAcrossFolders: false, activeFolderId: syntheticReviewMessage.folderId,
     threadPathById: () => "Synthetic folder", folderById: () => undefined,
     setSearchScope: noop, setActiveFolderId: noop, isDraftMessage: () => false,
     getImapFlagBadges: () => [{ kind: "category-transactional", label: "Transaktions-E-Mails" }],
     toggleFlaggedFlag: noop, toggleTodoFlag: noop, renderQuickActions: () => null,
     renderMessageMenu: () => <button data-message-action="menu">Menü</button>,
-    collapsedMessages: {}, setCollapsedMessages: noop, messageTabs: {}, setMessageTabs: noop,
-    fetchSource: noop, ensureMessageContent: async () => null, messageContentLoading: {},
-    setMessageFontScale: noop, messageFontScale: {}, adjustMessageZoom: noop, resetMessageZoom: noop,
-    messageZoom: {}, darkMode: false, hasHtmlContent: () => false,
-    renderMarkdownPanel: () => null, renderSourcePanel: () => null,
-    handleSelectMessage: noop, messageByMessageId: new Map(), getPrimaryEmail: () => null,
+    isCollapsed: false, setCollapsedMessages: noop, setMessageTabs: noop,
+    fetchSource: noop, ensureMessageContent: async () => null, contentLoading: false,
+    setMessageFontScale: noop, fontScale: 1, adjustMessageZoom: noop, resetMessageZoom: noop,
+    zoomValue: 1, darkMode: false, hasHtmlContent: () => false,
+    renderSourcePanel: () => null,
+    handleSelectMessage: noop, getPrimaryEmail: () => null,
     findRecipientAlias: () => null, onOpenRecipientAlias: noop, handleUnsubscribe: noop,
     readErrorMessage: async () => "", reportError: noop, senderIconsEnabled: false
   };
