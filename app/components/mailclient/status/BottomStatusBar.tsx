@@ -1,33 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useRef, type Dispatch, type SetStateAction } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { Activity, Loader2, TriangleAlert } from "lucide-react";
+import { Theme } from "@radix-ui/themes";
 import { MobileStatusFocusContext, restoreStatusFocus } from "@/app/components/shell/MobileStatusFocus";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
-import { Activity } from "lucide-react";
-import { Theme } from "@radix-ui/themes";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Button } from "@/app/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/app/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
-import type { AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
-import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
+import type { Account, AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
+import { formatDate, formatTime } from "@/lib/i18n/format";
+import type { UiLocale } from "@/lib/i18n/config";
 import type { CalendarReminder } from "../utils/calendarReminders";
 import type { ExceptionEntry, SyncJobProgress } from "../types";
-import {
-  BottomStatusSection,
-  type BottomStatusTone
-} from "./BottomStatusSection";
 import ProcessStatusPopover from "./ProcessStatusPopover";
 import UpcomingStatusPopover from "./UpcomingStatusPopover";
 import ExceptionStatusPopover from "./ExceptionStatusPopover";
-import CalendarPopover from "@/app/components/calendar/CalendarPopover";
+import { resolveStatusIndicator } from "./statusIndicator";
 
-export type BottomStatusPanel = "process" | "exception" | "reminder" | "calendar" | "mail-check" | null;
+export type BottomStatusPanel = "process" | "exception" | "reminder" | "calendar" | "mail-check" | "exceptions" | "reminders" | null;
 
 type BottomStatusBarProps = {
   onClearMobileSelection?: () => void;
   onCheckNewMail?: () => void;
+  accounts: Pick<Account, "id" | "name">[];
+  onRetrySync: (job: SyncJobProgress) => void;
+  mailCheckStatus: { running: boolean; lastCheckedAt: number | null; nextCheckAt: number | null };
+  calendarSidebarOpen: boolean;
   isSyncing: boolean;
   isRecomputingThreads: boolean;
   isRecomputingCategories: boolean;
@@ -48,167 +51,108 @@ type BottomStatusBarProps = {
   formatRelativeTime: (timestamp?: number | null) => string;
   onReloginAccount?: (entry: ExceptionEntry) => void;
   onOpenCalendarSidebar: () => void;
+  onToggleCalendarSidebar: () => void;
   onOpenCalendarMessage?: (messageId: string) => void;
   onFindRelatedCalendarInviteUid?: (uid: string) => void;
   calendarFirstDay?: 0 | 1;
   accountDateFormat?: AccountDateFormat;
 };
 
-export default function BottomStatusBar({
-  onClearMobileSelection,
-  onCheckNewMail,
-  isSyncing,
-  isRecomputingThreads,
-  isRecomputingCategories,
-  syncingFolders,
-  syncProgressItems,
-  accountFolders,
-  mailCheckMode,
-  activeAccountId,
-  pendingCalendarReminders,
-  upcomingEvents,
-  onRefreshPendingReminders,
-  onOpenReminderMessage,
-  onReportError,
-  exceptionEntries,
-  onClearExceptions,
-  openPanel,
-  setOpenPanel,
-  formatRelativeTime,
-  onReloginAccount,
-  onOpenCalendarSidebar,
-  onOpenCalendarMessage,
-  onFindRelatedCalendarInviteUid,
-  calendarFirstDay,
-  accountDateFormat
-}: BottomStatusBarProps) {
+function normalizePanel(panel: BottomStatusPanel) {
+  return panel === "exceptions" ? "exception" : panel === "reminders" ? "reminder" : panel;
+}
+
+/** Kept at the old import path so all existing status routes share one owner. */
+export default function BottomStatusBar(props: BottomStatusBarProps) {
+  const { setOpenPanel, isSyncing, exceptionEntries } = props;
+  const openPanel = normalizePanel(props.openPanel);
+  const t = useTranslations("Shell.status");
+  const locale = useLocale() as UiLocale;
   const isMobile = useIsMobile();
   const indicatorRef = useRef<HTMLButtonElement>(null);
-  const [currentTimeMs, setCurrentTimeMs] = useState<number | null>(null);
-  const processPanelOpen = openPanel === "process";
-  const exceptionPanelOpen = openPanel === "exception";
-  const reminderPanelOpen = openPanel === "reminder";
-  const calendarPanelOpen = openPanel === "calendar";
-
-  const currentDateTimeLabel = useMemo(
-    () => (currentTimeMs === null ? "" : formatAccountMediumDateTime(currentTimeMs, accountDateFormat) ?? ""),
-    [currentTimeMs, accountDateFormat]
-  );
-
-  useEffect(() => {
-    let intervalId: number | null = null;
-    const tick = () => {
-      setCurrentTimeMs(Date.now());
-    };
-    tick();
-    const timeoutId = window.setTimeout(() => {
-      tick();
-      intervalId = window.setInterval(tick, 60_000);
-    }, 60_000 - (Date.now() % 60_000));
-    return () => {
-      window.clearTimeout(timeoutId);
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, []);
-
-  const handleProcessPanelOpenChange = (open: boolean) => {
-    setOpenPanel((current) => (open ? "process" : current === "process" ? null : current));
-  };
-
-  const handleReminderPanelOpenChange = (open: boolean) => {
-    setOpenPanel((current) => (open ? "reminder" : current === "reminder" ? null : current));
-  };
-
-  const handleExceptionPanelOpenChange = (open: boolean) => {
-    setOpenPanel((current) => (open ? "exception" : current === "exception" ? null : current));
-  };
-
-  const handleCalendarPanelOpenChange = (open: boolean) => {
-    setOpenPanel((current) => (open ? "calendar" : current === "calendar" ? null : current));
-  };
-
-  const mailCheckStatusValue = mailCheckMode === "idle" ? "Idle" : "Polling";
-  const mailCheckStatusTone: BottomStatusTone = mailCheckMode === "idle" ? "muted" : "normal";
-
-  return (
-    <MobileStatusFocusContext.Provider value={indicatorRef}>
-    <div className={isMobile ? mobileStyles.indicators : `bottom-bar ${mobileStyles.desktopStatusBar}`}>
-      {isMobile ? <DropdownMenu><DropdownMenuTrigger asChild>
-        <Button ref={indicatorRef} variant="ghost" size="icon" aria-label="Activity and calendar" aria-busy={isSyncing}><Activity />{exceptionEntries.length > 0 ? <span className={mobileStyles.activityDot} /> : null}</Button>
-      </DropdownMenuTrigger><DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={isSyncing} onSelect={() => { void onCheckNewMail?.(); }}>Check for new mail</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("process")}>Processes</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("mail-check")}>Mail check: {mailCheckStatusValue}</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("reminder")}>Reminders</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("exception")}>Exceptions ({exceptionEntries.length})</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("calendar")}>Calendar</DropdownMenuItem>
-      </DropdownMenuContent></DropdownMenu> : null}
-      <ProcessStatusPopover
-        open={processPanelOpen}
-        onOpenChange={handleProcessPanelOpenChange}
-        isSyncing={isSyncing}
-        isRecomputingThreads={isRecomputingThreads}
-        isRecomputingCategories={isRecomputingCategories}
-        syncingFolders={syncingFolders}
-        syncProgressItems={syncProgressItems}
-        accountFolders={accountFolders}
-      />
-      {!isMobile && <BottomStatusSection
-        label="Mail check"
-        value={mailCheckStatusValue}
-        tone={mailCheckStatusTone}
-      />}
-      {!isMobile && <CalendarPopover
-        open={calendarPanelOpen}
-        accountId={activeAccountId}
-        firstDay={calendarFirstDay}
-        onOpenChange={handleCalendarPanelOpenChange}
-        onOpenSidebar={onOpenCalendarSidebar}
-        triggerLabel={currentDateTimeLabel}
-        onOpenMessage={onOpenCalendarMessage}
-        onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid}
-      />}
-      <ExceptionStatusPopover
-        open={exceptionPanelOpen}
-        onOpenChange={handleExceptionPanelOpenChange}
-        exceptionEntries={exceptionEntries}
-        onClearExceptions={onClearExceptions}
-        formatRelativeTime={formatRelativeTime}
-        onRelogin={onReloginAccount}
-      />
-      <UpcomingStatusPopover
-        open={reminderPanelOpen}
-        onOpenChange={handleReminderPanelOpenChange}
-        activeAccountId={activeAccountId}
-        pendingCalendarReminders={pendingCalendarReminders}
-        upcomingEvents={upcomingEvents}
-        onRefreshPendingReminders={onRefreshPendingReminders}
-        onOpenReminderMessage={onOpenReminderMessage}
-        onOpenCalendarSidebar={onOpenCalendarSidebar}
-        onReportError={onReportError}
-        accountDateFormat={accountDateFormat}
-      />
-      {isMobile ? <>
-        <Sheet open={calendarPanelOpen} onOpenChange={handleCalendarPanelOpenChange}>
-          <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined} className={mobileStyles.fullscreenSheet}>
-            <SheetTitle className="m-0 p-4">Calendar</SheetTitle>
-            <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-2">
-              <CalendarEventBrowser accountId={activeAccountId} firstDay={calendarFirstDay}
-                onOpenMessage={onOpenCalendarMessage ? (id) => { onOpenCalendarMessage(id); setOpenPanel(null); } : undefined}
-                onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid ? (uid) => { onClearMobileSelection?.(); onFindRelatedCalendarInviteUid(uid); setOpenPanel(null); } : undefined} />
-            </div></Theme>
-          </SheetContent>
-        </Sheet>
-        <Sheet open={openPanel === "mail-check"} onOpenChange={(open) => { if (!open) setOpenPanel(null); }}>
-          <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} side="bottom" aria-describedby={undefined}>
-            <SheetTitle className="px-4">Mail check</SheetTitle>
-            <p className="px-4">{mailCheckStatusValue}</p>
-          </SheetContent>
-        </Sheet>
-      </> : null}
-    </div>
-    </MobileStatusFocusContext.Provider>
-  );
+  const { state, attentionCount } = resolveStatusIndicator(props.syncProgressItems, exceptionEntries.length,
+    isSyncing || props.isRecomputingThreads || props.isRecomputingCategories || props.syncingFolders.size > 0);
+  const label = state === "attention" ? t("attention", { count: attentionCount }) : state === "syncing" ? t("syncing") : t("label");
+  const changePanel = (panel: BottomStatusPanel) => (open: boolean) => setOpenPanel(current => open ? panel : normalizePanel(current) === panel ? null : current);
+  const close = () => setOpenPanel(null);
+  const section = openPanel === "calendar" ? "reminder" : openPanel;
+  const indicator = <Button ref={indicatorRef} variant="ghost" size={isMobile ? "icon" : state === "idle" ? "icon-sm" : "sm"}
+    data-status-indicator={state} aria-label={label} title={label} className="shrink-0 gap-1.5">
+    {state === "attention" ? <TriangleAlert className="text-amber-600 dark:text-amber-400" />
+      : state === "syncing" ? <Loader2 className="motion-safe:animate-spin" /> : <Activity />}
+    {state === "syncing" && !isMobile ? <span>{t("syncing")}</span> : null}
+    {attentionCount > 0 ? <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-950 dark:bg-amber-950 dark:text-amber-100">{attentionCount}</span> : null}
+  </Button>;
+  const checkMail = <Button variant="outline" size="sm" disabled={isSyncing || props.mailCheckStatus.running}
+    onClick={() => { void props.onCheckNewMail?.(); }}>{t("checkMail")}</Button>;
+  const timestamp = (value: number | null) => value === null ? t("unknown") : `${formatDate(value, locale)} ${formatTime(value, locale)}`;
+  const mailCheck = <div className="space-y-2 text-sm">
+    <p>{props.mailCheckStatus.running ? t("checking") : t("idle")}</p>
+    <p>{t("lastCheck", { time: timestamp(props.mailCheckStatus.lastCheckedAt) })}</p>
+    <p>{props.mailCheckMode === "idle" ? t("liveCheck") : t("nextCheck", { time: timestamp(props.mailCheckStatus.nextCheckAt) })}</p>
+    {checkMail}
+  </div>;
+  const calendar = <div className="space-y-3">
+    <Button variant="outline" size="sm" onClick={() => { props.onToggleCalendarSidebar(); close(); }}>
+      {props.calendarSidebarOpen ? t("hideCalendarSidebar") : t("showCalendarSidebar")}
+    </Button>
+    <Button variant="ghost" size="sm" onClick={() => setOpenPanel(openPanel === "calendar" ? "reminder" : "calendar")}>
+      {openPanel === "calendar" ? t("reminder.title") : t("calendar")}
+    </Button>
+    {openPanel === "calendar" ? <CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
+      onOpenMessage={props.onOpenCalendarMessage ? id => { props.onOpenCalendarMessage?.(id); close(); } : undefined}
+      onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /> : null}
+  </div>;
+  const process = <ProcessStatusPopover embedded={!isMobile} open={openPanel === "process"} onOpenChange={changePanel("process")}
+    isSyncing={isSyncing} isRecomputingThreads={props.isRecomputingThreads} isRecomputingCategories={props.isRecomputingCategories}
+    syncingFolders={props.syncingFolders} syncProgressItems={props.syncProgressItems} accountFolders={props.accountFolders}
+    accounts={props.accounts} onRetrySync={props.onRetrySync} />;
+  const exceptions = <ExceptionStatusPopover embedded={!isMobile} open={openPanel === "exception"} onOpenChange={changePanel("exception")}
+    exceptionEntries={exceptionEntries} onClearExceptions={props.onClearExceptions} formatRelativeTime={props.formatRelativeTime} onRelogin={props.onReloginAccount} />;
+  const upcoming = <UpcomingStatusPopover embedded={!isMobile} open={openPanel === "reminder"} onOpenChange={changePanel("reminder")}
+    activeAccountId={props.activeAccountId} pendingCalendarReminders={props.pendingCalendarReminders} upcomingEvents={props.upcomingEvents}
+    onRefreshPendingReminders={props.onRefreshPendingReminders} onOpenReminderMessage={props.onOpenReminderMessage}
+    onOpenCalendarSidebar={props.onOpenCalendarSidebar} onReportError={props.onReportError} accountDateFormat={props.accountDateFormat} />;
+  return <MobileStatusFocusContext.Provider value={indicatorRef}>
+    {isMobile ? <div className={mobileStyles.indicators}>
+      <DropdownMenu><DropdownMenuTrigger asChild>{indicator}</DropdownMenuTrigger><DropdownMenuContent align="end" className="w-max max-w-[calc(100vw-1rem)]">
+        <DropdownMenuItem disabled={isSyncing} onSelect={() => { void props.onCheckNewMail?.(); }}>{t("checkMail")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("process")}>{t("process.title")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("mail-check")}>{t("mailCheck.title")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("reminder")}>{t("reminder.title")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("exception")}>{t("exception.title")} ({exceptionEntries.length})</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("calendar")}>{t("calendar")}</DropdownMenuItem>
+      </DropdownMenuContent></DropdownMenu>
+      {process}{exceptions}{upcoming}
+      <Sheet open={openPanel === "calendar" || openPanel === "mail-check"} onOpenChange={open => { if (!open) close(); }}>
+        <SheetContent onCloseAutoFocus={event => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined}
+          side={openPanel === "calendar" ? "right" : "bottom"} className={openPanel === "calendar" ? mobileStyles.fullscreenSheet : mobileStyles.statusSheet}>
+          <SheetTitle className="px-4">{openPanel === "calendar" ? t("calendar") : t("mailCheck.title")}</SheetTitle>
+          <Theme asChild><div className="min-h-0 flex-1 overflow-auto p-4">
+            {openPanel === "calendar" ? calendar : <><p className="mb-3 text-sm text-muted-foreground">{t("mailCheck.description")}</p>{mailCheck}</>}
+          </div></Theme>
+        </SheetContent>
+      </Sheet>
+    </div> : <Popover open={openPanel !== null} onOpenChange={open => { if (!open) close(); else setOpenPanel(attentionCount > 0 ? (exceptionEntries.length ? "exception" : "process") : "process"); }}>
+      <PopoverTrigger asChild>{indicator}</PopoverTrigger>
+      <PopoverContent align="end" aria-label={t("label")} className={`max-h-[calc(100dvh-5rem)] ${openPanel === "calendar" ? "w-[min(54rem,calc(100vw-2rem))]" : "w-[min(34rem,calc(100vw-2rem))]"} overflow-auto p-4`}>
+        <Theme asChild><div className="space-y-3">
+          <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-medium">{t("label")}</h2>{checkMail}</div>
+          {(["process", "mail-check", "exception", "reminder"] as const).map(panel => {
+            const key = panel === "mail-check" ? "mailCheck" : panel;
+            const active = section === panel;
+            return <section key={panel} data-status-section={panel} className="border-t border-border pt-3">
+              <h3 className="m-0 text-sm font-medium"><Button variant="ghost" size="sm" className="h-auto w-full justify-start px-0 py-1 text-left font-medium" aria-expanded={active} aria-controls={`status-${panel}`} aria-describedby={`status-${panel}-description`} onClick={() => setOpenPanel(panel)}>
+                {t(`${key}.title`)}{panel === "exception" && exceptionEntries.length ? ` (${exceptionEntries.length})` : ""}
+              </Button></h3>
+              <p id={`status-${panel}-description`} className="m-0 mt-0.5 text-xs text-muted-foreground">{t(`${key}.description`)}</p>
+              {active ? <div id={`status-${panel}`} className="mt-3">
+                {panel === "process" ? process : panel === "exception" ? exceptions : panel === "mail-check" ? mailCheck : <>{calendar}{openPanel !== "calendar" ? upcoming : null}</>}
+              </div> : null}
+            </section>;
+          })}
+        </div></Theme>
+      </PopoverContent>
+    </Popover>}
+  </MobileStatusFocusContext.Provider>;
 }

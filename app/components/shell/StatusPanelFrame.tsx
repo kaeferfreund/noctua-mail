@@ -8,6 +8,8 @@ import { useIsMobile } from "@/app/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 
 type Props = {
+  embedded?: boolean;
+  description?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -17,14 +19,15 @@ type Props = {
 };
 
 /** Keeps each status panel's content and handlers shared across both frames. */
-export default function StatusPanelFrame({ open, onOpenChange, title, trigger, contentProps, children }: Props) {
+export default function StatusPanelFrame({ embedded, description, open, onOpenChange, title, trigger, contentProps, children }: Props) {
   const isMobile = useIsMobile();
   const focusTarget = useContext(MobileStatusFocusContext);
+  if (embedded) return <>{children}</>;
   if (isMobile) return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, focusTarget?.current)} side="bottom" aria-describedby={undefined} showCloseButton={false} className={mobileStyles.statusSheet}>
         <SheetTitle className="sr-only">{title}</SheetTitle>
-        <Theme asChild><div className={`${mobileStyles.statusContent} ${contentProps.className ?? ""}`}>{children}</div></Theme>
+        <Theme asChild><div className={`${mobileStyles.statusContent} ${contentProps.className ?? ""}`}>{description ? <p className="mb-3 text-sm text-muted-foreground">{description}</p> : null}{children}</div></Theme>
       </SheetContent>
     </Sheet>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+import type { UiLocale } from "@/lib/i18n/config";
 import { useCallback, useMemo, useState } from "react";
 import { Trash2, X, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
 import {
@@ -34,6 +36,7 @@ import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 type UpcomingStatusPopoverProps = {
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   activeAccountId: string;
@@ -143,6 +146,7 @@ function formatUpcomingStatusDateTime(
 }
 
 export default function UpcomingStatusPopover({
+  embedded,
   open,
   onOpenChange,
   activeAccountId,
@@ -154,13 +158,15 @@ export default function UpcomingStatusPopover({
   onReportError,
   accountDateFormat
 }: UpcomingStatusPopoverProps) {
+  const t = useTranslations("Shell.status");
+  const locale = useLocale() as UiLocale;
   const { entries: upcomingEntries, mergedCount } = useMemo(
     () => buildUpcomingEntries(upcomingEvents, pendingCalendarReminders),
     [upcomingEvents, pendingCalendarReminders]
   );
   const nextEntry = upcomingEntries[0] ?? null;
   const upcomingStatusValue = (() => {
-    if (!nextEntry) return "None";
+    if (!nextEntry) return t("none");
     const dateTime = formatUpcomingStatusDateTime(
       nextEntry.startAtMs,
       accountDateFormat
@@ -169,8 +175,8 @@ export default function UpcomingStatusPopover({
   })();
   const upcomingStatusTone: BottomStatusTone = mergedCount > 0 ? "normal" : "muted";
   const groupedEntries = useMemo(
-    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs),
-    [upcomingEntries]
+    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs, Date.now(), locale),
+    [upcomingEntries, locale]
   );
   const [deletingReminderIds, setDeletingReminderIds] = useState<Set<string>>(new Set());
 
@@ -188,7 +194,7 @@ export default function UpcomingStatusPopover({
         await deleteCalendarReminder(activeAccountId, reminderId);
         await onRefreshPendingReminders();
       } catch {
-        onReportError("Failed to delete reminder.");
+        onReportError(t("deleteReminderError"));
       } finally {
         setDeletingReminderIds((prev) => {
           const next = new Set(prev);
@@ -197,7 +203,7 @@ export default function UpcomingStatusPopover({
         });
       }
     },
-    [activeAccountId, onRefreshPendingReminders, onReportError]
+    [activeAccountId, onRefreshPendingReminders, onReportError, t]
   );
 
   const handleEntryOpen = useCallback(
@@ -214,9 +220,9 @@ export default function UpcomingStatusPopover({
   );
 
   return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Upcoming"
+    <StatusPanelFrame embedded={embedded} description={t("reminder.description")} open={open} onOpenChange={onOpenChange} title={t("reminder.title")}
       trigger={<BottomStatusTriggerButton
-          label="Upcoming"
+          label={t("reminder.title")}
           value={upcomingStatusValue}
           tone={upcomingStatusTone}
           alignRight
@@ -227,10 +233,10 @@ export default function UpcomingStatusPopover({
         align: "end",
         sideOffset: 8, }}
     >
-        <Flex align="center" justify="between" className="popover-title-row">
+        {!embedded ? <Flex align="center" justify="between" className="popover-title-row">
           <Flex align="baseline" gap="3">
             <Heading size="3" weight="medium" className="reminder-main-title">
-              Upcoming
+              {t("reminder.title")}
             </Heading>
             <Badge color="gray" variant="soft" radius="full">
               {mergedCount}
@@ -241,13 +247,13 @@ export default function UpcomingStatusPopover({
               variant="ghost"
               color="gray"
               size="2"
-              tooltip="Close upcoming"
+              tooltip={t("close")}
               onClick={() => onOpenChange(false)}
             >
               <X size={16} />
             </TooltipIconButton>
           </Flex>
-        </Flex>
+        </Flex> : null}
         <Box className="popover-body">
           {upcomingEntries.length > 0 ? (
             <div className="reminder-groups">
@@ -303,13 +309,13 @@ export default function UpcomingStatusPopover({
                               }}
                               title={
                                 entry.messageId
-                                  ? "Open source mail"
-                                  : "Open calendar"
+                                  ? t("openSourceMail")
+                                  : t("calendar")
                               }
                               aria-label={
                                 entry.messageId
-                                  ? "Open source mail"
-                                  : "Open calendar"
+                                  ? t("openSourceMail")
+                                  : t("calendar")
                               }
                             >
                               <Flex direction="column" gap="1" className="reminder-item-main">
@@ -319,7 +325,7 @@ export default function UpcomingStatusPopover({
                                   weight="medium"
                                   className="reminder-item-title"
                                 >
-                                  {entry.title}
+                                  {entry.event?.summary || entry.reminder?.eventTitle || t("calendarEvent")}
                                 </Text>
                                 {displayUid ? (
                                   <Text
@@ -353,14 +359,14 @@ export default function UpcomingStatusPopover({
                                   ) : null}
                                   {eventDurationLabel ? (
                                     <Text size="1" color="gray">
-                                      (Duration: {eventDurationLabel})
+                                      {t("duration", { value: eventDurationLabel })}
                                     </Text>
                                   ) : null}
                                 </Flex>
                                 {reminder ? (
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Text size="1" color="gray">
-                                      Reminder: {reminder.leadLabel} before
+                                      {t("reminderLead", { minutes: reminder.leadMinutes })}
                                     </Text>
                                   </Flex>
                                 ) : null}
@@ -376,7 +382,7 @@ export default function UpcomingStatusPopover({
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Repeat size={12} className="reminder-icon" />
                                     <Text size="1" color="gray">
-                                      Repeats: {recurrenceSummary}
+                                      {t("repeats", { value: recurrenceSummary })}
                                     </Text>
                                   </Flex>
                                 ) : null}
@@ -387,7 +393,7 @@ export default function UpcomingStatusPopover({
                                 variant="ghost"
                                 color="gray"
                                 size="1"
-                                tooltip="Delete reminder"
+                                tooltip={t("deleteReminder")}
                                 className="reminder-delete-btn"
                                 disabled={isDeletingReminder}
                                 onClick={() => {
@@ -412,7 +418,7 @@ export default function UpcomingStatusPopover({
           ) : (
             <Flex align="center" justify="center" p="4" className="empty-state">
               <Text size="2" color="gray">
-                Nothing upcoming.
+                {t("reminder.empty")}
               </Text>
             </Flex>
           )}

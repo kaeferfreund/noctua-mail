@@ -140,6 +140,77 @@
     "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
+    },
+    "status": {
+      "label": "Activity and calendar",
+      "syncing": "Syncing …",
+      "attention": "{count, plural, one {# issue needs your attention} other {# issues need your attention}}",
+      "idle": "Idle",
+      "none": "None",
+      "unknown": "Not available yet",
+      "error": "Error",
+      "checkMail": "Check for new mail",
+      "checking": "Checking inbox …",
+      "lastCheck": "Last check: {time}",
+      "nextCheck": "Next check: {time}",
+      "liveCheck": "New mail is reported as it arrives.",
+      "calendar": "Open calendar",
+      "showCalendarSidebar": "Show calendar sidebar",
+      "hideCalendarSidebar": "Hide calendar sidebar",
+      "mailbox": "Mailbox",
+      "folder": "Folder",
+      "scope": "{mailbox} / {folder}",
+      "retry": "Try again",
+      "details": "Details",
+      "progress": "{processed} of {total} messages processed",
+      "retryDetail": "Retries: {attempt} of {max}",
+      "threads": "Recomputing threads…",
+      "categories": "Recomputing categories …",
+      "clearExceptions": "Clear exceptions",
+      "copyError": "Copy error",
+      "relogin": "Re-login",
+      "close": "Close",
+      "deleteReminderError": "Failed to delete reminder.",
+      "openSourceMail": "Open source mail",
+      "duration": "Duration: {value}",
+      "reminderLead": "Reminder: {minutes} minutes before",
+      "repeats": "Repeats: {value}",
+      "deleteReminder": "Delete reminder",
+      "process": {
+        "title": "Background tasks",
+        "description": "See current sync tasks, progress and retries.",
+        "empty": "No active background tasks."
+      },
+      "mailCheck": {
+        "title": "Inbox checks",
+        "description": "See your last and next inbox checks."
+      },
+      "exception": {
+        "title": "Errors",
+        "description": "See errors with timestamps and details.",
+        "empty": "No errors."
+      },
+      "reminder": {
+        "title": "Upcoming",
+        "description": "See your upcoming events and reminders.",
+        "empty": "Nothing upcoming."
+      },
+      "phase": {
+        "starting": "Preparing",
+        "fetching": "Fetching",
+        "finalizing": "Finalizing",
+        "done": "Done",
+        "failed": "Failed",
+        "retrying": "Retrying"
+      },
+      "mode": {
+        "full": "Full sync",
+        "recent": "Recent sync",
+        "new": "New sync",
+        "repair": "Repair sync"
+      },
+      "updatedAt": "Last updated: {time}",
+      "calendarEvent": "Calendar event"
     }
   },
   "Search": {
