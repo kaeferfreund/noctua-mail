@@ -26,6 +26,7 @@ export {
 } from "./strip";
 export {
   extractVisibleHtmlText,
+  hasRenderableHtmlMedia,
   selectPreferredHtmlDocument,
   extractBodyContent,
   extractHtmlBody
