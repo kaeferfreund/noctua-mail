@@ -321,6 +321,15 @@ describe("statement budget", () => {
     for (const key of ["1", "2", "12"]) expect(await countExecutions(() => listAccessibleAccountsForUser(viewers[key].user.id))).toBe(4);
     expect(await countExecutions(() => listAccessibleAccountsForUser(viewers.disabled.user.id))).toBe(2);
   });
+  test("summary: scope narrows the metadata read; per-mailbox work only for visible mailboxes", async () => {
+    const v = viewers["12"];
+    const scoped = await countExecutions(() => getUserMailboxSummary(v.user.id, [ACCOUNTS[4]]));
+    const foreign = await countExecutions(() => getUserMailboxSummary(viewers["2"].user.id, [ACCOUNTS[0]]));
+    const full = await countExecutions(() => getUserMailboxSummary(v.user.id));
+    // Metadata: candidates, roles, member counts; final authorization: one batched role read.
+    // Per mailbox (unchanged here): warm getAccountDb (3 master, phase 2) plus 3 shard reads.
+    expect({ scoped, foreign, full }).toEqual({ scoped: 3 + 6 + 1, foreign: 1, full: 3 + 6 * ACCOUNTS.length + 1 });
+  });
   test("members: owner read plus one member statement, independent of the directory size", async () => {
     expect(await countExecutions(() => listAccountMembers(ACCOUNTS[6]))).toBe(2);
   });
