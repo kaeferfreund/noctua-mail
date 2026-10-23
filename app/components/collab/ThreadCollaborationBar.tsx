@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { MessageSquare, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import type { AccountRole } from "@/lib/data";
 import type { ThreadCollabController } from "@/app/hooks/useThreadCollab";
@@ -26,7 +27,8 @@ export default function ThreadCollaborationBar({
       className="flex min-w-0 flex-col gap-2"
       aria-label={t("bar.label")}
     >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      {/* Phones keep the row on one line: notes become icon buttons, the assignee truncates. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:flex-nowrap">
         <AssigneeCombobox
           value={collab.state?.assigneeUserId ?? null}
           members={collab.members}
@@ -48,8 +50,11 @@ export default function ThreadCollaborationBar({
           size="sm"
           onClick={onActivity}
           aria-label={t("bar.internalNoteCount", {count: commentCount})}
+          className="max-md:h-8"
         >
-          {t("bar.noteCount", {count: commentCount})}
+          <MessageSquare className="md:hidden" aria-hidden />
+          <span className="md:hidden">{commentCount}</span>
+          <span className="hidden md:inline">{t("bar.noteCount", {count: commentCount})}</span>
         </Button>
         {!readOnly && (
           <Button
@@ -57,8 +62,12 @@ export default function ThreadCollaborationBar({
             size="sm"
             onClick={onNote}
             disabled={!collab.state}
+            aria-label={t("bar.note")}
+            className="max-md:size-8 max-md:px-0"
           >
-            {t("bar.note")}</Button>
+            <MessageSquarePlus className="md:hidden" aria-hidden />
+            <span className="hidden md:inline">{t("bar.note")}</span>
+          </Button>
         )}
       </div>
       {collab.loading && (
