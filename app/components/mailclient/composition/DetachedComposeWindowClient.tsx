@@ -1,5 +1,7 @@
 "use client";
 
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text } from "@radix-ui/themes";
 import { AccountDateFormatProvider } from "@/app/components/AccountDateFormatContext";
@@ -79,6 +81,7 @@ export default function DetachedComposeWindowClient({
   const [, setActiveMessageId] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
+  const { renderMessage } = useSenderMessages();
   const [notices, setNotices] = useState<InAppNotice[]>([]);
   const [composeMirror, setComposeMirror] = useState<ComposeMirror>({
     composeOpen: false,
@@ -233,12 +236,12 @@ export default function DetachedComposeWindowClient({
     if (status !== "ready" || !account || openedRef.current || !composeHandleRef.current) return;
     openedRef.current = true;
     void composeHandleRef.current
-      .openDetachedCompose(draft, { mode: handoff.mode, sourceMessage })
+      .openDetachedCompose(draft, { mode: handoff.mode, sourceMessage, identityId: handoff.identityId, signatureInitialized: handoff.signatureInitialized })
       .catch((openError) => {
         setError(openError instanceof Error ? openError.message : "Failed to initialize composer.");
         setStatus("error");
       });
-  }, [account, draft, handoff.mode, sourceMessage, status]);
+  }, [account, draft, handoff.mode, handoff.identityId, handoff.signatureInitialized, sourceMessage, status]);
 
   const handleComposeMirrorChange = useCallback((mirror: ComposeMirror) => {
     composeMirrorRef.current = mirror;
@@ -386,7 +389,7 @@ export default function DetachedComposeWindowClient({
   }, [folders]);
 
   if (status === "error") {
-    return <DetachedComposeState color="red">{error || "Failed to open composer."}</DetachedComposeState>;
+    return <DetachedComposeState color="red">{renderMessage(error) || "Failed to open composer."}</DetachedComposeState>;
   }
   if (status === "loading" || !account) {
     return <DetachedComposeState color="gray">Opening composer…</DetachedComposeState>;

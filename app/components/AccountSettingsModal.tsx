@@ -1,3 +1,5 @@
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -7,6 +9,8 @@ import { Flex, Tabs } from "@radix-ui/themes";
 import type { Account, AccountSettings, RecipientAlias, Topic } from "@/lib/data";
 import { hasSavableAccountSettingsChanges } from "@/lib/accountSettings";
 import AccountTabContent from "@/app/components/account-settings/tabs/AccountTabContent";
+import IdentitiesTabContent from "@/app/components/account-settings/tabs/IdentitiesTabContent";
+import SenderPreferences from "@/app/components/account-settings/tabs/SenderPreferences";
 import SignaturesTabContent from "@/app/components/account-settings/tabs/SignaturesTabContent";
 import PreferencesTabContent from "@/app/components/account-settings/tabs/PreferencesTabContent";
 import CategorizationTabContent from "@/app/components/account-settings/tabs/CategorizationTabContent";
@@ -22,6 +26,7 @@ import { type OverflowTabItem } from "@/app/components/account-settings/Overflow
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 export type ManageTab =
   | "account"
+  | "identities"
   | "signatures"
   | "preferences"
   | "categorization"
@@ -88,6 +93,7 @@ export default function AccountSettingsModal({
   onUpdateRecipientAlias,
   onDeleteRecipientAlias
 }: Props) {
+  const { messages: senderMessages } = useSenderMessages();
   const isMobile = useIsMobile();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
@@ -132,6 +138,7 @@ export default function AccountSettingsModal({
   const tabItems = useMemo<OverflowTabItem[]>(() => {
     const items: OverflowTabItem[] = [
       { value: "account", label: "Account" },
+      { value: "identities", label: senderMessages.identitiesTitle, disabled: !isExistingAccount },
       { value: "signatures", label: "Signatures", disabled: !isExistingAccount },
       { value: "preferences", label: "Preferences", disabled: !isExistingAccount },
       { value: "categorization", label: "Categorization", disabled: !isExistingAccount },
@@ -143,8 +150,8 @@ export default function AccountSettingsModal({
     ];
     items.push({ value: "members", label: "Members", disabled: !isExistingAccount });
     return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
-  }, [initialAccount.accessRole, isExistingAccount]);
-  const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
+  }, [initialAccount.accessRole, isExistingAccount, senderMessages.identitiesTitle]);
+  const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => tab.value === "preferences" && !tab.disabled)?.value ?? tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;
 
@@ -244,6 +251,8 @@ export default function AccountSettingsModal({
               />
             </Tabs.Content>}
 
+            <Tabs.Content value="identities" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}><IdentitiesTabContent key={localAccount.id} editingAccount={localAccount} apiFetch={apiFetch} /></Tabs.Content>
+
             {settingsTabVisible("signatures", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="signatures" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <SignaturesTabContent
                 editingAccount={localAccount}
@@ -256,7 +265,7 @@ export default function AccountSettingsModal({
             </Tabs.Content>}
 
             <Tabs.Content value="preferences" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
-              <PreferencesTabContent key={localAccount.id} editingAccount={localAccount} onClose={onClose} apiFetch={apiFetch} />
+              <PreferencesTabContent key={localAccount.id} editingAccount={localAccount} onClose={onClose} apiFetch={apiFetch} senderPreferences={<SenderPreferences editingAccount={localAccount} apiFetch={apiFetch} />} />
             </Tabs.Content>
 
             {settingsTabVisible("categorization", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="categorization" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>

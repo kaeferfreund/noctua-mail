@@ -358,3 +358,139 @@ assertion was weakened.
 - `timeout 1200 bun run build`: exit 0, including production TypeScript validation.
 - `git diff --check`: exit 0. Protected paths and `completeSend.ts` are unchanged;
   the five localized `drafts.ts` hunks are listed above.
+
+## Slice 3 — Compose, settings and signatures
+
+Compose loads a fresh, authenticated mailbox snapshot on account switch, compose
+open, and sender settings/preferences changes. Initial login and settings module
+warm-up do not eagerly fetch private composer preferences. It never caches private sender
+preferences globally. Cross-window refresh receipts contain only account ID and a
+nonce, so detached composers also refresh without storing private signature text in
+localStorage. `lib/ui/senderSettings.ts` reads identities, sparse own prefs
+and the authenticated profile/mailbox configuration. The existing pure
+`resolveComposeIdentity` supplies saved draft preservation, personal/mailbox
+fallbacks, self-sender priority and To/Cc/Bcc/X-Original-To/Delivered-To reply tiers.
+Only enabled identities appear as selectable From choices; an unavailable saved
+selection remains visible and blocks send/save until the person explicitly repairs
+it. Viewer From/send controls are disabled. The labeled From row is shared by
+inline, modal, mobile and detached compose.
+
+The selected `identityId` travels through the draft hash, automatic/manual/handoff
+save and direct send. Save/send responses reflect the effective ID without letting
+an obsolete save overwrite a newer choice. Empty detached sessions also retain
+account/identity and signature-initialization state in their handoff (so removing a
+signature in an empty composer survives detach); saved sessions restore the draft's identity and
+rendered body. Minimize/restore preserves the current session. Account resets cancel
+initialization and persistence from the previous session.
+
+`IdentitiesTabContent` lets managers create/edit display names, Reply-To and template
+links, enable/disable identities and promote an enabled mailbox default. Email is
+immutable after creation. Editors/viewers see the historical read-only list.
+Identity mutations use POST/PATCH, never `/settings` arrays. The default cannot be
+disabled until another identity is promoted. Own Default From and signatures save
+only changed keys to `/prefs`; null restores inheritance and empty signature text
+means none. Shared signature template/default saves use `/settings` with
+`teamDefaults:true`, independently of own preferences. Saved identity changes also
+refresh the account own-address presentation.
+
+`lib/signatureTemplates.ts` validates and renders the four supported placeholders:
+`{{user.name}}`, `{{user.email}}`, `{{identity.displayName}}`, `{{identity.email}}`.
+The signed-in person's email is the fallback for an absent personal name. Job titles
+are plain template text, because this contract has no user-title field. Substitution
+is single-pass with normalized line endings, HTML escaping, and escaped Markdown.
+The resolution order is own override (including empty), own explicit template/none,
+identity template, mailbox template, none. Missing references produce a warning.
+Personal overrides belong to the user/mailbox preference row; identity-specific
+shared templates are linked from each identity.
+
+The existing `computeComposeInitState`/`useComposeController.openCompose` path now
+resolves identity and signature with the initial body. It inserts once for new,
+reply/replyAll and forward, before quotes, in text/HTML/Markdown. Draft reopen leaves
+the authored text intact. There is no signature insertion effect. The existing
+Lexical initialization callback captures the serialized signature paragraph in the
+tracking ref; this changes no body content. Format conversion and refresh do not
+append another signature. Replacement removes only an exact unique tracked block.
+An edited/ambiguous block is preserved unless the user confirms the explicit
+replacement prompt; when its boundaries cannot be identified safely, confirmation
+adds the new signature and keeps the edited text, as the prompt explains.
+
+Slice-2 identity/SMTP errors appear inline beside From with a Review From link.
+`identity_unavailable` and `draft_identity_changed` direct the person to choose/review
+and save. SMTP copy distinguishes sender, recipients, content, temporary failure,
+configuration, connection and delivery uncertainty. Existing accepted-send Sent-copy
+and post-send warnings remain independent; a rejection never closes the composer.
+
+Regression anchors:
+
+- `compose identity selection` covers personal/mailbox defaults, all reply tiers,
+  self From, forward and disabled/unknown saved identities.
+- `sender compose initializer` covers new/reply/replyAll/forward × all three formats,
+  single insertion before quotes, saved draft preservation, explicit none and own text.
+- `signature templates` covers single-pass substitutions, HTML/Markdown escaping,
+  fallback, UTF-8 bounds, unavailable templates and preservation of edited blocks.
+- `compose From control` covers associated inline/modal labels, enabled choices,
+  one-identity/mobile row, unavailable guidance and viewer gating.
+- `sender identity settings` covers manager CRUD/default/enable state, editor/viewer
+  read-only history, sparse own From/override saves, preview, none and inheritance.
+- `sender identity compose integration` covers identity-only autosave,
+  minimize/restore, edited-signature confirmation, normalized Lexical replacement,
+  and detached captured account/identity. The existing cold conversion, send-race,
+  account-switch, focus and accepted-warning tests retain their coverage.
+- `inline sender rejection` covers both identity conflicts and every documented
+  smtp_* code. `lib/ui/senderSettings.test.ts` verifies uncached reads and mailbox scope.
+- `tests/browser/compose/qa-compose.spec.ts` adds the production settings/From/signature,
+  saved-draft restore/send and phone From scenario. Use `playwright.compose.config.ts`;
+  `seedSenderCompose.ts` reuses the enrolled synthetic two-person shell fixture.
+  Alex saves shared templates and a personal override, restores/sends a saved draft,
+  and Jo sends directly using Jo's profile. Distinct TEST-NET proxy clients and
+  paced logins keep the real production auth limits intact.
+- `lib/mail/resyncMessage.senderKey.test.ts` runs its existing real-IMAP cases in
+  fresh Bun processes. Pool unit tests intentionally leave a shared connect mock
+  installed; the added test files exposed this order dependency under seed 1337.
+  The two-file randomized reproducer changed from 51 pass / 6 fail to 57 pass /
+  zero fail across three repetitions. All original assertions and the 20-second
+  case budget remain; no production IMAP/SMTP code changed.
+
+Parallel-owner boundaries: this slice does not modify routes, DB/server code,
+transport, `lib/drafts.ts` or `lib/mcpServer.ts`. MCP's call to the shared renderer
+must be integrated by its owner; UI signature insertion does not append signatures
+in raw send. The household mapping/display-name/Reply-To/default/signature/probe
+choices from design §10 and Stage 4 provider/PWA acceptance remain open.
+
+### Slice 3 verification (2026-10-23)
+
+Bun 1.4.4; heavy gates ran sequentially with `nice -n 15`, worktree-local
+TMPDIR and synthetic loopback fixtures. Timeouts, retries and original assertions
+were preserved. The production server used 3880, with IMAP/SMTP/control on
+3882/3883/3884; both owned processes were stopped after browser verification.
+
+- `bun run typecheck`: zero errors in 1,189 files.
+- Focused pure tests, three repetitions: 372 passed, zero failed, 1,323 assertions
+  across 10 files (0.318s). Focused DOM including lazy-settings/cold-compose/send
+  races, three repetitions: 210 passed, zero failed, 1,722 assertions across seven
+  files (96.37s).
+- `timeout 1800 bun run test:ci`: 2,790 server tests, zero failed, 11,480 parent
+  assertions across 304 files (495.57s); then 450 DOM tests, zero failed, 2,675
+  assertions across 55 files (68.84s). Real resync assertions also run in the
+  isolated children and are not included in the parent's assertion counter.
+- `timeout 2400 bun run test:stress`: seed 1337, rerun-each=3; 8,370 passed,
+  zero failed, 34,440 parent assertions across 304 files (1406.89s).
+  The earlier run had 8,364 passed / six failures in the two real-IMAP resync
+  cases after the shared pool mock. The unchanged-seed two-file reproducer and
+  complete rerun passed after fixture isolation; no transport code changed.
+- `timeout 600 bun run lint`: the allowed baseline remains one pre-existing
+  `useCalendarConflicts.ts:58` error and 25 warnings, with no new findings.
+- `timeout 1200 bun run build`: exit zero; compiled in 20.7s, production
+  TypeScript finished in 38.6s, and all 31 static pages generated.
+- Production `playwright.compose.config.ts`: five passed, zero failed (1.4m),
+  including all existing QA-001/002/008 cases and the added two-person scenario.
+  The first browser attempt's four existing cases passed; the new case hit the
+  real auth rate limit during setup. Per-scenario TEST-NET proxy clients and
+  paced logins fixed the fixture without changing limits, assertions or retries.
+- `git diff --check`: exit zero. New English copy and reused control labels are
+  inventoried in `doc/SENDER-IDENTITIES-UI-STRINGS.json` (59 introduced strings,
+  11 reused labels); placeholder tokens are not translation targets.
+
+`MailClient.tsx` has exactly two localized hunks: the sender-settings account
+refresh subscription (line 4331) and shared-template save wiring using
+`teamDefaults:true` (line 5952). Imports and the notices render area are unchanged.
