@@ -131,7 +131,6 @@ test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable
   await page.locator('[data-shell-action="toggle-sidebar"]').click();
   await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute("data-state", "collapsed");
   await toolbar(page).getByRole("button", { name: "Delete", exact: true }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Move to Trash", exact: true }).click();
   const undo = page.locator(".inapp-notice-stack-pane").getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeVisible();
   await expect(undo).toBeInViewport({ ratio: 1 });
