@@ -45,7 +45,6 @@ export default function ProcessStatusPopover({ embedded, open, onOpenChange, isS
     trigger={<BottomStatusTriggerButton label={t("process.title")} value={t("idle")} />}
     contentProps={{ className: "bottom-popover bottom-popover-process" }}>
     <div className="space-y-3 text-sm">
-      {!embedded ? <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>{t("close")}</Button> : null}
       {jobs.map(job => <div key={job.jobId} className="space-y-1 break-words">
         <p className="font-medium">{scope(job)}</p>
         <p className="text-muted-foreground">{t(`mode.${job.mode}`)} · {t(`phase.${job.phase}`)}

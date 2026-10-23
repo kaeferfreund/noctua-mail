@@ -3,13 +3,11 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { UiLocale } from "@/lib/i18n/config";
 import { useCallback, useMemo, useState } from "react";
-import { Trash2, X, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
+import { Trash2, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
 import {
-  Badge,
   Box,
   Card,
   Flex,
-  Heading,
   Text
 } from "@radix-ui/themes";
 import {
@@ -221,6 +219,7 @@ export default function UpcomingStatusPopover({
 
   return (
     <StatusPanelFrame embedded={embedded} description={t("reminder.description")} open={open} onOpenChange={onOpenChange} title={t("reminder.title")}
+      count={mergedCount}
       trigger={<BottomStatusTriggerButton
           label={t("reminder.title")}
           value={upcomingStatusValue}
@@ -233,27 +232,6 @@ export default function UpcomingStatusPopover({
         align: "end",
         sideOffset: 8, }}
     >
-        {!embedded ? <Flex align="center" justify="between" className="popover-title-row">
-          <Flex align="baseline" gap="3">
-            <Heading size="3" weight="medium" className="reminder-main-title">
-              {t("reminder.title")}
-            </Heading>
-            <Badge color="gray" variant="soft" radius="full">
-              {mergedCount}
-            </Badge>
-          </Flex>
-          <Flex align="center" gap="2">
-            <TooltipIconButton
-              variant="ghost"
-              color="gray"
-              size="2"
-              tooltip={t("close")}
-              onClick={() => onOpenChange(false)}
-            >
-              <X size={16} />
-            </TooltipIconButton>
-          </Flex>
-        </Flex> : null}
         <Box className="popover-body">
           {upcomingEntries.length > 0 ? (
             <div className="reminder-groups">

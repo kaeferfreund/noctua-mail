@@ -146,6 +146,29 @@ describe("compact header status", () => {
     await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(indicator));
   });
+  it("gives each phone status Sheet one visible title row before its description", async () => {
+    window.innerWidth = 390;
+    const view = render(<Harness overrides={{ exceptionEntries: [{ id: "e", message: "Synthetic error", timestamp: 1792627200000 }] }} />);
+    const indicator = view.getByRole("button", { name: "1 Hinweis erfordert deine Aufmerksamkeit" });
+    for (const [entry, title, count, description] of [
+      ["Hintergrundaufgaben", "Hintergrundaufgaben", null, "Zeigt laufende Synchronisierungen, Fortschritt und neue Versuche."],
+      ["Posteingangsprüfung", "Posteingangsprüfung", null, "Zeigt die letzte und nächste Prüfung deines Posteingangs."],
+      ["Demnächst", "Demnächst", "0", "Zeigt deine nächsten Termine und Erinnerungen."],
+      ["Fehler (1)", "Fehler", "1", "Zeigt aufgetretene Fehler mit Zeitpunkt und Details."]
+    ] as const) {
+      fireEvent.keyDown(indicator, { key: "Enter" });
+      fireEvent.click(await view.findByRole("menuitem", { name: entry }));
+      const sheet = await view.findByRole("dialog", { name: title });
+      const heading = sheet.querySelector<HTMLElement>('[data-slot="sheet-title"]')!;
+      expect(heading.textContent).toBe(title);
+      expect(heading.className).not.toContain("sr-only");
+      expect(heading.parentElement!.querySelector('[data-slot="badge"]')?.textContent ?? null).toBe(count);
+      expect(within(sheet).getByRole("button", { name: "Schließen" }).getAttribute("data-slot")).toBe("sheet-close");
+      expect(heading.compareDocumentPosition(within(sheet).getByText(description)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      fireEvent.keyDown(sheet, { key: "Escape" });
+      await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
+    }
+  });
   it("shows the running build at the foot of the popover and of the phone menu", async () => {
     const buildInfo = { hash: "0ac6cfa3d9e1b2c4f5a6b7c8d9e0f1a2b3c4d5e6", shortHash: "0ac6cfa", builtAt: "2026-10-23T13:16:05Z" };
     const view = render(<Harness overrides={{ buildInfo }} />);
@@ -179,7 +202,7 @@ describe("phone calendar frame", () => {
     try {
       window.innerWidth = width;
       const view = render(<Harness initial="calendar" overrides={{ activeAccountId: "synthetic-account" }} />);
-      const sheet = await view.findByRole("dialog", { name: "Kalender öffnen" });
+      const sheet = await view.findByRole("dialog", { name: "Kalender" });
       expect(sheet.getAttribute("data-slot")).toBe("sheet-content");
       expect(sheet.getAttribute("data-side")).toBe("right");
       expect(sheet.querySelector('[data-slot="sheet-close"]')).toBeTruthy();
@@ -214,7 +237,7 @@ describe("phone calendar frame", () => {
     const css = postcss.parse(readFileSync(new URL("../../shell/MobileFrames.module.css", import.meta.url), "utf8"));
     const decls = (selector: string) => {
       const found: Record<string, string> = {};
-      css.walkRules(rule => { if (rule.selector === selector) rule.walkDecls(decl => { found[decl.prop] = decl.value; }); });
+      css.walkRules(rule => { if (rule.selectors.includes(selector)) rule.walkDecls(decl => { found[decl.prop] = decl.value; }); });
       return found;
     };
     expect(decls(".calendarBody :global(.fc .fc-toolbar.fc-header-toolbar)")["flex-wrap"]).toBe("wrap");
@@ -222,6 +245,7 @@ describe("phone calendar frame", () => {
     expect(decls(".calendarFrame button")["min-height"]).toBe("44px");
     expect(decls(".calendarFrame :global(.fc-button)")["min-width"]).toBe("44px");
     expect(decls('.fullscreenSheet > [data-slot="sheet-close"]')).toMatchObject({ width: "44px", height: "44px" });
+    expect(decls('.statusSheet > [data-slot="sheet-close"]')).toMatchObject({ width: "44px", height: "44px" });
     const body = decls(".calendarBody");
     expect(body).toMatchObject({ display: "flex", "flex-direction": "column", "min-width": "0", overflow: "hidden" });
     expect(parseFloat(body["min-height"])).toBeGreaterThanOrEqual(300);
