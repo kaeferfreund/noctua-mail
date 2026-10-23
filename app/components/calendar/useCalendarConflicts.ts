@@ -27,41 +27,45 @@ export type CalendarEventConflictItem = {
  * conflict.
  */
 export function useCalendarConflicts(accountId: string) {
-  const [conflicts, setConflicts] = useState<CalendarEventConflictItem[]>([]);
+  const [result, setResult] = useState<{ accountId: string; conflicts: CalendarEventConflictItem[] }>({ accountId, conflicts: [] });
+  // Adjust only when the account changes so switching away and back cannot
+  // resurrect an old snapshot before the new request settles.
+  if (result.accountId !== accountId) {
+    setResult({ accountId, conflicts: [] });
+  }
+  const conflicts = result.accountId === accountId ? result.conflicts : [];
   // Monotonic token: every refresh claims one; a response only applies if it's
   // still the latest. Bumped on cleanup so an in-flight fetch can't update state
   // after an account switch or unmount (stale data / setState-after-unmount).
-  const requestRef = useRef(0);
+  const requestRef = useRef({ version: 0 });
 
-  const refresh = useCallback(async () => {
-    if (!accountId) return;
-    const token = ++requestRef.current;
-    try {
-      const res = await fetch(buildAccountCalendarConflictsPath(accountId), {
-        credentials: "include"
-      });
+  const refresh = useCallback(() => {
+    if (!accountId) return Promise.resolve();
+    const request = requestRef.current;
+    const token = ++request.version;
+    return fetch(buildAccountCalendarConflictsPath(accountId), {
+      credentials: "include"
+    }).then(async res => {
       if (!res.ok) return;
       const body = (await res.json()) as {
         ok?: boolean;
         conflicts?: CalendarEventConflictItem[];
       };
-      if (token !== requestRef.current) return; // superseded or unmounted
-      if (body.ok) setConflicts(body.conflicts ?? []);
-    } catch {
+      if (token !== request.version) return; // superseded or unmounted
+      if (body.ok) setResult({ accountId, conflicts: body.conflicts ?? [] });
+    }).catch(() => {
       // transient; next signal refreshes
-    }
+    });
   }, [accountId]);
 
   useEffect(() => {
-    // Drop the previous account's conflicts immediately on switch so the banner
-    // can't show the wrong account's data while the new fetch is in flight.
-    setConflicts([]);
+    const request = requestRef.current;
     void refresh();
     const handler = () => void refresh();
     window.addEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handler);
     window.addEventListener(CALENDAR_SYNC_COMPLETED_EVENT, handler);
     return () => {
-      requestRef.current++; // invalidate any in-flight refresh
+      request.version++; // invalidate any in-flight refresh
       window.removeEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handler);
       window.removeEventListener(CALENDAR_SYNC_COMPLETED_EVENT, handler);
     };
