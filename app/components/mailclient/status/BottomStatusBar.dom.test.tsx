@@ -29,7 +29,7 @@ function props(): ComponentProps<typeof BottomStatusBar> {
     activeAccountId: "", calendarSidebarOpen: false, pendingCalendarReminders: [], upcomingEvents: [],
     onRefreshPendingReminders: async () => {}, onOpenReminderMessage: noop, onReportError: noop,
     exceptionEntries: [], onClearExceptions: noop, openPanel: null, setOpenPanel: noop,
-    formatRelativeTime: () => "just now", onOpenCalendarSidebar: noop, onToggleCalendarSidebar: noop
+    formatRelativeTime: () => "just now", onOpenCalendarSidebar: noop, onToggleCalendarSidebar: noop, buildInfo: null
   };
 }
 function Harness({ initial = null, overrides = {}, pwa = false }: {
@@ -145,6 +145,17 @@ describe("compact header status", () => {
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(indicator));
+  });
+  it("shows the running build at the foot of the popover and of the phone menu", async () => {
+    const buildInfo = { hash: "0ac6cfa3d9e1b2c4f5a6b7c8d9e0f1a2b3c4d5e6", shortHash: "0ac6cfa", builtAt: "2026-10-23T13:16:05Z" };
+    const view = render(<Harness overrides={{ buildInfo }} />);
+    fireEvent.click(view.getByRole("button", { name: "Aktivität und Kalender" }));
+    expect(within(await view.findByRole("dialog")).getByText("Build 0ac6cfa · 23.10.2026, 15:16")).toBeTruthy();
+    cleanup();
+    window.innerWidth = 390;
+    const phone = render(<Harness overrides={{ buildInfo }} />);
+    fireEvent.keyDown(phone.getByRole("button", { name: "Aktivität und Kalender" }), { key: "Enter" });
+    expect(within(await phone.findByRole("menu")).getByText("Build 0ac6cfa · 23.10.2026, 15:16")).toBeTruthy();
   });
   it("keeps a selected section when crossing the mobile breakpoint", async () => {
     const view = render(<Harness initial="exception" />);

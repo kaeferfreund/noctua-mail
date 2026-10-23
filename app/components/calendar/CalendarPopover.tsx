@@ -27,6 +27,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   onOpenSidebar: () => void;
   triggerLabel: string;
+  /** Accessible name and tooltip of the trigger; should contain the visible label. */
+  triggerTitle: string;
   onOpenMessage?: (messageId: string) => void;
   onFindRelatedByInviteUid?: (uid: string) => void;
 };
@@ -98,6 +100,7 @@ export default function CalendarPopover({
   onOpenChange,
   onOpenSidebar,
   triggerLabel,
+  triggerTitle,
   onOpenMessage,
   onFindRelatedByInviteUid
 }: Props) {
@@ -353,10 +356,11 @@ export default function CalendarPopover({
   return (
     <>
       <button
-        className="bottom-center-time"
-        style={{ cursor: "pointer", background: "none", border: "none", padding: 0, color: "inherit", font: "inherit" }}
-        title="Open calendar"
-        aria-label="Open calendar"
+        type="button"
+        className="bottom-section bottom-status-trigger"
+        title={triggerTitle}
+        aria-label={triggerTitle}
+        aria-expanded={open}
         onClick={() => onOpenChange(!open)}
       >
         {triggerLabel}

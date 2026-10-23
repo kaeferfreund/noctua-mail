@@ -210,6 +210,10 @@
     "refreshMandatory": "Refresh is mandatory before continuing. New build: {version}.",
     "refreshNow": "Refresh now",
     "status": {
+      "build": "Build {hash} · {date}, {time}",
+      "buildUndated": "Build {hash}",
+      "buildTitle": "Commit {hash}, built {time}",
+      "buildCommit": "Commit {hash}",
       "label": "Activity and calendar",
       "syncing": "Syncing …",
       "attention": "{count, plural, one {# issue needs your attention} other {# issues need your attention}}",

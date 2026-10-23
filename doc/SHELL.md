@@ -27,6 +27,10 @@ timestamps, details, re-login where applicable and clear-all. Mail checks show
 actual polling activity, the last attempt and next scheduled check, or explain
 IMAP IDLE delivery. No successful poll is invented for a newly connected stream.
 All status copy is in both catalogs under `Shell.status`.
+The running build (`BuildInfo`, "Build <sha7> · <date>, <time>" in the display
+zone, full commit and ISO time in the tooltip) sits as a footer line at the
+bottom of the desktop status popover and as a label at the end of the phone
+status menu; without build data it renders nothing.
 
 Desktop density (768px and wider) is scoped to `ShellPanes.module.css`:
 `--shell-gutter: 0px`, `--pane-padding-x/y: 12px`, and
