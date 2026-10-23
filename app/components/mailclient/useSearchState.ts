@@ -207,6 +207,12 @@ export function useSearchState(options: UseSearchStateOptions) {
     [activeFolderId, searchScope, setQuery, setActiveFolderId]
   );
 
+  // Absolute folder counts also change after flags/stream updates, without a
+  // completed sync. Refresh virtual totals from the server on those changes.
+  const folderCountsKey = useMemo(() => JSON.stringify(accountFolders.map(folder =>
+    [folder.id, folder.count, folder.unreadCount]
+  )), [accountFolders]);
+
   // Fetch virtual folder counts
   useEffect(() => {
     if (!activeAccountId) return;
@@ -252,7 +258,7 @@ export function useSearchState(options: UseSearchStateOptions) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion]);
+  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, folderCountsKey]);
 
   // Auto-clear virtual folder when conditions change
   useEffect(() => {
