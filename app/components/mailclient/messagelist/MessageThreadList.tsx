@@ -466,6 +466,7 @@ export default function MessageThreadList({
                         : t("moveTrash")
                     }
                     aria-label={t("delete")}
+                    data-message-action="delete"
                     disabled={pendingMessageActions.has(message.id)}
                     onClick={(event) => {
                       event.stopPropagation();

@@ -36,3 +36,21 @@ test("calendar days and stable group identities survive Berlin midnight and both
   expect(messageGroupLabel("Today", "sender", "de")).toBe("Today");
   expect(messageGroupLabel("INBOX", "folder", "de")).toBe("INBOX");
 });
+
+test("SQLite week buckets display their actual Berlin start, including W00 and year edges", () => {
+  for (const [key, de, en] of [
+    ["2026-W42", "Ab 19. Okt. 2026", "From 19 Oct 2026"],
+    ["2026-W00", "Ab 1. Jan. 2026", "From 1 Jan 2026"],
+    ["2026-W01", "Ab 5. Jan. 2026", "From 5 Jan 2026"],
+    ["2026-W52", "Ab 28. Dez. 2026", "From 28 Dec 2026"],
+    ["2027-W00", "Ab 1. Jan. 2027", "From 1 Jan 2027"],
+    ["2026-W12", "Ab 23. März 2026", "From 23 Mar 2026"],
+    ["2026-W43", "Ab 26. Okt. 2026", "From 26 Oct 2026"]
+  ]) {
+    expect(messageGroupLabel(key, "week", "de")).toBe(de);
+    expect(messageGroupLabel(key, "week", "en")).toBe(en);
+  }
+  expect(messageGroupLabel("2024-W00", "week", "de")).toBe("2024-W00"); // Jan 1 is Monday: no W00 bucket.
+  expect(messageGroupLabel("2026-W53", "week", "de")).toBe("2026-W53");
+  expect(messageGroupLabel("This Week", "date", "de")).toBe("Vor 2 bis 7 Tagen");
+});

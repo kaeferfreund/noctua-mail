@@ -37,7 +37,7 @@ export function RemoveAttachmentConfirmDialog({
           <Button variant="soft" color="gray" onClick={onCancel} disabled={removing}>{t("cancel")}</Button>
           {/* Not wrapped in AlertDialog.Action: the removal is async and the
               dialog must stay open, showing progress, until it resolves. */}
-          <Button color="red" variant="solid" onClick={onConfirm} loading={removing}>{t("remove")}{noun}
+          <Button color="red" variant="solid" onClick={onConfirm} loading={removing}>{t("removeAttachmentAction", { kind: noun })}
           </Button>
         </Flex>
       </AlertDialogContent>

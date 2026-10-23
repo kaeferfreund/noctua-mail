@@ -96,7 +96,7 @@
     "groups": {
       "today": "Today",
       "yesterday": "Yesterday",
-      "thisWeek": "This Week",
+      "thisWeek": "2 to 7 days ago",
       "older": "Older",
       "upcoming": "UPCOMING",
       "past": "PAST",
@@ -105,7 +105,7 @@
       "unknown": "Unknown",
       "flagged": "Flagged",
       "done": "Done",
-      "week": "{year}-W{week}"
+      "week": "From {date}"
     },
     "relativeGroups": {
       "noDate": "No date",
@@ -321,7 +321,7 @@
     "stepperCurrent": "{action}, currently {percent}",
     "stepperReset": "{action} (currently {percent})",
     "addressActions": "Address actions for {address}",
-    "noMatchingFolders": "No folders match “{query}”",
+    "noMatchingFolders": "No folders match “{query}”.",
     "copyAccountTitle": "{mode, select, move {Move} other {Copy}} {count, plural, one {message} other {# messages}} to account",
     "translatedTo": "Translated to {language}{hasSource, select, yes { · from {source}} other {}}",
     "moreEvents": "+{count, plural, one {# more event in attachment} other {# more events in attachment}}",

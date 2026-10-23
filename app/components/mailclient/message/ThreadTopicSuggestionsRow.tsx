@@ -138,9 +138,9 @@ function ThreadTopicSuggestionsRow({
                 <>
                   <Flex direction="column" gap="1">
                     <Text size="1" color="gray">{t("signalWeights")}</Text>
-                    <Text size="1" color="gray">{t("perThread")}<code>{t("threadScoreFormula")}</code>
+                    <Text size="1" color="gray">{t("perThread")} <code>{t("threadScoreFormula")}</code>
                     </Text>
-                    <Text size="1" color="gray">{t("perTopic")}<code>{t("suggestionScoreFormula")}</code>, <code>{t("matchCountFormula")}</code>
+                    <Text size="1" color="gray">{t("perTopic")} <code>{t("suggestionScoreFormula")}</code>, <code>{t("matchCountFormula")}</code>
                     </Text>
                   </Flex>
                   <Flex direction="column" gap="1">
@@ -168,9 +168,9 @@ function ThreadTopicSuggestionsRow({
                         {entry.matchedThreads.map((thread) => (
                           <Flex key={`${entry.topic.id}-${thread.threadId}`} direction="column" gap="1">
                             <Text size="1" color="gray">
-                              {thread.threadId}: {formatTopicSuggestionFormula(thread.signals, locale)} = {thread.score}
+                              {thread.threadId}: {formatTopicSuggestionFormula(thread.signals, locale)} = {formatNumber(thread.score, locale)}
                             </Text>
-                            <Text size="1" color="gray">{t("signalsLabel")}{thread.signals.map((signal) => formatTopicSuggestionSignal(signal, locale)).join(", ")}
+                            <Text size="1" color="gray">{t("signalsLabel")} {thread.signals.map((signal) => formatTopicSuggestionSignal(signal, locale)).join(", ")}
                             </Text>
                           </Flex>
                         ))}

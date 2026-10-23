@@ -594,6 +594,14 @@
 }
 
 @media (width < 768px) {
+  /* Long localized badges get their own row. Keep all header controls at
+     their intrinsic widths instead of shrinking their boxes into overlap. */
+  .topRow { flex-wrap: wrap; }
+  .topRowLead { flex-basis: 100%; }
+  .actions { flex: 0 0 auto; margin-left: auto; }
+  .messageActions { flex-shrink: 0; }
+  .badges > * { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
   .metaSplit { flex-direction: column; }
   .metaSegmentFrom { flex: 0 1 auto; width: 100%; }
   .metaSegmentDate { max-width: 100%; }

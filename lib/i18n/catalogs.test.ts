@@ -37,3 +37,15 @@ test("responsive list styling never treats accessible copy as control identity",
     expect(css).not.toMatch(/\[(?:aria-label|title)\s*=/);
   }
 });
+
+test("reviewed German reader copy follows the binding terminology and complete messages", () => {
+  const t = getTranslator("de");
+  expect(t("Reader.transactional")).toBe("🧾 Transaktions-E-Mails");
+  expect(t("Reader.flags.transactional")).toBe("🧾 Transaktions-E-Mails");
+  expect(t("Reader.categories.transactional")).toBe("Transaktions-E-Mails");
+  expect(t("Reader.unmarkAnswered")).toBe("Antwortmarkierung entfernen");
+  expect(t("Reader.noMatchingFolders", { query: "Synthetic {opaque}" })).toBe("Keine Ordner entsprechen „Synthetic {opaque}“.");
+  expect(t("Reader.startFullSync")).toBe("Synchronisierung starten");
+  expect(t("Reader.translatedTo", { language: "Synthetic language", hasSource: "no", source: "" })).toBe("Zielsprache: Synthetic language");
+  expect(t("Reader.recent")).toBe("Zuletzt verwendet"); // Folder history retains its meaning.
+});
