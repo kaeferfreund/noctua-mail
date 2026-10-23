@@ -1,7 +1,12 @@
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
+import { redactAuthUrl } from "../authRecoveryContext";
 import { assertServerRunning, installShutdownCoordinator, isShuttingDown } from "./shutdown";
+
+function redactedRequestUrl(target: string | undefined) {
+  return redactAuthUrl(URL.parse(target ?? "", "http://localhost")?.href ?? "");
+}
 
 /** Use the bound address (including an OS-selected port) for Next's internal URL. */
 export function listenerOrigin(address: AddressInfo) {
@@ -35,7 +40,7 @@ export async function startServer(options: { dir: string; hostname: string; port
     response.once("finish", finish); response.once("close", finish);
     try { await initialized; await handlers.requestHandler(request, response); }
     catch (error) {
-      console.error(`Failed to handle request for ${request.url}`, error);
+      console.error(`Failed to handle request for ${redactedRequestUrl(request.url)}`, error);
       if (!response.headersSent) response.writeHead(500);
       response.end("Internal Server Error");
     }
@@ -48,7 +53,7 @@ export async function startServer(options: { dir: string; hostname: string; port
       await handlers.upgradeHandler(request, socket, head);
     } catch (error) {
       socket.destroy();
-      console.error(`Failed to handle request for ${request.url}`, error);
+      console.error(`Failed to handle request for ${redactedRequestUrl(request.url)}`, error);
     }
   });
   if (options.keepAliveTimeout) server.keepAliveTimeout = options.keepAliveTimeout;
