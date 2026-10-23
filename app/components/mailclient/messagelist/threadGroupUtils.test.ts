@@ -193,7 +193,7 @@ describe("recipient alias display", () => {
       }
     ];
 
-    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com", false, findRecipientAlias);
+    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com", false, findRecipientAlias, "en");
 
     expect(result.text).toBe("Me, Friday Group, Petra");
     expect(result.tooltip).toBe(
@@ -229,7 +229,7 @@ describe("recipient alias display", () => {
       }
     ];
 
-    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com");
+    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com", false, undefined, "en");
 
     expect(result.text).toBe(
       "Daniel Raap [subshell Online Support System], Sarah Smith [subshell Online Support System]"
@@ -259,8 +259,19 @@ describe("recipient alias display", () => {
       }
     ];
 
-    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com");
+    const result = getCollapsedThreadFromDisplay(fullFlat, "me@example.com", false, undefined, "en");
 
     expect(result.text).toBe("Me, Bob, Carol");
   });
+});
+
+it("participant deduplication uses identity codes when the translated self label matches a sender name", () => {
+  const fullFlat = [
+    { message: makeMessage("self", "thread", 1, { from: "Own <me@example.test>", to: "" }), depth: 0 },
+    { message: makeMessage("other", "thread", 2, { from: "Ich <other@example.test>", to: "" }), depth: 1 }
+  ];
+  const de = getCollapsedThreadFromDisplay(fullFlat, "me@example.test", false, undefined, "de");
+  const en = getCollapsedThreadFromDisplay(fullFlat, "me@example.test", false, undefined, "en");
+  expect(de.participants?.map(p => p.email)).toEqual(["me@example.test", "other@example.test"]);
+  expect(en.participants?.map(p => p.email)).toEqual(de.participants?.map(p => p.email));
 });

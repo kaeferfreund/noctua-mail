@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { createRef, useState, type ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
 import MessageMenu from "@/app/components/mailclient/message/MessageMenu";

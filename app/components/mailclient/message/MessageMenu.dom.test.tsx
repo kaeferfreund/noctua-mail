@@ -1,6 +1,7 @@
 // Uses the shared resolver and actions through the real row menu.
 import { afterEach, describe, expect, it } from "bun:test";
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import type { ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
 import { TooltipProvider } from "@/app/components/ui/tooltip";

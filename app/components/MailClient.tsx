@@ -375,9 +375,12 @@ type ActiveTopicSuggestionsResponse = {
   suggestions?: TopicThreadSuggestion[];
 };
 
+import { useTranslations } from "next-intl";
+
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
+  const tn = useTranslations("Notifications");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -585,10 +588,10 @@ export default function MailClient({
         reportError(await readErrorMessage(foldersRes));
       }
     } catch {
-      reportError("Failed to refresh folders.");
+      reportError(tn("refreshFoldersFailed"));
     }
     return null;
-  }, [activeAccountId, apiFetch, reportError, readErrorMessage, setFolders]);
+  }, [activeAccountId, apiFetch, reportError, readErrorMessage, setFolders, tn]);
 
   const [groupBy, setGroupBy] = useState<
     "none" | "date" | "week" | "sender" | "domain" | "year" | "folder" | "event"
@@ -1188,28 +1191,29 @@ export default function MailClient({
   const relatedNotice = useMemo(() => {
     if (!isRelatedSearch) return "";
     const subject = relatedContext?.subject?.trim();
-    const label = subject
-      ? `"${shortenRelatedNoticeSubject(subject, RELATED_NOTICE_SUBJECT_MAX_CHARS)}"`
-      : relatedQueryId || "this message";
-    return `Showing related mails for ${label} (based on calendar invite UID matches, subject similarity, sender/recipient overlap, and conversation references).`;
-  }, [isRelatedSearch, relatedContext, relatedQueryId]);
+    return tn("relatedMessages", {
+      hasSubject: subject ? "yes" : "no",
+      subject: subject ? shortenRelatedNoticeSubject(subject, RELATED_NOTICE_SUBJECT_MAX_CHARS) : "",
+      reference: relatedQueryId || tn("thisMessage")
+    });
+  }, [isRelatedSearch, relatedContext, relatedQueryId, tn]);
   // clearSearch, activateVirtualFolder, and virtual folder count effects moved to useSearchState hook
   const formatRelativeTime = (timestamp?: number | null) => {
     if (!timestamp) return "";
     const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
-    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 60) return tn("relativeSeconds", { count: seconds });
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return tn("relativeMinutes", { count: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return tn("relativeHours", { count: hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return tn("relativeDays", { count: days });
   };
 
   const undoMoveOperation = async (
     targets: UndoMoveTarget[],
     accountId: string,
-    successTitle = "Move undone."
+    successTitle = tn("moveUndone", { count: 1 })
   ) => {
     if (targets.length === 0) return;
     // IMAP MOVE/COPY assigns a new UID in the destination, so the next
@@ -1281,7 +1285,7 @@ export default function MailClient({
         durationMs: 4500
       });
     } catch {
-      reportError("Failed to undo message move.");
+      reportError(tn("undoMoveFailed"));
     }
   };
 
@@ -1982,13 +1986,13 @@ export default function MailClient({
         accounts.find((account) => account.id === activeAccountId) ??
         null;
       if (!targetAccount || targetAccount.accessRole !== "manager") {
-        reportError("Mailbox unavailable; contact a manager.");
+        reportError(tn("mailboxUnavailable"));
         return;
       }
       setReloginDescription("");
       setReloginAccountId(targetAccount.id);
     },
-    [accounts, activeAccountId, reportError]
+    [accounts, activeAccountId, reportError, tn]
   );
   const handleReloginSuccess = useCallback(
     async (updatedAccount: Account) => {
@@ -2015,8 +2019,8 @@ export default function MailClient({
       );
       pushNotice({
         type: "success",
-        title: "Account reconnected",
-        description: `Updated IMAP credentials for ${updatedAccount.email}.`
+        title: tn("accountReconnected"),
+        description: tn("credentialsUpdated", { email: updatedAccount.email })
       });
       if (updatedAccount.id === activeAccountId) {
         void syncAccount(activeFolderId || undefined, "new", {
@@ -2024,7 +2028,7 @@ export default function MailClient({
         });
       }
     },
-    [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount]
+    [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
   );
   const calendarFirstDay: 0 | 1 = currentAccount?.settings?.calendar?.weekStartsOn === "sunday" ? 0 : 1;
   const accountSignatures = currentAccount?.settings?.signatures ?? [];
@@ -2625,10 +2629,10 @@ export default function MailClient({
         } catch (refreshErr) {
           pushNotice({
             type: "warning",
-            title: "Draft discarded, but mailbox refresh failed.",
+            title: tn("draftDiscardedRefreshFailed"),
             description:
               (refreshErr as Error)?.message ||
-              "Refresh the mailbox manually to see the updated state."
+              tn("refreshManually")
           });
         }
       } catch (err) {
@@ -2651,7 +2655,8 @@ export default function MailClient({
       removeDraftFromUi,
       reportError,
       setPendingMessageActions,
-      suppressDraftDeleteReconcile
+      suppressDraftDeleteReconcile,
+      tn
     ]
   );
 
@@ -3322,10 +3327,10 @@ export default function MailClient({
         } catch (refreshErr) {
           pushNotice({
             type: "warning",
-            title: "Draft sent, but mailbox refresh failed.",
+            title: tn("draftSentRefreshFailed"),
             description:
               (refreshErr as Error)?.message ||
-              "Refresh the mailbox manually to see the updated state."
+              tn("refreshManually")
           });
         }
       } catch (err) {
@@ -3355,7 +3360,8 @@ export default function MailClient({
       shouldKeepMessageInCurrentResults,
       suppressDraftDeleteReconcile,
       updateThreadCacheWithMessage,
-      viewMessage?.id
+      viewMessage?.id,
+      tn
     ]
   );
 
@@ -3663,25 +3669,23 @@ export default function MailClient({
         const failed = (data.results ?? []).filter((result) => !result.ok);
         const warning = (data.results ?? []).find((result) => result.warning)?.warning;
         if (copied === 0) {
-          reportError(failed[0]?.error ?? "Failed to copy messages to the other account.");
+          reportError(failed[0]?.error ?? tn("crossAccountFailed"));
           return;
         }
-        const verb = mode === "move" ? "Moved" : "Copied";
-        const subject =
-          copied === 1 ? "message" : `${copied} messages`;
         pushNotice({
           type: "success",
-          title: `${verb} ${subject} to ${destinationName}.`,
+          title: tn("crossAccountComplete", { mode, count: copied, destination: destinationName }),
           description:
             warning ??
-            (failed.length > 0 ? `${failed.length} could not be processed.` : undefined),
+            (failed.length > 0 ? tn("processingFailed", { count: failed.length }) : undefined),
           durationMs: NOTICE_TIMEOUTS.success
         });
       } catch {
-        reportError("Failed to copy messages due to a network error.");
+        reportError(tn("crossAccountNetworkFailed"));
       }
     },
     [
+      tn,
       copyToAccountState,
       accounts,
       apiFetch,
@@ -3878,9 +3882,7 @@ export default function MailClient({
         } finally {
           if (failed > 0) {
             reportError(
-              failed === 1
-                ? "Failed to add topic to one thread."
-                : `Failed to add topic to ${failed} threads.`
+              tn("topicAddFailed", { count: failed })
             );
           }
         }
@@ -3895,7 +3897,8 @@ export default function MailClient({
       postAddTopicToThread,
       refreshActiveTopicModeResults,
       refreshTopicStats,
-      reportError
+      reportError,
+      tn
     ]
   );
 
@@ -5191,7 +5194,7 @@ export default function MailClient({
         await refreshMailboxData();
       }
     } catch {
-      reportError("Re-sync failed due to a network error.");
+      reportError(tn("resyncNetworkFailed"));
     }
   };
 
@@ -5214,7 +5217,7 @@ export default function MailClient({
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      reportError("Download failed due to a network error.");
+      reportError(tn("downloadNetworkFailed"));
     }
   };
 
@@ -5230,8 +5233,8 @@ export default function MailClient({
     if (!opened) {
       pushNotice({
         type: "warning",
-        title: "Pop-up blocked",
-        description: "Allow pop-ups to open the message in a new window."
+        title: tn("popupBlocked"),
+        description: tn("allowMessagePopup")
       });
     }
   };
@@ -5245,8 +5248,8 @@ export default function MailClient({
     if (!opened) {
       pushNotice({
         type: "warning",
-        title: "Pop-up blocked",
-        description: "Allow pop-ups to open the HTML debug view."
+        title: tn("popupBlocked"),
+        description: tn("allowHtmlPopup")
       });
     }
   };

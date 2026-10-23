@@ -1,3 +1,5 @@
+import { getTranslator } from "@/lib/i18n/translator";
+import type { UiLocale } from "@/lib/i18n/config";
 import type { Message } from "@/lib/data";
 import {
   AI_MODIFIED_FLAG,
@@ -45,7 +47,8 @@ export function hasMeaningfulHtmlText(html?: string) {
   return /[\p{L}\p{N}]/u.test(textOnly);
 }
 
-export function getImapFlagBadges(message: Message): ImapFlagBadge[] {
+export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): ImapFlagBadge[] {
+  const t = getTranslator(locale);
   const rawFlags =
     message.flags && message.flags.length > 0
       ? message.flags
@@ -77,17 +80,17 @@ export function getImapFlagBadges(message: Message): ImapFlagBadge[] {
       const isAiModified = lower === AI_MODIFIED_FLAG.toLowerCase();
       if (lower === "\\recent" && (message.seen || message.draft)) return null;
       const label = isForwarded
-        ? "Forwarded"
+        ? t("Reader.flags.forwarded")
         : isCalendarInvite
-          ? "Calendar Invite"
+          ? t("Reader.flags.calendar")
           : isAiModified
-            ? "AI Modified"
+            ? t("Reader.flags.aiModified")
           : isTodo
-            ? "To-Do"
+            ? t("Reader.flags.todo")
             : isDone
-              ? "Done"
+              ? t("Reader.flags.done")
               : lower === "\\recent"
-                ? "New"
+                ? t("Reader.flags.new")
                 : flag.startsWith("\\")
                   ? flag.slice(1)
                   : flag;
@@ -107,15 +110,15 @@ export function getImapFlagBadges(message: Message): ImapFlagBadge[] {
     })
     .filter(Boolean) as ImapFlagBadge[];
   if (hasForwardedHeader && !badges.some((badge) => badge.kind === "forwarded")) {
-    badges.unshift({ label: "Forwarded", kind: "forwarded" });
+    badges.unshift({ label: t("Reader.flags.forwarded"), kind: "forwarded" });
   }
 
   // Add category badge if message is categorized
   if (message.category) {
     const categoryLabels: Record<string, string> = {
-      newsletter: "📰 Newsletter",
-      notification: "🔔 Notification",
-      transactional: "🧾 Transactional"
+      newsletter: t("Reader.flags.newsletter"),
+      notification: t("Reader.flags.notification"),
+      transactional: t("Reader.flags.transactional")
     };
     const label = categoryLabels[message.category] || message.category;
     badges.push({ label, kind: `category-${message.category}` });

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Edit3 } from "lucide-react";
 import styles from "./MessageListCommon.module.css";
 
@@ -12,11 +13,12 @@ export default function MessageSelectIndicators({
   isDraft,
   onFlaggedClick
 }: MessageSelectIndicatorsProps) {
+  const t = useTranslations("List");
   if (!isDraft) return null;
   return (
     <span className={styles.selectIcons}>
       {isDraft && (
-        <span className={`${styles.selectIcon} ${styles.selectIconDraft}`} title="Draft">
+        <span className={`${styles.selectIcon} ${styles.selectIconDraft}`} title={t("draft")}>
           <Edit3 size={12} />
         </span>
       )}

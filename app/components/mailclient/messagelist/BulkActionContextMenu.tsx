@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type React from "react";
 import { useEffect, useRef } from "react";
 import { DropdownMenu } from "@radix-ui/themes";
@@ -35,6 +37,7 @@ export default function BulkActionContextMenu({
   returnFocusRef,
   ...itemProps
 }: BulkActionContextMenuProps) {
+  const t = useTranslations("List");
   const triggerRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function BulkActionContextMenu({
           }
         }}
       >
-        <DropdownMenu.Label>{selectionCount} selected</DropdownMenu.Label>
+        <DropdownMenu.Label>{t("selectedCount", { count: selectionCount })}</DropdownMenu.Label>
         <BulkActionMenuItems {...itemProps} />
       </DropdownMenu.Content>
     </DropdownMenu.Root>
