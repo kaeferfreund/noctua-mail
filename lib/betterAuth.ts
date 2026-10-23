@@ -222,7 +222,8 @@ export async function migrateAuthSchema(options: BetterAuthOptions): Promise<Aut
 /** Writes the active mailbox onto the caller's Better Auth session row. */
 export async function setActiveAccountId(auth: NoctuaAuth, sessionToken: string, accountId: string | null) {
   const context = await auth.$context;
-  return context.internalAdapter.updateSession(sessionToken, { activeAccountId: accountId });
+  return withDbWriteRetry("setActiveAccountId", () =>
+    context.internalAdapter.updateSession(sessionToken, { activeAccountId: accountId }));
 }
 
 /** Fail startup instead of deriving security settings from request headers. */
