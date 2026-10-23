@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { MobileStatusFocusContext, restoreStatusFocus } from "@/app/components/shell/MobileStatusFocus";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
@@ -82,6 +84,7 @@ export default function BottomStatusBar({
   calendarFirstDay,
   accountDateFormat
 }: BottomStatusBarProps) {
+  const t = useTranslations("Shell.status");
   const isMobile = useIsMobile();
   const indicatorRef = useRef<HTMLButtonElement>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState<number | null>(null);
@@ -129,21 +132,21 @@ export default function BottomStatusBar({
     setOpenPanel((current) => (open ? "calendar" : current === "calendar" ? null : current));
   };
 
-  const mailCheckStatusValue = mailCheckMode === "idle" ? "Idle" : "Polling";
+  const mailCheckStatusValue = t(mailCheckMode === "idle" ? "idle" : "polling");
   const mailCheckStatusTone: BottomStatusTone = mailCheckMode === "idle" ? "muted" : "normal";
 
   return (
     <MobileStatusFocusContext.Provider value={indicatorRef}>
     <div className={isMobile ? mobileStyles.indicators : `bottom-bar ${mobileStyles.desktopStatusBar}`}>
       {isMobile ? <DropdownMenu><DropdownMenuTrigger asChild>
-        <Button ref={indicatorRef} variant="ghost" size="icon" aria-label="Activity and calendar" aria-busy={isSyncing}><Activity />{exceptionEntries.length > 0 ? <span className={mobileStyles.activityDot} /> : null}</Button>
+        <Button ref={indicatorRef} variant="ghost" size="icon" aria-label={t("activity")} aria-busy={isSyncing}><Activity />{exceptionEntries.length > 0 ? <span className={mobileStyles.activityDot} /> : null}</Button>
       </DropdownMenuTrigger><DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={isSyncing} onSelect={() => { void onCheckNewMail?.(); }}>Check for new mail</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("process")}>Processes</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("mail-check")}>Mail check: {mailCheckStatusValue}</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("reminder")}>Reminders</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("exception")}>Exceptions ({exceptionEntries.length})</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setOpenPanel("calendar")}>Calendar</DropdownMenuItem>
+        <DropdownMenuItem disabled={isSyncing} onSelect={() => { void onCheckNewMail?.(); }}>{t("check")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("process")}>{t("processes")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("mail-check")}>{t("mailCheckStatus", { state: mailCheckStatusValue })}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("reminder")}>{t("reminders")}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("exception")}>{t("exceptionCount", { count: exceptionEntries.length })}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setOpenPanel("calendar")}>{t("calendar")}</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu> : null}
       <ProcessStatusPopover
         open={processPanelOpen}
@@ -156,7 +159,7 @@ export default function BottomStatusBar({
         accountFolders={accountFolders}
       />
       {!isMobile && <BottomStatusSection
-        label="Mail check"
+        label={t("mailCheck")}
         value={mailCheckStatusValue}
         tone={mailCheckStatusTone}
       />}
@@ -193,7 +196,7 @@ export default function BottomStatusBar({
       {isMobile ? <>
         <Sheet open={calendarPanelOpen} onOpenChange={handleCalendarPanelOpenChange}>
           <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} aria-describedby={undefined} className={mobileStyles.fullscreenSheet}>
-            <SheetTitle className="m-0 p-4">Calendar</SheetTitle>
+            <SheetTitle className="m-0 p-4">{t("calendar")}</SheetTitle>
             <Theme asChild><div className="flex min-h-0 flex-1 flex-col overflow-auto p-2">
               <CalendarEventBrowser accountId={activeAccountId} firstDay={calendarFirstDay}
                 onOpenMessage={onOpenCalendarMessage ? (id) => { onOpenCalendarMessage(id); setOpenPanel(null); } : undefined}
@@ -203,7 +206,7 @@ export default function BottomStatusBar({
         </Sheet>
         <Sheet open={openPanel === "mail-check"} onOpenChange={(open) => { if (!open) setOpenPanel(null); }}>
           <SheetContent onCloseAutoFocus={(event) => restoreStatusFocus(event, indicatorRef.current)} side="bottom" aria-describedby={undefined}>
-            <SheetTitle className="px-4">Mail check</SheetTitle>
+            <SheetTitle className="px-4">{t("mailCheck")}</SheetTitle>
             <p className="px-4">{mailCheckStatusValue}</p>
           </SheetContent>
         </Sheet>
