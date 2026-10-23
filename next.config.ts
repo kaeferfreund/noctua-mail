@@ -27,6 +27,9 @@ const nextConfig: NextConfig = {
   // Standalone builds only ship traced files, so include the worker source tree
   // and its local TS dependencies explicitly for the routes that launch them.
   outputFileTracingIncludes: {
+    // Next 16.2's tracer misses sharp 0.35's libvips shared library.
+    // Include the installed platform's binaries in standalone deployments.
+    "/*": ["./node_modules/@img/sharp-libvips-*/lib/**"],
     "/api/accounts/*/sync": [
       ...workerRuntimeTraceFiles,
       // Worker subprocess loads lib/html.ts as TS source. Packages imported
