@@ -1,0 +1,536 @@
+[
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 39.861197999998694,
+    "min": 38.19850299999962,
+    "sqlHead": " SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messa",
+    "plan": [
+      "SEARCH t USING INDEX idx_threads_account_latest_received (accountId=?)",
+      "LIST SUBQUERY 3",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CREATE BLOOM FILTER"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 36.69984900000054,
+    "min": 35.633239999999205,
+    "sqlHead": " SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND COALESCE(",
+    "plan": [
+      "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "LIST SUBQUERY 3",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 37.174174000001585,
+    "min": 36.2371660000008,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM m",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 0.4850449999994453,
+    "min": 0.4685239999998885,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM m",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 25.888632999998663,
+    "min": 24.458019999998214,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 0.03531999999904656,
+    "min": 0.030961000000388594,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": true,
+    "ms": 41.42205200000171,
+    "min": 37.54429700000037,
+    "sqlHead": " SELECT CASE WHEN t.latestReceivedDateValue >= ? THEN 'Today' WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday' WHEN t.latestReceivedDateValue >= ? THEN 'Thi",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.2645220000013069,
+    "min": 0.23104199999943376,
+    "sqlHead": "SELECT messageId FROM message_fts_v3 WHERE message_fts_v3 MATCH ? AND accountId = ? LIMIT ?",
+    "plan": [
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.02500000000145519,
+    "min": 0.02351999999882537,
+    "sqlHead": "SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ? LIMIT ?",
+    "plan": [
+      "SEARCH attachments USING INDEX sqlite_autoindex_attachments_1 (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 28.273214000000735,
+    "min": 27.488526000001002,
+    "sqlHead": "SELECT id FROM messages WHERE accountId = ? AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?) LIMIT ?",
+    "plan": [
+      "SEARCH messages USING INDEX idx_messages_account_folder_unread (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 26.510318000000552,
+    "min": 25.709990000003017,
+    "sqlHead": " SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messa",
+    "plan": [
+      "SEARCH t USING INDEX idx_threads_account_latest_received (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+      "CREATE BLOOM FILTER"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 24.539380000001984,
+    "min": 23.63133200000084,
+    "sqlHead": " SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND COALESCE(",
+    "plan": [
+      "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.07164099999863538,
+    "min": 0.04708000000027823,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND (m.id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+    "plan": [
+      "SEARCH m USING INDEX sqlite_autoindex_messages_1 (accountId=? AND id=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.09000000000014552,
+    "min": 0.08608100000128616,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND (m.id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 25.15706599999976,
+    "min": 24.44902000000002,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.03363999999783118,
+    "min": 0.031200000001263106,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads needle",
+    "legacy": false,
+    "ms": 0.07256000000052154,
+    "min": 0.067960000000312,
+    "sqlHead": " SELECT CASE WHEN t.latestReceivedDateValue >= ? THEN 'Today' WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday' WHEN t.latestReceivedDateValue >= ? THEN 'Thi",
+    "plan": [
+      "SEARCH m USING INDEX sqlite_autoindex_messages_1 (accountId=? AND id=?)",
+      "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": true,
+    "ms": 44.14675599999828,
+    "min": 38.33782399999836,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "LIST SUBQUERY 3",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 4",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": true,
+    "ms": 0.018680000001040753,
+    "min": 0.015879999999015126,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": true,
+    "ms": 52.183829000001424,
+    "min": 36.44160700000066,
+    "sqlHead": " SELECT CASE WHEN m.dateValue >= ? THEN 'Today' WHEN m.dateValue >= ? THEN 'Yesterday' WHEN m.dateValue >= ? THEN 'This Week' ELSE 'Older' END as key, COUNT(*) ",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": true,
+    "ms": 42.04081700000097,
+    "min": 37.2036139999982,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND ((((m.accountId, m.id) IN (SELECT accountId, messageId FROM m",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9",
+      "CREATE BLOOM FILTER",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 0.22712200000023586,
+    "min": 0.2172419999988051,
+    "sqlHead": "SELECT messageId FROM message_fts_v3 WHERE message_fts_v3 MATCH ? AND accountId = ? LIMIT ?",
+    "plan": [
+      "SCAN message_fts_v3 VIRTUAL TABLE INDEX 0:M9"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 0.021959999998216517,
+    "min": 0.020759999999427237,
+    "sqlHead": "SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ? LIMIT ?",
+    "plan": [
+      "SEARCH attachments USING INDEX sqlite_autoindex_attachments_1 (accountId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 27.4366059999993,
+    "min": 27.067964000001666,
+    "sqlHead": "SELECT id FROM messages WHERE accountId = ? AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?) LIMIT ?",
+    "plan": [
+      "SEARCH messages USING INDEX idx_messages_account_folder_unread (accountId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 25.08178499999849,
+    "min": 24.862664000000223,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 0.017480000002251472,
+    "min": 0.015121000000362983,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 0.053679999997257255,
+    "min": 0.04724100000021281,
+    "sqlHead": " SELECT CASE WHEN m.dateValue >= ? THEN 'Today' WHEN m.dateValue >= ? THEN 'Yesterday' WHEN m.dateValue >= ? THEN 'This Week' ELSE 'Older' END as key, COUNT(*) ",
+    "plan": [
+      "SEARCH m USING INDEX sqlite_autoindex_messages_1 (accountId=? AND id=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  {
+    "label": "listMessages needle",
+    "legacy": false,
+    "ms": 0.04140000000188593,
+    "min": 0.038240999998379266,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND (m.id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+    "plan": [
+      "SEARCH m USING INDEX sqlite_autoindex_messages_1 (accountId=? AND id=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 28.632857000000513,
+    "min": 27.866931000000477,
+    "sqlHead": " SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messa",
+    "plan": [
+      "SEARCH t USING INDEX idx_threads_account_latest_received (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+      "CREATE BLOOM FILTER"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 29.1981420000011,
+    "min": 28.803578999999445,
+    "sqlHead": " SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND COALESCE(",
+    "plan": [
+      "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 26.765599999998813,
+    "min": 25.00646499999857,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND lower(COALESCE(m.fromAddr, '')) LIKE ? ",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 2.511182000002009,
+    "min": 2.419421999999031,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND lower(COALESCE(m.fromAddr, '')) LIKE ? AND m.threadId IN (?,?",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 35.279397000002064,
+    "min": 29.26154300000053,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 0.1350010000023758,
+    "min": 0.13232200000129524,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 0.035841000000800705,
+    "min": 0.03456000000005588,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": true,
+    "ms": 38.57746699999916,
+    "min": 36.59184800000003,
+    "sqlHead": " SELECT CASE WHEN t.latestReceivedDateValue >= ? THEN 'Today' WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday' WHEN t.latestReceivedDateValue >= ? THEN 'Thi",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 32.92009499999767,
+    "min": 28.13941299999715,
+    "sqlHead": " SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messa",
+    "plan": [
+      "SEARCH t USING INDEX idx_threads_account_latest_received (accountId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+      "CREATE BLOOM FILTER"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 36.124205000000075,
+    "min": 31.32972200000222,
+    "sqlHead": " SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND COALESCE(",
+    "plan": [
+      "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "LIST SUBQUERY 1",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 54.534889999998995,
+    "min": 25.31982799999969,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND lower(COALESCE(m.fromAddr, '')) LIKE ? ",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 2.600783000001684,
+    "min": 2.546263000000181,
+    "sqlHead": " SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND COALESCE(m.deleted, 0) = 0 AND lower(COALESCE(m.fromAddr, '')) LIKE ? AND m.threadId IN (?,?",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 34.881233000000066,
+    "min": 31.253680999998323,
+    "sqlHead": " SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedM",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+      "CORRELATED SCALAR SUBQUERY 1",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+      "CORRELATED SCALAR SUBQUERY 2",
+      "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 0.13696100000015576,
+    "min": 0.13380099999994854,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 0.036159999999654246,
+    "min": 0.034880000002885936,
+    "sqlHead": "SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+    "plan": [
+      "SEARCH message_calendar_events USING INDEX sqlite_autoindex_message_calendar_events_1 (accountId=? AND messageId=?)"
+    ]
+  },
+  {
+    "label": "listThreads from: only",
+    "legacy": false,
+    "ms": 43.476230000000214,
+    "min": 35.924441999999544,
+    "sqlHead": " SELECT CASE WHEN t.latestReceivedDateValue >= ? THEN 'Today' WHEN t.latestReceivedDateValue >= ? THEN 'Yesterday' WHEN t.latestReceivedDateValue >= ? THEN 'Thi",
+    "plan": [
+      "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=?)",
+      "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  }
+]
