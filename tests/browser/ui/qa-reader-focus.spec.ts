@@ -82,6 +82,7 @@ test("reader focus: Enter, toggles, j/k, sidebar reset, persistence, print and e
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
   await rows(page).first().click(); await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
   await expect(toolbar(page).getByRole("button", { name: "Back to messages", exact: true })).toBeFocused();
+  recordQa("reader-focus-saved-entry", await page.evaluate(() => ({ tag: document.activeElement?.tagName, label: document.activeElement?.getAttribute("aria-label") })));
   await page.evaluate(() => { window.print = () => { document.body.dataset.readerPrinted = "yes"; }; });
   await toolbar(page).getByRole("button", { name: "Print message", exact: true }).click();
   expect(await page.locator("body").getAttribute("data-reader-printed")).toBe("yes");
@@ -139,7 +140,7 @@ test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable
   recordQa("reader-focus-delete-notice", { deletedId, nextId, undo: await undo.boundingBox(), stack: await page.locator(".inapp-notice-stack-pane").boundingBox() });
   await screenshot(page, "delete-visible-undo.png");
   await undo.click();
-  await expect(page.getByText("1 message restored", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Message restored.", { exact: true }).first()).toBeVisible();
 });
 
 test("reader focus: archive row action and toolbar use real HTTP and continue to the next rendered message", async ({ page }) => {
@@ -192,7 +193,9 @@ test("reader focus: real print PDF excludes an unsent inline reply and internal 
   await draft.fill(privateText);
   await expect(draft).toHaveValue(privateText);
   await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel("Thread collaboration", { exact: true })).toBeVisible();
   await page.emulateMedia({ media: "print" });
+  await expect(page.getByLabel("Thread collaboration", { exact: true })).toBeHidden();
   await expect(draft).toBeHidden();
   await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeHidden();
   await expect(toolbar(page)).toBeHidden();
