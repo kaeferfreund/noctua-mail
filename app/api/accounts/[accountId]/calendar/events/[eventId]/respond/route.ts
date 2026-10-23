@@ -1,3 +1,6 @@
+import { listSenderIdentities } from "@/lib/serverDb";
+import { SenderIdentityError } from "@/lib/senderIdentities";
+import { resolveCalendarSenderIdentity } from "@/lib/calendarParticipation";
 import { collabActorFromSession } from "@/lib/threadCollab";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
@@ -21,7 +24,7 @@ import type {
   CalendarParticipationStatus
 } from "@/lib/data";
 import { buildCalendarReplyPayload } from "@/lib/calendarReply";
-import { sendSmtpMessage } from "@/lib/mail/smtp";
+import { sendSmtpMessage } from "@/lib/serverSmtp";
 import { smtpUpstreamErrorResponse } from "@/app/api/_helpers/smtpUpstreamError";
 import { completeSend, type SentCopyResult } from "@/lib/mail/completeSend";
 import { randomUUID } from "crypto";
@@ -68,6 +71,7 @@ export async function POST(request: Request, { params }: Params) {
   const payload = (await request.json().catch(() => null)) as
     | {
         accountId?: string;
+        identityId?: string;
         partstat?: string;
         scope?: string;
         sendReply?: boolean;
@@ -103,6 +107,7 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
     }
 
+    let identityId: string | undefined;
     let sentResult: SentCopyResult | undefined;
     try {
       let attendeeEmail = event.myAttendeeEmail;
@@ -114,6 +119,8 @@ export async function POST(request: Request, { params }: Params) {
           : "series";
 
       if (sendReply) {
+        const identity = resolveCalendarSenderIdentity(accountId, event, await listSenderIdentities(accountId), payload?.identityId);
+        identityId = identity.id;
         const sourceMessageRowId = resolveCalendarReplySourceMessageRowId({
           event,
           scope: effectiveScope,
@@ -127,6 +134,7 @@ export async function POST(request: Request, { params }: Params) {
           event,
           partstat as CalendarParticipationStatus,
           {
+            sender: identity,
             scope: effectiveScope,
             occurrenceStartAtMs:
               effectiveScope === "occurrence" ? occurrenceStartAtMs : undefined
@@ -149,7 +157,7 @@ export async function POST(request: Request, { params }: Params) {
               content: Buffer.from(reply.ics, "utf8")
             }
           ]
-        });
+        }, identity);
 
         sentResult = await completeSend({ account: accountContext.account, raw: result.raw, messageId,
           actor: collabActorFromSession(accountContext.session, accountContext.clientId), clientId: accountContext.clientId, ...threadHeaders });
@@ -212,10 +220,11 @@ export async function POST(request: Request, { params }: Params) {
         inviteProcessing = { processedAtMs, processedAutomatically: false };
       }
 
-      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing, ...sentResult });
+      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing, ...(identityId ? { identityId } : {}), ...sentResult });
     } catch (error) {
-      if (sentResult) return NextResponse.json({ ok: true, ...sentResult,
+      if (sentResult) return NextResponse.json({ ok: true, identityId, ...sentResult,
         postSendWarning: "RSVP email sent, but saving local calendar participation failed. Do not send it again." });
+      if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
         accountId,
         op: "send-calendar-response"

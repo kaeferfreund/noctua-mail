@@ -19,3 +19,7 @@ export async function sendRawSmtpMessage(
   const smtp = await loadServerSmtp();
   return smtp.sendRawSmtpMessage(...args);
 }
+
+export async function sendSmtpMessage(...args: Parameters<ServerSmtpModule["sendSmtpMessage"]>) {
+  return (await loadServerSmtp()).sendSmtpMessage(...args);
+}

@@ -34,10 +34,10 @@ export function stripBccHeader(raw: MimeBytes): MimeBytes;
 export function stripBccHeader(raw: MimeBytes): MimeBytes {
   if (Buffer.isBuffer(raw)) {
     const asString = raw.toString("latin1");
-    const stripped = stripInText(asString);
+    const stripped = stripInText(asString, ["bcc"]);
     return Buffer.from(stripped, "latin1");
   }
-  return stripInText(raw);
+  return stripInText(raw, ["bcc"]);
 }
 
 /**
@@ -46,7 +46,7 @@ export function stripBccHeader(raw: MimeBytes): MimeBytes {
  * empty line (end-of-headers) we emit everything from that point — the
  * blank-line separator plus the body — as-is.
  */
-function stripInText(raw: string): string {
+function stripInText(raw: string, names: readonly string[]): string {
   const out: string[] = [];
   let cursor = 0;
   let skipping = false;
@@ -62,7 +62,7 @@ function stripInText(raw: string): string {
     const isFoldedContinuation = lineText[0] === " " || lineText[0] === "\t";
     if (isFoldedContinuation) {
       if (!skipping) out.push(fullLine);
-    } else if (isBccHeaderLine(lineText)) {
+    } else if (lineText.indexOf(":") > 0 && names.includes(lineText.slice(0, lineText.indexOf(":")).toLowerCase())) {
       skipping = true;
     } else {
       skipping = false;
@@ -104,12 +104,11 @@ function readLine(raw: string, from: number): LineScan {
   };
 }
 
-function isBccHeaderLine(line: string): boolean {
-  // Header line starts with `Bcc:` (case-insensitive). There must be no
-  // whitespace before the colon per RFC 5322 §2.2.
-  if (line.length < 4) return false;
-  const name = line.slice(0, 3).toLowerCase();
-  return name === "bcc" && line[3] === ":";
+/** Strip the draft-only lookup hint without touching body bytes. */
+export function stripIdentityHeader<T extends MimeBytes>(raw: T): T {
+  return (Buffer.isBuffer(raw)
+    ? Buffer.from(stripInText(raw.toString("latin1"), ["x-noctua-identity-id"]), "latin1")
+    : stripInText(raw as string, ["x-noctua-identity-id"])) as T;
 }
 
 /**

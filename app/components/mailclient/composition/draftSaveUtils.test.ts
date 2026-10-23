@@ -224,3 +224,12 @@ describe("draftSaveUtils", () => {
     expect(payload.html).toBeUndefined();
   });
 });
+
+it("identity-only changes mark the draft dirty and travel in the saved payload", () => {
+  const input = { to: "recipient@example.test", cc: "", bcc: "", subject: "Synthetic", text: "Synthetic", html: undefined, attachments: [] };
+  const lastSavedHash = computeDraftHash({ ...input, identityId: "primary" });
+  expect(getDraftChangeState({ ...input, identityId: "alias", lastSavedHash }).canAutoSave).toBe(true);
+  const payload = buildDraftSavePayload({ ...input, identityId: "alias", composeQuotedHtmlEdited: false, composeReplyHeaders: null },
+    { text: "Synthetic", markdown: undefined, html: undefined, composeFormat: "text", attachments: [] });
+  expect(payload.identityId).toBe("alias");
+});

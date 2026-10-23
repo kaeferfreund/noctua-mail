@@ -59,6 +59,7 @@ export type ComposeSignatureState = {
 };
 
 export type DraftSavePayload = {
+  identityId?: string;
   to: string;
   cc?: string;
   bcc?: string;

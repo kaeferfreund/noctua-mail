@@ -1,3 +1,5 @@
+import { resolveSendIdentity, validateManagedReplyTo } from "@/lib/sendIdentity";
+import { SenderIdentityError } from "@/lib/senderIdentities";
 import { collabActorFromSession } from "@/lib/threadCollab";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
@@ -14,7 +16,7 @@ import {
   resolveComposeText
 } from "@/lib/mail/composePayload";
 import { buildSentInvite } from "@/lib/mail/sentInvite";
-import { sendSmtpMessage } from "@/lib/mail/smtp";
+import { sendSmtpMessage } from "@/lib/serverSmtp";
 import {
   getAccountIdFromParams,
   type AccountRouteParams
@@ -40,6 +42,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     if (originError) return originError;
     const payload = (await request.json()) as {
       accountId?: string;
+      identityId?: string;
+      from?: never;
+      envelopeFrom?: never;
       to?: string;
       cc?: string;
       bcc?: string;
@@ -62,6 +67,16 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       }>;
     };
     const { account, clientId } = accountContext;
+    let identity;
+    try {
+      if ("from" in payload || "envelopeFrom" in payload) throw new SenderIdentityError("invalid_identity", 400, "Use identityId to select a sender.");
+      identity = await resolveSendIdentity({ accountId, userId: accountContext.userId,
+        identityId: payload.identityId, inReplyTo: payload.inReplyTo, mode: payload.xForwardedMessageId ? "forward" : undefined });
+      validateManagedReplyTo(identity, payload.replyTo);
+    } catch (error) {
+      if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
+      throw error;
+    }
     const to = payload.to?.trim() ?? "";
     const cc = payload.cc?.trim() ?? "";
     const bcc = payload.bcc?.trim() ?? "";
@@ -125,6 +140,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const inviteResult = payload.invite
       ? buildSentInvite({
           account,
+          sender: identity,
           invite: payload.invite,
           subject: payload.subject,
           to,
@@ -140,7 +156,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       });
     }
 
-    const messageId = buildMessageId(account.email);
+    const messageId = buildMessageId(identity.email);
     let result: Awaited<ReturnType<typeof sendSmtpMessage>>;
     try {
       result = await sendSmtpMessage(account, {
@@ -154,10 +170,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         messageId,
         inReplyTo: payload.inReplyTo,
         references: payload.references,
-        replyTo: payload.replyTo,
         xForwardedMessageId: payload.xForwardedMessageId,
         ...(attachments.length > 0 ? { attachments } : {})
-      });
+      }, identity);
     } catch (error) {
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
         accountId: account.id,
@@ -191,6 +206,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     return NextResponse.json({
       ok: true,
       ...sentResult,
+      identityId: identity.id,
       inviteScheduled,
       inviteEventId,
       inviteWarning

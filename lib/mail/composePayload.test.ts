@@ -233,7 +233,7 @@ describe("normalizeCalendarAttachments", () => {
       subject: "Fwd: Café",
       text: "Forwarding the invite",
       attachments: [output!]
-    });
+    }, { id: "primary", email: testAccount.email, displayName: testAccount.name });
     const parsed = await simpleParser(raw);
     const part = parsed.attachments.find(
       (attachment: { contentType: string }) => attachment.contentType === "text/calendar"
@@ -277,7 +277,7 @@ describe("normalizeCalendarAttachments", () => {
         subject: "Fwd: Weekly sync",
         text: "Forwarding the invite",
         attachments
-      })
+      }, { id: "primary", email: testAccount.email, displayName: testAccount.name })
     ).toString("utf8");
     expect(raw).toContain(
       "Content-Type: text/calendar; method=REQUEST; charset=UTF-8; name=invite.ics"
