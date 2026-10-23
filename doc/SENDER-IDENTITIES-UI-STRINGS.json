@@ -1,0 +1,89 @@
+{
+  "language": "en",
+  "scope": "sender-identities slice 3",
+  "note": "Placeholder tokens are literal and must not be translated. Existing recipient/editor/action strings remain unchanged.",
+  "strings": {
+    "compose": [
+      "Choose a sender",
+      " (mailbox default)",
+      " — unavailable",
+      "Review From",
+      "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
+      "Choose an enabled From address before sending.",
+      "The signature may have been edited. Replace signature? Edited text will be kept and the new signature added if the original block cannot be found.",
+      "Could not load sender identities and preferences. Reopen the composer to retry.",
+      "Sender settings are unavailable for this mailbox.",
+      "Could not load sender identities.",
+      "Could not refresh sender identities.",
+      "A signature template is unavailable. Review your signature preferences."
+    ],
+    "compose_rejections": [
+      "This From address is unavailable. Choose an enabled sender and save the draft.",
+      "The saved sender details changed. Review From and save the draft before sending.",
+      "The mail provider rejected this From address. Choose another sender or ask a mailbox manager to review it.",
+      "The mail provider rejected a recipient. Review To, Cc and Bcc before trying again.",
+      "The mail provider rejected this message. Review its content and attachments.",
+      "The mail provider is temporarily unavailable. Keep this draft and try again later.",
+      "Sending is unavailable. Ask a mailbox manager to review the mail configuration.",
+      "Could not connect to the mail provider. Keep this draft and try again later.",
+      "The mail provider could not process this message. Keep this draft and contact a mailbox manager.",
+      "Connecting to the mail provider timed out. Keep this draft and try again later.",
+      "The mail provider did not respond in time. Keep this draft and try again later.",
+      "The mail provider timed out. Delivery may have succeeded; check Sent and with the recipient before sending again."
+    ],
+    "identities_settings": [
+      "Identities",
+      "Addresses this mailbox can send from. Sending authorization must be checked with the mail provider before enabling an address.",
+      "Loading identities…",
+      "Identity saved.",
+      "Only mailbox managers can change sender identities.",
+      " — Mailbox default",
+      " — Disabled",
+      "Reply-To:",
+      "Choose another mailbox default before disabling this identity.",
+      "Mailbox default for {email}",
+      "Add identity",
+      "Save identity",
+      "Display name",
+      "Reply-To",
+      "Optional single address; replies go here instead of From.",
+      "Signature template",
+      "Mailbox default"
+    ],
+    "sender_preferences": [
+      "Sender preferences",
+      "Personal From and signature for this mailbox",
+      "Loading sender preferences…",
+      "Sender preferences saved.",
+      "Default From",
+      "Unavailable identity",
+      "Personal signature template",
+      "Use identity or mailbox default",
+      "Personal signature",
+      "Overrides the template choice. Empty text explicitly means no signature.",
+      "Inherit signature template",
+      "Use personal text",
+      "Personal signature text",
+      "Supported placeholders: {{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}. Add job titles as plain text.",
+      "Use only the supported signature placeholders (maximum 8 KiB).",
+      "Signature preview",
+      "Save sender preferences"
+    ],
+    "shared_signatures": [
+      "Manage shared mailbox templates. Personal signature overrides are in Preferences. Supported placeholders: {{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}."
+    ],
+    "reused_labels_in_new_controls": [
+      "From:",
+      "Edit",
+      "Enable",
+      "Disable",
+      "Disabled",
+      "Enabled",
+      "Email",
+      "Saving…",
+      "Cancel",
+      "No signature",
+      "Close"
+    ]
+  }
+}
