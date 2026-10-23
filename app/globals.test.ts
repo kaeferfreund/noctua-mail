@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/postcss";
 import postcss, { type AtRule, type Node, type Root, type Rule } from "postcss";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
 import { APP_FONT_FACE_CSS, APP_FONT_FAMILY, APP_FONT_SUBSETS } from "@/lib/ui/fonts";
+import { DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
 
 // Compiles app/globals.css the way `next build` does (postcss.config.mjs) and
 // checks the cascade-layer contract from doc/TEAM-INBOX.md §7.1.
@@ -69,6 +70,16 @@ function rulesWithSelector(root: Root, selector: string) {
 
 // Cascade-layer order as the browser derives it: first appearance of each
 // top-level layer name, in statements and blocks alike.
+// Unlayered :root --layer-* declarations, in source order.
+function layerTokens(root: Root) {
+  const tokens: Record<string, number> = {};
+  root.walkRules((rule) => {
+    if (rule.selector !== ":root" || enclosingLayer(rule) !== null) return;
+    rule.walkDecls(/^--layer-/, (decl) => { tokens[decl.prop] = Number(decl.value); });
+  });
+  return tokens;
+}
+
 function effectiveLayerOrder(root: Root) {
   const order: string[] = [];
   root.walkAtRules("layer", (atRule) => {
@@ -104,7 +115,7 @@ describe("app/globals.css cascade layers", () => {
   );
 
   test(
-    "keeps the Radix dialog overlay lift at z-index 9995 and poppers at 9998",
+    "keeps the layer token ladder, the Radix dialog overlay lift at 9995 and poppers at 9998",
     async () => {
       const root = await compileGlobals();
       const zIndexFor = (selector: string) =>
@@ -115,8 +126,19 @@ describe("app/globals.css cascade layers", () => {
           });
           return values;
         });
-      expect(zIndexFor(".rt-BaseDialogOverlay")).toEqual([{ layer: "legacy", value: "9995" }]);
-      expect(zIndexFor(".rt-PopperContent")).toEqual([{ layer: "legacy", value: "9998" }]);
+      const tokens = layerTokens(root);
+      expect(tokens).toEqual({ "--layer-floating": 9990, "--layer-dialog": 9994,
+        "--layer-dialog-overlay": 9995, "--layer-popper": 9998, "--layer-drag-ghost": 9999 });
+      // The ladder is strictly ascending, and the JS mirror used for nested
+      // dialog arithmetic stays on the same values.
+      const order = Object.values(tokens);
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+      expect(tokens["--layer-dialog"]).toBe(DIALOG_LAYERS.base);
+      expect(tokens["--layer-dialog-overlay"]).toBe(DIALOG_LAYERS.settings);
+      expect(DIALOG_LAYERS.settings + 2 * DIALOG_LAYERS.step).toBeLessThan(tokens["--layer-popper"]);
+      expect(zIndexFor(".rt-BaseDialogOverlay")).toEqual([{ layer: "legacy", value: "var(--layer-dialog-overlay)" }]);
+      expect(zIndexFor(".rt-PopperContent")).toEqual([{ layer: "legacy", value: "var(--layer-popper)" }]);
+      expect(zIndexFor(".drag-ghost")).toEqual([{ layer: "legacy", value: "var(--layer-drag-ghost)" }]);
       // Radix Themes itself is layered below legacy, so the lift wins.
       expect(rulesWithSelector(root, ".rt-BaseDialogOverlay").map(enclosingLayer)).toContain(
         "radix"

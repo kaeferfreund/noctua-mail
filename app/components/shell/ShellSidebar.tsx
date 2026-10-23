@@ -34,6 +34,8 @@ import FolderSidebarPane, {
   type FolderSidebarPaneProps
 } from "@/app/components/mailclient/folder/FolderSidebarPane";
 import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSidebarSection";
+import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
+import type { BuildIdentity } from "@/lib/buildVersion";
 import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 
 export type ShellSidebarProps = {
@@ -48,7 +50,7 @@ export type ShellSidebarProps = {
   sync: { isSyncing: boolean; onCheckNewMail: () => void };
   user: ShellUserMenuProps;
   brand: {
-    buildVersionLabel: string;
+    buildInfo: BuildIdentity | null;
   };
   mailboxes: {
     accounts: ShellAccount[];
@@ -206,14 +208,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
             <img src="/icons/logo.svg" alt="" width={28} height={28} className="size-7 rounded-md" />
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="truncate text-sm font-semibold">{DEFAULT_APP_TITLE}</span>
-              {brand.buildVersionLabel ? (
-                <span
-                  className="truncate font-mono text-2xs text-muted-foreground"
-                  title={t("build", {version: brand.buildVersionLabel})}
-                >
-                  {brand.buildVersionLabel}
-                </span>
-              ) : null}
+              <BuildInfo info={brand.buildInfo} className="truncate text-2xs text-muted-foreground tabular-nums" />
             </div>
           </SidebarHeader>
           <SidebarContent>
