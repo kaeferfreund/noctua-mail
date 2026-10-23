@@ -174,6 +174,33 @@ describe("thread selector flagged EXISTS differential", () => {
     }
   });
 
+  test("date grouping lists every bucket with loaded counts without a bucket count query", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const statements: string[] = [];
+    const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      statements.push(sql);
+      return prepare(sql);
+    });
+    try {
+      for (const folderId of [undefined, "inbox"]) {
+        statements.length = 0;
+        const result = await listThreads({ accountId: fixture.a.accountId, folderId, page: 1, pageSize: 5, groupBy: "date" });
+        expect(result.items.length).toBeGreaterThan(0);
+        expect(result.groups.map(group => group.key)).toEqual(["Today", "Yesterday", "This Week", "Older"]);
+        for (const group of result.groups) {
+          expect(group.count).toBe(result.items.filter(item => item.groupKey === group.key).length);
+        }
+        expect(statements.some(sql => sql.includes("THEN 'Today'"))).toBe(false);
+      }
+      statements.length = 0;
+      const week = await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "week" });
+      expect(statements.some(sql => sql.includes("strftime('%Y-W%W'"))).toBe(true);
+      expect(week.groups.reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(week.items.length);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   test("shared physical shard isolates accounts with identical local message, folder and thread ids", async () => {
     expect(fixture.a.db).toBe(fixture.b.db);
     for (const accountId of [fixture.a.accountId, fixture.b.accountId]) {
