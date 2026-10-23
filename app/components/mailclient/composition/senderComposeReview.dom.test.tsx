@@ -313,3 +313,25 @@ it("sender snapshot catalog IDs are localized at the notice boundary", async () 
   expect(errors).toContain("Could not load sender identities and preferences.");
   expect(errors.some(message => message.includes("Errors.sender."))).toBe(false);
 });
+
+it("a mailbox switch with compose closed loads no sender settings and drops the previous mailbox's sender error", async () => {
+  const { view, props, handleRef } = renderCompose();
+  const loads: string[] = [];
+  const failing = { ...props, senderSettingsLoader: async (_: unknown, accountId: string) => {
+    loads.push(accountId); throw new Error("Synthetic sender read failure");
+  } } as typeof props;
+  view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...failing} /></Theme>);
+  await act(async () => { await handleRef.current?.openCompose("reply", sourceMessage).catch(() => {}); });
+  expect(loads).toEqual(["acc-test"]);
+  expect(view.queryByRole("button", { name: /retry/i })).not.toBeNull();
+  const switched = { ...failing, activeAccountId: "acc-other", senderSettingsLoader: async (_: unknown, accountId: string) => {
+    loads.push(accountId); return makeSender();
+  } } as typeof props;
+  view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...switched} /></Theme>);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  // No eager reload on the switch, and no dead retry for the previous mailbox.
+  expect(loads).toEqual(["acc-test"]);
+  expect(view.queryByRole("button", { name: /retry/i })).toBeNull();
+  await act(async () => { await handleRef.current?.openCompose("new"); });
+  expect(loads).toEqual(["acc-test", "acc-other"]);
+});

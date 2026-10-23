@@ -330,7 +330,6 @@ function ComposeOrchestratorImpl(
   const [senderError, setSenderError] = useState<string | null>(null);
   const signatureConfigKey = JSON.stringify([accountSignatures, defaultSignatureId]);
   const composeState = useComposeState();
-  const previousSenderAccountRef = useRef(activeAccountId);
   useEffect(() => {
     let active = true;
     const refresh = async (event?: Event) => {
@@ -351,16 +350,20 @@ function ComposeOrchestratorImpl(
         if (receipt.accountId === activeAccountId) void refresh();
       } catch { /* Ignore malformed refresh receipts. */ }
     };
-    // Refresh explicit mailbox switches, while keeping initial login/settings warm-up lazy.
-    const changedAccount = Boolean(previousSenderAccountRef.current && activeAccountId && previousSenderAccountRef.current !== activeAccountId);
-    previousSenderAccountRef.current = activeAccountId;
-    if (changedAccount) void refresh();
-    // Every open also loads its own snapshot before initialization.
+    // Sender settings load lazily: a mailbox switch closes compose, and every open
+    // loads its own snapshot before initialization.
     window.addEventListener("storage", storageRefresh);
     window.addEventListener(SENDER_SETTINGS_CHANGED, refresh);
     window.addEventListener("noctua:account-prefs-changed", refresh);
     return () => { active = false; window.removeEventListener("storage", storageRefresh); window.removeEventListener(SENDER_SETTINGS_CHANGED, refresh); window.removeEventListener("noctua:account-prefs-changed", refresh); };
   }, [activeAccountId, ownerUserId, apiFetch, signatureConfigKey, senderSettingsLoader]);
+  // A sender error (and its retry) belongs to the mailbox it was raised for.
+  const [senderErrorAccountId, setSenderErrorAccountId] = useState(activeAccountId);
+  if (senderErrorAccountId !== activeAccountId) {
+    setSenderErrorAccountId(activeAccountId);
+    setSenderError(null);
+    setRetrySender(null);
+  }
   const mobileView = useMobileComposeView(isMobile, composeState.composeView, composeState.setComposeView);
   const compose = { ...composeState, ...mobileView };
   const [detachingCompose, setDetachingCompose] = useState(false);
