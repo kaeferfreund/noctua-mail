@@ -38,17 +38,18 @@ function account(id: string, name: string, domain = "example.test", shared = fal
 
 function renderSidebar(
   accounts: ShellAccount[],
-  onSwitch: (id: string) => void,
+  onSwitch: ShellSidebarProps["mailboxes"]["onSwitch"],
   onSync = () => {},
   userOverrides: Partial<ShellSidebarProps["user"]> = {},
   views: ShellSidebarProps["views"] = { inbox: null, collab: [], virtual: [] },
   locale: UiLocale = "en",
   buildInfo: ShellSidebarProps["brand"]["buildInfo"] = null,
-  sidebar: { open?: boolean; openMobile?: boolean } = {}
+  sidebar: { open?: boolean; openMobile?: boolean } = {},
+  activeAccountId = accounts[0]?.id ?? ""
 ) {
   const props: ShellSidebarProps = {
     brand: { buildInfo },
-    mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined },
+    mailboxes: { accounts, activeAccountId, onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined },
     compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
     sync: { isSyncing: false, onCheckNewMail: onSync },
     user: {
@@ -140,6 +141,45 @@ describe("shell sidebar", () => {
       await act(async () => { fireEvent.click(item); });
     }
     expect(calls).toEqual(["json", "evict"]);
+  });
+  it("marks the clicked mailbox busy until its switch settles, aria-current only after the commit", async () => {
+    const accounts = [account("a", "Alpha"), account("b", "Bravo"), account("c", "Charlie")];
+    const pending = new Map<string, () => void>();
+    const onSwitch = (id: string) => new Promise<void>((resolve) => { pending.set(id, resolve); });
+    const view = renderSidebar(accounts, onSwitch);
+    const row = (name: string) => view.getByRole("button", { name: new RegExp(name) });
+    const settle = async (id: string) => { await act(async () => { pending.get(id)!(); }); };
+    fireEvent.click(row("Bravo"));
+    expect(row("Bravo").getAttribute("aria-busy")).toBe("true");
+    expect(row("Bravo").getAttribute("aria-current")).toBeNull();
+    expect(row("Alpha").getAttribute("aria-current")).toBe("true");
+    expect(row("Alpha").getAttribute("aria-busy")).toBeNull();
+    await settle("b");
+    expect(row("Bravo").getAttribute("aria-busy")).toBeNull();
+
+    // A -> B -> A: the superseded switch settling first leaves the newer click pending.
+    fireEvent.click(row("Bravo"));
+    fireEvent.click(row("Alpha"));
+    expect(row("Alpha").getAttribute("aria-busy")).toBe("true");
+    expect(row("Bravo").getAttribute("aria-busy")).toBeNull();
+    await settle("b");
+    expect(row("Alpha").getAttribute("aria-busy")).toBe("true");
+    await settle("a");
+    expect(view.container.querySelector("[aria-busy]")).toBeNull();
+
+    // A denied switch (403: switchAccount reports it and settles without a commit) clears the row too.
+    fireEvent.click(row("Charlie"));
+    expect(row("Charlie").getAttribute("aria-busy")).toBe("true");
+    await settle("c");
+    expect(row("Charlie").getAttribute("aria-busy")).toBeNull();
+    expect(row("Alpha").getAttribute("aria-current")).toBe("true");
+    cleanup();
+
+    // The committed mailbox carries aria-current; busy and current never overlap after the settle.
+    const committed = renderSidebar(accounts, () => Promise.resolve(), undefined, undefined, undefined, undefined, undefined, undefined, "c");
+    const current = committed.getByRole("button", { name: /Charlie/ });
+    expect(current.getAttribute("aria-current")).toBe("true");
+    expect(current.getAttribute("aria-busy")).toBeNull();
   });
 });
 
