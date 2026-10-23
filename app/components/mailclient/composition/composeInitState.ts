@@ -491,7 +491,7 @@ export function computeComposeInitState(
   mode: ComposeMode, message: Message | undefined, asNew: boolean,
   opts: Parameters<typeof computeBaseComposeInitState>[3] & { sender?: SenderSettings; skipSignature?: boolean },
   deps: Parameters<typeof computeBaseComposeInitState>[4]
-): ComposeInitFields & { identityId?: string; unavailableFrom?: string; signature?: SignatureBlock; warnings: string[] } {
+): ComposeInitFields & { identityId?: string; unavailableFrom?: string; signature?: SignatureBlock; unsignedBody?: string; warnings: string[] } {
   const sender = opts.sender;
   const fields = computeBaseComposeInitState(mode, message, asNew, opts, deps);
   if (!sender) return { ...fields, warnings: [] };
@@ -509,7 +509,9 @@ export function computeComposeInitState(
   const template = resolveSignatureTemplate(sender.account.settings, sender.prefs, selection.identity);
   result.warnings.push(...template.warnings);
   const block = { id: template.id, ...renderSignatureTemplate(template.body, sender.user, selection.identity) };
-  if (!block.text) return result;
+  // No signature for this identity: a later From switch may still prefix one
+  // to this untouched body, exactly like the insert below.
+  if (!block.text) return { ...result, unsignedBody: fields.composeTab === "html" ? fields.composeHtml : fields.composeTab === "markdown" ? fields.composeMarkdown : fields.composeBody };
   // Text replies contain their quote in the same field; prepend before that quote.
   return { ...result, signature: block,
     composeBody: [block.text, fields.composeBody].filter(Boolean).join("\n\n"),
