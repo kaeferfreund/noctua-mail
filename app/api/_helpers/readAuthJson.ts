@@ -16,15 +16,16 @@ export class BodyReadTimeoutError extends Error {
 /**
  * Read at most `limit` body bytes. Returns null once the body is known to exceed
  * the limit (a larger declared Content-Length, or the first chunk that would
- * overflow) after cancelling the stream, so a reject path never pulls the rest.
- * Rejects with BodyReadTimeoutError, after cancelling the stream, when the whole
- * read does not finish within `timeoutMs`.
+ * overflow), so a reject path never pulls the rest. Rejects with
+ * BodyReadTimeoutError when the whole read does not finish within `timeoutMs`.
+ * Both paths cancel the stream without awaiting it: a request stream's cancel
+ * can wait for the client's next chunk, which a stalled client never sends.
  */
 export async function readBoundedBody(request: Request, limit: number,
   timeoutMs = BODY_READ_TIMEOUT_MS): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (Number.isFinite(declared) && declared > limit) {
-    await request.body?.cancel().catch(() => {});
+    void request.body?.cancel().catch(() => {});
     return null;
   }
   const bytes = new Uint8Array(limit);
@@ -42,14 +43,13 @@ export async function readBoundedBody(request: Request, limit: number,
         if (done) break;
         if (value.byteLength > limit - length) {
           // Check before copying: never retain an oversized chunk in the buffer.
-          await reader.cancel().catch(() => {});
+          void reader.cancel().catch(() => {});
           return null;
         }
         bytes.set(value, length);
         length += value.byteLength;
       }
     } catch (error) {
-      // Cancelling settles the pending read; a stalled source is not awaited.
       if (error instanceof BodyReadTimeoutError) void reader.cancel().catch(() => {});
       throw error;
     } finally {
