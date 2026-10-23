@@ -72,7 +72,62 @@
       "viewer": "Leser",
       "editor": "Bearbeiter",
       "manager": "Verwalter"
-    }
+    },
+    "sender": {
+      "identitiesTitle": "Identitäten",
+      "identitiesHelp": "Adressen, mit denen dieses Postfach senden kann. Prüfe vor dem Aktivieren beim E-Mail-Anbieter, ob das Senden mit der Adresse erlaubt ist. Diese Berechtigung ist unabhängig von deiner Postfachrolle.",
+      "identitiesLoading": "Identitäten werden geladen …",
+      "identitySaved": "Identität gespeichert.",
+      "managerOnly": "Nur Verwalter des Postfachs können Absenderidentitäten ändern.",
+      "replyToLabel": "Antwortadresse:",
+      "chooseDefaultBeforeDisable": "Wähle einen anderen Standardabsender für das Postfach, bevor du diese Identität deaktivierst.",
+      "identityDefaultFor": "{email} als Standardabsender des Postfachs verwenden",
+      "addIdentity": "Identität hinzufügen",
+      "saveIdentity": "Identität speichern",
+      "displayName": "Anzeigename",
+      "replyTo": "Antwortadresse",
+      "replyToHelp": "Optional: eine einzelne Adresse, an die Antworten statt an die Absenderadresse gesendet werden.",
+      "signatureTemplate": "Signaturvorlage",
+      "mailboxDefault": "Postfachstandard",
+      "senderPreferencesTitle": "Absendereinstellungen",
+      "senderPreferencesHelp": "Persönlicher Absender und persönliche Signatur für dieses Postfach",
+      "senderPreferencesLoading": "Absendereinstellungen werden geladen …",
+      "senderPreferencesSaved": "Absendereinstellungen gespeichert.",
+      "defaultFrom": "Standardabsender",
+      "unavailableIdentity": "Nicht verfügbare Identität",
+      "personalTemplate": "Persönliche Signaturvorlage",
+      "inheritTemplate": "Standard der Identität oder des Postfachs verwenden",
+      "personalSignature": "Persönliche Signatur",
+      "personalSignatureHelp": "Ersetzt die gewählte Vorlage. Ein leeres Textfeld bedeutet ausdrücklich: keine Signatur.",
+      "inheritSignature": "Signaturvorlage übernehmen",
+      "usePersonalText": "Persönlichen Text verwenden",
+      "personalSignatureText": "Persönlicher Signaturtext",
+      "placeholdersHelp": "Unterstützte Platzhalter: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'. Ergänze Berufsbezeichnungen als normalen Text.",
+      "invalidTemplate": "Verwende nur die unterstützten Signaturplatzhalter (höchstens 8 KiB).",
+      "signaturePreview": "Signaturvorschau",
+      "saveSenderPreferences": "Absendereinstellungen speichern",
+      "sharedTemplatesHelp": "Verwalte die gemeinsamen Signaturvorlagen des Postfachs. Deine persönliche Signatur legst du unter „Einstellungen“ fest. Unterstützte Platzhalter: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'.",
+      "identityEnabled": "{sender}",
+      "identityDefault": "{sender} — Postfachstandard",
+      "identityDisabled": "{sender} — Deaktiviert",
+      "identityDefaultDisabled": "{sender} — Postfachstandard — Deaktiviert",
+      "identitySignatureDefault": "Standardsignatur des Postfachs"
+    },
+    "edit": "Bearbeiten",
+    "tabs": {
+      "account": "Postfach",
+      "signatures": "Signaturen",
+      "preferences": "Persönliche Einstellungen",
+      "categorization": "Kategorisierung",
+      "topics": "Themen",
+      "calendar": "Kalender",
+      "translation": "Übersetzung",
+      "recipient-aliases": "Empfänger-Aliasse",
+      "mcp": "MCP",
+      "members": "Mitglieder"
+    },
+    "accountTitle": "Postfacheinstellungen",
+    "close": "Schließen"
   },
   "Pwa": {
     "description": "Moderner Webmail-Client als Prototyp"
@@ -115,7 +170,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Meine Postfächer",
+      "mine": "Eigene Postfächer",
       "shared": "Gemeinsame Postfächer",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
@@ -128,7 +183,15 @@
       "unassigned": "{count} offen und nicht zugewiesen",
       "watcher": "Überwachung: {state}",
       "summary": "{email}\n{unread} ungelesen · {assignedToMe} mir zugewiesen · {unassignedOpen} offen und nicht zugewiesen\nÜberwachung: {state}",
-      "other": "Sonstige"
+      "other": "Sonstige",
+      "watcherStates": {
+        "disabled": "Deaktiviert",
+        "starting": "Startet",
+        "idling": "Wartet auf neue E-Mails",
+        "backoff": "Wartet auf erneuten Versuch",
+        "auth_failed": "Anmeldung fehlgeschlagen",
+        "stopped": "Angehalten"
+      }
     },
     "views": "Ansichten",
     "topics": "Themen",
@@ -140,6 +203,108 @@
     "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
+    },
+    "threadsCount": "{count, plural, one {# Thread} other {# Threads}}",
+    "refreshTitle": "Neuladen erforderlich",
+    "refreshDescription": "Eine neue Version ist verfügbar. Sie ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.",
+    "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neue Version: {version}.",
+    "refreshNow": "Jetzt neu laden",
+    "status": {
+      "activity": "Aktivität und Kalender",
+      "check": "Neue E-Mails abrufen",
+      "processes": "Prozesse",
+      "mailCheck": "E-Mail-Abruf",
+      "mailCheckStatus": "E-Mail-Abruf: {state}",
+      "reminders": "Erinnerungen",
+      "exceptions": "Fehler",
+      "exceptionCount": "Fehler ({count, number})",
+      "calendar": "Kalender",
+      "idle": "Inaktiv",
+      "polling": "Regelmäßiger Abruf",
+      "upcoming": "Bevorstehend",
+      "none": "Keine",
+      "error": "Fehler",
+      "closeProcesses": "Prozesse schließen",
+      "clearExceptions": "Fehler löschen",
+      "closeUpcoming": "Bevorstehende Termine schließen",
+      "copyError": "Fehler kopieren",
+      "noExceptions": "Keine Fehler.",
+      "relogin": "Erneut anmelden",
+      "noProcesses": "Keine aktiven Prozesse.",
+      "nothingUpcoming": "Keine bevorstehenden Termine.",
+      "preparingSync": "Synchronisierung wird vorbereitet …",
+      "recomputingThreads": "Threads werden neu berechnet …",
+      "recomputingCategories": "Kategorien werden neu berechnet …",
+      "retry": "Erneuter Versuch …",
+      "retryCount": "Erneuter Versuch ({attempt, number}/{max, number}) …",
+      "mailbox": "Postfach",
+      "syncingScope": "„{scope}“ wird synchronisiert ({mode}{percent, select, none {} other {, {percent}}}) …",
+      "syncRetryScope": "{mode}: {retry} {scope}",
+      "syncingFolders": "{more, plural, =0 {„{folder}“ wird synchronisiert …} one {„{folder}“ und # weiterer Ordner werden synchronisiert …} other {„{folder}“ und # weitere Ordner werden synchronisiert …}}",
+      "syncingMailbox": "Postfach wird synchronisiert …",
+      "openSource": "Ursprüngliche E-Mail öffnen",
+      "openCalendar": "Kalender öffnen",
+      "deleteReminder": "Erinnerung löschen",
+      "deleteReminderFailed": "Erinnerung konnte nicht gelöscht werden.",
+      "duration": "(Dauer: {duration})",
+      "reminderBefore": "Erinnerung: {lead} vorher",
+      "repeats": "Wiederholung: {summary}",
+      "upcomingSummary": "{count, number} · {title} · {dateTime}",
+      "phases": {
+        "starting": "Vorbereitung",
+        "fetching": "Abrufen",
+        "finalizing": "Abschließen",
+        "done": "Erledigt",
+        "failed": "Fehlgeschlagen",
+        "retrying": "Erneuter Versuch"
+      },
+      "modes": {
+        "full": "Vollständige Synchronisierung",
+        "recent": "Synchronisierung der letzten Nachrichten",
+        "new": "Synchronisierung neuer Nachrichten",
+        "repair": "Reparatursynchronisierung"
+      }
+    },
+    "topicPicker": {
+      "title": "Themen",
+      "empty": "Noch keine Themen. Erstelle unten ein Thema.",
+      "suggested": "Vorgeschlagen",
+      "all": "Alle Themen",
+      "name": "Themenname",
+      "shortName": "Kurzname für die Nachrichtenliste (optional)",
+      "noColor": "Keine Farbe",
+      "createAdd": "Erstellen und hinzufügen",
+      "cancel": "Abbrechen",
+      "new": "Neues Thema",
+      "apply": "Anwenden",
+      "colors": {
+        "gray": "Grau",
+        "red": "Rot",
+        "orange": "Orange",
+        "amber": "Bernstein",
+        "yellow": "Gelb",
+        "lime": "Limette",
+        "green": "Grün",
+        "teal": "Blaugrün",
+        "cyan": "Cyan",
+        "sky": "Himmelblau",
+        "blue": "Blau",
+        "indigo": "Indigo",
+        "violet": "Violett",
+        "purple": "Purpur",
+        "pink": "Rosa",
+        "brown": "Braun",
+        "crimson": "Karminrot",
+        "ruby": "Rubinrot",
+        "tomato": "Tomatenrot",
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "grass": "Grasgrün",
+        "mint": "Minze",
+        "jade": "Jade",
+        "iris": "Iris",
+        "plum": "Pflaume"
+      }
     }
   },
   "Search": {
@@ -445,7 +610,12 @@
       "delete": "Postfach löschen",
       "deleteConfirm": "{email} und die lokalen Daten endgültig löschen?",
       "membersTitle": "Mitglieder von {email}",
-      "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}"
+      "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+      "selfGrantTitle": "Dir selbst Zugriff geben?",
+      "selfGrantHelp": "Das gemeinsame Postfach wurde erstellt. Es hat noch keine Mitglieder. Gib dir ausdrücklich Zugriff oder füge später Mitglieder hinzu.",
+      "grantAccess": "Zugriff geben",
+      "later": "Später",
+      "noMembers": "Noch keine Mitglieder – niemand sieht dieses Postfach"
     },
     "users": {
       "refresh": "Benutzer aktualisieren",
@@ -922,6 +1092,10 @@
     }
   },
   "Notifications": {
+    "fullSyncCancelled": "Vollständige Synchronisierung abgebrochen",
+    "syncCancelledSelectionChanged": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen, weil du ein anderes Postfach ausgewählt hast.",
+    "folderAccountMismatch": "Der Ordner gehört nicht zu diesem Postfach. Bitte wähle das Postfach neu aus.",
+    "syncCancelledBeforeStart": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen.",
     "region": "Benachrichtigungen",
     "dismissLabel": "Benachrichtigung schließen",
     "dismiss": "Schließen",
@@ -982,5 +1156,107 @@
     "keywordFailed": "Nachrichtenschlagwort konnte nicht aktualisiert werden.",
     "categoryFailed": "Kategorie konnte nicht aktualisiert werden.",
     "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden."
+  },
+  "Compose": {
+    "sender": {
+      "chooseSender": "Absender auswählen",
+      "reviewSender": "Absender prüfen",
+      "unavailableDraft": "Die Absenderadresse dieses Entwurfs ist nicht verfügbar. Wähle einen aktiven Absender und speichere den Entwurf.",
+      "chooseEnabledSender": "Wähle vor dem Senden eine aktive Absenderadresse.",
+      "confirmKeepEditedSignature": "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten.",
+      "confirmKeepEditedWithoutSignature": "Den bearbeiteten Signaturtext behalten und nicht mehr als Signatur behandeln?",
+      "retrySender": "Absendereinstellungen erneut laden",
+      "senderOption": "{sender}",
+      "senderDefaultOption": "{sender} (Postfachstandard)",
+      "senderUnavailableOption": "{sender} — nicht verfügbar"
+    },
+    "from": "Von:",
+    "closeComposer": "Nachrichtenfenster schließen",
+    "fromValue": "Von {sender}"
+  },
+  "Errors": {
+    "sender": {
+      "senderLoadFailed": "Absenderidentitäten und Einstellungen konnten nicht geladen werden.",
+      "senderUnavailable": "Die Absendereinstellungen sind für dieses Postfach nicht verfügbar.",
+      "identityLoadFailed": "Absenderidentitäten konnten nicht geladen werden.",
+      "identityRefreshFailed": "Absenderidentitäten konnten nicht aktualisiert werden.",
+      "templateUnavailable": "Eine Signaturvorlage ist nicht verfügbar. Prüfe deine Signatureinstellungen. Bitte einen Verwalter des Postfachs, die gemeinsame Vorlage zu korrigieren.",
+      "identityUnavailable": "Diese Absenderadresse ist nicht verfügbar. Wähle einen aktiven Absender und speichere den Entwurf.",
+      "draftIdentityChanged": "Die gespeicherten Absenderdaten haben sich geändert. Prüfe den Absender und speichere den Entwurf vor dem Senden.",
+      "senderRejected": "Der E-Mail-Anbieter hat diese Absenderadresse abgelehnt. Wähle einen anderen Absender oder bitte einen Verwalter des Postfachs, die Adresse zu prüfen.",
+      "recipientRejected": "Der E-Mail-Anbieter hat einen Empfänger abgelehnt. Prüfe die Adressen unter An, Cc und Bcc, bevor du es erneut versuchst.",
+      "messageRejected": "Der E-Mail-Anbieter hat diese Nachricht abgelehnt. Prüfe den Inhalt und die Anhänge.",
+      "providerTemporary": "Der E-Mail-Anbieter ist vorübergehend nicht erreichbar. Behalte den Entwurf und versuche es später erneut.",
+      "providerConfiguration": "Das Senden ist nicht verfügbar. Bitte einen Verwalter des Postfachs, die E-Mail-Konfiguration zu prüfen.",
+      "providerConnection": "Die Verbindung zum E-Mail-Anbieter konnte nicht hergestellt werden. Behalte den Entwurf und versuche es später erneut.",
+      "providerFailure": "Der E-Mail-Anbieter konnte diese Nachricht nicht verarbeiten. Behalte den Entwurf und wende dich an einen Verwalter des Postfachs.",
+      "connectionTimeout": "Der Verbindungsaufbau zum E-Mail-Anbieter hat zu lange gedauert. Behalte den Entwurf und versuche es später erneut.",
+      "greetingTimeout": "Der E-Mail-Anbieter hat nicht rechtzeitig geantwortet. Behalte den Entwurf und versuche es später erneut.",
+      "deliveryUncertain": "Der E-Mail-Anbieter hat nicht rechtzeitig geantwortet. Die Nachricht wurde möglicherweise zugestellt. Prüfe den Ordner „Gesendet“ und frage beim Empfänger nach, bevor du erneut sendest.",
+      "personalDefaultUnavailable": "Deine Standardidentität ist nicht verfügbar. Wähle in den Einstellungen eine aktive Identität oder bitte einen Verwalter des Postfachs, sie wieder zu aktivieren.",
+      "savedIdentityUnavailable": "Die im Entwurf gespeicherte Identität ist nicht verfügbar. Prüfe den Absender und speichere den Entwurf.",
+      "identityExists": "Eine Identität mit dieser Adresse ist bereits vorhanden.",
+      "defaultIdentityRequired": "Wähle einen anderen Standardabsender für das Postfach, bevor du diese Identität deaktivierst.",
+      "signatureInUse": "Diese Signatur wird von einer Absenderidentität verwendet. Wähle zuerst eine andere Vorlage für diese Identität.",
+      "invalidPreferences": "Prüfe deine Absendereinstellungen und die Signaturplatzhalter."
+    }
+  },
+  "Views": {
+    "focused": {
+      "name": "Ungelesen & unbeantwortet",
+      "description": "Hier findest du ungelesene, unbeantwortete Nachrichten ohne Newsletter.",
+      "badgeLabel": "Ungelesen & unbeantwortet"
+    },
+    "actionQueue": {
+      "name": "Markiert & Aufgaben",
+      "description": "Hier findest du markierte Nachrichten sowie offene und erledigte Aufgaben.",
+      "badgeLabel": "Markiert oder Aufgabe"
+    },
+    "inviteDeck": {
+      "name": "Kalendereinladungen",
+      "description": "Hier findest du deine Kalendereinladungen.",
+      "badgeLabel": "Kalendereinladungen"
+    },
+    "assignedToMe": {
+      "name": "Mir zugewiesen",
+      "description": "Hier findest du Threads, die dir zugewiesen sind.",
+      "badgeLabel": "Mir zugewiesen"
+    },
+    "unassigned": {
+      "name": "Nicht zugewiesen",
+      "description": "Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.",
+      "badgeLabel": "Nicht zugewiesen"
+    },
+    "open": {
+      "name": "Offen",
+      "description": "Hier findest du Threads, die noch nicht erledigt sind.",
+      "badgeLabel": "Offen"
+    },
+    "inbox": {
+      "name": "Posteingang",
+      "description": "Hier findest du deine eingehenden Nachrichten."
+    },
+    "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "unreadLabel": "Ungelesen: {count, number}",
+    "pendingCount": "{count, plural, one {# offene Aufgabe} other {# offene Aufgaben}}",
+    "pendingLabel": "Aufgaben: {count, number}",
+    "countTitle": "{description} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
+    "rowTitle": "{name}: {description}",
+    "viewScope": "in „{name}“",
+    "everywhereScope": "überall",
+    "folderScope": "im Ordner „{name}“",
+    "currentFolderScope": "im aktuellen Ordner",
+    "allFieldsScope": "in allen Feldern",
+    "fieldsScope": "in den Feldern {fields}",
+    "filterCriteria": "Filter: {badges}",
+    "queryCriteria": "„{query}“"
+  },
+  "Folders": {
+    "inbox": "Posteingang",
+    "sent": "Gesendet",
+    "drafts": "Entwürfe",
+    "trash": "Papierkorb",
+    "spam": "Spam",
+    "archive": "Archiv"
   }
 }

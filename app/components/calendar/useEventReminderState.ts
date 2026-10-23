@@ -74,14 +74,20 @@ export function useEventReminderState({
   const [savingReminder, setSavingReminder] = useState(false);
   const [deletingReminder, setDeletingReminder] = useState(false);
 
-  // Evaluated on every render rather than memoized. `Date.now()` has to
-  // stay fresh so the Schedule button doesn't sit enabled after the
-  // event has already started; memoizing would pin the timestamp for
-  // as long as the other deps don't change. The recurrence resolver is
-  // cheap enough that per-render evaluation is a non-issue.
+  // Start with the same value on the server and the first client render.
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now());
+    const firstTick = window.setTimeout(updateNow, 0);
+    const timer = window.setInterval(updateNow, 1000);
+    return () => {
+      window.clearTimeout(firstTick);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const canScheduleReminder = (() => {
-    if (typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return false;
-    const nowMs = Date.now();
+    if (nowMs === null || typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return false;
     if (!recurrenceRule?.trim()) return canonicalStartMs > nowMs;
     const next = resolveNextReminderOccurrence({
       eventStartAtMs: canonicalStartMs,

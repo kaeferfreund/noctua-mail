@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { folderNameMatches } from "@/lib/i18n/folderNames";
+
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Folder as FolderIcon, Check } from "lucide-react";
 import { Dialog, TextField } from "@radix-ui/themes";
@@ -41,6 +43,7 @@ export default function CopyToAccountDialog({
   onOpenChange,
   onConfirm
 }: CopyToAccountDialogProps) {
+  const locale = useLocale();
   const t = useTranslations("Reader");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -101,11 +104,11 @@ export default function CopyToAccountDialog({
   const hasFolderMatch = useCallback(
     function match(folder: Folder): boolean {
       if (!folderQueryText) return true;
-      if (folder.name.toLowerCase().includes(folderQueryText)) return true;
+      if (folderNameMatches(folder, folderQueryText, locale)) return true;
       const children = folderTree.get(folder.id) ?? [];
       return children.some((child) => match(child));
     },
-    [folderQueryText, folderTree]
+    [folderQueryText, folderTree, locale]
   );
 
   const onToggleCollapse = useCallback((folderId: string) => {

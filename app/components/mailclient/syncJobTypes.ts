@@ -48,8 +48,13 @@ export type InternalSyncTriggerOptions = SyncTriggerOptions & {
   skipFullSyncConfirm?: boolean;
 };
 
+export type FullSyncCancellationCode =
+  | "confirmation_declined"
+  | "folder_account_mismatch"
+  | "mailbox_selection_changed";
+
 export class FullSyncDebugCancelledError extends Error {
-  constructor(reason: string) {
+  constructor(reason: string, readonly reasonCode: FullSyncCancellationCode = "confirmation_declined") {
     super(`Full sync cancelled before start. Reason: ${reason}`);
     this.name = "FullSyncDebugCancelledError";
   }
@@ -65,6 +70,7 @@ export class FullSyncDebugCancelledError extends Error {
 export type FullSyncDebugCancelledErrorLike = {
   name: "FullSyncDebugCancelledError";
   message: string;
+  reasonCode?: unknown;
 };
 
 export function isFullSyncDebugCancelledError(

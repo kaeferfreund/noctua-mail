@@ -843,13 +843,13 @@ async function createDraftMessage(
     accountId: context.accountId,
     clientId: `mcp:${context.tokenRecord.id}`,
     payload,
+    localFlags: [AI_MODIFIED_FLAG],
     actor: mcpActor(context),
     authorization: { tokenId: context.tokenRecord.id }
   });
 
   let message = result.message;
   if (result.draftId) {
-    await markMessageAiModified(context.accountId, result.draftId);
     message = await getMessageById(context.accountId, result.draftId);
   }
 
