@@ -1,3 +1,4 @@
+import { SenderIdentityError } from "./senderIdentityError";
 import { startIdentityRecomputeJob, getIdentityRecomputeJob, settleIdentityRecomputeAdmission } from "./threadRecomputeJobs";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
@@ -20,9 +21,7 @@ export const updateSenderIdentitySchema = z.object({
   displayName: text.optional(), replyTo: address.nullable().optional(), signatureId: optionalId.nullable().optional(),
   isDefault: z.boolean().optional(), enabled: z.boolean().optional()
 }).strict();
-export class SenderIdentityError extends Error {
-  constructor(public code: string, public status: number, message: string) { super(message); }
-}
+export { SenderIdentityError } from "./senderIdentityError";
 export type IdentityActor = { userId: string; clientId?: string };
 
 export function assertIdentitySignaturesAvailable(db: Database, accountId: string, signatureIds: readonly string[]) {

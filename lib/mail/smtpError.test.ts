@@ -81,3 +81,31 @@ describe("markSmtpUpstreamFailure / isSmtpUpstreamFailure", () => {
     );
   });
 });
+
+for (const [name, command, response, expected] of [
+  ["MAIL sender", "MAIL FROM", "553 address rejected", "smtp_sender_rejected"],
+  ["deferred sender at RCPT", "RCPT TO", "553 Sender address rejected: not owned by user", "smtp_sender_rejected"],
+  ["deferred sender at DATA", "DATA", "550 not allowed to send as this address", "smtp_sender_rejected"],
+  ["recipient", "RCPT TO", "550 No such recipient", "smtp_recipient_rejected"],
+  ["message", "DATA", "554 Message content rejected", "smtp_message_rejected"]
+] as const) {
+  it(`classifies ${name} without exposing provider detail`, () => {
+    const mapped = getSmtpHttpError({ code: command === "DATA" ? "EMESSAGE" : "EENVELOPE", command, response,
+      responseCode: 553, rejected: ["recipient@example.test"] }, "alias@example.test");
+    expect(mapped).toMatchObject({ status: 422, code: expected, smtpResponseCode: 553 });
+    if (expected === "smtp_sender_rejected") expect(mapped?.rejectedAddress).toBe("alias@example.test");
+    if (expected === "smtp_recipient_rejected") expect(mapped?.rejectedRecipients).toEqual(["recipient@example.test"]);
+    expect(mapped?.message).not.toContain(response);
+  });
+}
+it("keeps 4xx transient and authentication config drift separate from permanent sender rejection", () => {
+  expect(getSmtpHttpError({ code: "EENVELOPE", command: "MAIL FROM", responseCode: 451, response: "Sender temporarily rejected" }, "alias@example.test"))
+    .toMatchObject({ status: 502, code: "smtp_temporary_failure" });
+  expect(getSmtpHttpError({ code: "EAUTH", responseCode: 535, message: "synthetic credential detail" }))
+    .toMatchObject({ status: 502, code: "smtp_configuration_error" });
+});
+
+it("classifies an actual SMTP 4xx timeout response as temporary rather than a socket timeout", () => {
+  expect(getSmtpHttpError({ code: "EMESSAGE", command: "DATA", responseCode: 451, message: "451 Server timeout" }))
+    .toMatchObject({ status: 502, code: "smtp_temporary_failure", smtpResponseCode: 451 });
+});

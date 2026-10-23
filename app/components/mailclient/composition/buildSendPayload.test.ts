@@ -197,3 +197,9 @@ describe("buildSendPayload — Reply-To header", () => {
     expect(payload.replyTo).toBe("");
   });
 });
+
+it("plumbs an optional identity without generating a Reply-To override", () => {
+  const payload = buildSendPayload("reply", makeInput({ identityId: "synthetic-alias" }));
+  expect(payload.identityId).toBe("synthetic-alias");
+  expect(payload.replyTo).toBe("");
+});

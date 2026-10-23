@@ -1,8 +1,12 @@
+import { SenderIdentityError } from "./senderIdentities";
+import { resolveSendIdentity, IDENTITY_HEADER } from "./sendIdentity";
+import { validateDraftIdentity } from "./draftIdentity";
+import { listSenderIdentities } from "./serverDb";
 import { PostSendTimeoutError, postSendDeadlineAt, withImapDeadline } from "@/lib/mail/imapCancellation";
 import { completeSend, type SentCopyResult } from "@/lib/mail/completeSend";
 import type { CollabActor } from "@/lib/threadCollab";
 import { parseDeliveryMetadata } from "./mail/imap/parser";
-import { getOwnAddresses, isOwnAddress } from "./ownAddresses";
+import { getOwnAddresses, isOwnAddress, parseAddressEmails } from "./ownAddresses";
 import type { Account, Message } from "@/lib/data";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import { COMPOSE_INVITE_HEADER, encodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
@@ -28,7 +32,8 @@ import { buildRawMessage, sendRawSmtpMessage } from "./serverSmtp";
 import { hasMessageFlag } from "@/lib/messageFlags";
 import {
   injectUndisclosedRecipientsToHeader,
-  stripBccHeader
+  stripBccHeader,
+  stripIdentityHeader
 } from "@/lib/mail/stripBccHeader";
 import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 import { parseMailForCategorization } from "@/lib/mail/categorization/classifier";
@@ -51,6 +56,7 @@ export type DraftAttachmentInput = {
 };
 
 export type SaveDraftInput = {
+  identityId?: string;
   draftId?: string | null;
   to: string;
   cc?: string;
@@ -71,6 +77,7 @@ export type SaveDraftInput = {
 export type DraftCreateMode = "new" | "reply" | "forward";
 
 export type CreateDraftMessageInput = {
+  identityId?: string;
   mode?: DraftCreateMode;
   messageId?: string;
   to?: string;
@@ -87,6 +94,7 @@ export type CreateDraftMessageInput = {
 };
 
 export type SaveDraftResult = {
+  identityId: string;
   draftId: string | null;
   message: Message | null;
 };
@@ -111,7 +119,7 @@ export class DraftSendError extends Error {
   }
 }
 
-export type SendDraftResult = SentCopyResult;
+export type SendDraftResult = SentCopyResult & { identityId: string };
 
 function getReplyRecipient(ownAddresses: readonly string[], message: Message) {
   const sentByCurrentUser = isOwnAddress(message.from, ownAddresses);
@@ -139,6 +147,7 @@ export async function buildDraftInputForMode(
       throw new DraftSaveError(400, 'New drafts do not accept "messageId".');
     }
     return {
+      identityId: input.identityId,
       to: input.to?.trim() ?? "",
       cc: input.cc?.trim() ?? "",
       bcc: input.bcc?.trim() ?? "",
@@ -167,6 +176,7 @@ export async function buildDraftInputForMode(
   const { inReplyTo, references } = buildReplyThreadHeaders(referenceMessage);
 
   return {
+    identityId: input.identityId,
     to:
       input.to?.trim() ??
       (mode === "reply" ? getReplyRecipient(ownAddresses.length ? ownAddresses : getOwnAddresses(account), referenceMessage) : ""),
@@ -360,8 +370,24 @@ export async function saveDraftForAccount(params: {
   accountId: string;
   clientId: string;
   payload: SaveDraftInput;
+  actor?: CollabActor;
 }): Promise<SaveDraftResult> {
   const { account, accountId, clientId, payload } = params;
+  const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
+  if (payload.draftId && !existingDraft) throw new DraftSaveError(404, "Draft not found");
+  let identityId = payload.identityId;
+  if (existingDraft && identityId === undefined) {
+    const from = parseAddressEmails(existingDraft.from);
+    const identities = await listSenderIdentities(accountId);
+    const savedIdentity = identities.find(item => item.accountId === accountId &&
+      (existingDraft.senderIdentityId ? item.id === existingDraft.senderIdentityId : from.length === 1 && item.email === from[0]));
+    if (!savedIdentity?.enabled || from.length !== 1 || savedIdentity.email !== from[0]) {
+      throw new SenderIdentityError("identity_unavailable", 409, "Choose an enabled sender identity before saving this draft.");
+    }
+    identityId = savedIdentity.id;
+  }
+  const identity = await resolveSendIdentity({ accountId, userId: params.actor?.userId,
+    identityId, inReplyTo: payload.inReplyTo, mode: payload.xForwardedMessageId ? "forward" : undefined });
   const folders = await getFolders(account.id);
   const draftsFolder = findDraftsFolder(folders, account.id);
   if (!draftsFolder) {
@@ -376,7 +402,6 @@ export async function saveDraftForAccount(params: {
     html: payload.html,
     attachments: payload.attachments
   });
-  const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
   const preservedMessageId = existingDraft?.messageId?.trim() || undefined;
 
   const raw = await buildRawMessage(account, {
@@ -391,11 +416,10 @@ export async function saveDraftForAccount(params: {
     inReplyTo: payload.inReplyTo,
     references: payload.references,
     xForwardedMessageId: payload.xForwardedMessageId,
-    headers: payload.invite
-      ? { [COMPOSE_INVITE_HEADER]: encodeComposeInviteHeader(payload.invite) }
-      : undefined,
+    headers: { [IDENTITY_HEADER]: identity.id,
+      ...(payload.invite ? { [COMPOSE_INVITE_HEADER]: encodeComposeInviteHeader(payload.invite) } : {}) },
     ...(attachments.length > 0 ? { attachments } : {})
-  });
+  }, identity);
 
   if (payload.draftId) {
     if (existingDraft?.imapUid && existingDraft.mailboxPath) {
@@ -438,7 +462,7 @@ export async function saveDraftForAccount(params: {
     savedMessage = sanitized;
   }
 
-  return { draftId, message: savedMessage };
+  return { draftId, message: savedMessage, identityId: identity.id };
 }
 
 /**
@@ -533,15 +557,17 @@ export async function sendDraftForAccount(params: {
   // just don't appear in the message's own headers.
   const messageId = draft.messageId?.trim() || rawSource.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim();
   if (!messageId) throw new DraftSendError(409, "Draft has no Message-ID. Open it in compose and save it again.");
-  const wireSource = injectUndisclosedRecipientsToHeader(stripBccHeader(rawSource));
+  const identity = await validateDraftIdentity(rawSource, draft, await listSenderIdentities(accountId));
+  const sentSource = injectUndisclosedRecipientsToHeader(stripIdentityHeader(rawSource));
+  const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
   await sendRawSmtpMessage(account, wireSource, {
-    from: account.email,
+    from: identity.email,
     to: envelopeRecipients
   });
 
   const deadlineAt = postSendDeadlineAt();
-  const sentResult = await completeSend({ account, clientId, deadlineAt, raw: Buffer.from(rawSource),
+  const sentResult = await completeSend({ account, clientId, deadlineAt, raw: Buffer.from(sentSource),
     messageId, actor: params.actor, inReplyTo: draft.inReplyTo, references: draft.references,
     xForwardedMessageId: draft.xForwardedMessageId });
 
@@ -599,5 +625,5 @@ export async function sendDraftForAccount(params: {
     });
   }
 
-  return sentResult;
+  return { ...sentResult, identityId: identity.id };
 }

@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { options } from "./cli";
 import { demoPass, demoUser } from "./seed";
 export type ReceivedMail = { from: string; to: string[]; source: Buffer; file: string };
-export type SmtpOptions = { host?: string; port?: number; user?: string; pass?: string; out?: string; deliver?: (source: Buffer) => void | Promise<void> };
+export type SmtpOptions = { host?: string; port?: number; user?: string; pass?: string; out?: string; deliver?: (source: Buffer) => void | Promise<void>; rejectRecipient?: (address: string) => string | undefined };
 export async function startSmtpSink(config: SmtpOptions = {}) {
   const user = config.user ?? demoUser;
   const pass = config.pass ?? demoPass;
@@ -76,6 +76,8 @@ export async function startSmtpSink(config: SmtpOptions = {}) {
       if (command === "RCPT") {
         const address = arg.match(/^TO:\s*<([^>]+)>/i);
         if (from === undefined || !address) { send("503 5.5.1 MAIL FROM required"); return; }
+        const rejection = config.rejectRecipient?.(address[1]);
+        if (rejection) { send(rejection); return; }
         recipients.push(address[1]); send("250 2.1.5 Recipient accepted"); return;
       }
       if (command === "DATA") {

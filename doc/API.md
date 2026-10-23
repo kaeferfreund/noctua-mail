@@ -212,3 +212,99 @@ these with feat/team-auth's account-access/context helpers when Slice 3 lands; t
 route is team-auth-owned at integration. Do not activate
 HTTP MCP until that branch supplies its token checks. feat/collab-ui consumes the routes,
 collaboration enrichment, shared Sent state, and post-send warnings.
+
+## Sender identity send contracts (slice 2)
+
+All send and draft-save routes require an active MFA session and current **editor+**
+membership of the route mailbox. These checks precede identity validation. MCP uses
+its token creator's current membership at every tool call. Mailbox owners, transport
+credentials, shared Sent location and `sent_by.userId` retain their existing meanings;
+`sent_by.userId` is the person pressing Send, including another person's shared draft.
+
+- `POST /api/accounts/{accountId}/smtp/send` accepts optional `identityId` alongside
+  its existing compose fields. `from` and `envelopeFrom` are rejected. Explicit IDs
+  must belong to this mailbox and be enabled. Omission selects using the requester's
+  preferences and an in-mailbox source identified by `inReplyTo`; forwards use normal
+  defaults. The response includes the effective `identityId` and all existing send/
+  invitation fields. Resolution occurs before invitation construction and network IO.
+- `POST .../drafts/save` accepts optional `identityId` and returns
+  `{ok:true,identityId,draftId,message}`. The request schema rejects unknown fields.
+  Existing compose attachment metadata (`id`, `size`, `url`, `loadStatus`) remains
+  accepted alongside the MIME/dataUrl fields.
+  New drafts use the actor's defaults; edits without an ID preserve the saved identity,
+  including returning an error for an unavailable identity. An explicit enabled ID
+  lets the editor repair the draft. `message.senderIdentityId` records the selection.
+- `POST .../drafts/{draftId}/send` keeps its existing send behavior with no sender
+  override. The saved draft supplies the identity; switching requires saving first.
+  Success includes `identityId` plus the existing send fields. The server inspects
+  raw outer headers and parsed metadata: exactly one valid From, canonical display
+  name and configured Reply-To, no conflicting Sender or Resent headers, and agreement
+  between the optional marker, From address and metadata. Legacy drafts without a
+  marker resolve only by a matching From in this mailbox, never the current default.
+- `POST .../calendar/events/{eventId}/respond` accepts optional `identityId` only if
+  it matches the enabled identity for the saved `myAttendeeEmail`. Missing, stale or
+  disabled attendee identities fail without sending or changing participation.
+  Successful replies include `identityId`; `sendReply:false` keeps its existing local
+  participation behavior and omits send/identity fields. RSVP preserves the organizer.
+  New invitations use the selected identity for ORGANIZER and self-attendee matching.
+
+All MIME composition uses the resolved identity's display name/email for From and
+an explicit SMTP `envelope.from` of that email. Envelope recipients include To/Cc/Bcc.
+Reply-To is emitted only when configured and different from From. The legacy direct
+`replyTo` request field may be absent, empty, or exactly the configured address;
+other values return 400 `reply_to_managed`. Received Reply-To remains a reply-recipient
+hint, never an outgoing override. The draft-only `X-Noctua-Identity-Id` header is a
+lookup hint, not permission; it is stripped from both wire and Sent copies. Bcc is
+stripped from wire while retained in local draft/Sent. Approved From/Reply-To,
+Message-ID, threading, body and attachments remain consistent between copies.
+
+Identity errors return `{ok:false,code,message}`: 400 `invalid_identity` for malformed
+IDs/payloads or arbitrary From, 404 `identity_not_found` for unknown/foreign explicit
+IDs, 409 `identity_unavailable` for disabled identities or an unknown saved/attendee
+identity, and 409 `draft_identity_changed` when saved headers need review/resave.
+These failures preserve drafts and perform no SMTP, Sent APPEND, cleanup or attribution.
+An unavailable explicit choice never falls back. Authentication/access responses keep
+existing 401/403 conventions. Draft structural errors retain their existing statuses.
+
+Tagged SMTP transport errors use the same mapper on direct/draft/calendar routes:
+
+| HTTP | Code | Meaning / extra fields |
+| --- | --- | --- |
+| 422 | `smtp_sender_rejected` | Permanent MAIL FROM rejection or explicit sender-ownership denial deferred to RCPT/DATA. `rejectedAddress` is the validated identity; `smtpResponseCode` is numeric. |
+| 422 | `smtp_recipient_rejected` | Permanent RCPT rejection, with bounded `rejectedRecipients` and `smtpResponseCode`. |
+| 422 | `smtp_message_rejected` | Other permanent DATA/message rejection, with `smtpResponseCode`. |
+| 502 | `smtp_temporary_failure` | SMTP 4xx; retry later, with `smtpResponseCode`. |
+| 502 | `smtp_configuration_error` | SMTP authentication/configuration drift; a manager must review settings. |
+| 502 | `smtp_connection_failed` | Connection/TLS failure; existing contract. |
+| 504 | `smtp_connection_timeout`, `smtp_greeting_timeout`, `smtp_server_timeout` | Existing timeout stages and delivery-uncertainty guidance. |
+
+Responses never expose raw provider transcripts, credentials or message bodies.
+Partial recipient acceptance keeps the existing successful-send behavior. No identity
+fallback, global auto-disable, or second SMTP attempt follows acceptance. Existing
+`sentCopy`, `sentCopyWarning`, `postSendWarning` and absolute post-send deadlines remain
+unchanged; accepted delivery with a Sent failure must never prompt a resend.
+
+### MCP sender tools
+
+Every tool publishes input/output schemas. Optional `accountId` can only repeat the
+token mailbox. Identity mutations reuse REST services, manager authorization, signature
+reference validation and audit attribution (`clientId:mcp:<tokenId>`). There is no MCP
+send tool; clients create drafts and use the existing application send paths.
+
+| Tool | Input | Structured success / minimum role |
+| --- | --- | --- |
+| `list_sender_identities` | `{accountId?}` | `{ok:true,identities,defaultIdentityId?,effectiveDefaultIdentityId?,ownAddresses,warnings,recomputeJob}`; viewer |
+| `create_sender_identity` | `{accountId?,email,displayName,replyTo?,signatureId?,isDefault?,enabled?}` | `{ok:true,identity,recomputeJob}`; manager |
+| `update_sender_identity` | `{accountId?,identityId,patch:{displayName?,replyTo?:string\|null,signatureId?:string\|null,isDefault?,enabled?}}` | `{ok:true,identity}`; manager; disable using `enabled:false` |
+| `get_sender_preferences` | `{accountId?}` | `{ok:true,prefs:{defaultIdentityId?,defaultSignatureId?,signatureOverride?}}`; viewer, creator's own sparse row |
+| `set_sender_preferences` | `{accountId?,patch:{defaultIdentityId?:string\|null,defaultSignatureId?:string\|null,signatureOverride?:string\|null}}` | Same own sparse subset after merge; viewer; null restores inheritance, empty signature means none |
+| `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` | `{ok:true,mode,referenceMessageId,identityId,draftId,message}`; editor |
+
+Unknown mutation keys are rejected. Signature references must be in this mailbox;
+personal defaults cannot reference foreign/disabled identities. Another user's prefs
+are never returned. Expected domain errors carry `isError:true` and structured
+`{ok:false,code,message}` in a declared `ok`-discriminated output schema. Authorization
+errors retain existing MCP tool-error conventions. The SDK requires an object schema
+root, so the published schema carries the discriminated variants under `anyOf`, with
+the same variants checked by Zod. Signature rendering/insertion for MCP is the single
+remaining Slice 3 hook, shared with the forthcoming compose initializer.

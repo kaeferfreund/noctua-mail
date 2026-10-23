@@ -1,3 +1,6 @@
+import { saveDraftSchema } from "@/lib/draftSchemas";
+import { SenderIdentityError } from "@/lib/senderIdentities";
+import { collabActorFromSession } from "@/lib/threadCollab";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
@@ -18,19 +21,21 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(accountContext, async () => {
     const originError = requireJsonSameOrigin(request);
     if (originError) return originError;
-    const payload = (await request.json()) as SaveDraftInput & {
-      accountId?: string;
-    };
+    const parsed = saveDraftSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ ok: false, code: "invalid_identity", message: "Invalid draft payload" }, { status: 400 });
+    const payload: SaveDraftInput = parsed.data;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
     try {
       const result = await saveDraftForAccount({
         account,
         accountId: resolvedAccountId,
         clientId: clientId ?? "",
-        payload
+        payload,
+        actor: collabActorFromSession(accountContext.session, accountContext.clientId)
       });
-      return NextResponse.json({ ok: true, draftId: result.draftId, message: result.message });
+      return NextResponse.json({ ok: true, identityId: result.identityId, draftId: result.draftId, message: result.message });
     } catch (error) {
+      if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       if (error instanceof DraftSaveError) {
         return NextResponse.json(
           { ok: false, message: error.message },
