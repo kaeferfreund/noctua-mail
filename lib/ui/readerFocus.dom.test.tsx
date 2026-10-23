@@ -8,6 +8,7 @@ import ReaderToolbar from "@/app/components/mailclient/message/ReaderToolbar";
 import MessageListView from "@/app/components/mailclient/messagelist/MessageListView";
 import { reviewListProps } from "@/tests/helpers/i18nSlice2b";
 import { handleMessageRowKeyDown } from "@/app/components/mailclient/messagelist/listInteractions";
+import { useReaderFocusPlacement } from "./useReaderFocusPlacement";
 import { useReaderFocus } from "./useReaderFocus";
 import { isReaderRowActivation, readerShortcut, READER_HINT_KEY, READER_LAYOUT_KEY } from "./readerFocus";
 
@@ -109,4 +110,29 @@ for (const mode of ["card", "compact", "table", "threads"] as const) test(`${mod
   fireEvent.doubleClick(control); fireEvent.keyDown(control, { key: "Enter" });
   expect(opened.length).toBe(2);
   expect(rows.at(-1)).toContain(row.dataset.messageId!);
+});
+
+test("every focus entry places focus on Back; exit restores scroll with a virtualized-row fallback", async () => {
+  function Harness({ focused, rowPresent }: { focused: boolean; rowPresent: boolean }) {
+    const list = useRef<HTMLDivElement>(null), savedScroll = useRef<number | null>(211);
+    useReaderFocusPlacement(focused, "synthetic", list, savedScroll);
+    return <><div ref={list} tabIndex={-1} data-testid="focus-list">
+      {rowPresent && <button data-message-id="synthetic">Synthetic row</button>}
+    </div>{focused && <div data-reader-toolbar=""><button>Back</button></div>}</>;
+  }
+  const view = render(<Harness focused={false} rowPresent />);
+  view.rerender(<Harness focused rowPresent />);
+  await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  expect(document.activeElement).toBe(view.getByText("Back"));
+  view.rerender(<Harness focused={false} rowPresent={false} />);
+  await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  expect(document.activeElement).toBe(view.getByTestId("focus-list"));
+  expect(view.getByTestId("focus-list").scrollTop).toBe(211);
+  // The same effect also handles a single click re-entering the saved preference.
+  view.rerender(<Harness focused rowPresent />);
+  await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  expect(document.activeElement).toBe(view.getByText("Back"));
+  view.rerender(<Harness focused={false} rowPresent />);
+  await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  expect(document.activeElement).toBe(view.getByText("Synthetic row"));
 });

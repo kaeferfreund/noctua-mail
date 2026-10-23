@@ -1,5 +1,6 @@
 "use client";
 import ReaderToolbar from "./mailclient/message/ReaderToolbar";
+import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
 import { readerShortcut } from "@/lib/ui/readerFocus";
@@ -2745,6 +2746,7 @@ export default function MailClient({
       if (shouldAutoMinimizeComposer) {
         composeHandleRef.current?.setComposeView("minimized");
       }
+      if (readerLayout === "split") readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
       selectReaderLayout(nextMessage.id);
       setViewMessage(nextMessage);
     },
@@ -2758,7 +2760,8 @@ export default function MailClient({
       setPendingSelectionCollapseMessageId,
       setPendingSelectionScrollMessageId,
       setViewMessage,
-      selectReaderLayout
+      selectReaderLayout,
+      readerLayout
     ]
   );
 
@@ -2887,21 +2890,13 @@ export default function MailClient({
   const { navigate: navigateReader } = readerNavigation;
   const openReaderFocus = useCallback((message: Message) => {
     if (isMobile) return;
-    if (readerListScrollRef.current === null) readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
+    if (readerLayout === "split") readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
     handleSelectMessage(message);
     changeReaderLayout("focus");
-    window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-reader-toolbar] button')?.focus());
-  }, [handleSelectMessage, isMobile, changeReaderLayout]);
-  const closeReaderFocus = useCallback(() => {
-    changeReaderLayout("split");
-    // Focus restoration must not scroll the kept list viewport.
-    window.requestAnimationFrame(() => {
-      if (listPaneRef.current && readerListScrollRef.current !== null) listPaneRef.current.scrollTop = readerListScrollRef.current;
-      readerListScrollRef.current = null;
-      const row = listPaneRef.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(activeMessageId)}"]`);
-      row?.focus({ preventScroll: true });
-    });
-  }, [activeMessageId, changeReaderLayout]);
+  }, [handleSelectMessage, isMobile, changeReaderLayout, readerLayout]);
+  const closeReaderFocus = useCallback(() => changeReaderLayout("split"), [changeReaderLayout]);
+  const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
+  useReaderFocusPlacement(readerFocused, activeMessageId, listPaneRef, readerListScrollRef);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isMobile || !activeMessage) return;
