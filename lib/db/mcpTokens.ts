@@ -7,24 +7,45 @@ export type StoredMcpTokenRecord = McpTokenMetadata & {
   tokenHash: string;
 };
 
+/** Empty mapping is the legacy primary-only representation. */
+export function mcpTokenAccountIds(db: import("bun:sqlite").Database, token: { id: string; accountId: string }): string[] {
+  const rows = db.prepare("SELECT accountId FROM mcp_token_accounts WHERE tokenId=? ORDER BY accountId").all(token.id) as { accountId: string }[];
+  return rows.length ? rows.map(row => row.accountId) : [token.accountId];
+}
+function tokenMetadata(db: import("bun:sqlite").Database, row: StoredMcpTokenRow): McpTokenMetadata {
+  const token = mapMcpTokenRow(row);
+  return { ...token, accountIds: mcpTokenAccountIds(db, token) };
+}
+/** Called inside the mailbox-deletion or membership-revoke transaction. Keep surviving shared tokens.
+ *  With createdByUserId only that user's tokens lose the mailbox (membership revoke). */
+export function deleteMcpTokenAccountRows(db: import("bun:sqlite").Database, accountId: string, createdByUserId?: string) {
+  const owner = createdByUserId == null ? "" : " AND createdByUserId=?";
+  const args = createdByUserId == null ? [accountId] : [accountId, createdByUserId];
+  db.prepare(`DELETE FROM mcp_token_accounts WHERE accountId=?
+    AND tokenId IN (SELECT id FROM mcp_tokens WHERE accountId IS NOT NULL${owner})`).run(...args);
+  db.prepare(`DELETE FROM mcp_tokens WHERE accountId=?${owner} AND NOT EXISTS
+    (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)`).run(...args);
+  db.prepare(`UPDATE mcp_tokens SET accountId=(SELECT MIN(a.accountId) FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)
+    WHERE accountId=?${owner}`).run(...args);
+}
 export async function listMcpTokens(accountId: string) {
   const db = await getDb();
   const rows = db
     .prepare(
-      `SELECT id, accountId, createdByUserId, label, tokenSuffix, createdAt, expiresAt, lastUsedAt
-       FROM mcp_tokens
-       WHERE accountId = ?
+      `SELECT * FROM mcp_tokens t
+       WHERE EXISTS (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=t.id AND a.accountId=?)
+          OR (t.accountId=? AND NOT EXISTS (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=t.id))
        ORDER BY createdAt DESC, id ASC`
     )
-    .all(accountId) as StoredMcpTokenRow[];
-  return rows.map(mapMcpTokenRow);
+    .all(accountId, accountId) as StoredMcpTokenRow[];
+  return rows.map(row => tokenMetadata(db, row));
 }
 
 export async function getMcpTokenByHash(tokenHash: string): Promise<StoredMcpTokenRecord | null> {
   const db = await getDb();
   const row = db
     .prepare(
-      `SELECT id, accountId, createdByUserId, label, tokenHash, tokenSuffix, createdAt, expiresAt, lastUsedAt
+      `SELECT *
        FROM mcp_tokens
        WHERE tokenHash = ?
        LIMIT 1`
@@ -32,7 +53,7 @@ export async function getMcpTokenByHash(tokenHash: string): Promise<StoredMcpTok
     .get(tokenHash) as StoredMcpTokenRow | undefined;
   if (!row) return null;
   return {
-    ...mapMcpTokenRow(row),
+    ...tokenMetadata(db, row),
     tokenHash: String(row.tokenHash ?? "")
   };
 }
@@ -80,8 +101,10 @@ export async function deleteMcpToken(accountId: string, tokenId: string) {
   return withDbWriteRetry("deleteMcpToken", async () => {
     const db = await getDb();
     const result = db
-      .prepare(`DELETE FROM mcp_tokens WHERE accountId = ? AND id = ?`)
-      .run(accountId, tokenId) as { changes?: number };
+      .prepare(`DELETE FROM mcp_tokens WHERE id=? AND (
+        EXISTS (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id AND a.accountId=?)
+        OR (accountId=? AND NOT EXISTS (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)))`)
+      .run(tokenId, accountId, accountId) as { changes?: number };
     return Number(result?.changes ?? 0) > 0;
   });
 }

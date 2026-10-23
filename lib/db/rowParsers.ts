@@ -1,3 +1,4 @@
+import { parseMcpScopes } from "../mcpPermissions";
 import { seedSenderIdentityRow } from "./senderIdentities";
 import { isUiLocale } from "../i18n/config";
 import type {
@@ -120,6 +121,7 @@ export function mapAdminAuditRow(row: StoredAdminAuditRow): AdminAuditEntry {
 }
 
 export type StoredMcpTokenRow = {
+  scopes?: string | null;
   id?: string | null;
   accountId?: string | null;
   createdByUserId?: string | null;
@@ -133,6 +135,7 @@ export type StoredMcpTokenRow = {
 
 export function mapMcpTokenRow(row: StoredMcpTokenRow): McpTokenMetadata {
   return {
+    scopes: parseMcpScopes(row.scopes),
     id: String(row.id ?? ""),
     accountId: String(row.accountId ?? ""),
     createdByUserId: String(row.createdByUserId ?? ""),

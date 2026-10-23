@@ -424,7 +424,7 @@ export async function saveDraftForAccount(params: {
     ...(attachments.length > 0 ? { attachments } : {})
   }, identity);
 
-  const beforeWrite = params.authorization ? () => authorizeOutbound(params.authorization!, { accountId, minRole: "editor", identity }) : undefined;
+  const beforeWrite = params.authorization ? () => authorizeOutbound(params.authorization!, { accountId, minRole: "editor", identity, purpose: "draft" }) : undefined;
   const authorization = await beforeWrite?.();
   const assertCurrent = authorization ? await prepareOutboundAssertion(authorization) : () => {};
   assertCurrent();

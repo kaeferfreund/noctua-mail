@@ -226,6 +226,15 @@
       }
     },
     "mcp": {
+      "mailboxes": "Postfächer",
+      "primaryMailboxHint": "Dieses Postfach bleibt das Standardpostfach des Tokens.",
+      "permissionMode": "Berechtigungen",
+      "tokenMailboxes": "Postfächer: {mailboxes}",
+      "mode": {
+        "read": "Nur lesen",
+        "drafts": "Lesen und Entwürfe anlegen (kein Senden)",
+        "full": "Vollzugriff (auch senden)"
+      },
       "serverHeading": "MCP-Server",
       "endpointHint": "Verwende den MCP-Endpunkt unten mit dem Header <code>{header}</code>.",
       "copyServerUrl": "Server-URL kopieren",
