@@ -388,3 +388,51 @@ assertion was weakened.
 - `timeout 1200 bun run build`: exit 0, including production TypeScript validation.
 - `git diff --check`: exit 0. Protected paths and `completeSend.ts` are unchanged;
   the five localized `drafts.ts` hunks are listed above.
+
+### Local write-guard timing contract (round 5)
+
+Every guarded local write owns the shard writer before requesting the master
+writer. Read-only planning may run under that shard lock: message upsert resolves
+FTS deletion rowids there, using the same stable shard snapshot as the later DML.
+Planning must not publish files, mutate SQL, or treat an earlier actor snapshot as
+authority. It finishes before acquiring master. The final live assertion, first
+effect, file installation and shard COMMIT remain in one synchronous continuation
+under master IMMEDIATE exclusion. Master is released only after shard commit or
+failure. Async staging and cleanup remain outside both locks. Caller-owned
+transactions are rejected.
+
+A failed master BEGIN is a short handshake collision. The shared retry helper
+allows at most 16 jittered short waits (nominally 1, 2, 4, then 8 ms), followed by
+the existing coarse 120/240/480/960 ms schedule. Its handshake wall budget is
+2160 ms, the existing 1800 ms scheduled budget plus its maximum 20% jitter;
+preparation time counts against it. At most 21 whole attempts can run. Each retry
+rolls back the shard, releases both locks, and prepares fresh authorization.
+Shard/DML/COMMIT BUSY errors retain the existing five-attempt coarse policy.
+Neither the master/auth timeout (0 ms) nor shard timeout (15000 ms) changes.
+Retry telemetry includes operation, acquisition/write phase, short/coarse policy,
+attempt, delay and elapsed time.
+Hot authorization and admission queries reuse compiled SQLite statements; every
+invocation still executes against the current transaction, with fresh bindings.
+
+The durable admission pump also avoids repeating queue inserts/owner renewals
+while an existing ticket's owner has a healthy renewal margin, and skips
+promotions that would leave priority unchanged. These hints never create tickets
+or leases, grant admission, or raise priority. Missing tickets, actual promotions
+and owners within five seconds of expiry use the original writer path and coarse
+retry pacing; renewal, recovery and durable cleanup retain their authority.
+Master-only lease writes keep all four coarse waits first. Only a failed master
+acquisition that would otherwise exhaust can use the same bounded short recovery
+burst, within the same 2160 ms budget. DML/COMMIT failures still exhaust at the
+original five attempts. This avoids accelerating every normal worker admission
+while recovering rare release, queue and scheduler collisions.
+
+Worker admission can return false using a read-only eligibility hint when
+capacity is full or another queue head is eligible. A hint never grants a lease.
+Possible dead/expired-owner recovery or an owner within five seconds of expiry
+uses the original writer transaction. All successful reservations, fairness
+updates, spawn binding and durable release/cancel cleanup retain their original
+writer-locked authority checks. A child already bound to its exact PID and a
+scheduler already owned by the same live process still acquire that writer for
+the authoritative check; they omit a redundant UPDATE while expiry is more than
+five seconds away. Actual binding and renewal remain durable, with unchanged
+15-second lease durations. No successful admission is granted by a read hint.

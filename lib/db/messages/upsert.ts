@@ -253,7 +253,39 @@ export async function upsertMessages(
       INSERT INTO ${SHARD_FTS_TABLE} (accountId, messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const deleteFts = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`);
+    const deleteFtsStatement = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`);
+    const deleteFtsRow = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE rowid = ?`);
+    let plannedFtsRows: Map<string, number[]> | undefined;
+    const deleteFts = { run: (account: string, id: string) => {
+      if (!plannedFtsRows) return deleteFtsStatement.run(account, id);
+      if (!plannedFtsRows.has(id)) throw new Error("Unplanned guarded FTS deletion");
+      for (const rowid of plannedFtsRows.get(id)!) deleteFtsRow.run(rowid);
+      plannedFtsRows.set(id, []);
+    } };
+    const prepareFtsDeletes = () => {
+      if (!options.beforeWrite || replaceExisting) return;
+      // Plan a superset of possible storage identities using the same shard
+      // snapshot as the DML. Scans of v2's unindexed identity columns must not
+      // exclude auth writers. No FTS/schema generation change is needed.
+      const ids = new Set<string>();
+      if (options.replaceDraftId) ids.add(options.replaceDraftId);
+      for (const message of nextMessages) {
+        ids.add(message.id);
+        ids.add(buildMessageCollisionVariantId(message.id, message.mailboxPath ?? message.folderId, message.imapUid ?? null));
+        if (message.messageId) {
+          for (const row of findFolderMessageDuplicates.all(accountId, message.folderId, message.messageId, "") as Array<{ id: string }>) ids.add(row.id);
+        }
+      }
+      plannedFtsRows = new Map([...ids].map(id => [id, []]));
+      const values = [...ids];
+      for (let start = 0; start < values.length; start += 400) {
+        const chunk = values.slice(start, start + 400);
+        const rows = db.prepare(`SELECT rowid, messageId FROM ${SHARD_FTS_TABLE}
+          WHERE accountId=? AND messageId IN (${chunk.map(() => "?").join(",")})`)
+          .all(accountId, ...chunk) as Array<{ rowid: number; messageId: string }>;
+        for (const row of rows) plannedFtsRows.get(row.messageId)!.push(row.rowid);
+      }
+    };
     const deleteMessages = db.prepare(deleteSql);
     const existingScopeThreadIds =
       replaceExisting && folderId
@@ -646,7 +678,7 @@ export async function upsertMessages(
           // End sender identity metadata.
         );
         deleteFts.run(accountId, rowId);
-        insertFts.run(
+        const insertedFts = insertFts.run(
           accountId,
           rowId,
           message.subject,
@@ -657,6 +689,7 @@ export async function upsertMessages(
           message.body,
           message.preview
         );
+        plannedFtsRows?.set(rowId, [Number(insertedFts.lastInsertRowid)]);
         normalizeCalendarEventUids(message.calendarEventUids).forEach((eventUid) => {
           const existing = preservedCalendarInviteStateByUid.get(eventUid);
           insertCalendarEvent.run(
@@ -746,7 +779,7 @@ export async function upsertMessages(
           files.rollback();
           throw error;
         }
-      });
+      }, prepareFtsDeletes);
       for (const event of collabChanges) publishThreadCollabEvent(event);
     } catch (error) {
       // Also cover a commit failure, after the callback has returned.

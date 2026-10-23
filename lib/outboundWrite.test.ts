@@ -81,3 +81,106 @@ test("guard refuses an outer shard or master transaction instead of reversing lo
     } finally { db.exec("ROLLBACK"); }
   }
 });
+
+test("read-only planning owns only shard; a committed revoke there is asserted before any effect", async () => {
+  const f = await createCollabFixture(), master = await getDb();
+  const other = new Database(master.filename);
+  other.exec("PRAGMA busy_timeout=0");
+  let revoked = false, effects = 0;
+  const authorize = async () => ({ userId: "synthetic", clientId: "synthetic", assertCurrent: () => {
+    expect(master.inTransaction && f.db.inTransaction).toBe(true);
+    if (revoked) throw new Error("synthetic revoked during planning");
+  } });
+  try {
+    await expect(withOutboundWrite("synthetic plan", authorize, async write => write(f.db, () => {
+      effects++;
+    }, () => {
+      expect(f.db.inTransaction).toBe(true);
+      expect(master.inTransaction).toBe(false);
+      other.exec("BEGIN IMMEDIATE"); revoked = true; other.exec("COMMIT");
+    }))).rejects.toThrow("revoked during planning");
+    expect(effects).toBe(0);
+    expect(master.inTransaction || f.db.inTransaction).toBe(false);
+  } finally { other.close(); }
+});
+
+test("master acquisition retry rolls both locks back and prepares a fresh actor", async () => {
+  const f = await createCollabFixture(), master = await getDb();
+  const exec = master.exec.bind(master);
+  let preparations = 0, plans = 0, begins = 0, effects = 0;
+  const spy = spyOn(master, "exec").mockImplementation((sql: string) => {
+    if (sql === "BEGIN IMMEDIATE" && begins++ < 2) throw new Error("SQLITE_BUSY");
+    return exec(sql);
+  });
+  try {
+    await withOutboundWrite("synthetic handshake", async () => {
+      expect(master.inTransaction || f.db.inTransaction).toBe(false);
+      preparations++;
+      return { userId: "synthetic", clientId: "synthetic", assertCurrent: () => {
+        expect(preparations).toBe(3);
+        expect(master.inTransaction && f.db.inTransaction).toBe(true);
+      } };
+    }, async write => write(f.db, () => { effects++; }, () => { plans++; }));
+    expect([preparations, plans, begins, effects]).toEqual([3, 3, 3, 1]);
+    expect(master.inTransaction || f.db.inTransaction).toBe(false);
+  } finally { spy.mockRestore(); }
+});
+
+test("guarded FTS plans preserve same-copy identity and repeated IDs within a batch", async () => {
+  const f = await createCollabFixture();
+  const old = f.message("<synthetic-plan@example.test>", { id: "synthetic-planned-old" });
+  await f.seed(old);
+  const beforeWrite = async () => ({ userId: "synthetic", clientId: "synthetic", assertCurrent: () => {} });
+  const renamed = { ...old, id: "synthetic-new-id", subject: "Synthetic first" };
+  await f.api.upsertMessages(f.accountId, null, [renamed, { ...renamed, subject: "Synthetic final" }], false, { beforeWrite });
+  const rows = f.db.prepare(`SELECT messageId, subject FROM ${SHARD_FTS_TABLE} WHERE accountId=?`).all(f.accountId);
+  expect(rows).toEqual([{ messageId: old.id, subject: "Synthetic final" }]);
+  expect(f.db.prepare("SELECT id, subject FROM messages WHERE accountId=?").all(f.accountId))
+    .toEqual([{ id: old.id, subject: "Synthetic final" }]);
+});
+
+
+test("guarded FTS plans preserve colliding mailbox copies and other accounts' rows", async () => {
+  const f = await createCollabFixture();
+  const old = f.message("<synthetic-collision@example.test>", { id: "synthetic-collision", mailboxPath: "INBOX", imapUid: 1 });
+  await f.seed(old);
+  f.db.prepare(`INSERT INTO ${SHARD_FTS_TABLE} (accountId,messageId,subject) VALUES (?,?,?)`)
+    .run("synthetic-other-account", old.id, "Synthetic other account");
+  const beforeWrite = async () => ({ userId: "synthetic", clientId: "synthetic", assertCurrent: () => {} });
+  const variant = { ...old, imapUid: 2, subject: "Synthetic second copy" };
+  await f.api.upsertMessages(f.accountId, null, [variant, { ...variant, subject: "Synthetic final copy" }], false, { beforeWrite });
+  const messages = f.db.prepare("SELECT id,subject FROM messages WHERE accountId=? ORDER BY id").all(f.accountId);
+  const fts = f.db.prepare(`SELECT messageId AS id,subject FROM ${SHARD_FTS_TABLE} WHERE accountId=? ORDER BY messageId`).all(f.accountId);
+  expect(messages).toHaveLength(2);
+  expect(fts).toEqual(messages);
+  expect(f.db.prepare(`SELECT subject FROM ${SHARD_FTS_TABLE} WHERE accountId=?`).all("synthetic-other-account"))
+    .toEqual([{ subject: "Synthetic other account" }]);
+});
+
+
+test("a busy shard retains the coarse write policy and never acquires master first", async () => {
+  const f = await createCollabFixture(), master = await getDb();
+  const exec = f.db.exec.bind(f.db);
+  let begins = 0, preparations = 0, effects = 0;
+  const retry = spyOn(console, "warn");
+  const shard = spyOn(f.db, "exec").mockImplementation((sql: string) => {
+    if (sql === "BEGIN IMMEDIATE" && begins++ === 0) {
+      expect(master.inTransaction).toBe(false);
+      throw new Error("SQLITE_BUSY");
+    }
+    return exec(sql);
+  });
+  try {
+    await withOutboundWrite("synthetic shard contention", async () => {
+      preparations++;
+      return { userId: "synthetic", clientId: "synthetic", assertCurrent: () => {} };
+    }, async write => write(f.db, () => { effects++; }));
+    const logs = retry.mock.calls.filter(call => call[0] === "[db-write-retry] retry" && call[1].operation === "synthetic shard contention");
+    expect(logs).toHaveLength(1);
+    expect(logs[0][1]).toMatchObject({ phase: "write", policy: "coarse" });
+    expect(logs[0][1].delayMs).toBeGreaterThanOrEqual(96);
+    expect(logs[0][1].delayMs).toBeLessThanOrEqual(144);
+    expect([begins, preparations, effects]).toEqual([2, 2, 1]);
+    expect(master.inTransaction || f.db.inTransaction).toBe(false);
+  } finally { retry.mockRestore(); shard.mockRestore(); }
+});
