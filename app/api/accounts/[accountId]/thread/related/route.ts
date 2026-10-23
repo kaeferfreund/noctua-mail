@@ -12,6 +12,7 @@ import {
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { listThreadMessages } from "@/lib/db";
 import { normalizeThreadDateSource } from "@/lib/threadDate";
+import type { Message } from "@/lib/data";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -21,6 +22,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     messageIds?: string[];
     groupBy?: string;
     threadDateSource?: string;
+    /** `headers` omits body/htmlBody (read per message from the detail route). */
+    projection?: string;
+    excludeFolderIds?: string[];
   };
   const accountId = await getAccountIdFromParams(params);
   const threadIds = Array.isArray(payload.threadIds)
@@ -29,6 +33,14 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const messageIds = Array.isArray(payload.messageIds)
     ? payload.messageIds.map((value) => value.trim()).filter(Boolean)
     : [];
+  const excludeFolderIds = Array.isArray(payload.excludeFolderIds)
+    ? payload.excludeFolderIds
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+  const projection = payload.projection === "headers" ? "headers" : "full";
+
   const context = await requireAccountContext(request, accountId, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId or threadIds/messageIds"
@@ -43,19 +55,25 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     const groupBy = payload.groupBy ?? "date";
     const threadDateSource = normalizeThreadDateSource(payload.threadDateSource);
+    const enrich = async (items: Message[]) => {
+      await enrichMessagesWithThreadTopics(items, {
+        accountId: context.accountId,
+        accountEmail: getOwnAddresses(context.account),
+        includeSuggestions: true
+      });
+      await enrichMessagesWithThreadCollab(items, { accountId: context.accountId });
+    };
+
     const data = await listThreadMessages({
       accountId: context.accountId,
       threadIds,
       messageIds,
       groupBy,
-      threadDateSource
+      threadDateSource,
+      projection,
+      excludeFolderIds
     });
-    await enrichMessagesWithThreadTopics(data.items, {
-      accountId: context.accountId,
-      accountEmail: getOwnAddresses(context.account),
-      includeSuggestions: true
-    });
-    await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
+    await enrich(data.items);
 
     return compressedJsonResponse(request, { items: data.items });
   });

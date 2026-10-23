@@ -2215,7 +2215,8 @@ export default function MailClient({
         body: JSON.stringify({
           threadIds,
           groupBy,
-          threadDateSource
+          threadDateSource,
+          projection: "headers"
         }),
         signal
       });
@@ -4450,7 +4451,9 @@ export default function MailClient({
           body: JSON.stringify({
             threadIds,
             groupBy,
-            threadDateSource
+            threadDateSource,
+            projection: "headers",
+            excludeFolderIds: [activeFolderId, ...excludedFolderIdsForThreads]
           })
         });
         if (!res.ok) {
@@ -4466,18 +4469,14 @@ export default function MailClient({
         }
         const data = (await res.json()) as { items?: Message[] };
         const items = Array.isArray(data?.items) ? data.items : [];
-        const filtered = items.filter(
-          (item) => item.folderId !== activeFolderId && !checkIsThreadExcludedFolder(item.folderId)
-        );
         logListDebug("info", "thread-related:list-effect:response", {
           ...debugBase,
-          returnedCount: items.length,
-          filteredCount: filtered.length
+          returnedCount: items.length
         });
         if (currentKeyRef.current !== requestKey) {
           return;
         }
-        setThreadRelatedMessages(filtered);
+        setThreadRelatedMessages(items);
       } catch (error) {
         logListDebug("warn", "thread-related:list-effect:exception", {
           ...debugBase,
