@@ -26,9 +26,9 @@ import type { BuildIdentity } from "@/lib/buildVersion";
 import type React from "react";
 import dynamic from "next/dynamic";
 import {
-  startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -62,7 +62,6 @@ import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
 import DialogsHost from "./mailclient/dialogs/DialogsHost";
 import { useConfirmDialogs } from "./mailclient/dialogs/useConfirmDialogs";
-import { consumeCalendarOpenRequest } from "./mailclient/status/statusIndicator";
 import type { BottomStatusPanel } from "./mailclient/status/BottomStatusBar";
 import ComposeOrchestrator, {
   type ComposeMirror,
@@ -70,6 +69,11 @@ import ComposeOrchestrator, {
   type ComposeOrchestratorHandle
 } from "./mailclient/composition/ComposeOrchestrator";
 import type { ComposeMode } from "./mailclient/composition/composeTypes";
+import { useDeepLinks } from "./mailclient/useDeepLinks";
+import { UrlHistoryContext } from "@/app/hooks/UrlHistoryContext";
+import { settingsTabVisible } from "./account-settings/settingsAccess";
+import { resolveDeepLinkMessage } from "@/lib/navigation/resolveMessage";
+import { notificationDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import { parseMailto } from "@/lib/mailto";
 import {
   buildSavedDraftListMessage,
@@ -167,7 +171,6 @@ import {
   buildAccountMessageTopicSuggestionsPath,
   buildAccountMessagesActionPath,
   buildAccountMessageHtmlPath,
-  buildAccountMessagePath,
   buildAccountMessageSourcePath,
   buildAccountMessagesPath,
   buildAccountTopicSuggestionsPath,
@@ -432,6 +435,7 @@ export default function MailClient({
   const [manageOpen, setManageOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [adminSection, setAdminSection] = useState<"users" | "mailboxes" | "invites" | "audit">("users");
   const [newMailboxOpen, setNewMailboxOpen] = useState(false);
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
@@ -721,13 +725,7 @@ export default function MailClient({
   } | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [deletingFolderIds, setDeletingFolderIds] = useState<Set<string>>(new Set());
-  const pendingJumpMessageIdRef = useRef<string | null>(null);
-  const pendingJumpLocalMessageIdRef = useRef<string | null>(null);
-  const pendingJumpAccountIdRef = useRef<string | null>(null);
-  const pendingJumpRefreshKeyRef = useRef("");
-  const resolveMessageByExternalMessageIdRef = useRef<
-    ((messageId: string, accountId: string) => Promise<Message | null>) | null
-  >(null);
+  const navigateMessageRef = useRef<(messageId: string, accountId?: string) => void>(() => {});
   const duplicateMessageIdLogFingerprintRef = useRef("");
   const activeVisibilityLogFingerprintRef = useRef("");
   const threadPreferenceByFolderRef = useRef<Record<string, ThreadsMode>>({});
@@ -1012,18 +1010,6 @@ export default function MailClient({
     if (byName) return byName.folder;
     const byPartial = lowered.find((item) => item.name.includes("sent"));
     return byPartial?.folder ?? null;
-  };
-  const clearUrlParam = (name: string, value?: string | null) => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    const current = url.searchParams.get(name);
-    if (!current) return;
-    if (value && current !== value) return;
-    url.searchParams.delete(name);
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-  };
-  const clearNotificationDeepLink = (messageId?: string | null) => {
-    clearUrlParam("messageId", messageId);
   };
   const emptyListSyncing = isSyncing || syncingFolders.size > 0;
   const selectedSearchBadges = useMemo(
@@ -1411,43 +1397,6 @@ export default function MailClient({
     });
     return map;
   }, [messages, activeAccountId]);
-  const jumpToMessageId = (messageId: string, source = "unknown") => {
-    const normalized = messageId.trim();
-    const lower = normalized.toLowerCase();
-    const stripped = normalized.replace(/[<>]/g, "").trim().toLowerCase();
-    const target =
-      messageByMessageId.get(messageId) ??
-      messageByMessageId.get(normalized) ??
-      messages.find((message) => {
-        if (message.accountId !== activeAccountId || !message.messageId) return false;
-        const candidate = message.messageId.trim();
-        if (!candidate) return false;
-        if (candidate.toLowerCase() === lower) return true;
-        return candidate.replace(/[<>]/g, "").trim().toLowerCase() === stripped;
-      });
-    if (!target) {
-      console.warn("[noctua][reminder-link] messageId not found in loaded cache", {
-        source,
-        messageId,
-        activeAccountId,
-        loadedMessageIdCount: messageByMessageId.size
-      });
-      return false;
-    }
-    console.info("[noctua][reminder-link] message jump resolved", {
-      source,
-      messageId,
-      localMessageId: target.id,
-      folderId: target.folderId
-    });
-    setViewMessage(target);
-    const inCurrentFolder = filteredMessages.some((m) => m.id === target.id);
-    if (inCurrentFolder) {
-      selectionStore.setActiveId(target.id);
-      startTransition(() => setActiveMessageId(target.id));
-    }
-    return true;
-  };
   const activeTopicSuggestionRankedMessages = useMemo(
     () =>
       buildTopicSuggestionRankedMessages(
@@ -2009,27 +1958,6 @@ export default function MailClient({
   ) => {
     composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
   };
-
-  // Pending mailto: query (from ?mailto=...) — captured on mount, applied once
-  // an account is active and the compose orchestrator is mounted.
-  const pendingMailtoRef = useRef<ComposeOpenPrefill | null>(null);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get("mailto");
-    if (!raw) return;
-    pendingMailtoRef.current = parseMailto(raw);
-    params.delete("mailto");
-    const query = params.toString();
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-    window.history.replaceState({}, "", nextUrl);
-  }, []);
-  useEffect(() => {
-    const prefill = pendingMailtoRef.current;
-    if (!prefill || !currentAccount || !composeHandleRef.current) return;
-    pendingMailtoRef.current = null;
-    composeHandleRef.current.openCompose("new", undefined, false, prefill);
-  }, [currentAccount]);
 
   // Derive topics map from messages (topics are now included in the messages API response)
   useEffect(() => {
@@ -3716,17 +3644,7 @@ export default function MailClient({
     setQuery(`invite:${uidQueryTerm}`);
   };
 
-  const handleOpenCalendarMessage = (messageId: string) => {
-    const msg = messageById.get(messageId) ?? null;
-    if (msg) {
-      setViewMessage(msg);
-      setActiveMessageId(messageId);
-      return;
-    }
-    void resolveMessageByExternalMessageId(messageId, activeAccountId).then((resolved) => {
-      if (resolved) setViewMessage(resolved);
-    });
-  };
+  const handleOpenCalendarMessage = (messageId: string) => navigateMessageRef.current(messageId, activeAccountId);
 
   const renderQuickActions = (
     message: Message,
@@ -4217,38 +4135,12 @@ export default function MailClient({
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URL(window.location.href).searchParams;
-    const accountIdParam = params.get("accountId");
-    const scopeParam = params.get("scope");
-    const queryParam = params.get("q");
-    const messageId = params.get("messageId");
-    const localMessageId = params.get("openMessageId");
-    if (accountIdParam) {
-      void switchAccount(accountIdParam);
-    }
-    if (scopeParam === "all" || scopeParam === "folder") {
-      setSearchScope(scopeParam);
-    }
-    if (queryParam?.trim()) {
-      setQuery(queryParam.trim());
-    }
-    if (messageId) {
-      pendingJumpMessageIdRef.current = messageId;
-      pendingJumpAccountIdRef.current = accountIdParam?.trim() || null;
-      pendingJumpRefreshKeyRef.current = "";
-    }
-    if (localMessageId) {
-      pendingJumpLocalMessageIdRef.current = localMessageId;
-    }
-  }, []);
-
-  useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const payload = event.data as
         | {
             type?: string;
+            url?: string;
             messageId?: string | null;
             accountId?: string;
             reminderId?: string;
@@ -4257,29 +4149,8 @@ export default function MailClient({
         | null;
       if (!payload?.type) return;
       if (payload.type === "noctua:notification-open") {
-        const messageId = typeof payload.messageId === "string" ? payload.messageId : "";
-        if (!messageId) return;
-        const targetAccountId = typeof payload.accountId === "string" ? payload.accountId.trim() : "";
-        if (targetAccountId) {
-          pendingJumpAccountIdRef.current = targetAccountId;
-        }
-        if (targetAccountId && targetAccountId !== activeAccountId) {
-          const hasAccount = accounts.some((account) => account.id === targetAccountId);
-          if (hasAccount) {
-            pendingJumpMessageIdRef.current = messageId;
-            pendingJumpRefreshKeyRef.current = "";
-            void switchAccount(targetAccountId);
-            return;
-          }
-        }
-        if (jumpToMessageId(messageId, "sw-notification-open")) {
-          pendingJumpMessageIdRef.current = null;
-          pendingJumpAccountIdRef.current = null;
-          clearNotificationDeepLink(messageId);
-          return;
-        }
-        pendingJumpMessageIdRef.current = messageId;
-        pendingJumpRefreshKeyRef.current = "";
+        const target = notificationDeepLink(payload);
+        if (target.messageId) navigateMessageRef.current(target.messageId, target.accountId);
         return;
       }
       if (
@@ -4301,7 +4172,7 @@ export default function MailClient({
     return () => {
       navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
     };
-  }, [accounts, activeAccountId, clientId, messageByMessageId, switchAccount]);
+  }, [clientId]);
 
   useEffect(() => {
     if (authState !== "ok" || !sessionTtlSeconds) return;
@@ -4694,67 +4565,6 @@ export default function MailClient({
     upsertThreadCache
   ]);
 
-  useEffect(() => {
-    const pending = pendingJumpLocalMessageIdRef.current;
-    if (!pending) return;
-    const target = messageById.get(pending);
-    if (!target) return;
-    setViewMessage(target);
-    const inCurrentFolder = filteredMessages.some((m) => m.id === target.id);
-    if (inCurrentFolder) {
-      selectionStore.setActiveId(target.id);
-      startTransition(() => setActiveMessageId(target.id));
-    }
-    pendingJumpLocalMessageIdRef.current = null;
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      if (url.searchParams.get("openMessageId") === pending) {
-        url.searchParams.delete("openMessageId");
-        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-      }
-    }
-  }, [messageById, selectionStore, filteredMessages]);
-
-  useEffect(() => {
-    const pending = pendingJumpMessageIdRef.current;
-    if (!pending) return;
-    const pendingAccountId = pendingJumpAccountIdRef.current;
-    if (pendingAccountId && pendingAccountId !== activeAccountId) {
-      const hasPendingAccount = accounts.some((account) => account.id === pendingAccountId);
-      if (hasPendingAccount) {
-        void switchAccount(pendingAccountId);
-        return;
-      }
-      pendingJumpAccountIdRef.current = null;
-    }
-    if (jumpToMessageId(pending, "pending-jump-effect")) {
-      pendingJumpMessageIdRef.current = null;
-      pendingJumpAccountIdRef.current = null;
-      pendingJumpRefreshKeyRef.current = "";
-      clearNotificationDeepLink(pending);
-      return;
-    }
-    if (authState !== "ok") return;
-    const refreshKey = `${activeAccountId}:${pending}`;
-    if (pendingJumpRefreshKeyRef.current === refreshKey) return;
-    pendingJumpRefreshKeyRef.current = refreshKey;
-    console.info("[noctua][reminder-link] pending jump unresolved, fetching from server", {
-      messageId: pending,
-      activeAccountId,
-      refreshKey
-    });
-    void (async () => {
-      const resolved = await resolveMessageByExternalMessageIdRef.current?.(pending, activeAccountId);
-      if (resolved) {
-        setViewMessage(resolved);
-        pendingJumpMessageIdRef.current = null;
-        pendingJumpAccountIdRef.current = null;
-        pendingJumpRefreshKeyRef.current = "";
-        clearNotificationDeepLink(pending);
-      }
-    })();
-  }, [accounts, activeAccountId, authState, messageByMessageId, switchAccount]);
-
   const scrollActiveMessageIntoView = useCallback((behavior: ScrollBehavior) => {
     if (!activeMessageId) return false;
     const target = messageRefs.current.get(activeMessageId);
@@ -5004,119 +4814,82 @@ export default function MailClient({
     return () => observer.disconnect();
   }, [authState]);
 
-  const resolveMessageByExternalMessageId = useCallback(
-    async (messageId: string, accountId: string) => {
-      if (!accountId) return null;
-      try {
-        const res = await apiFetch(
-          buildAccountMessagePath(accountId, messageId),
-          { cache: "no-store" }
-        );
-        if (res.status === 404) {
-          console.warn("[noctua][reminder-link] server resolve not found", {
-            messageId,
-            accountId
-          });
-          return null;
-        }
-        if (!res.ok) {
-          console.warn("[noctua][reminder-link] server resolve failed", {
-            messageId,
-            accountId,
-            status: res.status
-          });
-          return null;
-        }
-        const payload = (await res.json()) as { ok?: boolean; message?: Message };
-        const resolved = payload?.message;
-        if (!payload?.ok || !resolved?.id || !resolved.folderId) {
-          console.warn("[noctua][reminder-link] server resolve payload invalid", {
-            messageId,
-            accountId
-          });
-          return null;
-        }
-        console.info("[noctua][reminder-link] server resolve success", {
-          messageId,
-          localMessageId: resolved.id,
-          folderId: resolved.folderId
-        });
-        return resolved;
-      } catch (error) {
-        console.warn("[noctua][reminder-link] server resolve exception", {
-          messageId,
-          accountId,
-          error
-        });
-        return null;
-      }
-    },
-    [apiFetch]
-  );
-  resolveMessageByExternalMessageIdRef.current = resolveMessageByExternalMessageId;
-
-  const openMessageByExternalMessageId = (
-    messageId: string,
-    source = "unknown",
-    requestedAccountId?: string | null
-  ) => {
-    const targetAccountId =
-      typeof requestedAccountId === "string" && requestedAccountId.trim()
-        ? requestedAccountId.trim()
-        : activeAccountId;
-    console.info("[noctua][reminder-link] open by external messageId", {
-      source,
-      messageId,
-      activeAccountId,
-      targetAccountId
-    });
-    if (targetAccountId && targetAccountId !== activeAccountId) {
-      const hasTargetAccount = accounts.some((account) => account.id === targetAccountId);
-      if (hasTargetAccount) {
-        pendingJumpMessageIdRef.current = messageId;
-        pendingJumpAccountIdRef.current = targetAccountId;
-        pendingJumpRefreshKeyRef.current = "";
-        void switchAccount(targetAccountId);
-        return false;
-      }
-    }
-    if (jumpToMessageId(messageId, source)) return true;
-    void (async () => {
-      const resolved = await resolveMessageByExternalMessageId(messageId, targetAccountId);
-      if (resolved) {
-        console.info("[noctua][reminder-link] server resolve applied to pane", {
-          source,
-          messageId,
-          localMessageId: resolved.id,
-          folderId: resolved.folderId
-        });
-        setViewMessage(resolved);
-        return;
-      }
-      console.warn("[noctua][reminder-link] message not found on server", {
-        source,
-        messageId,
-        targetAccountId
-      });
-    })();
-    return false;
-  };
-
   const [openBottomStatusPanel, setOpenBottomStatusPanel] = useState<BottomStatusPanel>(null);
 
-  // The PWA file handler at /calendar/import redirects to "/?openCalendar=1"
-  // after importing an .ics, so we open the calendar popover here on mount.
+  const deepLinkSelectionRef = useRef<Message | null>(null);
+  const deepLinkState: DeepLinkState = {
+    accountId: activeAccountId, folderId: activeFolderId,
+    messageId: viewMessage?.accountId === activeAccountId ? viewMessage.id : "",
+    query, scope: searchScope, view: activeVirtualFolderId, group: groupBy,
+    badges: Object.keys(searchBadges).filter(key => searchBadges[key as keyof typeof searchBadges]),
+    fields: Object.keys(searchFields).filter(key => searchFields[key as keyof typeof searchFields]),
+    settings: manageOpen ? manageTab : null, admin: adminOpen ? adminSection : null,
+    security: securityOpen, panel: openBottomStatusPanel === "exceptions" ? "exception" : openBottomStatusPanel === "reminders" ? "reminder" : openBottomStatusPanel,
+    calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
+  };
+  const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
+    ready: authState === "ok" && initialDataReady && initialFoldersLoadedAccountId === activeAccountId,
+    state: deepLinkState, accountIds: accounts.map(account => account.id), switchAccount,
+    applyPlace: requested => {
+      const targetView = requested.query.trim() ? null : requested.view;
+      const calendarAvailable = targetView ? targetView === "virtual:invite-deck" : requested.badges.includes("calendar");
+      const target: DeepLinkState = { ...requested,
+        folderId: requested.scope === "all" ? "" : accountFolders.some(folder => folder.id === requested.folderId)
+          ? requested.folderId : inboxFolder?.id ?? "",
+        messageId: "", view: targetView,
+        group: requested.group === "event" && !calendarAvailable ? "date" : requested.group,
+        settings: requested.settings && currentAccount ? settingsTabVisible(requested.settings, currentAccount.accessRole) ? requested.settings : "preferences" : null,
+        admin: isAdminUser ? requested.admin : null
+      };
+      deepLinkSelectionRef.current = null;
+      setViewMessage(null); setActiveMessageId(""); clearSelection(); resetReaderLayout();
+      setSearchScope(target.scope); setQuery(target.query); setActiveVirtualFolderId(target.view);
+      setActiveFolderId(target.folderId);
+      setGroupBy(target.group);
+      setSearchBadges(Object.fromEntries(Object.keys(searchBadges).map(key => [key, target.badges.includes(key)])) as typeof searchBadges);
+      setSearchFields(Object.fromEntries(Object.keys(searchFields).map(key => [key, target.fields.includes(key)])) as typeof searchFields);
+      setManageOpen(Boolean(target.settings && currentAccount)); setManageTab(target.settings ?? "account");
+      if (target.settings) setEditingAccount(currentAccount ?? null);
+      setAdminOpen(Boolean(target.admin && isAdminUser)); setAdminSection(target.admin ?? "users");
+      setSecurityOpen(target.security); setOpenBottomStatusPanel(target.panel); setCalendarSidebarOpen(target.calendar);
+      if (target.compose && (!composeOpen || composeMode !== "new")) {
+        const raw = new URLSearchParams(window.location.search).get("mailto");
+        composeHandleRef.current?.openCompose("new", undefined, false, raw ? parseMailto(raw) : undefined);
+      } else if (!target.compose && composeOpen) {
+        // Keep unsent content in the existing minimized composer when navigating Back.
+        composeHandleRef.current?.setComposeView("minimized");
+      } else if (target.compose && composeOpen) composeHandleRef.current?.setComposeView("inline");
+      return target;
+    },
+    resolveMessage: (accountId, messageId, signal) => resolveDeepLinkMessage(apiFetch, accountId, messageId, signal),
+    onUnauthenticated: () => setAuthState("unauth"),
+    onForbidden: () => { void loadInitialData(); },
+    openMessage: message => {
+      if (searchScope === "folder") setActiveFolderId(message.folderId);
+      setViewMessage(message); selectReaderLayout(message.id);
+      setActiveMessageId(message.id); selectionStore.setSelection(new Set([message.id]), message.id);
+      setPendingSelectionCollapseMessageId(message.id); setPendingSelectionScrollMessageId(message.id);
+      deepLinkSelectionRef.current = message;
+    },
+    notice: kind => pushNotice({ type: "info", title: tn(`deepLink.${kind}`) })
+  });
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nextUrl = consumeCalendarOpenRequest(window.location.href);
-    if (nextUrl === null) return;
-    setOpenBottomStatusPanel("calendar");
-    window.history.replaceState({}, "", nextUrl);
-  }, []);
+    const target = deepLinkSelectionRef.current;
+    if (!target || viewMessage?.id !== target.id || target.accountId !== activeAccountId) return;
+    if (filteredMessages.some(message => message.id === target.id)) {
+      selectionStore.setSelection(new Set([target.id]), target.id); setActiveMessageId(target.id);
+      setPendingSelectionCollapseMessageId(target.id); setPendingSelectionScrollMessageId(target.id);
+      deepLinkSelectionRef.current = null;
+    } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId) {
+      setMessagesPage(page => page + 1);
+    }
+  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
+
+  useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
   const handleNoticeOpen = (notice: InAppNotice) => {
     const jumpTarget = notice.messageId ?? notice.ids?.[0];
     if (jumpTarget) {
-      openMessageByExternalMessageId(jumpTarget, "in-app-notice");
+      navigateMessage(jumpTarget);
     } else if (notice.type === "error") {
       setOpenBottomStatusPanel("exception");
     } else {
@@ -5360,7 +5133,7 @@ export default function MailClient({
     editingAccount && accounts.some((account) => account.id === editingAccount.id)
   );
 
-  const identityDialogs = <>
+  const identityDialogs = <UrlHistoryContext.Provider value={true}>
     <AuthDialog open={securityOpen} onOpenChange={setSecurityOpen}>
       <AuthDialogContent data-shell="" className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <AuthDialogTitle>Profile &amp; security</AuthDialogTitle>
@@ -5373,8 +5146,8 @@ export default function MailClient({
       </AuthDialogContent>
     </AuthDialog>
     {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
-    {adminOpen && <AdminPanel isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
-  </>;
+    {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
+  </UrlHistoryContext.Provider>;
   if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
     if (authSecurity?.reauthRequired && !authSecurity.enrollmentRequired) return <AuthFrame title="Sign in again" description="Your session needs fresh verification."><AuthButton onClick={() => { void logout(); }}>Return to sign in</AuthButton></AuthFrame>;
@@ -5393,8 +5166,8 @@ export default function MailClient({
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
       {identityDialogs}
       <AppShell
-        onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); }}
-        mobileNavigation={{ messageId: viewMessage?.id ?? null, clearMessage: clearMobileMessage }}
+        onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); setViewMessage(null); }}
+        mobileNavigation={{ messageId: viewMessage?.id ?? null, clearMessage: clearMobileMessage, urlManaged: true }}
         sidebar={{
           compose: {
             onCompose: () => openCompose("new"),
@@ -5434,7 +5207,7 @@ export default function MailClient({
             summaries: mailboxSummaries,
             activeAccountId,
             onSwitch: (accountId: string) => {
-              void switchAccount(accountId);
+              navigateLinkedAccount(accountId);
             },
             onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
@@ -5807,7 +5580,7 @@ export default function MailClient({
             ) : null
         }}
         statusBar={
-          <BottomStatusBar
+          <UrlHistoryContext.Provider value={true}><BottomStatusBar
             onClearMobileSelection={() => setViewMessage(null)}
             onCheckNewMail={() => syncAccount(undefined, "new")}
             isSyncing={isSyncing}
@@ -5826,7 +5599,7 @@ export default function MailClient({
             upcomingEvents={upcomingCalendarEvents}
             onRefreshPendingReminders={refreshPendingCalendarReminders}
             onOpenReminderMessage={(messageId) => {
-              openMessageByExternalMessageId(messageId, "status-reminder-click");
+              navigateMessage(messageId);
             }}
             onReportError={reportError}
             exceptionEntries={exceptionEntries}
@@ -5844,7 +5617,7 @@ export default function MailClient({
             calendarFirstDay={calendarFirstDay}
             accountDateFormat={accountDateFormat}
             buildInfo={buildInfo}
-          />
+          /></UrlHistoryContext.Provider>
         }
         notices={(placement) => (
           <InAppNoticeStack
@@ -5885,7 +5658,7 @@ export default function MailClient({
       />
 
       {manageOpen && editingAccount && (
-        <AccountSettingsModal
+        <UrlHistoryContext.Provider value={true}><AccountSettingsModal
           editingAccount={editingAccount}
           isOpen={manageOpen}
           manageTab={manageTab}
@@ -5924,7 +5697,7 @@ export default function MailClient({
           onCreateRecipientAlias={createRecipientAliasForAccount}
           onUpdateRecipientAlias={updateRecipientAliasForAccount}
           onDeleteRecipientAlias={deleteRecipientAliasForAccount}
-        />
+        /></UrlHistoryContext.Provider>
       )}
 
       <AccountReloginDialog
