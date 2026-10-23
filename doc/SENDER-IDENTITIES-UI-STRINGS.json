@@ -175,5 +175,64 @@
     "Addresses",
     "Server error codes"
   ],
-  "leftoverEnglishNewControls": []
+  "leftoverEnglishNewControls": [],
+  "integrationMerge": {
+    "stage": "42310d8",
+    "conflictFiles": [
+      "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+      "lib/mail/resyncMessage.senderKey.test.ts",
+      "messages/de.json",
+      "messages/en.json"
+    ],
+    "catalogCounts": {
+      "de": 89,
+      "en": 89,
+      "senderConceptsPerLocale": 71,
+      "senderNamespaces": {
+        "Compose.sender": 10,
+        "Settings.sender": 38,
+        "Errors.sender": 23
+      },
+      "mappedSharedLabels": 11
+    },
+    "catalogHunks": [
+      {
+        "files": [
+          "messages/de.json",
+          "messages/en.json"
+        ],
+        "hunk": 1,
+        "location": "Settings after language",
+        "resolution": "Keep every stage Settings entry, including the complete members/preferences subtrees. Add this branch's entire Settings.sender subtree (38 keys) and Settings.edit. Reuse the stage values of Settings.members.enabled, Settings.preferences.saving and Settings.preferences.noSignature. Do not replace complete stage subtrees with this branch's minimal shared-label subsets."
+      },
+      {
+        "files": [
+          "messages/de.json",
+          "messages/en.json"
+        ],
+        "hunk": 2,
+        "location": "Root namespaces after Pwa",
+        "resolution": "Keep all stage namespaces and entries. Add Compose.sender (10 keys), Compose.from, Compose.closeComposer, Compose.fromValue and Errors.sender (23 keys). Deep-merge Admin, retaining the stage's complete users subtree plus all other Admin entries; enable/disable/email/cancel already have matching values. Preserve named sender/email parameters and ICU-quoted literal signature tokens. Do not concatenate or duplicate root namespace objects."
+      }
+    ],
+    "preexistingScalarDifference": {
+      "file": "messages/de.json",
+      "key": "Settings.language.saving",
+      "resolution": "Retain the stage value Sprache wird gespeichert … (space before ellipsis). The slice-3 branch has the older infra value; this round does not edit that key."
+    },
+    "resolvedCatalogLeafCount": {
+      "de": 943,
+      "en": 943
+    },
+    "baselineHunks": [
+      {
+        "file": "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+        "resolution": "Retain stage useLocale/useTranslations and localized error rendering; add ReactNode and senderPreferences?: ReactNode. Guard the legacy localized signature selector with !senderPreferences, keep its closing brace and injected {senderPreferences}. Preserve sparse preference PUT patches and null/inherit semantics."
+      },
+      {
+        "file": "lib/mail/resyncMessage.senderKey.test.ts",
+        "resolution": "Retain slice-3 realResyncTest and NOCTUA_REAL_RESYNC_SENDER_KEY for both case bodies; keep escaped anchored test names, named pass marker plus zero-failure assertion, and 20,000 ms budgets. Remove runIsolated/NOCTUA_RESYNC_TEST_CHILD without nesting wrappers. Keep all stage FTS changes and both unchanged case bodies."
+      }
+    ]
+  }
 }
