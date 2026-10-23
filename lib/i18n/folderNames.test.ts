@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { getFolderDisplayName, folderNameMatches } from "./folderNames";
+import { getFolderDisplayName, getFolderDisplayPath, folderNameMatches } from "./folderNames";
 
 for (const [flag, de, en] of [
   ["Inbox", "Posteingang", "Inbox"], ["Sent", "Gesendet", "Sent"], ["Drafts", "Entwürfe", "Drafts"],
@@ -19,4 +19,18 @@ test("user names that resemble special folders remain literal without a supporte
       expect(getFolderDisplayName({ name, specialUse }, "de")).toBe(name);
     }
   }
+});
+
+test("display paths localize each known ancestor and preserve literal names and missing IDs", () => {
+  const folders = [
+    { id: "acc:INBOX", accountId: "acc", name: "INBOX", specialUse: "\\Inbox", count: 0 },
+    { id: "acc:INBOX/Sent", accountId: "acc", parentId: "acc:INBOX", name: "Sent", count: 0 }
+  ];
+  const lookup = (id: string) => folders.find(folder => folder.id === id);
+  expect(getFolderDisplayPath(folders[0].id, lookup, "de", "acc")).toBe("Posteingang");
+  expect(getFolderDisplayPath(folders[1].id, lookup, "de", "acc")).toBe("Posteingang/Sent");
+  expect(getFolderDisplayPath(folders[1].id, lookup, "en", "acc")).toBe("Inbox/Sent");
+  expect(getFolderDisplayPath("acc:Unknown", lookup, "de", "acc")).toBe("Unknown");
+  expect(getFolderDisplayPath("other:Unknown", lookup, "de", "acc")).toBe("other:Unknown");
+  expect(folders[0].name).toBe("INBOX");
 });
