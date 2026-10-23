@@ -26,12 +26,20 @@ describe("FTS integer identity", () => {
     try {
       createV2FtsShard(db);
       const before = db.prepare("SELECT * FROM messages ORDER BY accountId,id").all();
+      const queries = ["alpha", "beta", "café", "CAFÉ", "subject:synthetic", "fromAddr:example",
+        '"alpha café"', "NEAR(alpha cafe, 5)", "alpha OR beta", "cafe NOT beta", "nohits"];
+      const orderedSearch = (table: string) => queries.map(query => db.prepare(`
+        SELECT m.accountId,m.id FROM messages m WHERE (m.accountId,m.id) IN (
+          SELECT accountId,messageId FROM ${table} WHERE ${table} MATCH ?)
+        ORDER BY m.dateValue DESC,m.accountId,m.id`).all(query));
+      const beforeSearch = orderedSearch("message_fts_v2");
       db.exec(`DELETE FROM message_fts_v2 WHERE accountId='b';
         INSERT INTO message_fts_v2(accountId,messageId,body) VALUES('a','same','duplicate'),('absent','same','orphan'),('a','absent','orphan')`);
       expect(getFtsOrphanCount(db)).toBe(2);
       const result = initAccountSchema(db);
       expect(result).toEqual({ migrated: true, droppedFtsOrphans: 2 });
       expect(db.prepare("SELECT * FROM messages ORDER BY accountId,id").all()).toEqual(before);
+      expect(orderedSearch("message_fts_v3")).toEqual(beforeSearch);
       expect(db.prepare("SELECT * FROM message_fts_identity ORDER BY ftsRowid").all()).toEqual([
         { ftsRowid: 1, accountId: "a", messageId: "same" }, { ftsRowid: 2, accountId: "b", messageId: "same" }
       ]);
@@ -132,6 +140,9 @@ describe("FTS integer identity", () => {
       expect(identity()).toBe(first);
       validateFtsIdentity(db);
     }
+    expect(db.prepare("SELECT rowid FROM message_fts_v3 WHERE message_fts_v3 MATCH 'newtoken' AND accountId=?").all(a.accountId))
+      .toEqual([{ rowid: first }]);
+    expect(db.prepare("SELECT rowid FROM message_fts_v3 WHERE message_fts_v3 MATCH 'oldtoken' AND accountId=?").all(a.accountId)).toEqual([]);
     await b.seed(b.message("same-thread", { id: "same", body: "othertoken" }));
     expect(db.prepare("SELECT DISTINCT ftsRowid FROM message_fts_identity WHERE messageId='same'").all()).toHaveLength(2);
     await a.seed({ ...msg, mailboxPath: "Archive", folderId: `${a.accountId}:Archive`, imapUid: 2 });
