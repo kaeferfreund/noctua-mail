@@ -12,18 +12,27 @@ import { drainImapConnectionPool } from "./imap/connectionPool";
 import { resyncImapMessageIntoDb } from "./resyncMessage";
 import { startImapServer } from "../../scripts/dev-fixture/imap-server";
 
-// The connection-pool suite registers a global _shared/ImapFlow mock. Keep
-// real-listener cases in a fresh module graph, as the send-scenario suite does.
-async function runIsolated(name: string) {
-  const { stderr } = await promisify(execFile)(process.execPath, ["test", "--timeout", "20000",
-    "--test-name-pattern", name, fileURLToPath(import.meta.url)], {
-    cwd: process.cwd(), env: { ...process.env, NOCTUA_RESYNC_TEST_CHILD: "1", NO_COLOR: "1" }, timeout: 25000
-  });
-  expect(stderr).toContain("1 pass");
+// Pool unit tests intentionally mock connectImapClient across Bun's module graph.
+// Real protocol fixtures need a fresh graph, as the collaboration send tests do.
+// Keep the original cases/assertions and the CI 20-second budget in each child.
+function realResyncTest(name: string, run: () => Promise<void>) {
+  if (process.env.NOCTUA_REAL_RESYNC_SENDER_KEY === "1") {
+    test(name, run);
+    return;
+  }
+  test(name, async () => {
+    const pattern = "^" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$";
+    const { stdout, stderr } = await promisify(execFile)(process.execPath, [
+      "test", "--timeout", "20000", "--test-name-pattern", pattern, fileURLToPath(import.meta.url)
+    ], { cwd: process.cwd(), env: { ...process.env, NOCTUA_REAL_RESYNC_SENDER_KEY: "1" },
+      timeout: 20_000, maxBuffer: 10 * 1024 * 1024 });
+    const output = stdout + stderr;
+    expect(output).toContain(`(pass) ${name}`);
+    expect(output).toContain("0 fail");
+  }, 20_000);
 }
 
-test("real IMAP resync replaces an unkeyed legacy row with the parsed sender key", async () => {
-  if (process.env.NOCTUA_RESYNC_TEST_CHILD !== "1") return runIsolated("real IMAP resync replaces");
+realResyncTest("real IMAP resync replaces an unkeyed legacy row with the parsed sender key", async () => {
   const f = await createCollabFixture();
   const server = await startImapServer({ port: 0, user: "team@example.test", pass: "synthetic" });
   try {
@@ -50,8 +59,7 @@ test("real IMAP resync replaces an unkeyed legacy row with the parsed sender key
   }
 });
 
-test("collision-variant resync preserves the base source and refreshes only the variant's ownership and sender", async () => {
-  if (process.env.NOCTUA_RESYNC_TEST_CHILD !== "1") return runIsolated("collision-variant resync preserves");
+realResyncTest("collision-variant resync preserves the base source and refreshes only the variant's ownership and sender", async () => {
   const f = await createCollabFixture();
   const { base, baseSource, copy, copySource } = await seedLegacySourceCollision(f);
   // Model a previously indexed collision variant with an unowned legacy cache.

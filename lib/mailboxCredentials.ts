@@ -1,3 +1,4 @@
+import { assertSignatureTemplate, SignatureTemplateError } from "./signatureTemplates";
 import { assertIdentitySignaturesAvailable } from "./senderIdentities";
 import { recordAdminAuditRow } from "./db/adminAudit";
 import type { Database } from "bun:sqlite";
@@ -49,6 +50,10 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
     if ("port" in server && (!Number.isInteger(server.port) || server.port! < 1 || server.port! > 65535)) throw new MailboxCredentialError("Invalid port");
     if ("secure" in server && typeof server.secure !== "boolean") throw new MailboxCredentialError("Invalid secure flag");
     if (endpointKeys.some(k => k in server && server[k] !== original[protocol][k]) && !server.password?.trim()) throw new MailboxCredentialError(`Changing ${protocol} endpoint requires its password`);
+  }
+  if (patch.settings?.signatures !== undefined) {
+    if (!Array.isArray(patch.settings.signatures)) throw new SignatureTemplateError("invalid signature list");
+    for (const signature of patch.settings.signatures) assertSignatureTemplate(signature?.body);
   }
   const next = mergeAccount(original, { ...patch,
     ...(patch.caldav && !patch.caldav.password?.trim() ? { caldav: { ...patch.caldav, password: original.caldav?.password ?? "" } } : {}),

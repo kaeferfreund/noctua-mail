@@ -819,9 +819,11 @@ function ComposerInitializer({
 
 function AppendPlugin({
   handleRef,
-  onInlineImage
+  onInlineImage,
+  onExport
 }: {
   handleRef: React.Ref<ComposeEditorHandle>;
+  onExport?: (snapshot: { html: string; text: string }) => void;
   onInlineImage?: (file: File, dataUrl: string) => void;
 }) {
   const [editor] = useLexicalComposerContext();
@@ -868,13 +870,15 @@ function AppendPlugin({
         insertImageFilesIntoEditor(editor, files, onInlineImage, insertionSelection);
       },
       exportCurrentHtml() {
-        return editor.getEditorState().read(() => ({
+        const snapshot = editor.getEditorState().read(() => ({
           html: cleanLexicalHtml($generateHtmlFromNodes(editor, null)),
           text: $getRoot().getTextContent()
         }));
+        onExport?.(snapshot);
+        return snapshot;
       }
     }),
-    [editor, onInlineImage]
+    [editor, onInlineImage, onExport]
   );
   return null;
 }
@@ -1087,7 +1091,16 @@ const ComposeEditor = forwardRef<ComposeEditorHandle, ComposeEditorProps>(functi
           onEnterSource={handleEnterSource}
           onExitSource={handleExitSource}
         />
-        <AppendPlugin handleRef={ref} onInlineImage={onInlineImage} />
+        <AppendPlugin handleRef={ref} onInlineImage={onInlineImage} onExport={(snapshot) => {
+          // An immediate body action supersedes the queued animation-frame
+          // export. Flush it now so a stale callback cannot restore old text.
+          if (changeFrameRef.current !== null) {
+            window.cancelAnimationFrame(changeFrameRef.current);
+            changeFrameRef.current = null;
+          }
+          pendingChangeRef.current = null;
+          onChange(snapshot.html, snapshot.text);
+        }} />
         <ComposerInitializer initialHtml={initialHtml} resetKey={resetKey} />
         <SourceSyncPlugin html={sourceHtml} showSource={showSource} />
         {quotedMessage && <QuotedMessagePlugin config={quotedMessage} />}
