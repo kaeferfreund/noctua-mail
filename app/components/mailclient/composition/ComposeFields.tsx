@@ -1,4 +1,5 @@
-import { senderMessages, senderOption } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { senderOption } from "@/lib/senderMessages";
 import { useEffect, useState } from "react";
 import type React from "react";
 import { Button, Select, Text, TextField } from "@radix-ui/themes";
@@ -213,6 +214,7 @@ export default function ComposeFields({
   getComposeToken,
   markComposeDirty
 }: ComposeFieldsProps) {
+  const { messages: senderMessages } = useSenderMessages();
   const [recipientOptions, setRecipientOptions] = useState<RecipientSuggestion[]>([]);
   const [recipientQuery, setRecipientQuery] = useState("");
   const [recipientLoading, setRecipientLoading] = useState(false);
@@ -316,15 +318,15 @@ export default function ComposeFields({
   const fromRow = (
     <div className={styles.composeGridRow}>
       <Text as="label" htmlFor={`compose-${variant}-from`} size="2" weight="medium" className={styles.label}>
-        From:
+        {senderMessages.from}
       </Text>
       <div className={styles.composeInputWrap}>
         <Select.Root value={identityId || "__unavailable"} disabled={identityDisabled || !onIdentityChange} onValueChange={id => { markComposeDirty(); onIdentityChange?.(id); }}>
           <Select.Trigger id={`compose-${variant}-from`} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} className={styles.composeFromTrigger} />
           <Select.Content position="popper" className={styles.composeFromMenu} collisionPadding={16}>
-            {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? senderOption(fromValue, "unavailable") : senderMessages.chooseSender}</Select.Item>}
+            {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? senderOption(fromValue, "unavailable", senderMessages) : senderMessages.chooseSender}</Select.Item>}
             {identities.filter(identity => identity.enabled).map(identity => <Select.Item key={identity.id} value={identity.id}>
-              {senderOption(identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email, identity.isDefault ? "default" : "enabled")}
+              {senderOption(identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email, identity.isDefault ? "default" : "enabled", senderMessages)}
             </Select.Item>)}
           </Select.Content>
         </Select.Root>

@@ -1,4 +1,5 @@
-import { senderMessages } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { Button, Card, Flex, Grid, Select, Text, TextArea, TextField } from "@radix-ui/themes";
 import Field from "@/app/components/account-settings/Field";
@@ -21,6 +22,7 @@ export default function SignaturesTabContent({
   onClose,
   onSave
 }: Props) {
+  const { messages: senderMessages } = useSenderMessages();
   const signatures = editingAccount.settings?.signatures ?? [];
   const invalidTemplate = signatures.some(signature => !validSignatureTemplate(signature.body));
   const saveDisabled = !isExistingAccount || !canSave || invalidTemplate;

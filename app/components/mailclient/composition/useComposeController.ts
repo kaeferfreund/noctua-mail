@@ -1,4 +1,5 @@
-import { senderMessages } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import { prepareSignatureTemplate, renderSignatureTemplate, replaceSignatureBlock } from "@/lib/signatureTemplates";
 import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type React from "react";
@@ -40,6 +41,7 @@ export function useComposeController({
   setDraftSaveError,
   findMessageByMessageId
 }: UseComposeControllerParams) {
+  const { messages: senderMessages } = useSenderMessages();
   // Recompute the orchestrator's render-time draft status after the lazy load.
   useMarkdownConverters(compose.composeOpen);
   const {

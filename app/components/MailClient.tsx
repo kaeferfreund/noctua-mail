@@ -1,6 +1,6 @@
 "use client";
 
-import { senderMessages } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
@@ -381,6 +381,7 @@ type ActiveTopicSuggestionsResponse = {
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
+  const { messages: senderMessages } = useSenderMessages();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -4338,7 +4339,7 @@ export default function MailClient({
     }).catch(() => reportError(senderMessages.identityRefreshFailed)); };
     window.addEventListener("noctua:sender-settings-changed", refreshSenders);
     return () => { active = false; window.removeEventListener("noctua:sender-settings-changed", refreshSenders); };
-  }, [apiFetch, reportError, currentUser?.id]);
+  }, [apiFetch, reportError, currentUser?.id, senderMessages.identityRefreshFailed]);
 
   // Initial sync on login (once per session per account). For existing accounts,
   // sync only the active folder first so new mail appears before any broader repair work.

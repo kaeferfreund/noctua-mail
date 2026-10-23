@@ -48,7 +48,7 @@ export function prepareSignatureTemplate(template: string) {
 
 /** Substitute once, then escape. Profile text can never introduce markup/tokens. */
 export function renderSignatureTemplate(template: string, user: SignatureUser, identity?: Pick<SenderIdentity, "email" | "displayName">) {
-  if (!validSignatureTemplate(template)) throw new Error(senderMessages.invalidTemplate);
+  if (!validSignatureTemplate(template)) throw new SignatureTemplateError();
   const values: Record<string, string> = {
     "user.name": user.name?.trim() || user.email,
     "user.email": user.email,

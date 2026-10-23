@@ -1,6 +1,8 @@
 "use client";
 
-import { senderMessages, senderSettingsError } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
+import { senderSettingsError } from "@/lib/senderMessages";
 
 import { useEffect, useState } from "react";
 import type { Account, UserAccountPrefsPatch } from "@/lib/data";
@@ -11,6 +13,7 @@ import { loadSenderSettings, notifySenderPreferencesChanged, type SenderSettings
 import { renderSignatureTemplate, resolveSignatureTemplate, validSignatureTemplate } from "@/lib/signatureTemplates";
 
 export default function SenderPreferences({ editingAccount, apiFetch = fetch }: { editingAccount: Account; apiFetch?: AdminFetch }) {
+  const { messages: senderMessages, renderMessage } = useSenderMessages();
   const [data, setData] = useState<SenderSettings | null>(null);
   const [patch, setPatch] = useState<UserAccountPrefsPatch>({});
   const [error, setError] = useState<unknown>(null);
@@ -43,7 +46,7 @@ export default function SenderPreferences({ editingAccount, apiFetch = fetch }: 
   return <section aria-label={senderMessages.senderPreferencesTitle} className="space-y-3 rounded-md border p-3">
     <p>{senderMessages.senderPreferencesHelp}</p>
     {!data && !error && <p role="status">{senderMessages.senderPreferencesLoading}</p>}
-    {Boolean(error) && <p role="alert">{senderSettingsError(error)}</p>}
+    {Boolean(error) && <p role="alert">{senderSettingsError(error, senderMessages)}</p>}
     {saved && <p role="status">{senderMessages.senderPreferencesSaved}</p>}
     <fieldset disabled={!data || busy} className="grid gap-3">
       <Field label={senderMessages.defaultFrom}><select value={prefs.defaultIdentityId ?? "inherit"} onChange={event => change({ defaultIdentityId: event.target.value === "inherit" ? null : event.target.value })}>
@@ -52,17 +55,17 @@ export default function SenderPreferences({ editingAccount, apiFetch = fetch }: 
         {data?.identities.filter(item => item.enabled).map(item => <option key={item.id} value={item.id}>{item.displayName} &lt;{item.email}&gt;</option>)}
       </select></Field>
       <Field label={senderMessages.personalTemplate}><select value={prefs.defaultSignatureId ?? "inherit"} onChange={event => change({ defaultSignatureId: event.target.value === "inherit" ? null : event.target.value })}>
-        <option value="inherit">{senderMessages.inheritTemplate}</option><option value="">No signature</option>
+        <option value="inherit">{senderMessages.inheritTemplate}</option><option value="">{senderMessages.noSignature}</option>
         {data?.account.settings?.signatures?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select></Field>
       <Field label={senderMessages.personalSignature} hint={senderMessages.personalSignatureHelp}><select value={prefs.signatureOverride === undefined ? "inherit" : "custom"} onChange={event => change({ signatureOverride: event.target.value === "inherit" ? null : "" })}><option value="inherit">{senderMessages.inheritSignature}</option><option value="custom">{senderMessages.usePersonalText}</option></select></Field>
       {prefs.signatureOverride !== undefined && <Field label={senderMessages.personalSignatureText}><textarea rows={5} value={prefs.signatureOverride} onChange={event => change({ signatureOverride: event.target.value })} /></Field>}
       <p className="text-sm">{senderMessages.placeholdersHelp}</p>
       {!valid && <p role="alert">{senderMessages.invalidTemplate}</p>}
-      {data?.warnings.map(warning => <p key={`sender-${warning}`} role="alert">{warning}</p>)}
-      {template.warnings.map(warning => <p key={warning} role="alert">{warning}</p>)}
-      <Field label={senderMessages.signaturePreview}><pre className="whitespace-pre-wrap">{preview || "No signature"}</pre></Field>
-      <Button disabled={busy || !valid || !Object.keys(patch).length} onClick={() => void save()}>{busy ? "Saving…" : senderMessages.saveSenderPreferences}</Button>
+      {data?.warnings.map(warning => <p key={`sender-${warning}`} role="alert">{renderMessage(warning)}</p>)}
+      {template.warnings.map(warning => <p key={warning} role="alert">{renderMessage(warning)}</p>)}
+      <Field label={senderMessages.signaturePreview}><pre className="whitespace-pre-wrap">{preview || senderMessages.noSignature}</pre></Field>
+      <Button disabled={busy || !valid || !Object.keys(patch).length} onClick={() => void save()}>{busy ? senderMessages.saving : senderMessages.saveSenderPreferences}</Button>
     </fieldset>
   </section>;
 }
