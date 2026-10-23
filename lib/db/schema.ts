@@ -812,6 +812,17 @@ export function initMasterSchema(db: any) {
       lastUsedAt INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS mcp_token_accounts (
+      tokenId TEXT NOT NULL REFERENCES mcp_tokens(id) ON DELETE CASCADE,
+      accountId TEXT NOT NULL,
+      PRIMARY KEY (tokenId, accountId)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mcp_token_accounts_account ON mcp_token_accounts(accountId, tokenId);
+    CREATE TRIGGER IF NOT EXISTS mcp_token_accounts_delete_token AFTER DELETE ON mcp_tokens
+    BEGIN
+      DELETE FROM mcp_token_accounts WHERE tokenId=OLD.id;
+    END;
+
     CREATE TABLE IF NOT EXISTS user_account_prefs (
       userId TEXT NOT NULL,
       accountId TEXT NOT NULL,

@@ -5,9 +5,9 @@ import { getIdentityRecomputeJob } from "./threadRecomputeJobs";
 import { accountPrefsPatchSchema } from "./accountPrefs";
 import { getUserAccountPrefs, mergeUserAccountPrefs, listSenderIdentities, InvalidAccountPreferencesError } from "./serverDb";
 import { getUserMailboxSummary } from "@/lib/mailboxSummary";
-import { listAccessibleAccountsForUser, listAccountMembersForRole } from "@/lib/accountAccess";
+import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
-import { resolveMcpToolContext } from "@/lib/mcpAuth";
+import { assertMcpToolPermission, listMcpTokenAccounts, resolveMcpToolContext } from "@/lib/mcpAuth";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getThreadCollabState, listThreadComments, listThreadActivity,
   updateThreadCollabState, addThreadComment } from "@/lib/threadCollab";
@@ -379,8 +379,7 @@ async function resolveAccountContext(
   requestedAccountId?: string,
   minRole: import("@/lib/data").AccountRole = "viewer"
 ): Promise<McpAccountContext & { role: import("@/lib/data").AccountRole }> {
-  const id = requestedAccountId?.trim() || baseContext.accountId;
-  if (id !== baseContext.accountId) throw new Error("MCP token is bound to another mailbox");
+  const id = requestedAccountId?.trim() || baseContext.tokenRecord.accountId;
   const live = await resolveMcpToolContext(baseContext.tokenRecord.id, id, minRole);
   return { ...baseContext, ...live };
 }
@@ -873,7 +872,7 @@ class StatelessJsonResponseTransport implements Transport {
   private readonly extra: MessageExtraInfo;
   private responseResolvers = new Map<string, () => void>();
 
-  constructor(extra: MessageExtraInfo) {
+  constructor(extra: MessageExtraInfo, private readonly authorizeTool: (name: string) => Promise<void>) {
     this.extra = extra;
   }
 
@@ -929,6 +928,14 @@ class StatelessJsonResponseTransport implements Transport {
       });
 
     for (const message of parsedMessages) {
+      if (isJSONRPCRequest(message) && message.method === "tools/call") {
+        try { await this.authorizeTool(String(message.params?.name ?? "")); }
+        catch (error) {
+          const text = error instanceof Error ? error.message : "MCP authorization failed";
+          await this.send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }], isError: true } });
+          continue;
+        }
+      }
       this.onmessage?.(message, this.extra);
     }
 
@@ -971,17 +978,13 @@ export async function executeMcpHttpRequest(params: {
   server.registerTool(
     "list_accounts",
     {
-      description: "List all accounts accessible to the authenticated user.",
+      description: "List only mailboxes covered by this token with current mailbox roles.",
       inputSchema: ACCOUNT_ID_ARG,
       outputSchema: LIST_ACCOUNTS_OUTPUT_SCHEMA
     },
     async ({ accountId }) => {
-      await resolveAccountContext(context, accountId);
-      const userId = context.authInfo?.extra?.["userId"] as string | undefined;
-      if (!userId) {
-        throw new Error("User identity not available in token.");
-      }
-      const accounts = await listAccessibleAccountsForUser(userId);
+      if (accountId) await resolveAccountContext(context, accountId);
+      const accounts = await listMcpTokenAccounts(context.tokenRecord.id);
       const summaries = accounts.map(({ account: { id, name, email, avatar }, role }) => ({ id, name, email, avatar, accessRole: role }));
       return buildToolResult(`Returned ${summaries.length} accounts.`, {
         ok: true,
@@ -994,7 +997,7 @@ export async function executeMcpHttpRequest(params: {
     "list_mailbox_summary",
     {
       description: "Read unread, assigned-to-me and unassigned-open counts for the token's accessible mailbox. Counts use the token creator as viewer.",
-      inputSchema: {},
+      inputSchema: ACCOUNT_ID_ARG,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       outputSchema: {
         ok: z.literal(true), generatedAt: z.number(), mailboxes: z.array(z.object({
@@ -1004,12 +1007,10 @@ export async function executeMcpHttpRequest(params: {
         }))
       }
     },
-    async () => {
-      const live = await resolveAccountContext(context);
-      // MCP tokens are mailbox-bound: metadata enumeration is not authority
-      // to read counts from the creator's other mailboxes.
+    async ({ accountId }) => {
+      const live = await resolveAccountContext(context, accountId);
       const summary = await getUserMailboxSummary(live.tokenRecord.createdByUserId, [live.accountId]);
-      await resolveAccountContext(context);
+      await resolveAccountContext(context, accountId);
       return buildToolResult(`Returned ${summary.mailboxes.length} mailbox summaries.`, summary);
     }
   );
@@ -1174,7 +1175,7 @@ export async function executeMcpHttpRequest(params: {
     return senderToolCall(async () => {
       const { accountId: _accountId, ...input } = args; void _accountId;
       return buildToolResult("Sender identity created.", { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, { ...mcpActor(ctx),
-        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) });
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }) });
     });
   });
   server.registerTool("update_sender_identity", {
@@ -1188,7 +1189,7 @@ export async function executeMcpHttpRequest(params: {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => buildToolResult("Sender identity updated.", { ok: true,
       identity: await updateSenderIdentity(ctx.accountId, args.identityId, args.patch, { ...mcpActor(ctx),
-        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager" }) }) }));
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }) }));
   });
   server.registerTool("get_sender_preferences", {
     description: "Read the token creator's own sender preferences for this mailbox.",
@@ -1211,7 +1212,7 @@ export async function executeMcpHttpRequest(params: {
         throw new InvalidAccountPreferencesError();
       }
       const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch,
-        () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", identity: args.patch.defaultIdentityId ?? undefined }));
+        () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", purpose: "identity-management", identity: args.patch.defaultIdentityId ?? undefined }));
       return buildToolResult("Sender preferences saved.", { ok: true, prefs: senderPrefs(prefs) });
     });
   });
@@ -1348,7 +1349,7 @@ export async function executeMcpHttpRequest(params: {
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,
     requestInfo: params.requestInfo
-  });
+  }, name => assertMcpToolPermission(context.tokenRecord.id, name));
   await server.connect(transport);
 
   try {
