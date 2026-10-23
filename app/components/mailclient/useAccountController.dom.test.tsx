@@ -19,6 +19,7 @@ const noop = () => {};
 function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (accountId: string, folderId?: string) => void,
   localeRef?: { current: UiLocale }) {
   const errors: string[] = [];
+  const renders: Array<{ accountId: string; folderId: string }> = [];
   const defaults: UseAccountControllerParams = {
     activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
     deletingFolderIds: new Set(), refreshFolders: async () => null, runSyncJob: async () => ({ count: 0 }),
@@ -62,6 +63,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     const [folders, setFolders] = useState<Folder[]>([]);
     const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
     const [auth, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
+    renders.push({ accountId: activeAccountId, folderId: activeFolderId });
     // With a locale, use the production error resolver under a switchable provider.
     const productionReadErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId: noop, setReloginDescription: noop });
     const readErrorMessage = localeRef ? productionReadErrorMessage : defaults.readErrorMessage;
@@ -80,7 +82,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     }, [activeAccountId, activeFolderId, folders, ready]);
     return { ...controller, readErrorMessage, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId };
   }, { wrapper: ({ children }) => <I18nTestProvider locale={localeRef?.current ?? "en"}>{children}</I18nTestProvider> });
-  return { ...hook, errors };
+  return { ...hook, errors, renders };
 }
 
 const json = (value: unknown) => Response.json(value);
@@ -137,7 +139,11 @@ describe("account bootstrap request order", () => {
     expect(result.current.mailboxState).toBe("unselected");
   });
 
-  it("persists a switch before rereading me and requesting selected folders", async () => {
+  // Was "persists a switch before rereading me and requesting selected folders".
+  // Persisting before activation is pinned by "activates nothing until the persisted
+  // selection and the folder read both succeeded"; the persisted selection still
+  // drives the next bootstrap below.
+  it("persists a switch and reads the selected folders in parallel, then bootstraps from the persisted selection", async () => {
     const calls: string[] = [];
     let selected = "account-a";
     const { result } = mount(async (input) => {
@@ -145,16 +151,17 @@ describe("account bootstrap request order", () => {
       if (url.endsWith("switch-account")) { selected = "account-b"; return json({ accountId: selected }); }
       if (url === "/api/auth/me") return json({ accounts, accountId: selected, mailboxState: "selected" });
       if (url === "/api/accounts") return json(accounts);
-      return json(url.endsWith("switch-account") ? { accountId: "account-b" } : []);
+      return json([]);
     });
     await waitFor(() => expect(result.current.ready).toBe(true));
     calls.length = 0;
     await act(async () => { await result.current.switchAccount("account-b"); });
-    expect(calls).toEqual(["/api/auth/switch-account", "/api/auth/me", "/api/accounts/account-b/folders"]);
+    expect(calls).toEqual(["/api/auth/switch-account", "/api/accounts/account-b/folders"]);
     expect(result.current.activeAccountId).toBe("account-b");
     calls.length = 0;
     await act(async () => { await result.current.loadInitialData(); });
     expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
+    expect(result.current.activeAccountId).toBe("account-b");
   });
 
   it("does not request accounts or folders after an auth 401", async () => {
@@ -197,9 +204,12 @@ describe("identity and mailbox state transitions", () => {
     mailboxState = "unselected"; await act(async () => { await result.current.loadInitialData(); });
     expect(result.current.mailboxState).toBe("unselected"); expect(result.current.activeAccountId).toBe("");
     expect(calls).toEqual(["/api/auth/me", "/api/auth/me", "/api/auth/me"]);
+    // Selected only after the server persisted it (activation order: see the D1 suite).
     await act(async () => { await result.current.switchAccount("account-b"); });
     expect(result.current.activeAccountId).toBe("account-b");
-    expect(calls.slice(-3)).toEqual(["/api/auth/switch-account", "/api/auth/me", "/api/accounts/account-b/folders"]);
+    expect(result.current.mailboxState).toBe("selected");
+    expect(calls.slice(-2)).toEqual(["/api/auth/switch-account", "/api/accounts/account-b/folders"]);
+    expect(calls.filter(url => url === "/api/auth/me")).toHaveLength(3);
   });
   it("does not log out for bootstrap network/503 errors and exposes retry", async () => {
     let failed = true;
@@ -270,8 +280,10 @@ for (const flow of ["switch", "create-self-grant-select"] as const) {
       }
       if (url === "/api/auth/me") return json({ user: { id: "synthetic-user", role: "admin" }, accounts,
         accountId: selected, mailboxState: "selected" });
-      return json([{ id: `${selected}:Archive`, accountId: selected, name: "Archive", count: 0 },
-        { id: `${selected}:INBOX`, accountId: selected, name: "Posteingang", specialUse: "\\Inbox", count: 0 }]);
+      // Folder reads are scoped by the path id, never by the session selection.
+      const folderAccount = /^\/api\/accounts\/([^/]+)\/folders$/.exec(url)?.[1] ?? selected;
+      return json([{ id: `${folderAccount}:Archive`, accountId: folderAccount, name: "Archive", count: 0 },
+        { id: `${folderAccount}:INBOX`, accountId: folderAccount, name: "Posteingang", specialUse: "\\Inbox", count: 0 }]);
     };
     const { result } = mount(apiFetch, (accountId, folderId) => syncs.push({ accountId, folderId }));
     await waitFor(() => expect(syncs.some(sync => sync.accountId === "account-a")).toBe(true));
@@ -292,3 +304,234 @@ for (const flow of ["switch", "create-self-grant-select"] as const) {
     expect(result.current.lastFolderId).toBe("");
   });
 }
+
+
+describe("parallel atomic mailbox switch", () => {
+  type Held = { url: string; init?: RequestInit; resolve: (res: Response) => void };
+  const foldersOf = (id: string) => [{ id: `${id}:Archive`, accountId: id, name: "Archive", count: 0 },
+    { id: `${id}:INBOX`, accountId: id, name: "Inbox", specialUse: "\\Inbox", count: 0 }];
+  const allAccounts = [...accounts, { id: "account-c" }, { id: "account-d" }] as Account[];
+  type Server = { selected: string; accounts?: Account[] };
+  // /auth/me answers at once from `server`; every other request is held until released.
+  async function booted(server: Server) {
+    const held: Held[] = [];
+    const calls: string[] = [];
+    const apiFetch: UseAccountControllerParams["apiFetch"] = async (input, init) => {
+      const url = String(input); calls.push(url);
+      if (url === "/api/auth/me") return json({ user: { id: "synthetic-user" }, accounts: server.accounts ?? allAccounts,
+        accountId: server.selected, mailboxState: "selected" });
+      return new Promise<Response>(resolve => held.push({ url, init, resolve }));
+    };
+    const release = async (match: string, res: (held: Held) => Response) => {
+      await waitFor(() => expect(held.some(item => item.url.includes(match))).toBe(true));
+      const [item] = held.splice(held.findIndex(entry => entry.url.includes(match)), 1);
+      await act(async () => { item.resolve(res(item)); await Promise.resolve(); });
+    };
+    const persisted = (item: Held) => JSON.parse(String(item.init?.body)).accountId as string;
+    // A switch-account response that applies the write, as the server does.
+    const persist = (item: Held) => { server.selected = persisted(item); return json({ ok: true, accountId: server.selected }); };
+    const view = mount(apiFetch);
+    await release(`/${server.selected}/folders`, () => json(foldersOf(server.selected)));
+    await waitFor(() => expect(view.result.current.ready).toBe(true));
+    calls.length = 0;
+    return { ...view, held, calls, release, persist, persisted };
+  }
+  const switchTo = (h: Awaited<ReturnType<typeof booted>>, id: string) => {
+    let done!: Promise<void>;
+    act(() => { done = h.result.current.switchAccount(id); });
+    return done;
+  };
+
+  it("persists the selection and reads the new folders in parallel, without /auth/me", async () => {
+    const h = await booted({ selected: "account-a" });
+    const done = switchTo(h, "account-b");
+    // Both requests are in flight before either answered.
+    expect(h.calls).toEqual(["/api/auth/switch-account", "/api/accounts/account-b/folders"]);
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.activeFolderId).toBe("account-b:INBOX");
+    expect(h.result.current.mailboxState).toBe("selected");
+    expect(h.calls).not.toContain("/api/auth/me");
+  });
+
+  it("(b) a switch keeps loadInitialData identity-stable, so the mount bootstrap never re-runs", async () => {
+    const h = await booted({ selected: "account-a" });
+    const bootstrap = h.result.current.loadInitialData;
+    const done = switchTo(h, "account-b");
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.loadInitialData).toBe(bootstrap);
+    expect(h.calls.filter(url => url === "/api/auth/me")).toEqual([]);
+  });
+
+  it("(a) activates nothing until the persisted selection and the folder read both succeeded", async () => {
+    const h = await booted({ selected: "account-a" });
+    act(() => { h.result.current.setActiveFolderId("account-a:INBOX"); });
+    const done = switchTo(h, "account-b");
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    // The folders of B have arrived, but B is not persisted yet: A stays fully active.
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
+    await h.release("switch-account", h.persist);
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.activeFolderId).toBe("account-b:INBOX");
+    // Account and folder change in the same commit: no render pairs a folder with another mailbox.
+    expect(h.renders.filter(render => render.folderId && !render.folderId.startsWith(`${render.accountId}:`))).toEqual([]);
+  });
+
+  for (const denied of ["switch-account", "/account-b/folders"]) {
+    it(`(c) a 403 from ${denied} never activates the mailbox and reloads the server view`, async () => {
+      const server: Server = { selected: "account-a", accounts };
+      const h = await booted(server);
+      const done = switchTo(h, "account-b");
+      server.accounts = [accounts[0]]; // B was revoked meanwhile
+      if (denied === "switch-account") {
+        await h.release("/account-b/folders", () => Response.json({ ok: false }, { status: 403 }));
+        await h.release("switch-account", () => Response.json({ ok: false }, { status: 403 }));
+      } else {
+        await h.release("/account-b/folders", () => Response.json({ ok: false }, { status: 403 }));
+        await h.release("switch-account", () => json({ ok: true, accountId: "account-a" }));
+      }
+      await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+      await act(async () => { await done; });
+      expect(h.calls).toContain("/api/auth/me");
+      expect(h.result.current.ready).toBe(true);
+      expect(h.result.current.activeAccountId).toBe("account-a");
+      expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-a"]);
+      expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
+      expect(h.errors).toEqual(["HTTP 403"]);
+    });
+  }
+
+  it("a folder read failure after a persisted switch resolves the mailbox from the server", async () => {
+    const h = await booted({ selected: "account-a" });
+    const done = switchTo(h, "account-b");
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => new Response(null, { status: 503 }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.calls.filter(url => url === "/api/auth/me")).toHaveLength(1);
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.ready).toBe(true);
+  });
+
+  it("rapid A -> B -> C persists in click order and commits only the last selection", async () => {
+    const h = await booted({ selected: "account-a" });
+    void switchTo(h, "account-b");
+    const done = switchTo(h, "account-c");
+    // One selection write at a time: C's write waits for B's.
+    await waitFor(() => expect(h.held.filter(item => item.url.endsWith("switch-account"))).toHaveLength(1));
+    await h.release("/account-c/folders", () => json(foldersOf("account-c")));
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-c"); return h.persist(item); });
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-c");
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    expect(h.result.current.activeAccountId).toBe("account-c");
+    expect(h.result.current.activeFolderId).toBe("account-c:INBOX");
+    expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
+  });
+
+  it("a write superseded before it was sent is skipped", async () => {
+    const h = await booted({ selected: "account-a" });
+    void switchTo(h, "account-b");
+    void switchTo(h, "account-c");
+    const done = switchTo(h, "account-d");
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-d"); return h.persist(item); });
+    await h.release("/account-d/folders", () => json(foldersOf("account-d")));
+    await act(async () => { await done; });
+    expect(h.calls.filter(url => url.endsWith("switch-account"))).toHaveLength(2);
+    expect(h.result.current.activeAccountId).toBe("account-d");
+  });
+
+  it("a bootstrap overlapping the switch publishes accounts but never overrides the switch's selection", async () => {
+    const server: Server = { selected: "account-a", accounts: allAccounts };
+    const h = await booted(server);
+    const done = switchTo(h, "account-b");
+    server.accounts = [...accounts, { id: "account-d" } as Account]; // membership changed meanwhile
+    await act(async () => { await h.result.current.loadInitialData(); }); // e.g. a mailboxes-changed event
+    expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-a", "account-b", "account-d"]);
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.ready).toBe(true);
+    expect(h.result.current.activeFolderId).toBe("account-b:INBOX");
+    expect(h.calls.filter(url => url.endsWith("/folders"))).toEqual(["/api/accounts/account-b/folders"]);
+    // That bootstrap read the old selection: the switch's choice is written again, not reverted.
+    server.selected = "account-a";
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    expect(server.selected).toBe("account-b");
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.calls.filter(url => url === "/api/auth/me")).toHaveLength(1);
+  });
+
+  it("a bootstrap overlapping the switch that no longer grants the target reloads the server view", async () => {
+    const server: Server = { selected: "account-a", accounts };
+    const h = await booted(server);
+    const done = switchTo(h, "account-b");
+    server.accounts = [accounts[0]];
+    await act(async () => { await h.result.current.loadInitialData(); });
+    await h.release("switch-account", h.persist);
+    server.selected = "account-a"; // revocation moved the selection to a granted mailbox
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+    await act(async () => { await done; });
+    expect(h.calls.filter(url => url === "/api/auth/me")).toHaveLength(2);
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-a"]);
+  });
+
+  it("a failed switch with a deferred bootstrap re-resolves the selection from the server", async () => {
+    const h = await booted({ selected: "account-a" });
+    const done = switchTo(h, "account-b");
+    await act(async () => { await h.result.current.loadInitialData(); });
+    expect(h.result.current.ready).toBe(false);
+    await h.release("switch-account", () => Response.json({ ok: false }, { status: 503 }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+    await act(async () => { await done; });
+    expect(h.result.current.ready).toBe(true);
+    expect(h.result.current.activeAccountId).toBe("account-a");
+  });
+
+  it("a logout during the switch keeps the signed-out state", async () => {
+    const h = await booted({ selected: "account-a" });
+    const done = switchTo(h, "account-b");
+    let loggedOut!: Promise<boolean>;
+    act(() => { loggedOut = h.result.current.logout(); });
+    await h.release("logout", () => json({ ok: true }));
+    await act(async () => { await loggedOut; });
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.result.current.auth).toBe("unauth");
+    expect(h.result.current.activeAccountId).toBe("");
+  });
+
+  it("(c) without /auth/me in the switch, a revoked membership still reaches the account list through the refresh bootstrap", async () => {
+    const server: Server = { selected: "account-a", accounts };
+    const h = await booted(server);
+    const done = switchTo(h, "account-b");
+    await h.release("switch-account", h.persist);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-a", "account-b"]);
+    // mailboxes-changed and the session refresh both run the bootstrap.
+    server.accounts = [accounts[1]];
+    let refreshed!: Promise<void>;
+    act(() => { refreshed = h.result.current.loadInitialData(); });
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await refreshed; });
+    expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-b"]);
+    expect(h.result.current.activeAccountId).toBe("account-b");
+  });
+});
