@@ -1,5 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, jest, test } from "bun:test";
+import { connect } from "node:net";
 import { requireBodylessSameOrigin, requireMutationSameOrigin } from "./requestOrigin";
+import { BODY_READ_TIMEOUT_MS } from "./readAuthJson";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { DELETE as removeUserPasskey } from "@/app/api/admin/users/[userId]/passkeys/[passkeyId]/route";
 import { DELETE as revokeUserSessions } from "@/app/api/admin/users/[userId]/sessions/route";
@@ -91,6 +93,54 @@ describe("bodyless guards never buffer a large body", () => {
       expect((await response.json()).code, name).toBe("unexpected_body");
       expect(large.pulled(), name).toBe(1);
       expect(large.cancelled(), name).toBe(true);
+    }
+  });
+});
+
+describe("bodyless guards abandon a stalled body", () => {
+  afterEach(() => jest.useRealTimers());
+  /**
+   * A real chunked HTTP request whose body stalls: the headers and optional
+   * chunks are sent, but never the terminating chunk.
+   */
+  async function stalledChunked(path: string, chunks: string, handler: (request: Request) => Promise<Response>) {
+    let entered!: () => void;
+    const reached = new Promise<void>(resolve => { entered = resolve; });
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+      const response = handler(request);
+      entered();
+      return response;
+    } });
+    const socket = connect(server.port, "127.0.0.1");
+    try {
+      let raw = "";
+      const answered = new Promise<string>(resolve => socket.on("data", data => {
+        raw += data.toString("latin1");
+        if (raw.includes("\r\n\r\n")) resolve(raw.split("\r\n")[0]);
+      }));
+      socket.write(`POST ${path} HTTP/1.1\r\nHost: 127.0.0.1:${server.port}\r\nOrigin: ${origin}\r\n` +
+        `Content-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n${chunks}`);
+      await reached;
+      jest.advanceTimersByTime(BODY_READ_TIMEOUT_MS);
+      return await answered;
+    } finally {
+      socket.destroy();
+      server.stop(true);
+    }
+  }
+
+  test("a stalled chunked text/plain body is rejected at the read deadline, before any session check", async () => {
+    for (const chunks of ["", "3\r\nabc\r\n"]) {
+      jest.useFakeTimers();
+      const guarded = (guard: typeof requireMutationSameOrigin) => async (request: Request) =>
+        await guard(request) ?? new Response(null, { status: 204 });
+      expect(await stalledChunked("/api/accounts/synthetic/threads/recompute", chunks, guarded(requireMutationSameOrigin)), chunks)
+        .toBe("HTTP/1.1 400 Bad Request");
+      expect(await stalledChunked("/api/accounts/synthetic/mcp-tokens/synthetic", chunks, guarded(requireBodylessSameOrigin)), chunks)
+        .toBe("HTTP/1.1 400 Bad Request");
+      // No session cookie: logout's guard runs before any session lookup.
+      expect(await stalledChunked("/api/auth/logout", chunks, logout), chunks).toBe("HTTP/1.1 400 Bad Request");
+      jest.useRealTimers();
     }
   });
 });
