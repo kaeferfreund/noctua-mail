@@ -211,6 +211,31 @@ visible compose/settings controls; older compose clients can omit identityId and
 the server resolver. Configuration is an application allowlist, not proof of provider
 send-as authorization. Stage 4 retains the provider probe/go-live gate.
 
+
+Review round 2 closes the final-boundary gap: `lib/outboundAuthorization.ts` reuses
+the live HTTP session/account and MCP token/role policies, then checks identity
+availability/configuration in the final actor snapshot. Direct send, draft save/
+send, RSVP (including local-only participation), MCP draft creation, own sender
+preferences and identity create/update all recheck immediately before their first
+effect. SMTP repeats the check after MIME composition; DB write retries recheck inside
+the immediate transaction.
+Post-acceptance Sent, attribution and cleanup remain independent of later access
+revocation. Tests in `lib/outboundAuthorization.routes.test.ts` are named
+`final boundary <path>: mid-request revocation, disabled user/identity, role downgrade and live credentials`
+for `direct`, `draft-save`, `draft-send`, `calendar-respond`, `mcp-create-draft`,
+`mcp-set-preferences`, `mcp-create-identity`, and `mcp-update-identity`. Each child
+fixture verifies zero transport, APPEND, cleanup and persisted data changes after
+revocation; sending paths also verify revocation during transport preparation and
+accepted delivery surviving revocation. Viewer preferences and editing disabled
+identities retain their documented permissions.
+
+Every tagged SMTP failure now maps to a sanitized structured error, with
+`smtp_upstream_error` (502) covering protocol failures and otherwise unknown errors.
+The real `554 5.7.1 synthetic-provider-private-detail` greeting is exercised through
+Nodemailer on direct, draft and RSVP routes in `verifySenderIdentity.ts`; responses
+exclude provider text and preserve drafts. `lib/mail/smtpError.test.ts` covers all
+Nodemailer error classes, unknown future codes and errors without a code.
+
 Published contracts, with regression anchors:
 
 - **Done: direct-send input/output and transport.** `POST .../smtp/send` accepts
@@ -300,3 +325,36 @@ MonkeyDent areas versus four addresses), manager-owned brand/person display name
 Reply-To and mailbox/personal defaults, personal signature text/overrides, and the
 controlled probe sink/forwarder-conversion plan. These choices affect initial defaults
 and Stage 4 enablement; no live addresses or provider credentials were used here.
+
+Round-2 `lib/drafts.ts` hunks only: authorization import; optional authorization
+source on save/send parameters; save check after MIME build and before replacement/
+APPEND; send check before the raw transport plus the same check passed to transport
+for its final boundary. No ingestion/serialization edits; `completeSend.ts` remains
+unchanged.
+
+### Round-2 verification (2026-10-23)
+
+Bun 1.4.4; heavy gates ran sequentially with `nice -n 15`, worktree-local
+TMPDIR and synthetic loopback fixtures only. No timeout, retry budget or existing
+assertion was weakened.
+
+- `bun run typecheck`: zero errors in 1,103 files.
+- Focused route/transport/MCP/draft/calendar gates: 90 passed, zero failed,
+  253 assertions across 12 files (37.42s). Includes all 31 real IMAP/SMTP send
+  scenarios and private-greeting sanitization on direct, draft and RSVP paths.
+- `timeout 1800 bun run test:ci`: 2,559 server tests, zero failed, 8,561 assertions,
+  278 files (379.74s); then 366 DOM tests, zero failed, 2,134 assertions,
+  40 files (35.66s).
+- `timeout 2400 bun run test:stress`: seed 1337, rerun-each=3; final run 7,677
+  passed, zero failed, 25,683 assertions, 278 files (1067.51s). All 24 executions
+  of the new boundary tests and all three 31-scenario send-fixture runs passed.
+- The initial stress run had 7,676 passed and one `SQLITE_BUSY` failure in Better
+  Auth's adapter during fixture-session creation in `senderIdentityMetadata.test.ts`
+  (25,677 assertions, 1082.59s). The same test's other two repetitions passed.
+  Its isolated randomized retry passed 15 tests / 90 assertions (5.89s), followed
+  by the complete successful stress rerun above, with unchanged code and limits.
+- `timeout 600 bun run lint`: exit 1 at the stated baseline: one pre-existing
+  `useCalendarConflicts.ts:58` error and 25 warnings; no changed-file findings.
+- `timeout 1200 bun run build`: exit 0, including production TypeScript validation.
+- `git diff --check`: exit 0. Protected paths and `completeSend.ts` are unchanged;
+  the five localized `drafts.ts` hunks are listed above.

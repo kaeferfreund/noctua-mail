@@ -1,3 +1,4 @@
+import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { collabActorFromSession } from "@/lib/threadCollab";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
@@ -46,6 +47,7 @@ export async function POST(request: Request, { params }: Params) {
     try {
       const result = await sendDraftForAccount({
         account,
+        authorization: { request },
         accountId: resolvedAccountId,
         clientId: clientId ?? "",
         draftId,
@@ -53,6 +55,7 @@ export async function POST(request: Request, { params }: Params) {
       });
       return okResponse(result);
     } catch (error) {
+      if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       if (error instanceof DraftSendError) {
         return errorResponse(error.message, error.status);

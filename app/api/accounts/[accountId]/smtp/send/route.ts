@@ -1,3 +1,4 @@
+import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { resolveSendIdentity, validateManagedReplyTo } from "@/lib/sendIdentity";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { collabActorFromSession } from "@/lib/threadCollab";
@@ -159,6 +160,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const messageId = buildMessageId(identity.email);
     let result: Awaited<ReturnType<typeof sendSmtpMessage>>;
     try {
+      const beforeSend = () => authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
+      await beforeSend();
       result = await sendSmtpMessage(account, {
         to: outboundTo || undefined,
         cc: cc || undefined,
@@ -172,8 +175,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         references: payload.references,
         xForwardedMessageId: payload.xForwardedMessageId,
         ...(attachments.length > 0 ? { attachments } : {})
-      }, identity);
+      }, identity, beforeSend);
     } catch (error) {
+      if (error instanceof OutboundAuthorizationError) return error.response;
+      if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
         accountId: account.id,
         op: "send-message"

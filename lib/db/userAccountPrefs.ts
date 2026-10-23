@@ -1,3 +1,4 @@
+import type { AuthorizedOutboundActor, OutboundWriteAuthorization } from "../outboundAuthorization";
 import type { UserAccountPrefs, UserAccountPrefsPatch } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
@@ -59,11 +60,14 @@ export async function getUserAccountPrefs(
 export async function mergeUserAccountPrefs(
   userId: string,
   accountId: string,
-  patch: UserAccountPrefsPatch
+  patch: UserAccountPrefsPatch,
+  beforeWrite?: OutboundWriteAuthorization
 ): Promise<UserAccountPrefs> {
   return withDbWriteRetry("mergeUserAccountPrefs", async () => {
     const db = await getDb();
+    let authorization: AuthorizedOutboundActor | undefined;
     const merge = (): UserAccountPrefs => {
+      authorization?.assertCurrent(db);
       if (patch.defaultIdentityId != null && !db.prepare(
         "SELECT 1 FROM sender_identities WHERE id=? AND accountId=? AND enabled=1"
       ).get(patch.defaultIdentityId, accountId)) throw new InvalidAccountPreferencesError();
@@ -80,6 +84,7 @@ export async function mergeUserAccountPrefs(
       ).run(userId, accountId, JSON.stringify(next), Date.now());
       return next;
     };
+    authorization = await beforeWrite?.();
     const merged: UserAccountPrefs = db.transaction(merge).immediate();
     return merged;
   });

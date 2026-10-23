@@ -24,7 +24,8 @@ export type SmtpHttpError = {
     | "smtp_connection_timeout"
     | "smtp_greeting_timeout"
     | "smtp_server_timeout"
-    | "smtp_connection_failed";
+    | "smtp_connection_failed"
+    | "smtp_upstream_error";
   message: string;
 };
 
@@ -128,5 +129,7 @@ export function getSmtpHttpError(error: unknown, senderEmail?: string): SmtpHttp
     };
   }
 
+  if (isSmtpUpstreamFailure(error)) return { status: 502, code: "smtp_upstream_error",
+    message: "The outgoing mail server could not complete the request. Try again later or ask a mailbox manager to review its SMTP configuration." };
   return null;
 }

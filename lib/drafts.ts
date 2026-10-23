@@ -1,3 +1,4 @@
+import { authorizeOutbound, type OutboundAuthorization } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentities";
 import { resolveSendIdentity, IDENTITY_HEADER } from "./sendIdentity";
 import { validateDraftIdentity } from "./draftIdentity";
@@ -371,6 +372,7 @@ export async function saveDraftForAccount(params: {
   clientId: string;
   payload: SaveDraftInput;
   actor?: CollabActor;
+  authorization?: OutboundAuthorization;
 }): Promise<SaveDraftResult> {
   const { account, accountId, clientId, payload } = params;
   const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
@@ -420,6 +422,8 @@ export async function saveDraftForAccount(params: {
       ...(payload.invite ? { [COMPOSE_INVITE_HEADER]: encodeComposeInviteHeader(payload.invite) } : {}) },
     ...(attachments.length > 0 ? { attachments } : {})
   }, identity);
+
+  if (params.authorization) await authorizeOutbound(params.authorization, { accountId, minRole: "editor", identity });
 
   if (payload.draftId) {
     if (existingDraft?.imapUid && existingDraft.mailboxPath) {
@@ -498,6 +502,7 @@ export async function sendDraftForAccount(params: {
   clientId: string;
   draftId: string;
   actor: CollabActor;
+  authorization?: OutboundAuthorization;
 }): Promise<SendDraftResult> {
   const { account, accountId, clientId, draftId } = params;
   const draft = await getMessageById(accountId, draftId);
@@ -561,10 +566,12 @@ export async function sendDraftForAccount(params: {
   const sentSource = injectUndisclosedRecipientsToHeader(stripIdentityHeader(rawSource));
   const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
+  const beforeSend = params.authorization ? () => authorizeOutbound(params.authorization!, { accountId, minRole: "editor", identity }) : undefined;
+  await beforeSend?.();
   await sendRawSmtpMessage(account, wireSource, {
     from: identity.email,
     to: envelopeRecipients
-  });
+  }, beforeSend);
 
   const deadlineAt = postSendDeadlineAt();
   const sentResult = await completeSend({ account, clientId, deadlineAt, raw: Buffer.from(sentSource),

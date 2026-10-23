@@ -103,12 +103,12 @@ export async function buildRawMessage(account: Account, mail: MailPayload, sende
   return raw;
 }
 
-export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender) {
-  const transporter = createSmtpTransport(account);
-
+export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => Promise<unknown>) {
   const mailOptions = buildMailOptions(mail, sender);
   const raw = await buildRawMessage(account, mail, sender);
 
+  await beforeSend?.();
+  const transporter = createSmtpTransport(account);
   let info: unknown;
   try {
     info = await transporter.sendMail({ envelope: mailOptions.envelope, raw: stripBccHeader(raw) });
@@ -138,8 +138,10 @@ export async function sendSmtpMessage(account: Account, mail: MailPayload, sende
 export async function sendRawSmtpMessage(
   account: Account,
   raw: Buffer | string,
-  envelope: { from: string; to: string[] }
+  envelope: { from: string; to: string[] },
+  beforeSend?: () => Promise<unknown>
 ) {
+  await beforeSend?.();
   const transporter = createSmtpTransport(account);
 
   let info: unknown;

@@ -109,3 +109,33 @@ it("classifies an actual SMTP 4xx timeout response as temporary rather than a so
   expect(getSmtpHttpError({ code: "EMESSAGE", command: "DATA", responseCode: 451, message: "451 Server timeout" }))
     .toMatchObject({ status: 502, code: "smtp_temporary_failure", smtpResponseCode: 451 });
 });
+
+for (const [code, expected, status] of [
+  ["EPROTOCOL", "smtp_upstream_error", 502],
+  ["EENVELOPE", "smtp_upstream_error", 502],
+  ["EMESSAGE", "smtp_upstream_error", 502],
+  ["ECONNECTION", "smtp_connection_failed", 502],
+  ["ESOCKET", "smtp_connection_failed", 502],
+  ["EDNS", "smtp_connection_failed", 502],
+  ["EAUTH", "smtp_configuration_error", 502],
+  ["ETLS", "smtp_connection_failed", 502],
+  ["ECONNREFUSED", "smtp_connection_failed", 502],
+  ["EHOSTUNREACH", "smtp_connection_failed", 502],
+  ["ENETUNREACH", "smtp_connection_failed", 502],
+  ["ETIMEDOUT", "smtp_server_timeout", 504],
+  ["ESTREAM", "smtp_upstream_error", 502],
+  ["EFILEACCESS", "smtp_upstream_error", 502],
+  ["EURLACCESS", "smtp_upstream_error", 502],
+  ["EREQUIRETLS", "smtp_upstream_error", 502],
+  ["ENOAUTH", "smtp_upstream_error", 502],
+  ["EAI_AGAIN", "smtp_upstream_error", 502],
+  ["ECONNRESET", "smtp_upstream_error", 502],
+  ["EFUTURE", "smtp_upstream_error", 502],
+  [undefined, "smtp_upstream_error", 502]
+] as const) {
+  it(`sanitizes tagged ${code ?? "unclassified"} transport failures`, () => {
+    const mapped = getSmtpHttpError(markSmtpUpstreamFailure(Object.assign(new Error("synthetic-provider-private-detail"), { code })));
+    expect(mapped).toMatchObject({ status, code: expected });
+    expect(JSON.stringify(mapped)).not.toContain("synthetic-provider-private-detail");
+  });
+}
