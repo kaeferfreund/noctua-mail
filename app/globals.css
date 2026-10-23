@@ -1055,13 +1055,15 @@ a {
   color: var(--text);
 }
 
-.bottom-center-build {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  color: var(--muted-foreground);
-  text-align: center;
+/* In the bar's flow (not absolutely centred) so it never covers the status
+   triggers; on narrow bars it truncates and the tooltip keeps the full value. */
+.bottom-build {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
 }
