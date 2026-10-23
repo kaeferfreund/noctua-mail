@@ -19,11 +19,13 @@ const nextConfig: NextConfig = {
     // Font and icon file names are stable but not content-hashed, so they
     // get a bounded, revalidating cache instead of `immutable`. No rule for
     // /runtime-config.js: it is regenerated per deployment and must stay
-    // revalidated on every load.
+    // revalidated on every load. The icons rule names the static public
+    // files only: /icons/logo.svg and /icons/badged/:size are dynamic,
+    // deployment-label routes that must keep their own must-revalidate.
     { source: "/fonts/:path*", headers: [
       {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
     ] },
-    { source: "/icons/:path*", headers: [
+    { source: "/icons/:file(icon-\\d+\\.png|base\\.svg)", headers: [
       {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
     ] }];
   },
