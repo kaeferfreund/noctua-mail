@@ -82,6 +82,21 @@ test("Enter, Shift+Enter, Escape and sidebar navigation; preferred layout surviv
   fireEvent.keyDown(window, { key: "Escape" }); expect(layout(view.container)).toBe("focus"); menu.remove();
   await act(async () => {});
 });
+test("keyboard entry: one Escape leaves focus while the focused Back tooltip is open", async () => {
+  const view = render(<FocusHarness />);
+  fireEvent.keyDown(view.getByTestId("row"), { key: "Enter" });
+  expect(layout(view.container)).toBe("focus");
+  // Keyboard-driven focus placement matches :focus-visible, which opens the tooltip.
+  const back = view.getByRole("button", { name: "Back to messages" });
+  await act(async () => { back.focus(); });
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe("Back to messages (Escape)");
+  fireEvent.keyDown(back, { key: "Escape" });
+  expect(layout(view.container)).toBe("split");
+  // Escape handled by anything other than a tooltip still wins over the shortcut.
+  const handled = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+  handled.preventDefault();
+  expect(readerShortcut(handled)).toBeNull();
+});
 test("hint is one line of translated copy, dismissible and seen only once across messages/remount", () => {
   let view = render(<FocusHarness />);
   fireEvent.click(view.getByTestId("row"));
@@ -139,4 +154,37 @@ test("every focus entry places focus on Back; exit restores scroll with a virtua
   view.rerender(<Harness focused={false} rowPresent />);
   await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
   expect(document.activeElement).toBe(view.getByText("Synthetic row"));
+});
+
+test("focus dropped by a disabled or removed control returns to Back while focused", async () => {
+  function Harness({ busy, notice }: { busy: boolean; notice: boolean }) {
+    const list = useRef<HTMLDivElement>(null), savedScroll = useRef<number | null>(null);
+    useReaderFocusPlacement(true, "synthetic", list, savedScroll);
+    return <><div ref={list} tabIndex={-1} /><div data-reader-toolbar=""><button>Back</button>
+      <button disabled={busy}>Delete</button></div>{notice && <button>Undo</button>}</>;
+  }
+  const frame = () => act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  const view = render(<Harness busy={false} notice />);
+  await frame();
+  // happy-dom has no focus fixup, so dispatch the blur Chromium performs when the
+  // focused control is disabled (busy Delete) or removed (Undo notice dismissed).
+  // It ignores blur() on a disabled button; the guard reads the state a frame later.
+  const remove = view.getByText("Delete");
+  remove.focus();
+  remove.blur();
+  view.rerender(<Harness busy notice />);
+  await frame();
+  expect(document.activeElement).toBe(view.getByText("Back"));
+  const undo = view.getByText("Undo");
+  undo.focus();
+  fireEvent.focusOut(undo);
+  view.rerender(<Harness busy={false} notice={false} />);
+  await frame();
+  expect(document.activeElement).toBe(view.getByText("Back"));
+  // An ordinary blur of a control that is still usable is left alone.
+  view.rerender(<Harness busy={false} notice={false} />);
+  remove.focus();
+  remove.blur();
+  await frame();
+  expect(document.activeElement).toBe(document.body);
 });
