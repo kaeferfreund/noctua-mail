@@ -7,6 +7,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { Button } from "@/app/components/ui/button"
 import { XIcon } from "lucide-react"
 import { DialogLayerContext, DIALOG_LAYERS } from "./dialogLayers"
+import { useDialogFocusRestore } from "./dialogFocus"
 
 function Dialog({
   ...props
@@ -62,7 +63,7 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  const opener = React.useRef<HTMLElement | null>(null)
+  const focusRestore = useDialogFocusRestore()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -74,12 +75,12 @@ function DialogContent({
         )}
         style={{ zIndex: React.useContext(DialogLayerContext), ...style }}
         onOpenAutoFocus={(event) => {
-          opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          focusRestore.onOpenAutoFocus()
           onOpenAutoFocus?.(event)
         }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
-          if (!event.defaultPrevented) { event.preventDefault(); opener.current?.focus() }
+          if (!event.defaultPrevented) focusRestore.onCloseAutoFocus(event)
         }}
         {...props}
       >
