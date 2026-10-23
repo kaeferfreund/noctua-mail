@@ -445,7 +445,12 @@
       "delete": "Postfach löschen",
       "deleteConfirm": "{email} und die lokalen Daten endgültig löschen?",
       "membersTitle": "Mitglieder von {email}",
-      "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}"
+      "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+      "selfGrantTitle": "Dir selbst Zugriff geben?",
+      "selfGrantHelp": "Das gemeinsame Postfach wurde erstellt. Es hat noch keine Mitglieder. Gib dir ausdrücklich Zugriff oder füge später Mitglieder hinzu.",
+      "grantAccess": "Zugriff geben",
+      "later": "Später",
+      "noMembers": "Noch keine Mitglieder – niemand sieht dieses Postfach"
     },
     "users": {
       "refresh": "Benutzer aktualisieren",
