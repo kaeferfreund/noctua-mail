@@ -1,0 +1,1 @@
+RESULT cmd="node_modules/.bin/tsc --noEmit -p tsconfig.json --incremental false" rc=0 wall=4.1s load_start=9.68 10.36 10.11 load_end=10.03 10.42 10.14

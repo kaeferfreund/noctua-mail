@@ -1,0 +1,9 @@
+bun add v1.4.4 (38afee6c8)
+Resolving dependencies
+Resolved, downloaded and extracted [89]
+Saved lockfile
+
+installed eslint@10.13.0 with binaries:
+ - eslint
+
+29 packages installed [518.00ms]

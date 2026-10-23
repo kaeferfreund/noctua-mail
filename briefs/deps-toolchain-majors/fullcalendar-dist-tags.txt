@@ -1,0 +1,7 @@
+@fullcalendar/core: {"latest":"7.1.3","legacy":"6.1.22"}
+@fullcalendar/react: {"latest":"7.1.3","legacy":"6.1.22"}
+@fullcalendar/rrule: {"latest":"7.1.3","legacy":"6.1.22"}
+@fullcalendar/daygrid: {"latest":"6.1.22"}
+@fullcalendar/timegrid: {"latest":"6.1.22"}
+@fullcalendar/interaction: {"latest":"6.1.22"}
+@fullcalendar/list: {"latest":"6.1.22"}

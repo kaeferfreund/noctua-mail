@@ -1,0 +1,53 @@
+# Experiment 4: @happy-dom/global-registrator ^21.0.4 (+ optional lib/testSetupDom.ts setting to silence 54 iframe NotSupportedError logs)
+diff --git a/lib/testSetupDom.ts b/lib/testSetupDom.ts
+index 891eccc..28442f8 100644
+--- a/lib/testSetupDom.ts
++++ b/lib/testSetupDom.ts
+@@ -6,7 +6,9 @@
+ import { GlobalRegistrator } from "@happy-dom/global-registrator";
+ import "./testSetupEnv";
+ 
+-GlobalRegistrator.register();
++// happy-dom 21 disables iframe page loading by default; HtmlMessage renders a
++// srcdoc iframe, which then logs a NotSupportedError for about:blank per mount.
++GlobalRegistrator.register({ settings: { enableIframePageLoading: true } });
+ 
+ // React 19 requires this flag before `act` will drive updates.
+ (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+diff --git a/package.json b/package.json
+index 8c276cb..6885afc 100644
+--- a/package.json
++++ b/package.json
+@@ -89,7 +89,7 @@
+     "qrcode": "^1.5.4"
+   },
+   "devDependencies": {
+-    "@happy-dom/global-registrator": "^20.14.6",
++    "@happy-dom/global-registrator": "^21.0.4",
+     "@playwright/test": "1.58.2",
+     "@testing-library/dom": "^10.4.2",
+     "@testing-library/react": "^16.3.3",
+@@ -97,15 +97,15 @@
+     "@types/html-to-text": "^9.0.4",
+     "@types/mailparser": "^3.9.0",
+     "@types/node": "^25.6.0",
++    "@types/qrcode": "^1.5.6",
+     "@types/react": "19.3.0",
+     "@types/react-dom": "19.3.0",
+     "@types/sanitize-html": "^2.16.1",
+     "eslint": "^9.39.4",
+     "eslint-config-next": "16.4.2",
+-    "typescript": "^6.0.3",
++    "eslint-plugin-react-hooks": "7.1.1",
+     "shadcn": "^4.22.1",
+-    "@types/qrcode": "^1.5.6",
+-    "eslint-plugin-react-hooks": "7.1.1"
++    "typescript": "^6.0.3"
+   },
+   "overrides": {
+     "sharp": "0.35.5",
+# bun.lock package-level changes
+- @happy-dom/global-registrator = @happy-dom/global-registrator@20.14.6
++ @happy-dom/global-registrator = @happy-dom/global-registrator@21.0.4
+- happy-dom = happy-dom@20.14.6
++ happy-dom = happy-dom@21.0.4

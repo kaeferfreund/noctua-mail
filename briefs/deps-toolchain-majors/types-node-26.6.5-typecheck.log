@@ -1,0 +1,20 @@
+$ bun check
+<error file="scripts/dev-fixture/verify-http.ts" line="37" column="50" code="TS2769">
+No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+<source>
+34 |   const started = await (await request(`${api}/sync`, { folderId: `${login.accountId}:${path}`, mode: "full" })).json() as { jobId: string };
+35 |   for (let attempt = 0; attempt < 120; attempt++) {
+36 |     const status = await (await request(`${api}/sync/status?jobId=${started.jobId}`)).json() as { job: { status: string; error?: string; result?: { count: number } } };
+37 |     assert.notEqual(status.job.status, "failed", status.job.error);
+                                                      ^^^^^^^^^^^^^^^^
+38 |     if (status.job.status === "done") { console.log(`sync ${path}: done count=${status.job.result?.count}`); return; }
+39 |     await sleep(250);
+</source>
+<related file="node_modules/@types/node/assert.d.ts" line="525" column="18">The last overload is declared here.</related>
+</error>
+Found 1 error in 1 file, checked 1,244 files [675.29ms]
+error: script "typecheck" exited with code 1
+RESULT cmd="bun run typecheck" rc=1 wall=0.7s load_start=8.78 10.24 10.13 load_end=8.78 10.24 10.13

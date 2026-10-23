@@ -1,0 +1,2 @@
+$ eslint . -f json -o "/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/eslint10-lint.json"
+RESULT cmd="bun run lint -f json -o /home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/eslint10-lint.json" rc=0 wall=58.8s load_start=7.61 10.36 10.00 load_end=10.06 10.61 10.11

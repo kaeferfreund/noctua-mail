@@ -1,0 +1,28 @@
+$ bun check
+<error file="lib/authStreams.test.ts" line="17" column="21" code="TS2339">
+Property 'transpileModule' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+<source>
+14 |   const begin=route.indexOf("        const send = async"),end=route.indexOf("\n\n        type Session",begin);
+15 |   expect(begin).toBeGreaterThan(0);expect(end).toBeGreaterThan(begin);
+16 |   const wrapper="function sendFactory(assertStreamAuthorized,identity,stopped,controller,encoder,getImapHttpError,mailboxFailureDto,accountId,accountContext,authStream){"+route.slice(begin,end)+";return send;}";
+17 |   const compiled=ts.transpileModule(wrapper,{compilerOptions:{target:ts.ScriptTarget.ESNext}}).outputText;
+                         ^^^^^^^^^^^^^^^
+18 |   const createSend=new Function(compiled+"\nreturn sendFactory;")();
+19 |   let delivered=0;
+</source>
+</error>
+<error file="lib/authStreams.test.ts" line="17" column="73" code="TS2339">
+Property 'ScriptTarget' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+<source>
+14 |   const begin=route.indexOf("        const send = async"),end=route.indexOf("\n\n        type Session",begin);
+15 |   expect(begin).toBeGreaterThan(0);expect(end).toBeGreaterThan(begin);
+16 |   const wrapper="function sendFactory(assertStreamAuthorized,identity,stopped,controller,encoder,getImapHttpError,mailboxFailureDto,accountId,accountContext,authStream){"+route.slice(begin,end)+";return send;}";
+17 |   const compiled=ts.transpileModule(wrapper,{compilerOptions:{target:ts.ScriptTarget.ESNext}}).outputText;
+                                                                             ^^^^^^^^^^^^
+18 |   const createSend=new Function(compiled+"\nreturn sendFactory;")();
+19 |   let delivered=0;
+</source>
+</error>
+Found 2 errors in 1 file, checked 1,244 files [997.44ms]
+error: script "typecheck" exited with code 1
+RESULT cmd="bun run typecheck" rc=1 wall=1.1s load_start=9.95 9.32 6.39 load_end=10.68 9.49 6.46

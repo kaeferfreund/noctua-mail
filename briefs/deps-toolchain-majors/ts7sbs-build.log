@@ -1,0 +1,157 @@
+$ bun --bun build-scripts/generateBuildVersion.ts && bun --bun next build && bun build-scripts/prepareStandaloneShutdown.ts
+Wrote /home/monkey/code/noctua-mail/wt-spike-toolchain-majors/public/build-version.json (empty)
+▲ Next.js 16.4.2 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 128ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 23.5s
+  Running TypeScript ...
+  Finished TypeScript in 39.1s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/31) ...
+  Generating static pages using 11 workers (7/31) 
+  Generating static pages using 11 workers (15/31) 
+  Generating static pages using 11 workers (23/31) 
+✓ Generating static pages using 11 workers (31/31) in 306ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /api/accounts
+├ ƒ /api/accounts/[accountId]
+├ ƒ /api/accounts/[accountId]/calendar/conflicts
+├ ƒ /api/accounts/[accountId]/calendar/conflicts/[eventId]/resolve
+├ ƒ /api/accounts/[accountId]/calendar/events
+├ ƒ /api/accounts/[accountId]/calendar/events/[eventId]
+├ ƒ /api/accounts/[accountId]/calendar/events/[eventId]/respond
+├ ƒ /api/accounts/[accountId]/calendar/events/participation
+├ ƒ /api/accounts/[accountId]/calendar/invites/process
+├ ƒ /api/accounts/[accountId]/calendar/sync
+├ ƒ /api/accounts/[accountId]/categories/debug
+├ ƒ /api/accounts/[accountId]/categories/model/reset
+├ ƒ /api/accounts/[accountId]/categories/recompute
+├ ƒ /api/accounts/[accountId]/categories/recompute/status
+├ ƒ /api/accounts/[accountId]/compose/recipients
+├ ƒ /api/accounts/[accountId]/destination-folders
+├ ƒ /api/accounts/[accountId]/drafts/[draftId]/discard
+├ ƒ /api/accounts/[accountId]/drafts/[draftId]/send
+├ ƒ /api/accounts/[accountId]/drafts/save
+├ ƒ /api/accounts/[accountId]/folders
+├ ƒ /api/accounts/[accountId]/folders/[folderId]/consistency
+├ ƒ /api/accounts/[accountId]/folders/[folderId]/delete
+├ ƒ /api/accounts/[accountId]/folders/[folderId]/rename
+├ ƒ /api/accounts/[accountId]/folders/create
+├ ƒ /api/accounts/[accountId]/identities
+├ ƒ /api/accounts/[accountId]/identities/[identityId]
+├ ƒ /api/accounts/[accountId]/imap/poll
+├ ƒ /api/accounts/[accountId]/imap/stream
+├ ƒ /api/accounts/[accountId]/mcp-tokens
+├ ƒ /api/accounts/[accountId]/mcp-tokens/[tokenId]
+├ ƒ /api/accounts/[accountId]/members
+├ ƒ /api/accounts/[accountId]/members/[userId]
+├ ƒ /api/accounts/[accountId]/members/candidates
+├ ƒ /api/accounts/[accountId]/message-topics
+├ ƒ /api/accounts/[accountId]/message-topics/explain
+├ ƒ /api/accounts/[accountId]/message-topics/suggest
+├ ƒ /api/accounts/[accountId]/messages
+├ ƒ /api/accounts/[accountId]/messages/[messageId]
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/archive
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/calendar-diff
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/category
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/delete
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/flags
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/html
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/not-spam
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/resync
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/source
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/spam
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/translate
+├ ƒ /api/accounts/[accountId]/messages/[messageId]/unsubscribe
+├ ƒ /api/accounts/[accountId]/messages/copy-to-account
+├ ƒ /api/accounts/[accountId]/messages/delete/associations
+├ ƒ /api/accounts/[accountId]/messages/delete/bulk
+├ ƒ /api/accounts/[accountId]/messages/delete/linked-calendar
+├ ƒ /api/accounts/[accountId]/messages/flags/bulk
+├ ƒ /api/accounts/[accountId]/messages/move
+├ ƒ /api/accounts/[accountId]/prefs
+├ ƒ /api/accounts/[accountId]/recipient-aliases
+├ ƒ /api/accounts/[accountId]/recipient-aliases/[aliasId]
+├ ƒ /api/accounts/[accountId]/recipient-aliases/transfer
+├ ƒ /api/accounts/[accountId]/related
+├ ƒ /api/accounts/[accountId]/relogin
+├ ƒ /api/accounts/[accountId]/reminders
+├ ƒ /api/accounts/[accountId]/search
+├ ƒ /api/accounts/[accountId]/sender-icon
+├ ƒ /api/accounts/[accountId]/settings
+├ ƒ /api/accounts/[accountId]/smtp/send
+├ ƒ /api/accounts/[accountId]/sync
+├ ƒ /api/accounts/[accountId]/sync/new-candidates
+├ ƒ /api/accounts/[accountId]/sync/status
+├ ƒ /api/accounts/[accountId]/thread/related
+├ ƒ /api/accounts/[accountId]/threads
+├ ƒ /api/accounts/[accountId]/threads/[threadId]/activity
+├ ƒ /api/accounts/[accountId]/threads/[threadId]/collab
+├ ƒ /api/accounts/[accountId]/threads/[threadId]/comments
+├ ƒ /api/accounts/[accountId]/threads/[threadId]/comments/[commentId]
+├ ƒ /api/accounts/[accountId]/threads/recompute
+├ ƒ /api/accounts/[accountId]/threads/recompute/status
+├ ƒ /api/accounts/[accountId]/topics
+├ ƒ /api/accounts/[accountId]/topics/[topicId]
+├ ƒ /api/accounts/[accountId]/topics/[topicId]/signals
+├ ƒ /api/accounts/[accountId]/topics/[topicId]/suggestions
+├ ƒ /api/accounts/[accountId]/topics/stats
+├ ƒ /api/accounts/[accountId]/topics/transfer
+├ ƒ /api/accounts/[accountId]/translation/compose
+├ ƒ /api/accounts/[accountId]/translation/test
+├ ƒ /api/admin/accounts
+├ ƒ /api/admin/accounts/[accountId]
+├ ƒ /api/admin/accounts/[accountId]/members/[userId]
+├ ƒ /api/admin/audit
+├ ƒ /api/admin/invites
+├ ƒ /api/admin/users
+├ ƒ /api/admin/users/[userId]
+├ ƒ /api/admin/users/[userId]/mfa-reset
+├ ƒ /api/admin/users/[userId]/passkeys/[passkeyId]
+├ ƒ /api/admin/users/[userId]/recovery
+├ ƒ /api/admin/users/[userId]/sessions
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/methods
+├ ƒ /api/auth/preferences
+├ ƒ /api/auth/reauth
+├ ƒ /api/auth/security
+├ ƒ /api/auth/security/backup-codes
+├ ƒ /api/auth/security/passkeys/remove
+├ ƒ /api/auth/security/passkeys/rename
+├ ƒ /api/auth/security/password
+├ ƒ /api/auth/security/sessions/revoke
+├ ƒ /api/auth/signup
+├ ƒ /api/auth/switch-account
+├ ƒ /api/auth/totp/replace
+├ ƒ /api/ba/[...all]
+├ ƒ /api/calendar/import
+├ ƒ /api/calendar/test
+├ ƒ /api/mcp
+├ ƒ /api/me/events
+├ ƒ /api/me/mailboxes/summary
+├ ƒ /api/probe
+├ ƒ /api/version
+├ ƒ /apple-icon
+├ ƒ /calendar/import
+├ ƒ /calendar/window
+├ ƒ /compose/window
+├ ƒ /icon
+├ ƒ /icons/badged/[size]
+├ ƒ /icons/logo.svg
+├ ○ /manifest.webmanifest
+├ ƒ /message/window
+└ ƒ /reset-password
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+RESULT cmd="bun run build" rc=0 wall=65.8s load_start=9.44 11.98 10.29 load_end=9.77 11.88 10.39

@@ -1,0 +1,9 @@
+2:1 no-restricted-imports 2
+4:41 react-hooks/rules-of-hooks 2
+5:15 jsx-a11y/aria-props 1
+5:46 react/jsx-key 2
+5:70 react/no-unescaped-entities 2
+5:76 @next/next/no-img-element 1
+5:76 jsx-a11y/alt-text 1
+8:1 import/no-anonymous-default-export 1
+8:16 react/display-name 2

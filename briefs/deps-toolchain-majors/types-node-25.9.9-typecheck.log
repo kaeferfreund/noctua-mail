@@ -1,0 +1,3 @@
+$ bun check
+✓ No type errors in 1,244 files [982.69ms]
+RESULT cmd="bun run typecheck" rc=0 wall=1.1s load_start=11.74 10.07 9.97 load_end=12.97 10.35 10.06

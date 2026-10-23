@@ -1,0 +1,18 @@
+$ eslint . -f json -o "/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/ts7-lint.json"
+
+Oops! Something went wrong! :(
+
+ESLint: 9.39.4
+
+TypeError: Cannot read properties of undefined (reading 'Cjs')
+    at Object.<anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@typescript-eslint/typescript-estree/dist/create-program/shared.js:59:18)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@typescript-eslint/typescript-estree/dist/create-program/getWatchProgramsForProjects.js:45:18)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+RESULT cmd="bun run lint -f json -o /home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/ts7-lint.json" rc=2 wall=1.9s load_start=7.54 8.84 6.38 load_end=7.54 8.84 6.38

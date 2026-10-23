@@ -1,0 +1,23 @@
+# mailparser ^3.12.4
+- mailparser = mailparser@3.12.3
++ mailparser = mailparser@3.12.4
+- mailparser/nodemailer = nodemailer@10.2.0
+diff -r .tmp/mp-untrusted/a/package/CHANGELOG.md .tmp/mp-untrusted/b/package/CHANGELOG.md
+2a3,9
+> ## [3.12.4](https://github.com/nodemailer/mailparser/compare/v3.12.3...v3.12.4) (2026-10-22)
+> 
+> 
+> ### Bug Fixes
+> 
+> * update dependencies ([fe3b459](https://github.com/nodemailer/mailparser/commit/fe3b4596140eccfdd8e224ab4576094e0e49ef54))
+> 
+diff -r .tmp/mp-untrusted/a/package/package.json .tmp/mp-untrusted/b/package/package.json
+3c3
+<     "version": "3.12.3",
+---
+>     "version": "3.12.4",
+100c100
+<         "nodemailer": "10.2.0",
+---
+>         "nodemailer": "10.2.1",
+=> only CHANGELOG + version + nodemailer pin 10.2.0->10.2.1 differ; lib/ code identical

@@ -1,0 +1,755 @@
+$ bun test --config=bunfig.dom.toml dom.test
+bun test v1.4.4 (38afee6c8)
+
+app/components/ComposeEditor.imageDrop.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+app/components/auth/MailboxGate.dom.test.tsx:
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+app/components/mailclient/useSyncController.dom.test.tsx:
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-b",
+  folderId: "synthetic-b:INBOX",
+  mode: "new",
+  fullSync: false,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+
+app/components/mailclient/useSyncController.notice.dom.test.tsx:
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] full sync cancelled {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] full sync cancelled {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+
+app/components/mailclient/useAccountController.dom.test.tsx:
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434171-1",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434234-2",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434285-3",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434444-4",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434499-5",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434658-6",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: "account-a:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-a:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-a:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434710-7",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: "account-b:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-b:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-b:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434713-8",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: "account-a:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-a:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-a:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792762434765-9",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: "account-b:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-b:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-b:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+
+app/components/shell/Shell.dom.test.tsx:
+Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).
+
+app/components/mailclient/composition/ComposeHeader.dom.test.tsx:
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+app/components/mailclient/composition/senderComposeReview.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 151 | it("P2-B a failed sender snapshot must allow retrying the same reply", async () => {
+152 |   const {view, handleRef, props} = renderCompose({ sender: makeSender(), followComposeOpen: false });
+153 |   let loads = 0;
+154 |   const errors: string[] = [];
+155 |   const revised = { ...props, reportError: (message: string) => errors.push(message), senderSettingsLoader: async () => {
+156 |     if (++loads === 1) throw Error("Synthetic transient sender read failure");
+                                   ^
+error: Synthetic transient sender read failure
+      at senderSettingsLoader (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:156:30)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1200:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1309:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:160:52)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/react/cjs/react.development.js:890:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:160:9)
+
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762439202-10",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 241 | 
+242 | it("P2-B retries a failed sender snapshot in place", async () => {
+243 |   const { view, handleRef, props } = renderCompose({ followComposeOpen: false });
+244 |   let loads = 0;
+245 |   view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...props} senderSettingsLoader={async () => {
+246 |     if (++loads === 1) throw Error("Synthetic transient sender failure");
+                                   ^
+error: Synthetic transient sender failure
+      at senderSettingsLoader (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:246:30)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1200:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1309:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:249:52)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/react/cjs/react.development.js:890:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:249:9)
+
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 305 | it("sender snapshot catalog IDs are localized at the notice boundary", async () => {
+306 |   const { senderMessages } = await import("@/lib/senderMessages");
+307 |   const errors: string[] = [];
+308 |   const { view, props, handleRef } = renderCompose({ reportError: message => errors.push(message) });
+309 |   view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...props} senderSettingsLoader={async () => {
+310 |     throw new Error(senderMessages.senderLoadFailed);
+                    ^
+error: Errors.sender.senderLoadFailed
+      at senderSettingsLoader (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:310:15)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1200:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1309:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:312:52)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/react/cjs/react.development.js:890:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/senderComposeReview.dom.test.tsx:312:9)
+
+
+app/components/mailclient/composition/sendMailRace.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762443756-11",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762444164-12",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 548 | describe("compose initialization errors", () => {
+549 |   it("reports hydration failures without rejecting fire-and-forget callers", async () => {
+550 |     const errors: string[] = [];
+551 |     const { view, handleRef } = renderCompose({
+552 |       ensureMessageContent: async () => {
+553 |         throw new Error("hydration failed");
+                        ^
+error: hydration failed
+      at ensureMessageContent (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/sendMailRace.dom.test.tsx:553:19)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1288:30)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/ComposeOrchestrator.tsx:1309:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/sendMailRace.dom.test.tsx:572:32)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/react/cjs/react.development.js:890:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/app/components/mailclient/composition/sendMailRace.dom.test.tsx:571:11)
+
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762452789-13",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762452991-14",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762453164-15",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762453354-16",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762453530-17",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762456539-18",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762456695-19",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762456834-20",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+An update to ComposeFields inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ComposeFields inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762459854-21",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+app/components/mailclient/composition/lazyComposeConversions.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762465301-22",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792762467534-23",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+ 563 pass
+ 0 fail
+ 3189 expect() calls
+Ran 563 tests across 73 files. [85.44s]
+RESULT cmd="bun run test:dom" rc=0 wall=85.5s load_start=9.79 9.05 5.93 load_end=11.03 9.42 6.32

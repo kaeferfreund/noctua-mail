@@ -1,0 +1,21 @@
+$ eslint . -f json -o "/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/ts7-lint-872.json"
+typescript-eslint does not support TS 7.0.
+Please see https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0 to run typescript-eslint using the TS 6 API.
+See also https://github.com/typescript-eslint/typescript-eslint/issues/10940 for tracking typescript-eslint's support for TS >=7.1
+
+Oops! Something went wrong! :(
+
+ESLint: 9.39.4
+
+Error: typescript-eslint does not support TS 7.0.
+    at Object.<anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript-eslint/dist/index.js:52:11)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/eslint-config-next/dist/index.js:5:64)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+RESULT cmd="bun run lint -f json -o /home/monkey/code/noctua-mail/wt-spike-toolchain-majors/.tmp/ts7-lint-872.json" rc=2 wall=1.6s load_start=9.21 10.85 8.79 load_end=8.96 10.77 8.78

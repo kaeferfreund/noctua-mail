@@ -1,0 +1,8 @@
+scripts/dev-fixture/verify-http.ts(37,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(actual: unknown, expected: unknown, message?: Error | AssertMessageFunction | undefined): void', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'Error | AssertMessageFunction | undefined'.
+      Type 'string' is not assignable to type 'Error | AssertMessageFunction | undefined'.
+  Overload 2 of 2, '(actual: unknown, expected: unknown, message: string, ...args: unknown[]): void', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+RESULT cmd="node_modules/.bin/tsc --noEmit -p tsconfig.json --incremental false" rc=2 wall=32.7s load_start=8.78 10.24 10.13 load_end=8.92 10.13 10.09

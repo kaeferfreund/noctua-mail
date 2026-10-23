@@ -1,0 +1,10 @@
+files=1254 errors=0 warnings=181 fatal=0
+@next/next/no-img-element	errors=0	warnings=2
+null	errors=0	warnings=1
+react-hooks/exhaustive-deps	errors=0	warnings=20
+react-hooks/immutability	errors=0	warnings=1
+react-hooks/preserve-manual-memoization	errors=0	warnings=53
+react-hooks/purity	errors=0	warnings=4
+react-hooks/refs	errors=0	warnings=59
+react-hooks/set-state-in-effect	errors=0	warnings=40
+react-hooks/use-memo	errors=0	warnings=1

@@ -1,0 +1,10 @@
+[0.03ms] ".env.local"
+bun add v1.4.4 (38afee6c8)
+Resolving dependencies
+Resolved, downloaded and extracted [1]
+Saved lockfile
+
+installed typescript@7.0.2 with binaries:
+ - tsc
+
+2 packages installed [186.00ms]

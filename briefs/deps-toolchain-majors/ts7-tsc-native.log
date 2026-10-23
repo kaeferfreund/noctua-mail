@@ -1,0 +1,3 @@
+lib/authStreams.test.ts(17,21): error TS2339: Property 'transpileModule' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+lib/authStreams.test.ts(17,73): error TS2339: Property 'ScriptTarget' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+RESULT cmd="node_modules/.bin/tsc --noEmit -p tsconfig.json" rc=1 wall=4.7s load_start=8.54 9.09 6.42 load_end=8.26 9.02 6.41

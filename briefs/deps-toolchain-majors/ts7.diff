@@ -1,0 +1,71 @@
+# Experiment 2a: typescript ^7.0.2 (plain). bun add reorders devDependencies alphabetically.
+diff --git a/package.json b/package.json
+index 8c276cb..d171742 100644
+--- a/package.json
++++ b/package.json
+@@ -97,15 +97,15 @@
+     "@types/html-to-text": "^9.0.4",
+     "@types/mailparser": "^3.9.0",
+     "@types/node": "^25.6.0",
++    "@types/qrcode": "^1.5.6",
+     "@types/react": "19.3.0",
+     "@types/react-dom": "19.3.0",
+     "@types/sanitize-html": "^2.16.1",
+     "eslint": "^9.39.4",
+     "eslint-config-next": "16.4.2",
+-    "typescript": "^6.0.3",
++    "eslint-plugin-react-hooks": "7.1.1",
+     "shadcn": "^4.22.1",
+-    "@types/qrcode": "^1.5.6",
+-    "eslint-plugin-react-hooks": "7.1.1"
++    "typescript": "^7.0.2"
+   },
+   "overrides": {
+     "sharp": "0.35.5",
+# bun.lock excerpt (20 @typescript/typescript-<platform> optional deps added, only linux-x64 shown)
+--- a/bun.lock
++++ b/bun.lock
+-        "typescript": "^6.0.3",
++        "typescript": "^7.0.2",
++
++
++
++
++
++
++
++
++
++
++
++
++    "@typescript/typescript-linux-x64": ["@typescript/typescript-linux-x64@7.0.2", "", { "os": "linux", "cpu": "x64" }, "sha512-EYdf2cNg7rgCWJnxCdJ+F3V39O8ihb37eHAu1LK8oAFizgTQbPOK7zHHXbPt8rX24COqODXeI3sIf0fCXG7H/A=="],
++
++
++
++
++
++
++
++
+-    "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+# plus test fix:
+diff --git a/lib/authStreams.test.ts b/lib/authStreams.test.ts
+index 1de4c98..c62d1b2 100644
+--- a/lib/authStreams.test.ts
++++ b/lib/authStreams.test.ts
+@@ -1,5 +1,4 @@
+ import {test,expect} from "bun:test";
+-import ts from "typescript";
+ import {readFileSync} from "node:fs";
+ import {createAuthenticatedTestSession} from "./testAuthHarness";
+ import {requireActiveUserSession} from "./auth";
+@@ -14,7 +13,7 @@ test("generation commit between stream check and enqueue prevents sensitive deli
+   const begin=route.indexOf("        const send = async"),end=route.indexOf("\n\n        type Session",begin);
+   expect(begin).toBeGreaterThan(0);expect(end).toBeGreaterThan(begin);
+   const wrapper="function sendFactory(assertStreamAuthorized,identity,stopped,controller,encoder,getImapHttpError,mailboxFailureDto,accountId,accountContext,authStream){"+route.slice(begin,end)+";return send;}";
+-  const compiled=ts.transpileModule(wrapper,{compilerOptions:{target:ts.ScriptTarget.ESNext}}).outputText;
++  const compiled=new Bun.Transpiler({loader:"ts",target:"bun"}).transformSync(wrapper);
+   const createSend=new Function(compiled+"\nreturn sendFactory;")();
+   let delivered=0;
+   const send=createSend(assertStreamAuthorized,identity,false,{enqueue:()=>{delivered++;}},new TextEncoder(),()=>null,()=>null,"synthetic",{role:"viewer"},{close:()=>{}});

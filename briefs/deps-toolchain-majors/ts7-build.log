@@ -1,0 +1,16 @@
+$ bun --bun build-scripts/generateBuildVersion.ts && bun --bun next build && bun build-scripts/prepareStandaloneShutdown.ts
+Wrote /home/monkey/code/noctua-mail/wt-spike-toolchain-majors/public/build-version.json (empty)
+▲ Next.js 16.4.2 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 229ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 32.5s
+  Running TypeScript ...
+lib/authStreams.test.ts(17,21): error TS2339: Property 'transpileModule' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+lib/authStreams.test.ts(17,73): error TS2339: Property 'ScriptTarget' does not exist on type 'typeof import("/home/monkey/code/noctua-mail/wt-spike-toolchain-majors/node_modules/typescript/lib/version")'.
+Failed to type check.
+
+error: "next" exited with code 1
+error: script "build" exited with code 1
+RESULT cmd="bun run build" rc=1 wall=41.6s load_start=7.25 8.76 6.37 load_end=18.58 11.56 7.42
