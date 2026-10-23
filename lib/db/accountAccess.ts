@@ -2,7 +2,7 @@ import type { AccountRole } from "../data";
 
 /** Synchronous core for authorization rechecks inside master transactions. */
 export function resolveAccountRoleRow(db: any, userId: string, accountId: string): AccountRole | null {
-  const row = db.prepare(`SELECT CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role
+  const row = db.query(`SELECT CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role
     FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id
     LEFT JOIN user_accounts ua ON ua.accountId=a.id AND ua.userId=p.id
     WHERE a.id=? AND (a.ownerUserId=p.id OR ua.userId IS NOT NULL)

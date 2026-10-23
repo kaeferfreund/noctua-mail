@@ -6,6 +6,9 @@
  * `getCalendarEventById` before consulting the override table; splitting
  * that read off would force a cross-module round-trip for a single lookup.
  */
+import type { Database } from "bun:sqlite";
+import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
+import { withOutboundWrite } from "../../outboundWrite";
 import type {
   CalendarEvent,
   CalendarEventEmailSnapshotFields,
@@ -126,9 +129,20 @@ export async function upsertCalendarParticipationOverride(
     occurrenceStartAtMs: number;
     partstat: CalendarParticipationStatus;
     attendeeEmail?: string;
-  }
+  },
+  beforeWrite?: OutboundWriteAuthorization
 ): Promise<CalendarParticipationOverrideRow> {
-  const db = await getAccountDb(accountId);
+  return withOutboundWrite("upsertCalendarParticipationOverride", beforeWrite, async write => {
+    const db = await getAccountDb(accountId);
+    return write(db, () => upsertCalendarParticipationOverrideRow(db, accountId, input));
+  });
+}
+
+function upsertCalendarParticipationOverrideRow(
+  db: Database,
+  accountId: string,
+  input: { eventUid: string; occurrenceStartAtMs: number; partstat: CalendarParticipationStatus; attendeeEmail?: string }
+): CalendarParticipationOverrideRow {
   const now = Date.now();
   // Normalize inputs symmetrically with `rowToCalendarParticipationOverride`
   // so reads and writes agree on what counts as a valid row. Without
@@ -195,16 +209,20 @@ export async function upsertCalendarParticipationOverride(
   return row;
 }
 
+function deleteCalendarParticipationOverrideRow(db: Database, accountId: string, eventUid: string, occurrenceStartAtMs: number) {
+  db.prepare(
+    `DELETE FROM calendar_participation_overrides
+     WHERE accountId = ? AND eventUid = ? AND occurrenceStartAtMs = ?`
+  ).run(accountId, eventUid, occurrenceStartAtMs);
+}
+
 export async function deleteCalendarParticipationOverrideForOccurrence(
   accountId: string,
   eventUid: string,
   occurrenceStartAtMs: number
 ): Promise<void> {
   const db = await getAccountDb(accountId);
-  db.prepare(
-    `DELETE FROM calendar_participation_overrides
-     WHERE accountId = ? AND eventUid = ? AND occurrenceStartAtMs = ?`
-  ).run(accountId, eventUid, occurrenceStartAtMs);
+  deleteCalendarParticipationOverrideRow(db, accountId, eventUid, occurrenceStartAtMs);
 }
 
 export async function resolveCalendarParticipation(
@@ -359,9 +377,17 @@ export async function cancelCalendarEventByUid(
 
 export async function upsertCalendarEvent(
   accountId: string,
-  event: CalendarEvent
+  event: CalendarEvent,
+  beforeWrite?: OutboundWriteAuthorization,
+  clearParticipationOccurrenceAtMs?: number
 ): Promise<void> {
-  const db = await getAccountDb(accountId);
+  return withOutboundWrite("upsertCalendarEvent", beforeWrite, async write => {
+    const db = await getAccountDb(accountId);
+    write(db, () => upsertCalendarEventRow(db, accountId, event, clearParticipationOccurrenceAtMs));
+  });
+}
+
+function upsertCalendarEventRow(db: Database, accountId: string, event: CalendarEvent, clearParticipationOccurrenceAtMs?: number) {
   db.prepare(
     `INSERT OR REPLACE INTO calendar_events (
       id, accountId, calendarId, eventUid, summary, description, location,
@@ -425,6 +451,9 @@ export async function upsertCalendarEvent(
     event.updatedAtMs,
     event.deletedAtMs ?? null
   );
+  if (Number.isFinite(clearParticipationOccurrenceAtMs)) {
+    deleteCalendarParticipationOverrideRow(db, accountId, event.eventUid, clearParticipationOccurrenceAtMs!);
+  }
 }
 
 export async function deleteCalendarEvent(
