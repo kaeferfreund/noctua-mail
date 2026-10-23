@@ -190,3 +190,36 @@ new captures are in the parent evidence directory and raw gates/probes in
 credentials and only ports 3875–3878. `.env.local` and the configured persistent
 data directory were not changed. Servers terminate via their recorded owned
 PIDs/process groups; no push or deployment occurs.
+
+## Round 3 phone calendar and layer tokens
+
+Review r2 found the week/day buttons clipped at 320 px: the phone calendar
+reused the desktop `.body` frame (`overflow: hidden`), and FullCalendar's
+one-row toolbar needed 351 px of a 288 px body. The phone Sheet now uses the
+`calendarFrame`/`calendarBody` primitives in `MobileFrames.module.css`; the
+desktop popover keeps the shared floating-calendar body. On phones the toolbar
+wraps: prev/title/next take the first row, ＋ Event/today and the
+month/week/day group share the next one. Every control, including the Sheet
+close, has a 44 px target, and week headers fit their columns. The body keeps a
+340 px minimum height and the Sheet body scrolls vertically when a shorter
+viewport (keyboard) cannot fit it. `data-calendar-frame` marks the route
+(`phone`/`popover`).
+
+Production measurements (`.fc-view-harness`, toolbar 96 px): 260 px at
+320×568, 224 px at 320×500, 384 px at 360×640 and 588 px at 390×844. In month,
+week and day view, every control is inside the viewport and wins hit testing
+at its centre. Pointer clicks use raw mouse coordinates, so Playwright cannot
+scroll an `overflow: hidden` ancestor into view. The checks find no horizontal
+overflow, seven in-viewport columns and no foreign element over the Sheet. The
+same check fails on `5809d89` (23.8 px targets; r2 measured the clipped day
+button). The density re-measurement against the r2 baseline is unchanged:
+list +32/+31 px, reader +29.58 px at 1280/1024, pane height +60 px.
+
+The z-index ladder is now a set of unlayered `--layer-*` tokens in
+`app/globals.css`: floating 9990, dialog 9994, dialog overlay 9995, popper 9998
+and drag ghost 9999. Status/calendar frames, the compose modal, the Radix
+lifts and the shadcn primitives (`z-(--layer-*)`) read those tokens. The
+nested dialog arithmetic keeps its JS mirror in `dialogLayers.ts`;
+`app/globals.test.ts` asserts the order and the mirror. Measured layers are
+unchanged: desktop status 9990 < mobile Sheet 9994 < event dialog 9995 <
+picker 9998.
