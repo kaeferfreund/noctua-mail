@@ -24,8 +24,9 @@ export class OutboundAuthorizationError extends Error {
 }
 
 /**
- * Await immediately before the first effect; repeat after asynchronous preparation
- * and on every DB write retry. Never call after SMTP acceptance. Identity and actor
+ * Await to prepare a live actor, then consume assertCurrent synchronously with the
+ * effect (or inside its write transaction). Repeat on every DB write retry.
+ * Never call after SMTP acceptance. Identity and actor
  * checks share a final synchronous snapshot, using the existing session/token and
  * role policies rather than a second authorization policy.
  */
@@ -71,4 +72,10 @@ export async function authorizeOutbound(
   };
   assertCurrent(await getDb());
   return { ...collabActorFromSession(context.session, context.clientId), assertCurrent };
+}
+
+/** Capture DB preparation now; consume the returned assertion synchronously at the effect. */
+export async function prepareOutboundAssertion(actor: AuthorizedOutboundActor): Promise<() => void> {
+  const db = await getDb();
+  return () => actor.assertCurrent(db);
 }
