@@ -56,3 +56,27 @@ test("changing locale preserves the selected virtual view and its protocol filte
   expect(hook.result.current.state.activeVirtualFolderId).toBe("virtual:action-queue");
   expect(hook.result.current.state.searchScope).toBe("all");
 });
+
+test("one mailbox's virtual-folder counts never show under another", async () => {
+  const held: Array<{ url: string; resolve: (res: Response) => void }> = [];
+  const apiFetch = (url: string) => new Promise<Response>(resolve => { held.push({ url, resolve }); });
+  const releaseAll = async (total: (url: string) => number) => {
+    await act(async () => { for (const item of held.splice(0)) item.resolve(Response.json({ total: total(item.url) })); });
+  };
+  const hook = renderHook(({ account }) => useSearchState({ activeAccountId: account, activeFolderId: "", setActiveFolderId: () => {}, accountFolders: [], folderById: new Map(), query: "", setQuery: () => {},
+    isRelatedSearch: false, relatedRestoreRef: { current: null }, relatedQueryId: null, virtualDefaultExcludedFolderIdsKey: "", syncCompletionVersion: 0, apiFetch }), { wrapper: I18nTestProvider, initialProps: { account: "synthetic-a" } });
+  await waitFor(() => expect(held).toHaveLength(4));
+  await releaseAll(() => 7);
+  await waitFor(() => expect(hook.result.current.state.focusedUnreadCount).toBe(7));
+  hook.rerender({ account: "synthetic-b" });
+  // Unknown until B's own counts arrive, not A's 7.
+  const counts = () => { const { focusedUnreadCount, actionQueueTodoCount, inviteDeckTotalCount, inviteDeckUnreadCount } = hook.result.current.state;
+    return [focusedUnreadCount, actionQueueTodoCount, inviteDeckTotalCount, inviteDeckUnreadCount]; };
+  expect(counts()).toEqual([null, null, null, null]);
+  await waitFor(() => expect(held).toHaveLength(4));
+  expect(held.every(item => item.url.startsWith("/api/accounts/synthetic-b/"))).toBe(true);
+  await releaseAll(() => 3);
+  await waitFor(() => expect(counts()).toEqual([3, 3, 3, 3]));
+  hook.rerender({ account: "" });
+  expect(counts()).toEqual([null, null, null, null]);
+});
