@@ -1,5 +1,7 @@
 // Narrow wrapper seams in a child process keep randomized Bun mocks isolated.
 import assert from "node:assert/strict";
+import { Database } from "bun:sqlite";
+import { buildImapMessageRowId } from "../messageIds";
 import type { OutboundWriteAuthorization } from "../outboundAuthorization";
 import { mock, spyOn } from "bun:test";
 import nodemailer from "nodemailer";
@@ -11,7 +13,7 @@ import { requireActiveUserSession } from "../auth";
 import { mintMcpToken } from "../mcpAuth";
 import { startSmtpSink } from "./mail/smtp-sink";
 import { demoPass, demoUser } from "./mail/seed";
-import { saveMessageSource } from "../storage";
+import { getMessageSource, saveMessageSource } from "../storage";
 import { SHARD_FTS_TABLE } from "../db/shardFormat";
 
 const path = process.argv[2];
@@ -34,6 +36,7 @@ const imapActual = { ...await import("../serverImap") };
 let smtpCalls = 0, appendCalls = 0, deleteCalls = 0;
 let hook: (() => void) | undefined;
 let accountReadHook: (() => void) | undefined;
+let beforeSanitize: (() => void) | undefined;
 let afterAcceptance: (() => void) | undefined;
 let insideTransport: (() => void) | undefined;
 let retryRevoke: (() => void) | undefined;
@@ -43,6 +46,7 @@ let guardRevoke: (() => void) | undefined;
 // after the async guard and after the actual synchronous effect-boundary assertion.
 const authorizationActual = { ...await import("../outboundAuthorization") };
 let queuedGuardRevoke: (() => void) | undefined;
+let authorizeCalls = 0;
 let skipGuards = 0;
 let probeWrite = false;
 let insideWrite = false;
@@ -51,6 +55,7 @@ let sameContinuation = false;
 let effectInitiated = false;
 mock.module("@/lib/outboundAuthorization", () => ({ ...authorizationActual,
   authorizeOutbound: async (...args: Parameters<typeof authorizationActual.authorizeOutbound>) => {
+    authorizeCalls++;
     const actor = await authorizationActual.authorizeOutbound(...args);
     const revoke = skipGuards-- > 0 ? undefined : queuedGuardRevoke;
     if (revoke) queuedGuardRevoke = undefined;
@@ -66,34 +71,26 @@ mock.module("@/lib/outboundAuthorization", () => ({ ...authorizationActual,
 }));
 const writeActual = { ...await import("../outboundWrite") };
 mock.module("@/lib/outboundWrite", () => ({
-  prepareOutboundWrite: async (...args: Parameters<typeof writeActual.prepareOutboundWrite>) => {
-    const guardedWrite = await writeActual.prepareOutboundWrite(...args);
-    return <T>(write: (assertCurrent: () => void) => T): T => {
+  withOutboundWrite: <T>(...args: Parameters<typeof writeActual.withOutboundWrite<T>>) => {
+    const [operation, beforeWrite, attempt] = args;
+    return writeActual.withOutboundWrite(operation, beforeWrite, guardedWrite => attempt((db, write) => {
       insideWrite = true;
       try {
-        return guardedWrite(assertCurrent => {
-          const result = write(() => {
-            assertCurrent();
-            if (probeWrite) {
-              assert.ok(master.inTransaction, "master BEGIN IMMEDIATE must hold authorization through the shard write");
-              assert.ok(shard.inTransaction, "local write must consume the assertion inside its shard transaction");
-              assert.ok(sameContinuation, "transaction writes must follow the assertion without an await");
-            }
-          });
+        return guardedWrite(db, () => {
           if (probeWrite) {
-            assert.ok(master.inTransaction, "master writer must remain held through shard commit");
-            assert.ok(sameContinuation, "shard transaction must commit before the queued microtask");
-            effectInitiated = true;
+            assert.ok(master.inTransaction, "master must hold authorization through shard commit");
+            assert.ok(shard.inTransaction, "assertion must run inside the shard writer");
+            assert.ok(sameContinuation, "write must follow assertion without an await");
           }
-          if (probeWrite && path === "draft-save") {
-            assert.equal(shard.prepare("SELECT 1 FROM messages WHERE accountId=? AND id=?").get(accountId, draftId), null, "replacement removes the old row inside the guarded transaction");
-            assert.equal(shard.prepare("SELECT 1 FROM attachments WHERE accountId=? AND messageId=?").get(accountId, draftId), null, "replacement removes old attachments atomically");
-            assert.equal(shard.prepare(`SELECT 1 FROM ${SHARD_FTS_TABLE} WHERE accountId=? AND messageId=?`).get(accountId, draftId), null, "replacement removes the old FTS row atomically");
+          const result = write();
+          if (probeWrite) {
+            assert.ok(master.inTransaction && shard.inTransaction);
+            effectInitiated = true;
           }
           return result;
         });
       } finally { insideWrite = false; }
-    };
+    }));
   }
 }));
 const createTransport = nodemailer.createTransport.bind(nodemailer);
@@ -111,6 +108,7 @@ spyOn(nodemailer, "createTransport").mockImplementation(((...args: Parameters<ty
 }) as typeof nodemailer.createTransport);
 // Exercise the real APPEND implementation after an asynchronous pool acquisition.
 let probeAppend = false;
+let rejectAppend = false;
 let transportPhase = false;
 const poolActual = { ...await import("../mail/imap/connectionPool") };
 mock.module("@/lib/mail/imap/connectionPool", () => ({ ...poolActual,
@@ -142,6 +140,12 @@ mock.module("@/lib/serverDb", () => ({ ...dbActual,
     const account = await dbActual.getAccountById(...args);
     const current = accountReadHook; accountReadHook = undefined; current?.();
     return account;
+  },
+  resolveThreadingForAccountMessages: async (...args: Parameters<typeof dbActual.resolveThreadingForAccountMessages>) => {
+    const result = await dbActual.resolveThreadingForAccountMessages(...args);
+    const revoke = beforeSanitize; beforeSanitize = undefined;
+    if (revoke) queueMicrotask(revoke);
+    return result;
   },
   upsertMessages: async (...args: Parameters<typeof dbActual.upsertMessages>) => dbActual.upsertMessages(args[0], args[1], args[2], args[3], { ...args[4], beforeWrite: args[4]?.beforeWrite ? beforeRetry(args[4].beforeWrite) : undefined }),
   mergeUserAccountPrefs: async (...args: Parameters<typeof dbActual.mergeUserAccountPrefs>) => dbActual.mergeUserAccountPrefs(args[0], args[1], args[2], args[3] ? beforeRetry(args[3]) : undefined),
@@ -185,6 +189,7 @@ mock.module("@/lib/serverImap", () => ({ ...imapActual,
     // Match the real pool's asynchronous preparation before consuming the guard.
     await Promise.resolve();
     args[6]?.beforeAppend?.();
+    if (rejectAppend) throw new Error("Synthetic rejected APPEND");
     appendCalls++; return 1;
   },
   deleteImapMessage: async () => { deleteCalls++; },
@@ -200,8 +205,8 @@ const { POST: mcp } = await import("../../app/api/mcp/route");
 const outbound = { identityId: alias.id, to: "recipient@example.test", subject: "Synthetic boundary", text: "Synthetic body" };
 const request = (body: unknown) => new Request("http://localhost:3000/api/send", { method: "POST", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }), body: JSON.stringify(body) });
 const params = (extra = {}) => ({ params: Promise.resolve({ accountId, ...extra }) });
-const draftId = "synthetic-boundary-draft";
 const messageId = "<synthetic-boundary-draft@example.test>";
+const draftId = buildImapMessageRowId(messageId);
 const raw = [`From: ${alias.displayName} <${alias.email}>`, "To: recipient@example.test", `Message-ID: ${messageId}`, `X-Noctua-Identity-Id: ${alias.id}`, "Subject: Synthetic boundary", "", "Synthetic body"].join("\r\n");
 await api.upsertMessages(accountId, null, [{ id: draftId, messageId, threadId: messageId, accountId, folderId: `${accountId}:Drafts`, from: `${alias.displayName} <${alias.email}>`, to: outbound.to, subject: outbound.subject, body: outbound.text, preview: "", date: new Date().toISOString(), dateValue: Date.now(), flags: ["\\Draft"], senderIdentityId: alias.id, source: raw, attachments: [{ id: "synthetic-boundary-attachment", filename: "synthetic.txt", contentType: "text/plain", size: 4, inline: false }], mailboxPath: "Drafts", imapUid: 22 }]);
 await saveMessageSource(accountId, draftId, raw);
@@ -394,19 +399,92 @@ try {
           if (scope === "series") assert.equal((shard.prepare("SELECT myPartstat FROM calendar_events WHERE id=?").get(eventId) as { myPartstat: string }).myPartstat, "ACCEPTED");
           else assert.equal((shard.prepare("SELECT partstat FROM calendar_participation_overrides WHERE accountId=?").get(accountId) as { partstat: string }).partstat, "ACCEPTED");
         } else {
-          const rows = shard.prepare("SELECT id,flags FROM messages WHERE accountId=? AND id<>?").all(accountId, draftId) as { id: string; flags: string }[];
+          const rows = shard.prepare("SELECT id,flags FROM messages WHERE accountId=?").all(accountId) as { id: string; flags: string }[];
           assert.ok(rows.length > 0, "draft write committed");
+          if (path === "draft-save") {
+            assert.equal(rows.length, 1, "replacement keeps exactly one draft");
+            assert.equal(shard.prepare("SELECT 1 FROM attachments WHERE accountId=? AND messageId=?").get(accountId, draftId), null, "old attachments removed atomically");
+          }
           if (isMcp) assert.ok(rows.some(row => JSON.parse(row.flags).includes("$NoctuaAI")), "MCP AI flag shares the guarded creation transaction");
         }
         finalAssertHook = undefined; probeWrite = false; restore();
         if (path !== "calendar-respond") {
-          const rows = shard.prepare("SELECT id FROM messages WHERE accountId=? AND id<>?").all(accountId, draftId) as { id: string }[];
+          const rows = shard.prepare("SELECT id FROM messages WHERE accountId=?").all(accountId) as { id: string }[];
           for (const row of rows) await api.deleteMessageById(accountId, row.id);
           await ensureDraft();
         }
         console.log(`PASS ${path}/transaction/${scope}/${variant}`);
       }
     }
+  }
+  if (path === "draft-save") {
+    await ensureDraft();
+    const previous = snapshot();
+    const oldSource = await getMessageSource(accountId, draftId);
+    rejectAppend = true;
+    try {
+      await assert.rejects(run(), /Synthetic rejected APPEND/);
+      assert.equal(snapshot(), previous, "rejected APPEND preserves the old draft and every SQL row");
+      assert.equal((shard.prepare("SELECT count(*) AS n FROM messages WHERE accountId=?").get(accountId) as { n: number }).n, 1);
+      assert.equal(await getMessageSource(accountId, draftId), oldSource);
+    } finally { rejectAppend = false; }
+    console.log("PASS draft-save/rejected-append-keeps-one-draft");
+  }
+  if (path === "draft-save") {
+    await ensureDraft();
+    const previous = snapshot();
+    const source = await getMessageSource(accountId, draftId);
+    beforeSanitize = () => master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(user.user.id, accountId);
+    const response = await run();
+    assert.equal(response.status, 403, JSON.stringify(await response.json()));
+    restore();
+    const after = JSON.parse(snapshot()), before = JSON.parse(previous);
+    for (const key of ["messages", "attachments", "fts", "calendar", "overrides", "tombstones"]) assert.deepEqual(after[key], before[key]);
+    assert.equal(await getMessageSource(accountId, draftId), source, "revocation before sanitization preserves cached source bytes");
+    console.log("PASS draft-save/revoked-before-sanitization-source-unchanged");
+  }
+  if (path === "calendar-respond") {
+    shard.prepare("DELETE FROM calendar_participation_overrides WHERE accountId=?").run(accountId);
+    const other = new Database(master.filename);
+    other.exec("PRAGMA busy_timeout=0");
+    try {
+      for (const scope of ["series", "occurrence"]) {
+        for (const revoked of [false, true]) {
+          restore();
+          shard.prepare("UPDATE calendar_events SET myPartstat='DECLINED' WHERE accountId=? AND id=?").run(accountId, eventId);
+          const before = JSON.parse(snapshot());
+          const preparedBefore = authorizeCalls;
+          let released = false;
+          accountReadHook = () => {
+            other.exec("BEGIN IMMEDIATE");
+            setTimeout(() => {
+              if (revoked) other.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(user.user.id, accountId);
+              other.exec("COMMIT"); released = true;
+            }, 75);
+          };
+          const response = await run(false, scope);
+          const body = await response.json();
+          assert.ok(released, "request must retry until the separate master writer releases");
+          assert.ok(authorizeCalls >= preparedBefore + 2, "retry must prepare fresh authorization");
+          assert.equal(response.status, revoked ? 403 : 200, JSON.stringify(body));
+          const after = JSON.parse(snapshot());
+          if (revoked) {
+            for (const key of ["messages", "attachments", "fts", "calendar", "overrides", "sentBy"]) assert.deepEqual(after[key], before[key], "fresh retry denies with no shard effects");
+          } else {
+            assert.equal(after.calendar.length, 1);
+            assert.equal(after.overrides.length, scope === "occurrence" ? 1 : 0);
+            if (scope === "series") assert.equal(after.calendar[0].myPartstat, "ACCEPTED");
+            else {
+              assert.equal(after.overrides[0].partstat, "ACCEPTED");
+              assert.equal(after.overrides[0].occurrenceStartAtMs, Date.UTC(2026, 9, 23, 10));
+            }
+          }
+          restore();
+          shard.prepare("DELETE FROM calendar_participation_overrides WHERE accountId=?").run(accountId);
+          console.log(`PASS calendar-respond/master-contention/${scope}/${revoked ? "revoked" : "success"}`);
+        }
+      }
+    } finally { other.close(); }
   }
   if (path === "calendar-respond") {
     hook = undefined;

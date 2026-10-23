@@ -1,6 +1,6 @@
 import { parseAddressEmails } from "../../ownAddresses";
 import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
-import { prepareOutboundWrite } from "../../outboundWrite";
+import { withOutboundWrite } from "../../outboundWrite";
 /**
  * The single write path that takes a batch of parsed RFC 5322 messages
  * and installs them into the local SQLite store. The function is large
@@ -40,7 +40,6 @@ import { stageMessageFiles } from "../../storage";
 import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
-import { withDbWriteRetry } from "../../dbWriteRetry";
 import { normalizeImapFlags, preserveLocalOnlyMessageFlags } from "../../messageFlags";
 import {
   normalizeCalendarEventUid,
@@ -100,7 +99,7 @@ export async function upsertMessages(
   replaceExisting = false,
   options: { recomputeThreads?: boolean; beforeWrite?: OutboundWriteAuthorization; replaceDraftId?: string } = {}
 ) {
-  return withDbWriteRetry("upsertMessages", async () => {
+  return withOutboundWrite("upsertMessages", options.beforeWrite, async authorizedWrite => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     if (nextMessages.some(message => message.accountId !== accountId)) {
       throw new Error("Message accountId must match the destination account; message belongs to another account");
@@ -708,10 +707,8 @@ export async function upsertMessages(
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
     try {
-      const authorizedWrite = await prepareOutboundWrite(options.beforeWrite);
-      const collabChanges = authorizedWrite(assertCurrent => db.transaction(() => {
+      const collabChanges = authorizedWrite(db, () => {
         try {
-          assertCurrent();
           captureIdentitySnapshots();
           if (options.replaceDraftId) {
             const previous = findMessageById.get(accountId, options.replaceDraftId) as ReplacedRow | undefined;
@@ -749,7 +746,7 @@ export async function upsertMessages(
           files.rollback();
           throw error;
         }
-      }).immediate());
+      });
       for (const event of collabChanges) publishThreadCollabEvent(event);
     } catch (error) {
       // Also cover a commit failure, after the callback has returned.
