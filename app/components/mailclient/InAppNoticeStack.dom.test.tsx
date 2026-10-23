@@ -1,6 +1,7 @@
 // Uses the existing happy-dom harness through bun run test:dom.
 import { afterEach, describe, expect, it } from "bun:test";
-import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
 import ShellSidebar, { type ShellSidebarProps } from "@/app/components/shell/ShellSidebar";

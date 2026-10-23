@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import type { OwnAddressInput } from "@/lib/ownAddresses";
 import { useEffect, useState } from "react";
 import type React from "react";
@@ -70,7 +71,7 @@ type ThreadMessageCardProps = {
   folderById: (folderId: string) => Folder | undefined;
   setSearchScope: React.Dispatch<React.SetStateAction<"folder" | "all">>;
   setActiveFolderId: React.Dispatch<React.SetStateAction<string>>;
-  getImapFlagBadges: (message: Message) => ImapFlagBadge[];
+  getImapFlagBadges: (message: Message, locale?: import("@/lib/i18n/config").UiLocale) => ImapFlagBadge[];
   toggleFlaggedFlag: (message: Message) => void;
   toggleTodoFlag: (message: Message) => void;
   isDraftMessage: (message: Message) => boolean;
@@ -195,6 +196,8 @@ export default function ThreadMessageCard({
   onHideTranslation,
   onChangeTranslationLang
 }: ThreadMessageCardProps) {
+  const locale = useLocale();
+  const t = useTranslations("Reader");
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<Attachment | null>(null);
@@ -220,20 +223,20 @@ export default function ThreadMessageCard({
       setRemovingAttachment(false);
     }
   };
-  const toValue = (message.to ?? "").trim() || "(no recipients)";
+  const toValue = (message.to ?? "").trim() || t("noRecipients");
   const ccValue = message.cc ?? "";
   const bccValue = message.bcc ?? "";
   const recipientFields = [
-    { label: "To" as const, value: toValue, hideWhenEmpty: false },
-    { label: "Cc" as const, value: ccValue, hideWhenEmpty: true },
-    { label: "Bcc" as const, value: bccValue, hideWhenEmpty: true }
+    { kind: "to" as const, label: "To" as const, value: toValue, hideWhenEmpty: false },
+    { kind: "cc" as const, label: "Cc" as const, value: ccValue, hideWhenEmpty: true },
+    { kind: "bcc" as const, label: "Bcc" as const, value: bccValue, hideWhenEmpty: true }
   ].map((field) => {
-    const alias = field.label === "Bcc" ? null : findRecipientAlias(field.value);
-    const recipientCount = field.label === "Bcc" ? 0 : countRecipientEntries(field.value);
+    const alias = field.kind === "bcc" ? null : findRecipientAlias(field.value);
+    const recipientCount = field.kind === "bcc" ? 0 : countRecipientEntries(field.value);
     return {
       ...field,
       alias,
-      showAliasAction: field.label !== "Bcc" && recipientCount > 1
+      showAliasAction: field.kind !== "bcc" && recipientCount > 1
     };
   });
   const priorityColor = getPriorityBadgeColor(message.priority);
@@ -275,7 +278,7 @@ export default function ThreadMessageCard({
     return Boolean(translationResultFor(format) || translationLoadingFor(format));
   };
   const folderBadgeIds = message.folderId ? [message.folderId] : [];
-  const dateDisplay = getMessageDateDisplay(message.dateValue, message.date, dateFormat);
+  const dateDisplay = getMessageDateDisplay(message.dateValue, message.date, dateFormat, locale);
 
   const handleFolderBadgeSelect = (folderId: string) => {
     if (includeThreadAcrossFolders || folderId !== activeFolderId) {
@@ -345,8 +348,8 @@ export default function ThreadMessageCard({
             .filter(Boolean)
             .join(" ") || undefined
         }
-        tooltip={active ? "Show original" : "Translate this message"}
-        aria-label="Translate message"
+        tooltip={active ? t("showOriginal") : t("translateThis")}
+        aria-label={t("translate")}
         aria-pressed={active}
         onClick={() => {
           if (active) {
@@ -389,7 +392,7 @@ export default function ThreadMessageCard({
         size="2"
         variant="soft"
         color="gray"
-        tooltip="Load message content"
+        tooltip={t("loadContent")}
         onClick={() => ensureMessageContent(message, { manual: true })}
       >
         <RefreshCw size={18} />
@@ -417,7 +420,7 @@ export default function ThreadMessageCard({
 
   const renderTranslationLoadingPanel = () => (
     <div className={styles.bodyLoading} role="status" aria-live="polite">
-      <span className={styles.bodyLoadingLabel}>Translating…</span>
+      <span className={styles.bodyLoadingLabel}>{t("translating")}</span>
       <div className={styles.bodyLoadingSkeleton} aria-hidden="true">
         <span className={styles.bodyLoadingLine} />
         <span className={styles.bodyLoadingLine} />
@@ -431,14 +434,12 @@ export default function ThreadMessageCard({
     const loading = translationLoadingFor(format);
     const error = translationErrorFor(format);
     const statusText = loading
-      ? "Translating…"
+      ? t("translating")
       : error
         ? error
         : result
-          ? `Translated to ${deeplTargetLanguageLabel(translationTargetLang)}${
-              result.detectedSourceLang ? ` · from ${result.detectedSourceLang}` : ""
-            }`
-          : "Not translated yet.";
+          ? t("translatedTo", { language: deeplTargetLanguageLabel(translationTargetLang), hasSource: result.detectedSourceLang ? "yes" : "no", source: result.detectedSourceLang ?? "" })
+          : t("notTranslated");
     return (
       <Flex
         align="center"
@@ -455,7 +456,7 @@ export default function ThreadMessageCard({
           value={translationTargetLang}
           onValueChange={(value) => onChangeTranslationLang?.(message.id, format, value)}
         >
-          <Select.Trigger aria-label="Translation target language" />
+          <Select.Trigger aria-label={t("targetLanguage")} />
           <Select.Content position="popper">
             {DEEPL_TARGET_LANGUAGES.map((language) => (
               <Select.Item key={language.code} value={language.code}>
@@ -464,9 +465,7 @@ export default function ThreadMessageCard({
             ))}
           </Select.Content>
         </Select.Root>
-        <Button size="1" variant="ghost" color="gray" onClick={() => onHideTranslation?.(message.id)}>
-          Show original
-        </Button>
+        <Button size="1" variant="ghost" color="gray" onClick={() => onHideTranslation?.(message.id)}>{t("showOriginal")}</Button>
       </Flex>
     );
   };
@@ -528,7 +527,7 @@ export default function ThreadMessageCard({
     content = wrapPanel(
       "loading",
       <div className={styles.bodyLoading} role="status" aria-live="polite">
-        <span className={styles.bodyLoadingLabel}>Loading message content…</span>
+        <span className={styles.bodyLoadingLabel}>{t("loadingContent")}</span>
         <div className={styles.bodyLoadingSkeleton} aria-hidden="true">
           <span className={styles.bodyLoadingLine} />
           <span className={styles.bodyLoadingLine} />
@@ -563,7 +562,7 @@ export default function ThreadMessageCard({
       : Boolean(message.hasInlineAttachments && message.htmlBody?.trim());
 
   if (threadViewMode === "compact" && isCollapsed) {
-    const imapBadges = getImapFlagBadges(message);
+    const imapBadges = getImapFlagBadges(message, locale);
     const showAttachmentIcon = hasNonInlineAttachments(message);
     const showInlineImageIcon = hasInlineImageAttachments;
     const fromDisplay = getMessageFromDisplay(
@@ -571,9 +570,9 @@ export default function ThreadMessageCard({
       { to: message.to, cc: message.cc, bcc: message.bcc },
       userEmail,
       true,
-      false
+      false, undefined, locale
     );
-    const senderText = fromDisplay.text || message.from || "(unknown)";
+    const senderText = fromDisplay.text || message.from || t("unknownSenderLabel");
     const senderEmail = getPrimaryEmail(message.from);
     // Show email address after display name only when they differ (i.e. there is a separate display name)
     const showSenderEmail =
@@ -621,7 +620,7 @@ export default function ThreadMessageCard({
                 />
               )}
               {fromDisplay.showRecipientIcon && (
-                <span className={styles.compactRecipientIcon} aria-label="Recipients">
+                <span className={styles.compactRecipientIcon} aria-label={t("recipients")}>
                   <MoveRight size={12} />
                 </span>
               )}
@@ -702,15 +701,15 @@ export default function ThreadMessageCard({
                 <Collapsible.Trigger
                   type="button"
                   className={styles.caretTrigger}
-                  title={isCollapsed ? "Expand message" : "Collapse message"}
-                  aria-label={isCollapsed ? "Expand message" : "Collapse message"}
+                  title={isCollapsed ? t("expandMessage") : t("collapseMessage")}
+                  aria-label={isCollapsed ? t("expandMessage") : t("collapseMessage")}
                 >
                   <span className={styles.caret}>
                     <CaretRightIcon />
                   </span>
                 </Collapsible.Trigger>
                 <div className={styles.badges}>
-                  {getImapFlagBadges(message).map((badge) =>
+                  {getImapFlagBadges(message, locale).map((badge) =>
                     badge.kind === "flagged" ? (
                       <FlagBadge
                         key={`${badge.kind}-${badge.label}`}
@@ -769,13 +768,10 @@ export default function ThreadMessageCard({
                     onSelectFolder={handleFolderBadgeSelect}
                   />
                   {message.recent && (
-                    <Badge size="1" variant="soft" color={badgeColors.recent}>
-                      Recent
-                    </Badge>
+                    <Badge size="1" variant="soft" color={badgeColors.recent}>{t("recent")}</Badge>
                   )}
                   {message.priority && message.priority.toLowerCase() !== "normal" && (
-                    <Badge size="1" variant="soft" color={priorityColor}>
-                      Priority: {message.priority}
+                    <Badge size="1" variant="soft" color={priorityColor}>{t("priority")}{message.priority}
                     </Badge>
                   )}
                   {hasNonInlineAttachments(message) && (
@@ -784,7 +780,7 @@ export default function ThreadMessageCard({
                       variant="soft"
                       color={badgeColors.attachment}
                       className={badgeStyles.badge}
-                      title="Attachments"
+                      title={t("attachments")}
                     >
                       <Paperclip size={12} />
                     </Badge>
@@ -795,7 +791,7 @@ export default function ThreadMessageCard({
                       variant="soft"
                       color={badgeColors.inlineAttachment}
                       className={badgeStyles.badge}
-                      title="Inline images"
+                      title={t("inlineImages")}
                     >
                       <ImageIcon size={12} />
                     </Badge>
@@ -854,7 +850,7 @@ export default function ThreadMessageCard({
                   />
                 </div>
                 <div className={`${styles.metaSegment} ${styles.metaSegmentDate}`}>
-                  <span className={styles.metaLabel}>Date:</span>
+                  <span className={styles.metaLabel}>{t("dateLabel")}</span>
                   <span className={styles.metaValue} title={dateDisplay.tooltip}>
                     {dateDisplay.text}
                   </span>
@@ -862,14 +858,14 @@ export default function ThreadMessageCard({
               </div>
               {recipientFields.map((field) => (
                 <MessageRecipientMetaField
-                  key={field.label}
+                  key={field.kind}
                   label={field.label}
                   value={field.value}
                   copyValue={formatAddressList(field.value)}
                   aliasName={field.alias?.name ?? null}
                   showAliasAction={field.showAliasAction}
                   onAliasAction={
-                    field.showAliasAction && field.label !== "Bcc"
+                    field.showAliasAction && field.kind !== "bcc"
                       ? () => onOpenRecipientAlias(field.label, field.value, field.alias)
                       : undefined
                   }
@@ -884,7 +880,7 @@ export default function ThreadMessageCard({
                 return ref ? (
                   <InReplyToReferenceRow
                     variant="message"
-                    label={ref.isForward ? "Forwarded mail:" : "In Reply To:"}
+                    label={ref.isForward ? t("forwardedMail") : t("inReplyTo")}
                     value={ref.target.subject ?? ref.refId}
                     onClick={() => handleSelectMessage(ref.target)}
                   />
@@ -893,9 +889,7 @@ export default function ThreadMessageCard({
             </div>
             {getUnsubscribeCapability(message) && !isCollapsed && (
               <div className={styles.unsubscribeBanner}>
-                <span className={styles.unsubscribeText}>
-                  This message is from a mailing list.
-                </span>
+                <span className={styles.unsubscribeText}>{t("mailingListMessage")}</span>
                 <Button
                   size="1"
                   variant="soft"
@@ -904,8 +898,8 @@ export default function ThreadMessageCard({
                   disabled={pendingMessageActions.has(message.id)}
                 >
                   {getUnsubscribeCapability(message) === "one-click"
-                    ? "Unsubscribe"
-                    : "Unsubscribe page"}
+                    ? t("unsubscribe")
+                    : t("unsubscribePage")}
                 </Button>
               </div>
             )}

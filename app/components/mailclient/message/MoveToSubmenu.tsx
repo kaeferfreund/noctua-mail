@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useState } from "react";
@@ -29,6 +30,7 @@ export default function MoveToSubmenu({
   onMoveToOther,
   disabled
 }: MoveToSubmenuProps) {
+  const t = useTranslations("Reader");
   const isMobile = useIsMobile();
   const [recentFolders, setRecentFolders] = useState<Folder[]>([]);
 
@@ -42,7 +44,7 @@ export default function MoveToSubmenu({
         <span className={styles.menuIcon}>
           <FolderInput size={14} />
         </span>
-        <span className={styles.menuLabel}>Move to</span>
+        <span className={styles.menuLabel}>{t("moveTo")}</span>
       </DropdownMenu.SubTrigger>
       <DropdownMenu.SubContent className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}>
         {recentFolders.map((folder) => (
@@ -61,7 +63,7 @@ export default function MoveToSubmenu({
           <span className={styles.menuIcon}>
             <FolderInput size={14} />
           </span>
-          <span className={styles.menuLabel}>More...</span>
+          <span className={styles.menuLabel}>{t("moreMenu")}</span>
         </DropdownMenu.Item>
       </DropdownMenu.SubContent>
     </DropdownMenu.Sub>

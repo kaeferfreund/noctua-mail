@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import HtmlMessage from "./HtmlMessage";
 
 afterEach(() => {

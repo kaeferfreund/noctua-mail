@@ -1,6 +1,7 @@
 import { afterEach, expect, it } from "bun:test";
 import { createRef } from "react";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import MessageListOrchestrator, { type MessageListOrchestratorProps } from "./MessageListOrchestrator";
 const noop = () => {};

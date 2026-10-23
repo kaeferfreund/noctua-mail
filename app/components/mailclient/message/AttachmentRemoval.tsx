@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { AlertDialog, Button, Flex, Text } from "@radix-ui/themes";
 import type { Attachment } from "@/lib/data";
 import AlertDialogContent from "./AlertDialogContent";
@@ -16,6 +17,7 @@ export function RemoveAttachmentConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useTranslations("Reader");
   const noun = attachment && isImageAttachment(attachment) ? "image" : "attachment";
   return (
     <AlertDialog.Root
@@ -25,22 +27,17 @@ export function RemoveAttachmentConfirmDialog({
       }}
     >
       <AlertDialogContent size="2">
-        <AlertDialog.Title size="3">Remove this {noun}?</AlertDialog.Title>
+        <AlertDialog.Title size="3">{t("removeAttachmentTitle", { kind: noun })}</AlertDialog.Title>
         <AlertDialog.Description>
           <Text as="span">
-            {attachment?.filename ? `“${attachment.filename}” ` : `This ${noun} `}
-            will be stripped from the message on the mail server and removed from this device. The
-            rest of the email is kept. This can’t be undone.
+            {t("removeAttachmentDescription", { kind: noun, named: attachment?.filename ? "yes" : "no", filename: attachment?.filename ?? "" })}
           </Text>
         </AlertDialog.Description>
         <Flex gap="3" mt="4" justify="end">
-          <Button variant="soft" color="gray" onClick={onCancel} disabled={removing}>
-            Cancel
-          </Button>
+          <Button variant="soft" color="gray" onClick={onCancel} disabled={removing}>{t("cancel")}</Button>
           {/* Not wrapped in AlertDialog.Action: the removal is async and the
               dialog must stay open, showing progress, until it resolves. */}
-          <Button color="red" variant="solid" onClick={onConfirm} loading={removing}>
-            Remove {noun}
+          <Button color="red" variant="solid" onClick={onConfirm} loading={removing}>{t("remove")}{noun}
           </Button>
         </Flex>
       </AlertDialogContent>

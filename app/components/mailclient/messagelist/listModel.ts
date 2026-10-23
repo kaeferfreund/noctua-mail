@@ -1,3 +1,4 @@
+import type { UiLocale } from "@/lib/i18n/config";
 import type { OwnAddressInput } from "@/lib/ownAddresses";
 import type { Message, RecipientAlias } from "@/lib/data";
 import { INVITE_DECK_GROUP_BY, sortGroupsForGroupBy } from "@/lib/messageGrouping";
@@ -23,6 +24,7 @@ export type MessageGroup = {
   items: Message[];
   count?: number;
   showCount?: boolean;
+  countIsLoaded?: boolean;
   allowToggleWhenEmpty?: boolean;
   variant?: "topic-suggestions";
 };
@@ -99,6 +101,7 @@ export type ThreadSelectionState = {
 };
 
 type SharedListParams = {
+  locale?: UiLocale;
   groupedMessages: MessageGroup[];
   collapsedGroups: Record<string, boolean>;
   collapsedThreads: Record<string, boolean>;
@@ -245,6 +248,10 @@ export function buildGroupedMessages(params: {
     mergedMeta.push({ key: "Done", label: "Done", count: doneCount });
   }
 
+  // Server time-bucket totals still use host-local SQL boundaries. Until that
+  // protected query is aligned with Europe/Berlin, count the already loaded
+  // rows under their Berlin keys; the overall list total/pagination stays intact.
+  const useLoadedTimeCounts = groupBy === "date" || groupBy === "week" || groupBy === "year";
   return mergedMeta.reduce<MessageGroup[]>((acc, group) => {
     const items = groups.get(group.key) ?? [];
     if (items.length === 0) {
@@ -253,7 +260,8 @@ export function buildGroupedMessages(params: {
     acc.push({
       key: group.key,
       label: group.label,
-      count: group.count,
+      count: useLoadedTimeCounts && group.key !== "Flagged" && group.key !== "Done" ? items.length : group.count,
+      ...(useLoadedTimeCounts && group.key !== "Flagged" && group.key !== "Done" ? { countIsLoaded: true } : {}),
       items
     });
     return acc;
@@ -269,6 +277,7 @@ function sortGroupMetaForGroupBy(groups: MessageGroupMeta[], groupBy: string) {
 
 export function buildMessageListItems(params: BuildMessageListItemsParams): ListItem[] {
   const {
+    locale = "de",
     groupedMessages,
     collapsedGroups,
     collapsedThreads,
@@ -321,7 +330,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
                 fullFlat,
                 userEmail,
                 preferToDisplay,
-                findRecipientAlias
+                findRecipientAlias, locale
               )
             : null;
         const collapsedThreadRepresentative =
@@ -371,7 +380,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
                   userEmail,
                   isInExpandedThread,
                   preferToDisplay,
-                  findRecipientAlias
+                  findRecipientAlias, locale
                 );
 
           rows.push({
@@ -425,7 +434,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
         userEmail,
         false,
         preferToDisplay,
-        findRecipientAlias
+        findRecipientAlias, locale
       );
       rows.push({
         type: "row",

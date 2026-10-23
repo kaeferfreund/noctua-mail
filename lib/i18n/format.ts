@@ -33,3 +33,12 @@ export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatU
 export function formatList(value: Iterable<string>, locale: UiLocale, options: Intl.ListFormatOptions = {}, zone = timeZone) {
   return cached(lists, key(locale, zone, options), () => new Intl.ListFormat(formattingLocales[locale], options)).format(value);
 }
+
+/** Calendar-day ordinal in the explicit display zone; subtraction stays correct across DST. */
+export function displayDayNumber(value: Date | number, zone = timeZone) {
+  const parts = cached(dates, `display-day:${zone}`, () => new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone
+  })).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(part("year"), part("month") - 1, part("day")) / 86_400_000;
+}

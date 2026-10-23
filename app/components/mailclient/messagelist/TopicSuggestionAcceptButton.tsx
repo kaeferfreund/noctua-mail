@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { Check } from "lucide-react";
 import { topicColorToScale } from "@/lib/data";
@@ -16,13 +17,14 @@ export default function TopicSuggestionAcceptButton({
   disabled = false,
   onClick
 }: TopicSuggestionAcceptButtonProps) {
+  const t = useTranslations("List");
   return (
     <TooltipIconButton
       size="1"
       variant="soft"
       color={topicColorToScale(topicColor) as any}
-      tooltip={isPending ? "Adding topic…" : "Add to topic"}
-      aria-label="Add to topic"
+      tooltip={isPending ? t("addingTopic") : t("addToTopic")}
+      aria-label={t("addToTopic")}
       disabled={disabled || isPending}
       onClick={onClick}
     >

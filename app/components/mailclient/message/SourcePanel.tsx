@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import RawTextPanel from "./RawTextPanel";
 
@@ -8,6 +9,7 @@ type SourcePanelProps = {
 };
 
 export default function SourcePanel({ messageId, fetchSource, scrubSource }: SourcePanelProps) {
+  const t = useTranslations("Reader");
   const [sourceState, setSourceState] = useState<{
     messageId: string;
     source: string;
@@ -41,16 +43,16 @@ export default function SourcePanel({ messageId, fetchSource, scrubSource }: Sou
   const source = sourceState && sourceState.messageId === messageId ? sourceState.source : "";
   const text =
     status === "loading"
-      ? "Loading source…"
+      ? t("loadingSource")
       : status === "error"
-        ? "Failed to load source."
+        ? t("sourceFailed")
         : scrubSource(source) ?? "";
 
   return (
     <RawTextPanel
       text={text}
       copyText={status === "loaded" ? source : ""}
-      copyLabel="Copy source"
+      copyLabel={t("copySource")}
       constrainHeight={false}
     />
   );

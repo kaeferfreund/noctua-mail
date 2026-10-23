@@ -267,3 +267,23 @@ describe("getMessageListRowKey", () => {
     ).toBe("msg-2");
   });
 });
+
+test("Berlin time buckets display loaded-row counts while host-local server totals await alignment", () => {
+  for (const [groupBy, key] of [["date", "Today"], ["week", "2026-W43"], ["year", "2026"]]) {
+    const messages = [makeMessage({ id: "berlin-1", groupKey: key }), makeMessage({ id: "berlin-2", groupKey: key })];
+    const groups = buildGroupedMessages({
+      listScopeMessages: messages, supportsThreads: false,
+      groupMeta: [{ key, label: key, count: 1 }, { key: "stale-host-bucket", label: "stale-host-bucket", count: 20 }],
+      groupBy, buildThreadTree: () => [], flattenThread: () => [], isFlaggedMessage: () => false, computeGroupMeta: () => []
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ key, count: 2, countIsLoaded: true, items: messages });
+  }
+  const groups = buildGroupedMessages({
+    listScopeMessages: [makeMessage({ groupKey: "sender@example.test" })], supportsThreads: false,
+    groupMeta: [{ key: "sender@example.test", label: "sender@example.test", count: 10 }], groupBy: "sender",
+    buildThreadTree: () => [], flattenThread: () => [], isFlaggedMessage: () => false, computeGroupMeta: () => []
+  });
+  expect(groups[0]?.count).toBe(10);
+  expect(groups[0]?.countIsLoaded).toBeUndefined();
+});

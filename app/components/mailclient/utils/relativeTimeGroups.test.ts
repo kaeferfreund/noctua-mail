@@ -6,7 +6,7 @@ function localDateMs(year: number, monthIndex: number, day: number) {
 }
 
 function getGroupLabel(timestampMs: number, nowMs: number) {
-  const grouped = groupItemsByRelativeTime([timestampMs], (value) => value, nowMs);
+  const grouped = groupItemsByRelativeTime([timestampMs], (value) => value, nowMs, "en");
   return grouped[0]?.label;
 }
 

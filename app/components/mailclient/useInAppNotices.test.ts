@@ -3,11 +3,12 @@ import { NOTICE_TIMEOUTS, NOTICE_TIMEOUTS_NO_UNDO } from "./constants";
 import { resolveInAppNoticeTimeoutMs } from "./useInAppNotices";
 
 describe("resolveInAppNoticeTimeoutMs", () => {
-  test("keeps the full timeout for undo actions regardless of label case", () => {
+  test("keeps the full timeout for undo actions regardless of translated label", () => {
     const timeoutMs = resolveInAppNoticeTimeoutMs({
       type: "success",
       title: "Event deleted.",
-      actionLabel: "UNDO",
+      actionKind: "undo",
+      actionLabel: "Rückgängig",
       onAction: () => undefined
     });
 
@@ -22,4 +23,9 @@ describe("resolveInAppNoticeTimeoutMs", () => {
 
     expect(timeoutMs).toBe(NOTICE_TIMEOUTS_NO_UNDO.success);
   });
+});
+
+test("a label alone never opts into undo behavior", () => {
+  expect(resolveInAppNoticeTimeoutMs({ type: "success", title: "Synthetic", actionLabel: "Undo", onAction() {} }))
+    .toBe(NOTICE_TIMEOUTS_NO_UNDO.success);
 });

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { Edit3, Forward, Reply, ReplyAll, Search, Send, Trash2 } from "lucide-react";
 import type { Message } from "@/lib/data";
@@ -41,6 +42,7 @@ export default function MessageQuickActions({
   onSendDraft,
   isTrashFolder
 }: MessageQuickActionsProps) {
+  const t = useTranslations("Reader");
   const allowThreadDeletion = origin !== "thread";
   const buttonSize = origin === "thread" ? "2" : "1";
   const isVisible = (action: MessageQuickAction, defaultValue = true) =>
@@ -55,7 +57,7 @@ export default function MessageQuickActions({
             size={buttonSize}
             variant="ghost"
             color="gray"
-            tooltip="Edit draft"
+            tooltip={t("editDraft")}
             disabled={pendingMessageActions.has(message.id)}
             onClick={(event) => {
               event.stopPropagation();
@@ -70,7 +72,7 @@ export default function MessageQuickActions({
             size={buttonSize}
             variant="ghost"
             color="gray"
-            tooltip="Send draft"
+            tooltip={t("sendDraft")}
             disabled={pendingMessageActions.has(message.id) || !canSendDraft}
             onClick={(event) => {
               event.stopPropagation();
@@ -85,7 +87,8 @@ export default function MessageQuickActions({
             size={buttonSize}
             variant="ghost"
             color="gray"
-            tooltip="Find related"
+            data-message-action="related"
+            tooltip={t("findRelated")}
             disabled={pendingMessageActions.has(message.id)}
             onClick={(event) => {
               event.stopPropagation();
@@ -100,8 +103,9 @@ export default function MessageQuickActions({
             size={buttonSize}
             variant="ghost"
             color="gray"
-            tooltip={isTrashFolder(message.folderId) ? "Delete permanently" : "Move to Trash"}
-            aria-label="Delete"
+            tooltip={isTrashFolder(message.folderId) ? t("deletePermanent") : t("moveTrash")}
+            data-message-action="delete"
+            aria-label={t("delete")}
             disabled={pendingMessageActions.has(message.id)}
             onClick={(event) => {
               event.stopPropagation();
@@ -122,7 +126,7 @@ export default function MessageQuickActions({
           size={buttonSize}
           variant="ghost"
           color="gray"
-          tooltip="Reply"
+          tooltip={t("reply")}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => {
             event.stopPropagation();
@@ -137,7 +141,7 @@ export default function MessageQuickActions({
           size={buttonSize}
           variant="ghost"
           color="gray"
-          tooltip="Reply all"
+          tooltip={t("replyAll")}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => {
             event.stopPropagation();
@@ -152,7 +156,7 @@ export default function MessageQuickActions({
           size={buttonSize}
           variant="ghost"
           color="gray"
-          tooltip="Forward"
+          tooltip={t("forward")}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => {
             event.stopPropagation();
@@ -167,7 +171,8 @@ export default function MessageQuickActions({
           size={buttonSize}
           variant="ghost"
           color="gray"
-          tooltip="Find related"
+          data-message-action="related"
+          tooltip={t("findRelated")}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => {
             event.stopPropagation();
@@ -182,8 +187,9 @@ export default function MessageQuickActions({
           size={buttonSize}
           variant="ghost"
           color="gray"
-          tooltip={isTrashFolder(message.folderId) ? "Delete permanently" : "Move to Trash"}
-          aria-label="Delete"
+          tooltip={isTrashFolder(message.folderId) ? t("deletePermanent") : t("moveTrash")}
+          data-message-action="delete"
+          aria-label={t("delete")}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => {
             event.stopPropagation();

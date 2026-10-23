@@ -6,6 +6,8 @@ import {readFileSync, readdirSync} from 'node:fs';
 import path from 'node:path';
 import {totpFromUri} from '../../helpers/totp';
 
+test.use({ locale: "en-GB" });
+
 test.skip(!process.env.COMPOSE_QA_SEED_FILE || !process.env.COMPOSE_QA_OUTBOX, 'Requires isolated synthetic compose fixture');
 
 async function post(page: Page, url: string, body: unknown) {

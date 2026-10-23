@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { startTransition, useEffect, useId, useRef, useState } from "react";
 import type React from "react";
 import {
@@ -68,36 +69,6 @@ type MenuOption<T extends string> = {
   disabled?: boolean;
 };
 
-const VIEW_OPTIONS: ReadonlyArray<MenuOption<MessageViewMode> & { icon: LucideIcon }> = [
-  { value: "threads", label: "Threads", icon: MessagesSquare },
-  { value: "compact", label: "Compact", icon: Rows3 },
-  { value: "card", label: "Cards", icon: StretchHorizontal },
-  { value: "table", label: "Table", icon: Table2 }
-];
-
-const SORT_OPTIONS: ReadonlyArray<MenuOption<MessageListSortBy>> = [
-  { value: "date", label: "Date" },
-  { value: "size", label: "Size" }
-];
-
-const GROUP_OPTIONS: ReadonlyArray<MenuOption<MessageListGroupBy> & { shortLabel?: string }> = [
-  { value: "date", label: "Date" },
-  { value: "week", label: "Week" },
-  { value: "sender", label: "Sender" },
-  { value: "domain", label: "Sender domain", shortLabel: "Domain" },
-  { value: "year", label: "Year" },
-  { value: "event", label: "Event" },
-  { value: "folder", label: "Folder" },
-  { value: "none", label: "None" }
-];
-
-const THREAD_DATE_OPTIONS: ReadonlyArray<MenuOption<ThreadDateSource>> = [
-  { value: "latestReceivedDateValue", label: "Received" },
-  { value: "latestDateValue", label: "Last activity" }
-];
-
-const countFormat = new Intl.NumberFormat();
-
 function MenuRadioSection<T extends string>({
   label,
   hint,
@@ -150,6 +121,35 @@ function MenuRadioSection<T extends string>({
 }
 
 export default function MessageListHeader({ state, actions }: MessageListHeaderProps) {
+  const t = useTranslations("List");
+  const VIEW_OPTIONS: ReadonlyArray<MenuOption<MessageViewMode> & { icon: LucideIcon }> = [
+    { value: "threads", label: t("threads"), icon: MessagesSquare },
+    { value: "compact", label: t("compact"), icon: Rows3 },
+    { value: "card", label: t("cards"), icon: StretchHorizontal },
+    { value: "table", label: t("table"), icon: Table2 }
+  ];
+
+  const SORT_OPTIONS: ReadonlyArray<MenuOption<MessageListSortBy>> = [
+    { value: "date", label: t("date") },
+    { value: "size", label: t("size") }
+  ];
+
+  const GROUP_OPTIONS: ReadonlyArray<MenuOption<MessageListGroupBy> & { shortLabel?: string }> = [
+    { value: "date", label: t("date") },
+    { value: "week", label: t("week") },
+    { value: "sender", label: t("sender") },
+    { value: "domain", label: t("senderDomain"), shortLabel: t("domain") },
+    { value: "year", label: t("year") },
+    { value: "event", label: t("event") },
+    { value: "folder", label: t("folder") },
+    { value: "none", label: t("none") }
+  ];
+
+  const THREAD_DATE_OPTIONS: ReadonlyArray<MenuOption<ThreadDateSource>> = [
+    { value: "latestReceivedDateValue", label: t("received") },
+    { value: "latestDateValue", label: t("lastActivity") }
+  ];
+
   const {
     searchScope,
     loadedMessageCount,
@@ -237,14 +237,12 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
   };
 
   // "349 of 10,848" reads as a count on its own; a bare "349" needs the noun.
-  const countLabel =
-    totalMessages !== null
-      ? `${countFormat.format(loadedMessageCount)} of ${countFormat.format(totalMessages)}`
-      : countFormat.format(loadedMessageCount);
-  const countNoun = (totalMessages ?? loadedMessageCount) === 1 ? "message" : "messages";
-  const loadingPrefix = listLoading ? "Loading… " : "";
-  const countText = `${loadingPrefix}${totalMessages !== null ? countLabel : `${countLabel} ${countNoun}`}`;
-  const countTitle = `${loadingPrefix}${countLabel} ${countNoun} loaded`;
+  const countParams = {
+    count: loadedMessageCount, total: totalMessages ?? loadedMessageCount,
+    totalKnown: totalMessages !== null ? "yes" : "no", loading: listLoading ? "yes" : "no"
+  };
+  const countText = t("messageCount", countParams);
+  const countTitle = t("messageCountLoaded", countParams);
 
   const currentView = VIEW_OPTIONS.find((option) => option.value === localView) ?? VIEW_OPTIONS[0];
   const CurrentViewIcon = currentView.icon;
@@ -268,32 +266,31 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
   const threadsUnavailableReason = threadsAllowed
     ? undefined
     : groupingDisabled
-      ? "Off while sorting by size"
+      ? t("sizeSortDisabled")
       : !isThreadDateSensitiveGroupBy(effectiveGroupBy)
-        ? "Requires Date, Week or Year grouping"
-        : "Not available in this folder";
+        ? t("dateGroupingRequired")
+        : t("folderUnavailable");
   const threadsHint =
     threadsUnavailableReason ??
-    (threadsScopeAvailable ? undefined : "Scoped views are inactive while searching everywhere");
+    (threadsScopeAvailable ? undefined : t("scopeSearchDisabled"));
   const threadsOptions: ReadonlyArray<MenuOption<ThreadsMode>> = [
-    { value: "off", label: "Off" },
-    { value: "on", label: "On" },
-    { value: "scope", label: "On in scoped views", disabled: !threadsScopeAvailable }
+    { value: "off", label: t("off") },
+    { value: "on", label: t("on") },
+    { value: "scope", label: t("onScoped"), disabled: !threadsScopeAvailable }
   ];
   // Disabled menu items are skipped by keyboard focus, so the reasons shown in
   // the menu would never be announced; the trigger name carries the full state.
   const threadsState = !threadsAllowed
-    ? "threads off"
+    ? t("threadsOff")
     : threadsMode === "off"
-      ? "threads off"
+      ? t("threadsOff")
       : threadsMode === "on"
-        ? "threads on"
-        : "threads on in scoped views";
-  const sortTooltip = `Sort & group: ${currentSort.label}${
-    groupingDisabled
-      ? ", grouping and threads off while sorting by size"
-      : `${isGrouped ? `, grouped by ${currentGroup.label}` : ", not grouped"}, ${threadsState}`
-  }`;
+        ? t("threadsOn")
+        : t("threadsScoped");
+  const sortTooltip = t("sortDescription", {
+    sort: currentSort.label, group: currentGroup.label,
+    grouping: groupingDisabled ? "disabled" : isGrouped ? "grouped" : "none", threads: threadsState
+  });
 
   const hasExpandedGroup = groupedMessages.some(
     (group) => !(collapsedGroups[group.key] ?? group.variant === "topic-suggestions")
@@ -317,13 +314,13 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
         <DropdownMenuTrigger asChild>
           <ToolbarButton
             menu
-            tooltip={`View: ${currentView.label}`}
+            tooltip={t("viewDescription", { view: currentView.label })}
             icon={<CurrentViewIcon className="size-4" />}
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={styles.viewMenu}>
           <MenuRadioSection
-            label="View"
+            label={t("view")}
             value={localView}
             options={VIEW_OPTIONS}
             onValueChange={handleViewChange}
@@ -342,15 +339,15 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={styles.sortMenu}>
           <MenuRadioSection
-            label="Sort by"
+            label={t("sortBy")}
             value={localSort}
             options={SORT_OPTIONS}
             onValueChange={handleSortChange}
           />
           <DropdownMenuSeparator />
           <MenuRadioSection
-            label="Group by"
-            hint={groupingDisabled ? "Off while sorting by size" : undefined}
+            label={t("groupBy")}
+            hint={groupingDisabled ? t("sizeSortDisabled") : undefined}
             value={effectiveGroupBy}
             options={groupOptions}
             disabled={groupingDisabled}
@@ -360,7 +357,7 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
             <>
               <DropdownMenuSeparator />
               <MenuRadioSection
-                label="Thread date"
+                label={t("threadDate")}
                 value={localThreadDateSource}
                 options={THREAD_DATE_OPTIONS}
                 onValueChange={handleThreadDateSourceChange}
@@ -369,7 +366,7 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
           )}
           <DropdownMenuSeparator />
           <MenuRadioSection
-            label="Threads"
+            label={t("threads")}
             hint={threadsHint}
             value={threadsAllowed ? threadsMode : "off"}
             options={threadsOptions}
@@ -380,7 +377,7 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
       </DropdownMenu>
       {hasToggleableGroup && (
         <ToolbarButton
-          tooltip={hasExpandedGroup ? "Collapse all groups" : "Expand all groups"}
+          tooltip={hasExpandedGroup ? t("collapseGroups") : t("expandGroups")}
           icon={
             hasExpandedGroup ? (
               <ListChevronsDownUp className="size-4" />
