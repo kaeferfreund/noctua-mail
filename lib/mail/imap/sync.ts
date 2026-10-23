@@ -450,14 +450,7 @@ export async function parseImapMessage(
   const parsedSource = await parseMailForCategorization(message.source);
   attachments = mergeAttachmentMetadataFromParsedAttachments(
     attachments,
-    (parsedSource.attachments ?? []) as Array<{
-      filename?: string | null;
-      contentType?: string | null;
-      contentId?: string | null;
-      cid?: string | null;
-      content?: Buffer | Uint8Array | ArrayBuffer | null;
-      dataUrl?: string | null;
-    }>
+    parsedSource.attachments ?? []
   );
   const calendarEventUids = collectCalendarEventUidsFromAttachments(
     parsedSource.attachments as CalendarAttachmentCandidate[]
