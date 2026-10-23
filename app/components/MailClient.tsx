@@ -1,4 +1,9 @@
 "use client";
+
+import { useStartupSync } from "./mailclient/useStartupSync";
+import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
+import { isAccountFolder } from "@/lib/folderAccount";
+import { findInboxFolder } from "@/lib/specialFolders";
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
@@ -291,7 +296,6 @@ import {
   normalizeRecipientListForComparison,
   replaceLastRecipientToken
 } from "@/lib/recipientLists";
-import { decideStartupSync } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 
 const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
@@ -572,6 +576,8 @@ export default function MailClient({
     apiFetch
   });
 
+  const activeAccountIdRef = useRef(activeAccountId);
+  activeAccountIdRef.current = activeAccountId;
   const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
     const targetAccountId = accountIdOverride?.trim() || activeAccountId;
     if (!targetAccountId) {
@@ -582,7 +588,7 @@ export default function MailClient({
       const foldersRes = await apiFetch(buildAccountFoldersPath(targetAccountId));
       if (foldersRes.ok) {
         const nextFolders = (await foldersRes.json()) as Folder[];
-        setFolders(nextFolders);
+        if (activeAccountIdRef.current === targetAccountId) setFolders(nextFolders);
         return nextFolders;
       } else {
         reportError(await readErrorMessage(foldersRes));
@@ -4331,84 +4337,11 @@ export default function MailClient({
     return () => window.clearInterval(timer);
   }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
 
-  // Initial sync on login (once per session per account). For existing accounts,
-  // sync only the active folder first so new mail appears before any broader repair work.
-  useEffect(() => {
-    if (!initialDataReady || !activeAccountId) return;
-    if (initialFoldersLoadedAccountId !== activeAccountId) return;
-
-    const hasAccountFolders = accountFolders.length > 0;
-
-    // For returning users, wait until the active folder is selected before starting
-    // sync, so the syncAccount closure captures the correct activeFolderId. Without
-    // this guard, activeFolderId is "" when the effect first fires (it gets set by a
-    // sibling effect that runs in the same flush), causing refreshMailboxData() to be
-    // skipped after sync completes and the user sees stale mail.
-    if (hasAccountFolders && !activeFolderId) return;
-
-    const syncStatus =
-      initialSyncStatusRef.current[activeAccountId] ?? readInitialSyncSessionStatus(activeAccountId);
-    if (syncStatus === "running" || syncStatus === "done") return;
-
-    initialSyncStatusRef.current[activeAccountId] = "running";
-    writeInitialSyncSessionStatus(activeAccountId, "running");
-    const accountId = activeAccountId;
-    const startupDecision = decideStartupSync({
-      hasAccountFolders,
-      activeFolderId
-    });
-    const startupTriggerId = logSyncPolicyCall({
-      caller: "startup",
-      policy: "decideStartupSync",
-      accountId: activeAccountId,
-      folderId: activeFolderId || null,
-      input: {
-        hasAccountFolders,
-        activeFolderId
-      },
-      decision: startupDecision
-    });
-    if (startupDecision.kind === "skip") {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-    const syncPromise =
-      startupDecision.kind === "account"
-        ? syncAccountRef.current?.(undefined, startupDecision.mode, {
-            fullSyncReason: startupDecision.reason,
-            triggerId: startupTriggerId
-          })
-        : startupDecision.mode === "new" || startupDecision.mode === "repair" || startupDecision.mode === "full"
-          ? syncAccountRef.current?.(startupDecision.folderId, startupDecision.mode, {
-              fullSyncReason: startupDecision.reason,
-              triggerId: startupTriggerId
-            })
-          : undefined;
-    if (!syncPromise) {
-      delete initialSyncStatusRef.current[accountId];
-      writeInitialSyncSessionStatus(accountId, null);
-      return;
-    }
-
-    void syncPromise
-      .then(() => {
-        initialSyncStatusRef.current[accountId] = "done";
-        writeInitialSyncSessionStatus(accountId, "done");
-      })
-      .catch(() => {
-        delete initialSyncStatusRef.current[accountId];
-        writeInitialSyncSessionStatus(accountId, null);
-      });
-  }, [
-    activeAccountId,
-    accountFolders.length,
-    initialDataReady,
-    initialFoldersLoadedAccountId,
-    activeFolderId,
-    readInitialSyncSessionStatus,
-    writeInitialSyncSessionStatus
-  ]);
+  useStartupSync({
+    initialDataReady, activeAccountId, initialFoldersLoadedAccountId, accountFolders,
+    activeFolderId, initialSyncStatusRef, readInitialSyncSessionStatus,
+    writeInitialSyncSessionStatus, syncAccountRef
+  });
 
   // CalDAV periodic sync
   useEffect(() => {
@@ -4930,16 +4863,17 @@ export default function MailClient({
     if (prevAccountIdRef.current !== activeAccountId) {
       prevAccountIdRef.current = activeAccountId;
       composeHandleRef.current?.resetSession();
+      setLastFolderId("");
       if (searchScope === "all") {
         setActiveFolderId("");
       } else {
-        setActiveFolderId(accountFolders[0]?.id ?? "");
+        setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
       }
       return;
     }
     if (searchScope === "all") return;
-    if (!activeFolderId) {
-      setActiveFolderId(accountFolders[0]?.id ?? "");
+    if (!isAccountFolder(activeAccountId, activeFolderId, accountFolders)) {
+      setActiveFolderId(findInboxFolder(accountFolders, activeAccountId)?.id ?? accountFolders[0]?.id ?? "");
     }
   }, [accountFolders, activeAccountId, activeFolderId, searchScope]);
 
@@ -5308,52 +5242,17 @@ export default function MailClient({
     window.addEventListener("storage", handleDetachedComposeEvent);
     return () => window.removeEventListener("storage", handleDetachedComposeEvent);
   }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice]);
-  // Auto-repair empty folders: if a folder shows no messages after loading,
-  // check if raw messages exist in DB (threading issue → recompute) or not (missing → sync).
-  useEffect(() => {
-    if (searchScope !== "folder" || !activeFolderId || !activeAccountId) return;
-    // Wait for the first real list response for this key before deciding the folder
-    // is unexpectedly empty. On initial refresh there is a short window where the
-    // list is empty simply because page 1 has not hydrated yet.
-    if (totalMessages === null) return;
-    if (listLoading || emptyListSyncing || isRecomputingThreads) return;
-    if (filteredMessages.length > 0) return;
-    if (autoRepairAttemptedFolderIdsRef.current.has(activeFolderId)) return;
-    autoRepairAttemptedFolderIdsRef.current.add(activeFolderId);
-    const folderId = activeFolderId;
-    const accountId = activeAccountId;
-    void (async () => {
-      try {
-        const params = new URLSearchParams({
-          folderId,
-          pageSize: "1"
-        });
-        const res = await apiFetch(buildAccountMessagesPath(accountId, params));
-        if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (typeof data?.total === "number" && data.total > 0) {
-          await recomputeThreadsRef.current();
-        } else {
-          await syncFolderWithBackgroundRef.current(folderId, true, "full", {
-            fullSyncReason:
-              "Auto-repair requested full sync because the folder list is empty and no raw messages were found in the DB."
-          });
-        }
-      } catch {
-        // silently ignore auto-repair errors
-      }
-    })();
-  }, [
-    searchScope,
-    activeFolderId,
-    activeAccountId,
+  useEmptyFolderRepair({
+    accountId: activeAccountId,
+    folderId: activeFolderId,
+    accountFolders,
+    enabled: searchScope === "folder" && totalMessages !== null &&
+      !listLoading && !emptyListSyncing && !isRecomputingThreads && filteredMessages.length === 0,
     apiFetch,
-    listLoading,
-    emptyListSyncing,
-    isRecomputingThreads,
-    filteredMessages.length,
-    totalMessages
-  ]);
+    attemptedFolderIdsRef: autoRepairAttemptedFolderIdsRef,
+    recomputeThreadsRef,
+    syncFolderRef: syncFolderWithBackgroundRef
+  });
 
 
   const rootFolders = accountFolders.filter((folder) => !folder.parentId);

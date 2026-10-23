@@ -44,9 +44,9 @@ export async function runNewMailCheck(
   }
 
   options.signal?.throwIfAborted();
-  const startedJobs = foldersToSync.map((d) =>
-    startSyncJob({ accountId, folderId: d.folderId, mode: "new" }, clientId, options.source)
-  );
+  const startedJobs = await Promise.all(foldersToSync.map((d) =>
+    startSyncJob({ accountId, folderId: d.folderId, mode: "new" }, clientId, options.source, options.signal)
+  ));
   const jobIds = startedJobs.map((j) => j.id);
 
   const deadline = Date.now() + TIMEOUT_MS;

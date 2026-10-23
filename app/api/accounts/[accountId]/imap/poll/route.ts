@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { formatEnvelopeAddresses, resolveMessageSenderKey } from "@/lib/mail/imap/parser";
 import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
 import { withAuthResponse } from "@/lib/auth";
@@ -18,7 +19,7 @@ import { imapUpstreamErrorResponse } from "@/app/api/_helpers/imapUpstreamError"
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
   const accountIdParam = await getAccountIdFromParams(params);
-  const mailbox = searchParams.get("mailbox") ?? "INBOX";
+  const requestedMailbox = searchParams.get("mailbox") ?? "INBOX";
   const sinceUidNextParam = searchParams.get("sinceUidNext");
   const sinceUidNext = sinceUidNextParam ? Number(sinceUidNextParam) : null;
   const accountContext = await requireAccountContext(request, accountIdParam, {
@@ -29,6 +30,13 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(accountContext, async () => {
     const { accountId, account, clientId } = accountContext;
 
+    const folderId = searchParams.get("folderId");
+    // `mailbox` is a raw IMAP path, never an account-prefixed folder ID.
+    // Validate it by its canonical folder ID, including the default INBOX.
+    const folderError = await validateAccountFolders(accountId,
+      [folderId, `${accountId}:${requestedMailbox}`]);
+    if (folderError) return folderError;
+    const mailbox = requestedMailbox;
     const logContext = { accountId, clientId };
 
     try {
