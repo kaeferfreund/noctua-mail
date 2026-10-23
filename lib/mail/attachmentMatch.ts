@@ -8,8 +8,12 @@ export function normalizeText(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
 }
 
-export function normalizeContentType(value?: string | null) {
-  return normalizeText((value ?? "").split(";")[0]);
+export function normalizeContentType(value?: unknown) {
+  // mailsplit represents a present but empty Content-Type as false, which
+  // mailparser forwards despite declaring attachment.contentType as string.
+  // It means no usable MIME type; coercing it would invent a type of "false".
+  if (typeof value !== "string") return "";
+  return normalizeText(value.split(";")[0]);
 }
 
 export function normalizeCid(value?: string | null) {

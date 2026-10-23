@@ -11,7 +11,7 @@ import { isCalendarAttachment } from "@/lib/messageFlags";
 
 type ParsedAttachmentCandidate = {
   filename?: string | null;
-  contentType?: string | null;
+  contentType?: string | false | null;
   contentId?: string | null;
   cid?: string | null;
   content?: Buffer | Uint8Array | ArrayBuffer | null;
@@ -111,7 +111,8 @@ export function mergeAttachmentMetadataFromParsedAttachments<
     if (!candidate) return attachment;
 
     const nextFilename = candidate.filename?.trim() || attachment.filename;
-    const nextContentType = candidate.contentType?.trim() || attachment.contentType;
+    const nextContentType =
+      (typeof candidate.contentType === "string" ? candidate.contentType.trim() : "") || attachment.contentType;
     const nextCid = cleanCid(candidate.contentId ?? candidate.cid) || attachment.cid;
 
     if (
