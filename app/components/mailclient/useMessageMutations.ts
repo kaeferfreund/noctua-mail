@@ -249,12 +249,17 @@ export function useMessageMutations({
     tn
   ]);
 
+  // Explicit JSON keeps bodyless commands valid when the browser/Next transport
+  // presents an empty request stream to requireMutationSameOrigin.
+  const requestMessageCommand = useCallback((messageId: string, action: string) =>
+    apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, action), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+    }), [activeAccountId, apiFetch]);
+
   const handleArchiveMessage = useCallback(async (message: Message) => {
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "archive"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "archive");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -281,7 +286,7 @@ export function useMessageMutations({
     }
   }, [
     activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
@@ -313,9 +318,7 @@ export function useMessageMutations({
 
       setPendingMessageActions((prev) => new Set(prev).add(message.id));
       try {
-        const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "unsubscribe"), {
-          method: "POST"
-        });
+        const res = await requestMessageCommand(message.id, "unsubscribe");
 
         if (!res.ok) {
           const errMsg = await readErrorMessage(res);
@@ -351,16 +354,14 @@ export function useMessageMutations({
         });
       }
     },
-    [activeAccountId, apiFetch, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
+    [requestMessageCommand, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
   );
 
   const handleMarkSpam = useCallback(async (message: Message) => {
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "spam"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -393,7 +394,7 @@ export function useMessageMutations({
     }
   }, [
     activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
@@ -406,9 +407,7 @@ export function useMessageMutations({
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "not-spam"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "not-spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -441,7 +440,7 @@ export function useMessageMutations({
     }
   }, [
     activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
