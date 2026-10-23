@@ -5,7 +5,9 @@ worktree `/home/monkey/code/noctua-mail/wt-perf-fts-search`, branch
 `perf/fts-search-driven`. Commits: `03d486e` (candidate resolution +
 differential tests), `82ce499` (bounded fetches + oversized-token probe);
 fix round 1: `55870b6` (F2), `10aafaf` (F4), `b3352c9` (F5) — see
-"Fix round 1" below. Review by the Umbau thread before merge, per task.
+"Fix round 1" below; fix round 2 (review r1 follow-ups): `5a06bd4` (R1),
+`78d8347` (fts_error classes), `d4c2b46` (R3) — see "Fix round 2". Review
+by the Umbau thread before merge, per task.
 
 ## Summary
 
@@ -44,7 +46,9 @@ absolute values inflated vs the rerank run at load 5–10, ratios are the
 signal): real `listThreads` search `needle` **99.04 → 49.38 ms**,
 two-token `needle gamma` **288.16 → 92.31 ms**, attachment search
 `invoice` **97.44 → 44.64 ms**, `listMessages` `needle` **61.36 → 23.60
-ms**, unselective `synthetic` (fallback) **388.08 → 385.50 ms** (≈0),
+ms**, unselective `synthetic` (fallback) **388.08 → 385.50 ms** (≈0 at
+load ~30; review r1 measured **+2.7 % to +4.3 %** on quieter runs — see
+"Fix round 2", R2),
 `from:`-only and default list unchanged (≈0, identical SQL). The rerank
 baseline for the same real search at low load was **81.03 ms**; the raw
 comparison still measures **14.81 ms OR-scan vs 0.20 ms FTS-driven**
@@ -167,7 +171,7 @@ resolution MATCH). Per `listMessages` search: **3 → 1**.
 ## Differential tests
 
 `lib/db/messages/query.ftsSearchDriven.test.ts` (49 tests, 442 expects
-at `82ce499`; 67 after fix round 1 — see below),
+at `82ce499`; 67 after fix round 1, 101 after fix round 2 — see below),
 built on the existing shared-shard synthetic fixture
 (`createSharedShardFixture`: two accounts, one physical shard, identical
 local ids — the FTS v3 collision case). Every corpus entry runs the real
@@ -225,7 +229,7 @@ bounds the noise.
 | `listThreads` search `needle` | 99.04 [90.46–136.46] | 49.38 [43.29–102.60] | **−50%** |
 | `listThreads` search `needle gamma` | 288.16 [274.82–433.95] | 92.31 [89.23–268.85] | **−68%** |
 | `listThreads` search `invoice` (attachment) | 97.44 [85.26–233.14] | 44.64 [43.64–77.44] | **−54%** |
-| `listThreads` search `synthetic` (11k hits → fallback) | 388.08 [340.39–749.94] | 385.50 [334.68–446.66] | ≈0 |
+| `listThreads` search `synthetic` (11k hits → fallback) | 388.08 [340.39–749.94] | 385.50 [334.68–446.66] | ≈0 (r1: +2.7 to +4.3 %) |
 | `listThreads` `from:sender` only (control, identical SQL) | 81.43 [78.60–89.75] | 83.48 [78.01–160.55] | ≈0 |
 | `listMessages` search `needle` | 61.36 [60.09–87.24] | 23.60 [22.74–29.81] | **−62%** |
 | `listThreads` default (control) | 70.02 [62.21–74.04] | 66.40 [62.98–114.75] | ≈0 |
@@ -294,8 +298,11 @@ Commands (cwd `wt-perf-fts-search`, heavy ones under `nice -n 10`,
 
 1. **Cap choice (2000).** Above it, searches silently use the legacy
    scan. On much larger shards a 2000-candidate `IN` list is still far
-   below SQLite's variable limit (32766 on 3.53.4) and each consuming
-   statement re-prepares with that many placeholders — is 2000 the
+   below any variable limit (Bun 1.4.4's SQLite accepts 250,000 bound
+   variables — measured in review r1; 32,766 is only SQLite's portable
+   default; the enforced cap maximum is 32,000 to leave headroom below it,
+   see R3) and each
+   consuming statement re-prepares with that many placeholders — is 2000 the
    right trade-off, or should the cap scale with page size / account
    size? No measurement above 11k backs a higher value yet.
 2. **All-tokens-oversized → legacy.** Two common words whose
@@ -495,6 +502,145 @@ Why no read transaction:
   contract, for a skew that is one request wide and self-heals on the
   next poll.
 
+## Fix round 2
+
+Follow-ups R1–R5 from `briefs/fts-search-driven-review-r1.md` (verdict
+MERGE-WITH-FOLLOW-UPS) plus an independently requested log
+classification. HEAD `d4c2b46` on `b3352c9`, base still `11dc3c5`.
+Line refs are `query.ts` at `d4c2b46`.
+
+| Item | Change | Commit |
+|---|---|---|
+| R1 — `AND`/`OR`/`NOT` → FTS5 syntax error (both modes) | `buildFtsTokenQuery` (`query.ts:474`) quotes the three FTS5 keyword barewords like any non-bareword token (`"NOT"*`, column-scoped `subject:"NOT"*`); searched as plain prefix terms in both modes | `5a06bd4` |
+| Log classification | `fts_error` lines gain `errorClass` `index` / `syntax` / `other`, derived in `FtsCandidateError` (`classifyFtsError`, `query.ts:820`) from the SQLite code/message; the message itself is still never logged | `78d8347` |
+| R3 — cap without upper bound | `maxFtsDrivenCandidates` (`query.ts:797`) clamps with one warning per configured value; default 2000 and invalid-value handling unchanged; `doc/DEPLOYMENT.md` documents the maximum and the reason. Maximum 32,766 in `d4c2b46`, lowered to **32,000** in the follow-up commit so a statement's other parameters stay below the portable limit (see "R3: cap maximum") | `d4c2b46` + follow-up |
+| R2 — fallback cost | Corrected in this brief (Summary, bench table, F1 rule): a cap/oversized fallback costs **+2.7 % to +4.3 %** on unselective searches, not ≈0 | brief only |
+| R3 — 32,766 figure | Corrected (risk 1): Bun 1.4.4's SQLite accepts 250,000 bound variables; 32,766 is the portable default; the enforced maximum is 32,000 (headroom for the non-candidate parameters) | brief only |
+| R4 — account hash pseudonymous | No change (review: acceptable; F1 exports only per-hash aggregates) | — |
+| R5 — F1 denominator | F1 step 3: primary denominator = searches with ≥ 1 free-text token, both shares reported; steps 2/4 bucket `fts_error` by `errorClass` | brief only |
+
+### R1: FTS5 keywords
+
+FTS5 treats `AND`, `OR`, `NOT` as operators only in upper case
+(case-sensitive); `NEAR` is an operator only when followed by `(`
+(verified on Bun 1.4.4 / SQLite 3.53.4: `NEAR*`, `subject:NEAR*`,
+`x* AND NEAR*` all parse; `NEAR(x)*` is a syntax error). A token
+containing `(` is never a bareword in `buildFtsTokenQuery`, so it is
+already quoted; `NEAR` therefore needs no handling. Lower/mixed case
+(`not`, `Not`, `aNd`) was never affected. `"NOT"*` is the same prefix
+query `not*` would be, so semantics match the lower-case form.
+
+Tests (`query.ftsSearchDriven.test.ts`): one corpus message carries the
+keywords (`subject: "NOT AND OR sale"`); 31 differential cases run
+`listThreads` + `listMessages`, pages 1–2, at the default cap and at cap
+3 (probe/fallback paths): `NOT`/`AND`/`OR`/`NEAR` upper, lower and mixed
+case alone; all three together; leading/trailing/infix with other
+tokens; whole-query quoting; `NEAR(needle)`; `fields` subject, subject +
+body, body (combined MATCH), sender, attachments; with `from:`, `in:`,
+`thread:`, `to:`; grouped by sender; unread badge. Each asserts legacy
+= driven (both succeed) and zero `fts_error` lines. A spot-check test
+asserts the keyword hits (`NOT` in subject → the keyword message;
+`NOT` ≡ `not`; `AND sale`, `sale OR` subject-scoped). Mutation: with the
+quoting removed, 21 of the 32 new tests fail (the remaining 11 are the
+lower/mixed-case, `NEAR` and attachments-only cases, as expected).
+
+Fuzz (`briefs/perf-fts-search-driven/keyword-fuzz.test.ts`, seeded LCG,
+synthetic shard, run temporarily from `lib/db/messages/`): 4,310 queries
+built from 62 pieces — FTS5 specials `" * ^ : ( ) - + NEAR(`, ASCII
+punctuation, `_`, `%`, `@`, brackets, non-ASCII letters (`ü É ß 中`),
+`²`, `½`, full-width `Ａ`, combining acute, ZWJ, `\x1a`, emoji, NBSP and
+ideographic space, column names `subject`/`body`, operators `from:`,
+`in:`, `thread:`, `topic:`, and the keywords in four casings — each as
+single pieces, prefixed/suffixed/infixed, and 1–3-token random
+combinations; × fields default / subject / subject+body / attachments
+× legacy and driven, through `listMessages` and `listThreads` (34,480
+search runs). Before the fix: the only error class was `fts5: syntax
+error near "AND"/"OR"/"NOT"` (both modes identical) and 721 driven
+`fts_error` lines, all `SQLITE_ERROR`. After the fix: **0 errors, 0
+`fts_error` lines**. No other token class produces an FTS5 syntax error,
+so nothing else was added.
+
+Finding from fix round 2, fixed in the follow-up commit: with the cap
+at 32,766, a consuming statement binds the candidate ids plus its other
+arguments (account id, folder, badges …), so on a SQLite build compiled
+with the portable 32,766 variable limit a search near the cap would fail
+with `too many SQL variables`. On Bun 1.4.4 (250,000) this cannot happen,
+but the documented maximum is meant to be portable, so it is now
+**32,000**, leaving 766 variables for the non-candidate parameters
+(a search binds well under 100 of those). The default 2000 is unchanged.
+
+### Error classes
+
+`classifyFtsError(code, message)` (`query.ts:820`), applied only to
+errors from the two FTS-touching resolution statements:
+
+- `index`: `code` starts with `SQLITE_CORRUPT` (incl. `_VTAB`), or the
+  message starts with `no such table: ` or `vtable constructor failed: `
+  (missing FTS or shadow table);
+- `syntax`: the message starts with `fts5: syntax error` or
+  `fts5: parser stack overflow`;
+- `other`: everything else (`SQLITE_BUSY`, `no such column` — ambiguous
+  between a schema drift and a code bug, so not guessed —, non-SQLite
+  errors).
+
+The message is read only inside the constructor and not stored. Tests:
+the 12 corrupt-shard FTS cases and the empty-scope case now assert
+`errorClass: "index"` (both `dropped`/`SQLITE_ERROR` and
+`malformed`/`SQLITE_CORRUPT`); a new test injects eight error shapes
+into the resolution MATCH (syntax ×2, missing table, vtable constructor,
+`SQLITE_CORRUPT_VTAB`, BUSY, `no such column`, plain `Error`) and asserts
+the class, a payload identical to legacy, and that neither the error
+text nor the query token nor the account id is in the line. Mutation
+(class forced to `other`): 14 tests fail.
+
+### R3: cap maximum
+
+Values above 32,000 clamp to 32,000 and warn once per configured value
+(`[fts-search] NOCTUA_FTS_DRIVEN_MAX_CANDIDATES above maximum, clamped`,
+`{ configured, max }` — operator config, no user data); a misconfigured
+service therefore logs once at its first search, not per search. Chosen
+over a silent clamp because, unlike an unparsable value, an oversized
+value is a deliberate operator choice that silently not taking effect
+would mislead. Test: unset/`""`/`abc`/`0`/`-5`/`Infinity`/`NaN` → fetch
+`LIMIT 2001`, `2.9` → 3, `32000` → 32,001 without warning; `32001` ×3 →
+one warning; `1e9` ×2 → one more. (Fix round 2 shipped 32,766; the
+follow-up commit lowered the maximum to 32,000 and moved the test
+values with it.)
+
+### Verification (HEAD `d4c2b46`)
+
+Commands in `wt-perf-fts-search`, everything under `nice -n 10`,
+`TMPDIR=$PWD/.tmp/tmp` (emptied afterwards).
+
+- `bun run typecheck` — 0 errors, 1,195 files.
+- `bun run lint` — 1 error + 25 warnings, exactly the `11dc3c5`
+  baseline (`react-hooks/set-state-in-effect` in
+  `useCalendarConflicts.ts:58`); `eslint` on `query.ts` and the test
+  file: 0 findings.
+- `bun test lib/db/messages` — **131 pass / 0 fail** (2,642 expects,
+  6 files; was 97); differential file 101 tests.
+- `bun run test:ci` (load 10.0 at start, 9.7 at end; started at once
+  because load was below 12) — unit **2,904 pass / 1 fail** (2,905 tests,
+  305 files, 445.88 s; wall 452 s). The failure is
+  `lib/sendIdentity.routes.test.ts` with `SQLITE_BUSY` (`database is
+  locked`) on the master-DB `DELETE FROM user_accounts` at
+  `lib/testFixtures/verifySenderIdentity.ts:339`, the same load flake as
+  in fix round 1; this branch does not touch the file. Rerun alone 3×
+  (load 9.0–9.6): 3 pass / 0 fail. `test:dom` run separately because `&&`
+  stops after the unit failure: **462 pass / 0 fail** (58 files,
+  69.83 s). Unit delta vs fix round 1 (2,871): +34 = the new tests in the
+  differential file.
+- `git -C repo merge-tree --write-tree d4c2b46 origin/deploy/dev-stage`
+  (`0ac6cfa`, round-9 candidate) — **clean**, tree `a2334a83df0b`, merge
+  base `11dc3c5`.
+
+### Follow-up commit e29b64f (orchestrator)
+
+Cap maximum lowered from 32,766 to 32,000 (see "R3: cap maximum"). Gates on
+`e29b64f`, load ~1.5: `bun run typecheck` 0 errors / 1,195 files; eslint on
+the two changed source files clean; `bun test lib/db/messages` 131 pass;
+`bun run test:ci` exit 0 in 444 s, **2,905 unit + 462 DOM pass, 0 fail**.
+
 ## Follow-ups
 
 ### F1: how many real searches exceed the cap (run after integration round 9)
@@ -509,8 +655,13 @@ shards, using only the F2 log line (no new code, no query text).
 2. **Numerator.** `grep '\[fts-search\] legacy fallback'` and aggregate
    by `reason` × `accountHash`: counts of `candidate_cap_exceeded`,
    `all_tokens_oversized` (`candidateCapExceeded: true`) and `fts_error`
-   (expected 0; any hit goes to the `perf/fts-identity-v3` owners with
-   its `errorCode`). Per account also bucket `tokenCount`, and for cap
+   (expected 0), the latter bucketed by `errorClass` (fix round 2):
+   `index` (missing/corrupt FTS table) → `perf/fts-identity-v3` owners
+   with its `errorCode`; `syntax` (FTS5 rejected the MATCH; expected 0
+   since R1) → search owners (`buildFtsTokenQuery`); `other` (e.g.
+   `SQLITE_BUSY`) → reported with its `errorCode`. Lines logged before
+   `78d8347` lack `errorClass`; do not mix them into the window. Per
+   account also bucket `tokenCount`, and for cap
    hits note that `observedCandidates` is clamped at `cap + 1` (fetches
    are capped), so it says "above the cap", not by how much.
 3. **Denominator.** Count list requests that carried a search: the
@@ -518,19 +669,32 @@ shards, using only the F2 log line (no new code, no query text).
    `…/messages` and `…/search` with a non-empty `q` parameter
    (`threads/route.ts:50`, `listMessagesHandler.ts:23`), counted per path
    by a one-off filter that drops the query string before aggregation
-   (never store or paste the values). MCP `search_messages` calls are
-   not in the proxy log; note their count separately if the MCP server
+   (never store or paste the values). **Primary denominator (R5):** only
+   `q` values with at least one free-text token, i.e. something left after
+   removing the `from:`/`to:`/`with:`/`in:`/`invite:`/`event:`/`thread:`/
+   `topic:` operators and symbol-only tokens — operator-only searches
+   resolve to `none` and can never fall back. The filter classifies each
+   value in memory (yes/no) and keeps only the counts. Report the share
+   against both denominators (free-text searches; all non-empty `q`).
+   MCP `search_messages` calls are not in the proxy log; note their count separately if the MCP server
    is in use. One request is one resolution (F2 guarantees no double
    logging).
 4. **Anonymised output.** A table per `accountHash` (12 hex, no
-   address): searches, cap fallbacks, oversized fallbacks, fallback
-   share; plus the overall share. Only aggregates go into the brief.
-5. **Decision rule.** Fallback share ≤ 5 % of searches: keep 2000.
-   Above that, run `briefs/perf-fts-search-driven/bench.ts` on a 15k
-   synthetic shard with caps 2000 / 5000 / 10000 to check the `IN`-list
-   prepare cost before raising the default (and update
-   `doc/DEPLOYMENT.md`). If only a few accounts dominate, prefer F6/F8
-   over a larger cap.
+   address): searches (free-text / all), cap fallbacks, oversized
+   fallbacks, `fts_error` by `errorClass`, fallback share (both
+   denominators); plus the overall shares. Only aggregates go into the
+   brief.
+5. **Decision rule.** Fallback share ≤ 5 % of free-text searches: keep
+   2000. Above that, run `briefs/perf-fts-search-driven/bench.ts` on a
+   15k synthetic shard with caps 2000 / 5000 / 10000 to check the
+   `IN`-list prepare cost before raising the default (and update
+   `doc/DEPLOYMENT.md`; the enforced maximum is 32,000). If only a few
+   accounts dominate, prefer F6/F8 over a larger cap. Cost side (R2): a
+   cap/oversized fallback is not free — it pays the discarded capped
+   resolution on top of the legacy clause, **+2.7 % to +4.3 %** on
+   unselective searches in review r1 (not ≈0 as the first bench
+   suggested) — so a high fallback share also means a 3–4 % tax on those
+   searches, not only a missed win.
 
 ### Left from review (unchanged on this branch)
 
@@ -547,8 +711,13 @@ shards, using only the F2 log line (no new code, no query text).
   (resolved once per top-level call, reused by selector/counts/groups).
   Legacy clause generation is retained verbatim for `legacy` resolution.
 - `lib/db/messages/query.ftsSearchDriven.test.ts` — new, 49 tests
-  (67 after fix round 1: +3 F2 logging, +15 F4 corrupt-shard).
-- `doc/DEPLOYMENT.md` — "Optional search tuning" env table (F5).
+  (67 after fix round 1: +3 F2 logging, +15 F4 corrupt-shard; 101 after
+  fix round 2: +32 R1 keyword, +1 error classes, +1 R3 clamp).
+- `doc/DEPLOYMENT.md` — "Optional search tuning" env table (F5); cap
+  maximum and `errorClass` (fix round 2).
+- `briefs/perf-fts-search-driven/keyword-fuzz.test.ts` — fix round 2
+  tokenizer-path fuzz (evidence only; copy into `lib/db/messages/` to run,
+  not part of the branch).
 - `briefs/perf-fts-search-driven/bench.ts`, `bench-results.json`,
   `replay-results.json` — harness + raw evidence (in `briefs/`, not the
   worktree).
