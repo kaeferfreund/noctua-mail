@@ -72,6 +72,7 @@ import ComposeOrchestrator, {
 } from "./mailclient/composition/ComposeOrchestrator";
 import type { ComposeMode } from "./mailclient/composition/composeTypes";
 import { useDeepLinks } from "./mailclient/useDeepLinks";
+import { useScrollAnchors } from "./mailclient/useScrollAnchors";
 import { UrlHistoryContext } from "@/app/hooks/UrlHistoryContext";
 import { settingsTabVisible } from "./account-settings/settingsAccess";
 import { resolveDeepLinkMessage } from "@/lib/navigation/resolveMessage";
@@ -2792,6 +2793,15 @@ export default function MailClient({
   }, [handleSelectMessage, isMobile, changeReaderLayout, readerFocused]);
   const closeReaderFocus = useCallback(() => changeReaderLayout("split"), [changeReaderLayout]);
   useReaderFocusPlacement(readerFocused, activeMessage?.id ?? "", listPaneRef, readerListScrollRef);
+  const scrollAnchors = useScrollAnchors({
+    accountId: activeAccountId, listKey: messagesKey, listRef: listPaneRef,
+    listShown: !isMobile || !viewMessage, readerMessageId: activeMessage?.id ?? "",
+    readerScroll: () => document.querySelector<HTMLElement>("#reader [data-reader-scroll]"),
+    readerItems: () => messageRefs.current,
+    getCollapsed: () => messageViewHandleRef.current?.getCollapsedMessages() ?? {},
+    restoreCollapsed: collapsed => messageViewHandleRef.current?.restoreCollapsedMessages(collapsed)
+  });
+  const { readerPlacement } = scrollAnchors;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isMobile || !activeMessage) return;
@@ -4588,11 +4598,14 @@ export default function MailClient({
 
   const scrollActiveMessageIntoView = useCallback((behavior: ScrollBehavior) => {
     if (!activeMessageId) return false;
+    // A restored scroll anchor owns the reader's position for this message.
+    const placement = readerPlacement();
+    if (placement === "skip") return true;
     const target = messageRefs.current.get(activeMessageId);
     if (!target) return false;
-    target.scrollIntoView({ behavior, block: "start" });
+    target.scrollIntoView({ behavior: placement === "instant" ? "auto" : behavior, block: "start" });
     return true;
-  }, [activeMessageId]);
+  }, [activeMessageId, readerPlacement]);
   const scheduleActiveMessageScroll = useCallback(
     (behavior: ScrollBehavior) => {
       if (!activeMessageId) return () => {};
@@ -4892,7 +4905,8 @@ export default function MailClient({
       setPendingSelectionCollapseMessageId(message.id); setPendingSelectionScrollMessageId(message.id);
       deepLinkSelectionRef.current = message;
     },
-    notice: kind => pushNotice({ type: "info", title: tn(`deepLink.${kind}`) })
+    notice: kind => pushNotice({ type: "info", title: tn(`deepLink.${kind}`) }),
+    onTransaction: scrollAnchors.onTransaction
   });
   useEffect(() => {
     const target = deepLinkSelectionRef.current;
