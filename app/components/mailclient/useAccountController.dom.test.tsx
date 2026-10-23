@@ -10,6 +10,7 @@ import { useApiErrorMessage } from "./useApiErrorMessage";
 import { I18nTestProvider } from "@/lib/i18n/testRender";
 import { getMessages } from "@/lib/i18n/translator";
 import type { UiLocale } from "@/lib/i18n/config";
+import { MailboxViewCache } from "./mailboxViewCache";
 
 afterEach(cleanup);
 
@@ -17,7 +18,7 @@ const accounts = [{ id: "account-a" }, { id: "account-b" }] as Account[];
 const noop = () => {};
 
 function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (accountId: string, folderId?: string) => void,
-  localeRef?: { current: UiLocale }) {
+  localeRef?: { current: UiLocale }, viewCache?: MailboxViewCache) {
   const errors: string[] = [];
   const renders: Array<{ accountId: string; folderId: string }> = [];
   const defaults: UseAccountControllerParams = {
@@ -69,7 +70,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     const readErrorMessage = localeRef ? productionReadErrorMessage : defaults.readErrorMessage;
     const controller = useAccountController({ ...defaults, readErrorMessage, activeAccountId, setActiveAccountId,
       accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState,
-      activeFolderId, setActiveFolderId, setLastFolderId, setFolders, setInitialFoldersLoadedAccountId });
+      activeFolderId, setActiveFolderId, setLastFolderId, setFolders, setInitialFoldersLoadedAccountId, viewCache });
     const syncAccountRef = useRef<Parameters<typeof useStartupSync>[0]["syncAccountRef"]["current"]>(undefined);
     syncAccountRef.current = async folderId => { firstSync?.(activeAccountId, folderId); };
     useStartupSync({ initialDataReady: ready, activeAccountId, initialFoldersLoadedAccountId,
@@ -80,7 +81,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
         setActiveFolderId(findInboxFolder(folders, activeAccountId)?.id ?? "");
       }
     }, [activeAccountId, activeFolderId, folders, ready]);
-    return { ...controller, readErrorMessage, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId };
+    return { ...controller, readErrorMessage, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId, folders };
   }, { wrapper: ({ children }) => <I18nTestProvider locale={localeRef?.current ?? "en"}>{children}</I18nTestProvider> });
   return { ...hook, errors, renders };
 }
@@ -313,7 +314,7 @@ describe("parallel atomic mailbox switch", () => {
   const allAccounts = [...accounts, { id: "account-c" }, { id: "account-d" }] as Account[];
   type Server = { selected: string; accounts?: Account[] };
   // /auth/me answers at once from `server`; every other request is held until released.
-  async function booted(server: Server) {
+  async function booted(server: Server, viewCache?: MailboxViewCache) {
     const held: Held[] = [];
     const calls: string[] = [];
     const apiFetch: UseAccountControllerParams["apiFetch"] = async (input, init) => {
@@ -330,7 +331,7 @@ describe("parallel atomic mailbox switch", () => {
     const persisted = (item: Held) => JSON.parse(String(item.init?.body)).accountId as string;
     // A switch-account response that applies the write, as the server does.
     const persist = (item: Held) => { server.selected = persisted(item); return json({ ok: true, accountId: server.selected }); };
-    const view = mount(apiFetch);
+    const view = mount(apiFetch, undefined, undefined, viewCache);
     await release(`/${server.selected}/folders`, () => json(foldersOf(server.selected)));
     await waitFor(() => expect(view.result.current.ready).toBe(true));
     calls.length = 0;
@@ -621,4 +622,93 @@ describe("parallel atomic mailbox switch", () => {
     expect(h.result.current.loadedAccounts.map(account => account.id)).toEqual(["account-b"]);
     expect(h.result.current.activeAccountId).toBe("account-b");
   });
+});
+
+describe("switch to a mailbox visited earlier", () => {
+  type Held = { url: string; init?: RequestInit; resolve: (res: Response) => void };
+  const foldersOf = (id: string, count = 0) => [{ id: `${id}:Archive`, accountId: id, name: "Archive", count: 0 },
+    { id: `${id}:INBOX`, accountId: id, name: "Inbox", specialUse: "\\Inbox", count }] as Folder[];
+  async function bootedWithCache(server: { selected: string; accounts: Account[] }) {
+    const held: Held[] = [];
+    const calls: string[] = [];
+    const cache = new MailboxViewCache();
+    const view = mount(async (input, init) => {
+      const url = String(input); calls.push(url);
+      if (url === "/api/auth/me") return json({ user: { id: "synthetic-user" }, accounts: server.accounts,
+        accountId: server.selected, mailboxState: "selected" });
+      return new Promise<Response>(resolve => held.push({ url, init, resolve }));
+    }, undefined, undefined, cache);
+    const release = async (match: string, res: () => Response) => {
+      await waitFor(() => expect(held.some(item => item.url.includes(match))).toBe(true));
+      const [item] = held.splice(held.findIndex(entry => entry.url.includes(match)), 1);
+      if (match === "switch-account" && res().ok) server.selected = JSON.parse(String(item.init?.body)).accountId;
+      await act(async () => { item.resolve(res()); await Promise.resolve(); });
+    };
+    await release(`/${server.selected}/folders`, () => json(foldersOf(server.selected)));
+    await waitFor(() => expect(view.result.current.ready).toBe(true));
+    calls.length = 0;
+    const switchTo = (id: string) => {
+      let done!: Promise<void>;
+      act(() => { done = view.result.current.switchAccount(id); });
+      return done;
+    };
+    return { ...view, held, calls, cache, release, switchTo };
+  }
+
+  it("shows the cached folders on the click, then takes the fresh folders and keeps a folder opened meanwhile", async () => {
+    const h = await bootedWithCache({ selected: "account-a", accounts });
+    h.cache.writeFolders("account-b", foldersOf("account-b", 3));
+    const done = h.switchTo("account-b");
+    // Nothing has answered yet, and B is already shown with its inbox and cached counts.
+    expect(h.calls).toEqual(["/api/auth/switch-account", "/api/accounts/account-b/folders"]);
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.activeFolderId).toBe("account-b:INBOX");
+    expect(h.result.current.folders.find(folder => folder.id === "account-b:INBOX")?.count).toBe(3);
+    act(() => { h.result.current.setActiveFolderId("account-b:Archive"); });
+    await h.release("switch-account", () => json({ ok: true }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b", 5)));
+    await act(async () => { await done; });
+    expect(h.result.current.folders.find(folder => folder.id === "account-b:INBOX")?.count).toBe(5);
+    expect(h.result.current.activeFolderId).toBe("account-b:Archive");
+    expect(h.calls).not.toContain("/api/auth/me");
+    expect(h.renders.filter(render => render.folderId && !render.folderId.startsWith(`${render.accountId}:`))).toEqual([]);
+  });
+
+  it("A -> B -> A with both cached ends on A, persisted last", async () => {
+    const server = { selected: "account-a", accounts };
+    const h = await bootedWithCache(server);
+    h.cache.writeFolders("account-a", foldersOf("account-a"));
+    h.cache.writeFolders("account-b", foldersOf("account-b"));
+    const toB = h.switchTo("account-b");
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    const toA = h.switchTo("account-a");
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    await h.release("switch-account", () => json({ ok: true }));
+    await h.release("switch-account", () => json({ ok: true }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+    await act(async () => { await Promise.all([toB, toA]); });
+    expect(server.selected).toBe("account-a");
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
+  });
+
+  for (const status of [403, 500]) {
+    it(`a ${status} on the switch replaces the cached view with the server's${status === 403 ? " and drops the mailbox's cache" : ""}`, async () => {
+      const server = { selected: "account-a", accounts };
+      const h = await bootedWithCache(server);
+      h.cache.writeFolders("account-b", foldersOf("account-b"));
+      const done = h.switchTo("account-b");
+      expect(h.result.current.activeAccountId).toBe("account-b");
+      if (status === 403) server.accounts = [accounts[0]];
+      await h.release("switch-account", () => Response.json({ ok: false }, { status }));
+      await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+      await act(async () => { await done; });
+      expect(h.calls).toContain("/api/auth/me");
+      expect(h.result.current.activeAccountId).toBe("account-a");
+      expect(h.result.current.ready).toBe(true);
+      expect(h.errors).toEqual([`HTTP ${status}`]);
+      expect(h.cache.readFolders("account-b") === null).toBe(status === 403);
+    });
+  }
 });
