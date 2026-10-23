@@ -1,4 +1,5 @@
 import type { Attachment } from "@/lib/data";
+import { normalizeContentType } from "@/lib/mail/attachmentMatch";
 
 export const CALENDAR_INVITE_FLAG = "calendar-invite";
 export const TODO_FLAG = "$Todo";
@@ -57,12 +58,12 @@ function endsWithExtension(value: string, extensions: readonly string[]) {
   return extensions.some((ext) => value.endsWith(ext));
 }
 
-function hasCalendarMime(value?: string | null) {
-  const normalized = normalize(value);
+function hasCalendarMime(value?: unknown) {
+  const normalized = normalizeContentType(value);
   return includesHint(normalized, CALENDAR_MIME_HINTS);
 }
 
-export function isCalendarAttachment(attachment: Pick<Attachment, "contentType" | "filename">) {
+export function isCalendarAttachment(attachment: Pick<Attachment, "filename"> & { contentType?: unknown }) {
   return (
     hasCalendarMime(attachment.contentType) ||
     endsWithExtension(normalize(attachment.filename), CALENDAR_FILENAME_EXTENSIONS)
