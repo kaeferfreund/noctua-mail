@@ -28,7 +28,7 @@ export default function MailtoHandlerSection() {
     try {
       navigator.registerProtocolHandler(
         "mailto",
-        `${window.location.origin}/?mailto=%s`
+        `${window.location.origin}/?c=%s`
       );
       setStatus({ kind: "ok" });
     } catch (err) {

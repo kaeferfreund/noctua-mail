@@ -161,12 +161,14 @@ test("build label in the popover footer, the phone menu and the sidebar brand", 
 test("PWA calendar route uses the header popover and preserves other URL state", async ({ page }) => {
   test.skip(baseline);
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/?other=keep&openCalendar=1#anchor");
+  await page.goto("/?other=keep&panel=calendar#anchor");
   const popover = page.getByRole("dialog", { name: "Aktivität und Kalender" });
   await expect(popover).toBeVisible();
   await expect(popover.locator('[data-status-section="reminder"] button[aria-expanded]')).toHaveAttribute("aria-expanded", "true");
   await expect(popover.getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeVisible();
-  await expect(page).toHaveURL(/\?other=keep#anchor$/);
+  expect(new URL(page.url()).searchParams.get("other")).toBe("keep");
+  expect(new URL(page.url()).searchParams.get("panel")).toBe("calendar");
+  expect(new URL(page.url()).hash).toBe("#anchor");
   await popover.getByRole("button", { name: "Kalender-Seitenleiste einblenden" }).click();
   await expect(popover).toHaveCount(0);
   await expect(page.locator('#calendar')).toBeVisible();
@@ -266,7 +268,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     if (width < 768) {
       await page.locator('[data-status-indicator]').click();
       await page.getByRole("menuitem", { name: "Kalender öffnen", exact: true }).click();
-    } else await page.goto("/?openCalendar=1");
+    } else await page.goto("/?panel=calendar");
     const surface = page.locator(width < 768 ? '[data-slot="sheet-content"]' : '[data-slot="popover-content"]');
     const harness = surface.locator(".fc-view-harness");
     await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
@@ -321,7 +323,7 @@ test("desktop calendar popover keeps Tab and Shift+Tab inside the popover", asyn
   expect(await post(page, "/api/accounts/qa-shared/calendar/events", {
     summary: "Synthetic tab loop", startAtMs: Date.now(), endAtMs: Date.now() + 3600000, allDay: true, sourceType: "local"
   })).toBe(200);
-  await page.goto("/?openCalendar=1");
+  await page.goto("/?panel=calendar");
   const popover = page.locator('[data-slot="popover-content"]');
   await expect(popover.locator(".fc-event").filter({ hasText: "Synthetic tab loop" }).first()).toBeVisible();
   const first = popover.getByRole("button", { name: "Neue E-Mails abrufen", exact: true });
