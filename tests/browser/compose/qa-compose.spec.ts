@@ -16,7 +16,8 @@ const scenarios = [
   "QA-008 desktop modal contains keyboard focus and restores its opener",
   "sender identities: personal From, signature replacement, saved draft reopen and mobile From",
   "QA-002 Send stays visible after autosave at 320px",
-  "P2-E mobile header keeps long enabled and unavailable senders and dismissal targets in bounds"
+  "P2-E/P2-G mobile sender metadata reserves a usable editor in de",
+  "P2-E/P2-G mobile sender metadata reserves a usable editor in en"
 ];
 test.beforeEach(async ({page}, info) => {
   const index=scenarios.indexOf(info.title);
@@ -49,8 +50,8 @@ async function openCompose(page: Page) {
 }
 
 // Review P2-D: visibility alone misses clipped controls and oversized popovers.
-async function assertFromBounds(page: Page) {
-  const from = page.getByLabel('From:', {exact:true});
+async function assertFromBounds(page: Page, label = 'From:') {
+  const from = page.getByLabel(label, {exact:true});
   const viewport = page.viewportSize()!;
   const control = await from.boundingBox();
   expect(control).not.toBeNull();
@@ -71,6 +72,7 @@ async function assertFromBounds(page: Page) {
   }
   console.log(JSON.stringify({finding:'P2-D',viewport,control,menu}));
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
 }
 
 // Real zero-delay keyboard events, autosave, send request and captured SMTP.
@@ -300,65 +302,145 @@ test('sender identities: personal From, signature replacement, saved draft reope
   expect((await page.request.put(`${mailbox}/prefs`,{headers:{origin:new URL(page.url()).origin},data:{defaultIdentityId:null,signatureOverride:null}})).status()).toBe(200);
 });
 
-test('P2-E mobile header keeps long enabled and unavailable senders and dismissal targets in bounds', async ({page}) => {
-  await page.setViewportSize({width:390,height:844});
-  await signIn(page);
-  const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
-  const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
-  const email=`${'a'.repeat(47)}@example.test`;
-  const displayName='Synthetic Long Display Name NNNNNNNNNNNN';
-  const headers={origin:new URL(page.url()).origin};
-  const existing=(await (await page.request.get(`${mailbox}/identities`)).json()).identities.find((item: {email:string})=>item.email===email);
-  const created=existing
-    ? await page.request.patch(`${mailbox}/identities/${existing.id}`,{headers,data:{displayName,enabled:true}})
-    : await page.request.post(`${mailbox}/identities`,{headers,data:{email,displayName}});
-  expect(created.status()).toBe(existing?200:201);
-  const identity=(await created.json()).identity;
-  expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:identity.id,signatureOverride:''}})).status()).toBe(200);
-  await page.reload();
-  await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-  await openCompose(page);
-  await expect(page.getByLabel('From:',{exact:true})).toContainText(email);
-  const subject=`Synthetic long sender header regression ${Date.now()}`;
-  await page.getByLabel('Subject:',{exact:true}).fill(subject);
-  const saved=await page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
-  expect(saved.status()).toBe(200);
-  const {draftId}=await saved.json();
-  await page.getByRole('button',{name:'Cancel',exact:true}).click();
-  for(const enabled of [true,false]) {
-    if(!enabled) expect((await page.request.patch(`${mailbox}/identities/${identity.id}`,{headers,data:{enabled:false}})).status()).toBe(200);
-    // Reopen the actual persisted draft in MailClient's mobile modal.
-    await page.goto('/');
-    await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
-    await page.getByRole('button',{name:/Drafts/}).first().click();
-    await page.getByText(subject,{exact:true}).first().click();
-    await page.getByRole('button',{name:'Edit draft',exact:true}).click();
-    await expect(page.getByLabel('From:',{exact:true})).toContainText(email);
-    for(const theme of ['light','dark'] as const) for(const width of [320,360,390]) {
-      await page.setViewportSize({width,height:844});
-      await page.emulateMedia({colorScheme:theme});
-      await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);document.documentElement.style.colorScheme=theme;document.querySelectorAll('.radix-themes').forEach(el=>{el.classList.remove('light','dark');el.classList.add(theme);});},theme);
-      const close=page.getByRole('button',{name:'Close composer',exact:true});
-      const cancel=page.getByRole('button',{name:'Cancel',exact:true});
-      const bounds=[];
-      for(const button of [close,cancel]) {
-        const box=await button.boundingBox();
-        expect(box).not.toBeNull();
-        expect(box!.x).toBeGreaterThanOrEqual(0);
-        expect(box!.y).toBeGreaterThanOrEqual(0);
-        expect(box!.x+box!.width).toBeLessThanOrEqual(width);
-        expect(box!.y+box!.height).toBeLessThanOrEqual(844);
-        expect(box!.width).toBeGreaterThanOrEqual(44);
-        expect(box!.height).toBeGreaterThanOrEqual(44);
-        expect(await button.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
-        bounds.push(box);
-      }
-      await expect(page.getByTitle(`From ${displayName} <${email}>`,{exact:true})).toHaveText(`From ${displayName} <${email}>`);
-      if(!enabled) await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
-      await assertFromBounds(page);
-      console.log(JSON.stringify({finding:'P2-E',width,theme,state:enabled?'enabled':'unavailable',close:bounds[0],cancel:bounds[1]}));
+// Geometry is checked after a real autosave, including the footer's saved-draft
+// controls. Test the editable element itself and its clipped visible area, not
+// just a parent editor shell that could conceal a zero-height input.
+for (const locale of ['de', 'en'] as const) {
+  test(`P2-E/P2-G mobile sender metadata reserves a usable editor in ${locale}`, async ({page}, info) => {
+    test.setTimeout(480000);
+    await page.setViewportSize({width:390,height:844});
+    await signIn(page);
+    const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
+    const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
+    const headers={origin:new URL(page.url()).origin};
+    const copy=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8')).Compose;
+    expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:locale}})).status()).toBe(200);
+    const longName='Synthetic Long Display Name NNNNNNNNNNNN';
+    const longEmail=`${'a'.repeat(47)}@example.test`;
+    const measurements: unknown[]=[];
+    let subject='';
+    let draftId='';
+
+    async function identity(email:string,displayName:string) {
+      const all=await page.request.get(`${mailbox}/identities`);
+      expect(all.status()).toBe(200);
+      const existing=(await all.json()).identities.find((item:{email:string})=>item.email===email);
+      const response=existing
+        ? await page.request.patch(`${mailbox}/identities/${existing.id}`,{headers,data:{displayName,enabled:true}})
+        : await page.request.post(`${mailbox}/identities`,{headers,data:{email,displayName}});
+      expect(response.status()).toBe(existing?200:201);
+      return (await response.json()).identity as {id:string;email:string;displayName:string};
     }
-    await page.getByRole('button',{name:'Cancel',exact:true}).click();
-  }
-  expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:null,signatureOverride:null}})).status()).toBe(200);
-});
+    async function openFresh(sender:{id:string;email:string;displayName:string},state:string) {
+      expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:sender.id,signatureOverride:''}})).status()).toBe(200);
+      await page.goto('/');
+      await expect(page.locator('html')).toHaveAttribute('lang',locale);
+      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
+      await openCompose(page);
+      await expect(page.getByLabel(copy.from,{exact:true})).toContainText(sender.email);
+      subject=`Synthetic editor space ${locale} ${state} ${Date.now()}`;
+      const saved=page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
+      await page.getByLabel('Subject:',{exact:true}).fill(subject);
+      const response=await saved;
+      expect(response.status()).toBe(200);
+      draftId=(await response.json()).draftId;
+      await expect(page.getByText(/Draft saved/)).toBeVisible();
+    }
+    async function reopen() {
+      await page.goto('/');
+      await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
+      await page.getByRole('button',{name:/Drafts/}).first().click();
+      await page.getByText(subject,{exact:true}).first().click();
+      await page.getByRole('button',{name:'Edit draft',exact:true}).click();
+      await expect(page.getByLabel('Subject:',{exact:true})).toHaveValue(subject);
+    }
+    async function matrix(sender:{email:string;displayName:string},state:string) {
+      const fullSender=`${sender.displayName} <${sender.email}>`;
+      for(const theme of ['light','dark'] as const) for(const width of [320,360,390]) {
+        await page.setViewportSize({width,height:844});
+        await page.emulateMedia({colorScheme:theme});
+        await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);document.documentElement.style.colorScheme=theme;document.querySelectorAll('.radix-themes').forEach(el=>{el.classList.remove('light','dark');el.classList.add(theme);});},theme);
+        const subtitle=page.getByTitle(copy.fromValue.replace('{sender}',fullSender),{exact:true});
+        await expect(subtitle).toHaveText(copy.fromValue.replace('{sender}',fullSender));
+        expect(await subtitle.evaluate(el=>({clamp:getComputedStyle(el).webkitLineClamp,hidden:!!el.closest('[aria-hidden="true"], [hidden]')}))).toEqual({clamp:'2',hidden:false});
+        const from=page.getByLabel(copy.from,{exact:true});
+        await expect(from).toHaveAttribute('title',fullSender);
+        await expect(from).toContainText(fullSender);
+        expect(await from.evaluate(el=>getComputedStyle(el.firstElementChild!).whiteSpace)).toBe('nowrap');
+        const bounds=[];
+        for(const button of [page.getByRole('button',{name:copy.closeComposer,exact:true}),page.getByRole('button',{name:'Cancel',exact:true})]) {
+          const box=await button.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box!.x).toBeGreaterThanOrEqual(0);
+          expect(box!.y).toBeGreaterThanOrEqual(0);
+          expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+          expect(box!.y+box!.height).toBeLessThanOrEqual(844);
+          expect(box!.width).toBeGreaterThanOrEqual(44);
+          expect(box!.height).toBeGreaterThanOrEqual(44);
+          expect(await button.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
+          bounds.push(box!);
+        }
+        if(state.includes('unavailable')) await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
+        await assertFromBounds(page,copy.from);
+        const editor=page.locator('[data-lexical-editor="true"]');
+        await expect(editor).toBeVisible();
+        const geometry=await editor.evaluate(el=>{
+          const r=el.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);
+          for(let parent=el.parentElement;parent;parent=parent.parentElement) {
+            if(['auto','scroll','hidden','clip'].includes(getComputedStyle(parent).overflowY)) {const p=parent.getBoundingClientRect();top=Math.max(top,p.top);bottom=Math.min(bottom,p.bottom);}
+          }
+          return {height:r.height,visibleHeight:bottom-top,hit:el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};
+        });
+        expect(geometry.height).toBeGreaterThanOrEqual(120);
+        expect(geometry.visibleHeight).toBeGreaterThanOrEqual(120);
+        expect(geometry.hit).toBe(true);
+        // A click and real keyboard input must reach the editor after autosave.
+        const marker=`Synthetic ${locale} ${state} ${theme} ${width}.`;
+        // Unavailable drafts were autosaved before disabling their identity.
+        // Saving is deliberately blocked until the sender is repaired, while
+        // the body must remain editable. Enabled cases also prove persistence.
+        const saved=state.includes('unavailable') ? null : page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().text?.includes(marker),{timeout:20000});
+        await editor.click();
+        await page.keyboard.press('ControlOrMeta+A');
+        await page.keyboard.type(marker,{delay:0});
+        await expect(editor).toContainText(marker.trim());
+        if(saved) {
+          expect((await saved).status()).toBe(200);
+          await expect(page.getByText(/Draft saved/)).toBeVisible();
+          const persisted=await page.request.get(`${mailbox}/messages/${encodeURIComponent(draftId)}`);
+          expect(persisted.status()).toBe(200);
+          expect((await persisted.json()).message.body).toContain(marker.trim());
+        }
+        measurements.push({locale,state,theme,width,header:await subtitle.locator('../..').evaluate(el=>el.getBoundingClientRect().height),from:(await from.boundingBox())!.height,editor:geometry.height,visibleEditor:geometry.visibleHeight,closeRight:bounds[0].x+bounds[0].width,typing:true});
+        console.log(JSON.stringify({finding:'P2-G',...measurements.at(-1) as object}));
+      }
+    }
+    try {
+      const long=await identity(longEmail,longName);
+      await openFresh(long,'enabled long');
+      await matrix(long,'enabled long');
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      expect((await page.request.patch(`${mailbox}/identities/${long.id}`,{headers,data:{enabled:false}})).status()).toBe(200);
+      await reopen();
+      await matrix(long,'unavailable');
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await reopen();
+      await matrix(long,'reopened unavailable draft');
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      for(const [state,email,displayName] of [
+        ['80-char name',`${'b'.repeat(47)}@example.test`,'N'.repeat(80)],
+        ['120-char address',`${'a'.repeat(64)}@${'b'.repeat(42)}.example.test`,longName]
+      ]) {
+        const sender=await identity(email,displayName);
+        await openFresh(sender,state);
+        await matrix(sender,state);
+        await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      }
+      expect(measurements).toHaveLength(30);
+      await info.attach(`editor-space-${locale}`,{body:JSON.stringify(measurements,null,2),contentType:'application/json'});
+    } finally {
+      expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:null,signatureOverride:null}})).status()).toBe(200);
+      expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:'en'}})).status()).toBe(200);
+    }
+  });
+}

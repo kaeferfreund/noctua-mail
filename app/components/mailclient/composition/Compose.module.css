@@ -498,3 +498,31 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+@media (width < 768px) {
+  .composeModal { --compose-editor-input-min-height: 120px; }
+
+  /* Clamp only the presentation: the complete sender remains text and title. */
+  .composeSubtitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .composeFromTrigger > :first-child {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Reserve the editor's intrinsic toolbar + input minimum. Long warnings or
+     recipient fields scroll here instead of taking that space from the body. */
+  .composeBody > .composeGrid {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .composeModal .composeMessageField { min-height: min-content; }
+}
