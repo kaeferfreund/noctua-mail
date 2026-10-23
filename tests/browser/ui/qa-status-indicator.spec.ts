@@ -187,7 +187,9 @@ test("density preserves reader controls, inline compose, resizing, notice alignm
   await detached.close();
 
   await page.getByRole("button", { name: "Neue E-Mail", exact: true }).click();
-  const compose = page.locator('article[class*="ComposeInlineCard"]');
+  // Next 16.4 production CSS module classes no longer carry the file name, so
+  // find the inline card by its own control instead of a module class prefix.
+  const compose = page.locator("article").filter({ has: page.getByRole("button", { name: "Open composer in new window", exact: true }) });
   await expect(compose).toBeVisible();
   await page.screenshot({ animations: "disabled", path: `${artifacts}/compose-1280-light.png` });
   const composeStyle = await style(compose);
