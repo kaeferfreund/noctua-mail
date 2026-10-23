@@ -16,6 +16,13 @@ for (const path of ["direct", "draft-save", "draft-send", "calendar-respond", "m
         expect(stdout).toContain(`PASS ${path}/same-continuation/${variant}`);
       }
     }
+    if (path === "draft-save") {
+      expect(stdout).toContain("PASS draft-save/revoked-before-sanitization-source-unchanged");
+      expect(stdout).toContain("PASS draft-save/rejected-append-keeps-one-draft");
+    }
+    if (path === "calendar-respond") for (const scope of ["series", "occurrence"]) for (const outcome of ["success", "revoked"]) {
+      expect(stdout).toContain(`PASS calendar-respond/master-contention/${scope}/${outcome}`);
+    }
     if (["draft-save", "mcp-create-draft"].includes(path)) expect(stdout).toContain(`PASS ${path}/revoked-during-db-retry`);
     if (["draft-save", "mcp-create-draft", "calendar-respond"].includes(path)) {
       for (const scope of path === "calendar-respond" ? ["series", "occurrence"] : ["series"]) {

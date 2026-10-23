@@ -8,7 +8,7 @@
  */
 import type { Database } from "bun:sqlite";
 import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
-import { prepareOutboundWrite } from "../../outboundWrite";
+import { withOutboundWrite } from "../../outboundWrite";
 import type {
   CalendarEvent,
   CalendarEventEmailSnapshotFields,
@@ -132,12 +132,10 @@ export async function upsertCalendarParticipationOverride(
   },
   beforeWrite?: OutboundWriteAuthorization
 ): Promise<CalendarParticipationOverrideRow> {
-  const db = await getAccountDb(accountId);
-  const authorizedWrite = await prepareOutboundWrite(beforeWrite);
-  return authorizedWrite(assertCurrent => db.transaction(() => {
-    assertCurrent();
-    return upsertCalendarParticipationOverrideRow(db, accountId, input);
-  }).immediate());
+  return withOutboundWrite("upsertCalendarParticipationOverride", beforeWrite, async write => {
+    const db = await getAccountDb(accountId);
+    return write(db, () => upsertCalendarParticipationOverrideRow(db, accountId, input));
+  });
 }
 
 function upsertCalendarParticipationOverrideRow(
@@ -383,12 +381,10 @@ export async function upsertCalendarEvent(
   beforeWrite?: OutboundWriteAuthorization,
   clearParticipationOccurrenceAtMs?: number
 ): Promise<void> {
-  const db = await getAccountDb(accountId);
-  const authorizedWrite = await prepareOutboundWrite(beforeWrite);
-  return authorizedWrite(assertCurrent => db.transaction(() => {
-    assertCurrent();
-    upsertCalendarEventRow(db, accountId, event, clearParticipationOccurrenceAtMs);
-  }).immediate());
+  return withOutboundWrite("upsertCalendarEvent", beforeWrite, async write => {
+    const db = await getAccountDb(accountId);
+    write(db, () => upsertCalendarEventRow(db, accountId, event, clearParticipationOccurrenceAtMs));
+  });
 }
 
 function upsertCalendarEventRow(db: Database, accountId: string, event: CalendarEvent, clearParticipationOccurrenceAtMs?: number) {
