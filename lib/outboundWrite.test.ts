@@ -1,3 +1,4 @@
+import { createSharedShardFixture } from "./testSharedShardHarness";
 import { Database } from "bun:sqlite";
 import { expect, spyOn, test } from "bun:test";
 import { createCollabFixture } from "./testThreadCollabHarness";
@@ -141,11 +142,10 @@ test("guarded FTS plans preserve same-copy identity and repeated IDs within a ba
 
 
 test("guarded FTS plans preserve colliding mailbox copies and other accounts' rows", async () => {
-  const f = await createCollabFixture();
+  const { a: f, b } = await createSharedShardFixture();
   const old = f.message("<synthetic-collision@example.test>", { id: "synthetic-collision", mailboxPath: "INBOX", imapUid: 1 });
   await f.seed(old);
-  f.db.prepare(`INSERT INTO ${SHARD_FTS_TABLE} (accountId,messageId,subject) VALUES (?,?,?)`)
-    .run("synthetic-other-account", old.id, "Synthetic other account");
+  await b.seed(b.message("<other-account@example.test>", { id: old.id, subject: "Synthetic other account" }));
   const beforeWrite = async () => ({ userId: "synthetic", clientId: "synthetic", assertCurrent: () => {} });
   const variant = { ...old, imapUid: 2, subject: "Synthetic second copy" };
   await f.api.upsertMessages(f.accountId, null, [variant, { ...variant, subject: "Synthetic final copy" }], false, { beforeWrite });
@@ -153,8 +153,13 @@ test("guarded FTS plans preserve colliding mailbox copies and other accounts' ro
   const fts = f.db.prepare(`SELECT messageId AS id,subject FROM ${SHARD_FTS_TABLE} WHERE accountId=? ORDER BY messageId`).all(f.accountId);
   expect(messages).toHaveLength(2);
   expect(fts).toEqual(messages);
-  expect(f.db.prepare(`SELECT subject FROM ${SHARD_FTS_TABLE} WHERE accountId=?`).all("synthetic-other-account"))
+  expect(f.db.prepare(`SELECT subject FROM ${SHARD_FTS_TABLE} WHERE accountId=?`).all(b.accountId))
     .toEqual([{ subject: "Synthetic other account" }]);
+  // FTS v3 supplies the identity validator after integration; v2 has no map.
+  if (SHARD_FTS_TABLE === ("message_fts_v3" as string)) {
+    const { validateFtsIdentity } = await import("./db/" + "ftsIdentity");
+    validateFtsIdentity(f.db);
+  }
 });
 
 
