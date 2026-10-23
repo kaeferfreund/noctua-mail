@@ -7,11 +7,22 @@ import { normalizeIdentityEmail, getOwnAddresses } from "../ownAddresses";
 import { getDb } from "./connection";
 
 type IdentityRow = Omit<SenderIdentity, "enabled" | "isDefault"> & { enabled: number; isDefault: number };
+const mapIdentityRow = (row: IdentityRow): SenderIdentity => ({ ...row, enabled: !!row.enabled, isDefault: !!row.isDefault,
+  replyTo: row.replyTo ?? undefined, signatureId: row.signatureId ?? undefined });
 export function listSenderIdentityRows(db: Database, accountId: string): SenderIdentity[] {
   return (db.query(`SELECT * FROM sender_identities WHERE accountId=?
-    ORDER BY isDefault DESC, email COLLATE NOCASE, id`).all(accountId) as IdentityRow[])
-    .map(row => ({ ...row, enabled: !!row.enabled, isDefault: !!row.isDefault,
-      replyTo: row.replyTo ?? undefined, signatureId: row.signatureId ?? undefined }));
+    ORDER BY isDefault DESC, email COLLATE NOCASE, id`).all(accountId) as IdentityRow[]).map(mapIdentityRow);
+}
+/** Batched `listSenderIdentityRows`: one statement, same rows and per-account order; absent key = no rows. */
+export function listSenderIdentityRowsForAccounts(db: Database, accountIds: readonly string[]): Map<string, SenderIdentity[]> {
+  const byAccount = new Map<string, SenderIdentity[]>();
+  if (!accountIds.length) return byAccount;
+  for (const row of db.query(`SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?))
+    ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id`).all(JSON.stringify(accountIds)) as IdentityRow[]) {
+    const rows = byAccount.get(row.accountId);
+    if (rows) rows.push(mapIdentityRow(row)); else byAccount.set(row.accountId, [mapIdentityRow(row)]);
+  }
+  return byAccount;
 }
 export async function listSenderIdentities(accountId: string): Promise<SenderIdentity[]> {
   return listSenderIdentityRows(await getDb(), accountId);
