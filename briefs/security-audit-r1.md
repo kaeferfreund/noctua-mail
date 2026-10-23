@@ -16,7 +16,7 @@ Scope is the combination of team-auth through fix round 5, collaboration `133bdd
 
 ### S1 — HIGH — Shared-shard message and thread primary keys allow one mailbox sync to overwrite another mailbox's cache
 
-**Locations:** `lib/db/schema.ts:956` (`messages.id` global primary key), `lib/messageIds.ts:28` (account-independent RFC Message-ID hash), `lib/db/messages/upsert.ts:145` (existing-row lookup scoped only to the syncing account), `lib/db/messages/upsert.ts:183` (global INSERT OR REPLACE), `lib/db/messages/upsert.ts:194` (FTS deletion by row ID), `lib/db/schema.ts:1046` (`threads.threadId` global primary key), `lib/db/threads.ts:294` (thread replacement). The watcher reaches these writes via its sync job; the same store is used by cross-account copy ingestion.
+**Locations:** `lib/db/schema.ts:956` (`messages.id` global primary key), `lib/messageIds.ts:26` (account-independent RFC Message-ID hash), `lib/db/messages/upsert.ts:143` (existing-row lookup scoped only to the syncing account), `lib/db/messages/upsert.ts:183` (global INSERT OR REPLACE), `lib/db/messages/upsert.ts:194` (FTS deletion by row ID), `lib/db/schema.ts:1046` (`threads.threadId` global primary key), `lib/db/threads.ts:294` (thread replacement). The watcher reaches these writes via its sync job; the same store is used by cross-account copy ingestion.
 
 **Boundary and scenario:** Mailboxes A and B are configured to share a physical shard, which the design explicitly permits. A remote sender or a compromised B IMAP server supplies a Message-ID already present in A. The ID builder returns the same row ID for both accounts. The B-scoped collision lookup sees no B row; INSERT OR REPLACE then replaces A's globally keyed row with B's row and replaces its FTS data. Even distinct messages with the same conversation root collide in the globally keyed thread index. A common message delivered to both mailboxes causes this without an attacker. A malicious sender who knows an existing Message-ID can deliberately trigger it through B, without A membership.
 
@@ -33,7 +33,7 @@ The fixture's master dbPath update establishes the supported storage topology; i
 
 ### S2 — MEDIUM — Attachment preview discloses another mailbox's filename through a shared shard
 
-**Locations:** `lib/db/messages/retrieval.ts:159`–163; `app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts:71` (metadata lookup), `:93` (filename in preview title).
+**Locations:** `lib/db/messages/retrieval.ts:159`–163; `app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts:70` (metadata lookup), `:93` (filename in preview title).
 
 **Boundary and scenario:** A viewer of mailbox A supplies a message-row ID and attachment ID belonging to inaccessible B. The route authorizes A, then getAttachmentMeta opens their common shard and selects by messageId/attachmentId without joining messages.accountId. `?preview=1` returns HTML containing B's filename before checking any A-scoped source/data file. IDs may be learned externally or guessed from deterministic attachment naming; possession of an ID is not mailbox authorization.
 

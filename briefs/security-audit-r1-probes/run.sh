@@ -1,6 +1,6 @@
 #!/bin/bash
 # Read-only audit runner. No host network or real environment.
-# Default: 26 integration/runtime probes. Run stream.test.ts separately because it mocks the IMAP transport.
+# Default: 27 integration/runtime probes. Run stream.test.ts separately because it mocks the IMAP transport.
 # Do not select repository fixtures with ephemeral listeners; permitted ports are 3824/3825 only.
 set -euo pipefail
 checkout=/home/monkey/code/noctua-mail/wt-audit

@@ -1,0 +1,14 @@
+# Verify feat/collab-ui-2b @ 7e1149a (Codex gpt-6.1-sol high, read-only, 2026-10-23 ~00:55 UTC) — verdict FIX
+
+Findings (all P2)
+1. app/hooks/useMailboxSummaries.ts:45/94 — a 401 from summary or stream permanently stops updates (data cleared, no retry) even after authentication is restored without a sessionKey change. Parent transport recovered. Expected: distinguish 401 (revalidate/recover) from 403 (permanent stop).
+2. app/hooks/mailboxSummaryEvents.ts:10 (lib/userEvents.ts:70) — watcher badge stays stale after watcher transitions (e.g. idling → auth_failed): the SSE payload carries counts only, the hook does no metadata read. Parent's canonical reread updated it. Expected: coordinated event-contract extension or a metadata read.
+3. app/hooks/useMailboxSummaries.ts:53/61 — an event for a mailbox unknown to the in-flight snapshot is discarded (apply returns null, pending cleared, no repair GET because mailboxes is non-null). Parent started a replacement read. Expected: one canonical repair read.
+4. app/components/mailclient/useSearchState.ts:276 (lib/db/messages/query.ts:2487/2713) — the Open consumer uses listThreads `total` (messages) as a distinct-thread count: two messages in one waiting thread → 2 instead of 1. The DOM test mocks `total`.
+
+Follow-ups (not 2b regressions)
+- lib/db/messages/query.ts:874 — the Unassigned view filter includes closed unassigned threads while the badge uses unassignedOpen (badge 1 vs 2 rows). Touches the badge-filter SQL that perf/thread-selector-flagged 709aa48 pins byte-identical → fix after the perf merges.
+- lib/db/senderIdentityMetadata.test.ts:66 — one SQLITE_BUSY in randomized stress during Better Auth synthetic-user creation (isolated head/parent controls pass); same class as the auth-fixture hardening in integration round 5 (353f7ec).
+
+Verified: 86 hook tests ×5 green, historical R5/R6/R7 controls 61/61; identity probe (old-user response after login as another user cannot replace state); summary controls (overlay without GET, 403 stop, 5xx/network reconnect+repair, backoff 1 s→30 s cap, fake timers/listeners clean incl. StrictMode/unmount, assignedToMe never crosses user keys); request counts: open 1 GET + 1 stream (parent 2 GETs), 20 events 0 GETs (parent 20), reconnect 1, membership change 1; admin acceptance passed; no display text as logic; grouping benchmark 11k/2.2k threads: 27.1 ms with flagged vs 24.1 ms without, date sort 2.8 ms. Gates: typecheck 0, ci 2506 + 375, changed tests 5× stable, lint 0 new, build ok, stress 7517/1 (the BUSY flake above). merge-tree: 0 conflicts vs ad6910f, db595c5, fc8883a, bc2ddae, 1d0e187.
+Display strings for i18n: "Unread", "Unread count unavailable", "{count} unread", "Assigned to me", "{count} assigned to me", "Unassigned", "{count} unassigned open", "Watcher: {state}", "—", tooltip "{email}\n{unread} unread · {assignedToMe} assigned to me · {unassignedOpen} unassigned open\nWatcher: {state}".
