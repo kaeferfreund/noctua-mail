@@ -10,7 +10,7 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
-import { listThreadMessages } from "@/lib/db";
+import { listThreadMessages, listThreadMessageWindow, ThreadWindowCursorError } from "@/lib/db";
 import { normalizeThreadDateSource } from "@/lib/threadDate";
 import type { Message } from "@/lib/data";
 
@@ -25,6 +25,14 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     /** `headers` omits body/htmlBody (read per message from the detail route). */
     projection?: string;
     excludeFolderIds?: string[];
+    /** Bounded reader window over exactly one thread (headers only). */
+    window?: {
+      anchorMessageId?: string;
+      cursor?: string;
+      before?: number;
+      after?: number;
+      pageSize?: number;
+    };
   };
   const accountId = await getAccountIdFromParams(params);
   const threadIds = Array.isArray(payload.threadIds)
@@ -40,7 +48,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         .filter(Boolean)
     : [];
   const projection = payload.projection === "headers" ? "headers" : "full";
-
+  const windowRequest =
+    payload.window && typeof payload.window === "object" ? payload.window : null;
   const context = await requireAccountContext(request, accountId, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId or threadIds/messageIds"
@@ -63,6 +72,37 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       });
       await enrichMessagesWithThreadCollab(items, { accountId: context.accountId });
     };
+
+    if (windowRequest) {
+      if (threadIds.length !== 1) {
+        return NextResponse.json(
+          { ok: false, message: "A thread window needs exactly one threadId" },
+          { status: 400 }
+        );
+      }
+      try {
+        const data = await listThreadMessageWindow({
+          accountId: context.accountId,
+          threadId: threadIds[0],
+          anchorMessageId:
+            typeof windowRequest.anchorMessageId === "string" ? windowRequest.anchorMessageId : null,
+          cursor: typeof windowRequest.cursor === "string" ? windowRequest.cursor : null,
+          before: windowRequest.before,
+          after: windowRequest.after,
+          pageSize: windowRequest.pageSize,
+          excludeFolderIds,
+          groupBy,
+          threadDateSource
+        });
+        await enrich(data.items);
+        return compressedJsonResponse(request, data);
+      } catch (error) {
+        if (error instanceof ThreadWindowCursorError) {
+          return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
 
     const data = await listThreadMessages({
       accountId: context.accountId,
