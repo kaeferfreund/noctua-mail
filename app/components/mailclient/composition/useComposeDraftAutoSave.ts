@@ -9,6 +9,7 @@ import type { ComposeReplyHeaders, ComposeTab, DraftSavePayload } from "./compos
 import { useMarkdownConverters } from "./useMarkdownConverters";
 
 export type UseComposeDraftAutoSaveParams = {
+  identityId?: string;
   composeOpen: boolean;
   sendingMail: boolean;
   draftSaving: boolean;
@@ -41,6 +42,7 @@ export type UseComposeDraftAutoSaveParams = {
 };
 
 export function useComposeDraftAutoSave({
+  identityId,
   composeOpen,
   sendingMail,
   draftSaving,
@@ -95,6 +97,7 @@ export function useComposeDraftAutoSave({
     const composePayload = buildComposePayloadRef.current({ preferText });
     const { text, html, attachments } = composePayload;
     const draftChangeState = getDraftChangeState({
+      identityId,
       draftId: composeDraftId,
       lastSavedHash: lastDraftHashRef.current,
       to: composeTo,
@@ -150,6 +153,7 @@ export function useComposeDraftAutoSave({
       const nextPreferText = composeTab === "html" && composeLastEditedRef.current === "text";
       const nextComposePayload = buildComposePayloadRef.current({ preferText: nextPreferText });
       const nextDraftChangeState = getDraftChangeState({
+        identityId,
         draftId: composeDraftId,
         lastSavedHash: lastDraftHashRef.current,
         to: composeTo,
@@ -171,6 +175,7 @@ export function useComposeDraftAutoSave({
       saveDraftRef.current(
         buildDraftSavePayload(
           {
+            identityId,
             to: composeTo,
             cc: composeCc,
             bcc: composeBcc,
@@ -192,6 +197,7 @@ export function useComposeDraftAutoSave({
     };
   }, [
     composeOpen,
+    identityId,
     convertersReady,
     sendingMail,
     draftSaving,

@@ -52,3 +52,81 @@ test("SIGTERM cancels an actual worker's 1500ms DB retry sleep", async () => {
     await stderr; await stdout;
   }
 });
+
+for (const [handshake, afterCoarse] of [[true, false], [false, false], [true, true]]) {
+  test(`retry policy bounds ${handshake ? afterCoarse ? "control-plane acquisition" : "handshake" : "ordinary write"} attempts and falls back to the original coarse schedule`, async () => {
+    jest.useFakeTimers();
+    const random = spyOn(Math, "random").mockReturnValue(0.5);
+    const times: number[] = [];
+    const started = Date.now();
+    const error = Object.assign(new Error("Synthetic busy"), { code: "SQLITE_BUSY" });
+    try {
+      const result = withDbWriteRetry("synthetic bounded retries", () => {
+        times.push(Date.now() - started);
+        throw error;
+      }, { handshakeRetry: () => handshake, handshakeRetryAfterCoarse: afterCoarse }).catch(caught => caught);
+      const shortDelays = handshake ? [1, 2, 4, ...Array(13).fill(8)] : [];
+      const coarseDelays = [120, 240, 480, 960];
+      const delays = afterCoarse ? [...coarseDelays, ...shortDelays] : [...shortDelays, ...coarseDelays];
+      for (const delay of delays) {
+        await Promise.resolve();
+        jest.advanceTimersByTime(delay);
+        await Promise.resolve();
+      }
+      expect(await result).toBe(error);
+      expect(times.length).toBe(handshake ? 21 : 5);
+      expect(times.at(-1)).toBe(delays.reduce((sum, delay) => sum + delay, 0));
+      expect(jest.getTimerCount()).toBe(0);
+    } finally { random.mockRestore(); jest.useRealTimers(); }
+  });
+}
+
+test("handshake wall budget includes preparation, and retries never mask a non-BUSY denial", async () => {
+  jest.useFakeTimers();
+  const random = spyOn(Math, "random").mockReturnValue(0.5);
+  try {
+    let attempts = 0;
+    const busy = new Error("SQLITE_BUSY");
+    const result = withDbWriteRetry("synthetic elapsed budget", () => {
+      attempts++;
+      jest.advanceTimersByTime(1_100);
+      throw busy;
+    }, { handshakeRetry: () => true }).catch(error => error);
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
+    expect(await result).toBe(busy);
+    expect(attempts).toBe(2);
+    let denied = 0;
+    await expect(withDbWriteRetry("synthetic denial", () => {
+      denied++; throw new Error("Forbidden");
+    }, { handshakeRetry: () => true })).rejects.toThrow("Forbidden");
+    expect(denied).toBe(1);
+  } finally { random.mockRestore(); jest.useRealTimers(); }
+});
+
+
+test("a delayed handshake wake does not admit another attempt past the wall deadline", async () => {
+  jest.useFakeTimers();
+  const random = spyOn(Math, "random").mockReturnValue(0.5);
+  const exhausted = spyOn(console, "error");
+  const busy = Object.assign(new Error("Synthetic master BUSY"), { code: "SQLITE_BUSY" });
+  const start = Date.now();
+  let attempts = 0;
+  try {
+    const result = withDbWriteRetry("synthetic delayed wake", () => {
+      if (++attempts === 1) throw busy;
+      return "late success";
+    }, { handshakeRetry: () => true }).catch(error => error);
+    await Promise.resolve();
+    jest.setSystemTime(start + 2_200);
+    jest.advanceTimersByTime(1);
+    await Promise.resolve();
+    expect(await result).toBe(busy);
+    expect(attempts).toBe(1);
+    expect(exhausted).toHaveBeenCalledWith("[db-write-retry] exhausted", {
+      operation: "synthetic delayed wake", retries: 1, attempts: 1, elapsedMs: 2_201,
+      error: { name: "Error", message: busy.message, code: "SQLITE_BUSY" }
+    });
+    expect(jest.getTimerCount()).toBe(0);
+  } finally { exhausted.mockRestore(); random.mockRestore(); jest.useRealTimers(); }
+});

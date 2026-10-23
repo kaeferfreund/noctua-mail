@@ -10,7 +10,7 @@ async function counts(page: Page) {
     const row = document.querySelector('[data-sidebar="menu-button"][aria-current="true"]')?.parentElement;
     const inboxRow = [...document.querySelectorAll('[data-sidebar="menu-button"]')].find(el => el.textContent === "Inbox")?.parentElement;
     const focusedRow = [...document.querySelectorAll('[data-sidebar="menu-button"]')].find(el => el.textContent === "Focused")?.parentElement;
-    const treeBadge = document.querySelector('[title^="INBOX ("][aria-label$=" unread"]');
+    const treeBadge = document.querySelector('[title^="Inbox ("][aria-label$=" unread"]');
     return { api: inbox?.unreadCount, summary: mailbox?.unread, mailbox: Number(row?.querySelector('[title="Unread"]')?.textContent), inbox: Number(inboxRow?.querySelector('[aria-label$=" unread"]')?.textContent), tree: Number(treeBadge?.textContent), focused: Number(focusedRow?.querySelector('[aria-label$=" unread"]')?.textContent?.replace("Unread: ", "")), total: inbox?.count };
   });
 }
@@ -23,7 +23,7 @@ test("QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread
   await signInQa(page);
   await expect.poll(() => counts(page), { timeout: 60000 }).toEqual(expected(110));
   console.log("QA-101 initial", JSON.stringify(await counts(page)));
-  await expect(page.getByRole("img", { name: "Watcher: idling", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Watcher: Listening for new mail", exact: true })).toBeVisible();
   await expect.poll(() => streamStatuses).toContain(200);
   const posts: unknown[] = [];
   page.on("request", req => { if (req.method() === "POST" && /\/messages\/[^/]+\/flags$/.test(new URL(req.url()).pathname)) posts.push(req.postDataJSON()); });

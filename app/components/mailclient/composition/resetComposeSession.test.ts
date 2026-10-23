@@ -66,6 +66,9 @@ describe("resetComposeSession", () => {
     };
 
     const compose: ResettableComposeState = {
+      setComposeIdentityId: createSetter<string | undefined>({ value: "alias" }),
+      setComposeUnavailableFrom: createSetter<string | undefined>({ value: undefined }),
+      setComposeSenderWarnings: createSetter<string[]>({ value: [] }),
       setComposeOpen: createSetter({ get value() { return state.composeOpen; }, set value(value) { state.composeOpen = value; } }),
       setComposeView: createSetter<ComposeView>({ get value() { return state.composeView; }, set value(value) { state.composeView = value; } }),
       setComposeDraftId: createSetter<string | null>({ get value() { return state.composeDraftId; }, set value(value) { state.composeDraftId = value; } }),

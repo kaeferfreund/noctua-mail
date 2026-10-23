@@ -1,8 +1,12 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 import { useMemo } from "react";
 import { X } from "lucide-react";
 import { Badge, Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+import type { UiLocale } from "@/lib/i18n/config";
 import type { Folder } from "@/lib/data";
 import type { SyncJobProgress } from "../types";
 import {
@@ -23,21 +27,7 @@ type ProcessStatusPopoverProps = {
   accountFolders: Folder[];
 };
 
-const SYNC_PHASE_LABELS: Record<SyncJobProgress["phase"], string> = {
-  starting: "Preparing",
-  fetching: "Fetching",
-  finalizing: "Finalizing",
-  done: "Done",
-  failed: "Failed",
-  retrying: "Retrying"
-};
-
-const SYNC_MODE_LABELS: Record<SyncJobProgress["mode"], string> = {
-  full: "Full sync",
-  recent: "Recent sync",
-  new: "New sync",
-  repair: "Repair sync"
-};
+type StatusTranslator = ReturnType<typeof useTranslations<"Shell.status">>;
 
 function formatSyncPercent(percent?: number) {
   if (typeof percent !== "number" || !Number.isFinite(percent)) return "";
@@ -61,18 +51,18 @@ function formatSyncCount(progress: SyncJobProgress) {
   return `${processed}`;
 }
 
-function formatRetryLabel(progress: SyncJobProgress) {
+function formatRetryLabel(progress: SyncJobProgress, t: StatusTranslator) {
   const { retryAttempt, maxRetries } = progress;
   if (typeof retryAttempt === "number" && typeof maxRetries === "number") {
-    return `Retrying (${retryAttempt}/${maxRetries})…`;
+    return t("retryCount", { attempt: retryAttempt, max: maxRetries });
   }
-  return "Retrying…";
+  return t("retry");
 }
 
-function formatSyncProgressSummary(progress: SyncJobProgress) {
-  const modeLabel = SYNC_MODE_LABELS[progress.mode] ?? "Sync";
+function formatSyncProgressSummary(progress: SyncJobProgress, t: StatusTranslator) {
+  const modeLabel = t(`modes.${progress.mode}`);
   if (progress.phase === "retrying") {
-    return `${modeLabel} · ${formatRetryLabel(progress)}`;
+    return `${modeLabel} · ${formatRetryLabel(progress, t)}`;
   }
   const countLabel = formatSyncCount(progress);
   const percentLabel = formatSyncPercent(progress.percent);
@@ -81,13 +71,14 @@ function formatSyncProgressSummary(progress: SyncJobProgress) {
   if (explicitMessage) {
     return metrics ? `${modeLabel} · ${explicitMessage} · ${metrics}` : `${modeLabel} · ${explicitMessage}`;
   }
-  const phaseLabel = SYNC_PHASE_LABELS[progress.phase] ?? "Running";
+  const phaseLabel = t(`phases.${progress.phase}`);
   return metrics ? `${modeLabel} · ${phaseLabel} · ${metrics}` : `${modeLabel} · ${phaseLabel}`;
 }
 
-function resolveSyncScopeLabel(progress: SyncJobProgress, folderById: Map<string, Folder>) {
-  const folderName = progress.folderId ? folderById.get(progress.folderId)?.name : undefined;
-  return folderName || progress.mailboxPath || "Mailbox";
+function resolveSyncScopeLabel(progress: SyncJobProgress, folderById: Map<string, Folder>, locale: UiLocale, t: StatusTranslator) {
+  const folder = progress.folderId ? folderById.get(progress.folderId) : undefined;
+  const folderName = folder ? getFolderDisplayName(folder, locale) : undefined;
+  return folderName || progress.mailboxPath || t("mailbox");
 }
 
 export default function ProcessStatusPopover({
@@ -100,6 +91,8 @@ export default function ProcessStatusPopover({
   syncProgressItems,
   accountFolders
 }: ProcessStatusPopoverProps) {
+  const t = useTranslations("Shell.status");
+  const locale = useLocale();
   const folderById = useMemo(
     () => new Map(accountFolders.map((folder) => [folder.id, folder])),
     [accountFolders]
@@ -126,27 +119,27 @@ export default function ProcessStatusPopover({
   const syncRows = [
     ...sortedSyncProgressItems.map((progress) => ({
       key: progress.jobId,
-      title: resolveSyncScopeLabel(progress, folderById),
-      detail: formatSyncProgressSummary(progress)
+      title: resolveSyncScopeLabel(progress, folderById, locale, t),
+      detail: formatSyncProgressSummary(progress, t)
     })),
     ...fallbackSyncingFolderItems.map((folder) => ({
       key: `fallback-${folder.id}`,
-      title: folder.name,
-      detail: "Preparing sync…"
+      title: getFolderDisplayName(folder, locale),
+      detail: t("preparingSync")
     }))
   ];
   const additionalProcessRows = [
-    isRecomputingThreads ? "Recomputing threads…" : "",
-    isRecomputingCategories ? "Recomputing categories…" : ""
+    isRecomputingThreads ? t("recomputingThreads") : "",
+    isRecomputingCategories ? t("recomputingCategories") : ""
   ].filter(Boolean);
   const activeProcessCount = syncRows.length + additionalProcessRows.length;
   const latestSyncProgress = sortedSyncProgressItems[0] ?? null;
   const latestSyncStatusValue = (() => {
     if (latestSyncProgress) {
-      const scopeLabel = resolveSyncScopeLabel(latestSyncProgress, folderById);
-      const modeLabel = SYNC_MODE_LABELS[latestSyncProgress.mode] ?? "Sync";
+      const scopeLabel = resolveSyncScopeLabel(latestSyncProgress, folderById, locale, t);
+      const modeLabel = t(`modes.${latestSyncProgress.mode}`);
       if (latestSyncProgress.phase === "retrying") {
-        return `${modeLabel}: ${formatRetryLabel(latestSyncProgress)} ${scopeLabel}`;
+        return t("syncRetryScope", { mode: modeLabel, retry: formatRetryLabel(latestSyncProgress, t), scope: scopeLabel });
       }
       // During the post-fetch finalizing tail the percent sits at 100, so
       // surface the step message instead — that's where the spinner outlives
@@ -156,29 +149,24 @@ export default function ProcessStatusPopover({
         return `${scopeLabel}: ${finalizingMessage}`;
       }
       const percentLabel = formatSyncPercent(latestSyncProgress.percent);
-      return percentLabel
-        ? `Syncing ${scopeLabel} (${modeLabel}, ${percentLabel})`
-        : `Syncing ${scopeLabel} (${modeLabel})...`;
+      return t("syncingScope", { scope: scopeLabel, mode: modeLabel, percent: percentLabel || "none" });
     }
     if (syncingFolderItems.length > 0) {
-      const firstFolderName = syncingFolderItems[0]?.name;
-      if (!firstFolderName) return "Syncing folder...";
-      if (syncingFolderItems.length === 1) return `Syncing ${firstFolderName}...`;
-      return `Syncing ${firstFolderName} +${syncingFolderItems.length - 1} more...`;
+      return t("syncingFolders", { folder: getFolderDisplayName(syncingFolderItems[0], locale), more: syncingFolderItems.length - 1 });
     }
-    return isSyncing ? "Syncing mailbox..." : "";
+    return isSyncing ? t("syncingMailbox") : "";
   })();
   const processStatusItems = [
     latestSyncStatusValue,
     ...additionalProcessRows
   ].filter(Boolean);
-  const processStatusValue = processStatusItems.length > 0 ? processStatusItems.join(" · ") : "Idle";
+  const processStatusValue = processStatusItems.length > 0 ? processStatusItems.join(" · ") : t("idle");
   const processStatusTone: BottomStatusTone = processStatusItems.length > 0 ? "normal" : "muted";
 
   return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Processes"
+    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title={t("processes")}
       trigger={<BottomStatusTriggerButton
-          label="Processes"
+          label={t("processes")}
           value={processStatusValue}
           tone={processStatusTone}
         />}
@@ -190,7 +178,7 @@ export default function ProcessStatusPopover({
         <Flex align="center" justify="between" className="popover-title-row">
           <Flex align="baseline" gap="3">
             <Heading size="3" weight="medium" className="reminder-main-title">
-              Processes
+              {t("processes")}
             </Heading>
             <Badge color="gray" variant="soft" radius="full">
               {activeProcessCount}
@@ -200,7 +188,7 @@ export default function ProcessStatusPopover({
             variant="ghost"
             color="gray"
             size="2"
-            tooltip="Close processes"
+            tooltip={t("closeProcesses")}
             onClick={() => onOpenChange(false)}
           >
             <X size={16} />
@@ -231,7 +219,7 @@ export default function ProcessStatusPopover({
             </Card>
           ) : (
             <Flex align="center" justify="center" p="4" className="empty-state">
-              <Text size="2" color="gray">No active processes.</Text>
+              <Text size="2" color="gray">{t("noProcesses")}</Text>
             </Flex>
           )}
         </Box>

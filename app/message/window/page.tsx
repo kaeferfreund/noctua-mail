@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "next-intl";
+import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import dynamic from "next/dynamic";
 
@@ -52,6 +54,7 @@ function getPrimaryEmail(value?: string) {
 }
 
 export default function MessageWindowPage() {
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const accountId = searchParams.get("accountId") ?? "";
   const messageId = searchParams.get("messageId") ?? "";
@@ -381,7 +384,7 @@ export default function MessageWindowPage() {
                 includeThreadAcrossFolders: false,
                 activeFolderId: safeMessage.folderId,
                 threadPathById: (folderId: string) =>
-                  folderId.replace(`${safeMessage.accountId}:`, ""),
+                  getFolderDisplayPath(folderId, id => folderById.get(id), locale, safeMessage.accountId),
                 folderById: (folderId: string) => folderById.get(folderId),
                 setSearchScope: noop as React.Dispatch<React.SetStateAction<"folder" | "all">>,
                 setActiveFolderId: noop as React.Dispatch<React.SetStateAction<string>>,

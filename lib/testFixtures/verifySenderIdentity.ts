@@ -18,6 +18,7 @@ import { parseAddressEmails } from "../ownAddresses";
 import { saveMessageSource, getMessageSource } from "../storage";
 import { parseDeliveryMetadata } from "../mail/imap/parser";
 import type { Message } from "../data";
+import { withDbWriteRetry } from "../dbWriteRetry";
 
 const api = await dbModulePromise;
 const accountId = `sender-${crypto.randomUUID()}`;
@@ -194,7 +195,10 @@ try {
     await rejected(() => sendDraft(request({}, auth), params({ draftId })), 403);
     await rejected(() => respond(request({ partstat: "ACCEPTED" }, auth), params({ eventId })), 403);
   }
-  master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(editor.user.id, accountId);
+  // Identity recompute workers also write master leases. Finish each bounded
+  // fixture transition before testing the resulting live authorization state.
+  await withDbWriteRetry("senderIdentityFixture.revokeEditor", () => master
+    .prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(editor.user.id, accountId));
   await rejected(() => direct(request(outbound), params()), 403);
   await rejected(() => save(request(outbound), params()), 403);
   await rejected(() => sendDraft(request({}), params({ draftId })), 403);
@@ -330,13 +334,16 @@ try {
   assert.equal(invalidDraft.isError, true); assert.equal(invalidDraft.structuredContent.code, "identity_not_found"); assert.deepEqual(counts(), beforeMcpInvalid);
   const foreignRef = (await call("create_draft_message", { mode: "reply", messageId: "foreign-source" })).result;
   assert.equal(foreignRef.isError, true);
-  master.prepare("UPDATE user_accounts SET role='editor' WHERE userId=? AND accountId=?").run(manager.user.id, accountId);
+  await withDbWriteRetry("senderIdentityFixture.downgradeEditor", () => master
+    .prepare("UPDATE user_accounts SET role='editor' WHERE userId=? AND accountId=?").run(manager.user.id, accountId));
   assert.equal((await call("update_sender_identity", { identityId: alias.id, patch: { enabled: false } })).result.isError, true);
-  master.prepare("UPDATE user_accounts SET role='viewer' WHERE userId=? AND accountId=?").run(manager.user.id, accountId);
+  await withDbWriteRetry("senderIdentityFixture.downgradeViewer", () => master
+    .prepare("UPDATE user_accounts SET role='viewer' WHERE userId=? AND accountId=?").run(manager.user.id, accountId));
   const beforeDowngrade = counts();
   assert.equal((await call("create_draft_message", outbound)).result.isError, true); assert.deepEqual(counts(), beforeDowngrade);
   assert.equal((await call("list_sender_identities")).result.structuredContent.ok, true);
-  master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(manager.user.id, accountId);
+  await withDbWriteRetry("senderIdentityFixture.revokeManager", () => master
+    .prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(manager.user.id, accountId));
   assert.deepEqual(await call("list_sender_identities"), { ok: false, message: "Unauthorized" });
   console.log("PASS sender identity route contracts");
 } finally { await sink.stop(); }

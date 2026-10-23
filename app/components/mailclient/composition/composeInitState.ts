@@ -1,3 +1,6 @@
+import { resolveComposeIdentity } from "@/lib/senderIdentitySelection";
+import { renderSignatureTemplate, resolveSignatureTemplate, type SignatureBlock } from "@/lib/signatureTemplates";
+import type { SenderSettings } from "@/lib/ui/senderSettings";
 import { isOwnAddress, parseAddressEmails } from "@/lib/ownAddresses";
 import type { AccountDateFormat, Message } from "@/lib/data";
 import { createDefaultComposeInviteDraft } from "@/lib/composeInvite";
@@ -137,7 +140,7 @@ const BLANK: ComposeInitFields = {
 // Pure function
 // ---------------------------------------------------------------------------
 
-export function computeComposeInitState(
+function computeBaseComposeInitState(
   mode: ComposeMode,
   message: Message | undefined,
   asNew: boolean,
@@ -154,7 +157,7 @@ export function computeComposeInitState(
   }
 ): ComposeInitFields {
   if (!message) {
-    return { ...BLANK };
+    return { ...BLANK, composeTab: opts.preferredComposeTab ?? "html" };
   }
 
   const { stripHtml, normalizeHtmlDerivedText } = deps;
@@ -431,6 +434,7 @@ export function computeComposeInitState(
 
   const initialDraftHash = !asNew
     ? computeDraftHash({
+        identityId: message.senderIdentityId,
         to: message.to ?? "",
         cc: message.cc ?? "",
         bcc: message.bcc ?? "",
@@ -479,4 +483,37 @@ export function computeComposeInitState(
     initialDraftHash,
     initialDraftSavedAt: !asNew ? (message.dateValue ?? Date.now()) : null
   };
+}
+
+
+/** One synchronous initializer for every host/editor. Saved drafts retain authored text. */
+export function computeComposeInitState(
+  mode: ComposeMode, message: Message | undefined, asNew: boolean,
+  opts: Parameters<typeof computeBaseComposeInitState>[3] & { sender?: SenderSettings; skipSignature?: boolean },
+  deps: Parameters<typeof computeBaseComposeInitState>[4]
+): ComposeInitFields & { identityId?: string; unavailableFrom?: string; signature?: SignatureBlock; warnings: string[] } {
+  const sender = opts.sender;
+  const fields = computeBaseComposeInitState(mode, message, asNew, opts, deps);
+  if (!sender) return { ...fields, warnings: [] };
+  const reopening = mode === "edit" && !asNew;
+  const selection = resolveComposeIdentity({ accountId: sender.account.id, identities: sender.identities,
+    prefs: sender.prefs, mode: reopening ? "draft" : mode === "reply" || mode === "replyAll" || mode === "forward" ? mode : "new", message });
+  const identityId = selection.unavailableIdentityId ?? selection.identity?.id;
+  const result = { ...fields, identityId, unavailableFrom: reopening && !selection.identity?.enabled ? message?.from : undefined,
+    warnings: [...sender.warnings, ...selection.warnings] };
+  if (reopening || opts.skipSignature) {
+    // Include a resolved legacy From in the baseline without changing its body.
+    if (result.initialDraftHash && identityId) result.initialDraftHash = JSON.stringify({ identityId, ...JSON.parse(result.initialDraftHash) });
+    return result;
+  }
+  const template = resolveSignatureTemplate(sender.account.settings, sender.prefs, selection.identity);
+  result.warnings.push(...template.warnings);
+  const block = { id: template.id, ...renderSignatureTemplate(template.body, sender.user, selection.identity) };
+  if (!block.text) return result;
+  // Text replies contain their quote in the same field; prepend before that quote.
+  return { ...result, signature: block,
+    composeBody: [block.text, fields.composeBody].filter(Boolean).join("\n\n"),
+    composeMarkdown: [block.markdown, fields.composeMarkdown].filter(Boolean).join("\n\n"),
+    composeHtml: block.html + fields.composeHtml,
+    composeHtmlText: [block.text, fields.composeHtmlText].filter(Boolean).join("\n\n") };
 }
