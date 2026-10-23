@@ -66,6 +66,8 @@ export type FullSyncConfirmState = {
 export type SyncJobResult = {
   count: number;
   newMessages?: SyncNotificationMessage[];
+  /** Mode of the job's final progress report (client-side; differs when a sync escalated). */
+  completedMode?: SyncMode;
 };
 
 export type SyncJobProgressPhase =

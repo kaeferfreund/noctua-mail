@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { UserMailboxSummary, MailboxSummaryResult } from "@/lib/mailboxSummary";
 import type { MailboxState } from "@/lib/authClient";
 import type { UserEvent } from "@/lib/userEvents";
-import { applyMailboxSummary, hasSummaryMetadata, readSummaryEvents, summaryReconnectDelay, type MailboxSummaryUpdate } from "./mailboxSummaryEvents";
+import { applyMailboxSummary, hasSummaryMetadata, readSummaryEvents, reconcileMailboxSummaries, summaryReconnectDelay, type MailboxSummaryUpdate } from "./mailboxSummaryEvents";
 
 type Options = {
   sessionKey: string | null;
@@ -39,7 +39,11 @@ export function useMailboxSummaries(options: Options) {
     let repairNeeded = false;
     const pending = new Map<string, MailboxSummaryUpdate>();
     const revisions = new Map<string, number>();
-    const publish = () => { if (!stopped) setEntry({ key: sessionKey, mailboxes: mailboxes ?? [] }); };
+    const publish = () => {
+      const next = mailboxes ?? [];
+      if (!stopped) setEntry(previous => previous?.key === sessionKey && previous.mailboxes === next
+        ? previous : { key: sessionKey, mailboxes: next });
+    };
     const stop = () => {
       deniedKey.current = sessionKey;
       stopped = true; controller.abort(); stream?.abort(); clearTimeout(timer);
@@ -64,7 +68,7 @@ export function useMailboxSummaries(options: Options) {
         if (!result.ok || !Array.isArray(result.mailboxes)) throw new Error("Invalid mailbox summary");
         // A heartbeat can precede a denied GET; only a valid snapshot recovers.
         failures = 0;
-        mailboxes = result.mailboxes;
+        mailboxes = reconcileMailboxSummaries(mailboxes, result.mailboxes);
         // Events delivered during the GET are newer than its snapshot. Overlay
         // the latest coalesced values, without invalidating the whole read.
         for (const update of pending.values()) {
@@ -96,8 +100,15 @@ export function useMailboxSummaries(options: Options) {
         (event.unread === null || Number.isFinite(event.unread)) && Number.isFinite(event.assignedToMe) && Number.isFinite(event.unassignedOpen)) {
         if (refreshTask) pending.set(event.accountId, event);
         const next = mailboxes && applyMailboxSummary(mailboxes, event);
-        if (next) { mailboxes = next; publish(); if (!refreshTask) pending.delete(event.accountId); }
+        if (next) {
+          const changed = next !== mailboxes;
+          mailboxes = next;
+          if (changed) publish();
+          if (!refreshTask) pending.delete(event.accountId);
+        }
         if (!next || !hasSummaryMetadata(event)) refreshMissing();
+        // Counts alone cannot prove that assignments stayed the same. Preserve
+        // this invalidation even when the sidebar snapshot is display-equal.
         callbacks.current.onSummaryChanged?.(event.accountId);
       } else if (event?.type === "thread-collab" && typeof event.accountId === "string" && typeof event.threadId === "string" && Number.isFinite(event.revision)) {
         const key = JSON.stringify([event.accountId, event.threadId]);

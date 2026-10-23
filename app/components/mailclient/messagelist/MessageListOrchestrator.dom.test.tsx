@@ -80,7 +80,7 @@ for (const scenario of ["next", "previous", "end", "failed"] as const) it(`archi
   let activeId = active.id;
   Object.assign(input.mutationInputs, {
     messages, viewMessage: active, activeMessageId: active.id,
-    navigationRows: scenario === "end" ? [active] : messages,
+    getNavigationRows: () => (scenario === "end" ? [active] : messages),
     shouldKeepMessageInCurrentResults: () => false,
     setViewMessage: (message: Message | null) => { selected = message; },
     setActiveMessageId: (id: string) => { activeId = id; },
@@ -101,7 +101,7 @@ for (const selectedDuringRequest of ["target", "other", "removed-row"] as const)
   const response = new Promise<Response>(resolve => { complete = resolve; });
   let selected: Message | null = null;
   Object.assign(input.mutationInputs, {
-    messages, navigationRows: messages, shouldKeepMessageInCurrentResults: () => false,
+    messages, getNavigationRows: () => messages, shouldKeepMessageInCurrentResults: () => false,
     setViewMessage: (message: Message | null) => { selected = message; },
     apiFetch: () => response
   });
@@ -110,7 +110,7 @@ for (const selectedDuringRequest of ["target", "other", "removed-row"] as const)
   act(() => { pending = handle.current!.handleArchiveMessage(messages[0]); });
   const current = selectedDuringRequest === "other" ? messages[2] : messages[0];
   selected = current;
-  const updated = { ...input, mutationInputs: { ...input.mutationInputs, activeMessageId: current.id, viewMessage: current, navigationRows: selectedDuringRequest === "removed-row" ? messages.slice(1) : messages } };
+  const updated = { ...input, mutationInputs: { ...input.mutationInputs, activeMessageId: current.id, viewMessage: current, getNavigationRows: () => (selectedDuringRequest === "removed-row" ? messages.slice(1) : messages) } };
   view.rerender(<Theme><MessageListOrchestrator {...updated} listHandleRef={handle} /></Theme>);
   await act(async () => { complete(Response.json({ action: "moved", archiveFolderId: "synthetic:Archive" })); await pending; });
   expect(selected as Message | null).toBe(selectedDuringRequest === "other" ? current : messages[1]);
