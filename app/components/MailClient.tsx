@@ -41,8 +41,7 @@ import MailboxGate from "./auth/MailboxGate";
 import { AuthFrame } from "./auth/AuthPrimitives";
 import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
-import AdminPanel from "./admin/AdminPanel";
-import { CreateMailbox } from "./admin/AdminMailboxes";
+import LazyDialogLoading from "./LazyDialogLoading";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
 import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
@@ -117,7 +116,6 @@ import {
   Card,
   Flex,
   IconButton,
-  Spinner,
   Text
 } from "@radix-ui/themes";
 import MessageViewOrchestrator, {
@@ -297,16 +295,15 @@ import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 
 const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
   ssr: false,
-  loading: () => (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/40"
-      role="status"
-      aria-label="Settings"
-      aria-busy="true"
-    >
-      <Spinner size="3" />
-    </div>
-  )
+  loading: () => <LazyDialogLoading label="Settings" />
+});
+const AdminPanel = dynamic(() => import("./admin/AdminPanel"), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Admin" />
+});
+const CreateMailbox = dynamic(() => import("./admin/AdminMailboxes").then(module => module.CreateMailbox), {
+  ssr: false,
+  loading: () => <LazyDialogLoading label="Postfach hinzufügen" mailboxDialog />
 });
 
 const LIST_DEBUG_SAMPLE_LIMIT = 12;
@@ -401,11 +398,6 @@ export default function MailClient({
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  useEffect(() => deferUntilIdle(() => {
-    // Speculative warm-up must not surface an unhandled rejection. A cold open
-    // still loads through next/dynamic, including when this request fails.
-    void import("./AccountSettingsModal").catch(() => {});
-  }), []);
   const [reloginAccountId, setReloginAccountId] = useState("");
   const [reloginDescription, setReloginDescription] = useState("");
   const [listWidth, setListWidth] = useState(840);
@@ -662,6 +654,18 @@ export default function MailClient({
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
+  useEffect(() => deferUntilIdle(() => {
+    // Speculative warm-up must not surface an unhandled rejection. A cold open
+    // still loads through next/dynamic, including when this request fails.
+    void import("./AccountSettingsModal").catch(() => {});
+  }), []);
+  useEffect(() => {
+    if (!isAdminUser) return;
+    return deferUntilIdle(() => {
+      void import("./admin/AdminPanel").catch(() => {});
+      void import("./admin/AdminMailboxes").catch(() => {});
+    });
+  }, [isAdminUser]);
   const detachedWarnings = useDetachedSendWarnings(accounts, authState === "ok" ? currentUser?.id : null);
   const [initialDataReady, setInitialDataReady] = useState(false);
   const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
