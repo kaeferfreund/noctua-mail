@@ -27,7 +27,7 @@
 }
 
 .threadView {
-  padding: var(--space-4);
+  padding: var(--reader-padding-y, var(--space-4)) var(--reader-padding-x, var(--space-4));
   display: flex;
   flex-direction: column;
   gap: 0;

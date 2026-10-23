@@ -16,6 +16,7 @@ import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from ".
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
+import type { BuildIdentity } from "@/lib/buildVersion";
 
 import type React from "react";
 import dynamic from "next/dynamic";
@@ -56,6 +57,7 @@ import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
 import DialogsHost from "./mailclient/dialogs/DialogsHost";
 import { useConfirmDialogs } from "./mailclient/dialogs/useConfirmDialogs";
+import { consumeCalendarOpenRequest } from "./mailclient/status/statusIndicator";
 import type { BottomStatusPanel } from "./mailclient/status/BottomStatusBar";
 import ComposeOrchestrator, {
   type ComposeMirror,
@@ -359,6 +361,7 @@ function describeRequestTarget(input: RequestInfo | URL): string | null {
 
 type MailClientProps = {
   buildVersionLabel?: string;
+  buildInfo?: BuildIdentity | null;
 };
 
 type MoveToDialogState = {
@@ -387,7 +390,8 @@ import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 export default function MailClient({
-  buildVersionLabel = ""
+  buildVersionLabel = "",
+  buildInfo = null
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
   const tv = useTranslations("Views");
@@ -834,6 +838,7 @@ export default function MailClient({
     syncCompletionVersion,
     syncProgressByJobId,
     mailCheckMode,
+    mailCheckStatus,
     syncStateRef,
     syncAccountRef,
     recomputeThreadsRef,
@@ -5039,12 +5044,9 @@ export default function MailClient({
   // after importing an .ics, so we open the calendar popover here on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("openCalendar") !== "1") return;
+    const nextUrl = consumeCalendarOpenRequest(window.location.href);
+    if (nextUrl === null) return;
     setOpenBottomStatusPanel("calendar");
-    params.delete("openCalendar");
-    const query = params.toString();
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState({}, "", nextUrl);
   }, []);
   const handleNoticeOpen = (notice: InAppNotice) => {
@@ -5361,7 +5363,7 @@ export default function MailClient({
             },
             onLogout: () => { void logout(); }
           },
-          brand: { buildVersionLabel },
+          brand: { buildInfo },
           mailboxes: {
             accounts,
             summaries: mailboxSummaries,
@@ -5713,7 +5715,11 @@ export default function MailClient({
             isRecomputingThreads={isRecomputingThreads}
             isRecomputingCategories={isRecomputingCategories}
             syncingFolders={syncingFolders}
-            syncProgressItems={Object.values(syncProgressByJobId)}
+            accounts={accounts}
+            onRetrySync={(job) => { void syncAccount(job.folderId, job.mode === "recent" ? "new" : job.mode); }}
+            mailCheckStatus={mailCheckStatus}
+            calendarSidebarOpen={calendarSidebarOpen}
+            syncProgressItems={Object.values(syncProgressByJobId).filter(job => job.accountId === activeAccountId)}
             accountFolders={accountFolders}
             mailCheckMode={mailCheckMode}
             activeAccountId={activeAccountId}
@@ -5733,10 +5739,12 @@ export default function MailClient({
             formatRelativeTime={formatRelativeTime}
             onReloginAccount={currentAccount?.accessRole === "manager" ? handleOpenReloginFromException : undefined}
             onOpenCalendarSidebar={() => setCalendarSidebarOpen(true)}
+            onToggleCalendarSidebar={() => setCalendarSidebarOpen(open => !open)}
             onOpenCalendarMessage={handleOpenCalendarMessage}
             onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}
             calendarFirstDay={calendarFirstDay}
             accountDateFormat={accountDateFormat}
+            buildInfo={buildInfo}
           />
         }
         notices={(placement) => (

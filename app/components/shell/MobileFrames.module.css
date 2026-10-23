@@ -8,13 +8,27 @@
   border: 0;
   border-radius: 0;
 }
-.statusSheet { max-height: 90dvh; overflow: hidden; }
+/* The generic Sheet close is a 28px icon; a fullscreen phone frame has room
+   for the 44px target its other controls use. */
+.fullscreenSheet > [data-slot="sheet-close"],
+.statusSheet > [data-slot="sheet-close"] { top: 4px; right: 4px; width: 44px; height: 44px; }
+.statusSheet { max-height: 90dvh; overflow: hidden; gap: 0; }
+/* Title row of every phone status Sheet: title and count, then the 44px close. */
+.statusSheetTitle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 56px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
 .statusContent {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   width: 100%;
   max-width: none;
-  max-height: 85dvh;
   min-height: 0;
   padding: 16px;
   box-shadow: none;
@@ -45,9 +59,6 @@
 .messageMenu :global([data-slot="dropdown-menu-sub-trigger"]),
 .messageMenu :global(.rt-DropdownMenuItem),
 .messageMenu :global(.rt-DropdownMenuSubTrigger) { min-height: 44px; }
-@media (width < 768px) {
-  .desktopStatusBar { display: none; }
-}
 
 /* A stable Dialog tree presents as a fullscreen settings sheet on phones. */
 .settingsFullscreen {
@@ -59,3 +70,29 @@
   padding: 0;
   border-radius: 0;
 }
+
+/* Phone calendar inside the fullscreen status Sheet. FullCalendar's toolbar
+   wraps instead of clipping: prev/title/next take the first row, create/today
+   and the month/week/day group share the next one (or two at 320px). Every
+   control keeps a 44px target and the grid a bounded minimum height; when a
+   short viewport (keyboard) cannot fit that, the Sheet body scrolls. */
+.calendarFrame button { min-height: 44px; }
+.calendarFrame :global(.fc-button) { min-width: 44px; }
+.calendarBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 340px;
+  overflow: hidden;
+}
+/* Outranks FullCalendar's own .fc .fc-toolbar.fc-header-toolbar margin. */
+.calendarBody :global(.fc .fc-toolbar.fc-header-toolbar) { flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.calendarBody :global(.fc-header-toolbar > .fc-toolbar-chunk:nth-child(2)) {
+  order: -1;
+  flex: 1 0 100%;
+  justify-content: space-between;
+}
+.calendarBody :global(.fc-toolbar-title) { min-width: 0; text-align: center; overflow-wrap: anywhere; }
+/* Week headers ("Mon 10/19") get about 33px per column at 320px. */
+.calendarBody :global(.fc .fc-col-header-cell-cushion) { padding: 2px 0; font-size: 11px; overflow-wrap: anywhere; }

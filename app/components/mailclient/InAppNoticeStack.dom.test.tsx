@@ -104,7 +104,7 @@ describe("in-app notice stack", () => {
 
   it("renders the docked notices in the sidebar footer above the account card", () => {
     const props = {
-      brand: { buildVersionLabel: "" },
+      brand: { buildInfo: null },
       mailboxes: { accounts: [], activeAccountId: "", onSwitch: () => {}, onAdd: () => {} },
       compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
       sync: { isSyncing: false, onCheckNewMail: () => {} },
