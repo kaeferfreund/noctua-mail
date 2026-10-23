@@ -19,7 +19,7 @@ it("switches status labels while preserving the underlying status code", () => {
   const trigger = page.getByRole("combobox", {name: "Thread-Status"});
   expect(trigger.textContent).toContain("In Bearbeitung");
   fireEvent.click(trigger);
-  fireEvent.click(page.getByRole("option", {name: "Abgeschlossen"}));
+  fireEvent.click(page.getByRole("option", {name: "Erledigt"}));
   expect(selected).toBe("closed");
 });
 

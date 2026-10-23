@@ -17,5 +17,6 @@ export const SCENARIOS = {
   management:"real UV removal and password plus UV security purposes",
   registrationFault:"registration finalizer fault quarantines the committed credential",
   uvFault:"UV reauth finalizer fault removes the rotated session and grant",
-  revoke:"anonymous options are invalidated by revoke"
+  revoke:"anonymous options are invalidated by revoke",
+  enrollmentMobile:"German enrollment buttons fit at 320 and 360 pixels"
 } as const;

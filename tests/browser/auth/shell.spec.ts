@@ -284,3 +284,45 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await expect(first).toHaveAttribute("aria-current", "true");
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
 });
+
+test(SCENARIOS.enrollmentMobile, async ({ page, seed }) => {
+  await page.context().addCookies([{ name: "noctua-ui-locale", value: "de", url: new URL(page.url()).origin }]);
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  await page.getByLabel("E-Mail", { exact: true }).fill(seed.email);
+  await page.getByLabel("App-Passwort", { exact: true }).fill(seed.password);
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click();
+  await page.getByRole("button", { name: "Ich habe mein Handy verloren", exact: true }).click();
+  await page.getByLabel("Ersatzcode", { exact: true }).fill(seed.backupCodes[0]);
+  await page.getByRole("button", { name: "Bestätigen", exact: true }).click();
+  await page.getByLabel("Aktuelles Passwort", { exact: true }).fill(seed.password);
+  await page.getByLabel("Unbenutzter Ersatzcode", { exact: true }).fill(seed.backupCodes[1]);
+  await page.getByRole("button", { name: "Authenticator ersetzen", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Authenticator einrichten", exact: true })).toBeVisible();
+  await page.getByLabel("Aktuelles Passwort", { exact: true }).fill(seed.password);
+  await page.getByRole("button", { name: "Einrichtung starten", exact: true }).click();
+  const restart = page.getByRole("button", { name: "Einrichtung neu starten", exact: true });
+  await expect(restart).toBeVisible();
+  await page.evaluate(async () => { await document.fonts.load("500 14px Inter"); await document.fonts.ready; });
+  for (const width of [320, 360]) {
+    await page.setViewportSize({ width, height: 900 });
+    const buttons = await page.locator("[data-shell] button:visible").evaluateAll(elements => elements.map(element => {
+      const button = element.getBoundingClientRect();
+      const parent = element.parentElement!;
+      const container = parent.getBoundingClientRect();
+      const style = getComputedStyle(parent);
+      return { label: element.textContent, left: button.left, right: button.right,
+        containerLeft: container.left + parseFloat(style.paddingLeft),
+        containerRight: container.right - parseFloat(style.paddingRight),
+        scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+    }));
+    expect(buttons.some(button => button.label === "Einrichtung neu starten")).toBe(true);
+    for (const button of buttons) {
+      expect(button.left, `${width}px: ${button.label}`).toBeGreaterThanOrEqual(button.containerLeft);
+      expect(button.right, `${width}px: ${button.label}`).toBeLessThanOrEqual(button.containerRight);
+      expect(button.scrollWidth, `${width}px: ${button.label}`).toBeLessThanOrEqual(button.clientWidth);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+});
