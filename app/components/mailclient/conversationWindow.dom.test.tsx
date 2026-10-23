@@ -200,6 +200,41 @@ describe("reader bodies on expand", () => {
     expect(pages).toEqual(["older", "newer"]);
   });
 
+  test("no load controls when the list rows already cover the whole conversation", () => {
+    // Window around message 30 of 48 (20–40 plus the newest); the threaded
+    // list holds all 48 rows and the reader merges them in.
+    const all = Array.from({ length: 48 }, (_, index) => header(index));
+    const windowRows = [...all.slice(20, 41), all[47]];
+    const threadWindow = {
+      anchorId: "window-m30",
+      total: 48,
+      hasOlder: true,
+      olderCursor: "older",
+      hasNewer: true,
+      newerCursor: "newer",
+      placeholders: [],
+      loading: null,
+      error: null
+    };
+    const { view, props } = renderView({
+      activeMessage: all[30],
+      activeThread: all,
+      threadContentById: { "window-thread": windowRows },
+      threadWindow,
+      onLoadThreadPage: () => {}
+    });
+    expect(view.queryByRole("button", { name: "Load older messages" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Load more messages" })).toBeNull();
+
+    // Message 5 is not in the list: something older is really missing.
+    view.rerender(
+      <Theme>
+        <ThreadView {...props} activeThread={all.filter((message) => message.id !== "window-m5")} />
+      </Theme>
+    );
+    expect(view.getByRole("button", { name: "Load older messages" })).toBeTruthy();
+  });
+
   test("a failed body read shows an error with a manual retry", async () => {
     const manual: Array<boolean | undefined> = [];
     const { view } = renderView(

@@ -1,5 +1,6 @@
 import type { Message } from "@/lib/data";
 import { isMessageContentUnloaded } from "@/lib/ui/messageView";
+import type { ThreadWindowState } from "../useThreadContent";
 
 export function getVisibleThreadMessages(params: {
   activeThread: Message[];
@@ -46,6 +47,30 @@ export function getRenderedThreadMessages(params: {
     ? [activeThread.find((item) => item.id === activeMessage.id) ?? activeMessage]
     : activeThread;
   return getVisibleThreadMessages({ activeThread: baseThread, showComposeInline, composeDraftId });
+}
+
+/**
+ * Which window load controls the reader shows. A cursor alone does not mean
+ * rows are missing: in the threaded list every member of the conversation is
+ * usually loaded already and merged into the reader. Once the rendered rows of
+ * the thread cover the window's total, nothing is left to load in either
+ * direction.
+ */
+export function getThreadWindowPageControls(params: {
+  threadWindow: Pick<ThreadWindowState, "total" | "hasOlder" | "hasNewer"> | null | undefined;
+  threadId: string;
+  renderedThread: Pick<Message, "id" | "threadId">[];
+}) {
+  const { threadWindow, threadId, renderedThread } = params;
+  if (!threadWindow) return { older: false, newer: false };
+  const renderedIds = new Set(
+    renderedThread.filter((message) => message.threadId === threadId).map((message) => message.id)
+  );
+  const complete = renderedIds.size >= threadWindow.total;
+  return {
+    older: threadWindow.hasOlder && !complete,
+    newer: threadWindow.hasNewer && !complete
+  };
 }
 
 export function getInlineComposePlacement(params: {

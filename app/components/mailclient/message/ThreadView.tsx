@@ -10,6 +10,7 @@ import type { ThreadMessageCardProps } from "./ThreadMessageCard";
 import {
   getDefaultExpandedMessageIds,
   getRenderedThreadMessages,
+  getThreadWindowPageControls,
   isThreadMessageCollapsed
 } from "./threadViewState";
 import type { ThreadWindowState } from "../useThreadContent";
@@ -87,6 +88,9 @@ export default function ThreadView({
   const defaultExpandedIds = getDefaultExpandedMessageIds(visibleThread, activeMessage.id);
   const { threadViewMode } = messageCardProps;
   const windowLoading = threadWindow?.loading ?? null;
+  const pageControls = onLoadThreadPage
+    ? getThreadWindowPageControls({ threadWindow, threadId: activeThreadId, renderedThread: visibleThread })
+    : { older: false, newer: false };
   const newestVisibleId = visibleThread.reduce<Message | null>(
     (newest, message) => (!newest || message.dateValue >= newest.dateValue ? message : newest),
     null
@@ -116,16 +120,14 @@ export default function ThreadView({
           <Text size="1" color="red">{t("threadLoadError")}</Text>
         </div>
       ) : null}
-      {threadWindow?.hasOlder && onLoadThreadPage ? renderPageControl("older") : null}
+      {pageControls.older ? renderPageControl("older") : null}
       {visibleThread.map((message) => {
         const reply = resolveInReplyToRef(message, messageByMessageId);
         const isCollapsed = isThreadMessageCollapsed(message.id, collapsedMessages, defaultExpandedIds);
         const isCompactCollapsed = threadViewMode === "compact" && isCollapsed;
         return (
           <React.Fragment key={message.id}>
-            {threadWindow?.hasNewer && onLoadThreadPage && message.id === newestVisibleId
-              ? renderPageControl("newer")
-              : null}
+            {pageControls.newer && message.id === newestVisibleId ? renderPageControl("newer") : null}
             <div className={`${styles.threadItem} ${isCompactCollapsed ? styles.compactThreadItem : ""}`}>
               <ThreadMessageCard
                 message={message}
