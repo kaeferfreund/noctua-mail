@@ -1055,19 +1055,15 @@ a {
   color: var(--text);
 }
 
-.bottom-center-time {
+.bottom-center-build {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  cursor: pointer;
   color: var(--muted-foreground);
   text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
-}
-.bottom-center-time:hover {
-  color: var(--text);
 }
 
 .bottom-muted {

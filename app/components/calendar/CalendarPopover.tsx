@@ -353,8 +353,8 @@ export default function CalendarPopover({
   return (
     <>
       <button
-        className="bottom-center-time"
-        style={{ cursor: "pointer", background: "none", border: "none", padding: 0, color: "inherit", font: "inherit" }}
+        type="button"
+        className="bottom-section bottom-status-trigger"
         title="Open calendar"
         aria-label="Open calendar"
         onClick={() => onOpenChange(!open)}
