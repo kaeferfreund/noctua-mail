@@ -34,7 +34,7 @@ async function sync(path: string) {
   const started = await (await request(`${api}/sync`, { folderId: `${login.accountId}:${path}`, mode: "full" })).json() as { jobId: string };
   for (let attempt = 0; attempt < 120; attempt++) {
     const status = await (await request(`${api}/sync/status?jobId=${started.jobId}`)).json() as { job: { status: string; error?: string; result?: { count: number } } };
-    assert.notEqual(status.job.status, "failed", status.job.error);
+    assert.notEqual(status.job.status, "failed", status.job.error ?? "Sync job failed");
     if (status.job.status === "done") { console.log(`sync ${path}: done count=${status.job.result?.count}`); return; }
     await sleep(250);
   }
