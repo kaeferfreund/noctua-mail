@@ -20,7 +20,7 @@ test("batched identity rows equal the per-account reads, incl. shared shard and 
   expect(listSenderIdentityRowsForAccounts(master, []).size).toBe(0);
 
   // Own addresses through the batched candidate reader match the single-account reader, disabled aliases included.
-  const owner = "batch-identity-owner";
+  const owner = `batch-identity-owner-${crypto.randomUUID()}`;
   master.prepare("UPDATE accounts SET ownerUserId=? WHERE id IN (?,?)").run(owner, a.accountId, b.accountId);
   const accounts = await getAccountsForUser(owner);
   expect(accounts.map(account => account.id).sort()).toEqual([a.accountId, b.accountId].sort());
