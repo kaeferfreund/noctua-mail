@@ -1,0 +1,9 @@
+wait 1 load 16.51
+wait 2 load 12.82
+wait 3 load 13.23
+wait 4 load 12.51
+wait 5 load 11.29
+wait 6 load 10.97
+start load 9.50 10.72 7.89 10/1948 3607764 at 2026-10-23T13:39:53Z
+exit 0 end load 13.36 11.84 8.53 18/1752 3613685 at 2026-10-23T13:41:12Z
+summarized
