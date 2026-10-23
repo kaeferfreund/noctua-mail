@@ -252,8 +252,8 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
               const target = opener?.isConnected && opener !== document.body
                 ? opener
                 : document.querySelector<HTMLButtonElement>(isMobile
-                  ? 'button[aria-label="Toggle sidebar"]'
-                  : 'button[aria-label="New mail"], button[aria-label="Toggle sidebar"]');
+                  ? 'button[data-shell-action="toggle-sidebar"]'
+                  : 'button[data-shell-action="compose"], button[data-shell-action="toggle-sidebar"]');
               if (target) {
                 event.preventDefault();
                 target.focus();

@@ -269,6 +269,15 @@ export function buildGroupedMessages(params: {
 }
 
 function sortGroupMetaForGroupBy(groups: MessageGroupMeta[], groupBy: string) {
+  if (groupBy === "week" || groupBy === "year") {
+    // Berlin may introduce a bucket missing from host-local server metadata.
+    // Order the union by persisted identity, never translated display labels.
+    const bucketOrder = (key: string) => {
+      const match = (groupBy === "week" ? /^(\d{4})-W(\d{2})$/ : /^(\d{4})$/).exec(key);
+      return match ? Number(match[1]) * 100 + Number(match[2] ?? 0) : Number.NEGATIVE_INFINITY;
+    };
+    return [...groups].sort((left, right) => bucketOrder(right.key) - bucketOrder(left.key));
+  }
   if (groupBy !== "date" && groupBy !== INVITE_DECK_GROUP_BY) {
     return groups;
   }

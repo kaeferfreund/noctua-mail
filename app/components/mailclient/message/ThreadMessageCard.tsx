@@ -768,10 +768,10 @@ export default function ThreadMessageCard({
                     onSelectFolder={handleFolderBadgeSelect}
                   />
                   {message.recent && (
-                    <Badge size="1" variant="soft" color={badgeColors.recent}>{t("recent")}</Badge>
+                    <Badge size="1" variant="soft" color={badgeColors.recent}>{t("flags.new")}</Badge>
                   )}
                   {message.priority && message.priority.toLowerCase() !== "normal" && (
-                    <Badge size="1" variant="soft" color={priorityColor}>{t("priority")}{message.priority}
+                    <Badge size="1" variant="soft" color={priorityColor}>{t("priority")} {message.priority}
                     </Badge>
                   )}
                   {hasNonInlineAttachments(message) && (

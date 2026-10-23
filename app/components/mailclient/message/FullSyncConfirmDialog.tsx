@@ -45,7 +45,7 @@ export default function FullSyncConfirmDialog({
             </Text>
           </Flex>
         </Box>
-        <Flex gap="3" mt="4" justify="end">
+        <Flex gap="3" mt="4" justify="end" wrap="wrap">
           <AlertDialog.Cancel>
             <Button variant="soft" color="gray" onClick={() => resolveConfirm(false)}>{t("cancel")}</Button>
           </AlertDialog.Cancel>

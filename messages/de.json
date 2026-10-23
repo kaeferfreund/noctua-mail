@@ -96,7 +96,7 @@
     "groups": {
       "today": "Heute",
       "yesterday": "Gestern",
-      "thisWeek": "Diese Woche",
+      "thisWeek": "Vor 2 bis 7 Tagen",
       "older": "Älter",
       "upcoming": "BEVORSTEHEND",
       "past": "VERGANGEN",
@@ -105,7 +105,7 @@
       "unknown": "Unbekannt",
       "flagged": "Markiert",
       "done": "Erledigt",
-      "week": "KW {week}/{year}"
+      "week": "Ab {date}"
     },
     "relativeGroups": {
       "noDate": "Ohne Datum",
@@ -186,7 +186,7 @@
     "scopeLabel": "Bereich:",
     "modeLabel": "Modus:",
     "reasonLabel": "Grund:",
-    "startFullSync": "Vollständige Synchronisierung starten",
+    "startFullSync": "Synchronisierung starten",
     "displayOptions": "Anzeigeoptionen",
     "showAs": "Anzeigen als",
     "markDone": "Als erledigt markieren",
@@ -204,7 +204,7 @@
     "markRead": "Als gelesen markieren",
     "unflag": "Markierung entfernen",
     "flag": "Markieren",
-    "unmarkAnswered": "Antwortmarkierung lösen",
+    "unmarkAnswered": "Antwortmarkierung entfernen",
     "markAnswered": "Als beantwortet markieren",
     "notSpam": "Als kein Spam markieren",
     "markSpam": "Als Spam markieren",
@@ -213,7 +213,7 @@
     "inboxNone": "Posteingang / keine",
     "newsletters": "📰 Newsletter",
     "notifications": "🔔 Benachrichtigungen",
-    "transactional": "🧾 Transaktionen",
+    "transactional": "🧾 Transaktions-E-Mails",
     "topics": "Themen",
     "suggested": "Vorgeschlagen",
     "allTopics": "Alle Themen",
@@ -321,9 +321,9 @@
     "stepperCurrent": "{action}, aktuell {percent}",
     "stepperReset": "{action} (aktuell {percent})",
     "addressActions": "Adressaktionen für {address}",
-    "noMatchingFolders": "Keine Ordner entsprechen „{query}“",
+    "noMatchingFolders": "Keine Ordner entsprechen „{query}“.",
     "copyAccountTitle": "{count, plural, one {Nachricht} other {# Nachrichten}} in anderes Konto {mode, select, move {verschieben} other {kopieren}}",
-    "translatedTo": "Übersetzt nach {language}{hasSource, select, yes { · aus {source}} other {}}",
+    "translatedTo": "Zielsprache: {language}{hasSource, select, yes { · aus {source}} other {}}",
     "moreEvents": "+{count, plural, one {# weiterer Termin im Anhang} other {# weitere Termine im Anhang}}",
     "deleteTitle": "{kind, select, thread {Thread löschen?} other {{count, plural, one {Nachricht löschen?} other {Nachrichten löschen?}}}}",
     "trashTitle": "{kind, select, thread {Thread in den Papierkorb verschieben?} other {{count, plural, one {Nachricht in den Papierkorb verschieben?} other {Nachrichten in den Papierkorb verschieben?}}}}",
@@ -365,7 +365,7 @@
       "new": "Neu",
       "newsletter": "📰 Newsletter",
       "notification": "🔔 Benachrichtigung",
-      "transactional": "🧾 Transaktion"
+      "transactional": "🧾 Transaktions-E-Mails"
     },
     "searchFolders": "Ordner suchen",
     "topicScore": "{topic}: Wert {score, number}, Treffer {matches, number}",
@@ -380,7 +380,7 @@
     "categories": {
       "newsletter": "Newsletter",
       "notification": "Benachrichtigung",
-      "transactional": "Transaktion"
+      "transactional": "Transaktions-E-Mails"
     }
   },
   "Notifications": {

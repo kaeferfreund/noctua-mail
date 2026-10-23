@@ -1,4 +1,5 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { formatNumber } from "@/lib/i18n/format";
 import { useId } from "react";
 import { ALargeSmall, Minus, Plus } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
@@ -12,7 +13,6 @@ import type { MessageTab } from "./types";
 
 const SCALE_STEP = 0.1;
 
-const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
 type StepperLabels = {
   title: string;
@@ -55,6 +55,8 @@ export default function MessageDisplayOptionsMenu({
   onResetZoom
 }: MessageDisplayOptionsMenuProps) {
   const t = useTranslations("Reader");
+  const locale = useLocale();
+  const formatPercent = (value: number) => formatNumber(value, locale, { style: "percent", maximumFractionDigits: 0 });
   const FORMAT_LABELS: Record<MessageTab, string> = {
     html: "HTML",
     text: t("plainText"),

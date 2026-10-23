@@ -1,3 +1,4 @@
+import { formatWeekBucketStart } from "@/lib/i18n/format";
 import type { UiLocale } from "@/lib/i18n/config";
 import { INVITE_DECK_GROUP_BY, EVENT_GROUP_BY } from "@/lib/messageGrouping";
 import { getTranslator } from "@/lib/i18n/translator";
@@ -236,8 +237,8 @@ export function messageGroupLabel(key: string, groupBy: string, locale: UiLocale
     return t(key === "UPCOMING" ? "List.groups.upcoming" : "List.groups.past");
   }
   if (groupBy === "week") {
-    const match = /^(\d{4})-W(\d{2})$/.exec(key);
-    if (match) return t("List.groups.week", { year: match[1], week: match[2] });
+    const date = formatWeekBucketStart(key, locale);
+    if (date) return t("List.groups.week", { date });
   }
   if (groupBy === "domain" && key === "Unknown") return t("List.groups.unknown");
   if (["date", "week", "year", "none", INVITE_DECK_GROUP_BY, EVENT_GROUP_BY].includes(groupBy) && key === "Other") return t("List.groups.other");

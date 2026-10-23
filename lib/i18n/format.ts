@@ -42,3 +42,20 @@ export function displayDayNumber(value: Date | number, zone = timeZone) {
   const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value);
   return Date.UTC(part("year"), part("month") - 1, part("day")) / 86_400_000;
 }
+
+/** Start of a SQLite %W bucket, including the partial W00 before the first Monday.
+ * Keep persisted bucket IDs; they are not ISO week numbers. UTC noon represents
+ * the computed calendar date safely in the explicit Europe/Berlin display zone.
+ */
+export function formatWeekBucketStart(bucket: string, locale: UiLocale): string | null {
+  const match = /^(\d{4})-W(\d{2})$/.exec(bucket);
+  if (!match) return null;
+  const year = Number(match[1]), week = Number(match[2]);
+  const jan1 = new Date(Date.UTC(year, 0, 1, 12));
+  const firstMondayOffset = (8 - jan1.getUTCDay()) % 7;
+  if (week > 53 || (week === 0 && firstMondayOffset === 0)) return null;
+  const start = new Date(jan1);
+  start.setUTCDate(1 + (week === 0 ? 0 : firstMondayOffset + (week - 1) * 7));
+  if (start.getUTCFullYear() !== year) return null;
+  return formatDate(start, locale, { day: "numeric", month: "short", year: "numeric" });
+}
