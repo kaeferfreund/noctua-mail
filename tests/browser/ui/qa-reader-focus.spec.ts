@@ -143,6 +143,8 @@ test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable
 });
 
 test("reader focus: archive row action and toolbar use real HTTP and continue to the next rendered message", async ({ page }) => {
+  const browserLog: string[] = [];
+  page.on("console", message => { if (/\[list-debug\].*(selecting message|message pruned|active message missing)/.test(message.text())) browserLog.push(message.text()); });
   await start(page);
   for (const surface of ["row", "toolbar"] as const) {
     const target = rows(page).first();
@@ -176,7 +178,13 @@ test("reader focus: archive row action and toolbar use real HTTP and continue to
     if (surface === "toolbar") {
       await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
       await expect(page.locator('[data-message-list-row="true"][data-active="true"]')).toHaveAttribute("data-message-id", nextId!);
-      await expect(toolbar(page).locator('[data-reader-position]')).toHaveText(/^1 \/ \d+\+?$/);
+      // Removing a collapsed thread root can leave another representative in
+      // that row, so derive the successor's position from the rendered order.
+      const position = await rows(page).evaluateAll((elements, id) => elements.findIndex(element => element.getAttribute("data-message-id") === id) + 1, nextId);
+      expect(position).toBeGreaterThan(0);
+      await expect(toolbar(page).locator('[data-reader-position]')).toHaveText(new RegExp(`^${position} / \\d+\\+?$`));
+      recordQa("reader-focus-archive-browser-log", browserLog);
+      recordQa("reader-focus-archive-state", await page.evaluate(() => ({ counter: document.querySelector("[data-reader-position]")?.textContent, rows: Array.from(document.querySelectorAll<HTMLElement>('[data-message-list-row="true"]')).map(row => ({ id: row.dataset.messageId, active: row.dataset.active, selected: row.dataset.selected })) })));
       await screenshot(page, "archive-next-focus.png");
     }
   }
@@ -184,6 +192,8 @@ test("reader focus: archive row action and toolbar use real HTTP and continue to
 
 test("reader focus: real print PDF excludes an unsent inline reply and internal controls", async ({ page }) => {
   await start(page);
+  await page.getByRole("textbox", { name: "Search messages in INBOX", exact: true }).fill('QA synthetic');
+  await expect(rows(page).first()).toContainText("QA synthetic");
   await rows(page).first().dblclick();
   await expect(page.locator('[data-reader-print]').getByText("Synthetic QA round two message.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reply", exact: true }).first().click();
