@@ -3,6 +3,7 @@ import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSen
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
+import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import type { ShellAccount } from "./shell/types";
@@ -407,6 +408,7 @@ export default function MailClient({
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
   const [collabRevision, setCollabRevision] = useState(0);
+  const [activeCollabRevision, setActiveCollabRevision] = useState(0);
   const [messageTopicsById, setMessageTopicsById] = useState<Map<string, Topic[]>>(new Map());
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [topicPickerMessage, setTopicPickerMessage] = useState<Message | null>(null);
@@ -932,8 +934,7 @@ export default function MailClient({
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion,
-    collabRevision
+    syncCompletionVersion
   });
 
   // Destructure search state and actions
@@ -946,8 +947,7 @@ export default function MailClient({
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
-    activeVirtualFolder,
-    collabCounts
+    activeVirtualFolder
   } = searchState;
   const {
     setSearchScope,
@@ -2881,7 +2881,7 @@ export default function MailClient({
   useEffect(() => { invalidateThreadCollab(activeAccountId); }, [activeAccountId, authoritativeRevision, invalidateThreadCollab]);
   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
   const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
-    apiFetch, sessionKey: currentUser?.id, refreshVersion: authoritativeRevision + collabRevision,
+    apiFetch, sessionKey: currentUser?.id, currentUserId: currentUser?.id, refreshVersion: authoritativeRevision + activeCollabRevision,
     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
     onCommit: (accountId) => {
       setCollabRevision(value => value + 1);
@@ -2889,12 +2889,15 @@ export default function MailClient({
     }
   });
   const mailboxSummaries = useMailboxSummaries({
+    authState: mailboxState,
     sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
     apiFetch,
     onMailboxesChanged: () => { void loadInitialData(); },
-    onThreadChanged: accountId => {
+    onSummaryChanged: accountId => { if (accountId === activeAccountId) setCollabRevision(value => value + 1); },
+    onThreadChanged: (accountId, threadId) => {
       if (accountId !== activeAccountId) return;
       invalidateThreadCollab(accountId);
+      if (threadId === activeMessage?.threadId) setActiveCollabRevision(value => value + 1);
       setCollabRevision(value => value + 1);
       queueFilteredSearchRefresh(true);
     }
@@ -5529,10 +5532,8 @@ export default function MailClient({
             // here (see ShellViews in ./shell/types.ts).
             collab: VIRTUAL_FOLDERS.filter(folder => ["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map(folder => ({
               ...folder, active: activeVirtualFolder?.id === folder.id,
-              count: folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? null
-                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? null : collabCounts[folder.id] ?? null,
-              countAriaLabel: `${folder.id === "virtual:assigned-to-me" ? activeMailboxSummary?.assignedToMe ?? 0
-                : folder.id === "virtual:unassigned" ? activeMailboxSummary?.unassignedOpen ?? 0 : collabCounts[folder.id] ?? 0} threads`, icon: <ListTodo size={13} />,
+              count: collaborationViewCount(folder.id, activeMailboxSummary),
+              countAriaLabel: `${collaborationViewCount(folder.id, activeMailboxSummary) ?? 0} threads`, icon: <ListTodo size={13} />,
               onSelect: () => activateVirtualFolder(folder.id)
             })),
             virtual: virtualFoldersForPane

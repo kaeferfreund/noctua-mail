@@ -75,7 +75,7 @@ mailbox. It returns `Cache-Control: no-store` and this contract (timestamps are 
   mailboxes: [{
     accountId: string, name: string, email: string,
     accessRole: "viewer" | "editor" | "manager", isOwner: boolean, shared: boolean,
-    unread: number | null, assignedToMe: number, unassignedOpen: number,
+    unread: number | null, assignedToMe: number, unassignedOpen: number, open: number,
     watcher: {
       state: "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped",
       lastEventAt?: number
@@ -92,7 +92,9 @@ the first recorded successful sync. `watcher.lastEventAt` is that sync's timesta
 when unknown. `shared` follows the account DTO's member-count definition. Collaboration
 counts are distinct live threads across mailbox folders: `assignedToMe` includes every status
 assigned to the session user; `unassignedOpen` has no assignee and status open, in_progress or
-waiting, including threads with no state row. Deleted messages and state without live messages
+waiting, including threads with no state row. `open` counts the same statuses across all live
+threads regardless of assignee, matching the whole-mailbox Open view (§7.2). Both counts are
+computed by the same SQL statement over the same distinct live threads. Deleted messages and state without live messages
 do not contribute. Counts use one indexed collaboration query per shard. These are mailbox
 badges and notifications; message browsing still selects one mailbox.
 
@@ -100,13 +102,17 @@ badges and notifications; message browsing still selects one mailbox.
 Each JSON data payload includes its event type:
 
 ```ts
-{ type: "mailbox-summary", accountId: string, unread: number | null, assignedToMe: number, unassignedOpen: number }
+{ type: "mailbox-summary", accountId: string, unread: number | null, assignedToMe: number, unassignedOpen: number, open: number, watcher: { state: "disabled" | "starting" | "idling" | "backoff" | "auth_failed" | "stopped", lastEventAt?: number } }
 { type: "thread-collab", accountId: string, threadId: string, revision: number }
 { type: "mailboxes-changed" }
 ```
 
 Watcher state/sync invalidations and committed collaboration mutations coalesce for 250 ms
-per mailbox. A refresh sends current counts followed by each changed thread's greatest
+per mailbox, including watcher-only state transitions. `watcher` has the same semantics as
+the summary response and replaces the previous watcher object (including an omitted timestamp).
+`open` and the event `watcher` object are additive fields. Older event payloads lacking either
+field require one coordinated canonical read; current complete events apply without a GET.
+A refresh sends current counts and watcher metadata followed by each changed thread's greatest
 committed revision in that burst. Revisions belong to `(accountId,threadId)` and match REST
 state/comment revisions; **mailbox-summary has no thread revision** because its counts can
 combine multiple threads. Membership changes send `mailboxes-changed`: refetch the summary

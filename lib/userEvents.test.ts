@@ -8,7 +8,7 @@ import { publishThreadCollabEvent, subscribeThreadCollabEvents } from "./threadC
 import { createUserEventStream } from "./userEvents";
 import { getUserMailboxSummary } from "./mailboxSummary";
 import { changeAccountMember } from "./accountMembers";
-import { recordMailboxSync } from "./db/mailboxSummary";
+import { recordMailboxSync, setMailboxWatcherState } from "./db/mailboxSummary";
 import { updateThreadCollabState, addThreadComment, editThreadComment, deleteThreadComment, recordReplySent, getThreadCollabState } from "./threadCollab";
 import * as store from "./db/threadCollab";
 import { GET } from "@/app/api/me/events/route";
@@ -48,12 +48,12 @@ test("user SSE route authenticates and coalesces watcher bursts; collaboration e
   try {
     expect(await read(reader)).toBe(": heartbeat\n\n");
     for (let i = 0; i < 30; i++) publishMailboxEvent({ accountId: f.accountId, type: "synced" });
-    expect(await read(reader)).toEqual({ type: "mailbox-summary", accountId: f.accountId, unread: 1, assignedToMe: 0, unassignedOpen: 1 });
+    expect(await read(reader)).toEqual({ type: "mailbox-summary", accountId: f.accountId, unread: 1, assignedToMe: 0, unassignedOpen: 1, open: 1, watcher: { state: process.env.NOCTUA_MAILBOX_WATCHER === "1" ? "starting" : "disabled", lastEventAt: 1234 } });
     await pause(300); // Any duplicate watcher event would become the next read.
     const first = await updateThreadCollabState(f.accountId, f.threadId, { assigneeUserId: principal.user.id }, f.actor);
     const latest = await updateThreadCollabState(f.accountId, f.threadId, { status: "waiting" }, f.actor);
     expect(latest!.revision).toBe(first!.revision + 1);
-    expect(await read(reader)).toEqual({ type: "mailbox-summary", accountId: f.accountId, unread: 1, assignedToMe: 1, unassignedOpen: 0 });
+    expect(await read(reader)).toEqual({ type: "mailbox-summary", accountId: f.accountId, unread: 1, assignedToMe: 1, unassignedOpen: 0, open: 1, watcher: { state: process.env.NOCTUA_MAILBOX_WATCHER === "1" ? "starting" : "disabled", lastEventAt: 1234 } });
     expect(await read(reader)).toEqual({ type: "thread-collab", accountId: f.accountId, threadId: f.threadId, revision: latest!.revision });
   } finally { await reader.cancel(); }
 });
@@ -230,4 +230,28 @@ test("message remaps publish affected thread revisions after the message transac
       { threadId: original.threadId, revision: 2 }, { threadId: targetId, revision: 1 }
     ]);
   } finally { unsubscribe(); }
+});
+
+
+test("watcher-only transitions publish current watcher metadata and Open events track distinct threads", async () => {
+  const previous = process.env.NOCTUA_MAILBOX_WATCHER;
+  process.env.NOCTUA_MAILBOX_WATCHER = "1";
+  const f = await fixture();
+  const reader = createUserEventStream(f.request, f.identity, { debounceMs: 1 }).getReader();
+  try {
+    await read(reader);
+    for (const state of ["idling", "auth_failed"] as const) {
+      await setMailboxWatcherState(f.accountId, state);
+      publishMailboxEvent({ accountId: f.accountId, type: "state", watcherState: state });
+      expect(await read(reader)).toMatchObject({ type: "mailbox-summary", open: 1, watcher: { state, lastEventAt: 1234 } });
+    }
+    await f.seed(f.message("<synthetic-second@example.test>"));
+    const state = await updateThreadCollabState(f.accountId, "<synthetic-second@example.test>", { status: "waiting" }, f.actor);
+    expect(await read(reader)).toMatchObject({ type: "mailbox-summary", open: 2, unassignedOpen: 2 });
+    expect(await read(reader)).toMatchObject({ type: "thread-collab", revision: state!.revision });
+  } finally {
+    await reader.cancel();
+    if (previous === undefined) delete process.env.NOCTUA_MAILBOX_WATCHER;
+    else process.env.NOCTUA_MAILBOX_WATCHER = previous;
+  }
 });

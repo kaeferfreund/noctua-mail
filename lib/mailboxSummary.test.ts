@@ -40,7 +40,7 @@ test("canonical summary: two users, three mailboxes, viewer counts include waiti
   expect(ids).toContain(personal.accountId); expect(ids).toContain(shared.accountId); expect(ids).not.toContain(foreign.accountId);
   const own = result.mailboxes.find((m: { accountId: string }) => m.accountId === personal.accountId);
   expect(own).toEqual({ accountId: personal.accountId, name: personal.account.name, email: personal.account.email,
-    accessRole: "manager", isOwner: true, shared: false, unread: 7, assignedToMe: 2, unassignedOpen: 3,
+    accessRole: "manager", isOwner: true, shared: false, unread: 7, assignedToMe: 2, unassignedOpen: 3, open: 5,
     watcher: { state: process.env.NOCTUA_MAILBOX_WATCHER === "1" ? "starting" : "disabled", lastEventAt: 1234 } });
   const sharedBefore = result.mailboxes.find((m: { accountId: string }) => m.accountId === shared.accountId);
   expect(sharedBefore).toMatchObject({ accessRole: "viewer", isOwner: false, shared: true, unread: null, assignedToMe: 0, unassignedOpen: 1 });
@@ -69,4 +69,36 @@ test("summary query uses shard indexes, including the additive legacy covering i
   expect(details).toContain("idx_thread_collab_state_summary");
   expect(details).toContain("idx_messages_live_thread_summary");
   expect(details).not.toMatch(/SCAN (?:messages|tc)\b/);
+  expect(details).not.toContain("MATERIALIZE live");
+  expect(plan.filter(row => /SCAN (?:live|threads)\b/.test(row.detail))).toHaveLength(1);
+});
+
+
+test("Open counts distinct waiting threads across all folders, including assigned, and excludes closed/deleted/history", async () => {
+  const f = await createCollabFixture();
+  await viewer.addMembership(viewer.user.id, f.accountId, "viewer");
+  await f.seed(f.message("waiting", { messageId: "<synthetic-waiting-1@example.test>" }),
+    f.message("waiting", { messageId: "<synthetic-waiting-2@example.test>", folderId: `${f.accountId}:Archive` }),
+    f.message("closed"), f.message("deleted", { deleted: true }));
+  for (const [threadId, status] of [["waiting", "waiting"], ["closed", "closed"], ["deleted", "open"], ["history", "open"]] as const)
+    store.updateThreadCollabState(f.db, f.accountId, threadId, { status, assigneeUserId: viewer.user.id }, { userId: viewer.user.id, clientId: "system" }, 100);
+  expect((await getUserMailboxSummary(viewer.user.id, [f.accountId])).mailboxes[0]).toMatchObject({ open: 1, unassignedOpen: 0 });
+});
+
+test("single-pass summary preserves zero counts and assignee-independent open counts", async () => {
+  const f = await createCollabFixture();
+  const query = f.db.prepare(COLLAB_SUMMARY_SQL);
+  const zero = '{"assignedToMe":0,"unassignedOpen":0,"open":0}';
+  expect(JSON.stringify(query.get(f.accountId, viewer.user.id))).toBe(zero);
+  await f.seed(f.message("waiting"),
+    f.message("waiting", { messageId: "<synthetic-archive@example.test>", folderId: `${f.accountId}:Archive` }),
+    f.message("default"), f.message("closed"), f.message("deleted", { deleted: true }));
+  const actor = { userId: viewer.user.id, clientId: "system" };
+  for (const [threadId, status] of [["waiting", "waiting"], ["closed", "closed"], ["deleted", "open"], ["history", "open"]] as const)
+    store.updateThreadCollabState(f.db, f.accountId, threadId, { status }, actor, 100);
+  expect(JSON.stringify(query.get(f.accountId, viewer.user.id))).toBe('{"assignedToMe":0,"unassignedOpen":2,"open":2}');
+  store.updateThreadCollabState(f.db, f.accountId, "waiting", { assigneeUserId: viewer.user.id }, actor, 101);
+  expect(JSON.stringify(query.get(f.accountId, viewer.user.id))).toBe('{"assignedToMe":1,"unassignedOpen":1,"open":2}');
+  expect(JSON.stringify(query.get(f.accountId, owner.user.id))).toBe('{"assignedToMe":0,"unassignedOpen":1,"open":2}');
+  expect(JSON.stringify(query.get("synthetic-foreign-account", viewer.user.id))).toBe(zero);
 });

@@ -502,7 +502,7 @@ function harness({ deferMembers = false } = {}) {
   const commits: string[] = [];
   const denials: string[] = [];
   const controller = createRef<ThreadCollabController>();
-  let props: Props = { account: 'a', thread: 'X', session: 's1' };
+  let props: Props = { account: 'a', thread: deferMembers ? '' : 'X', session: 's1' };
   const apiFetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
     if (String(url).endsWith('/me')) return json({ user: { id: 'synthetic-editor' } });
     if (String(url).endsWith('/members')) {
@@ -521,6 +521,9 @@ function harness({ deferMembers = false } = {}) {
     return <output data-testid="snapshot">{JSON.stringify({ state: current.state, comments: current.comments, pending: current.pending, readDenied: current.readDenied, error: current.error })}</output>;
   }
   const view = render(<Probe {...props} />);
+  // Standalone membership starts only without a selected thread. Keep these
+  // deferred lifecycle/ordering regressions after removing duplicate first GETs.
+  if (deferMembers) { props = { ...props, thread: "X" }; view.rerender(<Probe {...props} />); }
   const read = async (i: number, response: Response) => {
     await waitFor(() => expect(reads.length).toBeGreaterThan(i));
     await act(async () => { reads[i].resolve(response); });
@@ -1029,9 +1032,10 @@ it("R7-members: late standalone members GET must not replace newer complete GET 
 it("R7-members: late complete GET must not replace newer standalone members GET membership", async () => {
   const h = harness({ deferMembers: true });
   // Leave/return starts a newer standalone members read in the same account scope.
-  h.navigate({ account: "b" }); h.navigate({ account: "a" });
+  h.navigate({ account: "b", thread: "" }); h.navigate({ account: "a", thread: "" });
   await act(async () => { h.memberReads[2].resolve(json({ members: expandedMembers })); });
   expect(h.current().members).toEqual(expandedMembers);
+  h.navigate({ thread: "X" }); await h.reload();
   const higher = state({ revision: 3, status: "waiting" });
   await h.read(0, fullSnapshot(higher));
   expect(h.current().state).toEqual(higher);
@@ -1049,13 +1053,14 @@ for (const failure of ["HTTP 500", "network"] as const) {
     const h = harness({ deferMembers: true });
     await h.read(0, fullSnapshot(state(), [], expandedMembers));
     await act(async () => { h.memberReads[0].resolve(json({ members })); });
-    h.navigate({ account: "b" }); h.navigate({ account: "a" });
+    h.navigate({ account: "b", thread: "" }); h.navigate({ account: "a", thread: "" });
     expect(h.current().members).toEqual(expandedMembers);
     await act(async () => {
       if (failure === "network") h.memberReads[2].reject(new Error("Synthetic members failure"));
       else h.memberReads[2].resolve(failedRead());
       h.memberReads[1].resolve(json({ members }));
     });
+    h.navigate({ thread: "X" }); await h.reload();
     await h.read(1, failedRead()); await h.read(2, failedRead());
     expect(h.current().members).toEqual(expandedMembers);
     expect(h.current().state).toEqual(state());
@@ -1134,4 +1139,30 @@ it("R7-order: revisions beat opposing timestamps and request starts", async () =
   expect(h.updates).toHaveLength(publications);
 });
 
+});
+
+
+it("slice2b identity: reuses bootstrap user across accounts and sessions without auth/me or duplicate members reads", async () => {
+  const calls: string[] = [];
+  const apiFetch = async (input: RequestInfo | URL) => {
+    const url = String(input); calls.push(url);
+    if (url.endsWith("/members")) return json({ members });
+    return snapshot("one");
+  };
+  const hook = renderHook(({ account, user, session, thread }: { account: string; user: string; session: string; thread?: string }) =>
+    useThreadCollab(account, thread, { apiFetch, sessionKey: session, currentUserId: user }),
+    { initialProps: { account: "synthetic-a", user: "synthetic-user-a", session: "synthetic-session-a", thread: "one" as string | undefined } });
+  await waitFor(() => expect(hook.result.current.members).toEqual(members));
+  expect(hook.result.current.me).toBe("synthetic-user-a");
+  expect(calls).toEqual(["/api/accounts/synthetic-a/threads/one/collab"]);
+  hook.rerender({ account: "synthetic-b", user: "synthetic-user-a", session: "synthetic-session-a", thread: "one" });
+  await waitFor(() => expect(hook.result.current.members).toEqual(members));
+  hook.rerender({ account: "synthetic-b", user: "synthetic-user-b", session: "synthetic-session-b", thread: "one" });
+  expect(hook.result.current.me).toBe("synthetic-user-b");
+  await waitFor(() => expect(hook.result.current.members).toEqual(members));
+  expect(calls.filter(url => url.endsWith("/collab"))).toHaveLength(3);
+  expect(calls.some(url => url.endsWith("/me") || url.endsWith("/members"))).toBe(false);
+  hook.rerender({ account: "synthetic-b", user: "synthetic-user-b", session: "synthetic-session-b", thread: undefined });
+  await waitFor(() => expect(calls.filter(url => url.endsWith("/members"))).toHaveLength(1));
+  expect(hook.result.current.me).toBe("synthetic-user-b");
 });

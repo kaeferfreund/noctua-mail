@@ -1,12 +1,12 @@
 import type { ActiveUserSession } from "./auth";
 import { assertStreamAuthorized, registerAuthStream } from "./authStreams";
 import { resolveAccountRoleRow } from "./db/accountAccess";
-import { getUserMailboxSummary } from "./mailboxSummary";
+import { getUserMailboxSummary, type UserMailboxSummary } from "./mailboxSummary";
 import { subscribeMailboxEvents } from "./mailboxWatcherEvents";
 import { subscribeThreadCollabEvents } from "./threadCollabEvents";
 
 export type UserEvent =
-  | { type: "mailbox-summary"; accountId: string; unread: number | null; assignedToMe: number; unassignedOpen: number }
+  | { type: "mailbox-summary"; accountId: string; unread: number | null; assignedToMe: number; unassignedOpen: number; open: number; watcher: UserMailboxSummary["watcher"] }
   | { type: "thread-collab"; accountId: string; threadId: string; revision: number }
   | { type: "mailboxes-changed" };
 
@@ -70,7 +70,7 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
               const mailbox = summary.mailboxes.find(item => item.accountId === accountId);
               if (!mailbox || stopped) return;
               await send({ type: "mailbox-summary", accountId, unread: mailbox.unread,
-                assignedToMe: mailbox.assignedToMe, unassignedOpen: mailbox.unassignedOpen });
+                assignedToMe: mailbox.assignedToMe, unassignedOpen: mailbox.unassignedOpen, open: mailbox.open, watcher: mailbox.watcher });
               for (const [threadId, revision] of threads) await send({ type: "thread-collab", accountId, threadId, revision });
             });
           }, deps.debounceMs ?? 250);
