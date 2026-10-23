@@ -126,11 +126,18 @@ test("reader focus: Enter and Shift+Enter entries leave with one Escape although
     await expect(page.getByRole("tooltip", { name: "Back to messages (Escape)" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
-    // Exit focuses the selected row, or the list container while that row is not yet rendered.
-    await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[id="list"]') !== null)).toBe(true);
+    // Exit focuses the reader's row, or the list container while that row is not
+    // yet rendered; never another row.
+    const exitFocus = () => page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active?.closest('[id="list"]')) return null;
+      return active.closest<HTMLElement>("[data-message-id]")?.dataset.messageId ?? "list";
+    });
+    await expect.poll(exitFocus).not.toBeNull();
+    const focus = await exitFocus();
+    expect([id, "list"]).toContain(focus);
     await expect(page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`)).toHaveAttribute("data-selected", "true");
-    recordQa(`reader-focus-escape-${entry === "Enter" ? "enter" : "shift-enter"}`, { id, escapePresses: 1,
-      focus: await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.messageId ?? document.activeElement?.tagName) });
+    recordQa(`reader-focus-escape-${entry === "Enter" ? "enter" : "shift-enter"}`, { id, escapePresses: 1, focus });
   }
 });
 

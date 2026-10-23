@@ -2841,7 +2841,7 @@ export default function MailClient({
     changeReaderLayout("focus");
   }, [handleSelectMessage, isMobile, changeReaderLayout, readerFocused]);
   const closeReaderFocus = useCallback(() => changeReaderLayout("split"), [changeReaderLayout]);
-  useReaderFocusPlacement(readerFocused, activeMessageId, listPaneRef, readerListScrollRef);
+  useReaderFocusPlacement(readerFocused, activeMessage?.id ?? "", listPaneRef, readerListScrollRef);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isMobile || !activeMessage) return;
