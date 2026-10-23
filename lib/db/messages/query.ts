@@ -788,10 +788,12 @@ function logSearchFallback(params: {
 }
 
 const DEFAULT_FTS_DRIVEN_MAX_CANDIDATES = 2000;
-// Portable SQLite default for bound variables per statement. Bun's build
-// accepts 250,000, but every consuming statement re-prepares with one
-// placeholder per candidate, so larger caps only add prepare cost.
-const FTS_DRIVEN_MAX_CANDIDATES_LIMIT = 32_766;
+// Stays below SQLite's portable default of 32,766 bound variables per
+// statement: consuming statements bind the candidate ids plus a few other
+// parameters (account, folder, paging), so the cap leaves headroom for them.
+// Bun's build accepts 250,000, but every consuming statement re-prepares with
+// one placeholder per candidate, so larger caps only add prepare cost.
+const FTS_DRIVEN_MAX_CANDIDATES_LIMIT = 32_000;
 let clampedCandidateCapWarnedFor: number | undefined;
 
 function maxFtsDrivenCandidates(): number {

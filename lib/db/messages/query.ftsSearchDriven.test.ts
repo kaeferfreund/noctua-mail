@@ -512,7 +512,7 @@ describe("FTS-driven search candidates differential", () => {
     }
   });
 
-  test("candidate cap env: default for invalid values, clamped to 32,766 with one warning per value", async () => {
+  test("candidate cap env: default for invalid values, clamped to 32,000 with one warning per value", async () => {
     const accountId = fixture.a.accountId;
     const fetchLimits: unknown[] = [];
     const warnings: unknown[][] = [];
@@ -546,21 +546,21 @@ describe("FTS-driven search candidates differential", () => {
         expect(await effectiveFetchLimit(invalid)).toBe(2001);
       }
       expect(await effectiveFetchLimit("2.9")).toBe(3);
-      expect(await effectiveFetchLimit("32766")).toBe(32767);
+      expect(await effectiveFetchLimit("32000")).toBe(32001);
       expect(warnings).toHaveLength(0);
 
       for (let index = 0; index < 3; index += 1) {
-        expect(await effectiveFetchLimit("32767")).toBe(32767);
+        expect(await effectiveFetchLimit("32001")).toBe(32001);
       }
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toEqual([
         "[fts-search] NOCTUA_FTS_DRIVEN_MAX_CANDIDATES above maximum, clamped",
-        { configured: 32767, max: 32766 }
+        { configured: 32001, max: 32000 }
       ]);
-      expect(await effectiveFetchLimit("1e9")).toBe(32767);
-      expect(await effectiveFetchLimit("1e9")).toBe(32767);
+      expect(await effectiveFetchLimit("1e9")).toBe(32001);
+      expect(await effectiveFetchLimit("1e9")).toBe(32001);
       expect(warnings).toHaveLength(2);
-      expect(warnings[1][1]).toEqual({ configured: 1e9, max: 32766 });
+      expect(warnings[1][1]).toEqual({ configured: 1e9, max: 32000 });
       expect(JSON.stringify(warnings)).not.toContain("needle");
     } finally {
       delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
