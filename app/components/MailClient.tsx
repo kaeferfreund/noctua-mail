@@ -381,7 +381,6 @@ type ActiveTopicSuggestionsResponse = {
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
-  const { messages: senderMessages } = useSenderMessages();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -408,6 +407,7 @@ export default function MailClient({
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
+  const { messages: senderMessages } = useSenderMessages();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
