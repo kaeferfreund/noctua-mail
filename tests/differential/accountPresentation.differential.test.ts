@@ -323,6 +323,8 @@ describe("statement budget", () => {
   });
   test("summary: scope narrows the metadata read; per-mailbox work only for visible mailboxes", async () => {
     const v = viewers["12"];
+    // Warm the shard-path cache (getAccountDb re-resolves paths after master writes of earlier cases).
+    await getUserMailboxSummary(v.user.id);
     const scoped = await countExecutions(() => getUserMailboxSummary(v.user.id, [ACCOUNTS[4]]));
     const foreign = await countExecutions(() => getUserMailboxSummary(viewers["2"].user.id, [ACCOUNTS[0]]));
     const full = await countExecutions(() => getUserMailboxSummary(v.user.id));
