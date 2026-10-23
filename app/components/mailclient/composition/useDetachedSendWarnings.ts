@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { InAppNotice } from "../InAppNoticeStack";
 import {
   acknowledgeDetachedComposeWarning,
@@ -13,6 +14,7 @@ export function useDetachedSendWarnings(
   accounts: { id: string; name?: string; email?: string }[],
   ownerUserId: string | null | undefined,
 ) {
+  const t = useTranslations("Compose");
   const [receiptEntry, setReceiptEntry] = useState<{ ownerUserId: string | null | undefined; receipts: DetachedComposeEvent[] } | null>(null);
   const accountIdsKey = JSON.stringify(accounts.map(account => account.id).sort());
   // Filter during render as well: logout/access changes must hide old state
@@ -35,8 +37,8 @@ export function useDetachedSendWarnings(
       return {
         id: `${DETACHED_COMPOSE_WARNING_PREFIX}${receipt.eventId}`,
         type: "warning",
-        title: `Email sent · ${account?.name || account?.email || receipt.accountId}`,
-        description: [...(receipt.warnings ?? []), "Delivery succeeded. Do not send it again."].join(" "),
+        title: t("notices.detachedSentTitle", { mailbox: account?.name || account?.email || receipt.accountId }),
+        description: [...(receipt.warnings ?? []), t("warnings.deliverySucceeded")].join(" "),
         expiresAt: null,
         wrapDescription: true,
       };

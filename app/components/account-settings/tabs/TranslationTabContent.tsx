@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useDeeplLanguageLabel } from "@/lib/i18n/useDeeplLanguageLabel";
 import { Badge, Button, Callout, Flex, Select, Switch, Text } from "@radix-ui/themes";
 import { CheckCircle, Info, Languages, XCircle } from "lucide-react";
 import Field from "@/app/components/account-settings/Field";
@@ -11,10 +13,15 @@ import {
   DEFAULT_DEEPL_TARGET_LANG
 } from "@/lib/deeplLanguages";
 import { buildAccountTranslationTestPath } from "@/lib/accountApiPaths";
+import { formatNumber } from "@/lib/i18n/format";
 
 type TestResult =
   | { ok: true; plan: string; characterCount: number; characterLimit: number }
   | { ok: false; message: string };
+
+// Client-side failures keep a stable kind and are translated at render time;
+// server-provided `message` text stays opaque.
+type TestOutcome = TestResult | { ok: false; failure: "http"; status: number } | { ok: false; failure: "unreachable" };
 
 type Props = {
   editingAccount: Account;
@@ -36,7 +43,10 @@ export default function TranslationTabContent({
   apiFetch
 }: Props) {
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const t = useTranslations("Settings");
+  const languageLabel = useDeeplLanguageLabel();
+  const locale = useLocale();
+  const [testResult, setTestResult] = useState<TestOutcome | null>(null);
   const saveDisabled = !isExistingAccount || !canSave;
 
   const deepl = editingAccount.deepl;
@@ -70,43 +80,59 @@ export default function TranslationTabContent({
       // A non-JSON error body (e.g. an HTML 500) parses to null — report it as a
       // server error with the status rather than masking it as a network error.
       const data = (await res.json().catch(() => null)) as TestResult | null;
-      setTestResult(data ?? { ok: false, message: `Testing the key failed (HTTP ${res.status}).` });
+      setTestResult(data ?? { ok: false, failure: "http", status: res.status });
     } catch {
-      setTestResult({ ok: false, message: "Could not reach the server to test the key." });
+      setTestResult({ ok: false, failure: "unreachable" });
     } finally {
       setTesting(false);
     }
   };
 
+  const testResultText = (result: TestOutcome) => {
+    if (result.ok) {
+      return t("translation.keyValid", {
+        plan: result.plan,
+        used: formatNumber(result.characterCount, locale),
+        limit: formatNumber(result.characterLimit, locale)
+      });
+    }
+    if ("failure" in result) {
+      return result.failure === "http"
+        ? t("translation.testHttpFailed", { status: result.status })
+        : t("translation.testUnreachable");
+    }
+    return result.message;
+  };
+
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
-        <Flex align="center" gap="2">
+        <Flex align="center" gap="2" wrap="wrap">
           <Languages size={18} />
           <Text size="3" weight="medium">
-            DeepL Translation
+            {t("translation.heading")}
           </Text>
           <Badge size="1" color="gray" variant="soft">
-            Optional
+            {t("common.optional")}
           </Badge>
         </Flex>
 
         <Field
-          label="API key"
-          hint="From your DeepL account. Free-tier keys end in “:fx”. Stored encrypted and never sent back to the browser."
+          label={t("translation.apiKey")}
+          hint={t("translation.apiKeyHint")}
         >
           <PasswordField
             value={deepl?.apiKey ?? ""}
             onChange={(e) => updateDeepl({ apiKey: e.target.value })}
             placeholder={
-              deepl?.hasApiKey ? "A key is saved — leave blank to keep it" : "Paste your DeepL API key"
+              deepl?.hasApiKey ? t("translation.apiKeySavedPlaceholder") : t("translation.apiKeyPlaceholder")
             }
             autoComplete="off"
             style={{ width: "100%" }}
           />
         </Field>
 
-        <Field label="Enable translation" hint="Show a Translate action on messages in this account.">
+        <Field label={t("translation.enable")} hint={t("translation.enableHint")}>
           <Flex asChild align="center" gap="2">
             <label>
               <Switch
@@ -114,18 +140,18 @@ export default function TranslationTabContent({
                 checked={enabled}
                 onCheckedChange={(checked) => updateDeepl({ enabled: checked })}
               />
-              <Text size="2">Translate messages in this account</Text>
+              <Text size="2">{t("translation.enableSwitch")}</Text>
             </label>
           </Flex>
         </Field>
 
-        <Field label="Default target language" hint="Messages are translated into this language unless you pick another in the reader.">
+        <Field label={t("translation.targetLanguage")} hint={t("translation.targetLanguageHint")}>
           <Select.Root value={targetLang} onValueChange={(v) => updateDeepl({ targetLang: v })}>
             <Select.Trigger style={{ width: "100%" }} />
             <Select.Content position="popper">
               {DEEPL_TARGET_LANGUAGES.map((language) => (
                 <Select.Item key={language.code} value={language.code}>
-                  {language.label}
+                  {languageLabel(language.code)}
                 </Select.Item>
               ))}
             </Select.Content>
@@ -139,11 +165,11 @@ export default function TranslationTabContent({
             onClick={handleTestKey}
             disabled={testing || !keyAvailable}
           >
-            {testing ? "Testing…" : "Test key"}
+            {testing ? t("translation.testing") : t("translation.testKey")}
           </Button>
           {deepl ? (
             <Button size="2" variant="soft" color="red" onClick={clearDeepl}>
-              Remove DeepL
+              {t("translation.remove")}
             </Button>
           ) : null}
         </Flex>
@@ -154,9 +180,7 @@ export default function TranslationTabContent({
               {testResult.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}
             </Callout.Icon>
             <Callout.Text>
-              {testResult.ok
-                ? `Key valid (${testResult.plan} plan). ${testResult.characterCount.toLocaleString()} / ${testResult.characterLimit.toLocaleString()} characters used this period.`
-                : testResult.message}
+              {testResultText(testResult)}
             </Callout.Text>
           </Callout.Root>
         )}
@@ -166,7 +190,7 @@ export default function TranslationTabContent({
             <Callout.Icon>
               <Info size={14} />
             </Callout.Icon>
-            <Callout.Text>Add and save a DeepL API key to use translation.</Callout.Text>
+            <Callout.Text>{t("translation.missingKey")}</Callout.Text>
           </Callout.Root>
         )}
 
@@ -174,10 +198,7 @@ export default function TranslationTabContent({
           <Callout.Icon>
             <Info size={14} />
           </Callout.Icon>
-          <Callout.Text>
-            When enabled, message bodies can be translated on demand via DeepL. Translations are
-            cached per message and language. Message content is sent to DeepL for translation.
-          </Callout.Text>
+          <Callout.Text>{t("translation.privacy")}</Callout.Text>
         </Callout.Root>
       </Flex>
 
@@ -189,10 +210,10 @@ export default function TranslationTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          {saveDisabled ? "Close" : "Cancel"}
+          {saveDisabled ? t("close") : t("common.cancel")}
         </Button>
         <Button size="2" onClick={onSave} disabled={saveDisabled}>
-          Save
+          {t("common.save")}
         </Button>
       </Flex>
     </Flex>

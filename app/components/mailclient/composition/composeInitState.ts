@@ -4,14 +4,16 @@ import type { SenderSettings } from "@/lib/ui/senderSettings";
 import { isOwnAddress, parseAddressEmails } from "@/lib/ownAddresses";
 import type { AccountDateFormat, Message } from "@/lib/data";
 import { createDefaultComposeInviteDraft } from "@/lib/composeInvite";
-import { formatForwardedMessageDate, formatMessageDate } from "@/lib/dateFormatting";
+import { formatForwardedMessageDate, getMessageDateDisplay } from "@/lib/dateFormatting";
+import type { UiLocale } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 import {
   assembleQuotedHtml,
   buildForwardMetaHtml,
   buildQuotedHtmlPartsFromHtml,
   escapeHtml,
   extractQuotedHtmlFromDraft,
-  FORWARDED_MESSAGE_MARKER,
+  FORWARDED_MESSAGE_MARKERS,
   type ForwardMetaRow
 } from "@/lib/html";
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
@@ -148,6 +150,8 @@ function computeBaseComposeInitState(
     accountEmail: string;
     ownAddresses?: readonly string[];
     accountDateFormat: AccountDateFormat;
+    /** UI locale captured when the draft is created; generated text keeps it afterwards. */
+    locale: UiLocale;
     preferredComposeTab?: ComposeTab;
     findMessageByMessageId?: (messageId: string) => Message | undefined;
   },
@@ -161,7 +165,10 @@ function computeBaseComposeInitState(
   }
 
   const { stripHtml, normalizeHtmlDerivedText } = deps;
-  const { accountEmail, accountDateFormat, preferredComposeTab } = opts;
+  const { accountEmail, accountDateFormat, locale, preferredComposeTab } = opts;
+  // Application-owned correspondence only: addresses, subjects and bodies stay verbatim.
+  const t = getTranslator(locale);
+  const forwardedMessageMarker = FORWARDED_MESSAGE_MARKERS[locale];
 
   const ownAddresses = opts.ownAddresses ?? [accountEmail];
   const fromEmails = parseAddressEmails(message.from);
@@ -186,7 +193,7 @@ function computeBaseComposeInitState(
       ]
     : undefined;
 
-  const formattedDate = formatMessageDate(message.dateValue, message.date, accountDateFormat);
+  const formattedDate = getMessageDateDisplay(message.dateValue, message.date, accountDateFormat, locale).text;
 
   const buildReplyContent = (header: string, metaHtml?: string) => {
     const hasValidHtml = prefersHtml && hasHtmlContent(message.htmlBody);
@@ -230,7 +237,7 @@ function computeBaseComposeInitState(
   // reply
   // -------------------------------------------------------------------------
   if (mode === "reply") {
-    const replyHeader = `On ${formattedDate}, ${message.from} wrote:`;
+    const replyHeader = t("Compose.generated.replyHeader", { date: formattedDate, sender: message.from });
 
     let to: string;
     if (isSentByCurrentUser) {
@@ -257,7 +264,7 @@ function computeBaseComposeInitState(
   // replyAll
   // -------------------------------------------------------------------------
   if (mode === "replyAll") {
-    const replyHeader = `On ${formattedDate}, ${message.from} wrote:`;
+    const replyHeader = t("Compose.generated.replyHeader", { date: formattedDate, sender: message.from });
 
     let toList: string[];
     let ccList: string[];
@@ -327,15 +334,18 @@ function computeBaseComposeInitState(
     // Bcc is deliberately left out: forwarding one's own sent mail must not
     // reveal who was blind-copied.
     const forwardMetaRows: ForwardMetaRow[] = [
-      { label: "From", value: formatAddresses(message.from) },
-      { label: "Reply-To", value: replyToDiffersFromSender ? formatAddresses(replyToRaw) : "" },
+      { label: t("Compose.generated.forwardFields.from"), value: formatAddresses(message.from) },
       {
-        label: "Date",
-        value: formatForwardedMessageDate(message.dateValue, message.date, accountDateFormat)
+        label: t("Compose.generated.forwardFields.replyTo"),
+        value: replyToDiffersFromSender ? formatAddresses(replyToRaw) : ""
       },
-      { label: "Subject", value: message.subject ?? "" },
-      { label: "To", value: formatAddresses(message.to) },
-      { label: "Cc", value: formatAddresses(message.cc) }
+      {
+        label: t("Compose.generated.forwardFields.date"),
+        value: formatForwardedMessageDate(message.dateValue, message.date, accountDateFormat, locale)
+      },
+      { label: t("Compose.generated.forwardFields.subject"), value: message.subject ?? "" },
+      { label: t("Compose.generated.forwardFields.to"), value: formatAddresses(message.to) },
+      { label: t("Compose.generated.forwardFields.cc"), value: formatAddresses(message.cc) }
     ];
     const forwardMetaLines = forwardMetaRows
       .filter((row) => row.value.trim().length > 0)
@@ -352,18 +362,18 @@ function computeBaseComposeInitState(
     // and the header details stay embedded in the textarea body.
     const isRichForward = preferredComposeTab !== "text" && hasHtmlContent(message.htmlBody);
     const replyContent = buildReplyContent(
-      isRichForward ? "" : `${FORWARDED_MESSAGE_MARKER}\n${forwardMetaLines.join("\n")}\n`,
+      isRichForward ? "" : `${forwardedMessageMarker}\n${forwardMetaLines.join("\n")}\n`,
       buildForwardMetaHtml(forwardMetaRows)
     );
 
     const editorFields: Partial<ComposeInitFields> =
       replyContent.composeTab === "html"
         ? {
-            composeHtml: `<p>${escapeHtml(FORWARDED_MESSAGE_MARKER)}</p>`,
-            composeHtmlText: FORWARDED_MESSAGE_MARKER
+            composeHtml: `<p>${escapeHtml(forwardedMessageMarker)}</p>`,
+            composeHtmlText: forwardedMessageMarker
           }
         : replyContent.composeTab === "markdown"
-          ? { composeMarkdown: `${FORWARDED_MESSAGE_MARKER}\n\n` }
+          ? { composeMarkdown: `${forwardedMessageMarker}\n\n` }
           : {};
 
     return {

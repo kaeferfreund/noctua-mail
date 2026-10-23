@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import { locales } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 import {
   FORWARDED_MESSAGE_MARKER,
+  FORWARDED_MESSAGE_MARKERS,
   QUOTE_TEXT_SCAN_LIMIT,
   canWrapQuoteInParent,
   hasQuoteBoundaryMarker,
@@ -104,6 +107,42 @@ describe("isQuoteBoundary", () => {
   it("ignores empty and ordinary content", () => {
     expect(isQuoteBoundary(candidate())).toBe(false);
     expect(isQuoteBoundary(candidate({ text: "Mit freundlichen Grüßen" }))).toBe(false);
+  });
+});
+
+describe("Noctua's own generated correspondence in every UI locale", () => {
+  for (const locale of locales) {
+    const t = getTranslator(locale);
+
+    it(`${locale}: recognizes the forward separator`, () => {
+      expect(isQuoteBoundaryText(FORWARDED_MESSAGE_MARKERS[locale])).toBe(true);
+    });
+
+    it(`${locale}: recognizes the attribution line, also with braces and quotes in the sender`, () => {
+      for (const sender of ["Erika Muster <erika@example.test>", "\"Muster, {Erika}\" <erika@example.test>"]) {
+        const line = t("Compose.generated.replyHeader", { date: "01.01.2024, 13:00", sender });
+        expect(line).toContain(sender);
+        expect(isQuoteBoundaryText(line)).toBe(true);
+      }
+    });
+
+    it(`${locale}: recognizes the generated header block with or without the separator`, () => {
+      const field = (key: "from" | "date" | "subject" | "to", value: string) =>
+        `${t(`Compose.generated.forwardFields.${key}`)}: ${value}`;
+      const block = [
+        field("from", "Erika Muster <erika@example.test>"),
+        field("date", "Mo., 1. Jan. 2024, 13:00 MEZ"),
+        field("subject", "Synthetic subject"),
+        field("to", "max@example.test")
+      ];
+      expect(isQuoteBoundaryText(block.join("\n"))).toBe(true);
+      expect(isQuoteBoundaryText([FORWARDED_MESSAGE_MARKERS[locale], ...block].join("\n"))).toBe(true);
+    });
+  }
+
+  it("keeps the English constant for existing English forwards", () => {
+    expect(FORWARDED_MESSAGE_MARKER).toBe(FORWARDED_MESSAGE_MARKERS.en);
+    expect(FORWARDED_MESSAGE_MARKERS.de).toBe("-------- Weitergeleitete Nachricht --------");
   });
 });
 

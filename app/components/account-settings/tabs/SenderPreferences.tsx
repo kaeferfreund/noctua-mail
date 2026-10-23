@@ -7,7 +7,7 @@ import { senderSettingsError } from "@/lib/senderMessages";
 import { useEffect, useState } from "react";
 import type { Account, UserAccountPrefsPatch } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
-import Field from "../Field";
+import Field, { nativeControlClass } from "../Field";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { loadSenderSettings, notifySenderPreferencesChanged, type SenderSettings } from "@/lib/ui/senderSettings";
 import { renderSignatureTemplate, resolveSignatureTemplate, validSignatureTemplate } from "@/lib/signatureTemplates";
@@ -48,18 +48,18 @@ export default function SenderPreferences({ editingAccount, apiFetch = fetch }: 
     {!data && !error && <p role="status">{senderMessages.senderPreferencesLoading}</p>}
     {Boolean(error) && <p role="alert">{senderSettingsError(error, senderMessages)}</p>}
     {saved && <p role="status">{senderMessages.senderPreferencesSaved}</p>}
-    <fieldset disabled={!data || busy} className="grid gap-3">
-      <Field label={senderMessages.defaultFrom}><select value={prefs.defaultIdentityId ?? "inherit"} onChange={event => change({ defaultIdentityId: event.target.value === "inherit" ? null : event.target.value })}>
+    <fieldset disabled={!data || busy} className="m-0 grid min-w-0 grid-cols-1 gap-3 border-0 p-0">
+      <Field label={senderMessages.defaultFrom}><select className={nativeControlClass} value={prefs.defaultIdentityId ?? "inherit"} onChange={event => change({ defaultIdentityId: event.target.value === "inherit" ? null : event.target.value })}>
         <option value="inherit">{senderMessages.mailboxDefault}</option>
         {prefs.defaultIdentityId && !data?.identities.some(item => item.id === prefs.defaultIdentityId && item.enabled) && <option value={prefs.defaultIdentityId} disabled>{senderMessages.unavailableIdentity}</option>}
         {data?.identities.filter(item => item.enabled).map(item => <option key={item.id} value={item.id}>{item.displayName} &lt;{item.email}&gt;</option>)}
       </select></Field>
-      <Field label={senderMessages.personalTemplate}><select value={prefs.defaultSignatureId ?? "inherit"} onChange={event => change({ defaultSignatureId: event.target.value === "inherit" ? null : event.target.value })}>
+      <Field label={senderMessages.personalTemplate}><select className={nativeControlClass} value={prefs.defaultSignatureId ?? "inherit"} onChange={event => change({ defaultSignatureId: event.target.value === "inherit" ? null : event.target.value })}>
         <option value="inherit">{senderMessages.inheritTemplate}</option><option value="">{senderMessages.noSignature}</option>
         {data?.account.settings?.signatures?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select></Field>
-      <Field label={senderMessages.personalSignature} hint={senderMessages.personalSignatureHelp}><select value={prefs.signatureOverride === undefined ? "inherit" : "custom"} onChange={event => change({ signatureOverride: event.target.value === "inherit" ? null : "" })}><option value="inherit">{senderMessages.inheritSignature}</option><option value="custom">{senderMessages.usePersonalText}</option></select></Field>
-      {prefs.signatureOverride !== undefined && <Field label={senderMessages.personalSignatureText}><textarea rows={5} value={prefs.signatureOverride} onChange={event => change({ signatureOverride: event.target.value })} /></Field>}
+      <Field label={senderMessages.personalSignature} hint={senderMessages.personalSignatureHelp}><select className={nativeControlClass} value={prefs.signatureOverride === undefined ? "inherit" : "custom"} onChange={event => change({ signatureOverride: event.target.value === "inherit" ? null : "" })}><option value="inherit">{senderMessages.inheritSignature}</option><option value="custom">{senderMessages.usePersonalText}</option></select></Field>
+      {prefs.signatureOverride !== undefined && <Field label={senderMessages.personalSignatureText}><textarea rows={5} className={nativeControlClass} value={prefs.signatureOverride} onChange={event => change({ signatureOverride: event.target.value })} /></Field>}
       <p className="text-sm">{senderMessages.placeholdersHelp}</p>
       {!valid && <p role="alert">{senderMessages.invalidTemplate}</p>}
       {data?.warnings.map(warning => <p key={`sender-${warning}`} role="alert">{renderMessage(warning)}</p>)}

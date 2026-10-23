@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import type {
   DOMExportOutput,
@@ -165,6 +166,7 @@ function QuotedMessageBlock({
   darkMode
 }: QuotedMessagePayload) {
   const [editor] = useLexicalComposerContext();
+  const t = useTranslations("Editor.quoted");
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -173,13 +175,13 @@ function QuotedMessageBlock({
         <button
           type="button"
           className={styles.trigger}
-          title={expanded ? "Hide quoted message" : "Show quoted message"}
+          title={expanded ? t("hide") : t("show")}
           onClick={() => setExpanded((prev) => !prev)}
         >
           <CaretRightIcon
             className={`${styles.caret} ${expanded ? styles.caretOpen : ""}`}
           />
-          <span>Quoted message</span>
+          <span>{t("label")}</span>
         </button>
         <span className={styles.actions}>
           <Button
@@ -187,23 +189,23 @@ function QuotedMessageBlock({
             size="1"
             variant="soft"
             color="gray"
-            title="Convert the quoted message into editable content"
+            title={t("editTitle")}
             onClick={() => editor.dispatchCommand(QUOTED_MESSAGE_EDIT_COMMAND, undefined)}
           >
-            Edit
+            {t("edit")}
           </Button>
           <Button
             type="button"
             size="1"
             variant="soft"
             color="gray"
-            title="Toggle blockquote styling for the quoted message"
+            title={t("toggleQuoteTitle")}
             disabled={!canToggleQuote}
             onClick={() =>
               editor.dispatchCommand(QUOTED_MESSAGE_TOGGLE_QUOTE_COMMAND, undefined)
             }
           >
-            {quoteHtml ? "Unquote" : "Quote"}
+            {quoteHtml ? t("unquote") : t("quote")}
           </Button>
           {canStripImages && (
             <Button
@@ -211,12 +213,12 @@ function QuotedMessageBlock({
               size="1"
               variant="soft"
               color="gray"
-              title="Remove images from the quoted message"
+              title={t("removeImagesTitle")}
               onClick={() =>
                 editor.dispatchCommand(QUOTED_MESSAGE_STRIP_IMAGES_COMMAND, undefined)
               }
             >
-              Remove images
+              {t("removeImages")}
             </Button>
           )}
           {canRemoveMeta && (
@@ -225,12 +227,12 @@ function QuotedMessageBlock({
               size="1"
               variant="soft"
               color="gray"
-              title="Remove the header details (From, To, Cc, Date, ...) of the forwarded message"
+              title={t("removeMetaTitle")}
               onClick={() =>
                 editor.dispatchCommand(QUOTED_MESSAGE_REMOVE_META_COMMAND, undefined)
               }
             >
-              Remove details
+              {t("removeMeta")}
             </Button>
           )}
           <Button
@@ -238,10 +240,10 @@ function QuotedMessageBlock({
             size="1"
             variant="soft"
             color="gray"
-            title="Remove the quoted message from the reply"
+            title={t("removeTitle")}
             onClick={() => editor.dispatchCommand(QUOTED_MESSAGE_REMOVE_COMMAND, undefined)}
           >
-            Remove
+            {t("remove")}
           </Button>
         </span>
       </div>

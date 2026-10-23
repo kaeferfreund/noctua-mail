@@ -1,4 +1,5 @@
 import { Maximize2, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useComposeContext } from "./ComposeContext";
 import styles from "./Compose.module.css";
 
@@ -8,6 +9,7 @@ type ComposeMinimizedProps = {
 
 export default function ComposeMinimized({ open }: ComposeMinimizedProps) {
   const { composeSubject, setComposeView, setComposeOpen } = useComposeContext();
+  const t = useTranslations("Compose");
 
   if (!open) return null;
 
@@ -25,13 +27,13 @@ export default function ComposeMinimized({ open }: ComposeMinimizedProps) {
       }}
     >
       <span className={styles.composeMinimizedTitle}>
-        {composeSubject.trim() || "New message"}
+        {composeSubject.trim() || t("modes.new")}
       </span>
       <div className={styles.composeMinimizedActions}>
         <button
           className="icon-button small"
-          title="Restore"
-          aria-label="Restore"
+          title={t("window.restore")}
+          aria-label={t("window.restore")}
           onClick={(event) => {
             event.stopPropagation();
             setComposeView("modal");
@@ -41,8 +43,8 @@ export default function ComposeMinimized({ open }: ComposeMinimizedProps) {
         </button>
         <button
           className="icon-button small"
-          title="Close composer"
-          aria-label="Close composer"
+          title={t("closeComposer")}
+          aria-label={t("closeComposer")}
           onClick={(event) => {
             event.stopPropagation();
             setComposeOpen(false);
