@@ -691,7 +691,7 @@
       "showList": "Liste anzeigen",
       "hint": "Tipp: Doppelklick öffnet die Nachricht groß",
       "dismissHint": "Tipp zur Leseansicht schließen",
-      "shortcuts": "Umschalt+Enter: groß / Liste · Esc: zurück · j / k: weiter / zurück",
+      "toolbarLabel": "Steuerung der Leseansicht",
       "markUndone": "Als nicht erledigt markieren",
       "print": "Nachricht drucken",
       "previous": "Vorherige Nachricht",
