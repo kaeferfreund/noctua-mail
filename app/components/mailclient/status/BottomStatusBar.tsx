@@ -153,7 +153,7 @@ export default function BottomStatusBar({
         onOpenMessage={onOpenCalendarMessage}
         onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid}
       />}
-      {!isMobile && <BuildInfo info={buildInfo} className="bottom-center-build" />}
+      {!isMobile && <BuildInfo info={buildInfo} className="bottom-build" />}
       <ExceptionStatusPopover
         open={exceptionPanelOpen}
         onOpenChange={handleExceptionPanelOpenChange}
