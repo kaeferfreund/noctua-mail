@@ -18,6 +18,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
+import { applyMessageCollabUpdate, applyMessagesCollabUpdates, applyThreadCollabCacheUpdates } from "./mailclient/threadCollabUpdates";
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
@@ -2854,16 +2855,14 @@ export default function MailClient({
   }, [activeMessage, closeReaderFocus, isMobile, openReaderFocus, readerLayout, navigateReader]);
   const applyThreadCollabUpdates = useCallback((accountId: string, updates: Map<string, CollabSummary>) => {
     if (!updates.size) return;
-    setThreadCollabCache(prev => new Map(prev).set(accountId, new Map([...(prev.get(accountId) ?? []), ...updates])));
-    const apply = (msg: Message) => {
-      const state = updates.get(msg.threadId);
-      return msg.accountId === accountId && state ? { ...msg, collab: state } : msg;
-    };
-    setMessages(prev => prev.map(apply));
-    setViewMessage(prev => prev ? apply(prev) : prev);
+    setThreadCollabCache(prev => applyThreadCollabCacheUpdates(prev, accountId, updates));
+    setMessages(prev => applyMessagesCollabUpdates(prev, accountId, updates));
+    setViewMessage(prev => prev ? applyMessageCollabUpdate(prev, accountId, updates) : prev);
     for (const [threadId] of updates) {
       const cached = threadContentByIdRef.current[threadId];
-      if (cached) upsertThreadCache(threadId, cached.map(apply));
+      if (!cached) continue;
+      const next = applyMessagesCollabUpdates(cached, accountId, updates);
+      if (next !== cached) upsertThreadCache(threadId, next);
     }
   }, [setMessages, setViewMessage, threadContentByIdRef, upsertThreadCache]);
   const handleThreadCollabUpdate = useCallback((state: ThreadCollabState) => {
