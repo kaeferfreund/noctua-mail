@@ -442,6 +442,7 @@ export default function ThreadMessageCard({
           : t("notTranslated");
     return (
       <Flex
+        data-reader-print-exclude=""
         align="center"
         gap="2"
         wrap="wrap"
@@ -602,7 +603,7 @@ export default function ThreadMessageCard({
         <span className={styles.compactCaret}>
           <CaretRightIcon />
         </span>
-        <div className={styles.compactMain}>
+        <div className={styles.compactMain} data-mail-print="">
           <div className={styles.compactFirstLine}>
             <span
               className={`${styles.compactSender} ${!message.seen ? styles.compactSenderUnread : ""}`}
@@ -822,7 +823,7 @@ export default function ThreadMessageCard({
                 {renderMessageMenu(message, "thread", setMenuOpen)}
               </div>
             </div>
-            <div className={styles.info}>
+            <div className={styles.info} data-mail-print="">
               {!threadViewMode && (
                 <div className={styles.subjectLine}>
                   <span className={styles.subjectText}>{message.subject}</span>
@@ -905,7 +906,7 @@ export default function ThreadMessageCard({
             )}
             <Collapsible.Content className={`${styles.content} ${styles.collapsibleContent}`}>
               <div className={styles.collapsibleInner}>
-                {content}
+                <div data-mail-print="body">{content}</div>
                 <CalendarEventPreview
                   attachments={message.attachments ?? []}
                   accountId={message.accountId}

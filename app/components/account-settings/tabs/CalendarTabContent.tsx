@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Badge, Button, Callout, Flex, Grid, Select, Text, TextField } from "@radix-ui/themes";
 import { CheckCircle, Info, XCircle } from "lucide-react";
 import Field from "@/app/components/account-settings/Field";
@@ -8,14 +9,17 @@ import PasswordField from "@/app/components/PasswordField";
 import type { Account, CaldavConfig } from "@/lib/data";
 
 type TestResult = { ok: true; calendars: { displayName?: string; url: string }[] } | { ok: false; message: string };
+// A client-side connection failure is translated at render time; server `message` text stays opaque.
+type TestOutcome = TestResult | { ok: false; failure: "connection" };
 
+// The stored value is milliseconds; the label is derived from the amount and unit.
 const SYNC_INTERVAL_OPTIONS = [
-  { value: "60000", label: "1 minute" },
-  { value: "300000", label: "5 minutes" },
-  { value: "900000", label: "15 minutes" },
-  { value: "1800000", label: "30 minutes" },
-  { value: "3600000", label: "1 hour" }
-];
+  { value: "60000", unit: "minutes", count: 1 },
+  { value: "300000", unit: "minutes", count: 5 },
+  { value: "900000", unit: "minutes", count: 15 },
+  { value: "1800000", unit: "minutes", count: 30 },
+  { value: "3600000", unit: "hours", count: 1 }
+] as const;
 
 type Props = {
   editingAccount: Account;
@@ -35,7 +39,8 @@ export default function CalendarTabContent({
   onSave
 }: Props) {
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const t = useTranslations("Settings");
+  const [testResult, setTestResult] = useState<TestOutcome | null>(null);
   const saveDisabled = !isExistingAccount || !canSave;
 
   const caldav = editingAccount.caldav;
@@ -72,7 +77,7 @@ export default function CalendarTabContent({
       const data = (await res.json()) as TestResult;
       setTestResult(data);
     } catch {
-      setTestResult({ ok: false, message: "Connection failed. Check the URL and credentials." });
+      setTestResult({ ok: false, failure: "connection" });
     } finally {
       setTesting(false);
     }
@@ -95,19 +100,30 @@ export default function CalendarTabContent({
     });
   };
 
+  const testResultText = (result: TestOutcome) => {
+    if (result.ok) {
+      return t("calendar.connected", {
+        count: result.calendars.length,
+        // Calendar display names and URLs are user/server content and stay untranslated.
+        names: result.calendars.map((c) => c.displayName ?? c.url).join(", ")
+      });
+    }
+    return "failure" in result ? t("calendar.connectionFailed") : result.message;
+  };
+
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Flex direction="column" gap="3">
           <Text size="3" weight="medium">
-            Appearance
+            {t("calendar.appearance")}
           </Text>
-          <Field label="Week starts on">
+          <Field label={t("calendar.weekStartsOn")}>
             <Select.Root value={weekStartsOn} onValueChange={(v) => updateWeekStartsOn(v as "monday" | "sunday")}>
               <Select.Trigger style={{ width: "100%" }} />
               <Select.Content position="popper">
-                <Select.Item value="monday">Monday</Select.Item>
-                <Select.Item value="sunday">Sunday</Select.Item>
+                <Select.Item value="monday">{t("calendar.monday")}</Select.Item>
+                <Select.Item value="sunday">{t("calendar.sunday")}</Select.Item>
               </Select.Content>
             </Select.Root>
           </Field>
@@ -116,14 +132,14 @@ export default function CalendarTabContent({
         <Flex direction="column" gap="3">
           <Flex align="center" gap="2">
             <Text size="3" weight="medium">
-              CalDAV Server
+              {t("calendar.caldavHeading")}
             </Text>
             <Badge size="1" color="gray" variant="soft">
-              Optional
+              {t("common.optional")}
             </Badge>
           </Flex>
           <Grid columns="2" gap="3">
-            <Field label="Server URL" hint='e.g. "https://caldav.example.com/"'>
+            <Field label={t("calendar.serverUrl")} hint={t("calendar.serverUrlHint")}>
               <TextField.Root
                 value={caldav?.url ?? ""}
                 onChange={(e) => updateCaldav({ url: e.target.value })}
@@ -131,7 +147,7 @@ export default function CalendarTabContent({
                 style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Username">
+            <Field label={t("calendar.username")}>
               <TextField.Root
                 value={caldav?.user ?? ""}
                 onChange={(e) => updateCaldav({ user: e.target.value })}
@@ -140,16 +156,16 @@ export default function CalendarTabContent({
                 style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Password">
+            <Field label={t("calendar.password")}>
               <PasswordField
                 value={caldav?.password ?? ""}
                 onChange={(e) => updateCaldav({ password: e.target.value })}
-                placeholder="Password"
+                placeholder={t("calendar.passwordPlaceholder")}
                 autoComplete="new-password"
                 style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Calendar Path" hint="Leave blank to auto-discover">
+            <Field label={t("calendar.calendarPath")} hint={t("calendar.calendarPathHint")}>
               <TextField.Root
                 value={caldav?.calendarPath ?? ""}
                 onChange={(e) =>
@@ -159,7 +175,7 @@ export default function CalendarTabContent({
                 style={{ width: "100%" }}
               />
             </Field>
-            <Field label="Sync Interval">
+            <Field label={t("calendar.syncInterval")}>
               <Select.Root
                 value={String(caldav?.syncIntervalMs ?? "300000")}
                 onValueChange={(v) =>
@@ -170,7 +186,9 @@ export default function CalendarTabContent({
                 <Select.Content position="popper">
                   {SYNC_INTERVAL_OPTIONS.map((opt) => (
                     <Select.Item key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {opt.unit === "hours"
+                        ? t("calendar.intervalHours", { count: opt.count })
+                        : t("calendar.intervalMinutes", { count: opt.count })}
                     </Select.Item>
                   ))}
                 </Select.Content>
@@ -185,11 +203,11 @@ export default function CalendarTabContent({
               onClick={handleTestConnection}
               disabled={testing || !canTest}
             >
-              {testing ? "Testing…" : "Test Connection"}
+              {testing ? t("calendar.testing") : t("calendar.testConnection")}
             </Button>
             {caldav?.url ? (
               <Button size="2" variant="soft" color="red" onClick={clearCaldav}>
-                Remove CalDAV
+                {t("calendar.remove")}
               </Button>
             ) : null}
           </Flex>
@@ -200,9 +218,7 @@ export default function CalendarTabContent({
                 {testResult.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}
               </Callout.Icon>
               <Callout.Text>
-                {testResult.ok
-                  ? `Connected. Found ${testResult.calendars.length} calendar${testResult.calendars.length !== 1 ? "s" : ""}${testResult.calendars.length > 0 ? ": " + testResult.calendars.map((c) => c.displayName ?? c.url).join(", ") : ""}.`
-                  : testResult.message}
+                {testResultText(testResult)}
               </Callout.Text>
             </Callout.Root>
           )}
@@ -211,10 +227,7 @@ export default function CalendarTabContent({
             <Callout.Icon>
               <Info size={14} />
             </Callout.Icon>
-            <Callout.Text>
-              CalDAV is optional. Calendar events from email invites and manually created
-              events are always stored locally.
-            </Callout.Text>
+            <Callout.Text>{t("calendar.optionalInfo")}</Callout.Text>
           </Callout.Root>
         </Flex>
       </Flex>
@@ -227,10 +240,10 @@ export default function CalendarTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          {saveDisabled ? "Close" : "Cancel"}
+          {saveDisabled ? t("close") : t("common.cancel")}
         </Button>
         <Button size="2" onClick={onSave} disabled={saveDisabled}>
-          Save
+          {t("common.save")}
         </Button>
       </Flex>
     </Flex>

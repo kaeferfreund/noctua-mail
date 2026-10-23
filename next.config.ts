@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
+    ] },
+    // Font and icon file names are stable but not content-hashed, so they
+    // get a bounded, revalidating cache instead of `immutable`. No rule for
+    // /runtime-config.js: it is regenerated per deployment and must stay
+    // revalidated on every load. The icons rule names the static public
+    // files only: /icons/logo.svg and /icons/badged/:size are dynamic,
+    // deployment-label routes that must keep their own must-revalidate.
+    { source: "/fonts/:path*", headers: [
+      {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
+    ] },
+    { source: "/icons/:file(icon-\\d+\\.png|base\\.svg)", headers: [
+      {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
     ] }];
   },
   output: 'standalone',
@@ -23,6 +35,10 @@ const nextConfig: NextConfig = {
     root: projectDir
   },
   typedRoutes: false,
+  // The type gate is `bun check` in the `build` script, after `next build` so
+  // the generated .next/types are checked too; it reports the same errors as
+  // Next's tsc pass, which would otherwise take most of a cold build.
+  typescript: { ignoreBuildErrors: true },
   // Worker subprocesses execute TS entrypoints from ./scripts at runtime.
   // Standalone builds only ship traced files, so include the worker source tree
   // and its local TS dependencies explicitly for the routes that launch them.
@@ -46,10 +62,11 @@ const nextConfig: NextConfig = {
       // parse5 8.0.1 depends on entities ^8 and resolves the hoisted copy above.
       // parse5 8.0.0 nested entities ^6, so package.json starts the range at 8.0.1.
       "./node_modules/parse5/**",
-      // sanitize-html 2.17 and html-to-text 10 use htmlparser2 10, which still
-      // depends on entities ^7. That copy lives at
-      // node_modules/htmlparser2/node_modules/entities. The hoisted entities 8
-      // package is ESM-only, so the worker must keep this nested CJS copy.
+      // sanitize-html 2.18 (and @types/sanitize-html 2.16.2) use htmlparser2 12,
+      // the hoisted copy here, with entities 8 and domhandler 6. html-to-text 10
+      // keeps htmlparser2 10 with entities 7 nested under
+      // node_modules/html-to-text/node_modules; the tracer follows that copy
+      // from html-to-text's own imports.
       "./node_modules/htmlparser2/**"
     ],
     "/api/accounts/*/threads/recompute": workerRuntimeTraceFiles,

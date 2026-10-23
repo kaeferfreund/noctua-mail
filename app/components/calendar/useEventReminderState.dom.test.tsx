@@ -26,6 +26,16 @@ function clock(initial: number) {
   };
 }
 
+// perf/rrule-lazy: the recurrence resolver is dynamic-imported so `rrule`
+// stays out of the first load. Flush that import (as the browser does once
+// the chunk arrives) before asserting on recurring events.
+async function flushRecurrenceImport() {
+  await act(async () => {
+    await import("@/lib/reminderRecurrence");
+    await Promise.resolve();
+  });
+}
+
 test("reminder eligibility advances across event start without a parent render", () => {
   const time = clock(start - 1000);
   const hook = renderHook(() => useEventReminderState(input));
@@ -40,11 +50,15 @@ test("reminder eligibility advances across event start without a parent render",
   expect(time.pending()).toEqual([0, 0]);
 });
 
-test("recurring reminders retain the next occurrence and disable after the last one", () => {
+test("recurring reminders retain the next occurrence and disable after the last one", async () => {
   const day = 86400000;
   const time = clock(start - 1000);
   const hook = renderHook(() => useEventReminderState({ ...input, recurrenceRule: "FREQ=DAILY;COUNT=2" }));
   time.tick(start - 1000);
+  // Until the resolver has loaded, a recurring event reports "cannot
+  // schedule yet" instead of guessing from the series start.
+  expect(hook.result.current.canScheduleReminder).toBe(false);
+  await flushRecurrenceImport();
   expect(hook.result.current.canScheduleReminder).toBe(true);
   time.tick(start + 1000);
   expect(hook.result.current.canScheduleReminder).toBe(true);
@@ -98,6 +112,7 @@ test("scheduling resolves the occurrence from the click time between clock ticks
   }
   const page = render(<Button />);
   time.tick(start - 1000);
+  await flushRecurrenceImport();
   expect((page.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
   // No UI tick: persistence must use the actual time of the action.
   time.set(start + 1000);

@@ -9,6 +9,7 @@ import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type { Message } from "@/lib/data";
 import { stripHtmlToText } from "@/lib/html";
 import ComposeOrchestrator from "@/app/components/mailclient/composition/ComposeOrchestrator";
+import { $createParagraphNode, $createTextNode, $getRoot, type LexicalEditor } from "lexical";
 
 // FocusScope restores focus and removes itself from Radix's shared stack in a
 // zero-delay timer on unmount. Flush that task inside act before the next test
@@ -334,4 +335,53 @@ it("sender snapshot catalog IDs are localized at the notice boundary", async () 
   await act(async () => { await handleRef.current?.openCompose("reply", sourceMessage); });
   expect(errors).toContain("Could not load sender identities and preferences.");
   expect(errors.some(message => message.includes("Errors.sender."))).toBe(false);
+});
+
+for (const format of ["HTML", "Text", "Markdown"]) it(`QA-201 switching From to an unsigned identity and back restores the signature once in untouched ${format}`, async () => {
+  const confirm = spyOn(window, "confirm").mockReturnValue(false);
+  try {
+    const sender = makeSender();
+    sender.identities.push({ id: "unsigned", accountId: "acc-test", email: "unsigned@example.test", displayName: "Unsigned", enabled: true, isDefault: false, signatureId: "" } as SenderSettings["identities"][number]);
+    const { view, handleRef } = renderCompose({ sender });
+    await act(async () => { await handleRef.current?.openCompose("new"); });
+    const lexical = () => view.baseElement.querySelector('[data-lexical-editor="true"]');
+    await waitFor(() => expect(lexical()?.textContent).toContain("Synthetic Jo / me@example.test"));
+    const selector = format === "Text" ? 'textarea[name="compose_body"]' : '.w-md-editor textarea';
+    if (format !== "HTML") {
+      fireEvent.mouseDown(view.getByRole("tab", { name: new RegExp(`^${format}(?: ${format})?$`) }), { button: 0, ctrlKey: false });
+      await waitFor(() => expect(view.baseElement.querySelector<HTMLTextAreaElement>(selector)?.value.replace(/\\/g, "")).toContain("me@example.test"));
+    }
+    const body = () => (format === "HTML" ? lexical()?.textContent : view.baseElement.querySelector<HTMLTextAreaElement>(selector)?.value.replace(/\\/g, "")) ?? "";
+    const pick = async (name: RegExp) => {
+      fireEvent.click(view.getByRole("combobox", { name: "From:" }));
+      fireEvent.click(await view.findByRole("option", { name }));
+    };
+    for (let round = 0; round < 3; round += 1) {
+      await pick(/Unsigned <unsigned@example.test>/);
+      await waitFor(() => expect(body()).not.toContain("Synthetic Jo"));
+      expect(body().trim()).toBe("");
+      await pick(/Team <me@example.test>/);
+      await waitFor(() => expect(body()).toContain("Synthetic Jo / me@example.test"));
+      expect(body().match(/Synthetic Jo/g)).toHaveLength(1);
+      expect(body().trimStart()).toBe(body());
+      await pick(/Alias <alias@example.test>/);
+      await waitFor(() => expect(body()).toContain("Synthetic Jo / alias@example.test"));
+      expect(body().match(/Synthetic Jo/g)).toHaveLength(1);
+    }
+    expect(confirm).not.toHaveBeenCalled();
+    // A body the user really authored still asks before a signature is added.
+    await pick(/Unsigned <unsigned@example.test>/);
+    await waitFor(() => expect(body()).not.toContain("Synthetic Jo"));
+    if (format === "HTML") {
+      const editor = (lexical() as HTMLElement & { __lexicalEditor: LexicalEditor }).__lexicalEditor;
+      await act(async () => { editor.update(() => { $getRoot().clear().append($createParagraphNode().append($createTextNode("Authored"))); }); });
+    } else {
+      fireEvent.change(view.baseElement.querySelector<HTMLTextAreaElement>(selector)!, { target: { value: "Authored" } });
+    }
+    await waitFor(() => expect(body()).toContain("Authored"));
+    await pick(/Team <me@example.test>/);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(body()).toContain("Authored");
+    expect(body()).not.toContain("Synthetic Jo");
+  } finally { confirm.mockRestore(); }
 });

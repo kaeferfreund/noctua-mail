@@ -8,13 +8,27 @@
   border: 0;
   border-radius: 0;
 }
-.statusSheet { max-height: 90dvh; overflow: hidden; }
+/* The generic Sheet close is a 28px icon; a fullscreen phone frame has room
+   for the 44px target its other controls use. */
+.fullscreenSheet > [data-slot="sheet-close"],
+.statusSheet > [data-slot="sheet-close"] { top: 4px; right: 4px; width: 44px; height: 44px; }
+.statusSheet { max-height: 90dvh; overflow: hidden; gap: 0; }
+/* Title row of every phone status Sheet: title and count, then the 44px close. */
+.statusSheetTitle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 56px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
 .statusContent {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   width: 100%;
   max-width: none;
-  max-height: 85dvh;
   min-height: 0;
   padding: 16px;
   box-shadow: none;
@@ -25,19 +39,37 @@
 .settingsTabs:global(.rt-TabsList) {
   display: flex;
   flex-direction: column;
-  flex: 0 0 112px;
+  /* As wide as the longest single word, so labels wrap only between words;
+     the cap keeps room for the content if a word is unusually long. */
+  flex: 0 0 auto;
+  width: min-content;
+  max-width: 45%;
   height: auto;
   overflow-y: auto;
   box-shadow: none;
   border-right: 1px solid var(--border);
 }
-.settingsTabs :global(.rt-TabsTrigger) { height: auto; min-height: 44px; flex-shrink: 0; width: 100%; justify-content: flex-start; white-space: normal; padding: 8px; }
+/* The label layer already pads 8px horizontally; the trigger adds only the vertical room. */
+.settingsTabs :global(.rt-TabsTrigger) { height: auto; min-height: 44px; flex-shrink: 0; width: 100%; justify-content: flex-start; white-space: normal; padding: 8px 0; }
 .settingsTabs :global(.rt-TabsTriggerInner),
-.settingsTabs :global(.rt-TabsTriggerInnerHidden) { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.settingsTabs :global(.rt-TabsTriggerInnerHidden) { min-width: 0; max-width: 100%; overflow-wrap: break-word; white-space: normal; }
 /* The visible label sizes the row instead of overflowing an absolute layer. */
 .settingsTabs :global(.rt-TabsTriggerInner) { position: static; }
 .settingsTabs :global(.rt-TabsTriggerInnerHidden) { display: none; }
-.settingsBody :global(.rt-TabsContent) { min-width: 0; }
+/* German compounds in the narrow phone column hyphenate where the browser has a dictionary. */
+.settingsBody :global(.rt-TabsContent) { min-width: 0; hyphens: auto; }
+/* Long action labels wrap inside their button instead of running past the
+   phone viewport; single-line buttons keep their height. */
+.settingsBody :global(.rt-TabsContent .rt-Button),
+.settingsBody :global(.rt-TabsContent [data-slot="button"]:not([data-size^="icon"])) {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--base-button-height, 32px);
+  padding-block: 4px;
+  white-space: normal;
+}
+/* Callout text may also break inside a word where no dictionary is available. */
+.settingsBody :global(.rt-TabsContent .rt-CalloutText) { min-width: 0; overflow-wrap: anywhere; }
 .indicators { display: flex; align-items: center; }
 .activityDot { width: 6px; height: 6px; border-radius: 50%; background: var(--destructive); }
 .messageMore { width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0; box-sizing: border-box; align-self: center; }
@@ -45,9 +77,6 @@
 .messageMenu :global([data-slot="dropdown-menu-sub-trigger"]),
 .messageMenu :global(.rt-DropdownMenuItem),
 .messageMenu :global(.rt-DropdownMenuSubTrigger) { min-height: 44px; }
-@media (width < 768px) {
-  .desktopStatusBar { display: none; }
-}
 
 /* A stable Dialog tree presents as a fullscreen settings sheet on phones. */
 .settingsFullscreen {
@@ -59,3 +88,29 @@
   padding: 0;
   border-radius: 0;
 }
+
+/* Phone calendar inside the fullscreen status Sheet. FullCalendar's toolbar
+   wraps instead of clipping: prev/title/next take the first row, create/today
+   and the month/week/day group share the next one (or two at 320px). Every
+   control keeps a 44px target and the grid a bounded minimum height; when a
+   short viewport (keyboard) cannot fit that, the Sheet body scrolls. */
+.calendarFrame button { min-height: 44px; }
+.calendarFrame :global(.fc-button) { min-width: 44px; }
+.calendarBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 340px;
+  overflow: hidden;
+}
+/* Outranks FullCalendar's own .fc .fc-toolbar.fc-header-toolbar margin. */
+.calendarBody :global(.fc .fc-toolbar.fc-header-toolbar) { flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.calendarBody :global(.fc-header-toolbar > .fc-toolbar-chunk:nth-child(2)) {
+  order: -1;
+  flex: 1 0 100%;
+  justify-content: space-between;
+}
+.calendarBody :global(.fc-toolbar-title) { min-width: 0; text-align: center; overflow-wrap: anywhere; }
+/* Week headers ("Mon 10/19") get about 33px per column at 320px. */
+.calendarBody :global(.fc .fc-col-header-cell-cushion) { padding: 2px 0; font-size: 11px; overflow-wrap: anywhere; }

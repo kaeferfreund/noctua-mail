@@ -14,7 +14,11 @@ import { applyFolderStreamUpdates } from "./folderStreamUpdates";
 import { NOTICE_TIMEOUTS } from "./constants";
 import type { UndoMoveTarget } from "./useMessageMoveActions";
 
+import type { ContinueAfterRemoval } from "./messagelist/successfulRemoval";
+
 type UseMessageMutationsProps = {
+  continueAfterRemoval?: ContinueAfterRemoval;
+  navigationRows?: Message[];
   activeAccountId: string;
   searchScope: "folder" | "all";
   viewMessage: Message | null;
@@ -59,6 +63,8 @@ type MoveReconcileParams = {
 };
 
 export function useMessageMutations({
+  continueAfterRemoval,
+  navigationRows,
   activeAccountId,
   searchScope,
   viewMessage,
@@ -212,7 +218,12 @@ export function useMessageMutations({
       movedMessage,
       shouldKeepMessageInCurrentResults
     );
-    if (transition.kind === "clear") {
+    // A selection can finish rendering while the HTTP command is in flight.
+    // Let the shared continuation inspect the current reader, rather than the
+    // view captured when this request started.
+    if (continueAfterRemoval && (!movedMessage || !shouldKeepMessageInCurrentResults(movedMessage))) {
+      continueAfterRemoval([message.id], navigationRows);
+    } else if (transition.kind === "clear") {
       setViewMessage(null);
       setActiveMessageId("");
     } else if (transition.kind === "retarget") {
@@ -237,6 +248,8 @@ export function useMessageMutations({
     });
   }, [
     activeAccountId,
+    continueAfterRemoval,
+    navigationRows,
     evictMessageCaches,
     pushNotice,
     searchScope,
@@ -245,16 +258,21 @@ export function useMessageMutations({
     shouldKeepMessageInCurrentResults,
     undoMoveOperation,
     updateMessagesWithCurrentResultPrune,
-    viewMessage?.id,
+    viewMessage,
     tn
   ]);
+
+  // Explicit JSON keeps bodyless commands valid when the browser/Next transport
+  // presents an empty request stream to requireMutationSameOrigin.
+  const requestMessageCommand = useCallback((messageId: string, action: string) =>
+    apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, action), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+    }), [activeAccountId, apiFetch]);
 
   const handleArchiveMessage = useCallback(async (message: Message) => {
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "archive"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "archive");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -280,8 +298,7 @@ export function useMessageMutations({
       reportError(tn("archiveFailed"));
     }
   }, [
-    activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
@@ -313,9 +330,7 @@ export function useMessageMutations({
 
       setPendingMessageActions((prev) => new Set(prev).add(message.id));
       try {
-        const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "unsubscribe"), {
-          method: "POST"
-        });
+        const res = await requestMessageCommand(message.id, "unsubscribe");
 
         if (!res.ok) {
           const errMsg = await readErrorMessage(res);
@@ -351,16 +366,14 @@ export function useMessageMutations({
         });
       }
     },
-    [activeAccountId, apiFetch, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
+    [requestMessageCommand, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
   );
 
   const handleMarkSpam = useCallback(async (message: Message) => {
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "spam"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -392,8 +405,7 @@ export function useMessageMutations({
       });
     }
   }, [
-    activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
@@ -406,9 +418,7 @@ export function useMessageMutations({
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       applyMoveReconcileSuppression([message]);
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "not-spam"), {
-        method: "POST"
-      });
+      const res = await requestMessageCommand(message.id, "not-spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -440,8 +450,7 @@ export function useMessageMutations({
       });
     }
   }, [
-    activeAccountId,
-    apiFetch,
+    requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,

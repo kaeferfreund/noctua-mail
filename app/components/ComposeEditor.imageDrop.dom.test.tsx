@@ -2,7 +2,8 @@
 // client component (and Lexical) are imported.
 import { afterEach, describe, expect, it } from "bun:test";
 import React from "react";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import ComposeEditor from "./ComposeEditor";
 
 afterEach(() => cleanup());

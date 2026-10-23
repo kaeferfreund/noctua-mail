@@ -3,7 +3,8 @@ import type { CalendarEvent, CalendarReminder } from "@/lib/data";
 import {
   buildUpcomingEntries,
   DEFAULT_UPCOMING_CAP,
-  DEFAULT_UPCOMING_WINDOW_MS
+  DEFAULT_UPCOMING_WINDOW_MS,
+  reminderLeadUnit
 } from "./upcomingEntries";
 
 const HOUR = 60 * 60 * 1000;
@@ -274,5 +275,17 @@ describe("buildUpcomingEntries", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]?.startAtMs).toBe(nextStart);
     expect(entries[0]?.endAtMs).toBe(nextStart + 30 * 60 * 1000);
+  });
+});
+
+describe("reminderLeadUnit", () => {
+  it("uses the largest unit that divides the lead evenly", () => {
+    expect(reminderLeadUnit(0)).toEqual({ unit: "start", count: 0 });
+    expect(reminderLeadUnit(15)).toEqual({ unit: "minute", count: 15 });
+    expect(reminderLeadUnit(60)).toEqual({ unit: "hour", count: 1 });
+    expect(reminderLeadUnit(90)).toEqual({ unit: "minute", count: 90 });
+    expect(reminderLeadUnit(120)).toEqual({ unit: "hour", count: 2 });
+    expect(reminderLeadUnit(1440)).toEqual({ unit: "day", count: 1 });
+    expect(reminderLeadUnit(2880)).toEqual({ unit: "day", count: 2 });
   });
 });

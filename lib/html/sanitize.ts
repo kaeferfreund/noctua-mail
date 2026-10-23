@@ -131,10 +131,36 @@ function localSrcset(input: string) {
   return true;
 }
 
-export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = "block") {
-  if (!input) return input;
+type CssFilter = (input: string, inline?: boolean) => string;
+
+/**
+ * privateCss memoized for a single sanitize call. privateCss is a pure
+ * function of (input, inline), and mail markup repeats the same style
+ * attribute hundreds of times. Scoped per call, never module-wide, so memory
+ * stays bounded and nothing is shared across messages.
+ */
+function memoizedPrivateCss(): CssFilter {
+  const inlineCache = new Map<string, string>();
+  const sheetCache = new Map<string, string>();
+  return (input, inline = false) => {
+    const cache = inline ? inlineCache : sheetCache;
+    let output = cache.get(input);
+    if (output === undefined) {
+      output = privateCss(input, inline);
+      cache.set(input, output);
+    }
+    return output;
+  };
+}
+
+function sanitizeNormalized(
+  normalized: string,
+  mode: RemoteContentMode,
+  css: CssFilter,
+  onRemoteRewrite?: () => void
+) {
   const block = mode === "block";
-  const sanitized = sanitizeHtml(normalizeHtmlStructure(input), {
+  const sanitized = sanitizeHtml(normalized, {
     ...SANITIZE_HTML_OPTIONS,
     transformTags: {
       "*": (tagName, original) => {
@@ -145,16 +171,21 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
           delete attribs.name;
           delete attribs.content;
         }
-        if (attribs.style) attribs.style = privateCss(attribs.style, true);
+        if (attribs.style) attribs.style = css(attribs.style, true);
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
+        // The only mode-dependent code. sanitizeHtmlForDisplayPair skips the
+        // allow pass when neither rewrite below ran, so any future
+        // mode-specific behavior must also call onRemoteRewrite.
         if (block && (tagName === "img" || tagName === "source")) {
           if (attribs.src && !isLocalMailResource(attribs.src)) {
+            onRemoteRewrite?.();
             attribs["data-remote-src"] = attribs.src;
             attribs.src = BLANK_IMAGE;
           }
           // A srcset may mix remote and inline candidates (and data URLs contain
           // commas). Retain only wholly local sets; src remains the fallback.
           if (attribs.srcset && !localSrcset(attribs.srcset)) {
+            onRemoteRewrite?.();
             attribs["data-remote-srcset"] = attribs.srcset;
             delete attribs.srcset;
           }
@@ -166,5 +197,32 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
   // sanitize-html deliberately bypasses textFilter for raw style text. Filter
   // canonical style elements after the HTML allowlist has run instead.
   return sanitized.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
-    (_match, open, css, close) => `${open}${privateCss(css)}${close}`);
+    (_match, open, cssText, close) => `${open}${css(cssText)}${close}`);
+}
+
+export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = "block") {
+  if (!input) return input;
+  return sanitizeNormalized(normalizeHtmlStructure(input), mode, memoizedPrivateCss());
+}
+
+export type SanitizedHtmlPair = { block: string; allow: string };
+
+/**
+ * Both display policies for one message, equal to calling
+ * sanitizeHtmlForDisplay(input, "block") and (input, "allow"). Normalizes
+ * once and shares the CSS memo between the passes. When the block pass
+ * rewrote no remote source, the allow pass would run identical transforms,
+ * so its result is the block result and `block !== allow` stays the exact
+ * "message has remote content" signal.
+ */
+export function sanitizeHtmlForDisplayPair(input: string): SanitizedHtmlPair {
+  if (!input) return { block: input, allow: input };
+  const normalized = normalizeHtmlStructure(input);
+  const css = memoizedPrivateCss();
+  let remoteRewrites = 0;
+  const block = sanitizeNormalized(normalized, "block", css, () => {
+    remoteRewrites += 1;
+  });
+  const allow = remoteRewrites ? sanitizeNormalized(normalized, "allow", css) : block;
+  return { block, allow };
 }

@@ -1,4 +1,5 @@
 import { test, expect } from "bun:test";
+import "@/lib/testDbHarness";
 import { GET, POST } from "./route";
 test("MCP management requires an authenticated editor", async () => {
   for (const handler of [GET, POST]) {

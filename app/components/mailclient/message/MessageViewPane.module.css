@@ -27,7 +27,7 @@
 }
 
 .threadView {
-  padding: var(--space-4);
+  padding: var(--reader-padding-y, var(--space-4)) var(--reader-padding-x, var(--space-4));
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -78,4 +78,37 @@
   .subjectRow > :global(.rt-SegmentedControlRoot) { align-self: flex-end; }
   .subjectText[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .subjectToggle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-2); background: transparent; color: var(--gray-11); cursor: pointer; }
+}
+
+@media print {
+  :global(body:has([data-reader-print]) *) { visibility: hidden; }
+  /* Only mail headers/content opt into print. Prune unrelated subtrees so
+     private drafts and collaboration UI cannot leave content or blank pages. */
+  :global([data-mail-print]), :global([data-mail-print] *) { visibility: visible !important; }
+  :global([data-reader-print] *:not([data-mail-print]):not([data-mail-print] *):not(:has([data-mail-print]))) { display: none !important; }
+  :global([data-reader-print-exclude]),
+  :global([data-mail-print="body"] button), :global([data-mail-print="body"] input),
+  :global([data-mail-print="body"] textarea), :global([data-mail-print="body"] select),
+  :global([data-mail-print="body"] [role="combobox"]),
+  :global([data-mail-print="body"] [role="status"]), :global([data-mail-print="body"] [role="alert"]) { display: none !important; }
+  :global(body:has([data-reader-print])), :global(body:has([data-reader-print]) [data-shell]),
+  :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
+  :global(body:has([data-reader-print]) [data-group]),
+  :global(body:has([data-reader-print]) #reader), :global(body:has([data-reader-print]) #reader > div),
+  .pane, .threadViewShell, .threadView { height: auto !important; max-height: none !important; overflow: visible !important; }
+  :global(body:has([data-reader-print]) [data-slot="sidebar"]),
+  :global(body:has([data-reader-print]) [data-slot="shell-header"]),
+  :global(body:has([data-reader-print]) #list),
+  :global(body:has([data-reader-print]) #calendar),
+  :global(body:has([data-reader-print]) [data-slot="resizable-handle"]) { display: none !important; }
+  :global(body:has([data-reader-print]) [data-shell]),
+  :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
+  :global(body:has([data-reader-print]) #noctua-panes),
+  :global(body:has([data-reader-print]) #reader),
+  :global(body:has([data-reader-print]) #reader > div) {
+    display: block !important; position: static !important; width: 100% !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important;
+  }
+  :global([data-reader-print]) { visibility: visible !important; position: static; width: 100%; }
+  :global([data-reader-toolbar]), .mobileHeader { display: none !important; }
 }

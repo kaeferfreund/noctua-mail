@@ -43,6 +43,23 @@ The separate preview `https://remote-arm.tail31b4a1.ts.net:3790` has isolated da
 secrets, its own URL and RP ID `remote-arm.tail31b4a1.ts.net`, preview-only trust and new passkeys.
 Never add preview trust to production or claim canonical passkey reuse there.
 
+### Optional search tuning
+
+Leave both unset in normal operation. Searches resolve their matching message ids once from the
+FTS index and reuse them for list, count and group queries; the legacy inline search clause is the
+fallback and returns the same results.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOCTUA_FTS_DRIVEN_MAX_CANDIDATES` | `2000` | Maximum candidate ids per search (integer 1–32,000; invalid values use the default, larger values are clamped to 32,000 with one warning per configured value). Larger searches, and searches whose FTS read fails, use the legacy clause and log one `[fts-search] legacy fallback` warning without query text (`errorClass` `index`, `syntax` or `other` for FTS read failures). |
+| `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH` | unset (on) | Exactly `1` is the kill switch: every search uses the legacy clause, without a fallback log line. No schema or index change is involved; restart the service to apply. |
+
+The 32,000 maximum stays below SQLite's portable default limit of 32,766 bound variables per
+statement, leaving headroom for the other parameters each statement binds. Bun's
+bundled SQLite (1.4.4) accepts 250,000, but each list, count and group statement of a search is
+prepared with one placeholder per candidate id, so a larger cap mostly adds prepare cost; raise
+the default only after measuring.
+
 ## Deployment Methods
 
 ### Docker (Recommended)
