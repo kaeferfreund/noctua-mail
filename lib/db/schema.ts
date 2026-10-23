@@ -1,5 +1,5 @@
 import { ACCOUNT_KEY_TABLE_SQL, ensureAccountKeySchema } from "./accountKeys";
-import { prepareAccountShardConnection } from "./shardFormat";
+import { assertCompleteShardFormat, assertSupportedShardFormat, prepareAccountShardConnection } from "./shardFormat";
 import { getOwnAddresses, ownAddressList, type OwnAddressInput } from "../ownAddresses";
 import { seedSenderIdentityRow } from "./senderIdentities";
 import { randomUUID } from "crypto";
@@ -904,7 +904,7 @@ export function initMasterSchema(db: any) {
 
 // Collaboration shard schema. Kept separate from watcher summary/lastSyncAt changes.
 const threadCollabSchemaByDb = new WeakSet<object>();
-export function ensureThreadCollabRuntimeSchema(db: any) {
+export function ensureThreadCollabRuntimeSchema(db: any, inTransaction = false) {
   if (threadCollabSchemaByDb.has(db)) return;
   // A cold reader of an initialized shard must not acquire SQLite's writer
   // lock. Include indexes so a partially initialized schema is repaired too.
@@ -920,10 +920,10 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
   if (requiredObjects.every(name => existing.has(name)) &&
     ["thread_collab_state", "thread_comments"].every(table =>
       db.prepare(`PRAGMA table_info(${table})`).all().some((column: { name: string }) => column.name === "revision"))) {
-    threadCollabSchemaByDb.add(db);
+    if (!inTransaction) threadCollabSchemaByDb.add(db);
     return;
   }
-  db.transaction(() => {
+  const install = () => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS thread_collab_state (
         accountId TEXT NOT NULL, threadId TEXT NOT NULL,
@@ -965,13 +965,42 @@ export function ensureThreadCollabRuntimeSchema(db: any) {
       if (!columns.some(column => column.name === "revision"))
         db.exec(`ALTER TABLE ${table} ADD COLUMN revision INTEGER NOT NULL DEFAULT 0`);
     }
-  }).immediate();
-  threadCollabSchemaByDb.add(db);
+  };
+  if (inTransaction) install();
+  else {
+    db.transaction(install).immediate();
+    threadCollabSchemaByDb.add(db);
+  }
 }
 
 export function initAccountSchema(db: any) {
   prepareAccountShardConnection(db);
-  ensureThreadCollabRuntimeSchema(db);
+  assertCompleteShardFormat(db);
+  if (assertSupportedShardFormat(db) === 3) return initAccountSchemaBody(db, false);
+  // Additive initialization and both historical/current migrations commit as one
+  // unit. The audited parent-table rebuild requires FK OFF before BEGIN.
+  const foreignKeys = Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys);
+  const rebuildKeys = assertSupportedShardFormat(db) < 2;
+  if (rebuildKeys) db.exec("PRAGMA foreign_keys=OFF");
+  try {
+    if (rebuildKeys && Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys) !== 0) {
+      throw new Error("Account shard initialization must run outside a transaction");
+    }
+    const result = db.transaction(() => {
+      assertCompleteShardFormat(db);
+      return initAccountSchemaBody(db, true);
+    }).immediate();
+    threadCollabSchemaByDb.add(db);
+    senderIdentityMessageSchemaByDb.add(db);
+    if (result.droppedFtsOrphans) console.warn(`[shard-format-v3] dropped ${result.droppedFtsOrphans} orphan FTS rows`);
+    return result;
+  } finally {
+    if (rebuildKeys) db.exec(`PRAGMA foreign_keys=${foreignKeys}`);
+  }
+}
+
+function initAccountSchemaBody(db: any, inTransaction: boolean) {
+  ensureThreadCollabRuntimeSchema(db, inTransaction);
   db.exec(`
     CREATE TABLE IF NOT EXISTS mailbox_summary (
       accountId TEXT PRIMARY KEY,
@@ -1099,7 +1128,7 @@ export function initAccountSchema(db: any) {
     );
 
     -- The key/format migration below reserves this legacy name as a read-only
-    -- view and renames the physical FTS table to message_fts_v2 atomically.
+    -- view and builds message_fts_v3 plus its identity map atomically.
     CREATE VIRTUAL TABLE IF NOT EXISTS message_fts
     USING fts5(accountId UNINDEXED, messageId UNINDEXED, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview);
 
@@ -1289,7 +1318,7 @@ export function initAccountSchema(db: any) {
       ON calendar_event_conflicts(accountId);
   `);
 
-  ensureSenderIdentityMessageRuntimeSchema(db);
+  ensureSenderIdentityMessageRuntimeSchema(db, inTransaction);
 
   // Lightweight schema migration for existing account DBs.
   const messageColumns = new Set(
@@ -1399,7 +1428,7 @@ export function initAccountSchema(db: any) {
     }
     ensureCalendarReminderOptionalColumns(db);
   }
-  ensureAccountKeySchema(db);
+  return ensureAccountKeySchema(db, { inTransaction });
 }
 
 function normalizeReminderEventUidKey(uid?: string | null) {
@@ -1435,15 +1464,17 @@ function backfillCalendarReminderEventUidKeys(db: any) {
 
 const senderIdentityMessageSchemaByDb = new WeakSet<object>();
 /** Additive on fresh, legacy, and shared message shards, once per live handle. */
-export function ensureSenderIdentityMessageRuntimeSchema(db: any) {
+export function ensureSenderIdentityMessageRuntimeSchema(db: any, inTransaction = false) {
   if (senderIdentityMessageSchemaByDb.has(db)) return;
   // Cold readers of migrated shards must never acquire a writer lock.
   const columns = new Set((db.prepare("PRAGMA table_info(messages)").all() as Array<{ name: string }>).map(row => row.name));
   if (!["deliveredTo", "originalTo", "senderIdentityId"].every(name => columns.has(name))) {
     // Recheck under the writer lock: another connection may have migrated first.
-    db.transaction(() => ensureTableColumns(db, "messages", [
+    const install = () => ensureTableColumns(db, "messages", [
       ["deliveredTo", "TEXT"], ["originalTo", "TEXT"], ["senderIdentityId", "TEXT"]
-    ])).immediate();
+    ]);
+    if (inTransaction) install();
+    else db.transaction(install).immediate();
   }
-  senderIdentityMessageSchemaByDb.add(db);
+  if (!inTransaction) senderIdentityMessageSchemaByDb.add(db);
 }
