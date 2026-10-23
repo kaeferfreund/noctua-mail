@@ -72,7 +72,62 @@
       "viewer": "viewer",
       "editor": "editor",
       "manager": "manager"
-    }
+    },
+    "sender": {
+      "identitiesTitle": "Identities",
+      "identitiesHelp": "Addresses this mailbox can send from. Check send-as permission with the mail provider before enabling an address. This is separate from your mailbox role.",
+      "identitiesLoading": "Loading identities…",
+      "identitySaved": "Identity saved.",
+      "managerOnly": "Only mailbox managers can change sender identities.",
+      "replyToLabel": "Reply-To:",
+      "chooseDefaultBeforeDisable": "Choose another mailbox default before disabling this identity.",
+      "identityDefaultFor": "Mailbox default for {email}",
+      "addIdentity": "Add identity",
+      "saveIdentity": "Save identity",
+      "displayName": "Display name",
+      "replyTo": "Reply-To",
+      "replyToHelp": "Optional single address; replies go here instead of From.",
+      "signatureTemplate": "Signature template",
+      "mailboxDefault": "Mailbox default",
+      "senderPreferencesTitle": "Sender preferences",
+      "senderPreferencesHelp": "Personal From and signature for this mailbox",
+      "senderPreferencesLoading": "Loading sender preferences…",
+      "senderPreferencesSaved": "Sender preferences saved.",
+      "defaultFrom": "Default From",
+      "unavailableIdentity": "Unavailable identity",
+      "personalTemplate": "Personal signature template",
+      "inheritTemplate": "Use identity or mailbox default",
+      "personalSignature": "Personal signature",
+      "personalSignatureHelp": "Overrides the template choice. Empty text explicitly means no signature.",
+      "inheritSignature": "Inherit signature template",
+      "usePersonalText": "Use personal text",
+      "personalSignatureText": "Personal signature text",
+      "placeholdersHelp": "Supported placeholders: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'. Add job titles as plain text.",
+      "invalidTemplate": "Use only the supported signature placeholders (maximum 8 KiB).",
+      "signaturePreview": "Signature preview",
+      "saveSenderPreferences": "Save sender preferences",
+      "sharedTemplatesHelp": "Manage shared mailbox templates. Personal signature overrides are in Preferences. Supported placeholders: '{{user.name}}', '{{user.email}}', '{{identity.displayName}}', '{{identity.email}}'.",
+      "identityEnabled": "{sender}",
+      "identityDefault": "{sender} — Mailbox default",
+      "identityDisabled": "{sender} — Disabled",
+      "identityDefaultDisabled": "{sender} — Mailbox default — Disabled",
+      "identitySignatureDefault": "Mailbox default signature"
+    },
+    "edit": "Edit",
+    "tabs": {
+      "account": "Account",
+      "signatures": "Signatures",
+      "preferences": "Preferences",
+      "categorization": "Categorization",
+      "topics": "Topics",
+      "calendar": "Calendar",
+      "translation": "Translation",
+      "recipient-aliases": "Recipient Aliases",
+      "mcp": "MCP",
+      "members": "Members"
+    },
+    "accountTitle": "Account settings",
+    "close": "Close"
   },
   "Pwa": {
     "description": "Modern webmail client prototype"
@@ -128,7 +183,15 @@
       "unassigned": "{count} unassigned open",
       "watcher": "Watcher: {state}",
       "summary": "{email}\n{unread} unread · {assignedToMe} assigned to me · {unassignedOpen} unassigned open\nWatcher: {state}",
-      "other": "Other"
+      "other": "Other",
+      "watcherStates": {
+        "disabled": "Disabled",
+        "starting": "Starting",
+        "idling": "Listening for new mail",
+        "backoff": "Waiting to retry",
+        "auth_failed": "Authentication failed",
+        "stopped": "Stopped"
+      }
     },
     "views": "Views",
     "topics": "Topics",
@@ -139,7 +202,109 @@
     },
     "build": "Build {version}",
     "loading": {
-      "mailbox": "Postfach hinzufügen"
+      "mailbox": "Add mailbox"
+    },
+    "threadsCount": "{count, plural, one {# thread} other {# threads}}",
+    "refreshTitle": "Refresh required",
+    "refreshDescription": "A newer build is available, and this version may be incompatible with your current session.",
+    "refreshMandatory": "Refresh is mandatory before continuing. New build: {version}.",
+    "refreshNow": "Refresh now",
+    "status": {
+      "activity": "Activity and calendar",
+      "check": "Check for new mail",
+      "processes": "Processes",
+      "mailCheck": "Mail check",
+      "mailCheckStatus": "Mail check: {state}",
+      "reminders": "Reminders",
+      "exceptions": "Exceptions",
+      "exceptionCount": "Exceptions ({count, number})",
+      "calendar": "Calendar",
+      "idle": "Idle",
+      "polling": "Polling",
+      "upcoming": "Upcoming",
+      "none": "None",
+      "error": "Error",
+      "closeProcesses": "Close processes",
+      "clearExceptions": "Clear exceptions",
+      "closeUpcoming": "Close upcoming",
+      "copyError": "Copy error",
+      "noExceptions": "No exceptions.",
+      "relogin": "Re-login",
+      "noProcesses": "No active processes.",
+      "nothingUpcoming": "Nothing upcoming.",
+      "preparingSync": "Preparing sync…",
+      "recomputingThreads": "Recomputing threads…",
+      "recomputingCategories": "Recomputing categories…",
+      "retry": "Retrying…",
+      "retryCount": "Retrying ({attempt, number}/{max, number})…",
+      "mailbox": "Mailbox",
+      "syncingScope": "Syncing {scope} ({mode}{percent, select, none {...} other {, {percent}}})",
+      "syncRetryScope": "{mode}: {retry} {scope}",
+      "syncingFolders": "Syncing {folder}{more, plural, =0 {} other { +# more}}...",
+      "syncingMailbox": "Syncing mailbox...",
+      "openSource": "Open source mail",
+      "openCalendar": "Open calendar",
+      "deleteReminder": "Delete reminder",
+      "deleteReminderFailed": "Failed to delete reminder.",
+      "duration": "(Duration: {duration})",
+      "reminderBefore": "Reminder: {lead} before",
+      "repeats": "Repeats: {summary}",
+      "upcomingSummary": "{count, number} · {title} @ {dateTime}",
+      "phases": {
+        "starting": "Preparing",
+        "fetching": "Fetching",
+        "finalizing": "Finalizing",
+        "done": "Done",
+        "failed": "Failed",
+        "retrying": "Retrying"
+      },
+      "modes": {
+        "full": "Full sync",
+        "recent": "Recent sync",
+        "new": "New sync",
+        "repair": "Repair sync"
+      }
+    },
+    "topicPicker": {
+      "title": "Topics",
+      "empty": "No topics yet. Create one below.",
+      "suggested": "Suggested",
+      "all": "All topics",
+      "name": "Topic name",
+      "shortName": "Short name for message list (optional)",
+      "noColor": "No color",
+      "createAdd": "Create & add",
+      "cancel": "Cancel",
+      "new": "New topic",
+      "apply": "Apply",
+      "colors": {
+        "gray": "Gray",
+        "red": "Red",
+        "orange": "Orange",
+        "amber": "Amber",
+        "yellow": "Yellow",
+        "lime": "Lime",
+        "green": "Green",
+        "teal": "Teal",
+        "cyan": "Cyan",
+        "sky": "Sky",
+        "blue": "Blue",
+        "indigo": "Indigo",
+        "violet": "Violet",
+        "purple": "Purple",
+        "pink": "Pink",
+        "brown": "Brown",
+        "crimson": "Crimson",
+        "ruby": "Ruby",
+        "tomato": "Tomato",
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "grass": "Grass",
+        "mint": "Mint",
+        "jade": "Jade",
+        "iris": "Iris",
+        "plum": "Plum"
+      }
     }
   },
   "Search": {
@@ -445,7 +610,12 @@
       "delete": "Delete mailbox",
       "deleteConfirm": "Permanently delete {email} and its local data?",
       "membersTitle": "Members of {email}",
-      "memberCount": "{count, plural, one {# member} other {# members}}"
+      "memberCount": "{count, plural, one {# member} other {# members}}",
+      "selfGrantTitle": "Give yourself access?",
+      "selfGrantHelp": "The shared mailbox was created. It has no members yet. Explicitly grant yourself access or add members later.",
+      "grantAccess": "Grant access",
+      "later": "Later",
+      "noMembers": "No members yet – nobody can see this mailbox"
     },
     "users": {
       "refresh": "Refresh users",
@@ -922,6 +1092,10 @@
     }
   },
   "Notifications": {
+    "fullSyncCancelled": "Full sync cancelled",
+    "syncCancelledSelectionChanged": "Full sync was cancelled before starting because you selected another mailbox.",
+    "folderAccountMismatch": "The folder does not belong to this mailbox. Please select the mailbox again.",
+    "syncCancelledBeforeStart": "Full sync was cancelled before starting.",
     "region": "Notifications",
     "dismissLabel": "Dismiss notification",
     "dismiss": "Dismiss",
@@ -982,5 +1156,107 @@
     "keywordFailed": "Failed to update message keyword.",
     "categoryFailed": "Failed to update category.",
     "todoFailed": "Failed to update To-Do flag."
+  },
+  "Compose": {
+    "sender": {
+      "chooseSender": "Choose a sender",
+      "reviewSender": "Review sender",
+      "unavailableDraft": "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
+      "chooseEnabledSender": "Choose an enabled From address before sending.",
+      "confirmKeepEditedSignature": "Keep the edited signature and add the new signature? Your edited text will be preserved.",
+      "confirmKeepEditedWithoutSignature": "Keep the edited signature text and stop tracking it as a signature?",
+      "retrySender": "Retry loading sender settings",
+      "senderOption": "{sender}",
+      "senderDefaultOption": "{sender} (mailbox default)",
+      "senderUnavailableOption": "{sender} — unavailable"
+    },
+    "from": "From:",
+    "closeComposer": "Close composer",
+    "fromValue": "From {sender}"
+  },
+  "Errors": {
+    "sender": {
+      "senderLoadFailed": "Could not load sender identities and preferences.",
+      "senderUnavailable": "Sender settings are unavailable for this mailbox.",
+      "identityLoadFailed": "Could not load sender identities.",
+      "identityRefreshFailed": "Could not refresh sender identities.",
+      "templateUnavailable": "A signature template is unavailable. Review your signature preferences. Ask a mailbox manager to repair the shared template.",
+      "identityUnavailable": "This From address is unavailable. Choose an enabled sender and save the draft.",
+      "draftIdentityChanged": "The saved sender details changed. Review From and save the draft before sending.",
+      "senderRejected": "The mail provider rejected this From address. Choose another sender or ask a mailbox manager to review it.",
+      "recipientRejected": "The mail provider rejected a recipient. Review To, Cc and Bcc before trying again.",
+      "messageRejected": "The mail provider rejected this message. Review its content and attachments.",
+      "providerTemporary": "The mail provider is temporarily unavailable. Keep this draft and try again later.",
+      "providerConfiguration": "Sending is unavailable. Ask a mailbox manager to review the mail configuration.",
+      "providerConnection": "Could not connect to the mail provider. Keep this draft and try again later.",
+      "providerFailure": "The mail provider could not process this message. Keep this draft and contact a mailbox manager.",
+      "connectionTimeout": "Connecting to the mail provider timed out. Keep this draft and try again later.",
+      "greetingTimeout": "The mail provider did not respond in time. Keep this draft and try again later.",
+      "deliveryUncertain": "The mail provider timed out. Delivery may have succeeded; check Sent and with the recipient before sending again.",
+      "personalDefaultUnavailable": "Your default identity is unavailable. Choose an enabled identity in Preferences, or ask a mailbox manager to re-enable it.",
+      "savedIdentityUnavailable": "The saved draft identity is unavailable. Review sender and save the draft.",
+      "identityExists": "An identity with this address already exists.",
+      "defaultIdentityRequired": "Choose another mailbox default before disabling this identity.",
+      "signatureInUse": "This signature is used by a sender identity. Choose another template for that identity first.",
+      "invalidPreferences": "Review your sender preferences and signature placeholders."
+    }
+  },
+  "Views": {
+    "focused": {
+      "name": "Focused",
+      "description": "Unread, unanswered, not newsletters",
+      "badgeLabel": "Focused"
+    },
+    "actionQueue": {
+      "name": "Action Queue",
+      "description": "Flagged messages and open or completed to-dos",
+      "badgeLabel": "Flagged or To-Do"
+    },
+    "inviteDeck": {
+      "name": "Invite Deck",
+      "description": "Your calendar invitations",
+      "badgeLabel": "Calendar invitations"
+    },
+    "assignedToMe": {
+      "name": "Assigned to me",
+      "description": "Conversations assigned to you",
+      "badgeLabel": "Assigned to me"
+    },
+    "unassigned": {
+      "name": "Unassigned",
+      "description": "Conversations without an assignee",
+      "badgeLabel": "Unassigned"
+    },
+    "open": {
+      "name": "Open",
+      "description": "Conversations that are not closed",
+      "badgeLabel": "Open"
+    },
+    "inbox": {
+      "name": "Inbox",
+      "description": "Your incoming mail"
+    },
+    "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "unreadLabel": "Unread: {count, number}",
+    "pendingCount": "{count, plural, one {# to-do} other {# to-dos}}",
+    "pendingLabel": "To-Do: {count, number}",
+    "countTitle": "{description} ({total, plural, one {# message} other {# messages}}, {unread, plural, one {# unread} other {# unread}})",
+    "rowTitle": "{name}: {description}",
+    "viewScope": "in {name}",
+    "everywhereScope": "everywhere",
+    "folderScope": "in {name}",
+    "currentFolderScope": "in current folder",
+    "allFieldsScope": "in all fields",
+    "fieldsScope": "in fields {fields}",
+    "filterCriteria": "filter {badges}",
+    "queryCriteria": "\"{query}\""
+  },
+  "Folders": {
+    "inbox": "Inbox",
+    "sent": "Sent",
+    "drafts": "Drafts",
+    "trash": "Trash",
+    "spam": "Spam",
+    "archive": "Archive"
   }
 }

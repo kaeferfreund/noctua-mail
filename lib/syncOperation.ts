@@ -1,3 +1,4 @@
+import { assertAccountFolder } from "./folderAccountGuard";
 import { workerSafePoint } from "./server/workerLifecycle";
 import { getOwnAddresses } from "./ownAddresses";
 import {
@@ -258,6 +259,7 @@ export async function runSyncOperationBatched(
   options?: SyncOperationOptions
 ): Promise<SyncOperationResult> {
   workerSafePoint();
+  if (payload.folderId != null) await assertAccountFolder(payload.accountId, payload.folderId);
   const accounts = await getAccounts();
   const account = accounts.find((item) => item.id === payload.accountId);
 
@@ -266,7 +268,7 @@ export async function runSyncOperationBatched(
   }
 
   const mailboxPath = payload.folderId
-    ? payload.folderId.replace(`${account.id}:`, "")
+    ? payload.folderId.slice(account.id.length + 1)
     : undefined;
   const resolvedMailboxPath = mailboxPath ?? "INBOX";
   const syncMode = payload.mode ?? (payload.fullSync ? "full" : "recent");

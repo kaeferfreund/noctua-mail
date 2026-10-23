@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 import { useCallback, useMemo, useState } from "react";
 import { Trash2, X, MapPin, Clock, Repeat, Loader2 } from "lucide-react";
 import {
@@ -162,6 +164,8 @@ export default function UpcomingStatusPopover({
   onReportError,
   accountDateFormat
 }: UpcomingStatusPopoverProps) {
+  const t = useTranslations("Shell.status");
+  const locale = useLocale();
   const { entries: upcomingEntries, mergedCount } = useMemo(
     () => buildUpcomingEntries(upcomingEvents, pendingCalendarReminders),
     [upcomingEvents, pendingCalendarReminders]
@@ -176,17 +180,17 @@ export default function UpcomingStatusPopover({
   );
   const nextEntry = upcomingEntries[0] ?? null;
   const upcomingStatusValue = (() => {
-    if (!nextEntry) return "None";
+    if (!nextEntry) return t("none");
     const dateTime = formatUpcomingStatusDateTime(
       nextEntry.startAtMs,
       accountDateFormat
     );
-    return `${mergedCount} · ${nextEntry.title} @ ${dateTime}`;
+    return t("upcomingSummary", { count: mergedCount, title: nextEntry.title, dateTime });
   })();
   const upcomingStatusTone: BottomStatusTone = mergedCount > 0 ? "normal" : "muted";
   const groupedEntries = useMemo(
-    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs),
-    [upcomingEntries]
+    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs, undefined, locale),
+    [upcomingEntries, locale]
   );
   const [deletingReminderIds, setDeletingReminderIds] = useState<Set<string>>(new Set());
 
@@ -204,7 +208,7 @@ export default function UpcomingStatusPopover({
         await deleteCalendarReminder(activeAccountId, reminderId);
         await onRefreshPendingReminders();
       } catch {
-        onReportError("Failed to delete reminder.");
+        onReportError(t("deleteReminderFailed"));
       } finally {
         setDeletingReminderIds((prev) => {
           const next = new Set(prev);
@@ -213,7 +217,7 @@ export default function UpcomingStatusPopover({
         });
       }
     },
-    [activeAccountId, onRefreshPendingReminders, onReportError]
+    [activeAccountId, onRefreshPendingReminders, onReportError, t]
   );
 
   const handleEntryOpen = useCallback(
@@ -230,9 +234,9 @@ export default function UpcomingStatusPopover({
   );
 
   return (
-    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title="Upcoming"
+    <StatusPanelFrame open={open} onOpenChange={onOpenChange} title={t("upcoming")}
       trigger={<BottomStatusTriggerButton
-          label="Upcoming"
+          label={t("upcoming")}
           value={upcomingStatusValue}
           tone={upcomingStatusTone}
           alignRight
@@ -246,7 +250,7 @@ export default function UpcomingStatusPopover({
         <Flex align="center" justify="between" className="popover-title-row">
           <Flex align="baseline" gap="3">
             <Heading size="3" weight="medium" className="reminder-main-title">
-              Upcoming
+              {t("upcoming")}
             </Heading>
             <Badge color="gray" variant="soft" radius="full">
               {mergedCount}
@@ -257,7 +261,7 @@ export default function UpcomingStatusPopover({
               variant="ghost"
               color="gray"
               size="2"
-              tooltip="Close upcoming"
+              tooltip={t("closeUpcoming")}
               onClick={() => onOpenChange(false)}
             >
               <X size={16} />
@@ -320,13 +324,13 @@ export default function UpcomingStatusPopover({
                               }}
                               title={
                                 entry.messageId
-                                  ? "Open source mail"
-                                  : "Open calendar"
+                                  ? t("openSource")
+                                  : t("openCalendar")
                               }
                               aria-label={
                                 entry.messageId
-                                  ? "Open source mail"
-                                  : "Open calendar"
+                                  ? t("openSource")
+                                  : t("openCalendar")
                               }
                             >
                               <Flex direction="column" gap="1" className="reminder-item-main">
@@ -370,14 +374,14 @@ export default function UpcomingStatusPopover({
                                   ) : null}
                                   {eventDurationLabel ? (
                                     <Text size="1" color="gray">
-                                      (Duration: {eventDurationLabel})
+                                      {t("duration", { duration: eventDurationLabel })}
                                     </Text>
                                   ) : null}
                                 </Flex>
                                 {reminder ? (
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Text size="1" color="gray">
-                                      Reminder: {reminder.leadLabel} before
+                                      {t("reminderBefore", { lead: reminder.leadLabel })}
                                     </Text>
                                   </Flex>
                                 ) : null}
@@ -393,7 +397,7 @@ export default function UpcomingStatusPopover({
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Repeat size={12} className="reminder-icon" />
                                     <Text size="1" color="gray">
-                                      Repeats: {recurrenceSummary}
+                                      {t("repeats", { summary: recurrenceSummary })}
                                     </Text>
                                   </Flex>
                                 ) : null}
@@ -404,7 +408,7 @@ export default function UpcomingStatusPopover({
                                 variant="ghost"
                                 color="gray"
                                 size="1"
-                                tooltip="Delete reminder"
+                                tooltip={t("deleteReminder")}
                                 className="reminder-delete-btn"
                                 disabled={isDeletingReminder}
                                 onClick={() => {
@@ -429,7 +433,7 @@ export default function UpcomingStatusPopover({
           ) : (
             <Flex align="center" justify="center" p="4" className="empty-state">
               <Text size="2" color="gray">
-                Nothing upcoming.
+                {t("nothingUpcoming")}
               </Text>
             </Flex>
           )}

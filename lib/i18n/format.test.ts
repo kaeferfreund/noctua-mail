@@ -43,3 +43,23 @@ test("both explicitly imported catalogs have identical semantic keys and transla
   expect(getTranslator("de")("Settings.language.automatic")).toBe("Automatisch");
   expect(getTranslator("en")("Settings.language.automatic")).toBe("Automatic");
 });
+
+test("sender inventory covers both catalogs, named values and literal signature tokens", async () => {
+  const { senderMessages } = await import("@/lib/senderMessages");
+  const inventory = await import("@/doc/SENDER-IDENTITIES-UI-STRINGS.json");
+  expect(inventory.semanticIds).toHaveLength(71);
+  expect(inventory.catalogMapping).toEqual(senderMessages);
+  for (const locale of ["de", "en"] as const) {
+    const t = getTranslator(locale);
+    for (const id of Object.values(senderMessages)) {
+      expect(t.has(id)).toBe(true);
+      expect(t(id, { sender: "Synthetic {sender} <alias@example.test>", email: "alias@example.test" })).not.toBe(id);
+    }
+    expect(t(senderMessages.senderDefaultOption, { sender: "Synthetic {sender}" })).toContain("Synthetic {sender}");
+    for (const id of [senderMessages.placeholdersHelp, senderMessages.sharedTemplatesHelp]) {
+      const text = t(id);
+      for (const token of inventory.literalTokens) expect(text).toContain(token);
+      expect(text).not.toContain("'{{");
+    }
+  }
+});

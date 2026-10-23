@@ -21,11 +21,11 @@ type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery"
 function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
 function securityValue(value: boolean | undefined) { return value === undefined ? "users.unknown" : value ? "users.yes" : "users.no"; }
 
-export default function AdminPanel({ isAdminUser, apiFetch = fetch, client, onClose }: { isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+export default function AdminPanel({ isAdminUser, apiFetch = fetch, client, onClose, currentUserId, onAccessChanged }: { currentUserId?: string; onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   // Mount only for admins so no hidden panel fetches or secrets survive closing.
-  return isAdminUser ? <AdminPanelContent apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
+  return isAdminUser ? <AdminPanelContent currentUserId={currentUserId} onAccessChanged={onAccessChanged} apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
 }
-function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+function AdminPanelContent({ apiFetch, client, onClose, currentUserId, onAccessChanged }: { currentUserId?: string; onAccessChanged?: () => Promise<void>; apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   const t = useTranslations("Admin");
   const locale = useLocale();
   const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
@@ -111,7 +111,7 @@ function AdminPanelContent({ apiFetch, client, onClose }: { apiFetch: AdminFetch
           <label className="grid gap-1">{t("invites.role")}<select value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button disabled={busy}>{t("invites.issue")}</Button></form>
         <InviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
-      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} />}
+      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} currentUserId={currentUserId} onAccessChanged={onAccessChanged} />}
       {tab === "audit" && <AdminAuditLog apiFetch={apiFetch} />}
     </div>
     {pending && !reauthOpen && <AdminConfirmDialog title={t(`actionTitles.${pending.type}`)} description={pending.type === "role" ? t("confirmations.role", {email: pending.user.email, role: t(`roles.${pending.role!}`)}) : pending.type === "status" ? t(pending.user.disabled ? "confirmations.enable" : "confirmations.disable", {email: pending.user.email}) : t("confirmations.access", {email: pending.user.email})} busy={busy} error={actionError ? formatAdminError(actionError, t, locale) : undefined}

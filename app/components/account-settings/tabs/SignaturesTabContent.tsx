@@ -1,3 +1,6 @@
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
+import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { Button, Card, Flex, Grid, Select, Text, TextArea, TextField } from "@radix-ui/themes";
 import Field from "@/app/components/account-settings/Field";
 import type { Account, AccountSettings } from "@/lib/data";
@@ -19,15 +22,18 @@ export default function SignaturesTabContent({
   onClose,
   onSave
 }: Props) {
+  const { messages: senderMessages } = useSenderMessages();
   const signatures = editingAccount.settings?.signatures ?? [];
-  const saveDisabled = !isExistingAccount || !canSave;
+  const invalidTemplate = signatures.some(signature => !validSignatureTemplate(signature.body));
+  const saveDisabled = !isExistingAccount || !canSave || invalidTemplate;
 
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Text size="2" color="gray">
-          Manage signatures for this account.
+          {senderMessages.sharedTemplatesHelp}
         </Text>
+        {invalidTemplate && <Text as="p" role="alert">{senderMessages.invalidTemplate}</Text>}
         <Flex align="center" justify="between">
           <Text size="3" weight="medium">
             Signature list
@@ -50,7 +56,7 @@ export default function SignaturesTabContent({
         <Grid columns="2" gap="3">
           <Field label="Default signature">
             <Select.Root
-              value={editingAccount.settings?.defaultSignatureId ?? "none"}
+              value={editingAccount.settings?.defaultSignatureId || "none"}
               onValueChange={(value) =>
                 onUpdateSettings({
                   defaultSignatureId: value === "none" ? "" : value
@@ -139,7 +145,7 @@ export default function SignaturesTabContent({
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
           {saveDisabled ? "Close" : "Cancel"}
         </Button>
-        <Button size="2" onClick={onSave} disabled={saveDisabled}>
+        <Button size="2" onClick={() => { if (!invalidTemplate) onSave(); }} disabled={saveDisabled}>
           Save
         </Button>
       </Flex>

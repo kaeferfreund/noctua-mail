@@ -4,6 +4,7 @@ import styles from "./Compose.module.css";
 
 type ComposeActionsProps = {
   deliveredWarnings?: string[];
+  sendDisabled?: boolean;
   composeDraftId: string | null;
   composeOpen: boolean;
   canSaveDraft: boolean;
@@ -23,6 +24,7 @@ type ComposeActionsProps = {
 
 export default function ComposeActions({
   deliveredWarnings = [],
+  sendDisabled = false,
   composeDraftId,
   composeOpen,
   canSaveDraft,
@@ -100,7 +102,7 @@ export default function ComposeActions({
         <Button
           size="2"
           onClick={handleSendMail}
-          disabled={busy || sendingMail || Boolean(attachmentLoadState)}
+          disabled={sendDisabled || busy || sendingMail || Boolean(attachmentLoadState)}
           title={
             attachmentLoadState === "error"
               ? "Retry or remove the attachments that failed to load"
