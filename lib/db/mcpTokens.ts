@@ -16,13 +16,17 @@ function tokenMetadata(db: import("bun:sqlite").Database, row: StoredMcpTokenRow
   const token = mapMcpTokenRow(row);
   return { ...token, accountIds: mcpTokenAccountIds(db, token) };
 }
-/** Called inside the mailbox-deletion transaction. Keep surviving shared tokens. */
-export function deleteMcpTokenAccountRows(db: import("bun:sqlite").Database, accountId: string) {
-  db.prepare("DELETE FROM mcp_token_accounts WHERE accountId=?").run(accountId);
-  db.prepare(`DELETE FROM mcp_tokens WHERE accountId=? AND NOT EXISTS
-    (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)`).run(accountId);
+/** Called inside the mailbox-deletion or membership-revoke transaction. Keep surviving shared tokens.
+ *  With createdByUserId only that user's tokens lose the mailbox (membership revoke). */
+export function deleteMcpTokenAccountRows(db: import("bun:sqlite").Database, accountId: string, createdByUserId?: string) {
+  const owner = createdByUserId == null ? "" : " AND createdByUserId=?";
+  const args = createdByUserId == null ? [accountId] : [accountId, createdByUserId];
+  db.prepare(`DELETE FROM mcp_token_accounts WHERE accountId=?
+    AND tokenId IN (SELECT id FROM mcp_tokens WHERE accountId IS NOT NULL${owner})`).run(...args);
+  db.prepare(`DELETE FROM mcp_tokens WHERE accountId=?${owner} AND NOT EXISTS
+    (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)`).run(...args);
   db.prepare(`UPDATE mcp_tokens SET accountId=(SELECT MIN(a.accountId) FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)
-    WHERE accountId=?`).run(accountId);
+    WHERE accountId=?${owner}`).run(...args);
 }
 export async function listMcpTokens(accountId: string) {
   const db = await getDb();

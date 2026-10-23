@@ -1083,9 +1083,9 @@ current role on the selected covered mailbox. Mint only from a session with per-
 store its current generation in the token row atomically, rechecking membership and generation. Each tool accountId must belong to the token's set;
 omission selects its primary mailbox. Reject a deleted/banned creator or revoked
 membership immediately, irrespective of session age. Disabling/deleting, password reset/change,
-MFA reset and login-mailbox credential changes delete that user's tokens. Membership revoke deletes that user's primary-only tokens for the mailbox;
-multi-mailbox tokens retain their other memberships, and live role checks deny
-the revoked mailbox. Role downgrade is enforced at use time. Expiry and token deletion never
+MFA reset and login-mailbox credential changes delete that user's tokens. Membership revoke removes the mailbox from that user's tokens: tokens with no
+mailbox left are deleted, multi-mailbox tokens keep their other memberships and get a new
+primary; re-adding the member does not restore the token's access to that mailbox. Role downgrade is enforced at use time. Expiry and token deletion never
 depend on session cookie crypto. Generation mismatch rejects immediately even if
 onPasswordReset, token deletion, audit or process shutdown interrupts cleanup. A NULL generation
 never matches. Fault-inject callback failure after committed reset; the old bearer must fail before

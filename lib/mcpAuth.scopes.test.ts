@@ -91,6 +91,13 @@ test("real membership revoke retains multi-mailbox token and revokes single-mail
     expect(validateMcpTokenRow(principal.master, single.token)).toBeNull();
     expect((await listMcpTokenAccounts(multi.tokenRecord.id)).map(item => item.account.id)).toEqual([sharedId]);
     expect(resolveMcpToolContextRow(principal.master, multi.tokenRecord.id, sharedId).role).toBe("editor");
-    expect(() => resolveMcpToolContextRow(principal.master, multi.tokenRecord.id)).toThrow("Unauthorized");
+    // The primary moves to a remaining mailbox; the revoked one is no longer covered.
+    expect(resolveMcpToolContextRow(principal.master, multi.tokenRecord.id).accountId).toBe(sharedId);
+    expect(() => resolveMcpToolContextRow(principal.master, multi.tokenRecord.id, accountId)).toThrow("not covered");
+    expect(principal.master.prepare("SELECT COUNT(*) AS n FROM mcp_token_accounts WHERE tokenId=? AND accountId=?").get(multi.tokenRecord.id, accountId)).toEqual({ n: 0 });
   } finally { await principal.addMembership(principal.user.id, accountId, "manager"); }
+  // Re-adding the member does not restore the token's access to the revoked mailbox.
+  expect(() => resolveMcpToolContextRow(principal.master, multi.tokenRecord.id, accountId)).toThrow("not covered");
+  expect(validateMcpTokenRow(principal.master, single.token)).toBeNull();
+  expect((await listMcpTokenAccounts(multi.tokenRecord.id)).map(item => item.account.id)).toEqual([sharedId]);
 });
