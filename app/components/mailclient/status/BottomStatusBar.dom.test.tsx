@@ -195,6 +195,9 @@ describe("phone calendar frame", () => {
       expect(chunks[1].querySelector(".fc-prev-button") && chunks[1].querySelector(".fc-toolbar-title") && chunks[1].querySelector(".fc-next-button")).toBeTruthy();
       expect(chunks[2].querySelectorAll(".fc-button").length).toBe(3);
       expect(frame.querySelector(".fc-view-harness")).toBeTruthy();
+      // Href-less date labels must not count as tabbable for the Sheet's focus loop.
+      await waitFor(() => expect(frame.querySelectorAll(".fc-daygrid-day-number").length).toBeGreaterThan(0));
+      expect(frame.querySelectorAll("a:not([href]):not([tabindex])").length).toBe(0);
       expect(within(sheet).getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
     } finally { network.mockRestore(); }
   });

@@ -26,6 +26,7 @@ import {
   dayElapsedFraction,
   msUntilNextMinute
 } from "./calendarNowIndicator";
+import { removeDateLabelsFromTabOrder } from "./calendarFocus";
 import "./fullcalendar-theme.css";
 
 export type CalendarViewHandle = {
@@ -341,6 +342,8 @@ export default function CalendarView({
           firstDay={firstDay}
           events={fullCalendarEvents}
           eventDidMount={handleEventDidMount}
+          dayCellDidMount={removeDateLabelsFromTabOrder}
+          dayHeaderDidMount={removeDateLabelsFromTabOrder}
           datesSet={handleDatesSet}
           eventClick={handleEventClick}
           dateClick={handleDateClick}
@@ -390,6 +393,8 @@ export default function CalendarView({
         firstDay={firstDay}
         events={fullCalendarEvents}
         eventDidMount={handleEventDidMount}
+        dayCellDidMount={removeDateLabelsFromTabOrder}
+        dayHeaderDidMount={removeDateLabelsFromTabOrder}
         nowIndicator
         datesSet={handleDatesSet}
         eventClick={handleEventClick}

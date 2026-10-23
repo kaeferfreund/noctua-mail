@@ -32,6 +32,13 @@ zone, full commit and ISO time in the tooltip) sits as a footer line at the
 bottom of the desktop status popover and as a label at the end of the phone
 status menu; without build data it renders nothing.
 
+FullCalendar renders day numbers and column headers as `<a>` without `href`.
+Browsers skip them, but `tabIndex` still reports 0, so Radix FocusScope took
+one as the popover's last tabbable element and Tab left the calendar popover
+instead of wrapping. `CalendarView` sets `tabIndex = -1` on those labels when
+their cells mount (`calendarFocus.ts`), so the desktop popover loops focus in
+calendar mode exactly as in section mode, and Shift+Tab from the first control
+reaches the last event.
 Desktop density (768px and wider) is scoped to `ShellPanes.module.css`:
 `--shell-gutter: 0px`, `--pane-padding-x/y: 12px`, and
 `--reader-padding-x/y: 16px`. The existing outer 8px inset remains, preserving the
