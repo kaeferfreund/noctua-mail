@@ -10,8 +10,9 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
-import { listThreadMessages } from "@/lib/db";
+import { listThreadMessages, listThreadMessageWindow, ThreadWindowCursorError } from "@/lib/db";
 import { normalizeThreadDateSource } from "@/lib/threadDate";
+import type { Message } from "@/lib/data";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -21,6 +22,17 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     messageIds?: string[];
     groupBy?: string;
     threadDateSource?: string;
+    /** `headers` omits body/htmlBody (read per message from the detail route). */
+    projection?: string;
+    excludeFolderIds?: string[];
+    /** Bounded reader window over exactly one thread (headers only). */
+    window?: {
+      anchorMessageId?: string;
+      cursor?: string;
+      before?: number;
+      after?: number;
+      pageSize?: number;
+    };
   };
   const accountId = await getAccountIdFromParams(params);
   const threadIds = Array.isArray(payload.threadIds)
@@ -29,6 +41,15 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const messageIds = Array.isArray(payload.messageIds)
     ? payload.messageIds.map((value) => value.trim()).filter(Boolean)
     : [];
+  const excludeFolderIds = Array.isArray(payload.excludeFolderIds)
+    ? payload.excludeFolderIds
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
+  const projection = payload.projection === "headers" ? "headers" : "full";
+  const windowRequest =
+    payload.window && typeof payload.window === "object" ? payload.window : null;
   const context = await requireAccountContext(request, accountId, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId or threadIds/messageIds"
@@ -43,19 +64,56 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     const groupBy = payload.groupBy ?? "date";
     const threadDateSource = normalizeThreadDateSource(payload.threadDateSource);
+    const enrich = async (items: Message[]) => {
+      await enrichMessagesWithThreadTopics(items, {
+        accountId: context.accountId,
+        accountEmail: getOwnAddresses(context.account),
+        includeSuggestions: true
+      });
+      await enrichMessagesWithThreadCollab(items, { accountId: context.accountId });
+    };
+
+    if (windowRequest) {
+      if (threadIds.length !== 1) {
+        return NextResponse.json(
+          { ok: false, message: "A thread window needs exactly one threadId" },
+          { status: 400 }
+        );
+      }
+      try {
+        const data = await listThreadMessageWindow({
+          accountId: context.accountId,
+          threadId: threadIds[0],
+          anchorMessageId:
+            typeof windowRequest.anchorMessageId === "string" ? windowRequest.anchorMessageId : null,
+          cursor: typeof windowRequest.cursor === "string" ? windowRequest.cursor : null,
+          before: windowRequest.before,
+          after: windowRequest.after,
+          pageSize: windowRequest.pageSize,
+          excludeFolderIds,
+          groupBy,
+          threadDateSource
+        });
+        await enrich(data.items);
+        return compressedJsonResponse(request, data);
+      } catch (error) {
+        if (error instanceof ThreadWindowCursorError) {
+          return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
+
     const data = await listThreadMessages({
       accountId: context.accountId,
       threadIds,
       messageIds,
       groupBy,
-      threadDateSource
+      threadDateSource,
+      projection,
+      excludeFolderIds
     });
-    await enrichMessagesWithThreadTopics(data.items, {
-      accountId: context.accountId,
-      accountEmail: getOwnAddresses(context.account),
-      includeSuggestions: true
-    });
-    await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
+    await enrich(data.items);
 
     return compressedJsonResponse(request, { items: data.items });
   });

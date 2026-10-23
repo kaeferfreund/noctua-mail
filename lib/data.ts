@@ -164,6 +164,8 @@ export type Message = {
   imapUid?: number;
   body: string;
   htmlBody?: string;
+  /** Whether `body`/`htmlBody` are present in this payload; see MessageContentState. */
+  contentState?: import("./messageContentState").MessageContentState;
   source?: string;
   hasSource?: boolean;
   /** Byte length of the stored raw RFC822 source. */

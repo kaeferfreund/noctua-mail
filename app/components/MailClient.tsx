@@ -220,11 +220,14 @@ import { useRecipientAliases } from "./mailclient/useRecipientAliases";
 import { useAccountController } from "./mailclient/useAccountController";
 import ThreadJsonModal from "./mailclient/message/ThreadJsonModal";
 import {
-  doesCachedThreadCoverMessages,
   getComposeThreadFocusMessageId,
+  getDefaultExpandedMessageIds,
   getInlineComposePlacement,
-  getRenderedThreadMessages
+  getRenderedThreadMessages,
+  isThreadMessageCollapsed,
+  printWithLoadedBodies
 } from "./mailclient/message/threadViewState";
+import { withLoadedMessageBodyMemo } from "./mailclient/utils/threadContentCache";
 import RecipientAliasDialog from "./mailclient/RecipientAliasDialog";
 import AccountReloginDialog from "./mailclient/AccountReloginDialog";
 import TopicBadge from "./mailclient/TopicBadge";
@@ -1476,7 +1479,6 @@ export default function MailClient({
     threadContentById,
     threadEvictVersion,
     threadContentLoading,
-    setThreadContentLoading,
     threadContentErrorById,
     setLoadingSource,
     messageContentLoading,
@@ -1485,8 +1487,6 @@ export default function MailClient({
     sourceFetchRef,
     autoHydrationAttemptAtRef,
     upsertThreadCache,
-    clearThreadContentError,
-    setThreadContentError,
     updateThreadCacheWithMessage,
     evictMessagesFromThreadCache,
     evictThreadCache,
@@ -1495,8 +1495,14 @@ export default function MailClient({
     updateThreadCacheWithCategory,
     hydrateMessageFromServer,
     fetchSource,
-    hydrateMessageOnOpenIfNeeded,
-    ensureMessageContent
+    ensureMessageContent,
+    messageContentErrorById,
+    threadWindowById,
+    messageBodyById,
+    updateMessageBody,
+    loadThreadContent,
+    abortThreadContent,
+    loadThreadPage
   } = useThreadContent({
     activeAccountId,
     apiFetch,
@@ -1646,6 +1652,7 @@ export default function MailClient({
       if (cachedMessage) {
         updateThreadCacheWithMessage(applyPatch(cachedMessage));
       }
+      updateMessageBody(message, applyPatch);
     },
     [
       apiFetch,
@@ -1655,6 +1662,7 @@ export default function MailClient({
       seedNotificationDedupKeys,
       setActiveTopicSuggestionMessages,
       setThreadRelatedMessages,
+      updateMessageBody,
       updateThreadCacheWithMessage,
       viewMessage
     ]
@@ -2172,7 +2180,8 @@ export default function MailClient({
         body: JSON.stringify({
           threadIds,
           groupBy,
-          threadDateSource
+          threadDateSource,
+          projection: "headers"
         }),
         signal
       });
@@ -2888,7 +2897,7 @@ export default function MailClient({
     return localRoot ? flattenThread(localRoot).map((item) => item.message) : [];
   }, [activeMessage, supportsThreads, threadForest]);
 
-  const activeThread = useMemo(() => {
+  const activeThreadHeaders = useMemo(() => {
     if (!activeMessage) return [];
     const activeThreadId =
       activeMessage.threadId ?? activeMessage.messageId ?? activeMessage.id;
@@ -2929,6 +2938,13 @@ export default function MailClient({
       (item) => !checkIsThreadExcludedFolder(item.folderId)
     );
   }, [activeAccountId, activeLocalThread, activeMessage, threadContentById, threadScopeMessages]);
+  // Header rows with the bodies read on expand overlaid. Merged rows are reused
+  // while header and body are unchanged so memoized cards do not re-render.
+  const activeThread = useMemo(() => {
+    return activeThreadHeaders.map((message) =>
+      withLoadedMessageBodyMemo(message, messageBodyById[`${message.accountId}:${message.id}`])
+    );
+  }, [activeThreadHeaders, messageBodyById]);
 
   const threadMessages = useMemo(() => activeThread, [activeThread]);
   const inlineComposePlacement = useMemo(
@@ -4290,6 +4306,8 @@ export default function MailClient({
   }, [activeAccountId, currentAccount?.caldav?.url, currentAccount?.caldav?.syncIntervalMs, initialDataReady, apiFetch]);
 
   useEffect(() => {
+    // Superseded list-completion reads are cancelled, not only ignored.
+    const controller = new AbortController();
     // Already empty: keep the state, so a list change does not re-render.
     const clearThreadRelatedMessages = () => setThreadRelatedMessages(prev => (prev.length ? [] : prev));
     const loadThreadRelated = async () => {
@@ -4367,8 +4385,11 @@ export default function MailClient({
           body: JSON.stringify({
             threadIds,
             groupBy,
-            threadDateSource
-          })
+            threadDateSource,
+            projection: "headers",
+            excludeFolderIds: [activeFolderId, ...excludedFolderIdsForThreads]
+          }),
+          signal: controller.signal
         });
         if (!res.ok) {
           logListDebug("warn", "thread-related:list-effect:error-response", {
@@ -4383,30 +4404,28 @@ export default function MailClient({
         }
         const data = (await res.json()) as { items?: Message[] };
         const items = Array.isArray(data?.items) ? data.items : [];
-        const filtered = items.filter(
-          (item) => item.folderId !== activeFolderId && !checkIsThreadExcludedFolder(item.folderId)
-        );
         logListDebug("info", "thread-related:list-effect:response", {
           ...debugBase,
-          returnedCount: items.length,
-          filteredCount: filtered.length
+          returnedCount: items.length
         });
-        if (currentKeyRef.current !== requestKey) {
+        if (controller.signal.aborted || currentKeyRef.current !== requestKey) {
           return;
         }
-        setThreadRelatedMessages(filtered);
+        setThreadRelatedMessages(items);
       } catch (error) {
+        if (controller.signal.aborted) return;
         logListDebug("warn", "thread-related:list-effect:exception", {
           ...debugBase,
           error: error instanceof Error ? error.message : String(error)
         });
-        if (currentKeyRef.current !== requestKey) {
+        if (controller.signal.aborted || currentKeyRef.current !== requestKey) {
           return;
         }
         clearThreadRelatedMessages();
       }
     };
     loadThreadRelated();
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- threadRelatedCandidateIds churns with list refreshes; keying on threadRelatedCandidatesKey prevents refetch loops.
   }, [
     activeAccountId,
@@ -4419,181 +4438,136 @@ export default function MailClient({
     threadRelatedCandidatesKey
   ]);
 
+  // Trash/spam rows stay out of the conversation unless the reader is in that folder.
+  const getReaderExcludedFolderIds = useCallback(
+    (active: Message) =>
+      Array.from(excludedFolderIdsForThreads).filter(
+        (folderId) => folderId !== activeFolderId && folderId !== active.folderId
+      ),
+    [activeFolderId, excludedFolderIdsForThreads]
+  );
+
+  // Reader content: a bounded header window around the selected message.
+  // Bodies are read per expanded card (ThreadMessageCard -> ensureMessageContent).
   useEffect(() => {
-    const loadThreadContent = async () => {
-      const debugBase = {
-        activeAccountId,
-        activeFolderId,
-        activeMessageThreadKey,
-        supportsThreads,
-        groupBy,
-        threadDateSource
-      };
-      logListDebug("info", "thread-related:content-effect:start", debugBase);
-      if (!activeMessageThreadKey) {
-        logListDebug("info", "thread-related:content-effect:skip", {
-          ...debugBase,
-          reason: "missing-active-message-thread-key"
-        });
-        return;
-      }
-      const active = activeMessageRef.current;
-      if (!active) {
-        logListDebug("info", "thread-related:content-effect:skip", {
-          ...debugBase,
-          reason: "missing-active-message"
-        });
-        return;
-      }
-      const threadId =
-        active.threadId ?? active.messageId ?? active.id;
-      if (!threadId) {
-        logListDebug("info", "thread-related:content-effect:skip", {
-          ...debugBase,
-          reason: "missing-thread-id",
-          activeMessageId: active.id
-        });
-        return;
-      }
-      const loadFailureMessage = "Failed to load message content.";
-
-      const cachedThread = threadContentByIdRef.current[threadId];
-      const hasContent = (message?: Message | null) => {
-        if (!message) return false;
-        const hasText = (message.body ?? "").trim().length > 0;
-        const hasHtml = hasHtmlContent(message.htmlBody);
-        return hasText || hasHtml;
-      };
-      const cachedActive = cachedThread?.find((item) => item.id === active.id) ?? null;
-      const activeHasContent = hasContent(cachedActive ?? active);
-      let hydrationResult: boolean | null = null;
-      if (!activeHasContent) {
-        clearThreadContentError(threadId);
-        setThreadContentLoading(threadId);
-        const hydrationPromise = hydrateMessageOnOpenIfNeeded(active);
-        if (hydrationPromise) {
-          const hydrated = await hydrationPromise;
-          hydrationResult = Boolean(hydrated);
-        }
-      } else {
-        clearThreadContentError(threadId);
-      }
-      const localFlat = activeLocalThread.length > 0 ? activeLocalThread : [active];
-      const cachedThreadCoversLocalThread = doesCachedThreadCoverMessages({
-        activeThread: localFlat,
-        cachedThread
-      });
-      if (
-        supportsThreads &&
-        cachedThread &&
-        cachedThread.length > 0 &&
-        activeHasContent &&
-        cachedThreadCoversLocalThread
-      ) {
-        logListDebug("info", "thread-related:content-effect:skip", {
-          ...debugBase,
-          reason: "cached-thread-with-content-supports-threads",
-          threadId,
-          cachedCount: cachedThread.length,
-          localCount: localFlat.length,
-          activeMessageId: active.id
-        });
-        return;
-      }
-      if (!supportsThreads && activeHasContent && cachedThread && cachedThread.length > 0) {
-        logListDebug("info", "thread-related:content-effect:skip", {
-          ...debugBase,
-          reason: "cached-thread-with-content-no-thread-support",
-          threadId,
-          cachedCount: cachedThread.length,
-          activeMessageId: active.id
-        });
-        return;
-      }
-
-      const messageIds = Array.from(new Set(localFlat.map((item) => item.id)));
-      const threadIds = supportsThreads
-        ? Array.from(new Set(localFlat.map((item) => item.threadId).filter(Boolean)))
-        : [];
-
-      setThreadContentLoading(threadId);
-      clearThreadContentError(threadId);
-      try {
-        logListDebug("info", "thread-related:content-effect:request", {
-          ...debugBase,
-          threadId,
-          activeMessageId: active.id,
-          cachedCount: cachedThread?.length ?? 0,
-          activeHasContent,
-          hydrationResult,
-          messageCount: messageIds.length,
-          threadCount: threadIds.length,
-          messageSample: messageIds.slice(0, 8),
-          threadSample: threadIds.slice(0, 8)
-        });
-        const res = await apiFetch(buildAccountApiPath(activeAccountId, "/thread/related"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            threadIds,
-            messageIds,
-            groupBy,
-            threadDateSource
-          })
-        });
-        if (!res.ok) {
-          logListDebug("warn", "thread-related:content-effect:error-response", {
-            ...debugBase,
-            threadId,
-            status: res.status
-          });
-          setThreadContentError(threadId, loadFailureMessage);
-          setThreadContentLoading(null);
-          return;
-        }
-        const data = (await res.json()) as { items?: Message[] };
-        const items = Array.isArray(data?.items) ? data.items : [];
-        const filtered = items.filter(
-          (item) => item.folderId === activeFolderId || !checkIsThreadExcludedFolder(item.folderId)
-        );
-        const loadedActive = filtered.find((item) => item.id === active.id) ?? null;
-        const loadedHasContent = hasContent(loadedActive ?? active);
-        logListDebug("info", "thread-related:content-effect:response", {
-          ...debugBase,
-          threadId,
-          returnedCount: items.length,
-          filteredCount: filtered.length,
-          loadedHasContent
-        });
-        if (hydrationResult === false && !loadedHasContent) {
-          setThreadContentError(threadId, loadFailureMessage);
-        }
-        upsertThreadCache(threadId, filtered);
-      } catch (error) {
-        logListDebug("warn", "thread-related:content-effect:exception", {
-          ...debugBase,
-          threadId,
-          error: error instanceof Error ? error.message : String(error)
-        });
-        setThreadContentError(threadId, loadFailureMessage);
-      } finally {
-        setThreadContentLoading(null);
-      }
+    const active = activeMessageRef.current;
+    const debugBase = {
+      activeAccountId,
+      activeFolderId,
+      activeMessageThreadKey,
+      supportsThreads,
+      groupBy,
+      threadDateSource
     };
-    loadThreadContent();
+    if (!activeMessageThreadKey || !active) {
+      logListDebug("info", "thread-related:content-effect:skip", {
+        ...debugBase,
+        reason: "missing-active-message"
+      });
+      abortThreadContent();
+      return;
+    }
+    const threadId = active.threadId ?? active.messageId ?? active.id;
+    if (!threadId) return;
+    const cachedThread = threadContentByIdRef.current[threadId];
+    if (cachedThread?.some((item) => item.id === active.id)) {
+      logListDebug("info", "thread-related:content-effect:skip", {
+        ...debugBase,
+        reason: "cached-thread-contains-active-message",
+        threadId,
+        cachedCount: cachedThread.length,
+        activeMessageId: active.id
+      });
+      return;
+    }
+    const excludeFolderIds = getReaderExcludedFolderIds(active);
+    const key = [
+      activeAccountId,
+      threadId,
+      active.id,
+      threadEvictVersion,
+      groupBy,
+      threadDateSource,
+      supportsThreads ? "window" : "single",
+      excludeFolderIds.join(",")
+    ].join("|");
+    logListDebug("info", "thread-related:content-effect:request", {
+      ...debugBase,
+      threadId,
+      activeMessageId: active.id
+    });
+    void loadThreadContent({
+      key,
+      threadId,
+      anchorMessageId: active.id,
+      windowed: supportsThreads,
+      messageIds: [active.id],
+      excludeFolderIds,
+      groupBy,
+      threadDateSource
+    });
   }, [
+    abortThreadContent,
     activeAccountId,
     activeFolderId,
     activeMessageThreadKey,
+    getReaderExcludedFolderIds,
     groupBy,
+    loadThreadContent,
     threadDateSource,
     supportsThreads,
     threadEvictVersion,
-    activeLocalThread,
-    clearThreadContentError,
-    hydrateMessageOnOpenIfNeeded,
-    setThreadContentError,
-    upsertThreadCache
+    threadContentByIdRef
+  ]);
+
+  const activeThreadWindow = (() => {
+    if (!supportsThreads || !activeMessage) return null;
+    return threadWindowById[activeMessage.threadId ?? activeMessage.messageId ?? activeMessage.id] ?? null;
+  })();
+  const handleLoadThreadPage = useCallback(
+    (direction: "older" | "newer") => {
+      const active = activeMessageRef.current;
+      if (!active) return;
+      void loadThreadPage({
+        threadId: active.threadId ?? active.messageId ?? active.id,
+        direction,
+        excludeFolderIds: getReaderExcludedFolderIds(active),
+        groupBy,
+        threadDateSource
+      });
+    },
+    [getReaderExcludedFolderIds, groupBy, loadThreadPage, threadDateSource]
+  );
+  const printReader = useCallback(() => {
+    void printWithLoadedBodies({
+      renderedThread: getRenderedThreadMessages({
+        activeMessage,
+        activeThread,
+        supportsThreads,
+        threadContentById,
+        threadContentLoading,
+        showComposeInline,
+        composeDraftId
+      }),
+      collapsedMessages: messageViewHandleRef.current?.getCollapsedMessages() ?? {},
+      activeMessageId: activeMessage?.id,
+      ensureMessageContent,
+      // Two frames: React commits the loaded bodies before the print snapshot.
+      afterRender: () =>
+        new Promise((resolve) =>
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+        ),
+      print: () => window.print()
+    });
+  }, [
+    activeMessage,
+    activeThread,
+    composeDraftId,
+    ensureMessageContent,
+    showComposeInline,
+    supportsThreads,
+    threadContentById,
+    threadContentLoading
   ]);
 
   const scrollActiveMessageIntoView = useCallback((behavior: ScrollBehavior) => {
@@ -4610,8 +4584,11 @@ export default function MailClient({
     (behavior: ScrollBehavior) => {
       if (!activeMessageId) return () => {};
       const collapsed = messageViewHandleRef.current?.getCollapsedMessages() ?? {};
+      const defaultExpandedIds = getDefaultExpandedMessageIds(threadMessagesRef.current, activeMessageId);
       const hasExpandedSibling = threadMessagesRef.current.some(
-        (message) => message.id !== activeMessageId && !collapsed[message.id]
+        (message) =>
+          message.id !== activeMessageId &&
+          !isThreadMessageCollapsed(message.id, collapsed, defaultExpandedIds)
       );
       let frame = 0;
       let settleTimer = 0;
@@ -5522,6 +5499,7 @@ export default function MailClient({
                   busy={pendingMessageActions.has(activeMessage.id)}
                   renderMenu={() => renderMessageMenu(activeMessage, "thread")}
                   openWindow={() => handleOpenInNewWindow(activeMessage)}
+                  print={printReader}
                   position={readerNavigation.position}
                   total={readerNavigation.total}
                   hasMore={hasMoreMessages}
@@ -5545,6 +5523,8 @@ export default function MailClient({
                 threadContentById,
                 threadContentLoading,
                 threadContentErrorById,
+                threadWindow: activeThreadWindow,
+                onLoadThreadPage: handleLoadThreadPage,
                 composeDraftId,
                 composeMode,
                 composeThreadFocusMessageId,
@@ -5572,6 +5552,7 @@ export default function MailClient({
                   fetchSource,
                   ensureMessageContent,
                   messageContentLoading,
+                  messageContentErrorById,
                   darkMode,
                   hasHtmlContent,
                   renderSourcePanel,
