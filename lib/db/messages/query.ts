@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { hydrateIdentityMetadata } from "./identityMetadata";
 /**
  * Read-side queries for the messages domain.
@@ -465,9 +466,14 @@ function buildSearchTokens(raw?: string | null) {
     .filter((token): token is string => Boolean(token));
 }
 
+// Upper-case barewords FTS5 parses as operators (case-sensitive). `NEAR`
+// is only an operator when followed by `(`, which never reaches the
+// bareword branch, so it stays unquoted.
+const FTS5_KEYWORD_BAREWORDS = new Set(["AND", "OR", "NOT"]);
+
 function buildFtsTokenQuery(token: string) {
   const escaped = token.replace(/"/g, '""');
-  if (/^[\p{L}\p{N}]+$/u.test(token)) return `${escaped}*`;
+  if (/^[\p{L}\p{N}]+$/u.test(token) && !FTS5_KEYWORD_BAREWORDS.has(token)) return `${escaped}*`;
   if (/[\p{L}\p{N}]/u.test(token)) return `"${escaped}"*`;
   return null;
 }
@@ -702,6 +708,364 @@ function parseSearchInput(
   };
 }
 
+/**
+ * FTS-driven search candidates.
+ *
+ * The legacy clause repeats one `(accountId, id) IN (SELECT ... MATCH ?)`
+ * subquery per token plus three id `LIKE`s inside every selector/count/group
+ * statement, which makes SQLite scan `messages` and probe the FTS result
+ * (bloom filter) instead of driving from the FTS hits. Resolving the
+ * candidate id set once per top-level list call — FTS `MATCH` first, the
+ * explicit attachment-name and id-substring paths unioned in, then reused by
+ * the selector and every count/group statement as an `id IN (...)` clause —
+ * turns those statements into primary-key lookups on (accountId, id).
+ *
+ * Semantics are the legacy ones by construction: the identical per-token
+ * MATCH strings are reused (one combined MATCH with AND when no attachment
+ * terms can mix in per token), each token is `FTS OR attachment filename`,
+ * tokens are ANDed, and the whole raw query still substring-matches
+ * messageId/threadId/id via the same LIKE patterns. Unselective searches
+ * (candidate set above the cap) keep the legacy inline clause, where a scan
+ * is the cheaper plan anyway; every candidate fetch is capped at the same
+ * limit so a discarded resolution stays cheap, and a token whose own set
+ * exceeds the cap is probed against the bounded intersection of the other
+ * tokens with its legacy per-token clause instead of being materialized.
+ * A failing FTS statement during resolution (missing or corrupt
+ * `message_fts_v3`) also falls back to the legacy clause, so the search
+ * returns exactly what the legacy path returns — including its error —
+ * and never an empty driven result.
+ * `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH=1` forces the legacy clause everywhere
+ * (kill switch; also used by differential tests), and
+ * `NOCTUA_FTS_DRIVEN_MAX_CANDIDATES` overrides the cap.
+ */
+type SearchFallbackReason = "all_tokens_oversized" | "candidate_cap_exceeded" | "fts_error";
+
+type SearchCandidateResolution =
+  | { kind: "none" }
+  | {
+      kind: "legacy";
+      fallback?: {
+        reason: SearchFallbackReason;
+        tokenCount: number;
+        oversizedTokenCount?: number;
+        observedCandidates?: number;
+      };
+    }
+  | { kind: "ids"; ids: string[] };
+
+/**
+ * One log line per legacy fallback of a search (resolution runs once per
+ * top-level list call). Never carries user query content — no tokens, no
+ * raw query, no error text that could embed them; only the reason code, a
+ * hash of the account id, the cap, counts and, for `fts_error`, the SQLite
+ * error name/code plus a derived `errorClass`. `candidateCapExceeded` is the
+ * aggregation flag for measuring cap fallovers in production logs.
+ */
+function logSearchFallback(params: {
+  accountId: string;
+  reason: SearchFallbackReason;
+  cap: number;
+  tokenCount: number;
+  oversizedTokenCount?: number;
+  observedCandidates?: number;
+  candidateCapExceeded: boolean;
+  errorName?: string;
+  errorCode?: string;
+  errorClass?: FtsErrorClass;
+}) {
+  console.warn("[fts-search] legacy fallback", {
+    reason: params.reason,
+    accountHash: createHash("sha256").update(params.accountId).digest("hex").slice(0, 12),
+    cap: params.cap,
+    tokenCount: params.tokenCount,
+    candidateCapExceeded: params.candidateCapExceeded,
+    ...(params.oversizedTokenCount !== undefined ? { oversizedTokenCount: params.oversizedTokenCount } : {}),
+    ...(params.observedCandidates !== undefined ? { observedCandidates: params.observedCandidates } : {}),
+    ...(params.errorName !== undefined ? { errorName: params.errorName } : {}),
+    ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {}),
+    ...(params.errorClass !== undefined ? { errorClass: params.errorClass } : {})
+  });
+}
+
+const DEFAULT_FTS_DRIVEN_MAX_CANDIDATES = 2000;
+// Stays below SQLite's portable default of 32,766 bound variables per
+// statement: consuming statements bind the candidate ids plus a few other
+// parameters (account, folder, paging), so the cap leaves headroom for them.
+// Bun's build accepts 250,000, but every consuming statement re-prepares with
+// one placeholder per candidate, so larger caps only add prepare cost.
+const FTS_DRIVEN_MAX_CANDIDATES_LIMIT = 32_000;
+let clampedCandidateCapWarnedFor: number | undefined;
+
+function maxFtsDrivenCandidates(): number {
+  const override = Number(process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES);
+  if (!Number.isFinite(override) || override < 1) return DEFAULT_FTS_DRIVEN_MAX_CANDIDATES;
+  const configured = Math.floor(override);
+  if (configured <= FTS_DRIVEN_MAX_CANDIDATES_LIMIT) return configured;
+  // Once per configured value, not per search.
+  if (clampedCandidateCapWarnedFor !== configured) {
+    clampedCandidateCapWarnedFor = configured;
+    console.warn("[fts-search] NOCTUA_FTS_DRIVEN_MAX_CANDIDATES above maximum, clamped", {
+      configured,
+      max: FTS_DRIVEN_MAX_CANDIDATES_LIMIT
+    });
+  }
+  return FTS_DRIVEN_MAX_CANDIDATES_LIMIT;
+}
+
+/**
+ * `index`: the FTS table is missing or corrupt (owners: FTS identity /
+ * repair). `syntax`: FTS5 rejected the MATCH expression (owners: search
+ * token building). `other`: anything else, e.g. SQLITE_BUSY.
+ */
+type FtsErrorClass = "index" | "syntax" | "other";
+
+function classifyFtsError(code: string | undefined, message: string): FtsErrorClass {
+  if (code?.startsWith("SQLITE_CORRUPT")) return "index";
+  if (/^no such table: /.test(message) || /^vtable constructor failed: /.test(message)) return "index";
+  if (/^fts5: (syntax error|parser stack overflow)/.test(message)) return "syntax";
+  return "other";
+}
+
+/**
+ * A statement touching the FTS v3 table failed during resolution. Keeps
+ * only the SQLite error name/code and the class derived from the message
+ * for the fallback log line — never the message itself, which can embed
+ * the MATCH text.
+ */
+class FtsCandidateError extends Error {
+  readonly errorName: string;
+  readonly errorCode?: string;
+  readonly errorClass: FtsErrorClass;
+
+  constructor(cause: unknown) {
+    super("FTS candidate query failed");
+    this.name = "FtsCandidateError";
+    const fields = cause as { name?: unknown; code?: unknown; message?: unknown } | null;
+    this.errorName = typeof fields?.name === "string" ? fields.name : "Error";
+    this.errorCode = typeof fields?.code === "string" ? fields.code : undefined;
+    this.errorClass = classifyFtsError(
+      this.errorCode,
+      typeof fields?.message === "string" ? fields.message : ""
+    );
+  }
+}
+
+type SearchCandidateParams = {
+  ftsTokenQueries: string[];
+  rawQuery: string;
+  attachmentFilenameTerms: string[];
+};
+
+function resolveSearchCandidateIds(
+  db: any,
+  accountId: string,
+  params: SearchCandidateParams
+): SearchCandidateResolution {
+  if (!params.ftsTokenQueries.length && !params.rawQuery.trim() && !params.attachmentFilenameTerms.length) {
+    return { kind: "none" };
+  }
+  if (process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH === "1") return { kind: "legacy" };
+  try {
+    return resolveDrivenSearchCandidateIds(db, accountId, params);
+  } catch (error) {
+    if (!(error instanceof FtsCandidateError)) throw error;
+    // FTS read failed (missing/corrupt index, MATCH syntax, BUSY …; see
+    // `errorClass` in the log line): the legacy clause decides the outcome. It may
+    // still answer (e.g. its MATCH subquery is never reached when the
+    // scope has no rows) or raise the same error to the caller.
+    const tokenCount = Math.max(params.ftsTokenQueries.length, params.attachmentFilenameTerms.length);
+    logSearchFallback({
+      accountId,
+      reason: "fts_error",
+      cap: maxFtsDrivenCandidates(),
+      tokenCount,
+      candidateCapExceeded: false,
+      errorName: error.errorName,
+      errorCode: error.errorCode,
+      errorClass: error.errorClass
+    });
+    return { kind: "legacy", fallback: { reason: "fts_error", tokenCount } };
+  }
+}
+
+function resolveDrivenSearchCandidateIds(
+  db: any,
+  accountId: string,
+  params: SearchCandidateParams
+): SearchCandidateResolution {
+  const ftsTokenQueries = params.ftsTokenQueries;
+  const attachmentFilenameTerms = params.attachmentFilenameTerms;
+  const hasQuery = ftsTokenQueries.length > 0;
+  const idQuery = params.rawQuery.trim();
+  const hasIdQuery = Boolean(idQuery);
+  const hasAttachmentFilenameQuery = attachmentFilenameTerms.length > 0;
+
+  const cap = maxFtsDrivenCandidates();
+  const fetchLimit = cap + 1;
+  const tokenCountForLog = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
+  // Every reasoned legacy return goes through here so a fallback search
+  // logs exactly once (the kill-switch return stays unlogged).
+  const legacyFallback = (fallback: {
+    reason: SearchFallbackReason;
+    oversizedTokenCount?: number;
+    observedCandidates?: number;
+  }): SearchCandidateResolution => {
+    logSearchFallback({
+      accountId,
+      reason: fallback.reason,
+      cap,
+      tokenCount: tokenCountForLog,
+      oversizedTokenCount: fallback.oversizedTokenCount,
+      observedCandidates: fallback.observedCandidates,
+      candidateCapExceeded: true
+    });
+    return { kind: "legacy", fallback: { ...fallback, tokenCount: tokenCountForLog } };
+  };
+  // Capped fetches: `truncated` means the true set exceeds the cap.
+  const ftsIdsForMatch = (matchQuery: string) => {
+    let rows: Array<{ messageId: string }>;
+    try {
+      rows = db
+        .prepare(
+          `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ? LIMIT ?`
+        )
+        .all(matchQuery, accountId, fetchLimit) as Array<{ messageId: string }>;
+    } catch (error) {
+      throw new FtsCandidateError(error);
+    }
+    return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
+  };
+  const attachmentIdsForTerm = (term: string) => {
+    const rows = db
+      .prepare(
+        `SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ? LIMIT ?`
+      )
+      .all(accountId, `%${term}%`, fetchLimit) as Array<{ messageId: string }>;
+    return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
+  };
+  // Legacy per-token clause restricted to an already bounded id set; used
+  // for tokens too unselective to materialize on their own.
+  const probeToken = (
+    ids: string[],
+    token: { ftsTokenQuery?: string; attachmentTerm?: string }
+  ): Set<string> => {
+    const tokenParts: string[] = [];
+    const tokenArgs: any[] = [];
+    if (token.ftsTokenQuery) {
+      tokenParts.push(
+        `(m.accountId, m.id) IN (SELECT accountId, messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ?)`
+      );
+      tokenArgs.push(token.ftsTokenQuery);
+    }
+    if (token.attachmentTerm) {
+      tokenParts.push(
+        `EXISTS (
+          SELECT 1
+          FROM attachments a
+          WHERE a.accountId = m.accountId AND a.messageId = m.id
+            AND lower(COALESCE(a.filename, '')) LIKE ?
+        )`
+      );
+      tokenArgs.push(`%${token.attachmentTerm}%`);
+    }
+    if (tokenParts.length === 0 || ids.length === 0) return new Set(ids);
+    let rows: Array<{ id: string }>;
+    try {
+      rows = db
+        .prepare(
+          `SELECT m.id FROM messages m
+           WHERE m.accountId = ? AND m.id IN (${ids.map(() => "?").join(",")})
+             AND (${tokenParts.join(" OR ")})`
+        )
+        .all(accountId, ...ids, ...tokenArgs) as Array<{ id: string }>;
+    } catch (error) {
+      if (token.ftsTokenQuery) throw new FtsCandidateError(error);
+      throw error;
+    }
+    return new Set(rows.map((row) => row.id));
+  };
+
+  let tokenIntersection: Set<string> | null = null;
+  if (hasQuery || hasAttachmentFilenameQuery) {
+    if (!hasAttachmentFilenameQuery && ftsTokenQueries.length > 1) {
+      // No per-token attachment mixing is possible, so the legacy token AND
+      // is exactly one MATCH over the same scoped token queries.
+      const combined = ftsIdsForMatch(ftsTokenQueries.join(" AND "));
+      if (combined.truncated) {
+        return legacyFallback({ reason: "candidate_cap_exceeded", observedCandidates: combined.ids.length });
+      }
+      tokenIntersection = new Set(combined.ids);
+    } else {
+      const tokenCount = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
+      const oversizedTokens: Array<{ ftsTokenQuery?: string; attachmentTerm?: string }> = [];
+      for (let index = 0; index < tokenCount; index += 1) {
+        const ftsTokenQuery = ftsTokenQueries[index];
+        const attachmentTerm = attachmentFilenameTerms[index];
+        if (!ftsTokenQuery && !attachmentTerm) continue;
+        const tokenIds = new Set<string>();
+        let truncated = false;
+        if (ftsTokenQuery) {
+          const part = ftsIdsForMatch(ftsTokenQuery);
+          truncated = truncated || part.truncated;
+          for (const id of part.ids) tokenIds.add(id);
+        }
+        if (attachmentTerm) {
+          const part = attachmentIdsForTerm(attachmentTerm);
+          truncated = truncated || part.truncated;
+          for (const id of part.ids) tokenIds.add(id);
+        }
+        if (truncated || tokenIds.size > cap) {
+          oversizedTokens.push({ ftsTokenQuery, attachmentTerm });
+          continue;
+        }
+        if (tokenIntersection === null) {
+          tokenIntersection = tokenIds;
+        } else {
+          const previous: Set<string> = tokenIntersection;
+          tokenIntersection = new Set([...previous].filter((id: string) => tokenIds.has(id)));
+        }
+        if (tokenIntersection.size === 0) break;
+      }
+      if (oversizedTokens.length > 0) {
+        // Every token oversized: the intersection could still be small, but
+        // proving that costs as much as the legacy scan it would replace.
+        if (tokenIntersection === null) {
+          return legacyFallback({ reason: "all_tokens_oversized", oversizedTokenCount: oversizedTokens.length });
+        }
+        for (const token of oversizedTokens) {
+          if (tokenIntersection.size === 0) break;
+          tokenIntersection = probeToken([...tokenIntersection], token);
+        }
+      }
+    }
+  }
+
+  let candidates: Set<string> | null = tokenIntersection;
+  if (hasIdQuery) {
+    const pattern = `%${idQuery.toLowerCase()}%`;
+    const idRows = db
+      .prepare(
+        `SELECT id FROM messages
+         WHERE accountId = ?
+           AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?)
+         LIMIT ?`
+      )
+      .all(accountId, pattern, pattern, pattern, fetchLimit) as Array<{ id: string }>;
+    // The candidate set is a union with these ids, so an oversized id set
+    // alone already exceeds the cap.
+    if (idRows.length > cap) {
+      return legacyFallback({ reason: "candidate_cap_exceeded", observedCandidates: idRows.length });
+    }
+    candidates = candidates ?? new Set<string>();
+    for (const row of idRows) candidates.add(row.id);
+  }
+  if (!candidates) return { kind: "none" };
+  if (candidates.size > cap) {
+    return legacyFallback({ reason: "candidate_cap_exceeded", observedCandidates: candidates.size });
+  }
+  return { kind: "ids", ids: [...candidates] };
+}
+
 function applySearchQueryFilters(params: {
   where: string;
   args: any[];
@@ -709,6 +1073,7 @@ function applySearchQueryFilters(params: {
   rawQuery: string;
   attachmentFilenameTerms: string[];
   messageAlias?: string;
+  candidates?: SearchCandidateResolution;
 }) {
   const messageAlias = params.messageAlias ?? "m";
   const ftsTokenQueries = params.ftsTokenQueries;
@@ -720,6 +1085,26 @@ function applySearchQueryFilters(params: {
   if (!hasQuery && !hasIdQuery && !hasAttachmentFilenameQuery) {
     return {
       where: params.where,
+      hasQuery,
+      hasIdQuery,
+      hasAttachmentFilenameQuery
+    };
+  }
+
+  if (params.candidates?.kind === "ids") {
+    const ids = params.candidates.ids;
+    if (ids.length === 0) {
+      return {
+        where: `${params.where} AND (0 = 1)`,
+        hasQuery,
+        hasIdQuery,
+        hasAttachmentFilenameQuery
+      };
+    }
+    const where = `${params.where} AND (${messageAlias}.id IN (${ids.map(() => "?").join(",")}))`;
+    params.args.push(...ids);
+    return {
+      where,
       hasQuery,
       hasIdQuery,
       hasAttachmentFilenameQuery
@@ -1007,6 +1392,7 @@ async function getGroupCounts(params: {
   from?: string[] | null;
   recipients?: string[] | null;
   participants?: string[] | null;
+  searchCandidates?: SearchCandidateResolution;
 }) {
   const {
     accountId,
@@ -1087,12 +1473,18 @@ async function getGroupCounts(params: {
       where += " AND 0 = 1";
     }
   }
+  // Resolve at most once and thread it to the getTotalCount fallback
+  // below, so one search never resolves (or logs a fallback) twice.
+  const searchCandidates: SearchCandidateResolution =
+    params.searchCandidates ??
+    resolveSearchCandidateIds(db, accountId, { ftsTokenQueries, rawQuery, attachmentFilenameTerms });
   where = applySearchQueryFilters({
     where,
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates: searchCandidates
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
   where = applyBadgeFilters(where, args, badges, { viewerUserId });
@@ -1237,7 +1629,8 @@ async function getGroupCounts(params: {
         excludedFolderIds,
         from,
         recipients,
-        participants
+        participants,
+        searchCandidates
       })
     }
   ];
@@ -1255,6 +1648,7 @@ async function getTotalCount(params: {
   from?: string[] | null;
   recipients?: string[] | null;
   participants?: string[] | null;
+  searchCandidates?: SearchCandidateResolution;
 }) {
   const db = await getAccountDb(params.accountId);
   const {
@@ -1339,7 +1733,10 @@ async function getTotalCount(params: {
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates:
+      params.searchCandidates ??
+      resolveSearchCandidateIds(db, accountId, { ftsTokenQueries, rawQuery, attachmentFilenameTerms })
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
   where = applyBadgeFilters(where, args, badges, { viewerUserId });
@@ -1978,12 +2375,18 @@ export async function listMessages(params: {
       where += " AND 0 = 1";
     }
   }
+  const searchCandidates = resolveSearchCandidateIds(db, accountId, {
+    ftsTokenQueries,
+    rawQuery,
+    attachmentFilenameTerms
+  });
   const searchQueryState = applySearchQueryFilters({
     where,
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates: searchCandidates
   });
   where = searchQueryState.where;
   const hasQuery = searchQueryState.hasQuery;
@@ -2167,7 +2570,8 @@ export async function listMessages(params: {
           excludedFolderIds,
           from,
           recipients,
-          participants
+          participants,
+          searchCandidates
         }));
   const total =
     inviteDeckSummary?.total ??
@@ -2182,7 +2586,8 @@ export async function listMessages(params: {
       excludedFolderIds,
       from,
       recipients,
-      participants
+      participants,
+      searchCandidates
     }));
   const hasMore = offset + items.length < total;
   return { items, groups, total, hasMore, baseCount: items.length };
@@ -2290,12 +2695,18 @@ export async function listThreads(params: {
       where += " AND 0 = 1";
     }
   }
+  const searchCandidates = resolveSearchCandidateIds(db, accountId, {
+    ftsTokenQueries,
+    rawQuery,
+    attachmentFilenameTerms
+  });
   const searchQueryState = applySearchQueryFilters({
     where,
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates: searchCandidates
   });
   where = searchQueryState.where;
   const hasQuery = searchQueryState.hasQuery;
@@ -2488,7 +2899,8 @@ export async function listThreads(params: {
         excludedFolderIds,
         from,
         recipients,
-        participants
+        participants,
+        searchCandidates
       });
     }
 
@@ -2701,7 +3113,8 @@ export async function listThreads(params: {
             excludedFolderIds,
             from,
             recipients,
-            participants
+            participants,
+            searchCandidates
           })));
 
   const hasMore = offset + threadRows.length < threadTotal;
