@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type React from "react";
 import type { Message } from "@/lib/data";
 import type { MessageGroupMeta } from "./messagelist/listModel";
@@ -91,6 +91,18 @@ export function useMessageData({
   // The page load in flight. A load for a superseded key is aborted, so it never
   // holds back the first page of the new key.
   const inFlightLoadRef = useRef<{ key: string; controller: AbortController } | null>(null);
+  // Page 1 of another mailbox's inbox, requested while the switch to it persists the
+  // selection and reads its folders. Only that mailbox's first page-1 load may take it,
+  // and only with a byte-identical URL; any other outcome aborts it.
+  // The key whose first page is on screen from a successful read; cleared by errors.
+  const shownPageKeyRef = useRef<string | null>(null);
+  const firstPagePrefetchRef = useRef<{
+    accountId: string;
+    url: string;
+    response: Promise<Response>;
+    controller: AbortController;
+    timer: number;
+  } | null>(null);
 
   // Cleanup filteredSearchRefreshTimer and the page load on unmount
   useEffect(() => {
@@ -101,6 +113,12 @@ export function useMessageData({
       }
       inFlightLoadRef.current?.controller.abort();
       inFlightLoadRef.current = null;
+      const prefetch = firstPagePrefetchRef.current;
+      firstPagePrefetchRef.current = null;
+      if (prefetch) {
+        window.clearTimeout(prefetch.timer);
+        prefetch.controller.abort();
+      }
     };
   }, []);
 
@@ -187,6 +205,74 @@ export function useMessageData({
       effectiveSearchBadges
     });
 
+  const dropFirstPagePrefetch = useCallback(() => {
+    const prefetch = firstPagePrefetchRef.current;
+    if (!prefetch) return;
+    firstPagePrefetchRef.current = null;
+    window.clearTimeout(prefetch.timer);
+    prefetch.controller.abort();
+  }, []);
+
+  // The plain inbox view carries over to the next mailbox unchanged (a switch resets
+  // search, badges and scope), so its page-1 URL is known before the switch commits.
+  // Other views are not predicted; the list then loads after the commit as before.
+  const buildInboxFirstPageUrl = (accountId: string) =>
+    buildMessageListQueryUrl({
+      accountId,
+      page: 1,
+      groupBy,
+      searchScope: "folder",
+      activeFolderId: `${accountId}:INBOX`,
+      currentSearchExcludedFolderIds: [],
+      supportsThreads,
+      threadDateSource,
+      sortBy,
+      isRelatedSearch: false,
+      relatedQueryId: "",
+      query: "",
+      selectedSearchFields,
+      searchBadges: { attachments: false },
+      effectiveSearchBadges: []
+    });
+  const plainInboxView =
+    searchScope === "folder" &&
+    !isRelatedSearch &&
+    !query.trim() &&
+    !searchBadges.attachments &&
+    effectiveSearchBadges.length === 0 &&
+    Boolean(activeAccountId) &&
+    activeFolderId === `${activeAccountId}:INBOX`;
+  const prefetchInputsRef = useRef({ activeAccountId, apiFetch, plainInboxView, buildInboxFirstPageUrl });
+  useLayoutEffect(() => {
+    prefetchInputsRef.current = { activeAccountId, apiFetch, plainInboxView, buildInboxFirstPageUrl };
+  });
+  const prefetchFirstPage = useCallback((accountId: string) => {
+    dropFirstPagePrefetch();
+    const inputs = prefetchInputsRef.current;
+    if (!inputs.plainInboxView || !accountId || accountId === inputs.activeAccountId) return;
+    const url = inputs.buildInboxFirstPageUrl(accountId);
+    const controller = new AbortController();
+    const response = inputs.apiFetch(url, { signal: controller.signal });
+    // A prefetch that is dropped before anyone awaits it must not surface as unhandled.
+    response.catch(() => {});
+    const timer = window.setTimeout(() => {
+      if (firstPagePrefetchRef.current?.controller === controller) dropFirstPagePrefetch();
+    }, 10_000);
+    firstPagePrefetchRef.current = { accountId, url, response, controller, timer };
+  }, [dropFirstPagePrefetch]);
+
+  const takeFirstPagePrefetch = (url: string) => {
+    const prefetch = firstPagePrefetchRef.current;
+    if (!prefetch || prefetch.accountId !== activeAccountId) return null;
+    if (prefetch.url !== url) {
+      dropFirstPagePrefetch();
+      return null;
+    }
+    firstPagePrefetchRef.current = null;
+    window.clearTimeout(prefetch.timer);
+    return prefetch;
+  };
+
   // Paginated message load effect.
   useEffect(() => {
     const loadMessages = async () => {
@@ -206,7 +292,12 @@ export function useMessageData({
       lastRequestRef.current = { key: requestKey, page: messagesPage };
       try {
         setLoadingMessages(true);
-        const messagesRes = await apiFetch(buildQueryUrl(messagesPage), { signal: load.controller.signal });
+        const url = buildQueryUrl(messagesPage);
+        const prefetched = messagesPage === 1 ? takeFirstPagePrefetch(url) : null;
+        if (prefetched) {
+          load.controller.signal.addEventListener("abort", () => prefetched.controller.abort(), { once: true });
+        }
+        const messagesRes = await (prefetched?.response ?? apiFetch(url, { signal: load.controller.signal }));
         if (load.controller.signal.aborted) return;
         if (messagesRes.ok) {
           const data = (await messagesRes.json()) as {
@@ -270,6 +361,7 @@ export function useMessageData({
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (messagesPage === 1) {
+            shownPageKeyRef.current = requestKey;
             const nextMeta = Array.isArray(data?.groups)
               ? data.groups
               : computeGroupMeta(items);
@@ -279,12 +371,14 @@ export function useMessageData({
           }
           setMessageListError(null);
         } else {
+          shownPageKeyRef.current = null;
           const errorMessage = await readErrorMessage(messagesRes);
           reportError(errorMessage);
           setMessageListError(errorMessage || "Failed to load messages.");
         }
       } catch {
         if (load.controller.signal.aborted) return;
+        shownPageKeyRef.current = null;
         lastRequestRef.current = null;
         reportError("Failed to load messages.");
         setMessageListError("Failed to load messages.");
@@ -303,9 +397,14 @@ export function useMessageData({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccountId, hasMoreMessages, loadingMessages, messagesKey, messagesPage, authState]);
 
-  const refreshMailboxData = async (): Promise<boolean> => {
+  // skipIfCurrent: the caller knows the server data behind the list did not change
+  // (a "new" sync that wrote nothing); a first page already on screen is kept.
+  const refreshMailboxData = async (options?: { skipIfCurrent?: boolean }): Promise<boolean> => {
     if (searchScope === "folder" && !isRelatedSearch && !activeFolderId) {
       return false;
+    }
+    if (options?.skipIfCurrent && shownPageKeyRef.current === messagesKey) {
+      return true;
     }
     setRefreshingMessages(true);
     const requestKey = messagesKey;
@@ -313,6 +412,7 @@ export function useMessageData({
     try {
       const messageRes = await apiFetch(buildQueryUrl(1));
       if (!messageRes.ok) {
+        shownPageKeyRef.current = null;
         const message = await readErrorMessage(messageRes);
         reportError(message || "Failed to refresh mailbox data.");
         setMessageListError(message || "Failed to load messages.");
@@ -346,6 +446,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
+      shownPageKeyRef.current = requestKey;
       setAuthoritativeRevision(value => value + 1);
       setMessages((prev) => {
         logListReplacement("refreshMailboxData", prev, nextMessages);
@@ -409,6 +510,8 @@ export function useMessageData({
     queueFilteredSearchRefresh,
     messageMutationVersionRef,
     currentKeyRef,
-    markMessagesMutated
+    markMessagesMutated,
+    prefetchFirstPage,
+    dropFirstPagePrefetch
   };
 }

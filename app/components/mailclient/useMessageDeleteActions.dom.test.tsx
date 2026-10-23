@@ -75,8 +75,9 @@ function setup({
   });
   const pushNotice = mock((_notice: Parameters<Parameters<typeof useMessageDeleteActions>[0]["pushNotice"]>[0]) => {});
   const reportError = mock(() => {});
+  const navigationRows = [currentMessages[0], currentMessages[3]];
   const options: Parameters<typeof useMessageDeleteActions>[0] = {
-    continueAfterRemoval: continuation, navigationRows: [currentMessages[0], currentMessages[3]],
+    continueAfterRemoval: continuation, getNavigationRows: () => navigationRows,
     activeAccountId: "acc", activeMessageId: "", supportsThreads: true,
     collapsedThreads: {}, includeFlaggedGroup: false, searchScope: "folder",
     activeFolderId: permanent ? "acc:Trash" : "acc:INBOX",
@@ -172,5 +173,5 @@ it("successful delete consults the current reader even when selection was empty 
   const fixture = setup({ continuation });
   await fixture.remove(["root", "single"], ["root", "single"]);
   expect(continuation).toHaveBeenCalledTimes(1);
-  expect(continuation.mock.calls[0]).toEqual([["root", "single"], fixture.options.navigationRows]);
+  expect(continuation.mock.calls[0]).toEqual([["root", "single"], fixture.options.getNavigationRows?.()]);
 });
