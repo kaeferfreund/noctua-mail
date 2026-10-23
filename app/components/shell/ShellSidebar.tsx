@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useState, type ReactNode } from "react";
 import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
@@ -68,13 +70,14 @@ export function MailboxRows({
   onSwitch,
   summaries
 }: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "onSwitch" | "summaries">) {
+  const t = useTranslations("Shell");
   const summaryById = new Map(summaries?.map(summary => [summary.accountId, summary]));
   return (
     <div className="space-y-1">
       {groupMailboxes(accounts).map((group) => (
         <div key={group.domain ?? "all"}>
-          {group.domain ? (
-            <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{group.domain}</div>
+          {group.domain || accounts.length > 6 ? (
+            <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{group.domain ?? t("mailboxes.other")}</div>
           ) : null}
           <SidebarMenu>
             {group.accounts.map((account) => {
@@ -85,7 +88,7 @@ export function MailboxRows({
                   isActive={account.id === activeAccountId}
                   onClick={() => onSwitch(account.id)}
                   title={summary
-                    ? `${account.email}\n${summary.unread ?? "—"} unread · ${summary.assignedToMe} assigned to me · ${summary.unassignedOpen} unassigned open\nWatcher: ${summary.watcher.state}`
+                    ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: summary.watcher.state })
                     : account.email}
                   aria-current={account.id === activeAccountId ? "true" : undefined}
                   className={cn("data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]", summary && "pr-32")}
@@ -98,16 +101,16 @@ export function MailboxRows({
                 </SidebarMenuButton>
                 {summary && (
                   <SidebarMenuBadge className="right-1 w-auto gap-1.5 text-2xs">
-                    <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? "Unread count unavailable" : `${summary.unread} unread`} title="Unread">
+                    <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})} title={t("mailboxes.unreadTitle")}>
                       <Mail className="size-2.5" aria-hidden="true" />{summary.unread ?? "—"}
                     </span>
-                    <span className="flex items-center gap-0.5" aria-label={`${summary.assignedToMe} assigned to me`} title="Assigned to me">
+                    <span className="flex items-center gap-0.5" aria-label={t("mailboxes.assigned", {count: summary.assignedToMe})} title={t("mailboxes.assignedTitle")}>
                       <UserRound className="size-2.5" aria-hidden="true" />{summary.assignedToMe}
                     </span>
-                    <span className="flex items-center gap-0.5" aria-label={`${summary.unassignedOpen} unassigned open`} title="Unassigned">
+                    <span className="flex items-center gap-0.5" aria-label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} title={t("mailboxes.unassignedTitle")}>
                       <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
                     </span>
-                    <span role="img" aria-label={`Watcher: ${summary.watcher.state}`} title={`Watcher: ${summary.watcher.state}`}
+                    <span role="img" aria-label={t("mailboxes.watcher", {state: summary.watcher.state})} title={t("mailboxes.watcher", {state: summary.watcher.state})}
                       className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
                         summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
                   </SidebarMenuBadge>
@@ -122,6 +125,7 @@ export function MailboxRows({
 }
 
 export function ViewRow({ view }: { view: ShellView }) {
+  const t = useTranslations("Shell");
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
     <SidebarMenuItem>
@@ -137,7 +141,7 @@ export function ViewRow({ view }: { view: ShellView }) {
         <SidebarMenuBadge
           className="bg-sidebar-accent"
           title={view.countTitle ?? view.rowTitle}
-          aria-label={view.countAriaLabel ?? `${view.count} unread`}
+          aria-label={view.countAriaLabel ?? t("mailboxes.unread", {count: view.count ?? 0})}
         >
           {view.countLabel ?? view.count}
         </SidebarMenuBadge>
@@ -151,6 +155,7 @@ export function ViewRow({ view }: { view: ShellView }) {
  * "Shared mailboxes", "Views", "Topics" and the folder tree.
  */
 export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, notices, onNavigate }: ShellSidebarProps) {
+  const t = useTranslations("Shell");
   const { setOpenMobile } = useSidebar();
   const closeAfter = (action: () => void, navigate = false) => () => {
     setOpenMobile(false);
@@ -181,7 +186,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               {brand.buildVersionLabel ? (
                 <span
                   className="truncate font-mono text-2xs text-muted-foreground"
-                  title={`Build ${brand.buildVersionLabel}`}
+                  title={t("build", {version: brand.buildVersionLabel})}
                 >
                   {brand.buildVersionLabel}
                 </span>
@@ -191,24 +196,23 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
           <SidebarContent>
             <SidebarGroup>
               <div className="flex items-center gap-2">
-                <Button className="flex-1 justify-start" onClick={closeAfter(compose.onCompose)} aria-label="New mail">
-                  <SquarePen />Compose
-                </Button>
-                <Button variant="outline" size="icon" aria-label="Check all folders for new mail"
-                  title="Check all folders for new mail" disabled={sync.isSyncing} onClick={sync.onCheckNewMail}>
+                <Button className="flex-1 justify-start" onClick={closeAfter(compose.onCompose)} aria-label={t("compose.new")}>
+                  <SquarePen />{t("compose.label")}</Button>
+                <Button variant="outline" size="icon" aria-label={t("sync.allFolders")}
+                  title={t("sync.allFolders")} disabled={sync.isSyncing} onClick={sync.onCheckNewMail}>
                   <RefreshCw className={cn(sync.isSyncing && "animate-spin")} />
                 </Button>
               </div>
               {compose.onOpenDrafts && compose.draftsCount > 0 ? (
                 <SidebarMenu className="mt-2"><SidebarMenuItem>
-                  <SidebarMenuButton onClick={closeAfter(compose.onOpenDrafts, true)}><FileText /><span>Drafts</span></SidebarMenuButton>
+                  <SidebarMenuButton onClick={closeAfter(compose.onOpenDrafts, true)}><FileText /><span>{t("drafts")}</span></SidebarMenuButton>
                   <SidebarMenuBadge>{compose.draftsCount}</SidebarMenuBadge>
                 </SidebarMenuItem></SidebarMenu>
               ) : null}
             </SidebarGroup>
             <SidebarGroup>
-              <SidebarGroupLabel>My mailboxes</SidebarGroupLabel>
-              {mailboxes.onAdd && <SidebarGroupAction title="Add mailbox" aria-label="Add mailbox" onClick={closeAfter(mailboxes.onAdd)}>
+              <SidebarGroupLabel>{t("mailboxes.mine")}</SidebarGroupLabel>
+              {mailboxes.onAdd && <SidebarGroupAction title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
                 <Plus />
               </SidebarGroupAction>}
               <SidebarGroupContent>
@@ -220,13 +224,13 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     onSwitch={(id) => { setOpenMobile(false); onNavigate?.(); mailboxes.onSwitch(id); }}
                   />
                 ) : (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">No mailbox yet</p>
+                  <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
                 )}
               </SidebarGroupContent>
             </SidebarGroup>
             {shared.length > 0 ? (
               <SidebarGroup>
-                <SidebarGroupLabel>Shared mailboxes</SidebarGroupLabel>
+                <SidebarGroupLabel>{t("mailboxes.shared")}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <MailboxRows
                     accounts={shared}
@@ -239,7 +243,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
             ) : null}
             {viewRows.length > 0 ? (
               <SidebarGroup>
-                <SidebarGroupLabel>Views</SidebarGroupLabel>
+                <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {viewRows.map((view) => (
@@ -250,7 +254,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               </SidebarGroup>
             ) : null}
             {topics.topics.length > 0 ? (
-              <SidebarGroup aria-label="Topics">
+              <SidebarGroup aria-label={t("topics")}>
                 <TopicsSidebarSection
                   topics={topics.topics}
                   topicMessageCountById={topics.topicMessageCountById}

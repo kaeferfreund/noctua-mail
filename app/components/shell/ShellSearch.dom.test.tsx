@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { useState } from "react";
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { cleanup, fireEvent, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
 

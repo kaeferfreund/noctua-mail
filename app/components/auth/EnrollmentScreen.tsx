@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useEffect, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { authClient, type NoctuaAuthClient, type Proof, type TotpSetup } from "@/lib/authClient";
@@ -12,6 +14,7 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
   client?: NoctuaAuthClient;
   continuation?: { proof: Proof; password: string };
 }) {
+  const t = useTranslations("Auth");
   const [setup, setSetup] = useState<TotpSetup | null>(null);
   const [proof, setProof] = useState<Proof | null>(continuation?.proof ?? null);
   const [verified, setVerified] = useState(false);
@@ -31,7 +34,7 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
     return () => { active = false; };
   }, [setup?.totpURI, verified]);
   const secret = setup && !verified ? new URL(setup.totpURI).searchParams.get("secret") : null;
-  return <AuthFrame title={saved ? "Authenticator ready" : verified ? "Save your backup codes" : "Set up your authenticator"} description="An authenticator is required to protect your account. Mailbox access starts after setup.">
+  return <AuthFrame title={saved ? t("enroll.ready") : verified ? t("enroll.saveCodes") : t("enroll.title")} description={t("enroll.help")}>
     {!setup && !saved && <form className="space-y-4" onSubmit={event => {
       event.preventDefault(); const form = event.currentTarget; const password = String(new FormData(form).get("password"));
       void action.run(async () => {
@@ -41,9 +44,9 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
         await begin(nextProof, password); form.reset();
       });
     }}>
-      <p>If setup was interrupted or this page was reloaded, verify again to start a new setup.</p>
-      <AuthField name="password" label="Current password" type="password" autoComplete="current-password" required />
-      <Button disabled={action.disabled}>Start authenticator setup</Button>
+      <p>{t("enroll.restartHelp")}</p>
+      <AuthField name="password" label={t("currentPassword")} type="password" autoComplete="current-password" required />
+      <Button disabled={action.disabled}>{t("enroll.start")}</Button>
     </form>}
     {setup && !verified && <form className="space-y-4" onSubmit={event => {
       event.preventDefault(); const form = event.currentTarget; const code = String(new FormData(form).get("code"));
@@ -52,25 +55,25 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
         await client.verifyTotp(code, proof); setProof(null); setVerified(true); setQr(""); setSetup({ ...setup, totpURI: "" }); form.reset();
       });
     }}>
-      <p>Scan this QR code in your authenticator, or enter the setup secret manually.</p>
+      <p>{t("enroll.scanHelp")}</p>
       {/* A local data URL keeps the seed off third-party image/QR services. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- private local QR data URL */}
-      {qr && <img src={qr} alt="Authenticator setup QR code" width={240} height={240} />}
-      <AuthField label="Setup secret" value={secret ?? ""} readOnly autoComplete="off" />
-      <AuthField name="code" label="Authenticator code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required />
-      <Button disabled={action.disabled}>Verify authenticator</Button>
-      <Button type="button" variant="ghost" disabled={action.disabled} onClick={() => { setSetup(null); setProof(null); setQr(""); }}>Restart setup with fresh proof</Button>
+      {qr && <img src={qr} alt={t("enroll.qrAlt")} width={240} height={240} />}
+      <AuthField label={t("enroll.secret")} value={secret ?? ""} readOnly autoComplete="off" />
+      <AuthField name="code" label={t("authenticatorCode")} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required />
+      <Button disabled={action.disabled}>{t("enroll.verify")}</Button>
+      <Button type="button" variant="ghost" disabled={action.disabled} onClick={() => { setSetup(null); setProof(null); setQr(""); }}>{t("enroll.restart")}</Button>
     </form>}
     {setup && verified && !saved && <BackupCodes codes={setup.backupCodes} onDone={() => { setSetup(null); setSaved(true); }} />}
     {saved && <div className="space-y-3">
-      <p>You can also add a passkey using your device PIN, fingerprint or face.</p>
-      <Button variant="outline" onClick={() => setAddingKey(true)}>Add a passkey</Button>
-      <Button disabled={action.disabled} onClick={() => { void action.run(async () => { await onComplete(); }); }}>Continue to Noctua</Button>
+      <p>{t("enroll.passkeyHelp")}</p>
+      <Button variant="outline" onClick={() => setAddingKey(true)}>{t("enroll.addPasskey")}</Button>
+      <Button disabled={action.disabled} onClick={() => { void action.run(async () => { await onComplete(); }); }}>{t("enroll.continue")}</Button>
     </div>}
     <AuthError error={action.error} />
-    <Button variant="ghost" disabled={action.disabled} onClick={() => { void action.run(async () => { await onLogout(); }); }}>Log out</Button>
+    <Button variant="ghost" disabled={action.disabled} onClick={() => { void action.run(async () => { await onLogout(); }); }}>{t("logout")}</Button>
     {addingKey && <ReauthDialog purpose="passkey.enroll" client={client} onUnauthorized={onLogout} onCancel={() => setAddingKey(false)} onVerified={async grant => {
-      await client.addPasskey("My passkey", grant); setAddingKey(false);
+      await client.addPasskey(t("enroll.defaultPasskeyName"), grant); setAddingKey(false);
     }} />}
   </AuthFrame>;
 }

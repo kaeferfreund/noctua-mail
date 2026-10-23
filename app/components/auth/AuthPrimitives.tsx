@@ -1,6 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import Link from "next/link";
+import { formatAuthError } from "@/lib/i18n/authMessages";
 import LanguageSelector from "@/app/components/i18n/LanguageSelector";
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/app/components/ui/card";
@@ -8,7 +11,7 @@ import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Button } from "@/app/components/ui/button";
-import { AuthClientError, authErrorMessage } from "@/lib/authClient";
+import { AuthClientError } from "@/lib/authClient";
 
 export function AuthFrame({ title, description, children, authenticated = false }: { title: string; description?: string; children: ReactNode; authenticated?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -28,9 +31,10 @@ export function AuthField({ label, ...props }: InputHTMLAttributes<HTMLInputElem
   return <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label><Input id={id} {...props} /></div>;
 }
 export function AuthError({ error, genericLogin = false }: { error: unknown; genericLogin?: boolean }) {
+  const t = useTranslations("Auth");
   if (!error) return null;
-  return <Alert variant="destructive"><AlertDescription>{typeof error === "string" ? error : authErrorMessage(error, genericLogin)}
-    {error instanceof AuthClientError && error.loggedOut && <p><Link href="/" prefetch={false} className="underline">Return to sign in</Link></p>}
+  return <Alert variant="destructive"><AlertDescription>{formatAuthError(error, t, genericLogin)}
+    {error instanceof AuthClientError && error.loggedOut && <p><Link href="/" prefetch={false} className="underline">{t("returnToLogin")}</Link></p>}
   </AlertDescription></Alert>;
 }
 export function useAuthAction(onUnauthorized?: () => void) {
@@ -58,22 +62,23 @@ export function useAuthAction(onUnauthorized?: () => void) {
   return { pending, disabled: pending || rateLimited, error, setError, run };
 }
 export function BackupCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
-  const [notice, setNotice] = useState("");
-  return <section className="space-y-3" aria-label="New backup codes">
-    <p>Save these backup codes somewhere private. You will only see them once. Each code works once.</p>
+  const t = useTranslations("Auth");
+  const [notice, setNotice] = useState<"copied" | "copyFailed" | null>(null);
+  return <section className="space-y-3" aria-label={t("backup.title")}>
+    <p>{t("backup.help")}</p>
     <ul className="grid grid-cols-2 gap-2 rounded-lg border p-3 font-mono text-sm">{codes.map(code => <li key={code}>{code}</li>)}</ul>
     <div className="flex flex-wrap gap-2">
       <Button variant="outline" onClick={async () => {
-        try { await navigator.clipboard.writeText(codes.join("\n")); setNotice("Copied backup codes."); }
-        catch { setNotice("Copy unavailable. Save the codes manually or download them."); }
-      }}>Copy codes</Button>
+        try { await navigator.clipboard.writeText(codes.join("\n")); setNotice("copied"); }
+        catch { setNotice("copyFailed"); }
+      }}>{t("backup.copy")}</Button>
       <Button variant="outline" onClick={() => {
         const url = URL.createObjectURL(new Blob([codes.join("\n")], { type: "text/plain" }));
         const link = document.createElement("a"); link.href = url; link.download = "noctua-backup-codes.txt"; link.click();
         URL.revokeObjectURL(url);
-      }}>Download codes</Button>
+      }}>{t("backup.download")}</Button>
     </div>
-    <p role="status">{notice}</p>
-    <Button onClick={onDone}>I saved my backup codes</Button>
+    <p role="status">{notice ? t(`backup.${notice}`) : null}</p>
+    <Button onClick={onDone}>{t("backup.saved")}</Button>
   </section>;
 }

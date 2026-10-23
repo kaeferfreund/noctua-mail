@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type { Account } from "@/lib/data";
 import type { MailboxState } from "@/lib/authClient";
 import { Button } from "@/app/components/ui/button";
@@ -16,13 +18,14 @@ export default function MailboxGate({ state, accounts, error, onAdd, onSwitch, o
   onAdmin?: () => void;
   onLogout: () => void;
 }) {
-  return <AuthFrame authenticated title={state === "none" ? "No mailbox yet" : state === "unselected" ? "Choose a mailbox" : "Loading your account"}>
-    {state === "none" && (onAdd ? <><p>Create a mailbox, then grant its members access in Admin.</p><Button onClick={onAdd}>Add a mailbox</Button></> : <p>Ask your admin to give you access to a mailbox.</p>)}
+  const t = useTranslations("Auth");
+  return <AuthFrame authenticated title={state === "none" ? t("gate.none") : state === "unselected" ? t("gate.choose") : t("gate.loading")}>
+    {state === "none" && (onAdd ? <><p>{t("gate.createHelp")}</p><Button onClick={onAdd}>{t("gate.add")}</Button></> : <p>{t("gate.askAdmin")}</p>)}
     {state === "unselected" && <ul className="space-y-2">{accounts.map(account => <li key={account.id}><Button variant="outline" onClick={() => onSwitch(account.id)}>{account.name || account.email} · {account.email}</Button></li>)}</ul>}
     <AuthError error={error} />
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" onClick={onRetry}>Retry</Button>
-      {state && <><Button variant="outline" onClick={onSecurity}>Profile &amp; security</Button>{onAdmin && <Button variant="outline" onClick={onAdmin}>Admin</Button>}<Button variant="ghost" onClick={onLogout}>Log out</Button></>}
+      <Button variant="outline" onClick={onRetry}>{t("retry")}</Button>
+      {state && <><Button variant="outline" onClick={onSecurity}>{t("security.title")}</Button>{onAdmin && <Button variant="outline" onClick={onAdmin}>{t("admin")}</Button>}<Button variant="ghost" onClick={onLogout}>{t("logout")}</Button></>}
     </div>
   </AuthFrame>;
 }

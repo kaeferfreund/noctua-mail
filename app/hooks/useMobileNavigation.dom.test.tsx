@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { useCallback, useState } from "react";
 import { renderToString } from "react-dom/server";
 import { useIsMobile } from "./use-mobile";
@@ -72,7 +73,7 @@ describe("derived mobile navigation", () => {
     expect(push).not.toHaveBeenCalled();
   });
   it("server renders initial thread visibility independently of the media query", () => {
-    expect(renderToString(<Navigation initialId="deep-link" />)).toContain('data-mobile-view="thread"');
+    expect(renderToString(<I18nTestProvider><Navigation initialId="deep-link" /></I18nTestProvider>)).toContain('data-mobile-view="thread"');
   });
   it("reads the media query on first client mount and follows breakpoint changes", () => {
     const originalWidth = window.innerWidth;
