@@ -1158,6 +1158,10 @@
     "loadedGroupCount": "{count, plural, one {# Nachricht geladen} other {# Nachrichten geladen}}"
   },
   "Reader": {
+    "copyLink": "Link kopieren",
+    "linkCopied": "Link kopiert",
+    "linkCopyFailed": "Link konnte nicht kopiert werden",
+
     "focus": {
       "expand": "Vergrößern",
       "showList": "Liste anzeigen",
@@ -1411,6 +1415,12 @@
     }
   },
   "Notifications": {
+    "deepLink": {
+      "forbidden": "Auf dieses Postfach hast du keinen Zugriff. Das bisherige Postfach bleibt geöffnet.",
+      "missing": "Diese Nachricht ist nicht mehr verfügbar. Der Ordner bleibt geöffnet.",
+      "moved": "Diese Nachricht wurde verschoben. Ihr aktueller Ordner wurde geöffnet.",
+      "failed": "Die verlinkte Nachricht konnte nicht geladen werden. Bitte versuche es erneut."
+    },
     "operationFailed": "Vorgang fehlgeschlagen",
     "unexpectedError": "Unerwarteter Fehler.",
     "fullSyncCancelled": "Vollständige Synchronisierung abgebrochen",

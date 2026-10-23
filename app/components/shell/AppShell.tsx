@@ -40,7 +40,7 @@ function readSidebarCookie(): boolean {
 
 export type AppShellProps = {
   onReaderNavigate?: () => void;
-  mobileNavigation?: { messageId: string | null; clearMessage: () => void };
+  mobileNavigation?: { messageId: string | null; clearMessage: () => void; urlManaged?: boolean };
   sidebar: ShellSidebarProps;
   header: ShellHeaderProps;
   panes: ShellPanesProps;
@@ -65,7 +65,7 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
   // Hydrate the saved cookie without a synchronous setState effect. Changes
   // made through SidebarProvider drive local state and update its cookie.
   const isMobile = useIsMobile();
-  const navigation = useMobileNavigation(isMobile, mobileNavigation?.messageId ?? null, mobileNavigation?.clearMessage ?? noop);
+  const navigation = useMobileNavigation(isMobile, mobileNavigation?.messageId ?? null, mobileNavigation?.clearMessage ?? noop, mobileNavigation?.urlManaged);
   const savedOpen = useSyncExternalStore(subscribeSidebarCookie, readSidebarCookie, () => true);
   const [sidebarOpen, setSidebarOpen] = useState<boolean | null>(null);
   const open = sidebarOpen ?? savedOpen;

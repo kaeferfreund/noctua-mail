@@ -1,3 +1,4 @@
+import { messageDeepLink } from "@/lib/navigation/deepLinks";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import { Fragment, useState } from "react";
@@ -20,6 +21,7 @@ import {
   MoreVertical,
   SquareArrowOutUpRight,
   ListTree,
+  Link,
   Search,
   RefreshCw,
   Reply,
@@ -73,6 +75,7 @@ type MessageMenuAction =
   | "showRelated"
   | "showThread"
   | "topics"
+  | "copyLink"
   | "openWindow"
   | "openHtmlWindow"
   | "downloadEml"
@@ -168,6 +171,7 @@ export default function MessageMenu({
 }: MessageMenuProps) {
   const t = useTranslations("Reader");
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
+  const [copyResult, setCopyResult] = useState<"copied" | "failed" | null>(null);
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const rowReadAction = origin === "thread" ? undefined : readAction;
   const seen = rowReadAction?.seen ?? Boolean(message.seen);
@@ -539,6 +543,12 @@ export default function MessageMenu({
                   isDisabled("showThread")
                 )
               : null,
+            isVisible("copyLink") ? buildItem("copyLink", t(copyResult === "copied" ? "linkCopied" : copyResult === "failed" ? "linkCopyFailed" : "copyLink"), <Link size={14} />, () => {
+              void (async () => {
+                try { await navigator.clipboard.writeText(messageDeepLink(message, window.location.origin)); setCopyResult("copied"); }
+                catch { setCopyResult("failed"); }
+              })();
+            }) : null,
             isVisible("openWindow")
               ? buildItem(
                   "openWindow",
