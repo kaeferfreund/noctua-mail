@@ -12,6 +12,8 @@ type Props = {
   done: () => void; isDone: boolean; busy: boolean; renderMenu: () => ReactNode; openWindow: () => void;
   position: number; total: number; hasMore: boolean; previous: () => void; next: () => void;
   canPrevious: boolean; canNext: boolean; navigating: boolean;
+  /** Prints the reader; defaults to window.print(). */
+  print?: () => void;
 };
 export default function ReaderToolbar(props: Props) {
   const t = useTranslations("Reader");
@@ -34,7 +36,7 @@ export default function ReaderToolbar(props: Props) {
         </div>
         <div className={styles.navigation}>
           {action(t("openWindow"), <SquareArrowOutUpRight size={16} />, props.openWindow, false)}
-          {action(t("focus.print"), <Printer size={16} />, () => window.print(), false)}
+          {action(t("focus.print"), <Printer size={16} />, props.print ?? (() => window.print()), false)}
           <span className={styles.counter} data-reader-position="" aria-live="polite" aria-describedby={positionId} title={t(props.hasMore ? "focus.loadedPosition" : "focus.position", { position: props.position, total: props.total })}>{t(props.hasMore ? "focus.counterMore" : "focus.counter", { position: props.position, total: props.total })}</span>
           <span id={positionId} className="sr-only">{t(props.hasMore ? "focus.loadedPosition" : "focus.position", { position: props.position, total: props.total })}</span>
           {action(t("focus.previous"), <ChevronLeft size={18} />, props.previous, !props.canPrevious || props.navigating, "k")}

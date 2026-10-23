@@ -9,8 +9,16 @@ export {
   listRelatedMessages,
   listThreads,
   listThreadMessages,
-  type GroupMeta
+  type GroupMeta,
+  type ThreadMessageProjection
 } from "./query";
+
+export {
+  listThreadMessageWindow,
+  ThreadWindowCursorError,
+  type ThreadWindowInfo,
+  type ThreadWindowResult
+} from "./threadWindow";
 
 export {
   backfillMessageSourceSizes,

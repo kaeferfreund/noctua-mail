@@ -12,6 +12,7 @@ import { hydrateIdentityMetadata } from "./identityMetadata";
  */
 import type { Message } from "../../data";
 import { backfillMessageSenderKey } from "./senderKey";
+import { resolveStoredMessageContentState } from "../../messageContentState";
 import { getAccountDb } from "../connection";
 import { buildMessageRowIdLookupCandidates } from "../../messageIds";
 import {
@@ -99,6 +100,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     dateValue: row.dateValue,
     body: row.body,
     htmlBody: row.htmlBody ?? undefined,
+    contentState: resolveStoredMessageContentState(row),
     priority: row.priority ?? undefined,
     hasSource: Boolean(row.hasSource),
     ...hydrateIdentityMetadata(row),
