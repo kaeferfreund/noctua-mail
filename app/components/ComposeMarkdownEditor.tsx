@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import MDEditor from "@uiw/react-md-editor";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import MDEditor, { commands as markdownCommands, type ICommand } from "@uiw/react-md-editor";
+import { useTranslations } from "next-intl";
 import "@uiw/react-md-editor/markdown-editor.css";
 import "@uiw/react-markdown-preview/markdown.css";
 import remarkBreaks from "remark-breaks";
@@ -12,6 +13,94 @@ type ComposeMarkdownEditorProps = {
   onChange: (value: string) => void;
   resetKey?: number | string;
 };
+
+// Library command names → Editor.markdown.commands keys. Headings (heading1–6)
+// share one message with a level parameter; dividers carry no label.
+const MARKDOWN_COMMAND_KEYS = {
+  bold: "bold",
+  italic: "italic",
+  strikethrough: "strikethrough",
+  hr: "hr",
+  title: "title",
+  link: "link",
+  quote: "quote",
+  code: "code",
+  codeBlock: "codeBlock",
+  comment: "comment",
+  image: "image",
+  table: "table",
+  "unordered-list": "unorderedList",
+  "ordered-list": "orderedList",
+  "checked-list": "checkedList",
+  help: "help",
+  edit: "edit",
+  live: "live",
+  preview: "preview",
+  fullscreen: "fullscreen"
+} as const;
+
+type MarkdownCommandName = keyof typeof MARKDOWN_COMMAND_KEYS;
+type MarkdownCommandText = { label?: string; iconText?: string };
+
+function isMarkdownCommandName(name: string | undefined): name is MarkdownCommandName {
+  return Boolean(name && Object.hasOwn(MARKDOWN_COMMAND_KEYS, name));
+}
+
+/**
+ * Clones the library's command tree (same commands, order, shortcuts and
+ * execute handlers) and replaces only the button label and, for text icons
+ * such as "Heading 1", the visible icon text.
+ */
+export function localizeMarkdownCommands(
+  list: ICommand[],
+  localize: (command: ICommand) => MarkdownCommandText,
+  parent?: ICommand
+): ICommand[] {
+  return list.map((command) => {
+    const { label, iconText } = localize(command);
+    const next = { ...command } as ICommand;
+    if (parent) next.parent = parent;
+    if (label) next.buttonProps = { ...command.buttonProps, "aria-label": label, title: label };
+    if (iconText && isValidElement(command.icon)) next.icon = cloneElement(command.icon, undefined, iconText);
+    if (Array.isArray(command.children)) {
+      (next as { children?: ICommand[] }).children = localizeMarkdownCommands(command.children, localize, next);
+    }
+    return next;
+  });
+}
+
+function useLocalizedMarkdownCommands() {
+  const t = useTranslations("Editor.markdown");
+  return useMemo(() => {
+    // Shortcut bindings stay library data ("ctrlcmd+shift+j"); only the
+    // modifier names in the hint are localized.
+    const shortcut = (binding: string | undefined) =>
+      (binding ?? "")
+        .split("+")
+        .map((key) =>
+          key === "ctrlcmd" || key === "ctrl" ? t("keys.ctrl") : key === "shift" ? t("keys.shift") : key
+        )
+        .join(" + ");
+    const localize = (command: ICommand): MarkdownCommandText => {
+      const heading = /^heading([1-6])$/.exec(command.name ?? "");
+      if (heading) {
+        const level = Number(heading[1]);
+        return {
+          label: t("commands.heading", { level, shortcut: shortcut(command.shortcuts) }),
+          iconText: t("headingIcon", { level })
+        };
+      }
+      if (!isMarkdownCommandName(command.name)) return {};
+      return {
+        label: t(`commands.${MARKDOWN_COMMAND_KEYS[command.name]}`, { shortcut: shortcut(command.shortcuts) })
+      };
+    };
+    return {
+      commands: localizeMarkdownCommands(markdownCommands.getCommands(), localize),
+      extraCommands: localizeMarkdownCommands(markdownCommands.getExtraCommands(), localize)
+    };
+  }, [t]);
+}
 
 const DEFAULT_EDITOR_HEIGHT = 440;
 const MIN_EDITOR_HEIGHT = 60;
@@ -25,6 +114,7 @@ export default function ComposeMarkdownEditor({
   const [editorHeight, setEditorHeight] = useState(DEFAULT_EDITOR_HEIGHT);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [localValue, setLocalValue] = useState(value);
+  const { commands, extraCommands } = useLocalizedMarkdownCommands();
 
   // Detect dark mode from Radix theme
   useEffect(() => {
@@ -85,6 +175,8 @@ export default function ComposeMarkdownEditor({
           onChange(nextVal);
         }}
         preview="live"
+        commands={commands}
+        extraCommands={extraCommands}
         previewOptions={{
           // Mail compose treats single newlines as intentional line breaks.
           pluginsFilter(type, plugins) {

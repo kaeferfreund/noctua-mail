@@ -144,3 +144,19 @@ test("reminder leads read in whole minutes, hours or days in both locales", () =
     expect(en("Shell.status.reminderLead", { unit, count })).toBe(english);
   }
 });
+
+test("generated correspondence keeps user text opaque and uses recognizable German markers", () => {
+  const t = getTranslator("de");
+  expect(t("Compose.generated.replyHeader", { date: "01.01.2024, 13:00", sender: "Synthetic {opaque} <a@example.test>" }))
+    .toBe("Am 01.01.2024, 13:00 schrieb Synthetic {opaque} <a@example.test>:");
+  expect(getTranslator("en")("Compose.generated.replyHeader", { date: "01/01/2024, 13:00", sender: "Synthetic" }))
+    .toBe("On 01/01/2024, 13:00, Synthetic wrote:");
+  expect(Object.values(de.Compose.generated.forwardFields)).toEqual(["Von", "Antwort an", "Datum", "Betreff", "An", "Cc"]);
+});
+
+test("DeepL language names are localized by stable code and English keeps the shared labels", async () => {
+  const { DEEPL_TARGET_LANGUAGES } = await import("@/lib/deeplLanguages");
+  expect(Object.keys(de.Settings.translation.languages)).toEqual(DEEPL_TARGET_LANGUAGES.map(language => language.code));
+  expect(Object.values(en.Settings.translation.languages)).toEqual(DEEPL_TARGET_LANGUAGES.map(language => language.label));
+  expect(getTranslator("de")("Settings.translation.languages.EN-US")).toBe("Englisch (amerikanisch)");
+});

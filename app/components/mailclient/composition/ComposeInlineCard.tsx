@@ -1,4 +1,5 @@
 import { ArrowUpRight, ExternalLink } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Badge, Card } from "@radix-ui/themes";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import ComposeFields from "./ComposeFields";
@@ -61,18 +62,8 @@ export default function ComposeInlineCard() {
     composeMessageField
   } = useComposeContext();
 
-  const composeModeLabel =
-    composeMode === "reply"
-      ? "Reply"
-      : composeMode === "replyAll"
-        ? "Reply all"
-        : composeMode === "forward"
-          ? "Forward"
-          : composeMode === "edit"
-            ? "Edit draft"
-            : composeMode === "editAsNew"
-              ? "Edit as New"
-              : "New message";
+  const t = useTranslations("Compose");
+  const composeModeLabel = t(`modes.${composeMode}`);
 
   return (
     <Card
@@ -101,7 +92,7 @@ export default function ComposeInlineCard() {
               <TooltipIconButton
                 variant="ghost"
                 size="2"
-                tooltip="Open in modal"
+                tooltip={t("window.openInModal")}
                 onClick={popOutCompose}
               >
                 <ArrowUpRight size={14} />
@@ -110,8 +101,8 @@ export default function ComposeInlineCard() {
                 <TooltipIconButton
                   variant="ghost"
                   size="2"
-                  tooltip="Open in new window"
-                  aria-label="Open composer in new window"
+                  tooltip={t("window.openInNewWindow")}
+                  aria-label={t("window.openComposerInNewWindow")}
                   onClick={openComposeInNewWindow}
                   disabled={detachingCompose || sendingMail || discardingDraft}
                 >

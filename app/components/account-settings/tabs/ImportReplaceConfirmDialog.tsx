@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { AlertDialog, Button, Flex } from "@radix-ui/themes";
 import AlertDialogContent from "@/app/components/mailclient/message/AlertDialogContent";
 
@@ -20,6 +21,7 @@ export default function ImportReplaceConfirmDialog({
   onOpenChange,
   onConfirm
 }: ImportReplaceConfirmDialogProps) {
+  const t = useTranslations("Settings.common");
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent size="2">
@@ -28,7 +30,7 @@ export default function ImportReplaceConfirmDialog({
         <Flex gap="3" mt="4" justify="end">
           <AlertDialog.Cancel>
             <Button variant="soft" color="gray">
-              Cancel
+              {t("cancel")}
             </Button>
           </AlertDialog.Cancel>
           <AlertDialog.Action>

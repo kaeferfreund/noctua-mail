@@ -19,6 +19,7 @@ import {
   KEY_BACKSPACE_COMMAND,
   KEY_DELETE_COMMAND
 } from "lexical";
+import { useTranslations } from "next-intl";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import {
@@ -183,6 +184,7 @@ function ImageComponent({
   nodeKey: NodeKey;
 }) {
   const [editor] = useLexicalComposerContext();
+  const t = useTranslations("Editor.image");
   const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);
   const imageRef = useRef<HTMLImageElement | null>(null);
   // Live size shown while dragging a handle; committed to the node on release.
@@ -392,7 +394,7 @@ function ImageComponent({
         height={renderHeight}
         draggable={false}
         onDoubleClick={handleReset}
-        title={isSelected ? "Drag a corner to resize · double-click to reset" : undefined}
+        title={isSelected ? t("resizeHint") : undefined}
         style={{
           display: "block",
           maxWidth: "100%",
@@ -426,8 +428,8 @@ function ImageComponent({
             <button
               key={corner}
               type="button"
-              aria-label="Resize image (use arrow keys; hold shift for larger steps)"
-              title="Resize"
+              aria-label={t("resizeLabel")}
+              title={t("resize")}
               onPointerDown={handleResizeStart(corner)}
               onKeyDown={handleResizeKeyDown}
               style={style}
