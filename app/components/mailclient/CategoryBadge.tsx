@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Badge } from "@radix-ui/themes";
 import { getFlagBadgeColor } from "@/lib/ui/badgeColors";
 import badgeStyles from "./message/MessageBadge.module.css";
@@ -10,17 +11,19 @@ type CategoryBadgeProps = {
   size?: "1" | "2" | "3";
 };
 
-const CATEGORY_CONFIG: Record<EmailCategory, { icon: string; label: string }> = {
-  newsletter: { icon: "📰", label: "Newsletter" },
-  notification: { icon: "🔔", label: "Notification" },
-  transactional: { icon: "🧾", label: "Transactional" }
+const CATEGORY_CONFIG: Record<EmailCategory, { icon: string }> = {
+  newsletter: { icon: "📰" },
+  notification: { icon: "🔔" },
+  transactional: { icon: "🧾" }
 };
 
 export default function CategoryBadge({ category, showText = false, size = "1" }: CategoryBadgeProps) {
+  const t = useTranslations("Reader.categories");
   const config = CATEGORY_CONFIG[category];
   if (!config) return null;
 
-  const displayText = showText ? `${config.icon} ${config.label}` : config.icon;
+  const label = t(category);
+  const displayText = showText ? `${config.icon} ${label}` : config.icon;
 
   return (
     <Badge
@@ -28,8 +31,8 @@ export default function CategoryBadge({ category, showText = false, size = "1" }
       variant="soft"
       color={getFlagBadgeColor(`category-${category}`)}
       className={badgeStyles.badge}
-      title={config.label}
-      aria-label={config.label}
+      title={label}
+      aria-label={label}
     >
       {displayText}
     </Badge>

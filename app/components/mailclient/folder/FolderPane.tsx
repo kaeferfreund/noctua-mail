@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { MoreVertical, X } from "lucide-react";
 import { DropdownMenu, TextField } from "@radix-ui/themes";
@@ -31,15 +32,16 @@ type FolderPaneProps = {
  * actions menu, the folder search field and the folder tree (children).
  */
 export default function FolderPane({ state, actions, children }: FolderPaneProps) {
+  const t = useTranslations("List");
   const { folderQuery, accountFolderCount, isRecomputingThreads, isRecomputingCategories } = state;
   const { setFolderQuery, syncAccount, recomputeThreads, recomputeCategories } = actions;
 
   return (
-    <SidebarGroup aria-label="Folders">
+    <SidebarGroup aria-label={t("folders")}>
       <div className={styles.treeHeader}>
         <div>
-          <SidebarGroupLabel>Folders</SidebarGroupLabel>
-          <div className={styles.panelMeta}>{accountFolderCount} total</div>
+          <SidebarGroupLabel>{t("folders")}</SidebarGroupLabel>
+          <div className={styles.panelMeta}>{t("folderCount", { count: accountFolderCount })}</div>
         </div>
         <div className={styles.treeHeaderActions}>
           <DropdownMenu.Root>
@@ -48,36 +50,28 @@ export default function FolderPane({ state, actions, children }: FolderPaneProps
                 variant="ghost"
                 size="1"
                 className={styles.treeAction}
-                tooltip="Folder actions"
+                tooltip={t("folderActions")}
               >
                 <MoreVertical size={14} />
               </TooltipIconButton>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content align="end" className={styles.menuContent}>
-              <DropdownMenu.Item onSelect={() => syncAccount(undefined, "new")}>
-                Sync New Messages
-              </DropdownMenu.Item>
+              <DropdownMenu.Item onSelect={() => syncAccount(undefined, "new")}>{t("syncNew")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 onSelect={() =>
                   syncAccount(undefined, "full", {
-                    fullSyncReason: "Manual full mailbox sync from the folder pane."
+                    fullSyncReason: t("manualMailboxSyncReason")
                   })
                 }
-              >
-                Full Mailbox Sync
-              </DropdownMenu.Item>
+              >{t("fullMailboxSync")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 onSelect={() => recomputeThreads()}
                 disabled={isRecomputingThreads}
-              >
-                Recompute Threads
-              </DropdownMenu.Item>
+              >{t("recomputeThreads")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 onSelect={() => recomputeCategories()}
                 disabled={isRecomputingCategories}
-              >
-                Recompute Categories
-              </DropdownMenu.Item>
+              >{t("recomputeCategories")}</DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </div>
@@ -86,7 +80,7 @@ export default function FolderPane({ state, actions, children }: FolderPaneProps
         <TextField.Root
           size="2"
           type="search"
-          placeholder="Search folders"
+          placeholder={t("searchFolders")}
           value={folderQuery}
           onChange={(event) => setFolderQuery(event.target.value)}
           id="folder-search-input"
@@ -98,7 +92,7 @@ export default function FolderPane({ state, actions, children }: FolderPaneProps
                 size="1"
                 variant="ghost"
                 onClick={() => setFolderQuery("")}
-                tooltip="Clear folder search"
+                tooltip={t("clearFolderSearch")}
               >
                 <X size={12} />
               </TooltipIconButton>

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { Fragment, useState } from "react";
 import {
@@ -165,6 +166,7 @@ export default function MessageMenu({
   isSpamFolder,
   onOpenChange
 }: MessageMenuProps) {
+  const t = useTranslations("Reader");
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const rowReadAction = origin === "thread" ? undefined : readAction;
@@ -214,14 +216,14 @@ export default function MessageMenu({
       ? [
           buildItem(
             "todo",
-            "Mark as Done",
+            t("markDone"),
             <CheckSquare size={14} />,
             () => toggleTodoFlag(message),
             isDisabled("todo")
           ),
           buildItem(
             "unmarkTodo",
-            "Unmark as To-Do",
+            t("unmarkTodo"),
             <Square size={14} />,
             () => clearTodoFlag(message),
             isDisabled("todo")
@@ -230,7 +232,7 @@ export default function MessageMenu({
       : [
           buildItem(
             "todo",
-            "Mark as To-Do",
+            t("markTodo"),
             hasDone ? <SquareCheckBig size={14} /> : <Square size={14} />,
             () => toggleTodoFlag(message),
             isDisabled("todo")
@@ -244,8 +246,9 @@ export default function MessageMenu({
         <TooltipIconButton
           variant="ghost"
           size="1"
-          tooltip="Message actions"
-          aria-label="Message actions"
+          tooltip={t("messageActions")}
+          data-message-action="menu"
+          aria-label={t("messageActions")}
           className={isMobile ? mobileStyles.messageMore : undefined}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => event.stopPropagation()}
@@ -262,7 +265,7 @@ export default function MessageMenu({
           [
             isDraft
               ? isVisible("editDraft")
-                ? buildItem("editDraft", "Edit draft", <Edit3 size={14} />, () =>
+                ? buildItem("editDraft", t("editDraft"), <Edit3 size={14} />, () =>
                   openCompose("edit", message)
                   )
                 : null
@@ -270,34 +273,34 @@ export default function MessageMenu({
             isDraft && onSendDraft && isVisible("sendDraft")
               ? buildItem(
                   "sendDraft",
-                  "Send draft",
+                  t("sendDraft"),
                   <Send size={14} />,
                   () => void onSendDraft(message),
                   !canSendDraft
                 )
               : null,
             isDraft && onDiscardDraft && isVisible("discardDraft")
-              ? buildItem("discardDraft", "Discard draft", <Trash2 size={14} />, () =>
+              ? buildItem("discardDraft", t("discardDraft"), <Trash2 size={14} />, () =>
                   void onDiscardDraft(message)
                 )
               : null,
             isVisible("reply")
-              ? buildItem("reply", "Reply", <Reply size={14} />, () =>
+              ? buildItem("reply", t("reply"), <Reply size={14} />, () =>
                   openCompose("reply", message)
                 , isDisabled("reply"))
               : null,
             isVisible("replyAll")
-              ? buildItem("replyAll", "Reply all", <ReplyAll size={14} />, () =>
+              ? buildItem("replyAll", t("replyAll"), <ReplyAll size={14} />, () =>
                   openCompose("replyAll", message)
                 , isDisabled("replyAll"))
               : null,
             isVisible("forward")
-              ? buildItem("forward", "Forward", <Forward size={14} />, () =>
+              ? buildItem("forward", t("forward"), <Forward size={14} />, () =>
                   openCompose("forward", message)
                 , isDisabled("forward"))
               : null,
             isVisible("editAsNew")
-              ? buildItem("editAsNew", "Edit as New", <FileText size={14} />, () =>
+              ? buildItem("editAsNew", t("editAsNew"), <FileText size={14} />, () =>
                   openCompose("editAsNew", message, true)
                 , isDisabled("editAsNew"))
               : null
@@ -306,7 +309,7 @@ export default function MessageMenu({
             isVisible("markRead")
               ? buildItem(
                   "markRead",
-                  seen ? "Mark as unread" : "Mark as read",
+                  seen ? t("markUnread") : t("markRead"),
                   seen ? <MailOpen size={14} /> : <Mail size={14} />,
                   () => rowReadAction ? rowReadAction.onSelect() : updateFlagState(message, "seen", !message.seen),
                   isDisabled("markRead")
@@ -315,7 +318,7 @@ export default function MessageMenu({
             isVisible("flag")
               ? buildItem(
                   "flag",
-                  message.flagged ? "Unflag" : "Flag",
+                  message.flagged ? t("unflag") : t("flag"),
                   <Flag size={14} />,
                   () => updateFlagState(message, "flagged", !message.flagged),
                   isDisabled("flag")
@@ -325,7 +328,7 @@ export default function MessageMenu({
             isVisible("answered")
               ? buildItem(
                   "answered",
-                  message.answered ? "Unmark answered" : "Mark answered",
+                  message.answered ? t("unmarkAnswered") : t("markAnswered"),
                   <MailCheck size={14} />,
                   () => updateFlagState(message, "answered", !message.answered),
                   isDisabled("answered")
@@ -336,7 +339,7 @@ export default function MessageMenu({
             isVisible("spam")
               ? buildItem(
                   "spam",
-                  inSpamFolder ? "Mark as not Spam" : "Mark as Spam",
+                  inSpamFolder ? t("notSpam") : t("markSpam"),
                   inSpamFolder ? <Shield size={14} /> : <ShieldOff size={14} />,
                   () => (inSpamFolder ? handleMarkNotSpam(message) : handleMarkSpam(message)),
                   isDisabled("spam")
@@ -345,7 +348,7 @@ export default function MessageMenu({
             isVisible("archive")
               ? buildItem(
                   "archive",
-                  "Archive",
+                  t("archive"),
                   <Archive size={14} />,
                   () => handleArchiveMessage(message),
                   isDisabled("archive")
@@ -358,7 +361,7 @@ export default function MessageMenu({
                       <span className={styles.menuIcon}>
                         <Tags size={14} />
                       </span>
-                      <span className={styles.menuLabel}>Category</span>
+                      <span className={styles.menuLabel}>{t("category")}</span>
                     </DropdownMenu.SubTrigger>
                     <Theme asChild><DropdownMenu.SubContent className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}>
                       <DropdownMenu.Item
@@ -367,7 +370,7 @@ export default function MessageMenu({
                           handleSetCategory(message, null);
                         }}
                       >
-                        {menuRadioLabel(selectedCategory === null, "Inbox / none")}
+                        {menuRadioLabel(selectedCategory === null, t("inboxNone"))}
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item
@@ -376,7 +379,7 @@ export default function MessageMenu({
                           handleSetCategory(message, "newsletter");
                         }}
                       >
-                        {menuRadioLabel(selectedCategory === "newsletter", "📰 Newsletters")}
+                        {menuRadioLabel(selectedCategory === "newsletter", t("newsletters"))}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         onSelect={(event) => {
@@ -384,7 +387,7 @@ export default function MessageMenu({
                           handleSetCategory(message, "notification");
                         }}
                       >
-                        {menuRadioLabel(selectedCategory === "notification", "🔔 Notifications")}
+                        {menuRadioLabel(selectedCategory === "notification", t("notifications"))}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         onSelect={(event) => {
@@ -392,7 +395,7 @@ export default function MessageMenu({
                           handleSetCategory(message, "transactional");
                         }}
                       >
-                        {menuRadioLabel(selectedCategory === "transactional", "🧾 Transactional")}
+                        {menuRadioLabel(selectedCategory === "transactional", t("transactional"))}
                       </DropdownMenu.Item>
                     </DropdownMenu.SubContent></Theme>
                   </DropdownMenu.Sub>
@@ -406,11 +409,11 @@ export default function MessageMenu({
                   >
                     <DropdownMenu.SubTrigger disabled={isDisabled("topics")}>
                       <span className={styles.menuIcon}><Tags size={14} /></span>
-                      <span className={styles.menuLabel}>Topics</span>
+                      <span className={styles.menuLabel}>{t("topics")}</span>
                     </DropdownMenu.SubTrigger>
                     <Theme asChild><DropdownMenu.SubContent className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}>
                       {suggestions.length > 0 && (
-                        <DropdownMenu.Label>Suggested</DropdownMenu.Label>
+                        <DropdownMenu.Label>{t("suggested")}</DropdownMenu.Label>
                       )}
                       {suggestions.map((topic: Topic) => {
                         const assigned = message.topics?.some((t) => t.id === topic.id) ?? false;
@@ -442,7 +445,7 @@ export default function MessageMenu({
                         return (
                           <>
                             <DropdownMenu.Separator />
-                            <DropdownMenu.Label>All topics</DropdownMenu.Label>
+                            <DropdownMenu.Label>{t("allTopics")}</DropdownMenu.Label>
                             {rest.map((topic) => {
                               const assigned = message.topics?.some((t) => t.id === topic.id) ?? false;
                               return (
@@ -463,7 +466,7 @@ export default function MessageMenu({
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item onSelect={() => onAssignTopics(message)}>
                         <span className={styles.menuIcon}><Tags size={14} /></span>
-                        <span className={styles.menuLabel}>Manage topics...</span>
+                        <span className={styles.menuLabel}>{t("manageTopics")}</span>
                       </DropdownMenu.Item>
                     </DropdownMenu.SubContent></Theme>
                   </DropdownMenu.Sub>
@@ -472,7 +475,7 @@ export default function MessageMenu({
             isVisible("unsubscribe") && getUnsubscribeCapability(message)
               ? buildItem(
                   "unsubscribe",
-                  "Unsubscribe",
+                  t("unsubscribe"),
                   <MailX size={14} />,
                   () => handleUnsubscribe(message),
                   isDisabled("unsubscribe")
@@ -492,7 +495,7 @@ export default function MessageMenu({
             hasOtherAccounts && onCopyToAccount && isVisible("copyToAccount")
               ? buildItem(
                   "copyToAccount",
-                  "Copy to account...",
+                  t("copyAccount"),
                   <Copy size={14} />,
                   () => onCopyToAccount(message),
                   isDisabled("copyToAccount")
@@ -501,7 +504,7 @@ export default function MessageMenu({
             hasOtherAccounts && onMoveToAccount && isVisible("moveToAccount")
               ? buildItem(
                   "moveToAccount",
-                  "Move to account...",
+                  t("moveAccount"),
                   <ArrowRightLeft size={14} />,
                   () => onMoveToAccount(message),
                   isDisabled("moveToAccount")
@@ -510,7 +513,7 @@ export default function MessageMenu({
             showDeleteInMenu && isVisible("delete")
               ? buildItem(
                   "delete",
-                  isTrashFolder(message.folderId) ? "Delete permanently" : "Move to Trash",
+                  isTrashFolder(message.folderId) ? t("deletePermanent") : t("moveTrash"),
                   <Trash2 size={14} />,
                   () => handleDeleteMessage(message, { allowThreadDeletion }),
                   isDisabled("delete")
@@ -521,7 +524,7 @@ export default function MessageMenu({
             isVisible("showRelated")
               ? buildItem(
                   "showRelated",
-                  "Find related",
+                  t("findRelated"),
                   <Search size={14} />,
                   () => onShowRelated(message),
                   isDisabled("showRelated")
@@ -530,7 +533,7 @@ export default function MessageMenu({
             isVisible("showThread")
               ? buildItem(
                   "showThread",
-                  "Show thread",
+                  t("showThread"),
                   <ListTree size={14} />,
                   () => onShowThread(message),
                   isDisabled("showThread")
@@ -539,7 +542,7 @@ export default function MessageMenu({
             isVisible("openWindow")
               ? buildItem(
                   "openWindow",
-                  "Open in new window",
+                  t("openWindow"),
                   <SquareArrowOutUpRight size={14} />,
                   () => handleOpenInNewWindow(message),
                   isDisabled("openWindow")
@@ -548,7 +551,7 @@ export default function MessageMenu({
             isVisible("openHtmlWindow")
               ? buildItem(
                   "openHtmlWindow",
-                  "Open HTML in new window",
+                  t("openHtmlWindow"),
                   <SquareArrowOutUpRight size={14} />,
                   () => handleOpenHtmlInNewWindow(message),
                   isDisabled("openHtmlWindow")
@@ -557,7 +560,7 @@ export default function MessageMenu({
             isVisible("downloadEml")
               ? buildItem(
                   "downloadEml",
-                  "Download EML",
+                  t("downloadEml"),
                   <Download size={14} />,
                   () => handleDownloadEml(message),
                   isDisabled("downloadEml")
@@ -566,7 +569,7 @@ export default function MessageMenu({
             isVisible("resync")
               ? buildItem(
                   "resync",
-                  "Re-Sync",
+                  t("resync"),
                   <RefreshCw size={14} />,
                   () => handleResyncMessage(message),
                   isDisabled("resync")

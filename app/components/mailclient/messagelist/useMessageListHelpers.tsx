@@ -1,7 +1,8 @@
+import { useLocale } from "next-intl";
 import { useCallback } from "react";
 import type React from "react";
 import type { Folder, Message } from "@/lib/data";
-import { isMessageFlagged } from "../utils/messageHelpers";
+import { isMessageFlagged, messageGroupLabel } from "../utils/messageHelpers";
 import FolderBadges from "../folder/FolderBadges";
 import MessageSelectIndicators from "./MessageSelectIndicators";
 
@@ -22,6 +23,7 @@ export function useMessageListHelpers({
   setSearchScope,
   setActiveFolderId
 }: UseMessageListHelpersParams) {
+  const locale = useLocale();
   const folderById = useCallback(
     (id: string) => folders.find((folder) => folder.id === id),
     [folders]
@@ -63,9 +65,9 @@ export function useMessageListHelpers({
       if (groupBy === "folder") {
         return threadPathById(group.key);
       }
-      return group.label ?? group.key;
+      return messageGroupLabel(group.key, groupBy, locale, group.label ?? group.key);
     },
-    [groupBy, threadPathById]
+    [groupBy, locale, threadPathById]
   );
 
   return {

@@ -204,7 +204,7 @@ export default function CalendarEventBrowser({
       type: "success",
       title: DELETE_TITLES[scope],
       description: event.summary,
-      actionLabel: "UNDO",
+      actionKind: "undo",
       onAction: () => handleRestoreDeletedEvent(event, scope),
       durationMs: NOTICE_TIMEOUTS.success
     });

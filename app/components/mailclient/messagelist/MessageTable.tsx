@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import { useEffect, useRef, useState } from "react";
@@ -43,6 +44,8 @@ export default function MessageTable({
   helpers,
   refs
 }: MessageTableProps) {
+  const locale = useLocale();
+  const t = useTranslations("List");
   const {
     groupedMessages,
     visibleMessages,
@@ -173,7 +176,7 @@ export default function MessageTable({
               visibleMessages.length > 0 &&
               visibleMessages.every((item) => selectedMessageIds.has(item.message.id))
             }
-            aria-label="Select all"
+            aria-label={t("selectAll")}
             onClick={(event) => {
               event.stopPropagation();
               const allIds = visibleMessages.map((item) => item.message.id);
@@ -199,9 +202,7 @@ export default function MessageTable({
               setSortKey("from");
               setSortDir(sortDir === "asc" ? "desc" : "asc");
             }}
-          >
-            From/To
-          </button>
+          >{t("fromTo")}</button>
         </div>
         <div data-message-cell="subject" className={styles.cellSubject}>
           <button
@@ -210,17 +211,13 @@ export default function MessageTable({
               setSortKey("subject");
               setSortDir(sortDir === "asc" ? "desc" : "asc");
             }}
-          >
-            Subject
-          </button>
+          >{t("subject")}</button>
         </div>
         {showMessageSize && (
           <div
             data-message-cell="size" className={styles.cellSize}
-            title="Largest first across the whole folder — change it with the Sort control"
-          >
-            Size
-          </div>
+            title={t("sizeSortHint")}
+          >{t("size")}</div>
         )}
         <div data-message-cell="date" className={styles.cellDate}>
           <button
@@ -229,9 +226,7 @@ export default function MessageTable({
               setSortKey("date");
               setSortDir(sortDir === "asc" ? "desc" : "asc");
             }}
-          >
-            Date
-          </button>
+          >{t("date")}</button>
         </div>
         <div data-message-cell="actions" className={styles.cellActions} aria-hidden="true">
           {"\u00A0"}
@@ -277,7 +272,7 @@ export default function MessageTable({
           const dateDisplay = getMessageListDateDisplay(
             item.displayDateValue,
             item.displayDate,
-            dateFormat
+            dateFormat, locale
           );
           const {
             isThreadSelectionRoot,
@@ -405,7 +400,8 @@ export default function MessageTable({
                   <Checkbox
                     size="1"
                     checked={effectiveCheckboxState}
-                    aria-label="Select message"
+                    data-message-select="message"
+                    aria-label={t("selectMessage")}
                     disabled={isDisabled}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -434,7 +430,7 @@ export default function MessageTable({
                         className={`${styles.threadCaret} ${
                           item.isCollapsed ? "" : styles.threadCaretOpen
                         }`}
-                        title={item.isCollapsed ? "Expand thread" : "Collapse thread"}
+                        title={item.isCollapsed ? t("expandThread") : t("collapseThread")}
                         onPointerDown={(event) => {
                           event.stopPropagation();
                         }}
@@ -455,7 +451,7 @@ export default function MessageTable({
                         className={`${badgeStyles.badge} ${styles.threadIndicatorInline}`}
                       >
                         <GitBranch size={12} />
-                        <span>{item.threadSize}</span>
+                        <span title={t("threadMessageCount", { count: item.threadSize ?? 0 })}>{item.threadSize}</span>
                       </Badge>
                     </>
                   ) : (
@@ -463,7 +459,7 @@ export default function MessageTable({
                       <CaretRightIcon />
                     </span>
                   )}
-                  {!displaySeen && <VisuallyHidden>Unread</VisuallyHidden>}
+                  {!displaySeen && <VisuallyHidden>{t("unread")}</VisuallyHidden>}
                   {!item.showRecipientIcon && (
                     <SenderIcon
                       accountId={message.accountId}
@@ -476,7 +472,7 @@ export default function MessageTable({
                     />
                   )}
                   {item.showRecipientIcon && (
-                    <span className={styles.recipientIcon} title="Recipients" aria-label="Recipients">
+                    <span className={styles.recipientIcon} title={t("recipients")} aria-label={t("recipients")}>
                       <MoveRight size={12} />
                     </span>
                   )}
@@ -520,8 +516,8 @@ export default function MessageTable({
                 </span>
                 {showMessageSize && (
                   <span data-message-cell="size" className={styles.cellSize}>
-                    <Text as="span" size="1" title={describeMessageSize(message.sizeBytes).title}>
-                      {describeMessageSize(message.sizeBytes).label}
+                    <Text as="span" size="1" title={describeMessageSize(message.sizeBytes, locale).title}>
+                      {describeMessageSize(message.sizeBytes, locale).label}
                     </Text>
                   </span>
                 )}
@@ -537,10 +533,11 @@ export default function MessageTable({
                     color="gray"
                     tooltip={
                       isTrashFolder(message.folderId)
-                        ? "Delete permanently"
-                        : "Move to Trash"
+                        ? t("deletePermanent")
+                        : t("moveTrash")
                     }
-                    aria-label="Delete"
+                    data-message-action="delete"
+                    aria-label={t("delete")}
                     disabled={pendingMessageActions.has(message.id)}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -553,7 +550,8 @@ export default function MessageTable({
                     size="1"
                     variant="ghost"
                     color="gray"
-                    tooltip="Find related"
+                    data-message-action="related"
+                    tooltip={t("findRelated")}
                     disabled={pendingMessageActions.has(message.id)}
                     onClick={(event) => {
                       event.stopPropagation();

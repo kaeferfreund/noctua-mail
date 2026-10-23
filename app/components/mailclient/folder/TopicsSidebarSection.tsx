@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useMemo, type CSSProperties } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Topic } from "@/lib/data";
@@ -23,6 +24,7 @@ export default function TopicsSidebarSection({
   collapsed = false,
   onToggleCollapsed
 }: TopicsSidebarSectionProps) {
+  const t = useTranslations("List");
   const sidebarTopics = useMemo(() => {
     const items = [...topics];
     items.sort((a, b) => {
@@ -42,9 +44,9 @@ export default function TopicsSidebarSection({
         type="button"
         className={`${styles.treeHeader} ${topicStyles.header} ${topicStyles.headerBtn}`}
         onClick={onToggleCollapsed}
-        title={collapsed ? "Expand topics" : "Collapse topics"}
+        title={collapsed ? t("expandTopics") : t("collapseTopics")}
       >
-        <span className={styles.panelTitle}>Topics</span>
+        <span className={styles.panelTitle}>{t("topics")}</span>
         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
       </button>
       {!collapsed && sidebarTopics.map((topic) => (
@@ -69,11 +71,11 @@ export default function TopicsSidebarSection({
           type="button"
           className={`${styles.treeRow} ${activeTopicId === TOPIC_NONE_SENTINEL ? styles.treeRowActive : ""}`}
           onClick={() => onTopicClick(TOPIC_NONE_SENTINEL)}
-          title="Without topic"
+          title={t("withoutTopic")}
         >
           <span className={topicStyles.noTopicDash} />
           <span className={styles.treeName}>
-            <span className={styles.treeNameText}>Without topic</span>
+            <span className={styles.treeNameText}>{t("withoutTopic")}</span>
           </span>
         </button>
       )}

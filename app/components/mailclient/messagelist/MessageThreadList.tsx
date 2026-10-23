@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
@@ -50,6 +51,8 @@ export default function MessageThreadList({
   helpers,
   refs
 }: MessageThreadListProps) {
+  const locale = useLocale();
+  const t = useTranslations("List");
   const {
     groupedMessages,
     collapsedGroups,
@@ -191,7 +194,7 @@ export default function MessageThreadList({
         const dateDisplay = getMessageListDateDisplay(
           item.displayDateValue,
           item.displayDate,
-          dateFormat
+          dateFormat, locale
         );
         const isDragging = draggingMessageIds.has(message.id);
         const isActive = message.id === activeMessageId;
@@ -321,7 +324,7 @@ export default function MessageThreadList({
                     className={badgeStyles.badge}
                   >
                     <GitBranch size={12} />
-                    <span>{item.threadSize}</span>
+                    <span title={t("threadMessageCount", { count: item.threadSize ?? 0 })}>{item.threadSize}</span>
                   </Badge>
                 )}
 
@@ -330,7 +333,7 @@ export default function MessageThreadList({
                   fallbackTooltip={item.fromTooltip}
                 >
                   <span data-message-cell="from" className={styles.cellFrom} title={item.fromTooltip}>
-                    {!displaySeen && <VisuallyHidden>Unread</VisuallyHidden>}
+                    {!displaySeen && <VisuallyHidden>{t("unread")}</VisuallyHidden>}
                     {!item.showRecipientIcon && (
                       <SenderIcon
                         accountId={message.accountId}
@@ -345,8 +348,8 @@ export default function MessageThreadList({
                     {item.showRecipientIcon && (
                       <span
                         className={styles.recipientIcon}
-                        title="Recipients"
-                        aria-label="Recipients"
+                        title={t("recipients")}
+                        aria-label={t("recipients")}
                       >
                         <MoveRight size={12} />
                       </span>
@@ -365,8 +368,8 @@ export default function MessageThreadList({
                       variant="soft"
                       color={badgeColors.attachment}
                       className={badgeStyles.badge}
-                      title="Attachments"
-                      aria-label="Attachments"
+                      title={t("attachments")}
+                      aria-label={t("attachments")}
                     >
                       <Paperclip size={12} />
                     </Badge>
@@ -378,8 +381,8 @@ export default function MessageThreadList({
                       variant="soft"
                       color={badgeColors.calendarInvite}
                       className={badgeStyles.badge}
-                      title="Calendar invite"
-                      aria-label="Calendar invite"
+                      title={t("calendarInvite")}
+                      aria-label={t("calendarInvite")}
                     >
                       <CalendarDays size={12} />
                     </Badge>
@@ -440,8 +443,8 @@ export default function MessageThreadList({
 
                 {showMessageSize && (
                   <span data-message-cell="size" className={styles.cellSize}>
-                    <Text as="span" size="1" title={describeMessageSize(message.sizeBytes).title}>
-                      {describeMessageSize(message.sizeBytes).label}
+                    <Text as="span" size="1" title={describeMessageSize(message.sizeBytes, locale).title}>
+                      {describeMessageSize(message.sizeBytes, locale).label}
                     </Text>
                   </span>
                 )}
@@ -459,10 +462,11 @@ export default function MessageThreadList({
                     color="gray"
                     tooltip={
                       isTrashFolder(message.folderId)
-                        ? "Delete permanently"
-                        : "Move to Trash"
+                        ? t("deletePermanent")
+                        : t("moveTrash")
                     }
-                    aria-label="Delete"
+                    aria-label={t("delete")}
+                    data-message-action="delete"
                     disabled={pendingMessageActions.has(message.id)}
                     onClick={(event) => {
                       event.stopPropagation();

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import ThreadCollaborationBar from "@/app/components/collab/ThreadCollaborationBar";
 import { useInternalNoteDrafts } from "@/app/components/collab/useInternalNoteDrafts";
 import InternalNoteComposer from "@/app/components/collab/InternalNoteComposer";
@@ -239,6 +240,7 @@ function MessageViewOrchestratorImpl(
   { header, body }: MessageViewOrchestratorProps,
   ref: React.ForwardedRef<MessageViewOrchestratorHandle>
 ) {
+  const t = useTranslations("Reader");
   const [noteOpen, setNoteOpen] = useState(false);
   const activityRef = useRef<HTMLElement>(null);
   const noteDraft = useInternalNoteDrafts(body.activeAccountId, header.activeMessage?.threadId);
@@ -430,14 +432,14 @@ function MessageViewOrchestratorImpl(
       if (explanationRequestThreadIdRef.current !== normalizedThreadId) return;
       if (!res.ok || !data?.ok) {
         setTopicSuggestionExplanationError(
-          typeof data?.message === "string" ? data.message : "Failed to load explanation."
+          typeof data?.message === "string" ? data.message : t("explanationFailed")
         );
         return;
       }
       setTopicSuggestionExplanation((data.explanation ?? null) as TopicSuggestionExplanation | null);
     } catch {
       if (explanationRequestThreadIdRef.current !== normalizedThreadId) return;
-      setTopicSuggestionExplanationError("Failed to load explanation.");
+      setTopicSuggestionExplanationError(t("explanationFailed"));
     } finally {
       if (explanationRequestThreadIdRef.current === normalizedThreadId) {
         setTopicSuggestionExplanationLoading(false);
@@ -448,7 +450,8 @@ function MessageViewOrchestratorImpl(
     apiFetch,
     topicSuggestionExplanation,
     topicSuggestionExplanationLoading,
-    topicSuggestionExplanationThreadId
+    topicSuggestionExplanationThreadId,
+    t
   ]);
 
   const handleToggleActiveMessageTopic = useCallback(
@@ -522,12 +525,12 @@ function MessageViewOrchestratorImpl(
           });
           return;
         }
-        throw new Error(data?.message ?? "Translation failed.");
+        throw new Error(data?.message ?? t("translationFailed"));
       } catch (error) {
         // Ignore a stale error so a superseded request can't flip a newer view
         // into an error state.
         if (!isCurrentRequest()) return;
-        const messageText = error instanceof Error ? error.message : "Translation failed.";
+        const messageText = error instanceof Error ? error.message : t("translationFailed");
         setMessageTranslations((prev) => {
           const entry = prev[messageId];
           if (!entry) return prev;
@@ -543,7 +546,7 @@ function MessageViewOrchestratorImpl(
         });
       }
     },
-    [apiFetch, activeAccountId]
+    [apiFetch, activeAccountId, t]
   );
 
   const hideTranslation = useCallback((messageId: string) => {
@@ -695,8 +698,8 @@ function MessageViewOrchestratorImpl(
                       onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
                       style={{ flexShrink: 0 }}
                     >
-                      <SegmentedControl.Item value="compact">Compact</SegmentedControl.Item>
-                      <SegmentedControl.Item value="full">Full</SegmentedControl.Item>
+                      <SegmentedControl.Item value="compact">{t("compact")}</SegmentedControl.Item>
+                      <SegmentedControl.Item value="full">{t("full")}</SegmentedControl.Item>
                     </SegmentedControl.Root>
                   </Flex>
                   {threadTopics.length > 0 && (

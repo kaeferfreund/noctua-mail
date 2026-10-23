@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Check, Copy, List } from "lucide-react";
 import styles from "./ThreadMessageCard.module.css";
@@ -36,11 +37,13 @@ export default function MessageRecipientMetaField({
   onSearchByAddress,
   onComposeTo
 }: MessageRecipientMetaFieldProps) {
+  const t = useTranslations("Reader");
   const [expanded, setExpanded] = useState(false);
   const [copyOk, setCopyOk] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
   const valueRef = useRef<HTMLSpanElement | null>(null);
+  const displayLabel = { From: t("from"), To: t("to"), Cc: t("cc"), Bcc: t("bcc") }[label];
   const text = value ?? "";
   const normalizedCopyValue = copyValue?.trim() ?? "";
   const shouldMeasureOverflow = expandable && text.length > expandThreshold;
@@ -158,7 +161,7 @@ export default function MessageRecipientMetaField({
           variant="ghost"
           color="gray"
           className={`${styles.toCopy} ${copyActive ? styles.copyOk : ""}`}
-          tooltip={copyActive ? "Copied" : "Copy addresses"}
+          tooltip={copyActive ? t("copiedAddresses") : t("copyAddresses")}
           onClick={handleCopy}
         >
           <span className={styles.copyIconSwap} aria-hidden>
@@ -183,7 +186,7 @@ export default function MessageRecipientMetaField({
           variant="ghost"
           color="gray"
           className={styles.toCopy}
-          tooltip={aliasName ? "Manage recipient alias" : "Create recipient alias"}
+          tooltip={aliasName ? t("manageAlias") : t("createAlias")}
           onClick={onAliasAction}
         >
           <List size={12} />
@@ -195,7 +198,7 @@ export default function MessageRecipientMetaField({
   if (variant === "segment") {
     return (
       <div className={[styles.metaSegment, className].filter(Boolean).join(" ")}>
-        <span className={styles.metaLabel}>{label}:</span>
+        <span className={styles.metaLabel}>{displayLabel}:</span>
         {valueNode}
       </div>
     );
@@ -203,12 +206,12 @@ export default function MessageRecipientMetaField({
 
   return (
     <div className={[styles.metaLine, styles.metaLineTo, className].filter(Boolean).join(" ")}>
-      <span className={styles.metaLabel}>{label}:</span>
+      <span className={styles.metaLabel}>{displayLabel}:</span>
       <div className={styles.toWrapper}>
         {valueNode}
         {canToggle && (
           <button className={styles.moreButton} type="button" onClick={() => setExpanded((prev) => !prev)}>
-            {expanded ? "less..." : "more..."}
+            {expanded ? t("less") : t("more")}
           </button>
         )}
       </div>

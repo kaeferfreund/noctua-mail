@@ -1,3 +1,4 @@
+import { useLocale } from "next-intl";
 import { useMemo } from "react";
 import {
   buildMessageListItems,
@@ -24,9 +25,11 @@ export function useMessageListItems({
   mode,
   collapsedNestedMessages
 }: UseMessageListItemsParams): ListItem[] {
+  const locale = useLocale();
   return useMemo(
     () =>
       buildMessageListItems({
+        locale,
         groupedMessages,
         collapsedGroups,
         collapsedThreads,
@@ -44,6 +47,7 @@ export function useMessageListItems({
         collapsedNestedMessages
       }),
     [
+      locale,
       groupedMessages,
       collapsedGroups,
       collapsedThreads,
