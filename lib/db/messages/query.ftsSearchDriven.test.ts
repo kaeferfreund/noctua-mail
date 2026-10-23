@@ -792,3 +792,288 @@ describe("FTS-driven search on a corrupt FTS shard", () => {
     }
   });
 });
+
+/**
+ * QA-208: German spelling variants (ß ⇄ ss, umlaut ⇄ ae/oe/ue) are ORed
+ * inside each token's group, in the shared token builders, so legacy and
+ * FTS-driven search must stay byte-identical on a German corpus too.
+ */
+describe("German spelling variants in search (QA-208)", () => {
+  let fixture: Fixture;
+  const base = Date.UTC(2026, 2, 2, 9, 0, 0);
+  // Neutral ids: the whole raw query also substring-matches message,
+  // thread and local ids, so ids must not contain corpus words.
+  const id = {
+    strasseSharp: "q208-01",
+    strasseSs: "q208-02",
+    strasseUpper: "q208-03",
+    strasseAttachment: "q208-04",
+    gruesseUmlaut: "q208-05",
+    gruesseAscii: "q208-06",
+    gruesseSwiss: "q208-07",
+    uebermass: "q208-08",
+    uebermassAscii: "q208-09",
+    uebermassSwiss: "q208-10",
+    noel: "q208-11",
+    nolte: "q208-12",
+    fuss: "q208-13",
+    fussAscii: "q208-14",
+    massSharp: "q208-15",
+    massSs: "q208-16",
+    masseDimensions: "q208-17",
+    masseMass: "q208-18",
+    koeln: "q208-19",
+    koelnUmlaut: "q208-20",
+    poet: "q208-21",
+  };
+
+  beforeAll(async () => {
+    fixture = await createSharedShardFixture();
+    const a = fixture.a;
+    await a.api.saveFoldersForAccount(a.accountId, [
+      { id: "inbox", accountId: a.accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" },
+      { id: "archive", accountId: a.accountId, name: "Archive", count: 0 }
+    ]);
+    const msg = (localId: string, threadId: string, overrides: Parameters<typeof a.message>[1], day: number) =>
+      a.message(threadId, {
+        id: localId,
+        messageId: `<${localId}@example.test>`,
+        folderId: "inbox",
+        subject: "Synthetische Nachricht",
+        body: "Synthetischer Text",
+        preview: "Synthetische Vorschau",
+        dateValue: base + day * 86_400_000,
+        date: new Date(base + day * 86_400_000).toISOString(),
+        ...overrides
+      });
+    await a.api.upsertMessages(a.accountId, null, [
+      msg(id.strasseSharp, "q208-t01", { subject: "Hauptstraße gesperrt", body: "Die Straße ist ab Montag gesperrt", from: "verkehr@example.test", unread: true }, 1),
+      msg(id.strasseSs, "q208-t01", { subject: "Lieferung Lindenstrasse", body: "Strasse und Hausnummer fehlen", from: "mueller@example.test" }, 2),
+      msg(id.strasseUpper, "q208-t02", { subject: "STRASSENSPERRUNG HEUTE", body: "Umleitung beachten", folderId: "archive" }, 3),
+      msg(id.strasseAttachment, "q208-t03", {
+        subject: "Plan im Anhang",
+        body: "Siehe Datei",
+        attachments: [{ id: "de-att-1", filename: "Straßenplan-2026.pdf", contentType: "application/pdf", size: 2048, inline: false }]
+      }, 4),
+      msg(id.gruesseUmlaut, "q208-t04", { body: "Viele Grüße aus Berlin", from: "jo@example.test" }, 5),
+      msg(id.gruesseAscii, "q208-t04", { body: "Viele Gruesse vom Team", from: "mueller@example.test" }, 6),
+      msg(id.gruesseSwiss, "q208-t05", { body: "Freundliche Grüsse aus Zürich", folderId: "archive" }, 7),
+      msg(id.uebermass, "q208-t06", { subject: "Übermaß an Terminen", body: "Kalender voll" }, 8),
+      msg(id.uebermassAscii, "q208-t06", { subject: "Re: uebermass an Terminen", body: "Kalender leeren" }, 9),
+      msg(id.uebermassSwiss, "q208-t07", { body: "Ein Übermass an Arbeit" }, 10),
+      msg(id.noel, "q208-t08", { subject: "Joyeux Noël", body: "Feiertagsgruß" }, 11),
+      msg(id.nolte, "q208-t09", { subject: "Termin mit Frau Nolte", body: "Rückruf erbeten" }, 12),
+      msg(id.fuss, "q208-t10", { subject: "Fußweg gesperrt", body: "Bitte zu Fuß gehen" }, 13),
+      msg(id.fussAscii, "q208-t10", { subject: "Fussweg Umleitung", body: "Fussgaenger bitte links" }, 14),
+      msg(id.massSharp, "q208-t11", { subject: "Maß halten", body: "Ein Maß Bier" }, 15),
+      msg(id.massSs, "q208-t11", { subject: "Mass nehmen", body: "Mass und Ziel" }, 16),
+      msg(id.masseDimensions, "q208-t12", { subject: "Maße der Kiste", body: "Breite und Höhe" }, 17),
+      msg(id.masseMass, "q208-t15", { subject: "Masse der Ladung", body: "Gewicht in Kilogramm" }, 18),
+      msg(id.koeln, "q208-t13", { subject: "Treffen in Koeln", body: "Groessenaenderung der Fussgaengeruebergaenge" }, 19),
+      msg(id.koelnUmlaut, "q208-t13", { subject: "Treffen in Köln", body: "Größenänderung der Fußgängerübergänge" }, 20),
+      msg(id.poet, "q208-t14", { subject: "Potsdam Ausflug", body: "Schlossstraße und Park" }, 21)
+    ]);
+    // Same physical shard, same local id: must never leak into account a.
+    const b = fixture.b;
+    await b.api.upsertMessages(b.accountId, null, [
+      b.message("q208-t01", {
+        id: id.strasseSharp,
+        messageId: "<de-strasse-sharp@example.test>",
+        subject: "Andere Straße",
+        body: "Strasse im Konto b",
+        dateValue: base,
+        date: new Date(base).toISOString()
+      })
+    ]);
+  });
+
+  const sorted = (...values: string[]) => [...values].sort();
+  const idsFor = async (query: string, extra: Record<string, unknown> = {}) => {
+    const result = await listMessages({
+      accountId: fixture.a.accountId, page: 1, pageSize: 50, query, ...extra
+    } as Parameters<typeof listMessages>[0]);
+    return result.items.map((m) => m.id).sort();
+  };
+
+  const germanQueries: Array<{ name: string; params: Record<string, unknown> }> = [
+    ...[
+      "Straße", "strasse", "STRASSE", "straße", "strass", "Strassen", "stra", "stra*", "straße-plan",
+      "Grüße", "grüße", "grusse", "gruesse", "GRÜSSE", "GRUESSE",
+      "Übermaß", "uebermass", "ubermass", "Uebermass",
+      "Noël", "noel", "Fuß", "fuss", "Mass", "Maß", "masse", "Maße",
+      "Köln", "koeln", "Größenänderung", "groessenaenderung",
+      "Fußgängerübergänge", "fussgaengeruebergaenge", "Schlossstrasse", "Poet", "ẞ"
+    ].map((query) => ({ name: `token ${query}`, params: { query } })),
+    { name: "two German tokens", params: { query: "strasse gesperrt" } },
+    { name: "German + plain token", params: { query: "grüße team" } },
+    { name: "two variant tokens", params: { query: "fuss strasse" } },
+    { name: "quoted German input", params: { query: '"Grüße aus"' } },
+    { name: "from filter + German token", params: { query: "from:mueller grüße" } },
+    { name: "from filter + sharp s token", params: { query: "from:verkehr strasse" } },
+    { name: "with filter + German token", params: { query: "with:mueller strasse" } },
+    { name: "in filter + German token", params: { query: "in:archive strasse" } },
+    { name: "thread filter + German token", params: { query: "thread:q208-t04 gruesse" } },
+    { name: "fields subject", params: { query: "strasse", fields: ["subject"] } },
+    { name: "fields body", params: { query: "grusse", fields: ["body"] } },
+    { name: "fields body two tokens (combined MATCH)", params: { query: "gruesse aus", fields: ["body"] } },
+    { name: "fields subject+body", params: { query: "uebermass", fields: ["subject", "body"] } },
+    { name: "fields sender", params: { query: "müller", fields: ["sender"] } },
+    { name: "fields attachments", params: { query: "strassenplan", fields: ["attachments"] } },
+    { name: "attachment + FTS tokens mixed", params: { query: "strassenplan anhang" } },
+    { name: "folder scope inbox", params: { query: "strasse", folderId: "inbox" } },
+    { name: "folder scope archive", params: { query: "grüße", folderId: "archive" } },
+    { name: "badges unread", params: { query: "straße", badges: ["unread"] } },
+    { name: "grouped by sender", params: { query: "gruesse", groupBy: "sender" } },
+    { name: "grouped by folder", params: { query: "strasse", groupBy: "folder" } },
+    { name: "grouped by week", params: { query: "mass", groupBy: "week" } }
+  ];
+
+  for (const { name, params } of germanQueries) {
+    test(`listThreads + listMessages identical (default cap and cap 3): ${name}`, async () => {
+      const accountId = fixture.a.accountId;
+      const fallbacks: unknown[] = [];
+      const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+        if (args[0] === "[fts-search] legacy fallback") fallbacks.push(args[1]);
+      });
+      try {
+        for (const cap of [undefined, "3"]) {
+          if (cap) process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = cap;
+          try {
+            for (const page of [1, 2]) {
+              await runBoth(() =>
+                listThreads({ accountId, page, pageSize: 3, ...params } as Parameters<typeof listThreads>[0])
+              );
+              await runBoth(() =>
+                listMessages({ accountId, page, pageSize: 3, ...params } as Parameters<typeof listMessages>[0])
+              );
+            }
+          } finally {
+            delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+          }
+        }
+      } finally {
+        spy.mockRestore();
+      }
+      expect(fallbacks.filter((line) => (line as { reason?: string }).reason === "fts_error")).toEqual([]);
+    });
+  }
+
+  test("spot checks: ß and ss spellings find the same messages", async () => {
+    // "Schlossstraße" (id.poet) is one FTS token that does not start with
+    // "stra", so prefix search does not reach it.
+    const expected = sorted(id.strasseAttachment, id.strasseSharp, id.strasseSs, id.strasseUpper);
+    for (const query of ["Straße", "strasse", "STRASSE", "straße", "strass"]) {
+      expect(await idsFor(query)).toEqual(expected);
+    }
+    expect(await idsFor("stra")).toEqual(expected);
+    // A typed "*" is a literal in the filename LIKE (unchanged legacy
+    // behaviour), so only the FTS hits remain.
+    expect(await idsFor("stra*")).toEqual(sorted(id.strasseSharp, id.strasseSs, id.strasseUpper));
+    // Prefix: "Fußgängerübergänge" / "Fussgaenger…" (id.koeln*) start with "fuß"/"fuss".
+    const fuss = sorted(id.fuss, id.fussAscii, id.koeln, id.koelnUmlaut);
+    expect(await idsFor("Fuß")).toEqual(fuss);
+    expect(await idsFor("fuss")).toEqual(fuss);
+    expect(await idsFor("Schlossstrasse")).toEqual(sorted(id.poet));
+    expect(await idsFor("strasse gesperrt")).toEqual(sorted(id.strasseSharp));
+    expect(await idsFor("strasse", { fields: ["attachments"] })).toEqual(sorted(id.strasseAttachment));
+    expect(await idsFor("in:archive strasse")).toEqual(sorted(id.strasseUpper));
+  });
+
+  test("spot checks: umlaut and ae/oe/ue spellings", async () => {
+    const gruesse = sorted(id.gruesseAscii, id.gruesseSwiss, id.gruesseUmlaut);
+    for (const query of ["Grüße", "grüße", "GRÜSSE", "gruesse", "GRUESSE"]) {
+      expect(await idsFor(query)).toEqual(gruesse);
+    }
+    // A plain u is not read as a transliteration: "grusse" finds ü-text
+    // (index fold) but not text written "Gruesse".
+    expect(await idsFor("grusse")).toEqual(sorted(id.gruesseSwiss, id.gruesseUmlaut));
+    const uebermass = sorted(id.uebermass, id.uebermassAscii, id.uebermassSwiss);
+    expect(await idsFor("Übermaß")).toEqual(uebermass);
+    expect(await idsFor("uebermass")).toEqual(uebermass);
+    expect(await idsFor("Uebermass")).toEqual(uebermass);
+    expect(await idsFor("ubermass")).toEqual(sorted(id.uebermass, id.uebermassSwiss));
+    expect(await idsFor("Köln")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    expect(await idsFor("koeln")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    expect(await idsFor("Größenänderung")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    expect(await idsFor("groessenaenderung")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    // More than three sites: only the consistent spellings (corners).
+    expect(await idsFor("Fußgängerübergänge")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    expect(await idsFor("fussgaengeruebergaenge")).toEqual(sorted(id.koeln, id.koelnUmlaut));
+    expect(await idsFor("from:mueller grüße")).toEqual(sorted(id.gruesseAscii));
+    expect(await idsFor("müller", { fields: ["sender"] })).toEqual(sorted(id.gruesseAscii, id.strasseSs));
+  });
+
+  test("spot checks: recall over precision (documented surprising matches)", async () => {
+    expect(await idsFor("Noël")).toEqual(sorted(id.noel));
+    // "noel" also reads as "nöl" → index "nol*": finds "Nolte" as well.
+    expect(await idsFor("noel")).toEqual(sorted(id.noel, id.nolte));
+    // "Poet" reads as "pöt" → "pot*": finds "Potsdam".
+    expect(await idsFor("Poet")).toEqual(sorted(id.poet));
+    expect(await idsFor("Mass")).toEqual(sorted(id.massSharp, id.massSs, id.masseDimensions, id.masseMass));
+    expect(await idsFor("Maß")).toEqual(sorted(id.massSharp, id.massSs, id.masseDimensions, id.masseMass));
+    // "masse" (mass) also finds "Maße" (dimensions).
+    expect(await idsFor("masse")).toEqual(sorted(id.masseDimensions, id.masseMass));
+    expect(await idsFor("Maße")).toEqual(sorted(id.masseDimensions, id.masseMass));
+  });
+
+  test("account isolation on the shared shard holds for variants", async () => {
+    const b = await listMessages({ accountId: fixture.b.accountId, page: 1, pageSize: 50, query: "strasse" });
+    expect(b.items.map((m) => m.id)).toEqual(sorted(id.strasseSharp));
+    expect(b.items.every((m) => m.accountId === fixture.b.accountId)).toBe(true);
+    const a = await listMessages({ accountId: fixture.a.accountId, page: 1, pageSize: 50, query: "konto" });
+    expect(a.total).toBe(0);
+  });
+
+  test("column-filter variant group matches the same rows as one col:spelling term per pair", () => {
+    const columns = ["fromAddr", "toAddr", "ccAddr", "bccAddr", "subject", "body"];
+    const ids = (match: string) =>
+      (fixture.db
+        .prepare("SELECT accountId, messageId FROM message_fts_v3 WHERE message_fts_v3 MATCH ? ORDER BY accountId, messageId")
+        .all(match) as Array<{ accountId: string; messageId: string }>)
+        .map((row) => `${row.accountId}/${row.messageId}`);
+    const spellingSets = [
+      ["strasse*", "straße*"],
+      ["gruesse*", "grüsse*", "grueße*", "grüße*"],
+      ['"straße-plan"*', '"strasse-plan"*'],
+      ["mueller*", "müller*"]
+    ];
+    for (const scoped of [columns, ["subject"], ["subject", "body"], ["fromAddr"]]) {
+      for (const spellings of spellingSets) {
+        const perPair = `(${spellings.flatMap((spelling) => scoped.map((column) => `${column}:${spelling}`)).join(" OR ")})`;
+        const filtered = `{${scoped.join(" ")}} : (${spellings.join(" OR ")})`;
+        expect(ids(filtered)).toEqual(ids(perPair));
+      }
+    }
+    expect(ids(`{${columns.join(" ")}} : (strasse* OR straße*)`).length).toBeGreaterThan(0);
+  });
+
+  test("MATCH text: tokens without a variant site are unchanged, variants are ORed per token", async () => {
+    const matches: string[] = [];
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes("MATCH ? AND accountId")) return statement;
+      return {
+        all: (...args: unknown[]) => {
+          matches.push(String(args[0]));
+          return statement.all(...args);
+        }
+      } as unknown as ReturnType<typeof prepare>;
+    });
+    const accountId = fixture.a.accountId;
+    try {
+      await listMessages({ accountId, page: 1, pageSize: 3, query: "needle" });
+      await listMessages({ accountId, page: 1, pageSize: 3, query: "strasse", fields: ["subject"] } as Parameters<typeof listMessages>[0]);
+      await listMessages({ accountId, page: 1, pageSize: 3, query: "gruesse aus", fields: ["body"] } as Parameters<typeof listMessages>[0]);
+      await listMessages({ accountId, page: 1, pageSize: 3, query: "NOT", fields: ["subject"] } as Parameters<typeof listMessages>[0]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(matches).toEqual([
+      "(fromAddr:needle* OR toAddr:needle* OR ccAddr:needle* OR bccAddr:needle* OR subject:needle* OR body:needle*)",
+      "{subject} : (strasse* OR straße*)",
+      "{body} : (gruesse* OR grüsse* OR grueße* OR grüße*) AND body:aus*",
+      'subject:"NOT"*'
+    ]);
+  });
+});
