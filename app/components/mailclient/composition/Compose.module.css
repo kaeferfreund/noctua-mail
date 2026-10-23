@@ -63,6 +63,10 @@
   color: var(--gray-a11);
 }
 
+.composeScrollArea {
+  display: contents;
+}
+
 .composeBody {
   display: flex;
   flex-direction: column;
@@ -525,4 +529,40 @@
   }
 
   .composeModal .composeMessageField { min-height: min-content; }
+}
+
+/* A keyboard-sized viewport cannot fit both metadata and the editor beside a
+   fixed saved-draft footer. Scroll them together, with the header still outside
+   the scroll area, so native focus scrolling can reveal every field/action. */
+@media (width < 768px) and (height <= 600px) {
+  .composeHeader { flex-shrink: 0; }
+
+  .composeScrollArea {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .composeBody {
+    flex: none;
+    overflow: visible;
+  }
+
+  .composeBody > .composeGrid {
+    min-height: min-content;
+    overflow: visible;
+    /* Keep sender/recipient fields reachable while the editor and saved-draft
+       actions move through the same scroll area. No nested metadata viewport. */
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-panel-solid);
+  }
+
+  .composeModal .composeMessageField {
+    flex: none;
+    overflow: visible;
+  }
 }
