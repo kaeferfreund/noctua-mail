@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/accounts/*/sync": [
       ...workerRuntimeTraceFiles,
+      // imapflow 2 has separate import/require exports; keep both runtime trees
+      // available to standalone routes and the Bun worker subprocesses.
+      "./node_modules/imapflow/**",
       // Worker subprocess loads lib/html.ts as TS source. Packages imported
       // by lib/html.ts aren't traced into the sync-route standalone output
       // automatically, so copy them explicitly.
