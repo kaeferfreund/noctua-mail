@@ -10,6 +10,7 @@ import {
 import type { AccountDateFormat, McpTokenMetadata } from "@/lib/data";
 import { formatAccountTimestampLabel } from "@/lib/dateFormatting";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+import type { mintMcpToken } from "@/lib/mcpAuth";
 
 type Props = {
   accountId?: string;
@@ -20,10 +21,9 @@ type Props = {
   onClose: () => void;
 };
 
-type CreateTokenResponse = {
+// The route spreads mintMcpToken's result. Keep that server dependency type-only.
+type CreateTokenResponse = Partial<Awaited<ReturnType<typeof mintMcpToken>>> & {
   ok?: boolean;
-  token?: McpTokenMetadata;
-  secret?: string;
   message?: string;
 };
 
@@ -37,7 +37,6 @@ const EXPIRY_PRESETS = [
   { value: "30d", label: "30 days" },
   { value: "90d", label: "90 days" },
   { value: "180d", label: "180 days" },
-  { value: "never", label: "Never" },
   { value: "custom", label: "Custom" }
 ] as const;
 
@@ -55,17 +54,16 @@ function toDateTimeLocalValue(value: number) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function expiryFromPreset(
+function ttlFromPreset(
   preset: (typeof EXPIRY_PRESETS)[number]["value"],
   customDateTime: string
 ) {
-  if (preset === "never") return null;
   if (preset === "custom") {
-    return customDateTime ? new Date(customDateTime).getTime() : Number.NaN;
+    return customDateTime ? Math.floor((new Date(customDateTime).getTime() - Date.now()) / 1000) : Number.NaN;
   }
   const days = Number.parseInt(preset, 10);
   if (!Number.isFinite(days) || days <= 0) return Number.NaN;
-  return Date.now() + days * 24 * 60 * 60 * 1000;
+  return days * 24 * 60 * 60;
 }
 
 export default function McpTabContent({
@@ -126,6 +124,7 @@ export default function McpTabContent({
     if (isActive && isExistingAccount) {
       void loadTokens();
     }
+    return () => { setCreatedSecret(""); setCopiedValue(null); };
   }, [isActive, isExistingAccount, loadTokens]);
 
   useEffect(() => {
@@ -160,9 +159,9 @@ export default function McpTabContent({
     setError("");
     setCreatedSecret("");
     try {
-      const expiresAt = expiryFromPreset(expiryPreset, customExpiresAt);
-      if (Number.isNaN(expiresAt)) {
-        setError("Choose a valid token expiry.");
+      const ttlSeconds = ttlFromPreset(expiryPreset, customExpiresAt);
+      if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) {
+        setError("Choose an expiry between one minute and one year from now.");
         return;
       }
       const response = await request(buildAccountMcpTokensPath(accountId), {
@@ -170,16 +169,18 @@ export default function McpTabContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label,
-          expiresAt
+          ttlSeconds
         })
       });
       const data = (await response.json().catch(() => null)) as CreateTokenResponse | null;
-      if (!response.ok || !data?.ok || !data.token || !data.secret) {
+      if (!response.ok || !data?.ok || typeof data.token !== "string" || !data.tokenRecord?.id) {
         setError(data?.message ?? "Failed to create MCP token.");
         return;
       }
-      setTokens((current) => [data.token!, ...current.filter((item) => item.id !== data.token!.id)]);
-      setCreatedSecret(data.secret);
+      const tokenRecord = data.tokenRecord;
+      setTokens((current) => [tokenRecord, ...current.filter((item) => item.id !== tokenRecord.id)]);
+      setCreatedSecret(data.token);
+      await loadTokens();
       setLabel("");
       setExpiryPreset("180d");
       setCustomExpiresAt(toDateTimeLocalValue(Date.now() + 180 * 24 * 60 * 60 * 1000));
@@ -188,7 +189,7 @@ export default function McpTabContent({
     } finally {
       setCreating(false);
     }
-  }, [accountId, customExpiresAt, expiryPreset, label, request]);
+  }, [accountId, customExpiresAt, expiryPreset, label, request, loadTokens]);
 
   const handleDelete = useCallback(async (tokenId: string) => {
     if (!accountId) return;
