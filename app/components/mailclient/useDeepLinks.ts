@@ -10,6 +10,7 @@ type Options = {
   ready: boolean;
   state: DeepLinkState;
   accountIds: string[];
+  messages: Message[];
   switchAccount: (id: string) => Promise<void>;
   applyPlace: (state: DeepLinkState) => DeepLinkState;
   resolveMessage: (accountId: string, messageId: string, signal: AbortSignal) => Promise<MessageResolution>;
@@ -18,7 +19,7 @@ type Options = {
   openMessage: (message: Message) => void;
   notice: (kind: "forbidden" | "missing" | "moved" | "failed") => void;
 };
-type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; initial: boolean; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean; controller: AbortController };
+type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; initial: boolean; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean; controller: AbortController; done: () => void };
 
 /** URL → UI is an explicit transaction. UI → URL never initiates account loads. */
 export function useDeepLinks(options: Options) {
@@ -32,8 +33,12 @@ export function useDeepLinks(options: Options) {
   const update = useCallback(() => refresh(value => value + 1), []);
   const request = useCallback((target: DeepLinkState, initial = false, historyMode: "push" | "replace" = "replace") => {
     pending.current?.controller.abort();
-    pending.current = { target, initial, historyMode, phase: "requested", controller: new AbortController() };
+    pending.current?.done();
+    let done = () => {};
+    const settled = new Promise<void>(resolve => { done = resolve; });
+    pending.current = { target, initial, historyMode, phase: "requested", controller: new AbortController(), done };
     update();
+    return settled;
   }, [update]);
   const write = useCallback((state: DeepLinkState, mode: "push" | "replace") => {
     const href = serializeDeepLink(state, window.location.href);
@@ -49,7 +54,7 @@ export function useDeepLinks(options: Options) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     request(parseDeepLink(window.location.search), true);
     const onPop = (event: PopStateEvent) => {
-      if (!isMobileOverlayPop(event)) request(parseDeepLink(window.location.search));
+      if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search));
     };
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -62,6 +67,7 @@ export function useDeepLinks(options: Options) {
     return () => {
       initialized.current = false;
       pending.current?.controller.abort();
+      pending.current?.done();
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("pointerdown", onPointer, true);
@@ -132,6 +138,7 @@ export function useDeepLinks(options: Options) {
     } else if (work.phase === "settle") {
       if (!work.forbidden && work.expected && serializeDeepLink(options.state) !== serializeDeepLink(work.expected)) return;
       pending.current = null;
+      work.done();
       previous.current = options.state;
       // A directly opened reader gets a list entry too, including after login/reload.
       if (work.initial && options.state.messageId && !window.history.state?.noctuaMessageEntry) {
@@ -146,7 +153,11 @@ export function useDeepLinks(options: Options) {
     const last = previous.current;
     if (last && serializeDeepLink(last) === serializeDeepLink(next)) return;
     return afterMobileOverlayNavigation(() => {
-      write(next, last ? deepLinkHistoryMode(last, next, keyboard.current) : "replace");
+      // Deleting/archiving the reader advances selection within the same list.
+      // Replace that reader entry so Back cannot reopen the removed message.
+      const removedReader = last?.messageId && !options.messages.some(message => message.id === last.messageId) &&
+        serializeDeepLink({ ...last, messageId: next.messageId }) === serializeDeepLink(next);
+      write(next, last && !removedReader ? deepLinkHistoryMode(last, next, keyboard.current) : "replace");
       keyboard.current = false;
       previous.current = next;
     });
@@ -154,7 +165,9 @@ export function useDeepLinks(options: Options) {
   const navigateAccount = useCallback((accountId: string) => {
     const current = latest.current.state;
     const target = accountId === current.accountId ? { ...current, messageId: "" } : { ...emptyDeepLink(), accountId };
-    afterMobileOverlayNavigation(() => { write(target, "push"); request(target); });
+    return new Promise<void>(resolve => {
+      afterMobileOverlayNavigation(() => { write(target, "push"); void request(target).then(resolve); });
+    });
   }, [request, write]);
   const navigateMessage = useCallback((messageId: string, accountId?: string) => {
     const target = { ...emptyDeepLink(), accountId: accountId || latest.current.state.accountId, messageId };

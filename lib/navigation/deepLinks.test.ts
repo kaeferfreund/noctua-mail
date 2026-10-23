@@ -44,3 +44,11 @@ it("normalizes warm notification URL/fields through the same legacy parser as co
   expect(notificationDeepLink({ url: "/?accountId=a&messageId=legacy" })).toEqual({ ...emptyDeepLink(), accountId: "a", messageId: "legacy" });
   expect(notificationDeepLink({ url: "/?accountId=a&messageId=legacy", accountId: "b", messageId: "new" })).toEqual({ ...emptyDeepLink(), accountId: "b", messageId: "new" });
 });
+
+it("replaces only virtual-view auto-clear while keeping the filter navigation entry", () => {
+  const view = { ...emptyDeepLink(), accountId: "a", scope: "all" as const, view: "virtual:unassigned" as const };
+  const filtered = { ...view, badges: ["unread"] };
+  expect(deepLinkHistoryMode(view, filtered)).toBe("push");
+  expect(deepLinkHistoryMode(filtered, { ...filtered, view: null })).toBe("replace");
+  expect(deepLinkHistoryMode(view, { ...view, view: null })).toBe("push");
+});
