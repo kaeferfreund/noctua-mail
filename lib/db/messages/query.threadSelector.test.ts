@@ -186,8 +186,8 @@ describe("thread selector flagged EXISTS differential", () => {
         statements.length = 0;
         const result = await listThreads({ accountId: fixture.a.accountId, folderId, page: 1, pageSize: 5, groupBy: "date" });
         expect(result.items.length).toBeGreaterThan(0);
-        expect(result.groups.map(group => group.key)).toEqual(["Today", "Yesterday", "This Week", "Older"]);
-        for (const group of result.groups) {
+        expect(result.groups?.map(group => group.key)).toEqual(["Today", "Yesterday", "This Week", "Older"]);
+        for (const group of result.groups ?? []) {
           expect(group.count).toBe(result.items.filter(item => item.groupKey === group.key).length);
         }
         expect(statements.some(sql => sql.includes("THEN 'Today'"))).toBe(false);
@@ -195,7 +195,7 @@ describe("thread selector flagged EXISTS differential", () => {
       statements.length = 0;
       const week = await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "week" });
       expect(statements.some(sql => sql.includes("strftime('%Y-W%W'"))).toBe(true);
-      expect(week.groups.reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(week.items.length);
+      expect((week.groups ?? []).reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(week.items.length);
     } finally {
       spy.mockRestore();
     }
