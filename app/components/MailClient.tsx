@@ -2723,6 +2723,16 @@ export default function MailClient({
     return extras.length > 0 ? [...threadScopeMessages, ...extras] : threadScopeMessages;
   }, [activeAccountId, activeTopicSuggestionRankedMessages, threadScopeMessages]);
 
+  const activeMessage = useMemo(() => {
+    if (composeOpen && composeMode === "new") return undefined;
+    if (!viewMessage) return undefined;
+    if (viewMessage.accountId !== activeAccountId) return undefined;
+    return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
+  }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
+  // The saved preference applies only while a message is open; every list
+  // behaviour (paging, scroll capture, notice anchor) follows the shown layout.
+  const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
+
   const handleBeforeSelectMessage = useCallback(
     (nextMessage: Message, currentMessage: Message | null) => {
       const nextThreadKey = nextMessage.threadId ?? nextMessage.messageId ?? nextMessage.id;
@@ -2746,7 +2756,7 @@ export default function MailClient({
       if (shouldAutoMinimizeComposer) {
         composeHandleRef.current?.setComposeView("minimized");
       }
-      if (readerLayout === "split") readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
+      if (!readerFocused) readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
       selectReaderLayout(nextMessage.id);
       setViewMessage(nextMessage);
     },
@@ -2761,7 +2771,7 @@ export default function MailClient({
       setPendingSelectionScrollMessageId,
       setViewMessage,
       selectReaderLayout,
-      readerLayout
+      readerFocused
     ]
   );
 
@@ -2874,12 +2884,6 @@ export default function MailClient({
   const showComposeInline = composeOpen && composeView === "inline";
   const showComposeModal = composeOpen && composeView === "modal";
   const showComposeMinimized = composeOpen && composeView === "minimized";
-  const activeMessage = useMemo(() => {
-    if (composeOpen && composeMode === "new") return undefined;
-    if (!viewMessage) return undefined;
-    if (viewMessage.accountId !== activeAccountId) return undefined;
-    return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
-  }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
   const loadReaderPage = useCallback(() => setMessagesPage(page => page + 1), [setMessagesPage]);
   const readerNavigation = useReaderNavigation({
     enabled: !isMobile && readerLayout === "focus",
@@ -2890,12 +2894,11 @@ export default function MailClient({
   const { navigate: navigateReader } = readerNavigation;
   const openReaderFocus = useCallback((message: Message) => {
     if (isMobile) return;
-    if (readerLayout === "split") readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
+    if (!readerFocused) readerListScrollRef.current = listPaneRef.current?.scrollTop ?? 0;
     handleSelectMessage(message);
     changeReaderLayout("focus");
-  }, [handleSelectMessage, isMobile, changeReaderLayout, readerLayout]);
+  }, [handleSelectMessage, isMobile, changeReaderLayout, readerFocused]);
   const closeReaderFocus = useCallback(() => changeReaderLayout("split"), [changeReaderLayout]);
-  const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
   useReaderFocusPlacement(readerFocused, activeMessageId, listPaneRef, readerListScrollRef);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -4928,7 +4931,7 @@ export default function MailClient({
     const pane = listPaneRef.current;
     if (!pane) return;
     const handleScroll = () => {
-      if (loadingMessages || !hasMoreMessages || (!isMobile && readerLayout === "focus")) return;
+      if (loadingMessages || !hasMoreMessages || readerFocused) return;
       const threshold = 200;
       const remaining = pane.scrollHeight - pane.scrollTop - pane.clientHeight;
       if (remaining < threshold) {
@@ -4937,11 +4940,11 @@ export default function MailClient({
     };
     pane.addEventListener("scroll", handleScroll);
     return () => pane.removeEventListener("scroll", handleScroll);
-  }, [hasMoreMessages, loadingMessages, isMobile, readerLayout]);
+  }, [hasMoreMessages, loadingMessages, readerFocused]);
 
   const syncNoticePaneRightOffset = useCallback(() => {
     if (typeof window === "undefined") return;
-    const pane = !isMobile && readerLayout === "focus"
+    const pane = readerFocused
       ? document.getElementById("reader")
       : listPaneRef.current;
     if (!pane) {
@@ -4951,7 +4954,7 @@ export default function MailClient({
     const rect = pane.getBoundingClientRect();
     const next = Math.max(8, Math.round(window.innerWidth - rect.right));
     setNoticePaneRightOffset((prev) => (prev === next ? prev : next));
-  }, [isMobile, readerLayout]);
+  }, [readerFocused]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4964,7 +4967,7 @@ export default function MailClient({
       });
     };
     scheduleSync();
-    const pane = !isMobile && readerLayout === "focus"
+    const pane = readerFocused
       ? document.getElementById("reader")
       : listPaneRef.current;
     let observer: ResizeObserver | null = null;
@@ -4980,7 +4983,7 @@ export default function MailClient({
       if (observer) observer.disconnect();
       window.removeEventListener("resize", scheduleSync);
     };
-  }, [isMobile, readerLayout, listWidth, syncNoticePaneRightOffset]);
+  }, [readerFocused, listWidth, syncNoticePaneRightOffset]);
 
   const prevAccountIdRef = useRef(activeAccountId);
   useEffect(() => {
@@ -5842,7 +5845,7 @@ export default function MailClient({
             <MessageViewOrchestrator
               ref={messageViewHandleRef}
               header={{
-                mailboxLabel: !isMobile && readerLayout === "focus" ? currentAccount?.name || currentAccount?.email : undefined,
+                mailboxLabel: readerFocused ? currentAccount?.name || currentAccount?.email : undefined,
                 toolbar: !isMobile && activeMessage ? <ReaderToolbar
                   layout={readerLayout}
                   showHint={readerHintId === activeMessage.id}
