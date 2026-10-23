@@ -1158,6 +1158,10 @@
     "loadedGroupCount": "{count, plural, one {# message loaded} other {# messages loaded}}"
   },
   "Reader": {
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied",
+    "linkCopyFailed": "Could not copy link",
+
     "focus": {
       "expand": "Expand reading view",
       "showList": "Show message list",
@@ -1411,6 +1415,12 @@
     }
   },
   "Notifications": {
+    "deepLink": {
+      "forbidden": "You do not have access to this mailbox. Your current mailbox remains open.",
+      "missing": "This message is no longer available. The folder remains open.",
+      "moved": "This message was moved. Its current folder has been opened.",
+      "failed": "The linked message could not be loaded. Please try again."
+    },
     "operationFailed": "Operation failed",
     "unexpectedError": "Unexpected error.",
     "fullSyncCancelled": "Full sync cancelled",
