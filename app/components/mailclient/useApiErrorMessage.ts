@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { getExceptionAccountId } from "./utils/clientHelpers";
 
@@ -13,6 +13,11 @@ type ApiErrorMessageParams = {
 /** Resolve structured API errors at the UI boundary before generic diagnostics. */
 export function useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription }: ApiErrorMessageParams) {
   const tn = useTranslations("Notifications");
+  // Keep the resolver's identity locale-independent: the mount bootstrap effect
+  // depends on it, and a UI language switch must not re-bootstrap the mailbox
+  // (that unmounts the open composer). The latest translator is read at call time.
+  const tnRef = useRef(tn);
+  useEffect(() => { tnRef.current = tn; }, [tn]);
   return useCallback(async (res: Response) => {
     const responsePath = (() => {
       if (!res.url) return null;
@@ -50,7 +55,7 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       };
       const resolvedAccountId =
         data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
-      if (data?.code === "folder_account_mismatch") return tn("folderAccountMismatch");
+      if (data?.code === "folder_account_mismatch") return tnRef.current("folderAccountMismatch");
       if (data?.code === "mailbox_credentials_invalid") {
         if (data.repairAllowed && resolvedAccountId) {
           setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
@@ -75,5 +80,5 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       // ignore
     }
     return withRequestPath(`Request failed (${res.status})`);
-  }, [setAuthState, setReloginAccountId, setReloginDescription, tn]);
+  }, [setAuthState, setReloginAccountId, setReloginDescription]);
 }
