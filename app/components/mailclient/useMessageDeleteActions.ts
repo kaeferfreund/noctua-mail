@@ -12,6 +12,7 @@ import type { Folder, Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState } from "./types";
 import type { LinkedCalendarEventDetail } from "./utils/deleteConfirm";
 import type { SelectionStore } from "./messagelist/selectionStore";
+import { nextMessageAfterRemoval } from "./messagelist/successfulRemoval";
 import { resolveCollapsedThreadSelectionTarget } from "./messagelist/listSelection";
 import type { MoveMessagesToFolder, UndoMoveTarget } from "./useMessageMoveActions";
 import {
@@ -526,23 +527,9 @@ export function useMessageDeleteActions({
       if (!activeMessageId || !targetIds.has(activeMessageId)) {
         return { activeWasDeleted: false, nextActiveId: "" };
       }
-      let nextActiveId = (() => {
-        const indices = visibleMessages
-          .map((item, index) => (targetIds.has(item.message.id) ? index : -1))
-          .filter((idx) => idx >= 0);
-        if (indices.length === 0) return "";
-        const maxIndex = Math.max(...indices);
-        const minIndex = Math.min(...indices);
-        for (let i = maxIndex + 1; i < visibleMessages.length; i += 1) {
-          const candidate = visibleMessages[i]?.message?.id;
-          if (candidate && !targetIds.has(candidate)) return candidate;
-        }
-        for (let i = minIndex - 1; i >= 0; i -= 1) {
-          const candidate = visibleMessages[i]?.message?.id;
-          if (candidate && !targetIds.has(candidate)) return candidate;
-        }
-        return "";
-      })();
+      let nextActiveId = nextMessageAfterRemoval(
+        visibleMessages.map(item => item.message), targetIds
+      )?.id ?? "";
       if (threadIdForFallback && !nextActiveId) {
         const threadRoot = visibleMessages.find(
           (item) => item.threadId === threadIdForFallback
