@@ -1172,7 +1172,18 @@
     },
     "from": "Von:",
     "closeComposer": "Nachrichtenfenster schließen",
-    "fromValue": "Von {sender}"
+    "fromValue": "Von {sender}",
+    "generated": {
+      "replyHeader": "Am {date} schrieb {sender}:",
+      "forwardFields": {
+        "from": "Von",
+        "replyTo": "Antwort an",
+        "date": "Datum",
+        "subject": "Betreff",
+        "to": "An",
+        "cc": "Cc"
+      }
+    }
   },
   "Errors": {
     "sender": {

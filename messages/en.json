@@ -1172,7 +1172,18 @@
     },
     "from": "From:",
     "closeComposer": "Close composer",
-    "fromValue": "From {sender}"
+    "fromValue": "From {sender}",
+    "generated": {
+      "replyHeader": "On {date}, {sender} wrote:",
+      "forwardFields": {
+        "from": "From",
+        "replyTo": "Reply-To",
+        "date": "Date",
+        "subject": "Subject",
+        "to": "To",
+        "cc": "Cc"
+      }
+    }
   },
   "Errors": {
     "sender": {

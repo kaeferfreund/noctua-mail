@@ -48,6 +48,7 @@ export {
 export type { QuoteBoundaryCandidate, QuoteBoundaryMarkers, QuoteSizes } from "./quoteBoundary";
 export {
   FORWARDED_MESSAGE_MARKER,
+  FORWARDED_MESSAGE_MARKERS,
   QUOTE_TEXT_SCAN_LIMIT,
   hasQuoteBoundaryMarker,
   isQuoteBoundary,

@@ -7,6 +7,8 @@
 // The DOM walk that applies these rules lives in HtmlMessage; everything here
 // stays free of DOM types so it can be tested without a browser environment.
 
+import type { UiLocale } from "../i18n/config";
+
 /** The attribute-only half of a candidate, cheap enough to test on every element. */
 export type QuoteBoundaryMarkers = {
   tagName: string;
@@ -75,8 +77,15 @@ const HEADER_BLOCK_SUBJECT = /(?:^|[^\p{L}])(?:betreff|subject)\s*:/iu;
 
 const FORWARD_SEPARATOR =
   /^-{2,}\s*(?:original message|ursprüngliche nachricht|weitergeleitete nachricht|forwarded message)\s*-{2,}/i;
-/** Prefix of Noctua's own forwards; kept beside the regex that has to match it. */
-export const FORWARDED_MESSAGE_MARKER = "-------- Forwarded message --------";
+/**
+ * Prefix of Noctua's own forwards in the locale captured when the draft was
+ * created; kept beside the regex that has to match every one of them.
+ */
+export const FORWARDED_MESSAGE_MARKERS = {
+  de: "-------- Weitergeleitete Nachricht --------",
+  en: "-------- Forwarded message --------"
+} as const satisfies Record<UiLocale, string>;
+export const FORWARDED_MESSAGE_MARKER = FORWARDED_MESSAGE_MARKERS.en;
 
 // The attribution line is its own paragraph, so requiring it to be the whole
 // text keeps "wrote:" inside a running sentence from matching.

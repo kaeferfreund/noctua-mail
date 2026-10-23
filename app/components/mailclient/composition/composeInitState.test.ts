@@ -9,7 +9,13 @@ import {
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import type { Message } from "@/lib/data";
 import { formatForwardedMessageDate } from "@/lib/dateFormatting";
-import { FORWARDED_MESSAGE_MARKER, hasForwardMetaHtml, stripForwardMetaHtml } from "@/lib/html";
+import {
+  FORWARDED_MESSAGE_MARKER,
+  FORWARDED_MESSAGE_MARKERS,
+  hasForwardMetaHtml,
+  isQuoteBoundaryText,
+  stripForwardMetaHtml
+} from "@/lib/html";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,11 +23,11 @@ import { FORWARDED_MESSAGE_MARKER, hasForwardMetaHtml, stripForwardMetaHtml } fr
 
 const noop = (s: string) => s;
 const deps = { stripHtml: noop, normalizeHtmlDerivedText: noop };
-const opts = { accountEmail: "me@example.com", accountDateFormat: "locale" as const };
+const opts = { accountEmail: "me@example.com", accountDateFormat: "locale" as const, locale: "en" as const };
 
 function formattedFixtureDate() {
   const message = makeMessage();
-  return formatForwardedMessageDate(message.dateValue, message.date, opts.accountDateFormat);
+  return formatForwardedMessageDate(message.dateValue, message.date, opts.accountDateFormat, opts.locale);
 }
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
@@ -785,5 +791,84 @@ describe("computeComposeInitState — edit", () => {
       deps
     );
     expect(fields.composeReplyMessage).toBe(originalMsg);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generated correspondence — locale captured when the draft is created
+// ---------------------------------------------------------------------------
+
+describe("computeComposeInitState — localized generated correspondence", () => {
+  const german = { ...opts, locale: "de" as const };
+
+  it("writes the German attribution line with a Berlin-time date and keeps the sender verbatim", () => {
+    const fields = computeComposeInitState(
+      "reply",
+      makeMessage({ from: "Alice {opaque} 'x' <alice@example.com>" }),
+      false,
+      { ...german, preferredComposeTab: "text" },
+      deps
+    );
+    expect(fields.composeBody).toBe(
+      "\n\nAm 01.01.2024, 13:00 schrieb Alice {opaque} 'x' <alice@example.com>:\n> Original body"
+    );
+    expect(fields.composeSubject).toBe("Re: Hello");
+    expect(isQuoteBoundaryText("Am 01.01.2024, 13:00 schrieb Alice {opaque} 'x' <alice@example.com>:")).toBe(true);
+  });
+
+  it("puts the German attribution into the quoted header of rich replies and reply-alls", () => {
+    for (const mode of ["reply", "replyAll"] as const) {
+      const fields = computeComposeInitState(mode, makeMessage({ htmlBody: "<p>Hallo</p>" }), false, german, deps);
+      expect(fields.composeQuotedParts?.headerHtml).toBe(
+        "<p>Am 01.01.2024, 13:00 schrieb Alice &lt;alice@example.com&gt;:</p>"
+      );
+      expect(fields.composeQuotedHtml).toContain("schrieb Alice");
+    }
+  });
+
+  it("keeps the English attribution for English drafts", () => {
+    const fields = computeComposeInitState("reply", makeMessage(), false, { ...opts, preferredComposeTab: "text" }, deps);
+    expect(fields.composeBody).toBe("\n\nOn 01/01/2024, 13:00, Alice <alice@example.com> wrote:\n> Original body");
+  });
+
+  it("writes the German forward separator and header labels; subject prefixes stay protocol text", () => {
+    const message = makeMessage({
+      replyTo: "list@example.com",
+      cc: "carol@example.com",
+      subject: "Hallo <Welt>",
+      htmlBody: "<p>Hallo</p>"
+    });
+    const rich = computeComposeInitState("forward", message, false, german, deps);
+    expect(rich.composeSubject).toBe("Fwd: Hallo <Welt>");
+    expect(rich.composeHtml).toBe(`<p>${FORWARDED_MESSAGE_MARKERS.de}</p>`);
+    expect(rich.composeHtmlText).toBe("-------- Weitergeleitete Nachricht --------");
+    const meta = rich.composeQuotedParts?.metaHtml ?? "";
+    for (const label of ["Von", "Antwort an", "Datum", "Betreff", "An", "Cc"]) expect(meta).toContain(`>${label}:</th>`);
+    expect(meta).toContain(">Mo., 1. Jan. 2024, 13:00 MEZ</td>");
+    expect(meta).toContain("Hallo &lt;Welt&gt;");
+    expect(meta).not.toContain("From:");
+
+    const markdown = computeComposeInitState("forward", message, false, { ...german, preferredComposeTab: "markdown" }, deps);
+    expect(markdown.composeMarkdown).toBe(`${FORWARDED_MESSAGE_MARKERS.de}\n\n`);
+
+    const text = computeComposeInitState("forward", { ...message, htmlBody: undefined }, false, german, deps);
+    expect(text.composeBody).toBe(
+      "\n\n-------- Weitergeleitete Nachricht --------\nVon: Alice <alice@example.com>\nAntwort an: list@example.com\n" +
+        "Datum: Mo., 1. Jan. 2024, 13:00 MEZ\nBetreff: Hallo <Welt>\nAn: me@example.com\nCc: carol@example.com\n\n> Original body"
+    );
+    expect(isQuoteBoundaryText(text.composeBody)).toBe(true);
+  });
+
+  it("does not regenerate a saved draft's text in another UI locale", () => {
+    const germanReply = computeComposeInitState("reply", makeMessage(), false, { ...german, preferredComposeTab: "text" }, deps);
+    const reopened = computeComposeInitState(
+      "edit",
+      makeMessage({ body: germanReply.composeBody, htmlBody: undefined, xComposeFormat: "text" }),
+      false,
+      opts,
+      deps
+    );
+    expect(reopened.composeBody).toBe(germanReply.composeBody);
+    expect(reopened.composeBody).not.toContain("wrote:");
   });
 });
