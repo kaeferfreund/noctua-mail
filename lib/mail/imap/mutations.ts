@@ -40,14 +40,19 @@ export async function appendImapMessage(
   flags: string[] = ["\\Seen"],
   clientId?: string,
   internalDate: Date = new Date(),
-  options?: { fresh?: boolean }
+  options?: { fresh?: boolean; beforeAppend?: () => void }
 ) {
   const logContext = buildLogContext(account, clientId);
   return withPooledImapClient(account, logContext, async (client) => {
     const result = await logImapOp(
       "append",
       { mailbox: mailboxPath, ...logContext },
-      () => client.append(mailboxPath, rawMessage, flags, internalDate)
+      () => {
+        // Pool acquisition is asynchronous; assert only when APPEND can start
+        // in this same continuation, with no await between check and command.
+        options?.beforeAppend?.();
+        return client.append(mailboxPath, rawMessage, flags, internalDate);
+      }
     );
     if (!result) throw new Error("IMAP APPEND was not accepted");
     const uid = (result as any).uid;
@@ -138,7 +143,8 @@ type ImapDeleteTarget = MailboxUidTarget;
 export async function deleteImapMessages(
   account: Account,
   targets: ImapDeleteTarget[],
-  clientId?: string
+  clientId?: string,
+  beforeDelete?: () => void
 ) {
   const groupedTargets = groupTargetsByMailbox(targets);
   if (groupedTargets.length === 0) return;
@@ -151,7 +157,10 @@ export async function deleteImapMessages(
       await logImapOp(
         "messageDelete",
         { mailbox: target.mailboxPath, uidCount: target.uids.length, ...logContext },
-        () => client.messageDelete(target.uids, { uid: true })
+        () => {
+          beforeDelete?.();
+          return client.messageDelete(target.uids, { uid: true });
+        }
       );
     }
   });
@@ -161,9 +170,10 @@ export async function deleteImapMessage(
   account: Account,
   mailboxPath: string,
   uid: number,
-  clientId?: string
+  clientId?: string,
+  beforeDelete?: () => void
 ) {
-  await deleteImapMessages(account, [{ mailboxPath, uid }], clientId);
+  await deleteImapMessages(account, [{ mailboxPath, uid }], clientId, beforeDelete);
 }
 
 export async function updateImapFlags(
