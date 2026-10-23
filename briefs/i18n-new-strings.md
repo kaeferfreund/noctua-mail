@@ -9,5 +9,8 @@ Inventory baseline: briefs/i18n-plan.md (wt-ui-shell @ ba9d34a). Strings introdu
 | feat/collab-ui-2b 7e1149a | app/components/shell/ShellSidebar.tsx, app/hooks/useMailboxSummaries.ts | "Unread", "Unread count unavailable", "{count} assigned to me", "{count} unassigned open", "Watcher: {state}", "—" |
 | feat/i18n-infra 1d0e187 | messages/{de,en}.json | Settings.language.* (already in catalogs), Pwa.description |
 | fix/graceful-shutdown bc2ddae | server logs only | none user-facing |
+| fix/qa-shell c54a2a4 | McpTabContent.tsx, ThreadSubject.tsx | "Choose an expiry between one minute and one year from now.", "Expand subject", "Collapse subject" |
+| fix/qa-compose f9f4b5d | — | none |
+| feat/collab-ui-2b 7e1149a (review list) | ShellSidebar.tsx, useMailboxSummaries.ts | additionally "{count} unread", "Assigned to me", "Unassigned", tooltip "{email}\n{unread} unread · {assignedToMe} assigned to me · {unassignedOpen} unassigned open\nWatcher: {state}" |
 
 Open product decision: form of address (du/Sie) — orchestrator recommendation "du"; proceed with "du" unless the user objects.
