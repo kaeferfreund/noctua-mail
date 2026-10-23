@@ -107,7 +107,7 @@ export default function TranslationTabContent({
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
-        <Flex align="center" gap="2">
+        <Flex align="center" gap="2" wrap="wrap">
           <Languages size={18} />
           <Text size="3" weight="medium">
             {t("translation.heading")}
