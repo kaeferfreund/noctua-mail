@@ -51,6 +51,28 @@ test("Noctua verifyImapCredentials accepts plaintext and rejects bad credentials
   expect(await verifyImapCredentials(account, demoPass)).toBe(true);
   expect(await verifyImapCredentials(account, "wrong")).toBe(false);
 });
+test("QA-006 SELECT UNSEEN is a sequence number while STATUS UNSEEN is the count", async () => {
+  const store = new MailStore("qa-unread", anchor, join(directory, "qa-unread-uidvalidity.sqlite"));
+  const inbox = store.get("INBOX");
+  inbox.messages = []; inbox.uidNext = 1;
+  for (let i = 0; i < 300; i++) {
+    store.append("INBOX", makeMessage({ id: `qa-unread-${i}`, subject: `Synthetic unread ${i}` }), i < 110 ? [] : ["\\Seen"]);
+  }
+  const server = await startImapServer({ port: 0, store });
+  const connection = await client(server.port);
+  try {
+    const selected = await connection.mailboxOpen("INBOX");
+    expect(selected.exists).toBe(300);
+    expect(selected.unseen).toBe(1);
+    expect(await connection.status("INBOX", { messages: true, unseen: true })).toMatchObject({ messages: 300, unseen: 110 });
+    await connection.messageFlagsAdd("1:10", ["\\Seen"], { uid: true });
+    expect(await connection.status("INBOX", { unseen: true })).toMatchObject({ unseen: 100 });
+    for (let i = 0; i < 5; i++) store.append("INBOX", makeMessage({ id: `qa-new-${i}`, subject: "Synthetic new unread" }));
+    expect(await connection.status("INBOX", { messages: true, unseen: true })).toMatchObject({ messages: 305, unseen: 105 });
+    await connection.mailboxClose();
+    expect((await connection.mailboxOpen("INBOX")).unseen).toBe(11);
+  } finally { connection.close(); await server.stop(); }
+});
 test("LIST special-use, SELECT and FETCH nested MIME with byte-exact source and sections", async () => {
   const connection = await client();
   const list = await connection.list();
