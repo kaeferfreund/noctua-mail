@@ -174,7 +174,7 @@ function statusForRemovalError(message: string) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
+  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
   const messageId = (messageIdParam ?? "").trim();

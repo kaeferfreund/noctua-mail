@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: Params) {
   });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
-    const originError = requireMutationSameOrigin(request);
+    const originError = await requireMutationSameOrigin(request);
     if (originError) return originError;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
 
