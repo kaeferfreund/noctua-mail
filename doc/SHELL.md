@@ -17,7 +17,11 @@ leading back arrow, **Escape**, **Liste anzeigen / Show message list**, or
 **Shift+Enter**. Clicking a mailbox, folder, topic or view returns to split so the
 new list is visible. Navigation keeps the preferred layout for the next message;
 explicit back/toggle-to-list records split as the preference. Typing, composition,
-menus and dialogs keep their existing keyboard handling.
+menus and dialogs keep their existing keyboard handling. A tooltip closing on
+Escape (Back shows one after keyboard entry) does not consume that key press, so
+one Escape always returns to the list. The saved preference applies only while a
+message is open: with none open the list is shown, and list paging, scroll capture
+and the notice anchor follow that shown layout.
 
 Device storage uses `noctua:readerLayout` (`split` or `focus`), with a safe split
 fallback when storage is unavailable or invalid. No server preference is added.
@@ -36,7 +40,9 @@ continues. Pages entirely hidden by collapsed groups are skipped. A folder
 change, load error, changed selection or leaving focus cancels pending navigation.
 Archive and Delete / Entf share successful-removal continuation: next rendered
 row, otherwise previous, otherwise back to the list. Failed commands retain the
-current message. Shortcuts appear in the applicable controls’ tooltips. The
+current message. If the focused control disappears or is disabled (a busy Delete,
+a dismissed Undo notice), focus returns to Back instead of the page body.
+Shortcuts appear in the applicable controls’ tooltips. The
 localized toolbar group and live counter expose a descriptive accessible position.
 
 The focus toolbar reuses the list orchestrator's archive, spam, delete, move,
@@ -44,7 +50,8 @@ topic, flag and message-menu handlers, and the existing detached-window opener.
 Mark done/undone uses the existing keyword mutations. Printing calls
 `window.print()` with print CSS restricted to explicitly marked mail headers and
 message content. Unsent composers, notes, activity, collaboration controls and
-action chrome are excluded. Floating notices measure the visible reader in focus
+action chrome are excluded, as are sender avatars (their initials are decoration).
+Floating notices measure the visible reader in focus
 (including with a collapsed sidebar) and the list in split. The existing thread
 reader continues to supply subject, sender, mailbox/folder badges, date, replies,
 remote-content controls and collaboration bar.
@@ -56,7 +63,9 @@ The focused DOM suites are `lib/ui/readerFocus.dom.test.tsx` and
 `tests/browser/ui/qa-reader-focus.spec.ts`, included in
 `playwright.qa-round2.config.ts` and compatible with the existing synthetic QA
 fixture/session. `READER_FOCUS_EVIDENCE_DIR` optionally overrides the screenshot
-destination (default `../briefs/reader-focus-evidence`).
+destination. The default is the absolute `ROOT/briefs/reader-focus-evidence/latest`,
+resolved from the spec file (ROOT is the directory holding the `wt-*` worktrees),
+so preserved round directories are never overwritten.
 
 ### Merge rehearsal notes
 

@@ -1,10 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { signInQa, recordQa } from "./qaRound2Session";
 
 test.use({ locale: "en-GB" });
-const evidence = process.env.READER_FOCUS_EVIDENCE_DIR ?? "../briefs/reader-focus-evidence";
+// Evidence stays outside the checkout: ROOT/briefs next to the ROOT/wt-* worktrees,
+// resolved from this file rather than the working directory. Preserved rounds
+// live in sibling directories, so the default never overwrites them.
+const evidence = path.resolve(process.env.READER_FOCUS_EVIDENCE_DIR
+  ?? path.join(fileURLToPath(new URL("../../../../", import.meta.url)), "briefs", "reader-focus-evidence", "latest"));
 const rows = (page: Page) => page.locator('[data-message-list-row="true"]');
 const panes = (page: Page) => page.locator('[data-reader-layout]');
 const toolbar = (page: Page) => page.locator('[data-reader-toolbar]');
@@ -107,6 +112,55 @@ test("reader focus: Enter, toggles, j/k, sidebar reset, persistence, print and e
   expect(await page.evaluate(() => localStorage.getItem("noctua:readerLayout"))).toBe("split");
 });
 
+test("reader focus: Enter and Shift+Enter entries leave with one Escape although Back shows its tooltip", async ({ page }) => {
+  await start(page);
+  const back = toolbar(page).getByRole("button", { name: "Back to messages", exact: true });
+  for (const entry of ["Enter", "Shift+Enter"] as const) {
+    const row = rows(page).nth(entry === "Enter" ? 0 : 1);
+    const id = await row.getAttribute("data-message-id");
+    if (entry === "Shift+Enter") await row.click();
+    await row.focus(); await page.keyboard.press(entry);
+    await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+    await expect(back).toBeFocused();
+    // Keyboard-placed focus is focus-visible, so the Back tooltip is open.
+    await expect(page.getByRole("tooltip", { name: "Back to messages (Escape)" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
+    // Exit focuses the selected row, or the list container while that row is not yet rendered.
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[id="list"]') !== null)).toBe(true);
+    await expect(page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`)).toHaveAttribute("data-selected", "true");
+    recordQa(`reader-focus-escape-${entry === "Enter" ? "enter" : "shift-enter"}`, { id, escapePresses: 1,
+      focus: await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.messageId ?? document.activeElement?.tagName) });
+  }
+});
+
+test("reader focus: a saved focus preference keeps loading list pages while no message is open", async ({ page }) => {
+  const pages: string[] = [];
+  // Small pages make the synthetic fixture span several pages without changing product code.
+  await page.route(/\/api\/accounts\/qa-shared\/(threads|messages)(\?|$)/, async route => {
+    const url = new URL(route.request().url());
+    if (!url.searchParams.has("pageSize")) return route.continue();
+    url.searchParams.set("pageSize", "20");
+    pages.push(url.searchParams.get("page") ?? "");
+    await route.continue({ url: String(url) });
+  });
+  await start(page);
+  await page.evaluate(() => localStorage.setItem("noctua:readerLayout", "focus"));
+  await page.reload();
+  await expect(rows(page).first()).toBeVisible();
+  await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
+  const list = page.locator('[id="list"] aside');
+  const initial = [...pages];
+  await expect.poll(async () => {
+    await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    return pages.length - initial.length;
+  }).toBeGreaterThanOrEqual(2);
+  expect(await page.evaluate(() => localStorage.getItem("noctua:readerLayout"))).toBe("focus");
+  recordQa("reader-focus-saved-preference-paging", { initial, afterScroll: pages.slice(initial.length) });
+  await rows(page).first().click();
+  await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+});
+
 test("reader focus: 390px keeps the existing single-pane reader and mobile back history", async ({ page }) => {
   await start(page, 390);
   await page.evaluate(() => localStorage.setItem("noctua:readerLayout", "focus"));
@@ -133,6 +187,8 @@ test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable
   await toolbar(page).getByRole("button", { name: "Delete", exact: true }).click();
   const undo = page.locator(".inapp-notice-stack-pane").getByRole("button", { name: "Undo", exact: true });
   await expect(undo).toBeVisible();
+  const back = toolbar(page).getByRole("button", { name: "Back to messages", exact: true });
+  await expect(back).toBeFocused();
   await expect(undo).toBeInViewport({ ratio: 1 });
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
   await expect(page.locator('[data-message-list-row="true"][data-active="true"]')).toHaveAttribute("data-message-id", nextId!);
@@ -140,6 +196,8 @@ test("reader focus: collapsed sidebar keeps the delete notice and Undo reachable
   await screenshot(page, "delete-visible-undo.png");
   await undo.click();
   await expect(page.getByText("Message restored.", { exact: true }).first()).toBeVisible();
+  await expect(undo).toHaveCount(0);
+  await expect(back).toBeFocused();
 });
 
 test("reader focus: archive row action and toolbar use real HTTP and continue to the next rendered message", async ({ page }) => {
@@ -204,7 +262,14 @@ test("reader focus: real print PDF excludes an unsent inline reply and internal 
   await expect(draft).toHaveValue(privateText);
   await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeVisible();
   await expect(page.getByLabel("Thread collaboration", { exact: true })).toBeVisible();
+  // Sender avatars render initials as text; they are decoration and must not print.
+  const avatars = page.locator('[data-reader-print] span[aria-hidden="true"]:has(> img[alt=""])');
+  await expect(avatars.first()).toBeVisible();
+  const initials = (await avatars.first().innerText()).trim();
+  expect(initials).toMatch(/^\S{1,3}$/);
   await page.emulateMedia({ media: "print" });
+  for (const avatar of await avatars.all()) await expect(avatar).toBeHidden();
+  expect((await page.locator('[data-reader-print]').innerText()).split(/\s+/)).not.toContain(initials);
   await expect(page.getByLabel("Thread collaboration", { exact: true })).toBeHidden();
   await expect(draft).toBeHidden();
   await expect(page.getByRole("button", { name: "Send", exact: true }).first()).toBeHidden();
