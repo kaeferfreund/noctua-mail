@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import type { Folder } from "@/lib/data";
+import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import FolderPane from "./FolderPane";
 import FolderTree from "./FolderTree";
 import type { SyncTriggerOptions } from "../types";
@@ -86,6 +87,19 @@ export default function FolderSidebarPane({
 }: FolderSidebarPaneProps) {
   const [folderQuery, setFolderQuery] = useState("");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+  // MailClient re-creates most of these on every render; stable identities let
+  // the memoized folder tree skip renders that change nothing in it.
+  const treeHandlers = useStableHandlers({
+    setActiveFolderId,
+    setSearchScope,
+    clearSearch,
+    setDragOverFolderId,
+    handleMoveMessages,
+    handleCreateSubfolder,
+    handleRenameFolderItem,
+    handleDeleteFolderItem,
+    syncAccount
+  });
 
   return (
     <FolderPane
@@ -116,19 +130,7 @@ export default function FolderSidebarPane({
           draggingMessageIds,
           dragOverFolderId
         }}
-        actions={{
-          setActiveFolderId,
-          setSearchScope,
-          clearSearch,
-          setCollapsedFolders,
-          setDragOverFolderId,
-          handleMoveMessages,
-          handleCreateSubfolder,
-          handleRenameFolderItem,
-          handleDeleteFolderItem,
-          syncAccount,
-          folderSpecialIcon
-        }}
+        actions={{ ...treeHandlers, setCollapsedFolders, folderSpecialIcon }}
       />
     </FolderPane>
   );
