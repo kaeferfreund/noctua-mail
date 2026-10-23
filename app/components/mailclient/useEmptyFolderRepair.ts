@@ -23,10 +23,12 @@ type EmptyFolderRepairParams = {
 /** An empty list can need threading repair or a full fetch, scoped to its selection. */
 export function useEmptyFolderRepair({ accountId, folderId, accountFolders, enabled, apiFetch,
   attemptedFolderIdsRef, recomputeThreadsRef, syncFolderRef }: EmptyFolderRepairParams) {
+  // Folder counts/SSE refreshes replace the array without changing eligibility.
+  // Only selection or eligibility changes should invalidate a pending check.
+  const eligible = enabled && isAccountFolder(accountId, folderId, accountFolders);
   useEffect(() => {
-    if (!enabled || !isAccountFolder(accountId, folderId, accountFolders)) return;
+    if (!eligible) return;
     if (attemptedFolderIdsRef.current.has(folderId)) return;
-    attemptedFolderIdsRef.current.add(folderId);
     let cancelled = false;
     // Retain the callbacks belonging to this account. A ref read after awaiting
     // the list response could instead invoke the next account's sync controller.
@@ -39,6 +41,9 @@ export function useEmptyFolderRepair({ accountId, folderId, accountFolders, enab
         if (!res.ok) return;
         const data = await res.json() as { total?: number };
         if (cancelled) return;
+        // A cancelled check must remain retryable. Once launched, keep the
+        // marker even if repair fails so subsequent refreshes cannot loop.
+        attemptedFolderIdsRef.current.add(folderId);
         if (typeof data.total === "number" && data.total > 0) await recompute();
         else await syncFolder(folderId, true, "full", {
           fullSyncReason: "Auto-repair requested full sync because the folder list is empty and no raw messages were found in the DB."
@@ -48,6 +53,6 @@ export function useEmptyFolderRepair({ accountId, folderId, accountFolders, enab
       }
     })();
     return () => { cancelled = true; };
-  }, [accountId, folderId, accountFolders, enabled, apiFetch, attemptedFolderIdsRef,
+  }, [accountId, folderId, eligible, apiFetch, attemptedFolderIdsRef,
     recomputeThreadsRef, syncFolderRef]);
 }
