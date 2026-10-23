@@ -61,11 +61,18 @@ remote-content controls and collaboration bar.
 The focused DOM suites are `lib/ui/readerFocus.dom.test.tsx` and
 `lib/ui/readerNavigation.dom.test.tsx`. Browser coverage is
 `tests/browser/ui/qa-reader-focus.spec.ts`, included in
-`playwright.qa-round2.config.ts` and compatible with the existing synthetic QA
-fixture/session. `READER_FOCUS_EVIDENCE_DIR` optionally overrides the screenshot
-destination. The default is the absolute `ROOT/briefs/reader-focus-evidence/latest`,
-resolved from the spec file (ROOT is the directory holding the `wt-*` worktrees),
-so preserved round directories are never overwritten.
+`playwright.qa-round2.config.ts`. It uses the synthetic QA session and requires
+the round-two fixture (`QA_ROUND2_FIXTURE=1`, 300 synthetic INBOX messages); without
+it the saved-preference paging and print cases fail:
+
+```sh
+QA_ROUND2_FIXTURE=1 QA_SHELL_PORT=<port> bun scripts/runQaShellBrowserTests.ts \
+  --config=playwright.qa-round2.config.ts qa-reader-focus
+```
+
+Screenshots and PDFs go to the untracked `<checkout>/.tmp/reader-focus-evidence`,
+resolved from the spec file. `READER_FOCUS_EVIDENCE_DIR` redirects them, for
+example to a preserved review directory outside the checkout.
 
 ### Merge rehearsal notes
 
