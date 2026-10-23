@@ -1379,7 +1379,9 @@
     "quotedText": "Show or hide quoted text",
     "remoteBlocked": "Remote content blocked",
     "loadOnce": "Load once",
+    "loadOnceShort": "Load",
     "alwaysLoadSender": "Always load from this sender",
+    "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown until the original message is available or resynced.",
     "flags": {
       "forwarded": "Forwarded",
