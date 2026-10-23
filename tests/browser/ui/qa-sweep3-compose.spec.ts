@@ -73,3 +73,42 @@ test("QA-201 From switch to an unsigned identity and back restores the signature
   await expect(editor).toContainText("team@example.test");
   recordQa("QA-201", { rounds, promptsWhileUntouched: 0, promptsAfterAuthoredText: dialogs.length });
 });
+
+test("QA-204 the desktop From menu is about as wide as its field", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.emulateMedia({ colorScheme: "dark" });
+  await signInQa(page);
+  await seedSenders(page);
+  const results = [];
+  for (const [width, height, scheme, host] of [[1440, 900, "dark", "modal"], [1440, 900, "light", "inline"], [1280, 720, "light", "modal"], [390, 844, "dark", "phone"], [320, 568, "light", "phone"]] as const) {
+    await page.setViewportSize({ width, height }); await page.emulateMedia({ colorScheme: scheme });
+    await openNewMail(page);
+    // The reported case: the desktop modal (the label is localized by i18n slice 3).
+    if (host === "modal") {
+      await page.getByRole("button", { name: /^(Open in modal|Im Dialog öffnen)$/ }).click();
+      await expect(page.getByRole("dialog").getByLabel(copy.Compose.from, { exact: true })).toBeVisible();
+    }
+    const trigger = page.getByLabel(copy.Compose.from, { exact: true });
+    const field = (await trigger.boundingBox())!;
+    await trigger.click();
+    const listbox = page.getByRole("listbox");
+    await expect(listbox).toBeVisible();
+    // The popper content owns the width; the listbox viewport sits inside its padding.
+    const content = page.locator(".rt-SelectContent");
+    // Measure after the open animation; its transform scales the box while it runs.
+    await content.evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
+    const menu = (await content.boundingBox())!;
+    if (width >= 768) {
+      expect(Math.abs(menu.width - Math.min(560, Math.max(280, field.width)))).toBeLessThanOrEqual(1);
+      expect(menu.x).toBeGreaterThanOrEqual(field.x - 1);
+    } else {
+      expect(Math.round(menu.width)).toBe(width - 32);
+    }
+    expect(menu.x).toBeGreaterThanOrEqual(0);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: evidencePath(`QA-204-from-menu-${host}-${width}-${scheme}.png`) });
+    results.push({ width, scheme, host, field: { x: field.x, width: field.width }, menu: { x: menu.x, width: menu.width } });
+    await page.keyboard.press("Escape");
+    await expect(listbox).toHaveCount(0);
+  }
+  recordQa("QA-204", results);
+});
