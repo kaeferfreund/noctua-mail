@@ -92,3 +92,26 @@ for (const scenario of ["next", "previous", "end", "failed"] as const) it(`archi
   expect(selected as Message | null).toBe(expected);
   expect(activeId).toBe(expected?.id ?? "");
 });
+
+for (const selectedDuringRequest of ["target", "other"] as const) it(`archive completion uses the current reader: ${selectedDuringRequest}`, async () => {
+  const input = props("folder", false);
+  const messages = ["target", "next", "other"].map(id => ({ id, accountId: "synthetic", folderId: "synthetic:INBOX" }) as Message);
+  const handle = { current: null as MessageListHandle | null };
+  let complete!: (response: Response) => void;
+  const response = new Promise<Response>(resolve => { complete = resolve; });
+  let selected: Message | null = null;
+  Object.assign(input.mutationInputs, {
+    messages, navigationRows: messages, shouldKeepMessageInCurrentResults: () => false,
+    setViewMessage: (message: Message | null) => { selected = message; },
+    apiFetch: () => response
+  });
+  const view = render(<Theme><MessageListOrchestrator {...input} listHandleRef={handle} /></Theme>);
+  let pending!: Promise<void>;
+  act(() => { pending = handle.current!.handleArchiveMessage(messages[0]); });
+  const current = selectedDuringRequest === "target" ? messages[0] : messages[2];
+  selected = current;
+  const updated = { ...input, mutationInputs: { ...input.mutationInputs, activeMessageId: current.id, viewMessage: current } };
+  view.rerender(<Theme><MessageListOrchestrator {...updated} listHandleRef={handle} /></Theme>);
+  await act(async () => { complete(Response.json({ action: "moved", archiveFolderId: "synthetic:Archive" })); await pending; });
+  expect(selected as Message | null).toBe(selectedDuringRequest === "target" ? messages[1] : current);
+});

@@ -214,9 +214,14 @@ export function useMessageMutations({
       movedMessage,
       shouldKeepMessageInCurrentResults
     );
-    if (transition.kind === "clear") {
-      if (continueAfterRemoval) continueAfterRemoval([message.id]);
-      else { setViewMessage(null); setActiveMessageId(""); }
+    // A selection can finish rendering while the HTTP command is in flight.
+    // Let the shared continuation inspect the current reader, rather than the
+    // view captured when this request started.
+    if (continueAfterRemoval && (!movedMessage || !shouldKeepMessageInCurrentResults(movedMessage))) {
+      continueAfterRemoval([message.id]);
+    } else if (transition.kind === "clear") {
+      setViewMessage(null);
+      setActiveMessageId("");
     } else if (transition.kind === "retarget") {
       setViewMessage(transition.nextViewMessage);
       setActiveMessageId(transition.nextActiveMessageId);

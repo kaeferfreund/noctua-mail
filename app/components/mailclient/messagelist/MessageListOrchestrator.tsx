@@ -6,6 +6,7 @@ import {
   useDeferredValue,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -322,19 +323,23 @@ export default function MessageListOrchestrator({
     lastSelectedIdRef
   );
 
+  const removalInputsRef = useRef(mutationInputs);
+  useLayoutEffect(() => { removalInputsRef.current = mutationInputs; }, [mutationInputs]);
+
   // Both row actions and reader actions use the renderer's unique navigation order.
   const continueAfterRemoval = useCallback((removedIds: string[]) => {
+    const current = removalInputsRef.current;
     const removed = new Set(removedIds);
-    if (!removed.has(mutationInputs.activeMessageId)) return;
+    if (!removed.has(current.activeMessageId) && !removed.has(current.viewMessage?.id ?? "")) return;
     const next = nextMessageAfterRemoval(
-      mutationInputs.navigationRows ?? mutationInputs.visibleMessages.map(item => item.message), removed
+      current.navigationRows ?? current.visibleMessages.map(item => item.message), removed
     );
-    mutationInputs.setActiveMessageId(next?.id ?? "");
-    mutationInputs.setViewMessage(next);
+    current.setActiveMessageId(next?.id ?? "");
+    current.setViewMessage(next);
     if (next) selectionStore.setSelection(new Set([next.id]), next.id);
     else selectionStore.clearSelection();
     lastSelectedIdRef.current = next?.id ?? null;
-  }, [mutationInputs, selectionStore]);
+  }, [selectionStore]);
 
   const { handleMoveMessages, moveMessagesToFolder } = useMessageMoveActions({
     activeAccountId: mutationInputs.activeAccountId,
