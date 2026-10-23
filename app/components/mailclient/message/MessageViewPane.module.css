@@ -88,6 +88,19 @@
   :global(body:has([data-reader-print]) [data-group]),
   :global(body:has([data-reader-print]) #reader), :global(body:has([data-reader-print]) #reader > div),
   .pane, .threadViewShell, .threadView { height: auto !important; max-height: none !important; overflow: visible !important; }
-  :global([data-reader-print]) { position: absolute; inset: 0; width: 100%; }
+  :global(body:has([data-reader-print]) [data-slot="sidebar"]),
+  :global(body:has([data-reader-print]) [data-slot="shell-header"]),
+  :global(body:has([data-reader-print]) #list),
+  :global(body:has([data-reader-print]) #calendar),
+  :global(body:has([data-reader-print]) [data-slot="resizable-handle"]) { display: none !important; }
+  :global(body:has([data-reader-print]) [data-shell]),
+  :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
+  :global(body:has([data-reader-print]) #noctua-panes),
+  :global(body:has([data-reader-print]) #reader),
+  :global(body:has([data-reader-print]) #reader > div) {
+    display: block !important; position: static !important; width: 100% !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important;
+  }
+  :global([data-reader-print]) { position: static; width: 100%; }
   :global([data-reader-toolbar]), .mobileHeader { display: none !important; }
 }

@@ -28,7 +28,7 @@ function Harness({ hasMore = true, listKey = "inbox", error = null, enabled = tr
   const nav = useReaderNavigation({ enabled, rows, activeId: id, listKey, hasMore, loading, revision, error,
     select: m => setId(m.id), loadNextPage: () => { setLoads(n => n + 1); setLoading(true); } });
   return <><output>{id}:{nav.position}/{nav.total}:{loads}:{String(nav.pending)}</output>
-    <button onClick={() => nav.navigate(1)}>Next</button><button onClick={() => nav.navigate(-1)}>Previous</button>
+    <button disabled={!nav.canNext || nav.pending} onClick={() => nav.navigate(1)}>Next</button><button onClick={() => nav.navigate(-1)}>Previous</button>
     <button onClick={() => { setRows(prev => [...prev, message("c")]); setRevision(n => n + 1); setLoading(false); }}>Complete page</button>
     <button onClick={() => { setRevision(n => n + 1); setLoading(false); }}>Collapsed page</button></>;
 }
@@ -55,4 +55,14 @@ for (const reason of ["folder", "error", "leave"] as const) test(`pending naviga
   await waitFor(() => expect(view.getByRole("status").textContent).toBe("b:2/2:1:false"));
   fireEvent.click(view.getByText("Complete page"));
   await waitFor(() => expect(view.getByRole("status").textContent).toBe("b:2/3:1:false"));
+});
+
+test("a failed page blocks the unloaded boundary while loaded rows remain navigable", () => {
+  const view = render(<Harness error="Synthetic page failure" />);
+  expect((view.getByText("Next") as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(view.getByText("Previous"));
+  expect(view.getByRole("status").textContent).toBe("a:1/2:0:false");
+  expect((view.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(view.getByText("Next"));
+  expect(view.getByRole("status").textContent).toBe("b:2/2:0:false");
 });

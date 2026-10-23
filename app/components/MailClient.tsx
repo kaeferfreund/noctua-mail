@@ -5856,13 +5856,8 @@ export default function MailClient({
                   move={() => handleMoveTo(activeMessage, "thread")}
                   topics={() => handleAssignTopics(activeMessage)}
                   done={() => {
-                    void (async () => {
-                      if (hasDoneFlag(activeMessage)) await toggleTodoFlag(activeMessage);
-                      else {
-                        if (hasTodoFlag(activeMessage)) await updateKeywordFlag(activeMessage, TODO_FLAG, false);
-                        await updateKeywordFlag(activeMessage, DONE_FLAG, true);
-                      }
-                    })();
+                    if (hasTodoFlag(activeMessage) || hasDoneFlag(activeMessage)) void toggleTodoFlag(activeMessage);
+                    else void updateKeywordFlag(activeMessage, DONE_FLAG, true);
                   }}
                   isDone={hasDoneFlag(activeMessage)}
                   busy={pendingMessageActions.has(activeMessage.id)}

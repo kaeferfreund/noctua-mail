@@ -49,3 +49,74 @@ The focused DOM suites are `lib/ui/readerFocus.dom.test.tsx` and
 `playwright.qa-round2.config.ts` and compatible with the existing synthetic QA
 fixture/session. `READER_FOCUS_EVIDENCE_DIR` optionally overrides the screenshot
 destination (default `artifacts/reader-focus`).
+
+### Merge rehearsal notes
+
+Rehearsed with `git merge-tree --write-tree <ref> HEAD` (no worktree/index merge).
+The integration baseline is `origin/integration/stage` at `11dc3c5`; it merges
+cleanly. The following notes describe each conflict hunk against the requested
+other branch tips. These are instructions for the integrator, not changes to
+those branches.
+
+Against `origin/feat/sender-identities-3` (`e63a306`):
+
+- `app/components/MailClient.tsx`, import hunk immediately after `"use client"`:
+  retain `useSenderMessages` and all four reader imports. Sender refresh effects,
+  signature save behavior and reader state/slots are independent and must remain.
+- `app/components/account-settings/tabs/PreferencesTabContent.tsx`, import hunk:
+  keep `useLocale`/`useTranslations` and import `ReactNode` alongside React hooks.
+  This conflict already comes from integration's localized preferences.
+- Same preferences file, default-signature label hunk: keep the sender branch's
+  `!senderPreferences` condition and the integration branch's translated
+  `t("preferences.signature")` label. Preserve its matching conditional close.
+- `lib/mail/resyncMessage.senderKey.test.ts`, first isolation-helper hunk: select
+  one fresh-process isolation implementation, preserving both protocol tests
+  and their assertions plus the unchanged 20-second child budget. Do not combine
+  two environment flags/helpers. The integration `runIsolated` implementation
+  already isolates the global IMAP mock and is suitable to retain.
+- Same test file, second test declaration hunk: retain its `test(...)` declaration
+  and `NOCTUA_RESYNC_TEST_CHILD` guard if retaining `runIsolated`; use the sender
+  branch's `realResyncTest(...)` declaration only with that branch's helper.
+- `messages/de.json` and `messages/en.json`, hunk 1 in `Settings`: merge sender
+  settings keys into the existing translated settings object, preserving both
+  key trees. Do not choose one complete object over the other.
+- Both catalogs, hunk 2 at the top-level `Compose`/`Errors` insertion: merge the
+  sender `Compose.sender`/`Errors.sender` subtrees and associated Compose keys
+  into integration's complete catalogs. Retain `Reader.focus` in both locales,
+  preserve other namespaces and rerun catalog parity/JSON parsing.
+
+Against `origin/fix/admin-mailbox-self-grant` (`b6c1ba9`):
+
+- `playwright.qa-round2.config.ts`, `testMatch` hunk: keep both alternatives,
+  `qa-admin-self-grant|qa-reader-focus`, alongside the existing specs. MailClient's
+  admin access-refresh props merge automatically with reader changes.
+
+The full CI run also exposed an existing lazy-admin DOM test synchronization
+issue: Retry resolves identity asynchronously, but the test inspected idle-task
+cancellation without an async `act` boundary. The test now flushes the identity
+update and its passive effects before asserting both the missing Admin entry
+and cancellation. No admin production behavior, assertion or timeout was changed.
+
+A failed page blocks only the unloaded next boundary until the existing folder
+refresh clears the error. Already loaded rows stay navigable; another next click
+must never increment past a page that failed to load.
+
+Final reader-focus gates on the dedicated worktree: frozen install and unchanged
+`bun.lock`; typecheck zero errors; the two new DOM suites repeated three times
+(45 passes, zero failures); complete `test:ci` (2,804 server tests / 304 files /
+15,327 assertions, 477 DOM tests / 60 files / 2,748 assertions, zero failures).
+Lint retains exactly the supplied baseline: one `useCalendarConflicts.ts:58`
+error and 25 warnings, with no new diagnostics. Production build passes. All
+three QA browser cases pass on 3870 with the dev protocol fixture on 3871–3873;
+this includes full-width reader printing, detached-window opening, done/undone,
+keyboard navigation, persisted layout and unchanged 390 px mobile history.
+
+Screenshots in `artifacts/reader-focus/`: `reader-focus-light-1280.png`,
+`reader-focus-dark-1280.png`, `reader-focus-light-1024.png`,
+`reader-focus-dark-1024.png`, and `reader-mobile-390.png`. All correspondence and
+accounts in these artifacts are synthetic.
+
+The final focused stress command (`test:stress` with `bunfig.dom.toml`, the two
+reader suites and the isolated lazy-admin suite) passes 72 tests with 225
+assertions, seed 1337 and three repetitions; zero failures. The final browser
+screenshots clear incidental text selection before capture.
