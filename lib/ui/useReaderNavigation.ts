@@ -13,11 +13,11 @@ export function useReaderNavigation(inputs: Inputs) {
   useEffect(() => { latest.current = inputs; });
   const request = useRef<{ id: string; key: string; revision: number } | null>(null);
   const navigate = useCallback((direction: -1 | 1) => {
-    const { rows, activeId, listKey, hasMore, loading, revision, select, loadNextPage } = latest.current;
+    const { rows, activeId, listKey, hasMore, loading, revision, error, select, loadNextPage } = latest.current;
     if (!latest.current.enabled || request.current) return;
     const next = readerNavigation(rows, activeId, direction, hasMore);
     if (next === "load") {
-      if (loading) return;
+      if (loading || error) return;
       request.current = { id: activeId, key: listKey, revision };
       setPending(true);
       loadNextPage();
@@ -41,5 +41,9 @@ export function useReaderNavigation(inputs: Inputs) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [inputs]);
-  return { ...readerPosition(inputs.rows, inputs.activeId, inputs.hasMore), pending, navigate };
+  const position = readerPosition(inputs.rows, inputs.activeId, inputs.hasMore);
+  // Retrying by incrementing after a failed page would skip that page. Existing
+  // folder refresh clears the error; loaded rows remain navigable meanwhile.
+  const failedBoundary = Boolean(inputs.error) && position.index === inputs.rows.length - 1;
+  return { ...position, canNext: position.canNext && !failedBoundary, pending, navigate };
 }
