@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { DropdownMenu } from "@radix-ui/themes";
 import {
   Archive as ArchiveIcon,
@@ -37,31 +38,32 @@ export default function BulkActionMenuItems({
   hasOtherAccounts,
   onGetRecentFolders
 }: BulkActionMenuItemsProps) {
+  const t = useTranslations("List");
   return (
     <>
       <DropdownMenu.Item shortcut="R" onSelect={actions.onMarkRead}>
         <span className={menuStyles.menuIcon}>
           <MailOpen size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>Mark as read</span>
+        <span className={menuStyles.menuLabel}>{t("markRead")}</span>
       </DropdownMenu.Item>
       <DropdownMenu.Item shortcut="U" onSelect={actions.onMarkUnread}>
         <span className={menuStyles.menuIcon}>
           <Mail size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>Mark as unread</span>
+        <span className={menuStyles.menuLabel}>{t("markUnread")}</span>
       </DropdownMenu.Item>
       <DropdownMenu.Item shortcut="F" onSelect={actions.onToggleFlag}>
         <span className={menuStyles.menuIcon}>
           <Flag size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>Flag</span>
+        <span className={menuStyles.menuLabel}>{t("flag")}</span>
       </DropdownMenu.Item>
       <DropdownMenu.Item shortcut="T" onSelect={actions.onToggleTodo}>
         <span className={menuStyles.menuIcon}>
           <Square size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>To-Do</span>
+        <span className={menuStyles.menuLabel}>{t("todo")}</span>
       </DropdownMenu.Item>
       <DropdownMenu.Separator />
       <MoveToSubmenu
@@ -74,7 +76,7 @@ export default function BulkActionMenuItems({
           <span className={menuStyles.menuIcon}>
             <Copy size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Copy to account...</span>
+          <span className={menuStyles.menuLabel}>{t("copyAccount")}</span>
         </DropdownMenu.Item>
       )}
       {hasOtherAccounts && (
@@ -82,7 +84,7 @@ export default function BulkActionMenuItems({
           <span className={menuStyles.menuIcon}>
             <ArrowRightLeft size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Move to account...</span>
+          <span className={menuStyles.menuLabel}>{t("moveAccount")}</span>
         </DropdownMenu.Item>
       )}
       <DropdownMenu.Sub>
@@ -90,7 +92,7 @@ export default function BulkActionMenuItems({
           <span className={menuStyles.menuIcon}>
             <Tags size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Add topic</span>
+          <span className={menuStyles.menuLabel}>{t("addTopic")}</span>
         </DropdownMenu.SubTrigger>
         <DropdownMenu.SubContent
           className={menuStyles.menuContent}
@@ -107,14 +109,14 @@ export default function BulkActionMenuItems({
         <span className={menuStyles.menuIcon}>
           <ArchiveIcon size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>Archive</span>
+        <span className={menuStyles.menuLabel}>{t("archive")}</span>
       </DropdownMenu.Item>
       <DropdownMenu.Separator />
-      <DropdownMenu.Item color="red" shortcut="Del" onSelect={actions.onDelete}>
+      <DropdownMenu.Item color="red" shortcut={t("deleteKey")} onSelect={actions.onDelete}>
         <span className={menuStyles.menuIcon}>
           <Trash2 size={14} />
         </span>
-        <span className={menuStyles.menuLabel}>Delete</span>
+        <span className={menuStyles.menuLabel}>{t("delete")}</span>
       </DropdownMenu.Item>
     </>
   );

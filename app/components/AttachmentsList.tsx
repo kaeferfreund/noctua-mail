@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Download, File, FileText, Loader2, RotateCw } from "lucide-react";
@@ -259,6 +260,8 @@ export default function AttachmentsList({
   onRetryLoad?: (id: string) => void;
   showDownloadAll?: boolean;
 }) {
+  const t = useTranslations("Reader");
+  const locale = useLocale();
   const [hoveredImagePreview, setHoveredImagePreview] = useState<HoveredImagePreview | null>(null);
   const visibleAttachments = getVisibleAttachments(attachments, htmlBody);
   const downloadableAttachments = visibleAttachments.filter(
@@ -281,9 +284,9 @@ export default function AttachmentsList({
     const previewHref = getAttachmentPreviewHref(file);
     const downloadHref = getAttachmentDownloadHref(file);
     const defaultHref = previewHref ?? downloadHref ?? "#";
-    const defaultActionLabel = previewHref ? "Preview attachment" : "Download attachment";
+    const defaultActionLabel = previewHref ? t("previewAttachment") : t("downloadAttachment");
     const removeNoun = isImage(file.contentType) ? "image" : "attachment";
-    const removeLabel = `Remove ${removeNoun}${file.filename ? `: ${file.filename}` : ""}`;
+    const removeLabel = t("removeAttachmentLabel", { kind: removeNoun, named: file.filename ? "yes" : "no", filename: file.filename ?? "" });
     return (
       <div key={file.id} className="attachment-item">
         <div
@@ -291,7 +294,7 @@ export default function AttachmentsList({
           onMouseEnter={(event) => {
             if (!showImagePreview) return;
             setHoveredImagePreview({
-              alt: file.filename || "Attachment preview",
+              alt: file.filename || t("attachmentPreview"),
               anchorEl: event.currentTarget,
               src: file.url ?? file.dataUrl ?? ""
             });
@@ -304,13 +307,13 @@ export default function AttachmentsList({
         >
           <div className="attachment-icon">
             {file.loadStatus === "loading" ? (
-              <Loader2 size={14} className="attachment-load-spinner" aria-label="Loading attachment" />
+              <Loader2 size={14} className="attachment-load-spinner" aria-label={t("loadingAttachment")} />
             ) : (
               <AttachmentIcon size={16} aria-hidden="true" />
             )}
           </div>
-          <span className="attachment-extension" aria-hidden="true" title={ext || "file"}>
-            {ext || "file"}
+          <span className="attachment-extension" aria-hidden="true" title={ext || t("file")}>
+            {ext || t("file")}
           </span>
         </div>
         <a
@@ -333,14 +336,14 @@ export default function AttachmentsList({
           <span className="attachment-name">
             {file.filename}{" "}
             <span className="attachment-meta">
-              ({file.contentType || "unknown"}
-              {formatByteSize(file.size) ? `, ${formatByteSize(file.size)}` : ""})
+              ({file.contentType || t("unknownType")}
+              {formatByteSize(file.size, locale) ? `, ${formatByteSize(file.size, locale)}` : ""})
             </span>
             {file.loadStatus === "loading" && (
-              <span className="attachment-meta"> · Loading…</span>
+              <span className="attachment-meta"> · {t("attachmentLoadingStatus")}</span>
             )}
             {file.loadStatus === "error" && (
-              <span className="attachment-load-error" role="alert"> · Failed to load</span>
+              <span className="attachment-load-error" role="alert"> · {t("attachmentLoadFailed")}</span>
             )}
           </span>
         </a>
@@ -348,8 +351,8 @@ export default function AttachmentsList({
           <button
             type="button"
             className="icon-button ghost"
-            title="Retry loading attachment"
-            aria-label={`Retry loading attachment${file.filename ? `: ${file.filename}` : ""}`}
+            title={t("retryAttachment")}
+            aria-label={t("retryAttachmentLabel", { named: file.filename ? "yes" : "no", filename: file.filename ?? "" })}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -364,8 +367,8 @@ export default function AttachmentsList({
             className="icon-button ghost attachment-preview"
             href={downloadHref}
             download={file.filename || true}
-            aria-label="Download attachment"
-            title="Download attachment"
+            aria-label={t("downloadAttachment")}
+            title={t("downloadAttachment")}
           >
             <Download size={12} />
           </a>
@@ -395,7 +398,7 @@ export default function AttachmentsList({
       {visibleAttachments.length > 0 && (
         <div className="attachments">
           <div className="attachments-header">
-            <h4>Attachments</h4>
+            <h4>{t("attachments")}</h4>
             {showDownloadAll && downloadableAttachments.length > 1 && (
               <button
                 type="button"
@@ -409,7 +412,7 @@ export default function AttachmentsList({
                 }}
               >
                 <Download size={12} />
-                <span>Download all</span>
+                <span>{t("downloadAll")}</span>
               </button>
             )}
           </div>
@@ -419,7 +422,7 @@ export default function AttachmentsList({
       {removableInlineImages.length > 0 && (
         <div className="attachments">
           <div className="attachments-header">
-            <h4>Images in message</h4>
+            <h4>{t("imagesInMessage")}</h4>
           </div>
           <div className="attachment-list">{removableInlineImages.map(renderItem)}</div>
         </div>

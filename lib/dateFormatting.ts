@@ -1,3 +1,5 @@
+import { formatDate as formatUiDate } from "./i18n/format";
+import { formattingLocales, timeZone, type UiLocale } from "./i18n/config";
 import type { AccountDateFormat } from "./data";
 
 export const DEFAULT_ACCOUNT_DATE_FORMAT: AccountDateFormat = "locale";
@@ -158,8 +160,20 @@ export function formatAccountDateValue(
 export function getMessageDateDisplay(
   dateValue: number,
   fallbackDate: string,
-  preferredFormat?: AccountDateFormat
+  preferredFormat?: AccountDateFormat,
+  locale?: UiLocale
 ): DateDisplay {
+  if (locale && Number.isFinite(dateValue)) {
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return { text: fallbackDate, tooltip: fallbackDate };
+    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone, hourCycle: "h23" };
+    const render = (seconds: boolean) => {
+      const opts = { ...options, ...(seconds ? { second: "2-digit" as const } : {}) };
+      if (!preferredFormat || preferredFormat === "locale") return formatUiDate(date, locale, opts);
+      return formatAccountIntl(date, preferredFormat, { ...opts, ...(preferredFormat === "mdy" ? { hour12: true } : {}) }, locale);
+    };
+    return { text: render(false), tooltip: render(true) };
+  }
   const text = formatAccountDateValue(dateValue, preferredFormat, false);
   const tooltip = formatAccountDateValue(dateValue, preferredFormat, true);
   if (!text || !tooltip) {
@@ -354,12 +368,13 @@ export function formatAccountTimestampLabel(
 export function formatAccountIntl(
   date: Date,
   preferredFormat: AccountDateFormat | undefined,
-  options: Intl.DateTimeFormatOptions
+  options: Intl.DateTimeFormatOptions,
+  uiLocale?: UiLocale
 ): string {
   const format = normalizeAccountDateFormat(preferredFormat);
-  if (format === "ymd") return formatYmdComposite(date, options);
+  if (format === "ymd") return formatYmdComposite(date, options, uiLocale);
   const locale =
-    format === "locale" ? undefined : resolveLocaleForFormat(format);
+    format === "locale" ? (uiLocale ? formattingLocales[uiLocale] : undefined) : resolveLocaleForFormat(format);
   try {
     return new Intl.DateTimeFormat(locale, options).format(date);
   } catch {
@@ -400,12 +415,13 @@ function ymdDatePartsForTimeZone(date: Date, timeZone?: string) {
 function ymdWeekday(
   date: Date,
   weekday: Intl.DateTimeFormatOptions["weekday"],
-  timeZone?: string
+  timeZone?: string,
+  locale?: UiLocale
 ): string {
   // `ymd` controls date *order*, not language. The weekday name should
   // follow the user's system locale so a German user doesn't see "Mon"
   // when the rest of the UI says "Mo".
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale ? formattingLocales[locale] : undefined, {
     weekday,
     ...(timeZone ? { timeZone } : {})
   }).format(date);
@@ -418,7 +434,7 @@ function ymdWeekday(
  * date *order*, not language. AM/PM markers and timezone names follow the
  * user's UI locale, the same way they do for `mdy` / `dmy` / `locale`.
  */
-function ymdTimePart(date: Date, options: Intl.DateTimeFormatOptions): string {
+function ymdTimePart(date: Date, options: Intl.DateTimeFormatOptions, locale?: UiLocale): string {
   const timeOptions: Intl.DateTimeFormatOptions = {};
   if (options.timeStyle) timeOptions.timeStyle = options.timeStyle;
   if (options.hour) timeOptions.hour = options.hour;
@@ -436,10 +452,10 @@ function ymdTimePart(date: Date, options: Intl.DateTimeFormatOptions): string {
     timeOptions.hour = "2-digit";
     timeOptions.minute = "2-digit";
   }
-  return new Intl.DateTimeFormat(undefined, timeOptions).format(date);
+  return new Intl.DateTimeFormat(locale ? formattingLocales[locale] : undefined, timeOptions).format(date);
 }
 
-function formatYmdComposite(date: Date, options: Intl.DateTimeFormatOptions): string {
+function formatYmdComposite(date: Date, options: Intl.DateTimeFormatOptions, locale?: UiLocale): string {
   const hasDatePart = Boolean(
     options.dateStyle || options.year || options.month || options.day
   );
@@ -449,12 +465,12 @@ function formatYmdComposite(date: Date, options: Intl.DateTimeFormatOptions): st
   const hasWeekday = Boolean(options.weekday);
   try {
     const segments: string[] = [];
-    if (hasWeekday) segments.push(`${ymdWeekday(date, options.weekday, options.timeZone)},`);
+    if (hasWeekday) segments.push(`${ymdWeekday(date, options.weekday, options.timeZone, locale)},`);
     if (hasDatePart) {
       const dp = ymdDatePartsForTimeZone(date, options.timeZone);
       segments.push(`${dp.year}-${dp.month}-${dp.day}`);
     }
-    if (hasTimePart) segments.push(ymdTimePart(date, options));
+    if (hasTimePart) segments.push(ymdTimePart(date, options, locale));
     return segments.join(" ");
   } catch {
     try {

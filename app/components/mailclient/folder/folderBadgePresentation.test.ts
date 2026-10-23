@@ -24,10 +24,10 @@ describe("folder badge presentation", () => {
   });
 
   it("formats folder count titles from total and unread counts", () => {
-    expect(getFolderCountTitle("INBOX", 933, 556)).toBe("INBOX (933 Messages, 556 Unread)");
+    expect(getFolderCountTitle("INBOX", 933, 556, "en")).toBe("INBOX (933 Messages, 556 Unread)");
   });
 
   it("clamps negative counts to zero", () => {
-    expect(getFolderCountTitle("Drafts", -3, -1)).toBe("Drafts (0 Messages, 0 Unread)");
+    expect(getFolderCountTitle("Drafts", -3, -1, "en")).toBe("Drafts (0 Messages, 0 Unread)");
   });
 });

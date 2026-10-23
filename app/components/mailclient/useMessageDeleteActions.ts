@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type React from "react";
 import { useCallback } from "react";
 import {
@@ -73,6 +75,7 @@ type DeleteNoticeInput = {
   type: "success";
   title: string;
   description?: string;
+  actionKind?: "undo";
   actionLabel?: string;
   onAction?: () => void;
   durationMs?: number | null;
@@ -179,6 +182,7 @@ export function useMessageDeleteActions({
   markMessagesMutated,
   markDeleteReconcileSuppression
 }: UseMessageDeleteActionsOptions) {
+  const tn = useTranslations("Notifications");
   const isPermanentDeleteTarget = useCallback(
     (target: Message, trashFolderId: string | null) =>
       isPermanentDeleteTargetPure(target, trashFolderId, isTrashFolder),
@@ -322,10 +326,10 @@ export function useMessageDeleteActions({
       );
       if (!res.ok) {
         const errorMessage = await readErrorMessage(res);
-        throw new Error(errorMessage || "Failed to delete linked calendar items.");
+        throw new Error(errorMessage || tn("deleteCalendarFailed"));
       }
     },
-    [activeAccountId, apiFetch, readErrorMessage]
+    [activeAccountId, apiFetch, readErrorMessage, tn]
   );
 
   const deleteSingleMessagePermanently = useCallback(
@@ -335,7 +339,7 @@ export function useMessageDeleteActions({
       });
       if (!res.ok) {
         const errorMessage = await readErrorMessage(res);
-        throw new Error(errorMessage || "Failed to delete message.");
+        throw new Error(errorMessage || tn("deleteFailed"));
       }
       const data = (await res.json()) as DeleteResponse;
       const movedMessageId = data.messageId ?? target.id;
@@ -417,7 +421,7 @@ export function useMessageDeleteActions({
       searchScope,
       setGroupMeta,
       setMessages,
-      shouldKeepMessageInResults
+      shouldKeepMessageInResults, tn
     ]
   );
 
@@ -437,7 +441,7 @@ export function useMessageDeleteActions({
       });
       if (!res.ok) {
         const errorMessage = await readErrorMessage(res);
-        throw new Error(errorMessage || "Failed to delete messages.");
+        throw new Error(errorMessage || tn("deleteManyFailed"));
       }
       const data = (await res.json()) as BulkDeleteResponse;
       const deletedIds = new Set((data.deletedIds ?? []).filter(Boolean));
@@ -473,7 +477,7 @@ export function useMessageDeleteActions({
       readErrorMessage,
       searchScope,
       setGroupMeta,
-      setMessages
+      setMessages, tn
     ]
   );
 
@@ -487,24 +491,17 @@ export function useMessageDeleteActions({
       if (movedToTrashCount > 0) {
         pushNotice({
           type: "success",
-          title:
-            movedToTrashCount === 1
-              ? "Moved message to Trash."
-              : `Moved ${movedToTrashCount} messages to Trash.`,
-          description:
-            permanentlyDeletedCount > 0
-              ? permanentlyDeletedCount === 1
-                ? "1 message was deleted permanently."
-                : `${permanentlyDeletedCount} messages were deleted permanently.`
-              : singleSubject,
-          actionLabel: undoTargets.length > 0 ? "Undo" : undefined,
+          title: tn("movedTrash", { count: movedToTrashCount }),
+          description: permanentlyDeletedCount > 0
+            ? tn("deletedPermanentDescription", { count: permanentlyDeletedCount }) : singleSubject,
+          actionKind: undoTargets.length > 0 ? "undo" : undefined,
           onAction:
             undoTargets.length > 0
               ? () =>
                   void undoMoveOperation(
                     undoTargets,
                     activeAccountId,
-                    undoTargets.length === 1 ? "Message restored." : "Messages restored."
+                    tn("restored", { count: undoTargets.length })
                   )
               : undefined,
           durationMs: noticeSuccessTimeout
@@ -514,15 +511,12 @@ export function useMessageDeleteActions({
       if (permanentlyDeletedCount > 0) {
         pushNotice({
           type: "success",
-          title:
-            permanentlyDeletedCount === 1
-              ? "Message deleted permanently."
-              : `${permanentlyDeletedCount} messages deleted permanently.`,
+          title: tn("deletedPermanent", { count: permanentlyDeletedCount }),
           description: permanentlyDeletedCount === 1 ? singleSubject : undefined
         });
       }
     },
-    [activeAccountId, noticeSuccessTimeout, pushNotice, undoMoveOperation]
+    [activeAccountId, noticeSuccessTimeout, pushNotice, undoMoveOperation, tn]
   );
 
   const resolveDeleteNextActiveId = useCallback(
@@ -614,7 +608,7 @@ export function useMessageDeleteActions({
         options.threadIdForFallback
       );
       const singleSubject =
-        targets.length === 1 ? getMessageSubjectForNotice(targets[0]) : undefined;
+        targets.length === 1 ? getMessageSubjectForNotice(targets[0], tn("noSubject")) : undefined;
       const undoTargets: UndoMoveTarget[] = [];
       let movedToTrashCount = 0;
       let permanentlyDeletedCount = 0;
@@ -630,7 +624,7 @@ export function useMessageDeleteActions({
         setPendingMessageActions((prev) => new Set([...prev, ...targets.map((t) => t.id)]));
         if (moveTargets.length > 0) {
           if (!trashFolderId) {
-            reportError("Trash folder not found.");
+            reportError(tn("trashMissing"));
             return;
           }
           const moveResult = await moveMessagesToFolder(trashFolderId, {
@@ -701,7 +695,8 @@ export function useMessageDeleteActions({
       setViewMessage,
       setPendingMessageActions,
       onMessagesRemoved,
-      markDeleteReconcileSuppression
+      markDeleteReconcileSuppression,
+      tn
     ]
   );
 
@@ -731,14 +726,14 @@ export function useMessageDeleteActions({
             if (error instanceof Error && error.message) {
               reportError(error.message);
             } else {
-              reportError("Failed to delete linked calendar items.");
+              reportError(tn("deleteCalendarFailed"));
             }
             return;
           }
         }
       }
       await runDeleteTransaction(targets, {
-        errorMessage: "Failed to delete message.",
+        errorMessage: tn("deleteFailed"),
         threadIdForFallback: threadId
       });
     },
@@ -751,7 +746,7 @@ export function useMessageDeleteActions({
       reportError,
       runDeleteTransaction,
       supportsThreads,
-      threadScopeMessages
+      threadScopeMessages, tn
     ]
   );
 
@@ -790,14 +785,14 @@ export function useMessageDeleteActions({
             if (error instanceof Error && error.message) {
               reportError(error.message);
             } else {
-              reportError("Failed to delete linked calendar items.");
+              reportError(tn("deleteCalendarFailed"));
             }
             return;
           }
         }
       }
       await runDeleteTransaction(targets, {
-        errorMessage: "Failed to delete messages.",
+        errorMessage: tn("deleteManyFailed"),
         clearSelectionWhenActiveRemains: true
       });
     },
@@ -808,7 +803,7 @@ export function useMessageDeleteActions({
       messages,
       reportError,
       runDeleteTransaction,
-      threadScopeMessages
+      threadScopeMessages, tn
     ]
   );
 

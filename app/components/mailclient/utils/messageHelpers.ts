@@ -1,3 +1,7 @@
+import { formatWeekBucketStart } from "@/lib/i18n/format";
+import type { UiLocale } from "@/lib/i18n/config";
+import { INVITE_DECK_GROUP_BY, EVENT_GROUP_BY } from "@/lib/messageGrouping";
+import { getTranslator } from "@/lib/i18n/translator";
 /**
  * Pure utility functions for message operations
  */
@@ -51,7 +55,7 @@ export function buildSentMessageFromDraft(
   };
 }
 
-export function computeGroupMeta(items: Message[]): MessageGroupMeta[] {
+export function computeGroupMeta(items: Message[], groupBy = "none", locale: UiLocale = "de"): MessageGroupMeta[] {
   const counts = new Map<string, number>();
   items.forEach((msg) => {
     const key = msg.groupKey ?? "Other";
@@ -59,7 +63,7 @@ export function computeGroupMeta(items: Message[]): MessageGroupMeta[] {
   });
   return Array.from(counts.entries()).map(([key, count]) => ({
     key,
-    label: key,
+    label: messageGroupLabel(key, groupBy, locale),
     count
   }));
 }
@@ -219,3 +223,25 @@ export function resolveInReplyToRef(
   return { refId, target, isForward: Boolean(message.xForwardedMessageId) };
 }
 
+
+// These keys are persisted/server-provided identifiers. Only their labels change.
+export function messageGroupLabel(key: string, groupBy: string, locale: UiLocale, fallback = key) {
+  const t = getTranslator(locale);
+  if (key === "Flagged") return t("List.groups.flagged");
+  if (key === "Done") return t("List.groups.done");
+  if (groupBy === "date") {
+    const labels = { Today: "today", Yesterday: "yesterday", "This Week": "thisWeek", Older: "older" } as const;
+    if (Object.hasOwn(labels, key)) return t(`List.groups.${labels[key as keyof typeof labels]}`);
+  }
+  if (groupBy === INVITE_DECK_GROUP_BY && (key === "UPCOMING" || key === "PAST")) {
+    return t(key === "UPCOMING" ? "List.groups.upcoming" : "List.groups.past");
+  }
+  if (groupBy === "week") {
+    const date = formatWeekBucketStart(key, locale);
+    if (date) return t("List.groups.week", { date });
+  }
+  if (groupBy === "domain" && key === "Unknown") return t("List.groups.unknown");
+  if (["date", "week", "year", "none", INVITE_DECK_GROUP_BY, EVENT_GROUP_BY].includes(groupBy) && key === "Other") return t("List.groups.other");
+  if (groupBy === "none" && key === "All") return t("List.groups.all");
+  return fallback;
+}

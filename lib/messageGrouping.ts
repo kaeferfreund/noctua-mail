@@ -1,3 +1,4 @@
+import { displayDayNumber } from "./i18n/format";
 import type { Message } from "./data";
 import { resolveCurrentOrNextOccurrence } from "./reminderRecurrence";
 
@@ -23,21 +24,13 @@ export type InviteDeckEventBounds = {
   eventLastEndAtMs?: number | null;
 };
 
-function getLocalDayStartMs(timestampMs: number) {
-  const date = new Date(timestampMs);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-function getLocalDateOrdinal(date: Date) {
-  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
-}
-
 export function buildWeekGroupKey(timestampMs: number) {
-  const date = new Date(timestampMs);
-  const year = date.getFullYear();
-  const jan1 = new Date(year, 0, 1);
-  const dayOfYear = getLocalDateOrdinal(date) - getLocalDateOrdinal(jan1);
-  const jan1Weekday = jan1.getDay();
+  const dayNumber = displayDayNumber(timestampMs);
+  const date = new Date(dayNumber * DAY_MS);
+  const year = date.getUTCFullYear();
+  const jan1 = new Date(Date.UTC(year, 0, 1));
+  const dayOfYear = dayNumber - jan1.getTime() / DAY_MS;
+  const jan1Weekday = jan1.getUTCDay();
   const firstMondayOffset = jan1Weekday === 1 ? 0 : (8 - jan1Weekday) % 7;
   const week =
     dayOfYear < firstMondayOffset
@@ -47,18 +40,19 @@ export function buildWeekGroupKey(timestampMs: number) {
 }
 
 export function buildTimeGroupKey(timestampMs: number, groupBy: string, nowMs = Date.now()) {
-  const todayStart = getLocalDayStartMs(nowMs);
+  const todayStart = displayDayNumber(nowMs);
+  const targetDay = displayDayNumber(timestampMs);
 
   if (groupBy === INVITE_DECK_GROUP_BY) {
-    return timestampMs >= todayStart ? "UPCOMING" : "PAST";
+    return targetDay >= todayStart ? "UPCOMING" : "PAST";
   }
 
   if (groupBy === "date") {
-    const yesterdayStart = todayStart - DAY_MS;
-    const weekStart = todayStart - 7 * DAY_MS;
-    if (timestampMs >= todayStart) return "Today";
-    if (timestampMs >= yesterdayStart) return "Yesterday";
-    if (timestampMs >= weekStart) return "This Week";
+    const yesterdayStart = todayStart - 1;
+    const weekStart = todayStart - 7;
+    if (targetDay >= todayStart) return "Today";
+    if (targetDay >= yesterdayStart) return "Yesterday";
+    if (targetDay >= weekStart) return "This Week";
     return "Older";
   }
 
@@ -74,7 +68,7 @@ export function buildMessageGroupKey(
     typeof dateValueOverride === "number" && Number.isFinite(dateValueOverride)
       ? dateValueOverride
       : message.dateValue;
-  const date = new Date(effectiveDateValue);
+  const date = new Date(displayDayNumber(effectiveDateValue) * DAY_MS);
 
   if (groupBy === "date" || groupBy === INVITE_DECK_GROUP_BY) {
     return buildTimeGroupKey(effectiveDateValue, groupBy);
@@ -85,7 +79,7 @@ export function buildMessageGroupKey(
   if (groupBy === "week") {
     return buildWeekGroupKey(effectiveDateValue);
   }
-  if (groupBy === "year") return String(date.getFullYear());
+  if (groupBy === "year") return String(date.getUTCFullYear());
   if (groupBy === "domain") {
     const emailMatch = message.from.match(/<([^>]+)>/);
     const email = emailMatch ? emailMatch[1] : message.from;

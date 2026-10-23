@@ -1,3 +1,4 @@
+import type { UiLocale } from "@/lib/i18n/config";
 import type { AccountDateFormat } from "@/lib/data";
 import { getMessageDateDisplay } from "@/lib/dateFormatting";
 
@@ -9,7 +10,8 @@ type MessageDateDisplay = {
 export function getMessageListDateDisplay(
   dateValue: number,
   fallbackDate: string,
-  dateFormat?: AccountDateFormat
+  dateFormat?: AccountDateFormat,
+  locale: UiLocale = "de"
 ): MessageDateDisplay {
-  return getMessageDateDisplay(dateValue, fallbackDate, dateFormat);
+  return getMessageDateDisplay(dateValue, fallbackDate, dateFormat, locale);
 }

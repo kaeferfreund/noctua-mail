@@ -1,3 +1,6 @@
+import { formatNumber } from "@/lib/i18n/format";
+import { getTranslator } from "@/lib/i18n/translator";
+import type { UiLocale } from "@/lib/i18n/config";
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 
 /**
@@ -6,7 +9,7 @@ const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
  * `null` when no size is recorded, so callers can omit the label entirely
  * rather than render a misleading `0 B`.
  */
-export function formatByteSize(bytes?: number | null): string | null {
+export function formatByteSize(bytes?: number | null, locale: UiLocale = "de"): string | null {
   if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return null;
   let value = bytes;
   let unitIndex = 0;
@@ -17,7 +20,7 @@ export function formatByteSize(bytes?: number | null): string | null {
   // Sub-KB sizes are whole bytes; above that one decimal keeps rows aligned
   // without pretending to a precision the reader cares about.
   const digits = unitIndex === 0 ? 0 : value < 10 ? 1 : 0;
-  return `${value.toFixed(digits)} ${UNITS[unitIndex]}`;
+  return `${formatNumber(value, locale, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false })}${locale === "de" ? "\u00a0" : " "}${UNITS[unitIndex]}`;
 }
 
 /**
@@ -25,7 +28,7 @@ export function formatByteSize(bytes?: number | null): string | null {
  * `.eml` on disk get an em dash rather than a blank, so "unknown" stays
  * distinguishable from a rendering gap while the list is ranked by size.
  */
-export function describeMessageSize(sizeBytes?: number | null) {
-  const label = formatByteSize(sizeBytes);
-  return label ? { label, title: "Size on disk" } : { label: "—", title: "No stored source" };
+export function describeMessageSize(sizeBytes?: number | null, locale: UiLocale = "de") {
+  const label = formatByteSize(sizeBytes, locale);
+  return label ? { label, title: getTranslator(locale)("List.sizeOnDisk") } : { label: "—", title: getTranslator(locale)("List.noStoredSource") };
 }

@@ -2,6 +2,8 @@ import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { totpFromUri } from "../../helpers/totp";
 
+test.use({ locale: "en-GB" });
+
 // Run via: QA_SHELL_USE_BUILD=1 nice -n 15 bun scripts/runQaShellBrowserTests.ts
 // The harness owns the production server, synthetic storage and fixture ports.
 type Seed = { email: string; password: string; totpURI: string; id: string };
@@ -20,7 +22,7 @@ async function menu(page: Page, item: "Settings" | "Admin") {
 }
 test.beforeAll(async ({ browser }) => {
   seeds = JSON.parse(readFileSync(process.env.QA_SHELL_SEED_FILE!, "utf8"));
-  const context = await browser.newContext({ baseURL: process.env.QA_SHELL_BASE_URL ?? "http://localhost:3799" }), page = await context.newPage();
+  const context = await browser.newContext({ locale: "en-GB", baseURL: process.env.QA_SHELL_BASE_URL ?? "http://localhost:3799" }), page = await context.newPage();
   await page.goto("/");
   expect((await post(page, "/api/ba/sign-in/email", { email: seeds[0].email, password: seeds[0].password })).status).toBe(200);
   expect((await post(page, "/api/ba/two-factor/verify-totp", { code: totpFromUri(seeds[0].totpURI) })).status).toBe(200);

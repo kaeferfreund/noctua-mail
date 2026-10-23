@@ -15,7 +15,7 @@ export function resolveInAppNoticeTimeoutMs(input: NoticeInput) {
         ? durationMs
         : NOTICE_TIMEOUTS[notice.type];
   const hasUndoAction =
-    notice.actionLabel?.trim().toLowerCase() === "undo" &&
+    notice.actionKind === "undo" &&
     typeof notice.onAction === "function";
   return baseTimeoutMs == null
     ? null

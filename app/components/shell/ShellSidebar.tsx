@@ -196,7 +196,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
           <SidebarContent>
             <SidebarGroup>
               <div className="flex items-center gap-2">
-                <Button className="flex-1 justify-start" onClick={closeAfter(compose.onCompose)} aria-label={t("compose.new")}>
+                <Button className="flex-1 justify-start" onClick={closeAfter(compose.onCompose)} aria-label={t("compose.new")} data-shell-action="compose">
                   <SquarePen />{t("compose.label")}</Button>
                 <Button variant="outline" size="icon" aria-label={t("sync.allFolders")}
                   title={t("sync.allFolders")} disabled={sync.isSyncing} onClick={sync.onCheckNewMail}>
