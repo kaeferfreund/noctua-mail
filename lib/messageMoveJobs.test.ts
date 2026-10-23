@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import "./testDbHarness";
 import type { Account } from "@/lib/data";
 
 const updateMessageFolder = mock(async () => undefined);

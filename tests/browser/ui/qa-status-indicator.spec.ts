@@ -117,6 +117,47 @@ test("desktop status sections, density measurements and light/dark screenshots",
     writeFileSync(`${artifacts}/footer-gains.json`, JSON.stringify(footerGains, null, 2) + "\n");
   }
 });
+// Run once with NOCTUA_BUILD_HASH/NOCTUA_BUILD_TIME exported to the server and
+// once without; the label is server-rendered from the runtime env.
+test("build label in the popover footer, the phone menu and the sidebar brand", async ({ page }) => {
+  test.skip(baseline);
+  const hash = process.env.NOCTUA_BUILD_HASH?.trim() ?? "";
+  const label = hash ? new RegExp(`^Build ${hash.slice(0, 7)}( · \\d{2}\\.\\d{2}\\.\\d{4}, \\d{2}:\\d{2})?$`) : null;
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.setViewportSize({ width: 1440, height: 900 }); await page.emulateMedia({ colorScheme }); await page.goto("/");
+    await expect(page.locator("html")).toHaveClass(new RegExp(colorScheme));
+    await expect(page.locator('[data-status-indicator]')).toHaveAttribute("data-status-indicator", "idle", { timeout: 120000 });
+    await page.locator('[data-status-indicator]').click();
+    const popover = page.getByRole("dialog", { name: "Aktivität und Kalender" });
+    await expect(popover).toBeVisible();
+    const footer = popover.getByText(/^Build /);
+    if (label) {
+      await expect(footer).toHaveText(label);
+      await expect(footer).toHaveAttribute("title", new RegExp(`^Commit ${hash}`));
+      // Last child of the popover content, after the four sections.
+      expect(await footer.evaluate(element => element.nextElementSibling === null
+        && element.previousElementSibling?.getAttribute("data-status-section") === "reminder")).toBe(true);
+      await expect(page.locator('[data-sidebar="header"]').getByText(/^Build /)).toHaveText(label);
+    } else {
+      await expect(footer).toHaveCount(0);
+      await expect(page.getByText(/^Build /)).toHaveCount(0);
+    }
+    await page.screenshot({ animations: "disabled", path: `${artifacts}/build-popover-1440-${colorScheme}-${label ? "env" : "none"}.png` });
+    await page.keyboard.press("Escape"); await expect(popover).toHaveCount(0);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto("/");
+  await page.locator('[data-status-indicator]').click();
+  const menu = page.getByRole("menu");
+  if (label) await expect(menu.getByText(/^Build /)).toHaveText(label);
+  else await expect(menu.getByText(/^Build /)).toHaveCount(0);
+  await page.screenshot({ animations: "disabled", path: `${artifacts}/build-menu-390-${label ? "env" : "none"}.png` });
+  await page.getByRole("menuitem", { name: "Demnächst", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Demnächst", exact: true });
+  await expect(sheet).toHaveCSS("opacity", "1");
+  await expect(sheet.locator('[data-slot="sheet-title"]')).toBeVisible();
+  await page.screenshot({ animations: "disabled", path: `${artifacts}/status-sheet-390-reminder.png` });
+});
 test("PWA calendar route uses the header popover and preserves other URL state", async ({ page }) => {
   test.skip(baseline);
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -269,6 +310,50 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
       eventOpened: true, created: true, edited: true, focusRestored: true }));
   });
 }
+
+// FullCalendar's href-less date labels report tabIndex 0; Radix then picked one
+// as the popover's last tabbable element and Tab left the popover. Walk the real
+// tab order with the keyboard: it must wrap inside the popover both ways.
+test("desktop calendar popover keeps Tab and Shift+Tab inside the popover", async ({ page }) => {
+  test.skip(baseline);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator('[data-status-indicator]')).toHaveAttribute("data-status-indicator", "idle", { timeout: 120000 });
+  expect(await post(page, "/api/accounts/qa-shared/calendar/events", {
+    summary: "Synthetic tab loop", startAtMs: Date.now(), endAtMs: Date.now() + 3600000, allDay: true, sourceType: "local"
+  })).toBe(200);
+  await page.goto("/?openCalendar=1");
+  const popover = page.locator('[data-slot="popover-content"]');
+  await expect(popover.locator(".fc-event").filter({ hasText: "Synthetic tab loop" }).first()).toBeVisible();
+  const first = popover.getByRole("button", { name: "Neue E-Mails abrufen", exact: true });
+  await first.focus();
+  const focused = () => page.evaluate(() => {
+    const element = document.activeElement as HTMLElement | null;
+    const popover = document.querySelector('[data-slot="popover-content"]');
+    return { inside: !!element && !!popover?.contains(element), first: element?.textContent === "Neue E-Mails abrufen",
+      event: !!element?.closest(".fc-event"), label: element?.getAttribute("aria-label") ?? element?.textContent?.trim().slice(0, 60) ?? "" };
+  });
+  const order: string[] = [];
+  let wrapped = false, events = 0;
+  for (let step = 0; step < 120 && !wrapped; step++) {
+    await page.keyboard.press("Tab");
+    const now = await focused();
+    expect(now.inside, `Tab ${step + 1} after ${order.at(-1)}`).toBe(true);
+    if (now.first) wrapped = true; else { order.push(now.label); if (now.event) events++; }
+  }
+  expect(wrapped).toBe(true);
+  expect(events).toBeGreaterThan(0);
+  await page.keyboard.press("Shift+Tab");
+  const last = await focused();
+  expect(last.inside).toBe(true);
+  expect(last.label).toBe(order.at(-1));
+  await page.keyboard.press("Tab");
+  expect((await focused()).first).toBe(true);
+  await expect(popover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(page.locator('[data-status-indicator]')).toBeFocused();
+  writeFileSync(`${artifacts}/calendar-tab-loop.json`, JSON.stringify({ steps: order.length + 1, events, order }, null, 2) + "\n");
+});
 
 // Phone calendar in the fullscreen Sheet, including the 320x500 keyboard-
 // shortened viewport. Playwright's click() scrolls overflow:hidden ancestors

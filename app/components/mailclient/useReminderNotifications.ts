@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, CalendarEvent } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { buildAccountCalendarEventsPath } from "@/lib/accountApiPaths";
-import { expandCalendarEventForRange } from "@/lib/calendarOccurrences";
 import { CALENDAR_EVENTS_UPDATED_EVENT } from "@/app/components/calendar/calendarEventsClient";
 import type { ExceptionEntry } from "./types";
 import { DEFAULT_UPCOMING_WINDOW_MS } from "./status/upcomingEntries";
@@ -304,12 +303,26 @@ export function useReminderNotifications({
         | { items?: CalendarEvent[] }
         | null;
       const rawEvents = payload?.items ?? [];
+      // Occurrence expansion needs `rrule`; load it on demand, only when a
+      // fetched event actually repeats. Non-recurring events expand to
+      // themselves, matching `expandCalendarEventForRange`'s fast path.
+      // State is only set after expansion, so no unexpanded series start
+      // is ever displayed.
+      const expandCalendarEventForRange = rawEvents.some((event) =>
+        Boolean(event.recurrenceRule?.trim())
+      )
+        ? (await import("@/lib/calendarOccurrences")).expandCalendarEventForRange
+        : null;
       // Expand recurring events into per-occurrence synthetic events so the
       // popover can sort/display them by actual start time. Each occurrence
       // preserves the master event's metadata (id/uid/title/location/...)
       // but overrides startAtMs/endAtMs to the displayed occurrence.
       const expanded: CalendarEvent[] = [];
       rawEvents.forEach((event) => {
+        if (!expandCalendarEventForRange || !event.recurrenceRule?.trim()) {
+          expanded.push(event);
+          return;
+        }
         const occurrences = expandCalendarEventForRange(event, nowMs, endMs);
         occurrences.forEach((occurrence) => {
           if (occurrence.displayStartAtMs === event.startAtMs) {

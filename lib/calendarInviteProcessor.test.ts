@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import "@/lib/testDbHarness";
 import type { CalendarEvent, Message } from "@/lib/data";
 import type { CalendarEventEmailSnapshot } from "@/lib/calendarEventEmailSnapshot";
 import { saveMessageSource } from "@/lib/storage";

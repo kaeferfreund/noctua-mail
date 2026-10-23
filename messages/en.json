@@ -200,7 +200,6 @@
       "title": "Command Palette",
       "description": "Search for a command to run..."
     },
-    "build": "Build {version}",
     "loading": {
       "mailbox": "Add mailbox"
     },
@@ -241,11 +240,10 @@
       "clearExceptions": "Clear exceptions",
       "copyError": "Copy error",
       "relogin": "Re-login",
-      "close": "Close",
       "deleteReminderError": "Failed to delete reminder.",
       "openSourceMail": "Open source mail",
       "duration": "Duration: {value}",
-      "reminderLead": "Reminder: {minutes} minutes before",
+      "reminderLead": "Reminder: {unit, select, start {at start} day {{count, plural, one {# day} other {# days}} before} hour {{count, plural, one {# hour} other {# hours}} before} other {{count, plural, one {# minute} other {# minutes}} before}}",
       "repeats": "Repeats: {value}",
       "deleteReminder": "Delete reminder",
       "process": {

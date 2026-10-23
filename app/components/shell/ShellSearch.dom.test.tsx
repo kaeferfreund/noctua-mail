@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { useState } from "react";
 import { cleanup, fireEvent, within } from "@testing-library/react";
-import { render } from "@/lib/i18n/testRender";
+import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
 
 afterEach(cleanup);
 
-function SearchHarness({ scope = "folder" }: { scope?: "folder" | "all" }) {
+function SearchHarness({ scope = "folder", folder = "archive" }: { scope?: "folder" | "all"; folder?: string }) {
   const [query, setQuery] = useState("");
   const [searchScope, setSearchScope] = useState(scope);
-  const [activeFolderId, setActiveFolderId] = useState(scope === "folder" ? "archive" : "");
+  const [activeFolderId, setActiveFolderId] = useState(scope === "folder" ? folder : "");
   const [lastFolderId, setLastFolderId] = useState(scope === "folder" ? "inbox" : "archive");
   const [searchFields, setSearchFields] = useState({ ...DEFAULT_SEARCH_FIELDS, participants: false });
   const [searchBadges, setSearchBadges] = useState(DEFAULT_SEARCH_BADGES);
@@ -20,7 +20,7 @@ function SearchHarness({ scope = "folder" }: { scope?: "folder" | "all" }) {
     includeSentInEverywhere, sentFolderName: "Sent", isRelatedSearch: false,
     searchFieldsLabel: "All fields", searchBadgesLabel: "All messages",
     accountFolders: [
-      { id: "inbox", name: "Inbox", accountId: "synthetic", count: 0, unreadCount: 0 },
+      { id: "inbox", name: "INBOX", specialUse: "\\Inbox", accountId: "synthetic", count: 0, unreadCount: 0 },
       { id: "archive", name: "Archive", accountId: "synthetic", count: 0, unreadCount: 0 }
     ]
   };
@@ -44,6 +44,17 @@ describe("shell search filters", () => {
     const { view, filters } = await openFilters();
     fireEvent.click(filters.getByRole("radio", { name: /Current folder/ }));
     expect(JSON.parse(view.getByTestId("folders").textContent!)).toEqual({ activeFolderId: "archive", lastFolderId: "inbox" });
+  });
+
+  it("labels the current folder with its localized display name, not the IMAP name", async () => {
+    for (const [locale, name] of [["de", "Posteingang"], ["en", "Inbox"]] as const) {
+      const view = render(<SearchHarness folder="inbox" />, { wrapper: ({ children }) => <I18nTestProvider locale={locale}>{children}</I18nTestProvider> });
+      fireEvent.click(view.getByRole("button", { name: locale === "de" ? "Suchfilter" : "Search filters" }));
+      const dialog = within(await view.findByRole("dialog"));
+      expect(dialog.getByText(name).closest('[data-slot="badge"]')?.getAttribute("title")).toBe(name);
+      expect(dialog.queryByText("INBOX")).toBeNull();
+      cleanup();
+    }
   });
 
   it("reselecting Everywhere preserves Archive for the return to Current folder", async () => {

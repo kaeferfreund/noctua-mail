@@ -13,27 +13,13 @@ import { formatAttachmentPageTitle } from "@/lib/appBranding";
 import { removeMessageAttachmentEverywhere } from "@/lib/mail/removeMessageAttachment";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
+import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
 
 /** Private, revalidated cache. Attachment ids are reused across resync, so this is not immutable. */
 export const ATTACHMENT_CACHE_CONTROL = "private, max-age=86400";
 
-export function attachmentEntityTag(stat: { mtimeMs: number; size: number }) {
-  return `"${stat.mtimeMs.toString(16)}-${stat.size.toString(16)}"`;
-}
-
-function etagOpaqueTag(value: string) {
-  const trimmed = value.trim();
-  const withoutWeak = /^[wW]\//.test(trimmed) ? trimmed.slice(2).trim() : trimmed;
-  return withoutWeak;
-}
-
-/** If-None-Match uses weak comparison: `W/"tag"` matches `"tag"`. */
-export function ifNoneMatchMatches(header: string | null, etag: string) {
-  if (!header) return false;
-  const expected = etagOpaqueTag(etag);
-  if (!expected) return false;
-  return header.split(",").some((part) => etagOpaqueTag(part) === expected);
-}
+export const attachmentEntityTag = entityTagForStat;
+export { ifNoneMatchMatches };
 
 function attachmentCacheHeaders(etag: string) {
   return {
