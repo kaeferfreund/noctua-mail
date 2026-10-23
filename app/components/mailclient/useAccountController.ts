@@ -265,11 +265,15 @@ export function useAccountController({
   // commits the whole switch in one batch once both succeeded. Every per-account
   // route authorizes the path id itself, so the folder read needs no prior write;
   // accounts and identity are not re-read here, membership changes arrive through
-  // mailboxes-changed and the session refresh.
+  // mailboxes-changed and the session refresh. A click back to the mailbox still
+  // shown while another switch runs cancels that switch: it only writes the
+  // selection, in click order, and keeps the view as it is.
   const switchAccount = useCallback(
     async (nextAccountId: string) => {
       const normalizedAccountId = nextAccountId.trim();
-      if (!normalizedAccountId || normalizedAccountId === activeAccountId) return;
+      if (!normalizedAccountId) return;
+      const reselect = normalizedAccountId === activeAccountId;
+      if (reselect && switchesInFlight.current === 0) return;
       const version = ++switchVersion.current;
       switchEpoch.current++; switchesInFlight.current++;
       let rebootstrap = false;
@@ -292,9 +296,10 @@ export function useAccountController({
       let committed = false;
       try {
         const persisted = persistSelection(normalizedAccountId, () => version === switchVersion.current);
-        const foldersRead = apiFetch(buildAccountFoldersPath(normalizedAccountId)).catch(() => null);
+        const foldersRead = reselect ? null : apiFetch(buildAccountFoldersPath(normalizedAccountId)).catch(() => null);
         // Runs concurrently like the folder read; the list takes it only after the commit.
-        prefetchFirstPage?.(normalizedAccountId);
+        // A reselect commits nothing; the finally block drops a pending page.
+        if (!reselect) prefetchFirstPage?.(normalizedAccountId);
         const response = await persisted;
         if (version !== switchVersion.current || !response) return;
         if (!response.ok) {
@@ -303,6 +308,9 @@ export function useAccountController({
           rebootstrap = response.status === 401 || response.status === 403;
           return;
         }
+        // The view never left this mailbox, so nothing is committed: a bootstrap that
+        // overlapped the switches cleared its ready state and reloads the server view.
+        if (reselect) return;
         const foldersRes = await foldersRead;
         if (version !== switchVersion.current) return;
         if (!foldersRes?.ok) {

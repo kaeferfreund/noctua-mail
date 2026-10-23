@@ -438,6 +438,93 @@ describe("parallel atomic mailbox switch", () => {
     expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
   });
 
+  it("A -> B -> A before B commits keeps A, persists A last and does not reset A's view", async () => {
+    const server: Server = { selected: "account-a" };
+    const h = await booted(server);
+    act(() => { h.result.current.setActiveFolderId("account-a:INBOX"); h.result.current.setLastFolderId("account-a:INBOX"); });
+    void switchTo(h, "account-b");
+    const done = switchTo(h, "account-a");
+    // Returning to the mailbox still shown reads no folders, and its write waits for B's.
+    expect(h.calls).toEqual(["/api/auth/switch-account", "/api/accounts/account-b/folders"]);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-a"); return h.persist(item); });
+    await act(async () => { await done; });
+    expect(server.selected).toBe("account-a");
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
+    expect(h.result.current.lastFolderId).toBe("account-a:INBOX");
+    expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
+    expect(h.calls.filter(url => url.endsWith("switch-account"))).toHaveLength(2);
+    expect(h.calls).not.toContain("/api/auth/me");
+  });
+
+  it("A -> B -> A -> B ends on B", async () => {
+    const server: Server = { selected: "account-a" };
+    const h = await booted(server);
+    void switchTo(h, "account-b");
+    void switchTo(h, "account-a");
+    const done = switchTo(h, "account-b");
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    // A's write was superseded before it was sent.
+    await h.release("switch-account", item => { expect(h.persisted(item)).toBe("account-b"); return h.persist(item); });
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(server.selected).toBe("account-b");
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.activeFolderId).toBe("account-b:INBOX");
+  });
+
+  it("a click on the shown mailbox without a pending switch sends nothing", async () => {
+    const h = await booted({ selected: "account-a" });
+    await act(async () => { await h.result.current.switchAccount("account-a"); });
+    expect(h.calls).toEqual([]);
+  });
+
+  it("(c) A -> B -> A with a 403 on A's write activates nothing and reloads the server view", async () => {
+    const server: Server = { selected: "account-a", accounts: allAccounts };
+    const h = await booted(server);
+    void switchTo(h, "account-b");
+    const done = switchTo(h, "account-a");
+    await h.release("switch-account", h.persist);
+    server.accounts = allAccounts.filter(account => account.id !== "account-a"); // A was revoked meanwhile
+    await h.release("switch-account", () => Response.json({ ok: false }, { status: 403 }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await act(async () => { await done; });
+    expect(h.errors).toEqual(["HTTP 403"]);
+    expect(h.calls.filter(url => url === "/api/auth/me")).toHaveLength(1);
+    expect(h.result.current.activeAccountId).toBe("account-b");
+    expect(h.result.current.loadedAccounts.map(account => account.id)).not.toContain("account-a");
+    expect(h.result.current.ready).toBe(true);
+  });
+
+  it("a bootstrap overlapping A -> B -> A keeps A and reloads the server view once A is persisted", async () => {
+    const server: Server = { selected: "account-a" };
+    const h = await booted(server);
+    act(() => { h.result.current.setActiveFolderId("account-a:INBOX"); h.result.current.setLastFolderId("account-a:INBOX"); });
+    void switchTo(h, "account-b");
+    const done = switchTo(h, "account-a");
+    await h.release("switch-account", h.persist);
+    // e.g. a mailboxes-changed event reads the selection between B's and A's writes.
+    await act(async () => { await h.result.current.loadInitialData(); });
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.ready).toBe(false);
+    await h.release("switch-account", h.persist);
+    await act(async () => { await done; });
+    // The overlapped bootstrap left the view not ready: it is resolved again from the server.
+    await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+    expect(server.selected).toBe("account-a");
+    expect(h.calls.filter(url => url === "/api/auth/me")).toHaveLength(2);
+    expect(h.result.current.ready).toBe(true);
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
+    expect(h.result.current.lastFolderId).toBe("account-a:INBOX");
+    expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
+  });
+
   it("a write superseded before it was sent is skipped", async () => {
     const h = await booted({ selected: "account-a" });
     void switchTo(h, "account-b");
