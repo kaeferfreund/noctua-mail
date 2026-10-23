@@ -65,7 +65,7 @@ describe("mobile kept component frames", () => {
     const page = render(<Theme><ProcessStatusPopover open onOpenChange={noop} isSyncing={false}
       isRecomputingThreads isRecomputingCategories={false} syncingFolders={new Set()}
       syncProgressItems={[]} accountFolders={[]} /></Theme>);
-    const sheet = await page.findByRole("dialog", { name: "Processes" });
+    const sheet = await page.findByRole("dialog", { name: "Background tasks" });
     expect(sheet.getAttribute("data-slot")).toBe("sheet-content");
     expect(within(sheet).getByText("Recomputing threads…").closest(".radix-themes")).toBeTruthy();
   });
@@ -73,7 +73,7 @@ describe("mobile kept component frames", () => {
     let cleared = 0;
     const page = render(<Theme><ExceptionStatusPopover open onOpenChange={noop} exceptionEntries={[]}
       onClearExceptions={() => { cleared++; }} formatRelativeTime={() => "just now"} /></Theme>);
-    const sheet = await page.findByRole("dialog", { name: "Exceptions" });
+    const sheet = await page.findByRole("dialog", { name: "Errors" });
     fireEvent.click(within(sheet).getByRole("button", { name: "Clear exceptions" }));
     expect(cleared).toBe(1);
   });

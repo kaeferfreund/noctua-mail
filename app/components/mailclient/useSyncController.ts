@@ -41,7 +41,9 @@ import {
 import { startRecomputeJob } from "./recomputeJobRunner";
 import {
   detectSyncEscalation,
-  normalizeSyncJobProgress
+  normalizeSyncJobProgress,
+  recordSyncProgress,
+  retainSyncFailure
 } from "./syncJobProgress";
 import type {
   FullSyncConfirmState,
@@ -167,6 +169,7 @@ export function useSyncController({
   const [syncProgressByJobId, setSyncProgressByJobId] = useState<
     Record<string, SyncJobProgress>
   >({});
+  const [mailCheckStatus, setMailCheckStatus] = useState<{ accountId: string; running: boolean; lastCheckedAt: number | null; nextCheckAt: number | null }>({ accountId: "", running: false, lastCheckedAt: null, nextCheckAt: null });
   const [mailCheckMode, setMailCheckMode] = useState<"idle" | "polling">("polling");
   const [streamMode, setStreamMode] = useState<"stream" | "polling" | "idle">("polling");
 
@@ -263,7 +266,8 @@ export function useSyncController({
   const waitForSyncJob = async (
     accountId: string,
     jobId: string,
-    requestedMode?: SyncMode
+    requestedMode?: SyncMode,
+    requestedFolderId?: string
   ): Promise<SyncJobResult> => {
     const startedAt = Date.now();
     const timeoutMs = 1000 * 60 * 60;
@@ -276,6 +280,7 @@ export function useSyncController({
         return next;
       });
     };
+    let succeeded = false;
     try {
       while (Date.now() - startedAt < timeoutMs) {
         const statusRes = await apiFetch(
@@ -315,10 +320,11 @@ export function useSyncController({
             });
           }
           const nextProgress = normalizeSyncJobProgress({ progress, jobId });
-          setSyncProgressByJobId((prev) => ({ ...prev, [jobId]: nextProgress }));
+          setSyncProgressByJobId(prev => recordSyncProgress(prev, nextProgress));
         }
         const status = data.job?.status;
         if (status === "done") {
+          succeeded = true;
           return data.job?.result ?? { count: 0 };
         }
         if (status === "failed") {
@@ -333,8 +339,14 @@ export function useSyncController({
         });
       }
       throw new Error("Sync timed out.");
+    } catch (error) {
+      setSyncProgressByJobId(prev => retainSyncFailure(prev, {
+        jobId, accountId, folderId: requestedFolderId, mailboxPath: "", mode: requestedMode ?? "new",
+        processed: 0, phase: "failed", updatedAt: Date.now()
+      }));
+      throw error;
     } finally {
-      clearProgress();
+      if (succeeded) clearProgress();
     }
   };
 
@@ -421,7 +433,7 @@ export function useSyncController({
     if (!data.jobId) {
       throw new Error("Sync job did not return a job id.");
     }
-    return waitForSyncJob(accountId, data.jobId, syncMode);
+    return waitForSyncJob(accountId, data.jobId, syncMode, payload.folderId ?? undefined);
   };
 
   const lastMailServerUnreachableNoticeAtRef = useRef(0);
@@ -942,8 +954,13 @@ export function useSyncController({
         !isAccountFolder(activeAccountId, inboxFolder?.id, accountFolders)) return;
     let disposed = false;
     let streamReconnectTimer: number | null = null;
+    let pollingIntervalMs: number | null = null;
+    let pollingStartedAt = 0;
+    const nextPollAt = () => pollingIntervalMs === null ? null
+      : pollingStartedAt + (Math.floor((Date.now() - pollingStartedAt) / pollingIntervalMs) + 1) * pollingIntervalMs;
 
     const stopPoll = () => {
+      pollingIntervalMs = null;
       if (pollTimerRef.current) {
         window.clearInterval(pollTimerRef.current);
         pollTimerRef.current = null;
@@ -1091,6 +1108,9 @@ export function useSyncController({
     const pollOnce = async () => {
       if (disposed || pollInFlightRef.current) return;
       pollInFlightRef.current = true;
+      setMailCheckStatus(prev => ({ accountId: activeAccountId, running: true,
+        lastCheckedAt: prev.accountId === activeAccountId ? prev.lastCheckedAt : null,
+        nextCheckAt: nextPollAt() }));
       let pollPath: string | undefined;
       try {
         const inboxFolderId = inboxFolderRef.current?.id;
@@ -1148,11 +1168,15 @@ export function useSyncController({
         });
       } finally {
         pollInFlightRef.current = false;
+        if (!disposed) setMailCheckStatus({ accountId: activeAccountId, running: false,
+          lastCheckedAt: Date.now(), nextCheckAt: nextPollAt() });
       }
     };
 
     const startPoll = (intervalMs: number) => {
       stopPoll();
+      pollingIntervalMs = intervalMs;
+      pollingStartedAt = Date.now();
       setMailCheckMode("polling");
       setStreamMode("polling");
       void pollOnce();
@@ -1224,6 +1248,8 @@ export function useSyncController({
       streamSourceRef.current = source;
 
       source.addEventListener("open", () => {
+        if (!disposed) setMailCheckStatus(prev => ({ accountId: activeAccountId, running: false,
+          lastCheckedAt: prev.accountId === activeAccountId ? prev.lastCheckedAt : null, nextCheckAt: null }));
         setMailCheckMode("idle");
         setStreamMode("stream");
       });
@@ -1434,6 +1460,7 @@ export function useSyncController({
     setSyncCompletionVersion,
     syncProgressByJobId,
     mailCheckMode,
+    mailCheckStatus: mailCheckStatus.accountId === activeAccountId ? mailCheckStatus : { running: false, lastCheckedAt: null, nextCheckAt: null },
     streamMode,
     // Refs
     syncStateRef,
