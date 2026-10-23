@@ -272,7 +272,7 @@ describe("saved shell hydration", () => {
   });
 });
 
-for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views and descriptions in ${locale}, selecting stable IDs`, () => {
+for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views and descriptions in ${locale}, selecting stable IDs`, async () => {
   const t = getTranslator(locale);
   const selected: string[] = [];
   const rows = VIRTUAL_FOLDERS.map(folder => ({
@@ -289,12 +289,29 @@ for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views 
   expect(page.getByText(locale === "de" ? "Ansichten" : "Views")).toBeTruthy();
   expect(page.getByPlaceholderText(locale === "de" ? "Ordner suchen" : "Search folders")).toBeTruthy();
   expect(page.getByText(locale === "de" ? "0 insgesamt" : "0 total")).toBeTruthy();
-  for (const button of buttons) {
-    expect(button.title).not.toContain("undefined");
-    expect(button.title).toContain(": ");
+  const views = [inbox, ...rows];
+  for (const [index, button] of buttons.entries()) {
+    // The description is a row-bound tooltip (no native title) and follows
+    // keyboard focus from row to row without keeping the previous text.
+    expect(button.hasAttribute("title")).toBe(false);
+    await act(async () => { button.focus(); });
+    const tooltip = await page.findByRole("tooltip");
+    expect(page.getAllByRole("tooltip")).toHaveLength(1);
+    expect(tooltip.textContent).toBe(t("Views.rowTitle", { name: views[index].name, description: views[index].description }));
+    expect(tooltip.textContent).not.toContain("undefined");
+    expect(tooltip.textContent).toContain(": ");
+    expect(button.getAttribute("aria-describedby")).toBe(tooltip.id);
     fireEvent.click(button);
   }
   expect(selected).toEqual([inbox.id, ...VIRTUAL_FOLDERS.map(folder => folder.id)]);
+  // Moving the pointer to the neighbouring row replaces the description at once.
+  await act(async () => { (document.activeElement as HTMLElement | null)?.blur(); });
+  for (const [index, button] of buttons.slice(0, 3).entries()) {
+    if (index) fireEvent.pointerLeave(buttons[index - 1], { pointerType: "mouse" });
+    fireEvent.pointerMove(button, { pointerType: "mouse" });
+    await waitFor(() => expect(page.getAllByRole("tooltip").map(tooltip => tooltip.textContent))
+      .toEqual([t("Views.rowTitle", { name: views[index].name, description: views[index].description })]));
+  }
 });
 
 for (const locale of ["de", "en"] as const) it(`uses numeric view counts with complete accessible descriptions in ${locale}`, () => {

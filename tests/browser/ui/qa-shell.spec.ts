@@ -138,3 +138,63 @@ test("QA-011/012/013: 44px phone header actions, reduced-motion sidebar, folder 
   await expect(page.getByText("No messages match this search.", { exact: true })).toBeVisible();
   await expect(page.getByText("No messages in this folder.", { exact: true })).toHaveCount(0);
 });
+test("QA-014: sidebar view rows keep the count inside the row highlight and describe the hovered row", async ({ page }) => {
+  const views = JSON.parse(readFileSync("messages/en.json", "utf8")).Views as Record<string, { name: string; description: string }>;
+  const catalogKey: Record<string, string> = { "virtual:assigned-to-me": "assignedToMe", "virtual:unassigned": "unassigned", "virtual:open": "open", "virtual:focused": "focused", "virtual:action-queue": "actionQueue" };
+  const box = (el: Element) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+  for (const colorScheme of ["light", "dark"] as const) for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    await page.emulateMedia({ colorScheme }); await page.setViewportSize(viewport); await page.goto("/");
+    const active = page.locator('[data-view-id^="folder:"][data-active="true"]');
+    await expect(active.locator("..").locator('[data-sidebar="menu-badge"]')).toBeVisible();
+    await page.mouse.move(viewport.width - 4, viewport.height - 4);
+    const rows = await page.locator("[data-view-id]").evaluateAll(buttons => buttons.map(button => {
+      const rect = (el: Element) => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; };
+      const badge = button.parentElement!.querySelector('[data-sidebar="menu-badge"]');
+      return { id: button.getAttribute("data-view-id")!, active: button.getAttribute("data-active") === "true", row: rect(button),
+        label: rect(button.querySelector("span")!), badge: badge ? rect(badge) : null, background: getComputedStyle(button).backgroundColor };
+    }));
+    const withBadge = rows.filter(row => row.badge);
+    expect(withBadge.map(row => row.id)).toContain(rows.find(row => row.active)!.id);
+    for (const { row, label, badge } of withBadge) {
+      // The highlighted button box spans the badge, and wrapped labels end before it.
+      expect(badge!.left).toBeGreaterThanOrEqual(row.left); expect(badge!.right).toBeLessThanOrEqual(row.right);
+      expect(badge!.top).toBeGreaterThanOrEqual(row.top); expect(badge!.bottom).toBeLessThanOrEqual(row.bottom);
+      expect(label.right).toBeLessThanOrEqual(badge!.left);
+    }
+    const activeBackground = rows.find(row => row.active)!.background;
+    const hovered = page.locator('[data-view-id="virtual:unassigned"]');
+    await hovered.hover();
+    await expect.poll(() => hovered.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+    const hoverBackground = await hovered.evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(hoverBackground).not.toBe(activeBackground);
+    await active.hover();
+    await expect.poll(() => active.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(activeBackground);
+    // The description belongs to the row under the pointer, opens beside it and stays in the viewport.
+    // The first row is re-entered right after leaving it (Unassigned, Inbox, Unassigned), which
+    // must reopen its own description rather than leave none or the previous row's.
+    for (const id of ["virtual:unassigned", "virtual:open", "virtual:focused"]) {
+      const row = page.locator(`[data-view-id="${id}"]`);
+      await row.hover();
+      const content = page.locator('[data-slot="tooltip-content"]');
+      await expect(content).toHaveCount(1);
+      await expect(content).toHaveAttribute("role", "tooltip");
+      await expect(content).toHaveText(`${views[catalogKey[id]].name}: ${views[catalogKey[id]].description}`);
+      const [rowBox, tip] = [await row.evaluate(box), await content.evaluate(box)];
+      expect(tip.left).toBeGreaterThanOrEqual(rowBox.right);
+      expect(tip.top).toBeGreaterThanOrEqual(0); expect(tip.bottom).toBeLessThanOrEqual(viewport.height);
+      expect(tip.right).toBeLessThanOrEqual(viewport.width);
+    }
+    // Keyboard focus shows the full ring inside the scrolling sidebar content.
+    await page.mouse.move(viewport.width - 4, viewport.height - 4);
+    await page.keyboard.press("Shift");
+    await hovered.focus();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(1);
+    await expect(page.getByRole("tooltip")).toHaveText(`${views.unassigned.name}: ${views.unassigned.description}`);
+    const ring = await hovered.evaluate(el => {
+      const clip = el.closest('[data-sidebar="content"]')!.getBoundingClientRect(), r = el.getBoundingClientRect();
+      return { focusVisible: el.matches(":focus-visible"), shadow: getComputedStyle(el).boxShadow, inside: r.left - 2 >= clip.left && r.right + 2 <= clip.right };
+    });
+    expect(ring.focusVisible).toBe(true); expect(ring.shadow).toContain("0px 0px 0px 2px"); expect(ring.inside).toBe(true);
+    console.log("QA-014", JSON.stringify({ colorScheme, width: viewport.width, activeBackground, hoverBackground, rows: withBadge.length }));
+  }
+});
