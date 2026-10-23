@@ -214,7 +214,7 @@ const eventId = "synthetic-boundary-event";
 await api.upsertCalendarEvent(accountId, { id: eventId, accountId, eventUid: eventId, summary: "Synthetic RSVP", startAtMs: Date.UTC(2026, 9, 23, 10), allDay: false, sourceType: "email", myAttendeeEmail: alias.email, createdAtMs: Date.now(), updatedAtMs: Date.now(), organizer: "organizer@example.test", rawIcs: ["BEGIN:VCALENDAR", "VERSION:2.0", "METHOD:REQUEST", "BEGIN:VEVENT", `UID:${eventId}`, "DTSTART:20261023T100000Z", "ORGANIZER:mailto:organizer@example.test", `ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:${alias.email}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n") });
 const session = await requireActiveUserSession(request({}));
 if (session instanceof Response) throw new Error("Missing synthetic session");
-const minted = await mintMcpToken(session, accountId, "Synthetic boundary", 3600);
+const minted = await mintMcpToken(session, accountId, "Synthetic boundary", 3600, { mode: "full" });
 const isMcp = path.startsWith("mcp-");
 const management = path === "mcp-create-identity" || path === "mcp-update-identity";
 const ensureDraft = async () => {

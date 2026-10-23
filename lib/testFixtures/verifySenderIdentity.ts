@@ -295,7 +295,7 @@ try {
 
   const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: manager.jar.headers() }));
   if (session instanceof Response) throw new Error("No synthetic session");
-  const minted = await mintMcpToken(session, accountId, "Synthetic sender contract", 3600);
+  const minted = await mintMcpToken(session, accountId, "Synthetic sender contract", 3600, { mode: "full" });
   const rpc = async (method: string, tool?: string, args?: Record<string, unknown>) => (await mcp(new Request("http://localhost:3000/api/mcp", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${minted.token}` },
     body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, ...(tool ? { params: { name: tool, arguments: args ?? {} } } : {}) }) }))).json();
   const call = (tool: string, args?: Record<string, unknown>) => rpc("tools/call", tool, args);

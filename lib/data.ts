@@ -241,6 +241,8 @@ export type RecipientAlias = {
 };
 
 export type McpTokenMetadata = {
+  accountIds?: string[];
+  scopes?: import("./mcpPermissions").McpScope[];
   id: string;
   accountId: string;
   createdByUserId: string;

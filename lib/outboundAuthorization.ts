@@ -32,7 +32,7 @@ export class OutboundAuthorizationError extends Error {
  */
 export async function authorizeOutbound(
   source: OutboundAuthorization,
-  input: { accountId: string; minRole: AccountRole; identity?: ResolvedSender | string }
+  input: { accountId: string; minRole: AccountRole; identity?: ResolvedSender | string; purpose?: "draft" | "identity-management" }
 ): Promise<AuthorizedOutboundActor> {
   const checkIdentity = (db: Database) => {
     if (!input.identity) return;
@@ -45,9 +45,11 @@ export async function authorizeOutbound(
     }
   };
   if ("tokenId" in source) {
-    const context = await resolveMcpToolContext(source.tokenId, input.accountId, input.minRole, checkIdentity);
+    // Default is transmission: future token callers must explicitly opt into a non-send purpose.
+    const scope = input.purpose === "draft" ? "drafts" : input.purpose === "identity-management" ? "manage" : "send";
+    const context = await resolveMcpToolContext(source.tokenId, input.accountId, input.minRole, checkIdentity, scope);
     return { userId: context.tokenRecord.createdByUserId, clientId: `mcp:${source.tokenId}`,
-      assertCurrent: db => { resolveMcpToolContextRow(db, source.tokenId, input.accountId, input.minRole, checkIdentity); } };
+      assertCurrent: db => { resolveMcpToolContextRow(db, source.tokenId, input.accountId, input.minRole, checkIdentity, scope); } };
   }
   const context = await requireAccountContext(source.request, input.accountId, { minRole: input.minRole });
   if (context instanceof NextResponse) throw new OutboundAuthorizationError(context);
