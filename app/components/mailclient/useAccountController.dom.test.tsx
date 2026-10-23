@@ -6,13 +6,18 @@ import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "./useSearchState";
 import { useStartupSync } from "./useStartupSync";
 import { findInboxFolder } from "@/lib/specialFolders";
 import { useAccountController, type UseAccountControllerParams } from "./useAccountController";
+import { useApiErrorMessage } from "./useApiErrorMessage";
+import { I18nTestProvider } from "@/lib/i18n/testRender";
+import { getMessages } from "@/lib/i18n/translator";
+import type { UiLocale } from "@/lib/i18n/config";
 
 afterEach(cleanup);
 
 const accounts = [{ id: "account-a" }, { id: "account-b" }] as Account[];
 const noop = () => {};
 
-function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (accountId: string, folderId?: string) => void) {
+function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (accountId: string, folderId?: string) => void,
+  localeRef?: { current: UiLocale }) {
   const errors: string[] = [];
   const defaults: UseAccountControllerParams = {
     activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
@@ -57,7 +62,10 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     const [folders, setFolders] = useState<Folder[]>([]);
     const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
     const [auth, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
-    const controller = useAccountController({ ...defaults, activeAccountId, setActiveAccountId,
+    // With a locale, use the production error resolver under a switchable provider.
+    const productionReadErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId: noop, setReloginDescription: noop });
+    const readErrorMessage = localeRef ? productionReadErrorMessage : defaults.readErrorMessage;
+    const controller = useAccountController({ ...defaults, readErrorMessage, activeAccountId, setActiveAccountId,
       accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState,
       activeFolderId, setActiveFolderId, setLastFolderId, setFolders, setInitialFoldersLoadedAccountId });
     const syncAccountRef = useRef<Parameters<typeof useStartupSync>[0]["syncAccountRef"]["current"]>(undefined);
@@ -70,14 +78,36 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
         setActiveFolderId(findInboxFolder(folders, activeAccountId)?.id ?? "");
       }
     }, [activeAccountId, activeFolderId, folders, ready]);
-    return { ...controller, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId };
-  });
+    return { ...controller, readErrorMessage, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId };
+  }, { wrapper: ({ children }) => <I18nTestProvider locale={localeRef?.current ?? "en"}>{children}</I18nTestProvider> });
   return { ...hook, errors };
 }
 
 const json = (value: unknown) => Response.json(value);
 
 describe("account bootstrap request order", () => {
+  it("a UI language switch keeps the error resolver and does not re-bootstrap the mailbox", async () => {
+    const calls: string[] = [];
+    const localeRef: { current: UiLocale } = { current: "de" };
+    const { result, rerender } = mount(async (input) => {
+      const url = String(input); calls.push(url);
+      return json(url === "/api/auth/me" ? { accounts, accountId: "account-b", mailboxState: "selected" } : []);
+    }, undefined, localeRef);
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    const resolver = result.current.readErrorMessage;
+    for (const locale of ["en", "de"] as const) {
+      localeRef.current = locale;
+      rerender();
+      await act(async () => { await Promise.resolve(); });
+      expect(result.current.readErrorMessage).toBe(resolver);
+      expect(result.current.ready).toBe(true);
+      // The stable resolver still localizes with the current UI language.
+      expect(await resolver(Response.json({ code: "folder_account_mismatch" }, { status: 400 })))
+        .toBe(getMessages(locale).Notifications.folderAccountMismatch);
+    }
+    expect(calls).toEqual(["/api/auth/me", "/api/accounts/account-b/folders"]);
+  });
+
   it("cold loads once: auth/me -> folders, even after publishing the selected account", async () => {
     const calls: string[] = [];
     const { result, rerender } = mount(async (input) => {
