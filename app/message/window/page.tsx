@@ -3,7 +3,6 @@
 import { useLocale } from "next-intl";
 import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
-import dynamic from "next/dynamic";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
@@ -31,10 +30,6 @@ import MessageViewPane from "@/app/components/mailclient/message/MessageViewPane
 import ThreadView from "@/app/components/mailclient/message/ThreadView";
 import type { MessageTab } from "@/app/components/mailclient/message/types";
 import styles from "./page.module.css";
-
-const MarkdownPanel = dynamic(() => import("@/app/components/mailclient/message/MarkdownPanel"), {
-  loading: () => <div role="status">Loading Markdown…</div>
-});
 
 type DeleteResponse = {
   action: "deleted" | "moved";
@@ -309,10 +304,6 @@ export default function MessageWindowPage() {
     />
   );
 
-  const renderMarkdownPanel = (body: string | undefined, targetMessageId: string) => (
-    <MarkdownPanel body={body} fontScale={messageFontScale[targetMessageId] ?? 1} />
-  );
-
   const adjustMessageZoom = (targetMessageId: string, delta: number) => {
     setMessageZoom((prev) => {
       const current = prev[targetMessageId] ?? 1;
@@ -479,7 +470,6 @@ export default function MessageWindowPage() {
                 messageZoom,
                 darkMode,
                 hasHtmlContent,
-                renderMarkdownPanel,
                 renderSourcePanel,
                 handleSelectMessage: noop as (message: Message) => void,
                 messageByMessageId: new Map(
