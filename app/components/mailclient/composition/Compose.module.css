@@ -14,14 +14,14 @@
   overflow: hidden;
 }
 
-.composeBackdrop { z-index: 9994; }
+.composeBackdrop { z-index: var(--layer-dialog); }
 
 .composeModal[role="dialog"] {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 9994;
+  z-index: var(--layer-dialog);
   box-sizing: border-box;
 }
 

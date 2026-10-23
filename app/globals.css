@@ -246,6 +246,26 @@
   --quote-2: var(--iris-4);
 }
 
+/* z-index ladder for fixed and portalled layers, lowest first. Modules and
+   the shadcn primitives read these tokens (z-(--layer-*) in Tailwind)
+   instead of repeating the numbers:
+     --layer-floating        floating calendar and composite status popover
+     --layer-dialog          base shadcn dialog/sheet content, compose modal
+     --layer-dialog-overlay  Radix Themes dialog overlay (.rt-BaseDialogOverlay)
+     9996–9997               nested Settings/Admin dialogs and confirmations,
+                             assigned by DialogLayerContext from the JS mirror
+                             in app/components/ui/dialogLayers.ts
+     --layer-popper          shadcn and Radix Themes popper content
+     --layer-drag-ghost      off-screen .drag-ghost
+   app/globals.test.ts keeps the order and the JS mirror in sync. */
+:root {
+  --layer-floating: 9990;
+  --layer-dialog: 9994;
+  --layer-dialog-overlay: 9995;
+  --layer-popper: 9998;
+  --layer-drag-ghost: 9999;
+}
+
 /* Radix Themes reads its own surface tokens; point them at the shadcn ones so
    kept components and the new shell share one palette and one font. Radix
    defaults <Em>/<Quote> to Times and <Code>/<Kbd> to its own mono stack. */
@@ -332,16 +352,7 @@ body {
   min-height: 100%;
 }
 
-/* z-index ladder for fixed and portalled layers, lowest first:
-     9990  floating calendar panel (CalendarPopover.module.css)
-     9994  base shadcn dialog/sheet content
-     9995  Radix Themes dialog overlay (.rt-BaseDialogOverlay, below)
-     9996–9997  nested Settings/Admin dialogs and confirmations, assigned by
-           DialogLayerContext (app/components/ui/dialogLayers.ts)
-     9998  shadcn popper content (z-[9998] in app/components/ui/{popover,
-           select,dropdown-menu,tooltip}.tsx) and Radix Themes popper
-           content (.rt-PopperContent, below)
-     9999  off-screen .drag-ghost
+/* Layers come from the --layer-* tokens (ladder in the :root block above).
    Radix Themes dialog overlays portal into `.radix-themes` with z-index: auto,
    and a fixed-position element always forms a stacking context, so without
    the lift a dialog opened from the calendar panel (e.g. EventDialog via the
@@ -349,7 +360,7 @@ body {
    a shadcn dialog or sheet has to paint above that frame. SettingsFrame seeds
    the shared dialog context at its own layer so children paint above it. */
 .rt-BaseDialogOverlay {
-  z-index: 9995;
+  z-index: var(--layer-dialog-overlay);
 }
 
 /* Radix popper content (Popover/Select/DropdownMenu/Tooltip, e.g. the event
@@ -357,7 +368,7 @@ body {
    A popper opened from inside a dialog has to render above the dialog
    overlay, otherwise it sits behind it and looks unresponsive. */
 .rt-PopperContent {
-  z-index: 9998;
+  z-index: var(--layer-popper);
 }
 
 button {
@@ -977,21 +988,6 @@ a {
 }
 
 
-.bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 16px;
-  border-top: 1px solid var(--border);
-  background: var(--card);
-  font-size: var(--text-2xs);
-  color: var(--muted-foreground);
-  gap: 12px;
-  min-height: 28px;
-  flex-shrink: 0;
-  position: relative;
-}
-
 .bottom-section {
   display: flex;
   align-items: center;
@@ -1053,26 +1049,6 @@ a {
 
 .bottom-item {
   color: var(--text);
-}
-
-/* The fixed sections keep one line; the build label and the wide upcoming
-   section absorb a narrow bar instead of the bar growing taller. */
-.bottom-bar > .bottom-section:not(.bottom-wide) {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* In the bar's flow (not absolutely centred) so it never covers the status
-   triggers; on narrow bars it truncates and the tooltip keeps the full value. */
-.bottom-build {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-2xs);
 }
 
 .bottom-muted {
@@ -1663,6 +1639,6 @@ a {
   color: var(--text);
   font-size: 13px;
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--layer-drag-ghost);
 }
 }

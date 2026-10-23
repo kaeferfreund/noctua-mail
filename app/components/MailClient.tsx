@@ -57,6 +57,7 @@ import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
 import DialogsHost from "./mailclient/dialogs/DialogsHost";
 import { useConfirmDialogs } from "./mailclient/dialogs/useConfirmDialogs";
+import { consumeCalendarOpenRequest } from "./mailclient/status/statusIndicator";
 import type { BottomStatusPanel } from "./mailclient/status/BottomStatusBar";
 import ComposeOrchestrator, {
   type ComposeMirror,
@@ -837,6 +838,7 @@ export default function MailClient({
     syncCompletionVersion,
     syncProgressByJobId,
     mailCheckMode,
+    mailCheckStatus,
     syncStateRef,
     syncAccountRef,
     recomputeThreadsRef,
@@ -5042,12 +5044,9 @@ export default function MailClient({
   // after importing an .ics, so we open the calendar popover here on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("openCalendar") !== "1") return;
+    const nextUrl = consumeCalendarOpenRequest(window.location.href);
+    if (nextUrl === null) return;
     setOpenBottomStatusPanel("calendar");
-    params.delete("openCalendar");
-    const query = params.toString();
-    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState({}, "", nextUrl);
   }, []);
   const handleNoticeOpen = (notice: InAppNotice) => {
@@ -5716,7 +5715,11 @@ export default function MailClient({
             isRecomputingThreads={isRecomputingThreads}
             isRecomputingCategories={isRecomputingCategories}
             syncingFolders={syncingFolders}
-            syncProgressItems={Object.values(syncProgressByJobId)}
+            accounts={accounts}
+            onRetrySync={(job) => { void syncAccount(job.folderId, job.mode === "recent" ? "new" : job.mode); }}
+            mailCheckStatus={mailCheckStatus}
+            calendarSidebarOpen={calendarSidebarOpen}
+            syncProgressItems={Object.values(syncProgressByJobId).filter(job => job.accountId === activeAccountId)}
             accountFolders={accountFolders}
             mailCheckMode={mailCheckMode}
             activeAccountId={activeAccountId}
@@ -5736,6 +5739,7 @@ export default function MailClient({
             formatRelativeTime={formatRelativeTime}
             onReloginAccount={currentAccount?.accessRole === "manager" ? handleOpenReloginFromException : undefined}
             onOpenCalendarSidebar={() => setCalendarSidebarOpen(true)}
+            onToggleCalendarSidebar={() => setCalendarSidebarOpen(open => !open)}
             onOpenCalendarMessage={handleOpenCalendarMessage}
             onFindRelatedCalendarInviteUid={handleFindRelatedByCalendarInviteUid}
             calendarFirstDay={calendarFirstDay}

@@ -4,7 +4,7 @@
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 16px;
+  padding: var(--pane-padding-y, 16px) var(--pane-padding-x, 16px);
   background: var(--card);
   font-size: 14px;
   overflow-y: auto;

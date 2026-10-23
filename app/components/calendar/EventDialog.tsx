@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, Flex, Text, TextArea, TextField } from "@radix-ui/themes";
 import { Trash2 } from "lucide-react";
 import {
@@ -18,6 +18,7 @@ import {
   shiftEndPreservingDuration,
   type RecurrenceOption
 } from "@/lib/composeInvite";
+import { useDialogFocusRestore } from "@/app/components/ui/dialogFocus";
 import DialogTitleBar from "@/app/components/mailclient/message/DialogTitleBar";
 import CalendarEventScheduleFields from "./CalendarEventScheduleFields";
 
@@ -45,6 +46,8 @@ export default function EventDialog({
   onDeleted
 }: Props) {
   const isEditing = Boolean(event?.id);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const focusRestore = useDialogFocusRestore();
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -156,7 +159,13 @@ export default function EventDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Content size="3" style={{ maxWidth: 520 }} aria-describedby={undefined}>
+      <Dialog.Content size="3" style={{ maxWidth: 520 }} aria-describedby={undefined}
+        onOpenAutoFocus={event => {
+          focusRestore.onOpenAutoFocus();
+          event.preventDefault();
+          titleRef.current?.focus();
+        }}
+        onCloseAutoFocus={focusRestore.onCloseAutoFocus}>
         <Flex direction="column" gap="3">
           <DialogTitleBar
             title={isEditing ? "Edit Event" : "New Event"}
@@ -168,7 +177,7 @@ export default function EventDialog({
               placeholder="Event title"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              autoFocus
+              ref={titleRef}
             />
           </Flex>
 
