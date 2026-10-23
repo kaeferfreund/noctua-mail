@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import LanguageSelector from "@/app/components/i18n/LanguageSelector";
 import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
@@ -22,8 +22,8 @@ const fields: PreferenceField[] = [
   { group: "threading", key: "includeAcrossFolders", label: "Include threads across folders", options: yesNo, boolean: true },
   { group: "notifications", key: "newMail", label: "New mail notifications", options: yesNo, boolean: true }
 ];
-export default function PreferencesTabContent({ editingAccount, onClose, apiFetch = fetch }: {
-  editingAccount: Account; onClose: () => void; apiFetch?: AdminFetch;
+export default function PreferencesTabContent({ editingAccount, onClose, apiFetch = fetch, senderPreferences }: {
+  editingAccount: Account; onClose: () => void; apiFetch?: AdminFetch; senderPreferences?: ReactNode;
 }) {
   const [prefs, setPrefs] = useState<UserAccountPrefs>({});
   const [patch, setPatch] = useState<UserAccountPrefsPatch>({});
@@ -72,13 +72,14 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
             }}><option value="inherit">Inherit mailbox default</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
           </label>;
         })}
-        <label className="grid gap-1 text-sm">Default signature<select className="rounded-md border bg-background p-2" value={signatureValue ?? "inherit"} onChange={event => {
+        {!senderPreferences && <label className="grid gap-1 text-sm">Default signature<select className="rounded-md border bg-background p-2" value={signatureValue ?? "inherit"} onChange={event => {
           setSaved(false); setPatch(previous => ({ ...previous, defaultSignatureId: event.target.value === "inherit" ? null : event.target.value }));
         }}><option value="inherit">Inherit mailbox default</option><option value="">No signature</option>
           {signatureValue && !editingAccount.settings?.signatures?.some(signature => signature.id === signatureValue) && <option value={signatureValue}>Unavailable signature</option>}
           {editingAccount.settings?.signatures?.map(signature => <option key={signature.id} value={signature.id}>{signature.name}</option>)}
-        </select></label>
+        </select></label>}
       </fieldset>
+      {senderPreferences}
       <MailtoHandlerSection />
     </div>
     <div className="flex justify-end gap-3 border-t pt-3"><Button variant="outline" onClick={onClose}>Close</Button>

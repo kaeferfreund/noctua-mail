@@ -1,3 +1,4 @@
+import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { Button, Card, Flex, Grid, Select, Text, TextArea, TextField } from "@radix-ui/themes";
 import Field from "@/app/components/account-settings/Field";
 import type { Account, AccountSettings } from "@/lib/data";
@@ -20,14 +21,16 @@ export default function SignaturesTabContent({
   onSave
 }: Props) {
   const signatures = editingAccount.settings?.signatures ?? [];
-  const saveDisabled = !isExistingAccount || !canSave;
+  const invalidTemplate = signatures.some(signature => !validSignatureTemplate(signature.body));
+  const saveDisabled = !isExistingAccount || !canSave || invalidTemplate;
 
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <Flex direction="column" gap="4" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
         <Text size="2" color="gray">
-          Manage signatures for this account.
+          Manage shared mailbox templates. Personal signature overrides are in Preferences. Supported placeholders: {"{{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}"}.
         </Text>
+        {invalidTemplate && <Text as="p" role="alert">Use only the supported signature placeholders (maximum 8 KiB).</Text>}
         <Flex align="center" justify="between">
           <Text size="3" weight="medium">
             Signature list
@@ -50,7 +53,7 @@ export default function SignaturesTabContent({
         <Grid columns="2" gap="3">
           <Field label="Default signature">
             <Select.Root
-              value={editingAccount.settings?.defaultSignatureId ?? "none"}
+              value={editingAccount.settings?.defaultSignatureId || "none"}
               onValueChange={(value) =>
                 onUpdateSettings({
                   defaultSignatureId: value === "none" ? "" : value
