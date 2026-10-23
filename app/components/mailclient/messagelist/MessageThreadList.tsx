@@ -1,3 +1,5 @@
+import { isReaderRowActivation } from "@/lib/ui/readerFocus";
+import { useReaderNavigationRows } from "./useReaderNavigationRows";
 import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -85,6 +87,8 @@ export default function MessageThreadList({
     handleMessageDragStart,
     handleMessageDragEnd,
     handleRowClick,
+    onOpenReader,
+    onNavigationRowsChange,
     handleSelectMessage,
     selectRangeTo,
     toggleMessageSelection,
@@ -143,6 +147,8 @@ export default function MessageThreadList({
     mode: "nested",
     collapsedNestedMessages
   });
+
+  useReaderNavigationRows(listItems, onNavigationRowsChange);
 
   return (
     <MessageListRenderer
@@ -283,6 +289,8 @@ export default function MessageThreadList({
               data-message-layout="stacked"
               data-message-narrow={narrowRows}
               data-message-id={message.id}
+              data-active={message.id === activeMessageId}
+              data-selected={rowSelected}
               role="button"
               tabIndex={0}
               draggable
@@ -294,6 +302,9 @@ export default function MessageThreadList({
                 handleMessageDragStart(event, message, threadIds);
               }}
               onDragEnd={handleMessageDragEnd}
+              onDoubleClick={(event) => {
+                if (isReaderRowActivation(event)) onOpenReader?.(message);
+              }}
               onClick={(event) => {
                 handleCollapsedThreadRootClick({
                   event,
@@ -310,7 +321,10 @@ export default function MessageThreadList({
                 handleMessageRowKeyDown({
                   event,
                   messageId: message.id,
-                  onSelect: () => handleSelectMessage(message),
+                  onSelect: () => {
+                    handleSelectMessage(message);
+                    onOpenReader?.(message);
+                  },
                   selectRangeTo,
                   toggleMessageSelection
                 });

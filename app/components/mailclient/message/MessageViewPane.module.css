@@ -79,3 +79,15 @@
   .subjectText[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .subjectToggle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--radius-2); background: transparent; color: var(--gray-11); cursor: pointer; }
 }
+
+@media print {
+  :global(body:has([data-reader-print]) *) { visibility: hidden; }
+  :global([data-reader-print]), :global([data-reader-print] *) { visibility: visible !important; }
+  :global(body:has([data-reader-print])), :global(body:has([data-reader-print]) [data-shell]),
+  :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
+  :global(body:has([data-reader-print]) [data-group]),
+  :global(body:has([data-reader-print]) #reader), :global(body:has([data-reader-print]) #reader > div),
+  .pane, .threadViewShell, .threadView { height: auto !important; max-height: none !important; overflow: visible !important; }
+  :global([data-reader-print]) { position: absolute; inset: 0; width: 100%; }
+  :global([data-reader-toolbar]), .mobileHeader { display: none !important; }
+}

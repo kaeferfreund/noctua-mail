@@ -47,6 +47,7 @@ type MessageRowProps = {
   showThreadIndicator: boolean;
   threadSize?: number;
   onRowPointerDown?: () => void;
+  onRowDoubleClick?: (event: React.MouseEvent) => void;
   onRowClick: (event: React.MouseEvent) => void;
   onRowKeyDown: (event: React.KeyboardEvent) => void;
   onMouseEnter?: () => void;
@@ -123,6 +124,7 @@ function MessageRow({
   threadSize,
   onRowPointerDown,
   onRowClick,
+  onRowDoubleClick,
   onRowKeyDown,
   onMouseEnter,
   onMouseLeave,
@@ -319,6 +321,7 @@ function MessageRow({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onRowClick}
+      onDoubleClick={onRowDoubleClick}
       onPointerDown={handlePointerDown}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

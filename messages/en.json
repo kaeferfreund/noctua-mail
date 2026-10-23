@@ -686,6 +686,21 @@
     "loadedGroupCount": "{count, plural, one {# message loaded} other {# messages loaded}}"
   },
   "Reader": {
+    "focus": {
+      "expand": "Expand reading view",
+      "showList": "Show message list",
+      "hint": "Tip: Double-click opens the message in a larger view",
+      "dismissHint": "Dismiss reading view tip",
+      "shortcuts": "Shift+Enter: expand / list · Esc: back · j / k: next / previous",
+      "markUndone": "Mark as not done",
+      "print": "Print message",
+      "previous": "Previous message",
+      "next": "Next message",
+      "counter": "{position} / {total}",
+      "counterMore": "{position} / {total}+",
+      "position": "Message {position} of {total} visible rows",
+      "loadedPosition": "Message {position} of {total} loaded visible rows; more messages available"
+    },
     "cancel": "Cancel",
     "remove": "Remove",
     "calendarChanges": "Calendar update changes",
