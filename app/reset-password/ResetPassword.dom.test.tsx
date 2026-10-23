@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { StrictMode } from "react";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import ResetPasswordPage from "./page";
 import ResetPasswordForm from "@/app/components/auth/ResetPasswordForm";
 import { clientFixture } from "@/app/components/auth/authTestHelpers";

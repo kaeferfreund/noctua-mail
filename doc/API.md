@@ -212,3 +212,27 @@ these with feat/team-auth's account-access/context helpers when Slice 3 lands; t
 route is team-auth-owned at integration. Do not activate
 HTTP MCP until that branch supplies its token checks. feat/collab-ui consumes the routes,
 collaboration enrichment, shared Sent state, and post-send warnings.
+
+## Personal UI language
+
+`GET /api/auth/me` adds `user.uiLocale: "de" | "en" | null` to both full and
+restricted identities. Existing identity/security fields and the four-state
+`mailboxState` contract are unchanged. Null selects automatic locale resolution.
+
+`PUT /api/auth/preferences` accepts exactly `{"uiLocale":"de"}`, `{"uiLocale":"en"}`
+or `{"uiLocale":null}` and returns `{ok:true,uiLocale:"de"|"en"|null}` with
+`Cache-Control: no-store`. It requires the signed-in user's live MFA-assured
+session, even without a selected mailbox, and the shared same-origin JSON checks.
+Unknown fields (including userId), invalid locales and malformed JSON return 400
+`invalid_request`. Missing session returns 401; restricted assurance returns 403.
+Origin/media-type failures retain the existing helper's `invalid_origin` (403)
+and `json_required` (400) conventions. Auth refresh/deletion headers are forwarded.
+The endpoint only writes the current session user's Noctua `users.uiLocale`;
+Better Auth identity/security tables are untouched. Like switch-account, this
+preference mutation adds no audit event.
+
+A successful write also synchronizes the validated `noctua-ui-locale` cookie
+(Path=/, SameSite=Lax, one year; Automatic/null deletes it). Anonymous auth screens
+use this device cookie directly. Resolution is personal preference → device
+cookie → quality-weighted Accept-Language with regional variants → German.
+See [I18N.md](I18N.md) for message and formatting conventions.

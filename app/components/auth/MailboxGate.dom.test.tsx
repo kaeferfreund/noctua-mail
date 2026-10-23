@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import type { Account } from "@/lib/data";
 import MailboxGate from "./MailboxGate";
 afterEach(cleanup);
