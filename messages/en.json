@@ -526,6 +526,7 @@
       "label": "Assignee",
       "unassigned": "Unassigned",
       "me": "Me",
+      "meNamed": "Me ({name})",
       "searchPlaceholder": "Search members…",
       "search": "Search members",
       "noMembers": "No members found.",

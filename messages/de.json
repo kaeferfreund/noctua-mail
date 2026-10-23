@@ -526,6 +526,7 @@
       "label": "Zuständig",
       "unassigned": "Nicht zugewiesen",
       "me": "Ich",
+      "meNamed": "Ich ({name})",
       "searchPlaceholder": "Mitglieder suchen …",
       "search": "Mitglieder suchen",
       "noMembers": "Keine Mitglieder gefunden.",
