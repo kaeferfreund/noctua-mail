@@ -63,7 +63,7 @@ Goals
 Non-goals (for now)
 
 - Per-user read state. `\Seen` stays shared IMAP state, as it is in every IMAP client.
-- OAuth for MCP clients. Bearer tokens stay; token scopes are reserved but not enforced yet.
+- OAuth for MCP clients. Bearer tokens stay; per-token mailbox sets and read/drafts/manage/send scopes are enforced (see doc/API.md).
 - Unified multi-account inbox. One mailbox is active at a time; the sidebar switches between them.
 - Replacing Radix Themes inside the kept components. They keep working under the new tokens.
 - Tauri/desktop mode is removed and unsupported. Startup rejects it (§8); no desktop carve-outs remain.
@@ -1065,16 +1065,27 @@ MCP bearer auth remains Noctua's, independent of Better Auth sessions. New token
 `mcp_` + 32 cryptographically random bytes (base64url), looked up by SHA-256 hash in mcp_tokens;
 show the secret once. No encrypted session payload, IMAP secret, role snapshot or browser cookie is
 embedded. Creation takes authenticated userId/accountId, not SessionData, and requires completed
-MFA plus editor or manager membership. TTL/expiry remains explicit; scopes stays reserved.
+MFA plus editor or manager membership. TTL/expiry remains explicit. Tokens can cover several own/shared mailboxes selected
+at creation, with the current creator membership/role checked for each mailbox.
+Creation modes are read only (`read`), read and drafts (`read,drafts`, default), and
+full access (`read,drafts,manage,send`). Scopes are stored as a JSON array in
+`mcp_tokens.scopes` and enforced centrally. Legacy NULL scopes mean read/drafts,
+without sending or sender identity/preferences management. Empty mailbox mappings
+mean primary only. `mcp_token_accounts(tokenId,accountId)` stores new sets; deleting
+tokens removes their mappings, deleting a mailbox preserves tokens with remaining
+mailboxes and promotes a remaining primary. No MCP send tool exists; the outbound
+boundary requires `send` for token-based transmission and rechecks before effects.
+Mailbox sets and modes are immutable; create a new token to change them.
 
 Every request checks token hash/expiry, the creator's existing enabled auth_user + Noctua profile,
 completed MFA (both records), `token.securityGeneration === auth_security_state.generation` and
-current role on the token's bound mailbox. Mint only from a session with per-session mfa assurance;
-store its current generation in the token row atomically, rechecking membership and generation. Each tool accountId must match that
-mailbox; cross-mailbox use requires another token. Reject a deleted/banned creator or revoked
+current role on the selected covered mailbox. Mint only from a session with per-session mfa assurance;
+store its current generation in the token row atomically, rechecking membership and generation. Each tool accountId must belong to the token's set;
+omission selects its primary mailbox. Reject a deleted/banned creator or revoked
 membership immediately, irrespective of session age. Disabling/deleting, password reset/change,
-MFA reset and login-mailbox credential changes delete that user's tokens. Membership revoke deletes
-that user/account's tokens; role downgrade is enforced at use time. Expiry and token deletion never
+MFA reset and login-mailbox credential changes delete that user's tokens. Membership revoke removes the mailbox from that user's tokens: tokens with no
+mailbox left are deleted, multi-mailbox tokens keep their other memberships and get a new
+primary; re-adding the member does not restore the token's access to that mailbox. Role downgrade is enforced at use time. Expiry and token deletion never
 depend on session cookie crypto. Generation mismatch rejects immediately even if
 onPasswordReset, token deletion, audit or process shutdown interrupts cleanup. A NULL generation
 never matches. Fault-inject callback failure after committed reset; the old bearer must fail before
@@ -1818,8 +1829,9 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   password reset; sessions/MCP revoked. Raw plugin admin endpoints cannot skip audit, last-admin or
   cleanup; concurrent last-admin operations; disable/delete partial failures remain fail-closed.
 - MCP: opaque random token/hash only, no credential payload, old tokens rejected at cutover, creator
-  liveness/MFA + bound mailbox membership rechecked, accountId cannot escape token binding,
-  downgrade takes effect, disable/reset/delete/revoke removes tokens; viewer mutations denied.
+  liveness/MFA + selected mailbox membership rechecked, accountId cannot escape the token set,
+  downgrade takes effect, disable/reset/delete removes tokens; revoke denies that mailbox while
+  preserving other covered memberships; token scopes and viewer mutation restrictions are enforced.
 - Database concurrency: keep shared-handle rollback as a negative control, dedicated handle test
   with SQLITE_BUSY and async retry; stress actual signup/changePassword/ban versus Noctua writes.
   No auth/network await inside synchronous Noctua transactions, no whole-auth-request retry, busy

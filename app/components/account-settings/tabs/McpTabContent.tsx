@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
-import { Badge, Button, Card, Flex, Select, Text, TextField } from "@radix-ui/themes";
+import { Badge, Button, Card, Checkbox, Flex, Select, Text, TextField } from "@radix-ui/themes";
 import {
   buildAccountMcpTokenPath,
   buildAccountMcpTokensPath
@@ -13,6 +13,7 @@ import { formatAccountIntl } from "@/lib/dateFormatting";
 import { formatDate } from "@/lib/i18n/format";
 import { timeZone, type UiLocale } from "@/lib/i18n/config";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+import { MCP_PERMISSION_MODES, mcpPermissionMode, type McpPermissionMode } from "@/lib/mcpPermissions";
 import type { mintMcpToken } from "@/lib/mcpAuth";
 
 type Props = {
@@ -33,6 +34,7 @@ type CreateTokenResponse = Partial<Awaited<ReturnType<typeof mintMcpToken>>> & {
 type ListTokensResponse = {
   ok?: boolean;
   tokens?: McpTokenMetadata[];
+  mailboxes?: { id: string; name: string; email: string }[];
   message?: string;
 };
 
@@ -93,7 +95,11 @@ function ttlFromPreset(
   return days * 24 * 60 * 60;
 }
 
-export default function McpTabContent({
+export default function McpTabContent(props: Props) {
+  return <McpTokenSettings key={props.accountId} {...props} />;
+}
+
+function McpTokenSettings({
   accountId,
   isActive,
   isExistingAccount,
@@ -105,6 +111,9 @@ export default function McpTabContent({
   const locale = useLocale();
   const request = apiFetch ?? fetch;
   const [tokens, setTokens] = useState<McpTokenMetadata[]>([]);
+  const [mailboxes, setMailboxes] = useState<NonNullable<ListTokensResponse["mailboxes"]>>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(accountId ? [accountId] : []);
+  const [mode, setMode] = useState<McpPermissionMode>("drafts");
   const [label, setLabel] = useState("");
   const [expiryPreset, setExpiryPreset] = useState<(typeof EXPIRY_PRESETS)[number]["value"]>("180d");
   const [customExpiresAt, setCustomExpiresAt] = useState(() =>
@@ -142,6 +151,7 @@ export default function McpTabContent({
       }
       const data = (await response.json()) as ListTokensResponse;
       setTokens(data.ok && Array.isArray(data.tokens) ? data.tokens : []);
+      setMailboxes(data.ok && Array.isArray(data.mailboxes) ? data.mailboxes : []);
     } catch {
       setError(t("mcp.loadFailed"));
     } finally {
@@ -151,6 +161,8 @@ export default function McpTabContent({
 
   useEffect(() => {
     if (isActive && isExistingAccount) {
+      // Synchronize remote metadata when the tab opens; the request owns loading/error state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadTokens();
     }
     return () => { setCreatedSecret(""); setCopiedValue(null); };
@@ -198,7 +210,9 @@ export default function McpTabContent({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label,
-          ttlSeconds
+          ttlSeconds,
+          accountIds: selectedAccountIds,
+          mode
         })
       });
       const data = (await response.json().catch(() => null)) as CreateTokenResponse | null;
@@ -218,7 +232,7 @@ export default function McpTabContent({
     } finally {
       setCreating(false);
     }
-  }, [accountId, customExpiresAt, expiryPreset, label, request, loadTokens, t]);
+  }, [accountId, customExpiresAt, expiryPreset, label, selectedAccountIds, mode, request, loadTokens, t]);
 
   const handleDelete = useCallback(async (tokenId: string) => {
     if (!accountId) return;
@@ -287,6 +301,26 @@ export default function McpTabContent({
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder={t("mcp.labelPlaceholder")}
               />
+            </Flex>
+            <Flex direction="column" gap="2" role="group" aria-label={t("mcp.mailboxes")}>
+              <Text size="2" weight="medium">{t("mcp.mailboxes")}</Text>
+              <Text size="1" color="gray">{t("mcp.primaryMailboxHint")}</Text>
+              {mailboxes.map(mailbox => (
+                <Text as="label" size="2" key={mailbox.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowWrap: "anywhere" }}>
+                  <Checkbox checked={selectedAccountIds.includes(mailbox.id)} disabled={mailbox.id === accountId || creating}
+                    onCheckedChange={checked => setSelectedAccountIds(current => checked ? [...new Set([...current, mailbox.id])] : current.filter(id => id !== mailbox.id))} />
+                  {mailbox.name} ({mailbox.email})
+                </Text>
+              ))}
+            </Flex>
+            <Flex direction="column" gap="2" role="group" aria-label={t("mcp.permissionMode")}>
+              <Text size="2" weight="medium">{t("mcp.permissionMode")}</Text>
+              {MCP_PERMISSION_MODES.map(value => (
+                <Text as="label" size="2" key={value} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <input type="radio" name={`mcp-mode-${accountId}`} value={value} checked={mode === value} disabled={creating} onChange={() => setMode(value)} />
+                  {t(`mcp.mode.${value}`)}
+                </Text>
+              ))}
             </Flex>
             <Flex direction="column" gap="2">
               <Text size="2" color="gray">{t("mcp.expiry")}</Text>
@@ -389,6 +423,11 @@ export default function McpTabContent({
                       {deletingId === token.id ? t("mcp.deleting") : t("common.delete")}
                     </Button>
                   </Flex>
+                  <Text size="1">{t(`mcp.mode.${mcpPermissionMode(token.scopes)}`)}</Text>
+                  <Text size="1" style={{ overflowWrap: "anywhere" }}>{t("mcp.tokenMailboxes", { mailboxes: (token.accountIds ?? [token.accountId]).map(id => {
+                    const mailbox = mailboxes.find(item => item.id === id);
+                    return mailbox ? `${mailbox.name} (${mailbox.email})` : id;
+                  }).join(", ") })}</Text>
                   <Text size="1" color="gray">{t("mcp.created", { date: timestampLabel(token.createdAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.expires", { date: timestampLabel(token.expiresAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.lastUsed", { date: timestampLabel(token.lastUsedAt) })}</Text>

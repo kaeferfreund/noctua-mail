@@ -151,7 +151,7 @@ describe("Slice 3 live MCP/streams and shard cleanup", () => {
   test("MCP foreign mailbox, role downgrade, null/stale generation, ban and both factor records", async () => {
     const f = await fixture(); const { token, tokenRecord } = await mintMcpToken(f.context, f.id, "Synthetic", 3600);
     expect(token).toMatch(/^mcp_[A-Za-z0-9_-]{43}$/); expect(await validateMcpToken(token)).not.toBeNull();
-    await expect(resolveMcpToolContext(tokenRecord.id, "foreign")).rejects.toThrow("another mailbox");
+    await expect(resolveMcpToolContext(tokenRecord.id, "foreign")).rejects.toThrow("not covered");
     await f.db.setUserAccountRole(f.user.id, f.id, "viewer", f.user.id);
     await expect(resolveMcpToolContext(tokenRecord.id, f.id, "editor")).rejects.toThrow("Insufficient mailbox role");
     expect((await validateMcpToken(token))?.role).toBe("viewer");
