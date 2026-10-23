@@ -20,7 +20,7 @@ async function menu(page: Page, item: "Settings" | "Admin") {
 }
 test.beforeAll(async ({ browser }) => {
   seeds = JSON.parse(readFileSync(process.env.QA_SHELL_SEED_FILE!, "utf8"));
-  const context = await browser.newContext({ baseURL: "http://localhost:3855" }), page = await context.newPage();
+  const context = await browser.newContext({ baseURL: process.env.QA_SHELL_BASE_URL ?? "http://localhost:3799" }), page = await context.newPage();
   await page.goto("/");
   expect((await post(page, "/api/ba/sign-in/email", { email: seeds[0].email, password: seeds[0].password })).status).toBe(200);
   expect((await post(page, "/api/ba/two-factor/verify-totp", { code: totpFromUri(seeds[0].totpURI) })).status).toBe(200);
