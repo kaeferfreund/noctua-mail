@@ -43,6 +43,17 @@ The separate preview `https://preview.example.org:3790` has isolated data/auth/e
 secrets, its own URL and RP ID `preview.example.org`, preview-only trust and new passkeys.
 Never add preview trust to production or claim canonical passkey reuse there.
 
+### Optional search tuning
+
+Leave both unset in normal operation. Searches resolve their matching message ids once from the
+FTS index and reuse them for list, count and group queries; the legacy inline search clause is the
+fallback and returns the same results.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOCTUA_FTS_DRIVEN_MAX_CANDIDATES` | `2000` | Maximum candidate ids per search (integer ≥ 1; invalid values use the default). Larger searches, and searches whose FTS read fails, use the legacy clause and log one `[fts-search] legacy fallback` warning without query text. |
+| `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH` | unset (on) | Exactly `1` is the kill switch: every search uses the legacy clause, without a fallback log line. No schema or index change is involved; restart the service to apply. |
+
 ## Deployment Methods
 
 ### Docker (Recommended)
