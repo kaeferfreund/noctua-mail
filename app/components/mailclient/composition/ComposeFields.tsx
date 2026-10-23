@@ -322,7 +322,7 @@ export default function ComposeFields({
       </Text>
       <div className={styles.composeInputWrap}>
         <Select.Root value={identityId || "__unavailable"} disabled={identityDisabled || !onIdentityChange} onValueChange={id => { markComposeDirty(); onIdentityChange?.(id); }}>
-          <Select.Trigger id={`compose-${variant}-from`} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} className={styles.composeFromTrigger} />
+          <Select.Trigger id={`compose-${variant}-from`} title={fromValue} aria-describedby={senderMessage ? `compose-${variant}-sender-message` : undefined} className={styles.composeFromTrigger} />
           <Select.Content position="popper" className={styles.composeFromMenu} collisionPadding={16}>
             {!identities.some(identity => identity.id === identityId && identity.enabled) && <Select.Item value={identityId || "__unavailable"} disabled>{fromValue ? senderOption(fromValue, "unavailable", senderMessages) : senderMessages.chooseSender}</Select.Item>}
             {identities.filter(identity => identity.enabled).map(identity => <Select.Item key={identity.id} value={identity.id}>
