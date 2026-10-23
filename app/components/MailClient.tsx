@@ -4980,7 +4980,7 @@ export default function MailClient({
       if (observer) observer.disconnect();
       window.removeEventListener("resize", scheduleSync);
     };
-  }, [listWidth, syncNoticePaneRightOffset]);
+  }, [isMobile, readerLayout, listWidth, syncNoticePaneRightOffset]);
 
   const prevAccountIdRef = useRef(activeAccountId);
   useEffect(() => {
