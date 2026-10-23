@@ -2,7 +2,8 @@
 // register happy-dom before any component module loads.
 import { afterEach, expect, it, spyOn } from "bun:test";
 import React from "react";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type { Message } from "@/lib/data";
@@ -299,4 +300,16 @@ it("P2-A repeated format round trips keep a multiline personal signature replace
       expect(editor().textContent!.match(/Synthetic Jo/g)).toHaveLength(1);
     }
   } finally { confirm.mockRestore(); }
+});
+
+it("sender snapshot catalog IDs are localized at the notice boundary", async () => {
+  const { senderMessages } = await import("@/lib/senderMessages");
+  const errors: string[] = [];
+  const { view, props, handleRef } = renderCompose({ reportError: message => errors.push(message) });
+  view.rerender(<Theme><ComposeOrchestrator ref={handleRef} {...props} senderSettingsLoader={async () => {
+    throw new Error(senderMessages.senderLoadFailed);
+  }} /></Theme>);
+  await act(async () => { await handleRef.current?.openCompose("reply", sourceMessage); });
+  expect(errors).toContain("Could not load sender identities and preferences.");
+  expect(errors.some(message => message.includes("Errors.sender."))).toBe(false);
 });

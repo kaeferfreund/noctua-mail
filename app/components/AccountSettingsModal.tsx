@@ -1,4 +1,5 @@
-import { senderMessages } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -92,6 +93,7 @@ export default function AccountSettingsModal({
   onUpdateRecipientAlias,
   onDeleteRecipientAlias
 }: Props) {
+  const { messages: senderMessages } = useSenderMessages();
   const isMobile = useIsMobile();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
@@ -148,7 +150,7 @@ export default function AccountSettingsModal({
     ];
     items.push({ value: "members", label: "Members", disabled: !isExistingAccount });
     return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
-  }, [initialAccount.accessRole, isExistingAccount]);
+  }, [initialAccount.accessRole, isExistingAccount, senderMessages.identitiesTitle]);
   const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => tab.value === "preferences" && !tab.disabled)?.value ?? tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;

@@ -1,6 +1,7 @@
 "use client";
 
-import { senderMessages } from "@/lib/senderMessages";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { senderMessages, isSenderMessageId } from "@/lib/senderMessages";
 
 import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
 import { resolveSignatureTemplate } from "@/lib/signatureTemplates";
@@ -325,6 +326,7 @@ function ComposeOrchestratorImpl(
   const [sender, setSender] = useState<SenderSettings | null>(null);
   const [senderLoading, setSenderLoading] = useState(true);
   const [retrySender, setRetrySender] = useState<(() => void) | null>(null);
+  const { messages: senderCopy, renderMessage } = useSenderMessages();
   const [senderError, setSenderError] = useState<string | null>(null);
   const signatureConfigKey = JSON.stringify([accountSignatures, defaultSignatureId]);
   const composeState = useComposeState();
@@ -339,7 +341,7 @@ function ComposeOrchestratorImpl(
         const snapshot = await senderSettingsLoader(apiFetch, activeAccountId);
         if (active) { setSender(snapshot); setSenderError(null); setRetrySender(null); }
       } catch (error) {
-        if (active) { setSender(null); setSenderError(error instanceof Error ? error.message : senderMessages.identityLoadFailed); setRetrySender(() => () => { if (active) void refresh(); }); }
+        if (active) { setSender(null); setSenderError(senderMessages.identityLoadFailed); setRetrySender(() => () => { if (active) void refresh(); }); }
       } finally { if (active) setSenderLoading(false); }
     };
     const storageRefresh = (event: StorageEvent) => {
@@ -1112,7 +1114,7 @@ function ComposeOrchestratorImpl(
       } else {
         const message = await readSenderError(res, readErrorMessage);
         if (isSendSession()) setSenderError(message);
-        reportError(message);
+        reportError(renderMessage(message));
       }
     } catch (error) {
       if (delivered) {
@@ -1203,7 +1205,7 @@ function ComposeOrchestratorImpl(
         setSender(snapshot); setSenderError(null);
       } catch (error) {
         if (!isStale()) {
-          setSender(null); setSenderError(error instanceof Error ? error.message : senderMessages.identityLoadFailed);
+          setSender(null); setSenderError(senderMessages.identityLoadFailed);
           setRetrySender(() => () => { if (!isStale()) void openCompose(mode, message, asNew, prefill, restoredIdentityId, skipSignature); });
         }
         throw error;
@@ -1308,9 +1310,11 @@ function ComposeOrchestratorImpl(
     } catch (error) {
       console.error("[noctua] failed to open composer:", error);
       reportError(
-        error instanceof Error && error.message.trim()
-          ? `Failed to open composer: ${error.message}`
-          : "Failed to open composer."
+        error instanceof Error && isSenderMessageId(error.message)
+          ? renderMessage(error.message)
+          : error instanceof Error && error.message.trim()
+            ? `Failed to open composer: ${error.message}`
+            : "Failed to open composer."
       );
     }
   };
@@ -1538,7 +1542,7 @@ function ComposeOrchestratorImpl(
     identityDisabled: senderLoading || !senderCanCompose || sendingMail || draftSaving,
     sendDisabled: senderLoading || !senderCanCompose || !sender?.identities.some(item => item.id === composeIdentityId && item.enabled),
     onSenderRetry: senderError && !senderLoading ? retrySender ?? undefined : undefined,
-    senderMessage: senderError ?? draftSaveError ?? (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? senderMessages.unavailableDraft : compose.composeSenderWarnings.join(" ")),
+    senderMessage: senderError ? renderMessage(senderError) : draftSaveError ? renderMessage(draftSaveError) : (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? senderCopy.unavailableDraft : compose.composeSenderWarnings.map(renderMessage).join(" ")),
     onIdentityChange: (id) => {
       const identity = sender?.identities.find(item => item.id === id && item.enabled);
       if (!identity || sendingMail || !senderCanCompose) return;
@@ -1633,7 +1637,7 @@ function ComposeOrchestratorImpl(
   return (
     <ComposeContextProvider value={contextValue}>
       {senderError && retrySender && !composeOpen && <div role="alert">
-        {senderError} <button type="button" disabled={senderLoading} onClick={retrySender}>{senderMessages.retrySender}</button>
+        {renderMessage(senderError)} <button type="button" disabled={senderLoading} onClick={retrySender}>{senderCopy.retrySender}</button>
       </div>}
       <ComposeModal isMobile={isMobile} open={isMobile ? composeOpen : showComposeModal} />
       <ComposeMinimized open={!isMobile && showComposeMinimized} />

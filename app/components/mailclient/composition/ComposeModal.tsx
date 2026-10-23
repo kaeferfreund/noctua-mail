@@ -1,3 +1,4 @@
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { useLayoutEffect, useRef } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Dock, ExternalLink, X } from "lucide-react";
@@ -72,6 +73,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
     composeMessageField
   } = useComposeContext();
 
+  const { messages: senderMessages, resolve } = useSenderMessages();
   const returnFocusRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (open) returnFocusRef.current = document.activeElement as HTMLElement | null;
@@ -114,10 +116,10 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
         onDrop={handleComposeDrop}
       >
         <div className={styles.composeHeader}>
-          <div>
+          <div className={styles.composeHeaderText}>
             <DialogPrimitive.Title asChild>{heading}</DialogPrimitive.Title>
-            <Text size="2" color="gray" className={styles.composeSubtitle}>
-              From {fromValue}
+            <Text size="2" color="gray" className={styles.composeSubtitle} title={resolve("Compose.fromValue", { sender: fromValue })}>
+              {resolve("Compose.fromValue", { sender: fromValue })}
             </Text>
           </div>
           <div className={styles.composeHeaderActions}>
@@ -156,7 +158,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             <TooltipIconButton
               variant="ghost"
               size="2"
-              tooltip="Close composer"
+              tooltip={senderMessages.closeComposer}
               disabled={detachingCompose}
               onClick={close}
             >

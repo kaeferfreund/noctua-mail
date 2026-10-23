@@ -1,6 +1,7 @@
 import { notifySenderPreferencesChanged, SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import type { Account, SenderIdentity } from "@/lib/data";
 import IdentitiesTabContent from "./tabs/IdentitiesTabContent";
@@ -103,4 +104,29 @@ test("cross-window sender refresh receipts never store personal signature text",
   expect(JSON.parse(raw).accountId).toBe("a");
   expect(raw).not.toContain("Private synthetic signature"); expect(raw).not.toContain("defaultIdentityId");
   window.localStorage.removeItem(SENDER_SETTINGS_STORAGE_KEY);
+});
+
+test("locale changes translate open identity forms and retained API errors without losing user input", async () => {
+  const { I18nTestProvider } = await import("@/lib/i18n/testRender");
+  const { AdminApiError } = await import("@/app/hooks/useAdminApi");
+  const apiFetch: AdminFetch = async (_, init) => init?.method
+    ? response({ ok: false, code: "identity_exists", message: "Private synthetic provider detail" }, 409)
+    : response({ identities });
+  const form = <Theme><IdentitiesTabContent editingAccount={account} apiFetch={apiFetch} /></Theme>;
+  const view = render(<I18nTestProvider locale="en">{form}</I18nTestProvider>);
+  await waitFor(() => expect((view.getByRole("button", { name: "Add identity" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(view.getByRole("button", { name: "Add identity" }));
+  fireEvent.change(view.getByLabelText("Email"), { target: { value: "synthetic@example.test" } });
+  fireEvent.change(view.getByLabelText("Display name"), { target: { value: "Synthetic {{user.name}}" } });
+  fireEvent.click(view.getByRole("button", { name: "Save identity" }));
+  await view.findByText("An identity with this address already exists.");
+  view.rerender(<I18nTestProvider locale="de">{form}</I18nTestProvider>);
+  expect(view.getByRole("alert").textContent).toBe("Eine Identität mit dieser Adresse ist bereits vorhanden.");
+  expect((view.getByLabelText("E-Mail") as HTMLInputElement).value).toBe("synthetic@example.test");
+  expect((view.getByLabelText("Anzeigename") as HTMLInputElement).value).toBe("Synthetic {{user.name}}");
+  expect(view.getByRole("button", { name: "Abbrechen" })).toBeTruthy();
+  expect(view.queryByText("Private synthetic provider detail")).toBeNull();
+  // The API wrapper still exposes the original structured error to callers.
+  const { adminRequest } = await import("@/app/hooks/useAdminApi");
+  await expect(adminRequest(apiFetch, "/synthetic", { method: "POST" })).rejects.toBeInstanceOf(AdminApiError);
 });

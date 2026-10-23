@@ -1,5 +1,7 @@
 "use client";
 
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text } from "@radix-ui/themes";
 import { AccountDateFormatProvider } from "@/app/components/AccountDateFormatContext";
@@ -79,6 +81,7 @@ export default function DetachedComposeWindowClient({
   const [, setActiveMessageId] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
+  const { renderMessage } = useSenderMessages();
   const [notices, setNotices] = useState<InAppNotice[]>([]);
   const [composeMirror, setComposeMirror] = useState<ComposeMirror>({
     composeOpen: false,
@@ -386,7 +389,7 @@ export default function DetachedComposeWindowClient({
   }, [folders]);
 
   if (status === "error") {
-    return <DetachedComposeState color="red">{error || "Failed to open composer."}</DetachedComposeState>;
+    return <DetachedComposeState color="red">{renderMessage(error) || "Failed to open composer."}</DetachedComposeState>;
   }
   if (status === "loading" || !account) {
     return <DetachedComposeState color="gray">Opening composer…</DetachedComposeState>;

@@ -15,7 +15,8 @@ const scenarios = [
   "QA-002 Send stays visible after autosave at 390px",
   "QA-008 desktop modal contains keyboard focus and restores its opener",
   "sender identities: personal From, signature replacement, saved draft reopen and mobile From",
-  "QA-002 Send stays visible after autosave at 320px"
+  "QA-002 Send stays visible after autosave at 320px",
+  "P2-E mobile header keeps long enabled and unavailable senders and dismissal targets in bounds"
 ];
 test.beforeEach(async ({page}, info) => {
   const index=scenarios.indexOf(info.title);
@@ -297,4 +298,67 @@ test('sender identities: personal From, signature replacement, saved draft reope
   } finally { await otherContext.close(); }
   // Reset only this synthetic person's preferences for repeatable future runs.
   expect((await page.request.put(`${mailbox}/prefs`,{headers:{origin:new URL(page.url()).origin},data:{defaultIdentityId:null,signatureOverride:null}})).status()).toBe(200);
+});
+
+test('P2-E mobile header keeps long enabled and unavailable senders and dismissal targets in bounds', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  await signIn(page);
+  const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
+  const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
+  const email=`${'a'.repeat(47)}@example.test`;
+  const displayName='Synthetic Long Display Name NNNNNNNNNNNN';
+  const headers={origin:new URL(page.url()).origin};
+  const existing=(await (await page.request.get(`${mailbox}/identities`)).json()).identities.find((item: {email:string})=>item.email===email);
+  const created=existing
+    ? await page.request.patch(`${mailbox}/identities/${existing.id}`,{headers,data:{displayName,enabled:true}})
+    : await page.request.post(`${mailbox}/identities`,{headers,data:{email,displayName}});
+  expect(created.status()).toBe(existing?200:201);
+  const identity=(await created.json()).identity;
+  expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:identity.id,signatureOverride:''}})).status()).toBe(200);
+  await page.reload();
+  await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
+  await openCompose(page);
+  await expect(page.getByLabel('From:',{exact:true})).toContainText(email);
+  const subject=`Synthetic long sender header regression ${Date.now()}`;
+  await page.getByLabel('Subject:',{exact:true}).fill(subject);
+  const saved=await page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
+  expect(saved.status()).toBe(200);
+  const {draftId}=await saved.json();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  for(const enabled of [true,false]) {
+    if(!enabled) expect((await page.request.patch(`${mailbox}/identities/${identity.id}`,{headers,data:{enabled:false}})).status()).toBe(200);
+    // Reopen the actual persisted draft in MailClient's mobile modal.
+    await page.goto('/');
+    await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
+    await page.getByRole('button',{name:/Drafts/}).first().click();
+    await page.getByText(subject,{exact:true}).first().click();
+    await page.getByRole('button',{name:'Edit draft',exact:true}).click();
+    await expect(page.getByLabel('From:',{exact:true})).toContainText(email);
+    for(const theme of ['light','dark'] as const) for(const width of [320,360,390]) {
+      await page.setViewportSize({width,height:844});
+      await page.emulateMedia({colorScheme:theme});
+      await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);document.documentElement.style.colorScheme=theme;document.querySelectorAll('.radix-themes').forEach(el=>{el.classList.remove('light','dark');el.classList.add(theme);});},theme);
+      const close=page.getByRole('button',{name:'Close composer',exact:true});
+      const cancel=page.getByRole('button',{name:'Cancel',exact:true});
+      const bounds=[];
+      for(const button of [close,cancel]) {
+        const box=await button.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.y).toBeGreaterThanOrEqual(0);
+        expect(box!.x+box!.width).toBeLessThanOrEqual(width);
+        expect(box!.y+box!.height).toBeLessThanOrEqual(844);
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+        expect(await button.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
+        bounds.push(box);
+      }
+      await expect(page.getByTitle(`From ${displayName} <${email}>`,{exact:true})).toHaveText(`From ${displayName} <${email}>`);
+      if(!enabled) await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
+      await assertFromBounds(page);
+      console.log(JSON.stringify({finding:'P2-E',width,theme,state:enabled?'enabled':'unavailable',close:bounds[0],cancel:bounds[1]}));
+    }
+    await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  }
+  expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:null,signatureOverride:null}})).status()).toBe(200);
 });

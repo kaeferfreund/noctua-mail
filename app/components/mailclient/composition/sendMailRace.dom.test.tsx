@@ -2,7 +2,8 @@
 // register happy-dom before any component module loads.
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import React from "react";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { SenderSettings } from "@/lib/ui/senderSettings";

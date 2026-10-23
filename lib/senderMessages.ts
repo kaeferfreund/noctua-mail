@@ -1,99 +1,122 @@
-/** Slice 3 English messages, staged for semantic Compose/Settings/Errors catalog IDs.
- * No component in this slice uses useTranslations yet. Stored template text and
- * the four signature placeholders are user content and are never translated.
+/** Stable catalog IDs. Keep these in state/warnings; resolve copy only when rendering.
+ * User content, signature tokens, and server error codes are never translated.
  */
 export const senderMessages = {
-  chooseSender: "Choose a sender",
-  reviewSender: "Review sender",
-  unavailableDraft: "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
-  chooseEnabledSender: "Choose an enabled From address before sending.",
-  confirmKeepEditedSignature: "Keep the edited signature and add the new signature? Your edited text will be preserved.",
-  confirmKeepEditedWithoutSignature: "Keep the edited signature text and stop tracking it as a signature?",
-  senderLoadFailed: "Could not load sender identities and preferences.",
-  senderUnavailable: "Sender settings are unavailable for this mailbox.",
-  identityLoadFailed: "Could not load sender identities.",
-  identityRefreshFailed: "Could not refresh sender identities.",
-  templateUnavailable: "A signature template is unavailable. Review your signature preferences. Ask a mailbox manager to repair the shared template.",
-  identityUnavailable: "This From address is unavailable. Choose an enabled sender and save the draft.",
-  draftIdentityChanged: "The saved sender details changed. Review From and save the draft before sending.",
-  senderRejected: "The mail provider rejected this From address. Choose another sender or ask a mailbox manager to review it.",
-  recipientRejected: "The mail provider rejected a recipient. Review To, Cc and Bcc before trying again.",
-  messageRejected: "The mail provider rejected this message. Review its content and attachments.",
-  providerTemporary: "The mail provider is temporarily unavailable. Keep this draft and try again later.",
-  providerConfiguration: "Sending is unavailable. Ask a mailbox manager to review the mail configuration.",
-  providerConnection: "Could not connect to the mail provider. Keep this draft and try again later.",
-  providerFailure: "The mail provider could not process this message. Keep this draft and contact a mailbox manager.",
-  connectionTimeout: "Connecting to the mail provider timed out. Keep this draft and try again later.",
-  greetingTimeout: "The mail provider did not respond in time. Keep this draft and try again later.",
-  deliveryUncertain: "The mail provider timed out. Delivery may have succeeded; check Sent and with the recipient before sending again.",
-  identitiesTitle: "Identities",
-  identitiesHelp: "Addresses this mailbox can send from. Check send-as permission with the mail provider before enabling an address. This is separate from your mailbox role.",
-  identitiesLoading: "Loading identities…",
-  identitySaved: "Identity saved.",
-  managerOnly: "Only mailbox managers can change sender identities.",
-  replyToLabel: "Reply-To:",
-  chooseDefaultBeforeDisable: "Choose another mailbox default before disabling this identity.",
-  identityDefaultFor: "Mailbox default for {email}",
-  addIdentity: "Add identity",
-  saveIdentity: "Save identity",
-  displayName: "Display name",
-  replyTo: "Reply-To",
-  replyToHelp: "Optional single address; replies go here instead of From.",
-  signatureTemplate: "Signature template",
-  mailboxDefault: "Mailbox default",
-  senderPreferencesTitle: "Sender preferences",
-  senderPreferencesHelp: "Personal From and signature for this mailbox",
-  senderPreferencesLoading: "Loading sender preferences…",
-  senderPreferencesSaved: "Sender preferences saved.",
-  defaultFrom: "Default From",
-  unavailableIdentity: "Unavailable identity",
-  personalTemplate: "Personal signature template",
-  inheritTemplate: "Use identity or mailbox default",
-  personalSignature: "Personal signature",
-  personalSignatureHelp: "Overrides the template choice. Empty text explicitly means no signature.",
-  inheritSignature: "Inherit signature template",
-  usePersonalText: "Use personal text",
-  personalSignatureText: "Personal signature text",
-  placeholdersHelp: "Supported placeholders: {{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}. Add job titles as plain text.",
-  invalidTemplate: "Use only the supported signature placeholders (maximum 8 KiB).",
-  signaturePreview: "Signature preview",
-  saveSenderPreferences: "Save sender preferences",
-  sharedTemplatesHelp: "Manage shared mailbox templates. Personal signature overrides are in Preferences. Supported placeholders: {{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}.",
-  retrySender: "Retry loading sender settings",
-  personalDefaultUnavailable: "Your default identity is unavailable. Choose an enabled identity in Preferences, or ask a mailbox manager to re-enable it.",
-  savedIdentityUnavailable: "The saved draft identity is unavailable. Review sender and save the draft.",
-  identityExists: "An identity with this address already exists.",
-  defaultIdentityRequired: "Choose another mailbox default before disabling this identity.",
-  signatureInUse: "This signature is used by a sender identity. Choose another template for that identity first.",
-  invalidPreferences: "Review your sender preferences and signature placeholders.",
-  senderOption: "{sender}",
-  senderDefaultOption: "{sender} (mailbox default)",
-  senderUnavailableOption: "{sender} — unavailable",
-  identityEnabled: "{sender}",
-  identityDefault: "{sender} — Mailbox default",
-  identityDisabled: "{sender} — Disabled",
-  identityDefaultDisabled: "{sender} — Mailbox default — Disabled",
-  identitySignatureDefault: "Mailbox default signature",
+  "chooseSender": "Compose.sender.chooseSender",
+  "reviewSender": "Compose.sender.reviewSender",
+  "unavailableDraft": "Compose.sender.unavailableDraft",
+  "chooseEnabledSender": "Compose.sender.chooseEnabledSender",
+  "confirmKeepEditedSignature": "Compose.sender.confirmKeepEditedSignature",
+  "confirmKeepEditedWithoutSignature": "Compose.sender.confirmKeepEditedWithoutSignature",
+  "senderLoadFailed": "Errors.sender.senderLoadFailed",
+  "senderUnavailable": "Errors.sender.senderUnavailable",
+  "identityLoadFailed": "Errors.sender.identityLoadFailed",
+  "identityRefreshFailed": "Errors.sender.identityRefreshFailed",
+  "templateUnavailable": "Errors.sender.templateUnavailable",
+  "identityUnavailable": "Errors.sender.identityUnavailable",
+  "draftIdentityChanged": "Errors.sender.draftIdentityChanged",
+  "senderRejected": "Errors.sender.senderRejected",
+  "recipientRejected": "Errors.sender.recipientRejected",
+  "messageRejected": "Errors.sender.messageRejected",
+  "providerTemporary": "Errors.sender.providerTemporary",
+  "providerConfiguration": "Errors.sender.providerConfiguration",
+  "providerConnection": "Errors.sender.providerConnection",
+  "providerFailure": "Errors.sender.providerFailure",
+  "connectionTimeout": "Errors.sender.connectionTimeout",
+  "greetingTimeout": "Errors.sender.greetingTimeout",
+  "deliveryUncertain": "Errors.sender.deliveryUncertain",
+  "identitiesTitle": "Settings.sender.identitiesTitle",
+  "identitiesHelp": "Settings.sender.identitiesHelp",
+  "identitiesLoading": "Settings.sender.identitiesLoading",
+  "identitySaved": "Settings.sender.identitySaved",
+  "managerOnly": "Settings.sender.managerOnly",
+  "replyToLabel": "Settings.sender.replyToLabel",
+  "chooseDefaultBeforeDisable": "Settings.sender.chooseDefaultBeforeDisable",
+  "identityDefaultFor": "Settings.sender.identityDefaultFor",
+  "addIdentity": "Settings.sender.addIdentity",
+  "saveIdentity": "Settings.sender.saveIdentity",
+  "displayName": "Settings.sender.displayName",
+  "replyTo": "Settings.sender.replyTo",
+  "replyToHelp": "Settings.sender.replyToHelp",
+  "signatureTemplate": "Settings.sender.signatureTemplate",
+  "mailboxDefault": "Settings.sender.mailboxDefault",
+  "senderPreferencesTitle": "Settings.sender.senderPreferencesTitle",
+  "senderPreferencesHelp": "Settings.sender.senderPreferencesHelp",
+  "senderPreferencesLoading": "Settings.sender.senderPreferencesLoading",
+  "senderPreferencesSaved": "Settings.sender.senderPreferencesSaved",
+  "defaultFrom": "Settings.sender.defaultFrom",
+  "unavailableIdentity": "Settings.sender.unavailableIdentity",
+  "personalTemplate": "Settings.sender.personalTemplate",
+  "inheritTemplate": "Settings.sender.inheritTemplate",
+  "personalSignature": "Settings.sender.personalSignature",
+  "personalSignatureHelp": "Settings.sender.personalSignatureHelp",
+  "inheritSignature": "Settings.sender.inheritSignature",
+  "usePersonalText": "Settings.sender.usePersonalText",
+  "personalSignatureText": "Settings.sender.personalSignatureText",
+  "placeholdersHelp": "Settings.sender.placeholdersHelp",
+  "invalidTemplate": "Settings.sender.invalidTemplate",
+  "signaturePreview": "Settings.sender.signaturePreview",
+  "saveSenderPreferences": "Settings.sender.saveSenderPreferences",
+  "sharedTemplatesHelp": "Settings.sender.sharedTemplatesHelp",
+  "retrySender": "Compose.sender.retrySender",
+  "personalDefaultUnavailable": "Errors.sender.personalDefaultUnavailable",
+  "savedIdentityUnavailable": "Errors.sender.savedIdentityUnavailable",
+  "identityExists": "Errors.sender.identityExists",
+  "defaultIdentityRequired": "Errors.sender.defaultIdentityRequired",
+  "signatureInUse": "Errors.sender.signatureInUse",
+  "invalidPreferences": "Errors.sender.invalidPreferences",
+  "senderOption": "Compose.sender.senderOption",
+  "senderDefaultOption": "Compose.sender.senderDefaultOption",
+  "senderUnavailableOption": "Compose.sender.senderUnavailableOption",
+  "identityEnabled": "Settings.sender.identityEnabled",
+  "identityDefault": "Settings.sender.identityDefault",
+  "identityDisabled": "Settings.sender.identityDisabled",
+  "identityDefaultDisabled": "Settings.sender.identityDefaultDisabled",
+  "identitySignatureDefault": "Settings.sender.identitySignatureDefault",
+  "edit": "Settings.edit",
+  "enable": "Admin.users.enable",
+  "disable": "Admin.users.disable",
+  "email": "Admin.email",
+  "enabled": "Settings.members.enabled",
+  "saving": "Settings.preferences.saving",
+  "cancel": "Admin.cancel",
+  "noSignature": "Settings.preferences.noSignature",
+  "from": "Compose.from",
+  "closeComposer": "Compose.closeComposer",
+  "fromSubtitle": "Compose.fromValue"
 } as const;
 
-export function senderOption(sender: string, state: "enabled" | "default" | "unavailable") {
+export type SenderMessageId = typeof senderMessages[keyof typeof senderMessages];
+export type SenderCopy = Record<keyof typeof senderMessages, string>;
+const messageIds = new Set<string>(Object.values(senderMessages));
+export function isSenderMessageId(value: string): value is SenderMessageId {
+  return messageIds.has(value);
+}
+
+export function senderOption(sender: string, state: "enabled" | "default" | "unavailable", senderMessages: SenderCopy) {
   const message = state === "unavailable" ? senderMessages.senderUnavailableOption : state === "default" ? senderMessages.senderDefaultOption : senderMessages.senderOption;
   return message.replace("{sender}", () => sender);
 }
 
-export function senderSettingsError(error: unknown): string {
+export function senderSettingsError(error: unknown, copy: SenderCopy): string {
   const messages: Record<string, string> = {
-    identity_exists: senderMessages.identityExists,
-    default_identity_required: senderMessages.defaultIdentityRequired,
-    signature_in_use: senderMessages.signatureInUse,
-    invalid_preferences: senderMessages.invalidPreferences,
-    signature_template_invalid: senderMessages.invalidTemplate
+    identity_exists: copy.identityExists,
+    default_identity_required: copy.defaultIdentityRequired,
+    signature_in_use: copy.signatureInUse,
+    invalid_preferences: copy.invalidPreferences,
+    signature_template_invalid: copy.invalidTemplate
   };
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
-  return messages[code] ?? (error instanceof Error ? error.message : senderMessages.identityLoadFailed);
+  if (messages[code]) return messages[code];
+  if (error instanceof Error) {
+    const entry = Object.entries(senderMessages).find(([, id]) => id === error.message);
+    if (entry) return copy[entry[0] as keyof SenderCopy];
+  }
+  // Provider details and unknown API messages are never UI copy.
+  return copy.identityLoadFailed;
 }
 
-export function identityStatus(sender: string, isDefault: boolean, enabled: boolean) {
+export function identityStatus(sender: string, isDefault: boolean, enabled: boolean, senderMessages: SenderCopy) {
   const message = isDefault ? (enabled ? senderMessages.identityDefault : senderMessages.identityDefaultDisabled) : (enabled ? senderMessages.identityEnabled : senderMessages.identityDisabled);
   return message.replace("{sender}", () => sender);
 }

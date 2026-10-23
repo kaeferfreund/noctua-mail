@@ -1,3 +1,4 @@
+import { senderMessages } from "@/lib/senderMessages";
 import { expect, test } from "bun:test";
 import { loadSenderSettings } from "./senderSettings";
 test("reloads private sender data each time and captures the requested mailbox independently of the active account", async () => {
@@ -14,6 +15,6 @@ test("reloads private sender data each time and captures the requested mailbox i
   expect(second.account.ownAddresses).toEqual(["alias@example.test"]); expect(paths).toHaveLength(6);
 });
 test("failed or inaccessible sender reads never resolve to a cached/default mailbox", async () => {
-  await expect(loadSenderSettings(async () => new Response("{}", { status: 403 }), "a")).rejects.toThrow("Could not load sender");
-  await expect(loadSenderSettings(async () => new Response(JSON.stringify({ identities: [], user: { email: "user@example.test" }, accounts: [] })), "a")).rejects.toThrow("unavailable");
+  await expect(loadSenderSettings(async () => new Response("{}", { status: 403 }), "a")).rejects.toThrow(senderMessages.senderLoadFailed);
+  await expect(loadSenderSettings(async () => new Response(JSON.stringify({ identities: [], user: { email: "user@example.test" }, accounts: [] })), "a")).rejects.toThrow(senderMessages.senderUnavailable);
 });
