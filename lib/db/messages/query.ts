@@ -702,6 +702,113 @@ function parseSearchInput(
   };
 }
 
+/**
+ * FTS-driven search candidates.
+ *
+ * The legacy clause repeats one `(accountId, id) IN (SELECT ... MATCH ?)`
+ * subquery per token plus three id `LIKE`s inside every selector/count/group
+ * statement, which makes SQLite scan `messages` and probe the FTS result
+ * (bloom filter) instead of driving from the FTS hits. Resolving the
+ * candidate id set once per top-level list call — FTS `MATCH` first, the
+ * explicit attachment-name and id-substring paths unioned in, then reused by
+ * the selector and every count/group statement as an `id IN (...)` clause —
+ * turns those statements into primary-key lookups on (accountId, id).
+ *
+ * Semantics are the legacy ones by construction: the identical per-token
+ * MATCH strings are reused (one combined MATCH with AND when no attachment
+ * terms can mix in per token), each token is `FTS OR attachment filename`,
+ * tokens are ANDed, and the whole raw query still substring-matches
+ * messageId/threadId/id via the same LIKE patterns. Unselective searches
+ * (candidate set above the cap) keep the legacy inline clause, where a scan
+ * is the cheaper plan anyway. `NOCTUA_DISABLE_FTS_DRIVEN_SEARCH=1` forces the
+ * legacy clause everywhere (kill switch; also used by differential tests).
+ */
+type SearchCandidateResolution =
+  | { kind: "none" }
+  | { kind: "legacy" }
+  | { kind: "ids"; ids: string[] };
+
+const MAX_FTS_DRIVEN_CANDIDATES = 2000;
+
+function resolveSearchCandidateIds(
+  db: any,
+  accountId: string,
+  params: {
+    ftsTokenQueries: string[];
+    rawQuery: string;
+    attachmentFilenameTerms: string[];
+  }
+): SearchCandidateResolution {
+  const ftsTokenQueries = params.ftsTokenQueries;
+  const attachmentFilenameTerms = params.attachmentFilenameTerms;
+  const hasQuery = ftsTokenQueries.length > 0;
+  const idQuery = params.rawQuery.trim();
+  const hasIdQuery = Boolean(idQuery);
+  const hasAttachmentFilenameQuery = attachmentFilenameTerms.length > 0;
+  if (!hasQuery && !hasIdQuery && !hasAttachmentFilenameQuery) return { kind: "none" };
+  if (process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH === "1") return { kind: "legacy" };
+
+  const ftsIdsForMatch = (matchQuery: string) =>
+    (db
+      .prepare(
+        `SELECT messageId FROM ${SHARD_FTS_TABLE} WHERE ${SHARD_FTS_TABLE} MATCH ? AND accountId = ?`
+      )
+      .all(matchQuery, accountId) as Array<{ messageId: string }>).map((row) => row.messageId);
+  const attachmentIdsForTerm = (term: string) =>
+    (db
+      .prepare(
+        `SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ?`
+      )
+      .all(accountId, `%${term}%`) as Array<{ messageId: string }>).map((row) => row.messageId);
+
+  let tokenIntersection: Set<string> | null = null;
+  if (hasQuery || hasAttachmentFilenameQuery) {
+    if (!hasAttachmentFilenameQuery && ftsTokenQueries.length > 1) {
+      // No per-token attachment mixing is possible, so the legacy token AND
+      // is exactly one MATCH over the same scoped token queries.
+      tokenIntersection = new Set(ftsIdsForMatch(ftsTokenQueries.join(" AND ")));
+    } else {
+      const tokenCount = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
+      for (let index = 0; index < tokenCount; index += 1) {
+        const tokenIds = new Set<string>();
+        const ftsTokenQuery = ftsTokenQueries[index];
+        if (ftsTokenQuery) {
+          for (const id of ftsIdsForMatch(ftsTokenQuery)) tokenIds.add(id);
+        }
+        const attachmentTerm = attachmentFilenameTerms[index];
+        if (attachmentTerm) {
+          for (const id of attachmentIdsForTerm(attachmentTerm)) tokenIds.add(id);
+        }
+        if (tokenIds.size === 0 && !ftsTokenQuery && !attachmentTerm) continue;
+        if (tokenIntersection === null) {
+          tokenIntersection = tokenIds;
+        } else {
+          const previous: Set<string> = tokenIntersection;
+          tokenIntersection = new Set([...previous].filter((id: string) => tokenIds.has(id)));
+        }
+        if (tokenIntersection.size === 0) break;
+      }
+    }
+  }
+
+  let candidates: Set<string> | null = tokenIntersection;
+  if (hasIdQuery) {
+    const pattern = `%${idQuery.toLowerCase()}%`;
+    const idRows = db
+      .prepare(
+        `SELECT id FROM messages
+         WHERE accountId = ?
+           AND (lower(messageId) LIKE ? OR lower(threadId) LIKE ? OR lower(id) LIKE ?)`
+      )
+      .all(accountId, pattern, pattern, pattern) as Array<{ id: string }>;
+    candidates = candidates ?? new Set<string>();
+    for (const row of idRows) candidates.add(row.id);
+  }
+  if (!candidates) return { kind: "none" };
+  if (candidates.size > MAX_FTS_DRIVEN_CANDIDATES) return { kind: "legacy" };
+  return { kind: "ids", ids: [...candidates] };
+}
+
 function applySearchQueryFilters(params: {
   where: string;
   args: any[];
@@ -709,6 +816,7 @@ function applySearchQueryFilters(params: {
   rawQuery: string;
   attachmentFilenameTerms: string[];
   messageAlias?: string;
+  candidates?: SearchCandidateResolution;
 }) {
   const messageAlias = params.messageAlias ?? "m";
   const ftsTokenQueries = params.ftsTokenQueries;
@@ -720,6 +828,26 @@ function applySearchQueryFilters(params: {
   if (!hasQuery && !hasIdQuery && !hasAttachmentFilenameQuery) {
     return {
       where: params.where,
+      hasQuery,
+      hasIdQuery,
+      hasAttachmentFilenameQuery
+    };
+  }
+
+  if (params.candidates?.kind === "ids") {
+    const ids = params.candidates.ids;
+    if (ids.length === 0) {
+      return {
+        where: `${params.where} AND (0 = 1)`,
+        hasQuery,
+        hasIdQuery,
+        hasAttachmentFilenameQuery
+      };
+    }
+    const where = `${params.where} AND (${messageAlias}.id IN (${ids.map(() => "?").join(",")}))`;
+    params.args.push(...ids);
+    return {
+      where,
       hasQuery,
       hasIdQuery,
       hasAttachmentFilenameQuery
@@ -1007,6 +1135,7 @@ async function getGroupCounts(params: {
   from?: string[] | null;
   recipients?: string[] | null;
   participants?: string[] | null;
+  searchCandidates?: SearchCandidateResolution;
 }) {
   const {
     accountId,
@@ -1092,7 +1221,10 @@ async function getGroupCounts(params: {
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates:
+      params.searchCandidates ??
+      resolveSearchCandidateIds(db, accountId, { ftsTokenQueries, rawQuery, attachmentFilenameTerms })
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
   where = applyBadgeFilters(where, args, badges, { viewerUserId });
@@ -1237,7 +1369,8 @@ async function getGroupCounts(params: {
         excludedFolderIds,
         from,
         recipients,
-        participants
+        participants,
+        searchCandidates: params.searchCandidates
       })
     }
   ];
@@ -1255,6 +1388,7 @@ async function getTotalCount(params: {
   from?: string[] | null;
   recipients?: string[] | null;
   participants?: string[] | null;
+  searchCandidates?: SearchCandidateResolution;
 }) {
   const db = await getAccountDb(params.accountId);
   const {
@@ -1339,7 +1473,10 @@ async function getTotalCount(params: {
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates:
+      params.searchCandidates ??
+      resolveSearchCandidateIds(db, accountId, { ftsTokenQueries, rawQuery, attachmentFilenameTerms })
   }).where;
   where = applyInviteUidQueryFilters({ where, args, accountId, inviteUidTerms });
   where = applyBadgeFilters(where, args, badges, { viewerUserId });
@@ -1978,12 +2115,18 @@ export async function listMessages(params: {
       where += " AND 0 = 1";
     }
   }
+  const searchCandidates = resolveSearchCandidateIds(db, accountId, {
+    ftsTokenQueries,
+    rawQuery,
+    attachmentFilenameTerms
+  });
   const searchQueryState = applySearchQueryFilters({
     where,
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates: searchCandidates
   });
   where = searchQueryState.where;
   const hasQuery = searchQueryState.hasQuery;
@@ -2167,7 +2310,8 @@ export async function listMessages(params: {
           excludedFolderIds,
           from,
           recipients,
-          participants
+          participants,
+          searchCandidates
         }));
   const total =
     inviteDeckSummary?.total ??
@@ -2182,7 +2326,8 @@ export async function listMessages(params: {
       excludedFolderIds,
       from,
       recipients,
-      participants
+      participants,
+      searchCandidates
     }));
   const hasMore = offset + items.length < total;
   return { items, groups, total, hasMore, baseCount: items.length };
@@ -2290,12 +2435,18 @@ export async function listThreads(params: {
       where += " AND 0 = 1";
     }
   }
+  const searchCandidates = resolveSearchCandidateIds(db, accountId, {
+    ftsTokenQueries,
+    rawQuery,
+    attachmentFilenameTerms
+  });
   const searchQueryState = applySearchQueryFilters({
     where,
     args,
     ftsTokenQueries,
     rawQuery,
-    attachmentFilenameTerms
+    attachmentFilenameTerms,
+    candidates: searchCandidates
   });
   where = searchQueryState.where;
   const hasQuery = searchQueryState.hasQuery;
@@ -2488,7 +2639,8 @@ export async function listThreads(params: {
         excludedFolderIds,
         from,
         recipients,
-        participants
+        participants,
+        searchCandidates
       });
     }
 
@@ -2701,7 +2853,8 @@ export async function listThreads(params: {
             excludedFolderIds,
             from,
             recipients,
-            participants
+            participants,
+            searchCandidates
           })));
 
   const hasMore = offset + threadRows.length < threadTotal;
