@@ -1467,6 +1467,116 @@
         "to": "An",
         "cc": "Cc"
       }
+    },
+    "modes": {
+      "new": "Neue Nachricht",
+      "reply": "Antworten",
+      "replyAll": "Allen antworten",
+      "forward": "Weiterleiten",
+      "edit": "Entwurf bearbeiten",
+      "editAsNew": "Als neu bearbeiten"
+    },
+    "fields": {
+      "to": "An:",
+      "cc": "Cc:",
+      "bcc": "Bcc:",
+      "subject": "Betreff:",
+      "subjectPlaceholder": "Betreff",
+      "loadingSuggestions": "Wird geladen …",
+      "showCcBcc": "Cc/Bcc anzeigen",
+      "hideCcBcc": "Cc/Bcc ausblenden",
+      "showCcBccTitle": "Cc und Bcc anzeigen",
+      "hideCcBccTitle": "Cc und Bcc ausblenden",
+      "clearCcBccToHide": "Leere Cc und Bcc, um die Felder auszublenden",
+      "inReplyTo": "{subject} — {from}",
+      "toPlaceholder": "name@example.com"
+    },
+    "actions": {
+      "discardDraft": "Verwerfen",
+      "saveDraft": "Speichern",
+      "saving": "Speichert …",
+      "cancel": "Abbrechen",
+      "send": "Senden",
+      "sending": "Sendet …",
+      "loadingAttachments": "Lädt Anhänge …",
+      "attachmentsFailedTitle": "Lade die fehlgeschlagenen Anhänge erneut oder entferne sie.",
+      "close": "Schließen"
+    },
+    "draft": {
+      "saving": "Entwurf wird gespeichert …",
+      "saveFailedStatus": "Entwurf nicht gespeichert",
+      "savedAgo": "Entwurf {time} gespeichert",
+      "notSavedYet": "Entwurf noch nicht gespeichert",
+      "idTitle": "Entwurf: {id}",
+      "saveFailed": "Der Entwurf konnte nicht gespeichert werden.",
+      "discardFailed": "Der Entwurf konnte nicht verworfen werden.",
+      "loadComposerFailed": "Das Nachrichtenfenster konnte nicht geladen werden. Versuche es erneut.",
+      "saveFailedNotice": "Der Entwurf konnte nicht gespeichert werden."
+    },
+    "window": {
+      "openInModal": "Im Dialog öffnen",
+      "openInNewWindow": "In neuem Fenster öffnen",
+      "openComposerInNewWindow": "Nachricht in neuem Fenster bearbeiten",
+      "dock": "In der Threadansicht andocken",
+      "minimize": "Nachrichtenfenster minimieren",
+      "restore": "Wiederherstellen",
+      "openFailedTitle": "Neues Fenster konnte nicht geöffnet werden",
+      "openFailedDesktop": "Das Desktop-Fenster konnte nicht erstellt werden. Deine Nachricht bleibt hier geöffnet.",
+      "openFailedPopup": "Erlaube Pop-ups, um die Nachricht in einem neuen Fenster zu öffnen.",
+      "handoffSaveFailed": "Der Entwurf konnte vor dem Öffnen des neuen Fensters nicht gespeichert werden.",
+      "handoffFailed": "Die Nachricht konnte nicht an das neue Fenster übergeben werden.",
+      "closeSaveFailed": "Der Entwurf konnte nicht gespeichert werden. Lass dieses Fenster geöffnet und versuche es erneut.",
+      "opening": "Nachrichtenfenster wird geöffnet …",
+      "openFailed": "Das Nachrichtenfenster konnte nicht geöffnet werden.",
+      "openFailedReason": "Das Nachrichtenfenster konnte nicht geöffnet werden: {reason}",
+      "initFailed": "Das Nachrichtenfenster konnte nicht vorbereitet werden.",
+      "accountUnavailable": "Das Postfach für dieses Nachrichtenfenster ist nicht mehr verfügbar.",
+      "draftNotFound": "Entwurf nicht gefunden.",
+      "errorTitle": "Fehler im Nachrichtenfenster",
+      "operationFailed": "Der Vorgang ist fehlgeschlagen.",
+      "refreshFoldersFailed": "Die Ordner konnten nicht aktualisiert werden.",
+      "requestFailed": "Anfrage fehlgeschlagen ({status}).",
+      "flagUpdateFailed": "Die Nachricht wurde gesendet, aber ihre Markierung als beantwortet oder weitergeleitet konnte nicht aktualisiert werden."
+    },
+    "notices": {
+      "emailSent": "E-Mail gesendet.",
+      "emailSentTitle": "E-Mail gesendet",
+      "emailSentWithWarning": "E-Mail mit Warnung gesendet",
+      "refreshFailed": "E-Mail gesendet, aber das Postfach konnte nicht aktualisiert werden. Aktualisiere das Postfach, um den neuesten Stand zu sehen.",
+      "sendFailed": "Die E-Mail konnte nicht gesendet werden.",
+      "noRecipient": "Füge mindestens einen Empfänger hinzu.",
+      "inviteIncomplete": "Vervollständige vor dem Senden die Angaben zur Termineinladung.",
+      "attachmentsLoading": "Anhänge werden noch geladen. Versuche es gleich noch einmal.",
+      "attachmentsFailed": "Einige Anhänge konnten nicht geladen werden. Lade sie erneut oder entferne sie zuerst.",
+      "draftSent": "Entwurf gesendet.",
+      "draftSentWithWarning": "Entwurf mit Warnung gesendet",
+      "detachedSentTitle": "E-Mail gesendet · {mailbox}",
+      "draftSendFailed": "Der Entwurf konnte nicht gesendet werden."
+    },
+    "warnings": {
+      "sentCopyNotSaved": "E-Mail gesendet, aber die Kopie in „Gesendet“ konnte nicht gespeichert werden. Sende die E-Mail nicht erneut.",
+      "checkSentFolder": "Prüfe den Ordner „Gesendet“. Fehlt die Kopie, wende dich an einen Verwalter des Postfachs. Sende die E-Mail nicht erneut.",
+      "configureSentFolder": "Bitte einen Verwalter des Postfachs, den Ordner „Gesendet“ festzulegen (Verwalter: in den Postfacheinstellungen). Sende die E-Mail nicht erneut.",
+      "deliverySucceeded": "Die Zustellung war erfolgreich. Sende die E-Mail nicht erneut."
+    },
+    "attachments": {
+      "imageFallback": "Bild",
+      "imageCount": "{count, plural, one {# Bild} other {# Bilder}}",
+      "dropMenuLabel": "{label} hinzufügen: in die Nachricht einbetten oder als Datei anhängen",
+      "embed": "In Nachricht einbetten",
+      "attach": "Als Datei anhängen"
+    },
+    "invite": {
+      "badge": "Einladung",
+      "title": "Termineinladung hinzufügen",
+      "create": "Einladung erstellen",
+      "remove": "Einladung entfernen",
+      "subjectHint": "Als Titel des Termins wird der Betreff dieser E-Mail verwendet.",
+      "descriptionHint": "Als Beschreibung des Termins wird die endgültige Nur-Text-Fassung dieser E-Mail verwendet."
+    },
+    "translation": {
+      "noContent": "Es gibt keinen Inhalt zum Übersetzen.",
+      "failed": "Die Übersetzung ist fehlgeschlagen."
     }
   },
   "Errors": {

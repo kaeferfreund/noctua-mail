@@ -3,6 +3,7 @@
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Text } from "@radix-ui/themes";
 import { AccountDateFormatProvider } from "@/app/components/AccountDateFormatContext";
 import InAppNoticeStack, { type InAppNotice } from "@/app/components/mailclient/InAppNoticeStack";
@@ -48,15 +49,21 @@ function getAccountFromValue(account: Account) {
   return name ? `${name} <${account.email}>` : account.email;
 }
 
-function formatRelativeTime(timestamp: number | null) {
-  if (!timestamp) return "";
-  const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+type DetachedLoadErrorKey = "accountUnavailable" | "draftNotFound" | "openFailed" | "initFailed";
+/** Client failures keep a catalog key; server and sender-catalog text stays as is. */
+type DetachedLoadError = { key: DetachedLoadErrorKey } | { text: string };
+
+class DetachedComposeLoadError extends Error {
+  readonly key: DetachedLoadErrorKey;
+  constructor(key: DetachedLoadErrorKey) {
+    super(key);
+    this.key = key;
+  }
+}
+
+function toDetachedLoadError(error: unknown, fallback: DetachedLoadErrorKey): DetachedLoadError {
+  if (error instanceof DetachedComposeLoadError) return { key: error.key };
+  return error instanceof Error && error.message ? { text: error.message } : { key: fallback };
 }
 
 function makeNoticeId() {
@@ -80,8 +87,10 @@ export default function DetachedComposeWindowClient({
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
   const [, setActiveMessageId] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DetachedLoadError>({ key: "openFailed" });
   const { renderMessage } = useSenderMessages();
+  const t = useTranslations("Compose.window");
+  const tn = useTranslations("Notifications");
   const [notices, setNotices] = useState<InAppNotice[]>([]);
   const [composeMirror, setComposeMirror] = useState<ComposeMirror>({
     composeOpen: false,
@@ -122,8 +131,8 @@ export default function DetachedComposeWindowClient({
     const message = body?.message || body?.error || body?.details;
     if (message?.trim()) return message;
     const text = await response.text().catch(() => "");
-    return text.trim() || `Request failed (${response.status}).`;
-  }, []);
+    return text.trim() || t("requestFailed", { status: response.status });
+  }, [t]);
 
   const pushNotice = useCallback((input: {
     type: "info" | "success" | "warning" | "error";
@@ -146,10 +155,10 @@ export default function DetachedComposeWindowClient({
   const reportError = useCallback((message: string) => {
     pushNotice({
       type: "error",
-      title: "Composer error",
-      description: message || "The operation failed."
+      title: t("errorTitle"),
+      description: message || t("operationFailed")
     });
-  }, [pushNotice]);
+  }, [pushNotice, t]);
 
   const refreshFolders = useCallback(async () => {
     try {
@@ -164,10 +173,10 @@ export default function DetachedComposeWindowClient({
       setFolders(nextFolders.filter((folder) => folder.accountId === handoff.accountId));
       return nextFolders;
     } catch {
-      reportError("Failed to refresh folders.");
+      reportError(t("refreshFoldersFailed"));
       return [];
     }
-  }, [apiFetch, handoff.accountId, readErrorMessage, reportError]);
+  }, [apiFetch, handoff.accountId, readErrorMessage, reportError, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,13 +204,13 @@ export default function DetachedComposeWindowClient({
 
         const accounts = (await accountsResponse.json()) as Account[];
         const nextAccount = accounts.find((candidate) => candidate.id === handoff.accountId) ?? null;
-        if (!nextAccount) throw new Error("The account for this composer is no longer available.");
+        if (!nextAccount) throw new DetachedComposeLoadError("accountUnavailable");
         const nextFolders = (await foldersResponse.json()) as Folder[];
         const draftData = draftResponse
           ? ((await draftResponse.json()) as { message?: Message | null })
           : null;
         const nextDraft = draftData?.message ?? null;
-        if (handoff.draftId && !nextDraft) throw new Error("Draft not found.");
+        if (handoff.draftId && !nextDraft) throw new DetachedComposeLoadError("draftNotFound");
         const sourceData = sourceResponse?.ok
           ? ((await sourceResponse.json()) as { message?: Message | null })
           : null;
@@ -223,7 +232,7 @@ export default function DetachedComposeWindowClient({
         setStatus("ready");
       } catch (loadError) {
         if (cancelled) return;
-        setError(loadError instanceof Error ? loadError.message : "Failed to open composer.");
+        setError(toDetachedLoadError(loadError, "openFailed"));
         setStatus("error");
       }
     })();
@@ -238,7 +247,7 @@ export default function DetachedComposeWindowClient({
     void composeHandleRef.current
       .openDetachedCompose(draft, { mode: handoff.mode, sourceMessage, identityId: handoff.identityId, signatureInitialized: handoff.signatureInitialized })
       .catch((openError) => {
-        setError(openError instanceof Error ? openError.message : "Failed to initialize composer.");
+        setError(toDetachedLoadError(openError, "initFailed"));
         setStatus("error");
       });
   }, [account, draft, handoff.mode, handoff.identityId, handoff.signatureInitialized, sourceMessage, status]);
@@ -326,9 +335,9 @@ export default function DetachedComposeWindowClient({
       );
       if (!response.ok) reportError(await readErrorMessage(response));
     } catch {
-      reportError("The message was sent, but its reply or forward flag could not be updated.");
+      reportError(t("flagUpdateFailed"));
     }
-  }, [apiFetch, handoff.accountId, readErrorMessage, reportError]);
+  }, [apiFetch, handoff.accountId, readErrorMessage, reportError, t]);
 
   const syncFolderWithBackgroundRef = useRef(async (
     folderId: string,
@@ -375,6 +384,17 @@ export default function DetachedComposeWindowClient({
     }
   });
 
+  const formatRelativeTime = useCallback((timestamp: number | null) => {
+    if (!timestamp) return "";
+    const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
+    if (seconds < 60) return tn("relativeSeconds", { count: seconds });
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return tn("relativeMinutes", { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return tn("relativeHours", { count: hours });
+    return tn("relativeDays", { count: Math.floor(hours / 24) });
+  }, [tn]);
+
   const messageById = useMemo(
     () => new Map(messages.map((message) => [message.id, message])),
     [messages]
@@ -389,10 +409,10 @@ export default function DetachedComposeWindowClient({
   }, [folders]);
 
   if (status === "error") {
-    return <DetachedComposeState color="red">{renderMessage(error) || "Failed to open composer."}</DetachedComposeState>;
+    return <DetachedComposeState color="red">{"key" in error ? t(error.key) : renderMessage(error.text)}</DetachedComposeState>;
   }
   if (status === "loading" || !account) {
-    return <DetachedComposeState color="gray">Opening composer…</DetachedComposeState>;
+    return <DetachedComposeState color="gray">{t("opening")}</DetachedComposeState>;
   }
 
   return (

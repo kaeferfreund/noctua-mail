@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "bun:test";
 import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
-import { render } from "@/lib/i18n/testRender";
+import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import InAppNoticeStack from "../InAppNoticeStack";
 import { useDetachedSendWarnings } from "./useDetachedSendWarnings";
 import {
@@ -38,13 +38,13 @@ it("retains mailbox A warnings while mailbox B is selected, across later events 
 
 it("a fresh login cannot see another user's receipts, even for a shared accessible mailbox", () => {
   notifyDetachedComposeOutcome("handoff-a", { version: 1, status: "ready", ownerUserId: "previous-user", accountId: "a", mode: "new", draftId: null, sourceMessageId: null, createdAtMs: Date.now(), updatedAtMs: Date.now() }, "sent", null, ["Synthetic previous user warning."]);
-  const hook = renderHook(() => useDetachedSendWarnings([{ id: "a" }, { id: "b" }], "current-user"));
+  const hook = renderHook(() => useDetachedSendWarnings([{ id: "a" }, { id: "b" }], "current-user"), { wrapper: I18nTestProvider });
   expect(hook.result.current.notices).toEqual([]);
 });
 
 it("a fresh login cannot see receipts for an inaccessible mailbox", () => {
   notifyDetachedComposeOutcome("handoff-a", { version: 1, status: "ready", ownerUserId: "current-user", accountId: "a", mode: "new", draftId: null, sourceMessageId: null, createdAtMs: Date.now(), updatedAtMs: Date.now() }, "sent", null, ["Synthetic inaccessible mailbox warning."]);
-  const hook = renderHook(() => useDetachedSendWarnings([{ id: "b" }], "current-user"));
+  const hook = renderHook(() => useDetachedSendWarnings([{ id: "b" }], "current-user"), { wrapper: I18nTestProvider });
   expect(hook.result.current.notices).toEqual([]);
 });
 
@@ -52,6 +52,7 @@ it("clears in-memory receipts on logout/login and access revocation and ignores 
   const handoff = { version: 1 as const, status: "ready" as const, ownerUserId: "previous-user", accountId: "a", mode: "new" as const, draftId: null, sourceMessageId: null, createdAtMs: Date.now(), updatedAtMs: Date.now() };
   notifyDetachedComposeOutcome("previous-handoff", handoff, "sent", null, ["Previous user's synthetic warning."]);
   const hook = renderHook(({ userId, accounts }) => useDetachedSendWarnings(accounts, userId), {
+    wrapper: I18nTestProvider,
     initialProps: { userId: "previous-user" as string | null, accounts: [{ id: "a" }] },
   });
   expect(hook.result.current.notices).toHaveLength(1);
@@ -75,7 +76,7 @@ it("clears in-memory receipts on logout/login and access revocation and ignores 
 
 it("ignores legacy receipts with no authenticated owner", () => {
   window.localStorage.setItem("noctua:detached-compose-warning:legacy", JSON.stringify({ version: 1, eventId: "legacy", handoffId: "legacy-handoff", accountId: "a", outcome: "sent", mode: "new", draftId: null, sourceMessageId: null, createdAtMs: Date.now(), warnings: ["Legacy synthetic warning."] }));
-  const hook = renderHook(() => useDetachedSendWarnings([{ id: "a" }], "current-user"));
+  const hook = renderHook(() => useDetachedSendWarnings([{ id: "a" }], "current-user"), { wrapper: I18nTestProvider });
   expect(hook.result.current.notices).toEqual([]);
 });
 

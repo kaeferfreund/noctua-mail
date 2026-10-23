@@ -1,6 +1,7 @@
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { senderOption } from "@/lib/senderMessages";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { Button, Select, Text, TextField } from "@radix-ui/themes";
 import type { Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
@@ -89,6 +90,7 @@ function RecipientField({
   onToggle
 }: RecipientFieldProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const t = useTranslations("Compose.fields");
 
   return (
     <div className={styles.composeGridRow}>
@@ -168,7 +170,7 @@ function RecipientField({
               ))}
               {recipientLoading && (
                 <span className={`${styles.composeSuggestion} ${styles.composeSuggestionMuted}`}>
-                  Loading…
+                  {t("loadingSuggestions")}
                 </span>
               )}
             </div>
@@ -215,6 +217,7 @@ export default function ComposeFields({
   markComposeDirty
 }: ComposeFieldsProps) {
   const { messages: senderMessages } = useSenderMessages();
+  const t = useTranslations();
   const [recipientOptions, setRecipientOptions] = useState<RecipientSuggestion[]>([]);
   const [recipientQuery, setRecipientQuery] = useState("");
   const [recipientLoading, setRecipientLoading] = useState(false);
@@ -285,23 +288,23 @@ export default function ComposeFields({
     composeBcc.trim().length > 0;
   const showCcBccFields = composeShowBcc || hasCcOrBccValue;
   const canHideCcBcc = !hasCcOrBccValue;
-  const toggleLabel = showCcBccFields ? "Hide Cc/Bcc" : "Show Cc and Bcc";
+  const toggleLabel = t(showCcBccFields ? "Compose.fields.hideCcBcc" : "Compose.fields.showCcBcc");
   const toggleTitle = showCcBccFields
     ? canHideCcBcc
-      ? "Hide Cc and Bcc"
-      : "Clear Cc/Bcc to hide fields"
-    : "Show Cc and Bcc";
+      ? t("Compose.fields.hideCcBccTitle")
+      : t("Compose.fields.clearCcBccToHide")
+    : t("Compose.fields.showCcBccTitle");
   const inReplyToRow = inReplyToMessage ? (
     <InReplyToReferenceRow
       variant="compose"
-      value={`${inReplyToMessage.subject || "(no subject)"} — ${inReplyToMessage.from}`}
+      value={t("Compose.fields.inReplyTo", { subject: inReplyToMessage.subject || t("Reader.noSubject"), from: inReplyToMessage.from })}
       onClick={onJumpToMessage ? () => onJumpToMessage(inReplyToMessage.id) : undefined}
     />
   ) : null;
   const subjectRow = (
     <div className={styles.composeGridRow}>
       <Text as="label" htmlFor={`compose-${variant}-subject`} size="2" weight="medium" className={styles.label}>
-        Subject:
+        {t("Compose.fields.subject")}
       </Text>
       <TextField.Root
         id={`compose-${variant}-subject`}
@@ -311,7 +314,7 @@ export default function ComposeFields({
         onChange={(event) => {
           commitSubject(event.target.value);
         }}
-        placeholder="Subject"
+        placeholder={t("Compose.fields.subjectPlaceholder")}
       />
     </div>
   );
@@ -340,10 +343,10 @@ export default function ComposeFields({
       {fromRow}
       <RecipientField
         variant={variant}
-        label="To:"
+        label={t("Compose.fields.to")}
         focusKey="to"
         value={composeTo}
-        placeholder="recipient@example.com"
+        placeholder={t("Compose.fields.toPlaceholder")}
         recipientOptions={recipientOptions}
         recipientActiveIndex={recipientActiveIndex}
         recipientLoading={recipientLoading}
@@ -371,7 +374,7 @@ export default function ComposeFields({
       {showCcBccFields && (
         <RecipientField
           variant={variant}
-          label="Cc:"
+          label={t("Compose.fields.cc")}
           focusKey="cc"
           value={composeCc}
           placeholder="cc@example.com"
@@ -392,7 +395,7 @@ export default function ComposeFields({
       {showCcBccFields && (
         <RecipientField
           variant={variant}
-          label="Bcc:"
+          label={t("Compose.fields.bcc")}
           focusKey="bcc"
           value={composeBcc}
           placeholder="bcc@example.com"

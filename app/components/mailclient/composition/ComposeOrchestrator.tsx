@@ -1,6 +1,7 @@
 "use client";
 
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { useLocale, useTranslations } from "next-intl";
 import { senderMessages, isSenderMessageId } from "@/lib/senderMessages";
 
 import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
@@ -66,8 +67,8 @@ import { useDraftManager } from "./useDraftManager";
 import type { ComposeMode } from "./composeTypes";
 
 const ATTACHMENT_LOAD_BLOCK_MESSAGE = {
-  loading: "Attachments are still loading. Try again in a moment.",
-  error: "Some attachments could not be loaded. Retry or remove them first."
+  loading: "notices.attachmentsLoading",
+  error: "notices.attachmentsFailed"
 } as const;
 
 type Signature = {
@@ -327,6 +328,8 @@ function ComposeOrchestratorImpl(
   const [senderLoading, setSenderLoading] = useState(true);
   const [retrySender, setRetrySender] = useState<(() => void) | null>(null);
   const { messages: senderCopy, renderMessage } = useSenderMessages();
+  const t = useTranslations("Compose");
+  const locale = useLocale();
   const [senderError, setSenderError] = useState<string | null>(null);
   const signatureConfigKey = JSON.stringify([accountSignatures, defaultSignatureId]);
   const composeState = useComposeState();
@@ -794,7 +797,7 @@ function ComposeOrchestratorImpl(
       discardingDraftRequestRef.current
     ) return;
     if (attachmentLoadState) {
-      reportError(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]);
+      reportError(t(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]));
       return;
     }
     detachingComposeRef.current = true;
@@ -827,10 +830,10 @@ function ComposeOrchestratorImpl(
         removeDetachedComposeHandoff(handoffId);
         pushNotice({
           type: "warning",
-          title: "Could not open composer window",
+          title: t("window.openFailedTitle"),
           description: openResult.error
-            ? "The desktop window could not be created. Your message remains open here."
-            : "Allow pop-ups to open the composer in a new window."
+            ? t("window.openFailedDesktop")
+            : t("window.openFailedPopup")
         });
         return;
       }
@@ -841,7 +844,7 @@ function ComposeOrchestratorImpl(
           ...baseHandoff,
           status: "error",
           draftId: handoff.draftId,
-          message: "The draft could not be saved before opening the new window.",
+          message: t("window.handoffSaveFailed"),
           updatedAtMs: Date.now()
         });
         return;
@@ -857,7 +860,7 @@ function ComposeOrchestratorImpl(
       setComposeView("inline");
     } catch (error) {
       removeDetachedComposeHandoff(handoffId);
-      reportError("The composer handoff could not be created.");
+      reportError(t("window.handoffFailed"));
       if (error instanceof Error) {
         console.error("[noctua] detached composer handoff failed:", error);
       }
@@ -881,7 +884,8 @@ function ComposeOrchestratorImpl(
     saveDraftForHandoff,
     sendingMailRef,
     setComposeOpen,
-    setComposeView
+    setComposeView,
+    t
   ]);
 
   const closeDetachedCompose = useCallback(async () => {
@@ -892,7 +896,7 @@ function ComposeOrchestratorImpl(
       discardingDraftRequestRef.current
     ) return;
     if (attachmentLoadState) {
-      reportError(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]);
+      reportError(t(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]));
       return;
     }
     closingDetachedComposeRef.current = true;
@@ -900,7 +904,7 @@ function ComposeOrchestratorImpl(
     try {
       const saved = await saveDraftForHandoff();
       if (!saved.saved || (saved.hasContent && !saved.draftId)) {
-        reportError("The draft could not be saved. Keep this window open and try again.");
+        reportError(t("window.closeSaveFailed"));
         closingDetachedComposeRef.current = false;
         setDetachingCompose(false);
         return;
@@ -911,7 +915,7 @@ function ComposeOrchestratorImpl(
     } catch {
       closingDetachedComposeRef.current = false;
       setDetachingCompose(false);
-      reportError("The draft could not be saved. Keep this window open and try again.");
+      reportError(t("window.closeSaveFailed"));
     }
   }, [
     attachmentLoadState,
@@ -920,7 +924,8 @@ function ComposeOrchestratorImpl(
     onDetachedComposeOutcome,
     reportError,
     saveDraftForHandoff,
-    sendingMailRef
+    sendingMailRef,
+    t
   ]);
 
   const resetAfterSend = useCallback(() => {
@@ -955,18 +960,18 @@ function ComposeOrchestratorImpl(
     }
     setSenderError(null);
     if (attachmentLoadState) {
-      reportError(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]);
+      reportError(t(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]));
       return;
     }
     const composeInviteDraft = currentComposeInviteDraft;
     if (!composeTo.trim() && !composeCc.trim() && !composeBcc.trim()) {
-      reportError("Please add at least one recipient.");
+      reportError(t("notices.noRecipient"));
       return;
     }
     const invitePayload =
       composeIncludeInvite ? buildComposeInvitePayload(composeInviteDraft) : undefined;
     if (composeIncludeInvite && !invitePayload) {
-      reportError("Please complete the event invitation details before sending.");
+      reportError(t("notices.inviteIncomplete"));
       return;
     }
     sendingMailRef.current = true;
@@ -1034,11 +1039,11 @@ function ComposeOrchestratorImpl(
           | null;
         delivered = true;
         if (isSendSession()) { deliveredRef.current = true; if (sendResult?.identityId) compose.setComposeIdentityId(sendResult.identityId); }
-        acceptedWarnings = getSendWarnings(sendResult);
+        acceptedWarnings = getSendWarnings(sendResult, locale);
         if (sendResult?.inviteWarning) acceptedWarnings.push(sendResult.inviteWarning);
         if (isSendSession()) setDeliveredWarnings(acceptedWarnings);
-        pushNotice({ type: "success", title: "Email sent.", description: composeSubject.trim().slice(0, 180) || undefined });
-        acceptedWarnings.forEach(description => pushNotice({ type: "warning", title: "Email sent with a warning", description }));
+        pushNotice({ type: "success", title: t("notices.emailSent"), description: composeSubject.trim().slice(0, 180) || undefined });
+        acceptedWarnings.forEach(description => pushNotice({ type: "warning", title: t("notices.emailSentWithWarning"), description }));
         if (composeReplyMessage) {
           const threadId =
             composeReplyMessage.threadId ??
@@ -1118,17 +1123,17 @@ function ComposeOrchestratorImpl(
       }
     } catch (error) {
       if (delivered) {
-        const warning = "Email sent, but mailbox refresh failed. Refresh the mailbox to see the latest state.";
+        const warning = t("notices.refreshFailed");
         acceptedWarnings.push(warning);
         if (isSendSession()) {
           setDeliveredWarnings([...acceptedWarnings]);
           if (!detachedWindow) { setComposeView(composeView); setComposeOpen(true); }
         }
-        pushNotice({ type: "warning", title: "Email sent", description: warning });
+        pushNotice({ type: "warning", title: t("notices.emailSentTitle"), description: warning });
       } else reportError(
         error instanceof Error && error.message.trim()
           ? error.message
-          : "Failed to send email."
+          : t("notices.sendFailed")
       );
     } finally {
       // An account reset can release A and let B claim this shared flag.
@@ -1313,8 +1318,8 @@ function ComposeOrchestratorImpl(
         error instanceof Error && isSenderMessageId(error.message)
           ? renderMessage(error.message)
           : error instanceof Error && error.message.trim()
-            ? `Failed to open composer: ${error.message}`
-            : "Failed to open composer."
+            ? t("window.openFailedReason", { reason: error.message })
+            : t("window.openFailed")
       );
     }
   };

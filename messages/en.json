@@ -1467,6 +1467,116 @@
         "to": "To",
         "cc": "Cc"
       }
+    },
+    "modes": {
+      "new": "New message",
+      "reply": "Reply",
+      "replyAll": "Reply all",
+      "forward": "Forward",
+      "edit": "Edit draft",
+      "editAsNew": "Edit as New"
+    },
+    "fields": {
+      "to": "To:",
+      "cc": "Cc:",
+      "bcc": "Bcc:",
+      "subject": "Subject:",
+      "subjectPlaceholder": "Subject",
+      "loadingSuggestions": "Loading…",
+      "showCcBcc": "Show Cc and Bcc",
+      "hideCcBcc": "Hide Cc/Bcc",
+      "showCcBccTitle": "Show Cc and Bcc",
+      "hideCcBccTitle": "Hide Cc and Bcc",
+      "clearCcBccToHide": "Clear Cc/Bcc to hide fields",
+      "inReplyTo": "{subject} — {from}",
+      "toPlaceholder": "recipient@example.com"
+    },
+    "actions": {
+      "discardDraft": "Discard Draft",
+      "saveDraft": "Save draft",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "send": "Send",
+      "sending": "Sending...",
+      "loadingAttachments": "Loading attachments…",
+      "attachmentsFailedTitle": "Retry or remove the attachments that failed to load",
+      "close": "Close"
+    },
+    "draft": {
+      "saving": "Saving draft…",
+      "saveFailedStatus": "Draft save failed",
+      "savedAgo": "Draft saved {time}",
+      "notSavedYet": "Draft not saved yet",
+      "idTitle": "Draft: {id}",
+      "saveFailed": "Draft save failed.",
+      "discardFailed": "Failed to discard draft.",
+      "loadComposerFailed": "Failed to load composer. Please retry.",
+      "saveFailedNotice": "Failed to save draft."
+    },
+    "window": {
+      "openInModal": "Open in modal",
+      "openInNewWindow": "Open in new window",
+      "openComposerInNewWindow": "Open composer in new window",
+      "dock": "Dock in thread view",
+      "minimize": "Minimize composer",
+      "restore": "Restore",
+      "openFailedTitle": "Could not open composer window",
+      "openFailedDesktop": "The desktop window could not be created. Your message remains open here.",
+      "openFailedPopup": "Allow pop-ups to open the composer in a new window.",
+      "handoffSaveFailed": "The draft could not be saved before opening the new window.",
+      "handoffFailed": "The composer handoff could not be created.",
+      "closeSaveFailed": "The draft could not be saved. Keep this window open and try again.",
+      "opening": "Opening composer…",
+      "openFailed": "Failed to open composer.",
+      "openFailedReason": "Failed to open composer: {reason}",
+      "initFailed": "Failed to initialize composer.",
+      "accountUnavailable": "The account for this composer is no longer available.",
+      "draftNotFound": "Draft not found.",
+      "errorTitle": "Composer error",
+      "operationFailed": "The operation failed.",
+      "refreshFoldersFailed": "Failed to refresh folders.",
+      "requestFailed": "Request failed ({status}).",
+      "flagUpdateFailed": "The message was sent, but its reply or forward flag could not be updated."
+    },
+    "notices": {
+      "emailSent": "Email sent.",
+      "emailSentTitle": "Email sent",
+      "emailSentWithWarning": "Email sent with a warning",
+      "refreshFailed": "Email sent, but mailbox refresh failed. Refresh the mailbox to see the latest state.",
+      "sendFailed": "Failed to send email.",
+      "noRecipient": "Please add at least one recipient.",
+      "inviteIncomplete": "Please complete the event invitation details before sending.",
+      "attachmentsLoading": "Attachments are still loading. Try again in a moment.",
+      "attachmentsFailed": "Some attachments could not be loaded. Retry or remove them first.",
+      "draftSent": "Draft sent.",
+      "draftSentWithWarning": "Draft sent with a warning",
+      "detachedSentTitle": "Email sent · {mailbox}",
+      "draftSendFailed": "Failed to send draft."
+    },
+    "warnings": {
+      "sentCopyNotSaved": "Email sent, but the Sent copy could not be saved. Do not send it again.",
+      "checkSentFolder": "Check the Sent folder. If the copy is missing, contact a mailbox manager. Do not send it again.",
+      "configureSentFolder": "Ask a mailbox manager to configure the Sent folder (managers: configure it in mailbox settings). Do not send it again.",
+      "deliverySucceeded": "Delivery succeeded. Do not send it again."
+    },
+    "attachments": {
+      "imageFallback": "image",
+      "imageCount": "{count, plural, one {# image} other {# images}}",
+      "dropMenuLabel": "Add {label}: embed in the message or attach as a file",
+      "embed": "Embed in message",
+      "attach": "Attach as file"
+    },
+    "invite": {
+      "badge": "Invite",
+      "title": "Add event invitation",
+      "create": "Create invite",
+      "remove": "Remove invite",
+      "subjectHint": "The event title will use this email's subject.",
+      "descriptionHint": "The event description will use the final plain-text version of this email."
+    },
+    "translation": {
+      "noContent": "There is no content to translate.",
+      "failed": "Translation failed."
     }
   },
   "Errors": {

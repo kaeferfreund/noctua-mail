@@ -395,6 +395,7 @@ export default function MailClient({
   const ts = useTranslations("Search");
   const tl = useTranslations("List");
   const locale = useLocale();
+  const tcompose = useTranslations("Compose");
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -2560,7 +2561,7 @@ export default function MailClient({
         });
         if (!res.ok) {
           const errMsg = await readErrorMessage(res);
-          reportError(errMsg || "Failed to discard draft.");
+          reportError(errMsg || tcompose("draft.discardFailed"));
           return;
         }
         suppressDraftDeleteReconcile(draftId);
@@ -2578,7 +2579,7 @@ export default function MailClient({
           });
         }
       } catch (err) {
-        reportError((err as Error)?.message || "Failed to discard draft.");
+        reportError((err as Error)?.message || tcompose("draft.discardFailed"));
       } finally {
         setPendingMessageActions((prev) => {
           if (!prev.has(draftId)) return prev;
@@ -2598,7 +2599,8 @@ export default function MailClient({
       reportError,
       setPendingMessageActions,
       suppressDraftDeleteReconcile,
-      tn
+      tn,
+      tcompose
     ]
   );
 
@@ -3202,14 +3204,14 @@ export default function MailClient({
         });
         if (!res.ok) {
           const errMsg = await readErrorMessage(res);
-          reportError(errMsg || "Failed to send draft.");
+          reportError(errMsg || tcompose("notices.draftSendFailed"));
           return;
         }
         const sendResult = (await res.json().catch(() => null)) as
           | (SendOutcome & { sentFolderId?: string | null; sentMessageUid?: number | null; messageId?: string | null })
           | null;
 
-        const presentation = presentDraftSendOutcome(sendResult, message.subject ?? "", pushNotice);
+        const presentation = presentDraftSendOutcome(sendResult, message.subject ?? "", pushNotice, locale);
 
         // Don't let the deletion-reconciler fire a misleading "draft gone on
         // server" tombstone notice for the row we're about to repurpose.
@@ -3276,7 +3278,7 @@ export default function MailClient({
           });
         }
       } catch (err) {
-        reportError((err as Error)?.message || "Failed to send draft.");
+        reportError((err as Error)?.message || tcompose("notices.draftSendFailed"));
       } finally {
         setPendingMessageActions((prev) => {
           if (!prev.has(draftId)) return prev;
@@ -3303,7 +3305,9 @@ export default function MailClient({
       suppressDraftDeleteReconcile,
       updateThreadCacheWithMessage,
       viewMessage?.id,
-      tn
+      tn,
+      tcompose,
+      locale
     ]
   );
 

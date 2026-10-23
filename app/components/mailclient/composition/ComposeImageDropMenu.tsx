@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, Text } from "@radix-ui/themes";
 import { ImageIcon, Paperclip } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { PendingImageDrop } from "./composeTypes";
 import styles from "./ComposeImageDropMenu.module.css";
 
@@ -23,6 +24,7 @@ export default function ComposeImageDropMenu({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const embedButtonRef = useRef<HTMLButtonElement | null>(null);
   const [position, setPosition] = useState({ top: drop.y, left: drop.x });
+  const t = useTranslations("Compose.attachments");
 
   // Move focus into the dialog on open so keyboard/screen-reader users land on
   // the prompt instead of the content behind the backdrop.
@@ -69,7 +71,8 @@ export default function ComposeImageDropMenu({
   }, [onCancel]);
 
   const count = drop.files.length;
-  const label = count === 1 ? drop.files[0]?.name || "image" : `${count} images`;
+  // File names are user content; only the fallback and count are app copy.
+  const label = count === 1 ? drop.files[0]?.name || t("imageFallback") : t("imageCount", { count });
 
   if (typeof document === "undefined") return null;
   // Portal out of the compose modal so the fixed-positioned popover escapes its
@@ -86,7 +89,7 @@ export default function ComposeImageDropMenu({
         style={{ top: position.top, left: position.left }}
         role="dialog"
         aria-modal="true"
-        aria-label={`Add ${label}: embed in the message or attach as a file`}
+        aria-label={t("dropMenuLabel", { label })}
         onClick={(event) => event.stopPropagation()}
       >
         <Text size="1" color="gray" className={styles.caption} truncate>
@@ -94,11 +97,11 @@ export default function ComposeImageDropMenu({
         </Text>
         <Button ref={embedButtonRef} type="button" size="2" variant="soft" color="gray" onClick={onEmbed}>
           <ImageIcon size={14} />
-          Embed in message
+          {t("embed")}
         </Button>
         <Button type="button" size="2" variant="soft" color="gray" onClick={onAttach}>
           <Paperclip size={14} />
-          Attach as file
+          {t("attach")}
         </Button>
       </div>
     </div>,
