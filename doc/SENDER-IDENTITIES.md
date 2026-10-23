@@ -332,6 +332,36 @@ APPEND; send check before the raw transport plus the same check passed to transp
 for its final boundary. No ingestion/serialization edits; `completeSend.ts` remains
 unchanged.
 
+### Round-3 authorization boundary
+
+`authorizeOutbound` prepares a live actor; its resolved promise is not permission
+to perform a later effect. Each SMTP path passes a synchronous `assertCurrent`
+callback to the transport. After all MIME/module preparation, the callback and
+`transport.sendMail` run in one synchronous continuation, with no intervening
+`await`. Draft APPEND repeats the assertion after asynchronous pool acquisition,
+in the callback that immediately invokes `client.append`; replacement cleanup
+likewise asserts immediately before the IMAP delete command.
+
+Draft rows (including replacement attachment/FTS cleanup and MCP's AI flag) and
+local-only RSVP participation consume authorization inside their immediate shard
+write transaction. `prepareOutboundWrite` holds a master `BEGIN IMMEDIATE` lock
+through that synchronous write, preventing another process from committing a
+membership, session, user or identity revocation between check and write. Draft
+DB retries prepare authorization again. APPEND precedes local replacement so a
+denied APPEND preserves the old draft; a later denied local write also preserves
+the existing local row. Series RSVP and occurrence-override cleanup share a
+transaction. Successful SMTP acceptance still owns Sent, attribution, RSVP
+persistence and draft-send cleanup independently of later revocation.
+
+`lib/outboundAuthorization.routes.test.ts` runs isolated fixtures that queue
+membership removal, user disablement, viewer downgrade and identity disablement
+immediately after an assertion. Already queued revocations deny without SMTP,
+APPEND, cleanup or local DB writes. Transport spies prove SMTP/APPEND initiation
+precedes a revocation queued by the final synchronous assertion. Transaction
+probes prove draft/RSVP writes hold both writer transactions, run before the
+queued revocation, and reject revocation between async authorization and the
+transaction. MCP stores its AI flag in the same guarded creation transaction.
+
 ### Round-2 verification (2026-10-23)
 
 Bun 1.4.4; heavy gates ran sequentially with `nice -n 15`, worktree-local

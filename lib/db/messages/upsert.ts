@@ -1,4 +1,6 @@
 import { parseAddressEmails } from "../../ownAddresses";
+import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
+import { prepareOutboundWrite } from "../../outboundWrite";
 /**
  * The single write path that takes a batch of parsed RFC 5322 messages
  * and installs them into the local SQLite store. The function is large
@@ -94,7 +96,7 @@ export async function upsertMessages(
   folderId: string | null,
   nextMessages: Message[],
   replaceExisting = false,
-  options: { recomputeThreads?: boolean } = {}
+  options: { recomputeThreads?: boolean; beforeWrite?: OutboundWriteAuthorization; replaceDraftId?: string } = {}
 ) {
   return withDbWriteRetry("upsertMessages", async () => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
@@ -691,8 +693,22 @@ export async function upsertMessages(
 
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
-    const collabChanges = db.transaction(() => {
+    const authorizedWrite = await prepareOutboundWrite(options.beforeWrite);
+    const collabChanges = authorizedWrite(assertCurrent => db.transaction(() => {
+      assertCurrent();
       captureIdentitySnapshots();
+      if (options.replaceDraftId) {
+        const previous = findMessageById.get(accountId, options.replaceDraftId) as ReplacedRow | undefined;
+        if (previous) {
+          replacedById.set(previous.id, previous);
+          if (previous.messageId) replacedByHeader.set(previous.messageId, previous);
+          if (previous.threadId) dedupedThreadIds.add(previous.threadId);
+          deleteAttachmentsForMessage.run(accountId, previous.id);
+          deleteCalendarEventsForMessage.run(accountId, previous.id);
+          deleteFts.run(accountId, previous.id);
+          deleteMessageById.run(accountId, previous.id);
+        }
+      }
       if (replaceExisting) {
         // Capture identities under the same writer lock as delete + remap.
         const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
@@ -711,7 +727,7 @@ export async function upsertMessages(
         upsertBatch(nextMessages.slice(start, start + UPSERT_BATCH_SIZE), !replaceExisting);
       }
       return remapThreadCollab(db, accountId, remaps);
-    }).immediate();
+    }).immediate());
     for (const event of collabChanges) publishThreadCollabEvent(event);
 
     let affectedThreadIds: string[] = [];

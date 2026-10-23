@@ -1,4 +1,4 @@
-import { authorizeOutbound, type OutboundAuthorization } from "./outboundAuthorization";
+import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentities";
 import { resolveSendIdentity, IDENTITY_HEADER } from "./sendIdentity";
 import { validateDraftIdentity } from "./draftIdentity";
@@ -30,7 +30,7 @@ import {
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
 import { appendImapMessage, deleteImapMessage, syncImapMessage } from "./serverImap";
 import { buildRawMessage, sendRawSmtpMessage } from "./serverSmtp";
-import { hasMessageFlag } from "@/lib/messageFlags";
+import { appendMessageFlags, hasMessageFlag } from "@/lib/messageFlags";
 import {
   injectUndisclosedRecipientsToHeader,
   stripBccHeader,
@@ -371,6 +371,7 @@ export async function saveDraftForAccount(params: {
   accountId: string;
   clientId: string;
   payload: SaveDraftInput;
+  localFlags?: string[];
   actor?: CollabActor;
   authorization?: OutboundAuthorization;
 }): Promise<SaveDraftResult> {
@@ -423,22 +424,16 @@ export async function saveDraftForAccount(params: {
     ...(attachments.length > 0 ? { attachments } : {})
   }, identity);
 
-  if (params.authorization) await authorizeOutbound(params.authorization, { accountId, minRole: "editor", identity });
-
-  if (payload.draftId) {
-    if (existingDraft?.imapUid && existingDraft.mailboxPath) {
-      await deleteImapMessage(account, existingDraft.mailboxPath, existingDraft.imapUid, clientId);
-    }
-    if (existingDraft) {
-      await deleteMessageById(accountId, existingDraft.id);
-    }
-  }
-
-  const uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId);
+  const beforeWrite = params.authorization ? () => authorizeOutbound(params.authorization!, { accountId, minRole: "editor", identity }) : undefined;
+  const authorization = await beforeWrite?.();
+  const assertCurrent = authorization ? await prepareOutboundAssertion(authorization) : () => {};
+  assertCurrent();
+  const uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
   if (!uid) {
     throw new DraftSaveError(502, "Failed to save draft to IMAP server");
   }
 
+  assertCurrent();
   let draftId: string | null = null;
   let savedMessage: Message | null = null;
   const localMessage = await messageFromAppendedDraft({
@@ -461,9 +456,16 @@ export async function saveDraftForAccount(params: {
       sanitized.quotedHtmlEdited = payload.quotedHtmlEdited;
     }
     sanitized.draftInvite = payload.invite ?? null;
-    await upsertMessages(account.id, null, [sanitized], false);
+    if (params.localFlags) sanitized.flags = appendMessageFlags(sanitized.flags, params.localFlags);
+    // Replacement and its attachment/FTS bookkeeping share the guarded writer.
+    await upsertMessages(account.id, null, [sanitized], false, { beforeWrite, replaceDraftId: existingDraft?.id });
     draftId = sanitized.id;
     savedMessage = sanitized;
+  }
+
+  if (existingDraft?.imapUid && existingDraft.mailboxPath) {
+    assertCurrent();
+    await deleteImapMessage(account, existingDraft.mailboxPath, existingDraft.imapUid, clientId, assertCurrent);
   }
 
   return { draftId, message: savedMessage, identityId: identity.id };
@@ -566,8 +568,9 @@ export async function sendDraftForAccount(params: {
   const sentSource = injectUndisclosedRecipientsToHeader(stripIdentityHeader(rawSource));
   const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
-  const beforeSend = params.authorization ? () => authorizeOutbound(params.authorization!, { accountId, minRole: "editor", identity }) : undefined;
-  await beforeSend?.();
+  const authorization = params.authorization ? await authorizeOutbound(params.authorization, { accountId, minRole: "editor", identity }) : undefined;
+  const beforeSend = authorization ? await prepareOutboundAssertion(authorization) : undefined;
+  beforeSend?.();
   await sendRawSmtpMessage(account, wireSource, {
     from: identity.email,
     to: envelopeRecipients
