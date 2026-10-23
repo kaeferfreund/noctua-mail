@@ -84,13 +84,13 @@ test("SSR and initial hydration agree across the clock boundary; StrictMode clea
 test("scheduling resolves the occurrence from the click time between clock ticks", async () => {
   const time = clock(start - 1000);
   let scheduled: { nextEventStartAtMs: number; triggerAtMs: number }[] = [];
-  spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+  spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (_url: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === "POST") {
       const key = Object.keys(window.localStorage).find(key => key.startsWith("noctua:calendar-reminder-cache"))!;
       scheduled = JSON.parse(window.localStorage.getItem(key)!);
     }
     return Response.json({ items: [] });
-  });
+  }, { preconnect: globalThis.fetch.preconnect }));
   const notices: string[] = [];
   function Button() {
     const reminder = useEventReminderState({ ...input, accountId: "synthetic-reminder-clock", recurrenceRule: "FREQ=DAILY;COUNT=2", onNotice: notice => { notices.push(notice); } });

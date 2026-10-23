@@ -7,7 +7,7 @@ afterEach(() => { cleanup(); mock.restore(); });
 const conflict = (id: string): CalendarEventConflictItem => ({ eventId: id, eventUid: `${id}@example.test`, summary: "Synthetic conflict", timeZone: null, allDay: false, localChangedAtMs: null, remoteChangedAtMs: null, localDiff: null, remoteDiff: null });
 function requests() {
   const pending: { url: string; resolve: (response: Response) => void; reject: (error: Error) => void }[] = [];
-  spyOn(globalThis, "fetch").mockImplementation(url => new Promise<Response>((resolve, reject) => { pending.push({ url: String(url), resolve, reject }); }));
+  spyOn(globalThis, "fetch").mockImplementation(Object.assign((url: RequestInfo | URL) => new Promise<Response>((resolve, reject) => { pending.push({ url: String(url), resolve, reject }); }), { preconnect: globalThis.fetch.preconnect }));
   const respond = async (index: number, id: string) => { await act(async () => { pending[index].resolve(Response.json({ ok: true, conflicts: [conflict(id)] })); }); };
   return { pending, respond };
 }
