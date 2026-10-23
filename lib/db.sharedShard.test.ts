@@ -1,3 +1,4 @@
+import { validateFtsIdentity } from "./db/ftsIdentity";
 import { describe, expect, test } from "bun:test";
 import { createSharedShardFixture } from "./testSharedShardHarness";
 import { buildImapMessageRowId } from "./messageIds";
@@ -31,6 +32,8 @@ describe("shared shard account identities", () => {
     await expect(a.api.upsertMessages(a.accountId, null, [b.message(thread)], true)).rejects.toThrow("Message accountId must match");
     expect((await a.api.getMessageById(a.accountId, id))?.subject).toBe("A subject");
     expect(db.prepare("SELECT accountId FROM threads WHERE threadId = ?").all(thread)).toHaveLength(2);
+    expect(db.prepare("SELECT ftsRowid FROM message_fts_identity WHERE messageId=?").all(id)).toHaveLength(2);
+    validateFtsIdentity(db);
     expect((await getMailboxSummaries([a.accountId, b.accountId])).map(s => s.unreadInbox)).toEqual([1, 0]);
   });
 
@@ -68,7 +71,7 @@ describe("shared shard account identities", () => {
 
   for (const operation of ["replace-folder", "replace-account", "delete-one", "delete-batch", "delete-prefix"] as const) {
     test(`${operation} preserves the other account's messages and dependents`, async () => {
-      const { a, b } = await createSharedShardFixture();
+      const { a, b, db } = await createSharedShardFixture();
       const af = `${a.accountId}:INBOX`, bf = `${b.accountId}:INBOX`;
       await a.seed(a.message(thread, { id, messageId: header, folderId: af, body: "syntheticretainedword", attachments: [attachment("A.pdf")], calendarEventUids: ["same-event"] }));
       await b.seed(b.message(thread, { id, messageId: header, folderId: bf, attachments: [attachment("B.pdf")], calendarEventUids: ["same-event"] }));
@@ -78,6 +81,7 @@ describe("shared shard account identities", () => {
       else if (operation === "delete-batch") await b.api.deleteMessagesByIds(b.accountId, [id]);
       else await b.api.deleteMessagesByFolderPrefix(b.accountId, "INBOX");
       expect(await b.api.getMessageById(b.accountId, id)).toBeNull();
+      validateFtsIdentity(db);
       expect((await a.api.getMessageById(a.accountId, id))?.attachments?.[0]?.filename).toBe("A.pdf");
       expect((await a.api.getCachedTranslation(a.accountId, id, "de", "text", "m"))?.translatedText).toBe("A translation");
       expect((await a.api.listMessages({ accountId: a.accountId, page: 1, pageSize: 30, query: "syntheticretainedword" })).items).toHaveLength(1);

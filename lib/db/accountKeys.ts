@@ -1,4 +1,5 @@
-import { assertSupportedShardFormat, installShardWriterGuards, shardWriterGuardsInstalled } from "./shardFormat";
+import { assertCompleteShardFormat, assertSupportedShardFormat, installShardWriterGuards, SHARD_FTS_TABLE, SHARD_FORMAT_VERSION, shardWriterGuardsInstalled } from "./shardFormat";
+import { buildFtsIdentity, getFtsOrphanCount } from "./ftsIdentity";
 
 /**
  * Shard identities include accountId. Row ids remain stable for API URLs and
@@ -157,19 +158,28 @@ function needsRebuild(db: any, table: TableName) {
  * lock, with foreign_key_check before commit. An error rolls the whole change
  * back and restores the connection's original foreign-key setting.
  */
-export function ensureAccountKeySchema(db: any) {
-  assertSupportedShardFormat(db);
+export function ensureAccountKeySchema(db: any, options: { inTransaction?: boolean } = {}) {
+  assertCompleteShardFormat(db);
   const ftsNeedsRebuild = () => !columns(db, "message_fts").some(column => column.name === "accountId");
-  if (!tableNames.some(table => needsRebuild(db, table)) && !ftsNeedsRebuild() && shardWriterGuardsInstalled(db)) return;
+  if (shardWriterGuardsInstalled(db)) {
+    if (tableNames.some(table => needsRebuild(db, table))) {
+      throw new Error("Incomplete account shard keys; explicit atomic repair required");
+    }
+    return { migrated: false, droppedFtsOrphans: 0 };
+  }
   const foreignKeys = Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys);
-  db.exec("PRAGMA foreign_keys = OFF");
+  const rebuildKeys = tableNames.some(table => needsRebuild(db, table));
+  if (!options.inTransaction && rebuildKeys) db.exec("PRAGMA foreign_keys = OFF");
   try {
-    if (Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys) !== 0) {
+    if (!options.inTransaction && rebuildKeys && Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys) !== 0) {
       throw new Error("Account shard key migration must run outside a transaction");
     }
-    db.transaction(() => {
+    const migrate = () => {
       // Re-read after taking the writer lock: another process may have migrated.
-      assertSupportedShardFormat(db);
+      assertCompleteShardFormat(db);
+      if (shardWriterGuardsInstalled(db)) return { migrated: false, droppedFtsOrphans: 0 };
+      const oldFts = assertSupportedShardFormat(db) === 2 ? "message_fts_v2" : "message_fts";
+      const droppedFtsOrphans = getFtsOrphanCount(db, oldFts);
       const tables = tableNames.filter(table => needsRebuild(db, table));
       const rebuildFts = tables.includes("messages") || ftsNeedsRebuild();
       for (const table of tables) {
@@ -206,9 +216,21 @@ export function ensureAccountKeySchema(db: any) {
       if (db.prepare("PRAGMA foreign_key_check").all().length) {
         throw new Error("Account shard migration could not preserve message ownership");
       }
+      buildFtsIdentity(db);
+      const legacyView = db.prepare("SELECT type FROM sqlite_master WHERE name='message_fts'").get();
+      if (legacyView?.type === "view") db.exec("DROP VIEW message_fts");
+      db.exec(`DROP TABLE ${oldFts}`);
+      db.exec(`CREATE VIEW message_fts AS SELECT rowid, * FROM ${SHARD_FTS_TABLE};
+        CREATE VIEW message_fts_v2 AS SELECT rowid, * FROM ${SHARD_FTS_TABLE}`);
       installShardWriterGuards(db);
-    }).immediate();
+      db.exec(`PRAGMA user_version = ${SHARD_FORMAT_VERSION}`);
+      if (!shardWriterGuardsInstalled(db)) throw new Error("Incomplete migrated account shard format");
+      return { migrated: true, droppedFtsOrphans };
+    };
+    const result = options.inTransaction ? migrate() : db.transaction(migrate).immediate();
+    if (!options.inTransaction && result.droppedFtsOrphans) console.warn(`[shard-format-v3] dropped ${result.droppedFtsOrphans} orphan FTS rows`);
+    return result;
   } finally {
-    db.exec(`PRAGMA foreign_keys = ${foreignKeys}`);
+    if (!options.inTransaction && rebuildKeys) db.exec(`PRAGMA foreign_keys = ${foreignKeys}`);
   }
 }

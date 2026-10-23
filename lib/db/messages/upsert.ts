@@ -33,6 +33,7 @@ import { parseAddressEmails } from "../../ownAddresses";
  */
 import { publishThreadCollabEvent } from "../../threadCollabEvents";
 import { SHARD_FTS_TABLE } from "../shardFormat";
+import { prepareFtsIdentityWriter } from "../ftsIdentity";
 import type { Message } from "../../data";
 import { stageMessageFiles } from "../../storage";
 import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
@@ -160,10 +161,13 @@ export async function upsertMessages(
     );
     const deleteFtsByScope = folderId
       ? db.prepare(
-          `DELETE FROM ${SHARD_FTS_TABLE} WHERE EXISTS (SELECT 1 FROM messages m WHERE m.accountId = ${SHARD_FTS_TABLE}.accountId AND m.id = ${SHARD_FTS_TABLE}.messageId AND m.accountId = ? AND m.folderId = ?)`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE rowid IN (
+            SELECT i.ftsRowid FROM message_fts_identity i JOIN messages m
+              ON m.accountId=i.accountId AND m.id=i.messageId
+            WHERE m.accountId = ? AND m.folderId = ?)`
         )
       : db.prepare(
-          `DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ?`
+          `DELETE FROM ${SHARD_FTS_TABLE} WHERE rowid IN (SELECT ftsRowid FROM message_fts_identity WHERE accountId = ?)`
         );
     const insertAttachment = db.prepare(
       `INSERT INTO attachments (accountId, id, messageId, filename, contentType, size, inline, cid, url)
@@ -248,11 +252,8 @@ export async function upsertMessages(
         pendingMoveSourceUid=NULL,
         pendingMoveStartedAt=NULL
     `);
-    const insertFts = db.prepare(`
-      INSERT INTO ${SHARD_FTS_TABLE} (accountId, messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const deleteFts = db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`);
+    const ftsWriter = prepareFtsIdentityWriter(db);
+    const deleteFts = ftsWriter.remove;
     const deleteMessages = db.prepare(deleteSql);
     const existingScopeThreadIds =
       replaceExisting && folderId
@@ -593,6 +594,11 @@ export async function upsertMessages(
           rowId !== message.id && message.htmlBody
             ? message.htmlBody.replaceAll(baseMessagePathSegment, rowMessagePathSegment)
             : message.htmlBody;
+        // Replacement snapshots retain metadata after their old rows/maps were
+        // deleted. Only a surviving message must already own an identity.
+        const replacedRow = replaceExisting && (!folderId || existingRow?.folderId === folderId);
+        const ftsRowid = ftsWriter.lookup(accountId, rowId, Boolean(existingRow) && !replacedRow);
+        deleteFts.run(accountId, rowId);
         insertMessage.run(
           rowId,
           accountId,
@@ -644,10 +650,7 @@ export async function upsertMessages(
           message.senderIdentityId ?? existingRow?.senderIdentityId ?? null
           // End sender identity metadata.
         );
-        deleteFts.run(accountId, rowId);
-        insertFts.run(
-          accountId,
-          rowId,
+        ftsWriter.insert(accountId, rowId, ftsRowid, [
           message.subject,
           message.from,
           message.to,
@@ -655,7 +658,7 @@ export async function upsertMessages(
           message.bcc ?? "",
           message.body,
           message.preview
-        );
+        ]);
         normalizeCalendarEventUids(message.calendarEventUids).forEach((eventUid) => {
           const existing = preservedCalendarInviteStateByUid.get(eventUid);
           insertCalendarEvent.run(
