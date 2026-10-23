@@ -3043,6 +3043,8 @@ export async function listThreads(params: {
     messagesRows.map((row) => String(row.id ?? ""))
   );
 
+  // Date-sensitive keys depend only on the thread date: derive them once per thread.
+  const threadDateGroupKeyByThreadId = new Map<string, string>();
   const items: Message[] = messagesRows.map((row) => {
     const calendarInviteData = calendarInviteDataByMessageId.get(row.id);
     const message: Message = {
@@ -3097,14 +3099,19 @@ export async function listThreads(params: {
     };
     const threadDateValue = threadDateValueByThreadId.get(message.threadId);
     message.threadSortDateValue = threadDateValue ?? message.dateValue;
+    let threadDateGroupKey: string | undefined;
+    if (isThreadDateSensitiveGroupBy(groupBy) && threadDateValue !== undefined) {
+      threadDateGroupKey = threadDateGroupKeyByThreadId.get(message.threadId);
+      if (threadDateGroupKey === undefined) {
+        threadDateGroupKey = buildGroupKey(message, groupBy, threadDateValue);
+        threadDateGroupKeyByThreadId.set(message.threadId, threadDateGroupKey);
+      }
+    }
     message.groupKey =
       eventGroupsByMessageId.get(message.id)?.key ??
       inviteDeckThreadGroupsByMessageId.get(message.id) ??
-      buildGroupKey(
-        message,
-        groupBy,
-        isThreadDateSensitiveGroupBy(groupBy) ? threadDateValue : undefined
-      );
+      threadDateGroupKey ??
+      buildGroupKey(message, groupBy);
     return message;
   });
 
