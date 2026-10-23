@@ -247,13 +247,17 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           await enforceCapacity();
           // SELECT/EXAMINE UNSEEN is the first unseen sequence number. Only
           // STATUS UNSEEN is an unread count, including for a selected mailbox.
-          const readFolderStatus = () => logImapOp(
-            "imap.status",
-            { ...logContext, mailbox },
-            () => client.status(mailbox, {
-              uidNext: true, uidValidity: true, messages: true, unseen: true
-            })
-          );
+          const readFolderStatus = async () => {
+            const status = await logImapOp(
+              "imap.status",
+              { ...logContext, mailbox },
+              () => client.status(mailbox, {
+                uidNext: true, uidValidity: true, messages: true, unseen: true
+              })
+            );
+            if (!status) throw new Error(`IMAP STATUS failed for ${mailbox}`);
+            return status;
+          };
           const sendFolderStatus = (status: Awaited<ReturnType<typeof readFolderStatus>>) =>
             send("folder:update", [{
               id: folder.id,
@@ -274,7 +278,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               uidValidity: status.uidValidity == null ? currentState?.uidValidity : String(status.uidValidity),
               highestUid: currentState?.highestUid, highestModSeq: currentState?.highestModSeq,
               supportsQresync });
-            const uidNext = status?.uidNext ?? previousUidNext;
+            const uidNext = status.uidNext ?? previousUidNext;
             if (uidNext <= previousUidNext) {
               await sendFolderStatus(status);
               return;
@@ -435,6 +439,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
                         unseen: true
                       })
                   );
+                  if (!status) continue;
                   updates.push({
                     id: folder.id,
                     uidNext: status.uidNext,
