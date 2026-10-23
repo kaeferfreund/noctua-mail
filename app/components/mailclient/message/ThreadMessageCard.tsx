@@ -442,6 +442,7 @@ export default function ThreadMessageCard({
           : t("notTranslated");
     return (
       <Flex
+        data-reader-print-exclude=""
         align="center"
         gap="2"
         wrap="wrap"
@@ -905,7 +906,7 @@ export default function ThreadMessageCard({
             )}
             <Collapsible.Content className={`${styles.content} ${styles.collapsibleContent}`}>
               <div className={styles.collapsibleInner}>
-                <div data-mail-print="">{content}</div>
+                <div data-mail-print="body">{content}</div>
                 <CalendarEventPreview
                   attachments={message.attachments ?? []}
                   accountId={message.accountId}

@@ -86,6 +86,11 @@
      private drafts and collaboration UI cannot leave content or blank pages. */
   :global([data-mail-print]), :global([data-mail-print] *) { visibility: visible !important; }
   :global([data-reader-print] *:not([data-mail-print]):not([data-mail-print] *):not(:has([data-mail-print]))) { display: none !important; }
+  :global([data-reader-print-exclude]),
+  :global([data-mail-print="body"] button), :global([data-mail-print="body"] input),
+  :global([data-mail-print="body"] textarea), :global([data-mail-print="body"] select),
+  :global([data-mail-print="body"] [role="combobox"]),
+  :global([data-mail-print="body"] [role="status"]), :global([data-mail-print="body"] [role="alert"]) { display: none !important; }
   :global(body:has([data-reader-print])), :global(body:has([data-reader-print]) [data-shell]),
   :global(body:has([data-reader-print]) [data-slot="sidebar-inset"]),
   :global(body:has([data-reader-print]) [data-group]),
