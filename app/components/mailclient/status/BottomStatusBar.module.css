@@ -1,0 +1,19 @@
+.calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* FullCalendar's 100% height needs a bounded flex frame, just like the
+   floating calendar. Its shared body supplies flex: 1 and min-height: 0. */
+.calendarOpen {
+  height: min(660px, calc(100dvh - 24rem));
+}
+
+@media (max-width: 767px) {
+  .calendarOpen {
+    flex: 1;
+    height: 100%;
+  }
+}

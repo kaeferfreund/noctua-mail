@@ -209,3 +209,22 @@ test("density preserves reader controls, inline compose, resizing, notice alignm
   }));
   expect(Math.abs(offset.actual - offset.expected)).toBeLessThanOrEqual(1);
 });
+
+for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
+  test(`calendar frame renders clickable events at ${width}x${height}`, async ({ page }) => {
+    test.skip(baseline);
+    await page.setViewportSize({ width, height });
+    const summary = `Synthetic calendar frame ${width}`;
+    expect(await post(page, "/api/accounts/qa-shared/calendar/events", {
+      summary, startAtMs: Date.now(), endAtMs: Date.now() + 3600000, allDay: true, sourceType: "local"
+    })).toBe(200);
+    await page.goto("/?openCalendar=1");
+    const surface = page.locator(width < 768 ? '[data-slot="sheet-content"]' : '[data-slot="popover-content"]');
+    const harness = surface.locator(".fc-view-harness");
+    await expect.poll(() => harness.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(0);
+    const harnessHeight = await harness.evaluate(element => element.getBoundingClientRect().height);
+    await surface.locator(".fc-event-title").filter({ hasText: summary }).first().click();
+    await expect(surface.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+    console.log("CALENDAR_FRAME", JSON.stringify({ width, height, harnessHeight, eventOpened: true }));
+  });
+}
