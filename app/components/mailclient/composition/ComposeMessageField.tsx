@@ -1,5 +1,9 @@
 "use client";
 
+import { replaceSignatureBlock } from "@/lib/signatureTemplates";
+
+import { findSerializedSignatureBlock } from "./signatureHtmlTracking";
+
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
@@ -11,7 +15,7 @@ import type { ComposeEditorHandle } from "../../ComposeEditor";
 import type { ComposeTranslationUi } from "./useComposeTranslation";
 import { DEEPL_TARGET_LANGUAGES, deeplTargetLanguageLabel } from "@/lib/deeplLanguages";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
-import type { ComposeQuotedParts, PendingImageDrop } from "./composeTypes";
+import type { ComposeQuotedParts, PendingImageDrop, ComposeSignatureState } from "./composeTypes";
 import type { Attachment } from "@/lib/data";
 import { assembleQuotedHtml, hasForwardMetaHtml, stripForwardMetaHtml } from "@/lib/html";
 import {
@@ -31,9 +35,14 @@ import { ComposeConversionBoundary } from "./ComposeConversionBoundary";
 
 // @lexical/* (~5 MB of packages) only mounts when the user switches to the
 // HTML compose tab — keep it out of the initial MailClient chunk.
-const ComposeEditor = dynamic(() => import("../../ComposeEditor"), {
-  ssr: false
-});
+const ComposeEditor = dynamic(async () => {
+  const { default: Editor } = await import("../../ComposeEditor");
+  // next/dynamic owns its React ref (the loadable retry handle). Carry the
+  // editor handle explicitly so immediate body actions can flush Lexical.
+  return function LoadedComposeEditor({ editorRef, ...props }: React.ComponentProps<typeof Editor> & { editorRef: React.Ref<ComposeEditorHandle> }) {
+    return <Editor {...props} ref={editorRef} />;
+  };
+}, { ssr: false });
 
 // Load the Markdown wrapper, vendor styles and editor together on first mount.
 // Keeping CSS inside this boundary lets the chunk loader wait for the styles
@@ -84,6 +93,8 @@ type ComposeMessageFieldProps = {
   composeMarkdownRef: React.MutableRefObject<string>;
   composeDirtyRef: React.MutableRefObject<boolean>;
   composeEditorInitRef: React.MutableRefObject<boolean>;
+  composeSignatureRef?: React.MutableRefObject<ComposeSignatureState | null>;
+  composeEditorSnapshotRef?: React.MutableRefObject<(() => { html: string; text: string } | undefined) | null>;
   composeLastEditedRef: React.MutableRefObject<ComposeTab>;
   composeSessionVersionRef: React.MutableRefObject<number>;
   stripHtml: (value: string) => string;
@@ -160,6 +171,8 @@ function ReadyComposeMessageField({
   composeMarkdownRef,
   composeDirtyRef,
   composeEditorInitRef,
+  composeSignatureRef,
+  composeEditorSnapshotRef,
   composeLastEditedRef,
   composeSessionVersionRef,
   stripHtml,
@@ -182,7 +195,6 @@ function ReadyComposeMessageField({
   setComposeQuotedHtmlEdited,
   setComposeQuotedParts,
   setComposeStripImages,
-  setComposeSignatureId,
   setSignatureMenuOpen,
   applySignatureToCompose,
   handleInlineImage,
@@ -199,6 +211,14 @@ function ReadyComposeMessageField({
   const hasQuotedContent = hasQuotedHtml || hasQuotedParts;
   const [isQuotedExpanded, setIsQuotedExpanded] = useState(true);
   const composeEditorRef = useRef<ComposeEditorHandle | null>(null);
+  useEffect(() => {
+    if (!composeEditorSnapshotRef || composeTab !== "html") return;
+    const snapshot = () => composeEditorRef.current?.exportCurrentHtml();
+    composeEditorSnapshotRef.current = snapshot;
+    return () => {
+      if (composeEditorSnapshotRef.current === snapshot) composeEditorSnapshotRef.current = null;
+    };
+  }, [composeEditorSnapshotRef, composeTab]);
   // Local to each rendered instance: the inline and modal composers mount the
   // same element in different trees, so a shared ref would be nulled when the
   // other instance unmounts during a view switch, breaking the Attach button.
@@ -263,6 +283,16 @@ function ReadyComposeMessageField({
     : hasForwardMetaHtml(composeQuotedHtml);
   const switchComposeTab = (nextTab: ComposeTab) => {
     if (nextTab === composeTab) return;
+    if (composeBodyDebounceRef.current) {
+      clearTimeout(composeBodyDebounceRef.current);
+      composeBodyDebounceRef.current = null;
+    }
+    // Flush the active editor before unmounting its debounced field.
+    if (composeTab === "markdown") setComposeMarkdown(composeMarkdownRef.current);
+    if (composeTab === "text") setComposeBody(composeTextRef.current?.value ?? composeBody);
+    const snapshot = composeTab === "html" ? composeEditorRef.current?.exportCurrentHtml() : undefined;
+    const currentHtml = snapshot?.html ?? composeHtml;
+    const currentHtmlText = snapshot?.text ?? composeHtmlText;
     const lastEdited = composeLastEditedRef.current;
     const currentMarkdown = composeMarkdownRef.current;
 
@@ -274,6 +304,22 @@ function ReadyComposeMessageField({
         { stripHtml }
       );
       if (result) {
+        const signature = composeSignatureRef?.current;
+        const source = lastEdited === "markdown" ? currentMarkdown : currentBody;
+        const previous = lastEdited === "markdown" ? signature?.markdown : signature?.text;
+        if (signature && previous && composeSignatureRef && !replaceSignatureBlock(source, previous, "", "\n\n").conflict) {
+          // Keep the unchanged signature in its own HTML block. Converting a
+          // whole Text body into one paragraph would merge it with authored
+          // text and destroy the exact boundary used by later From changes.
+          const index = source.indexOf(previous);
+          const convert = (body: string) => computeHtmlOnSwitchToHtml(
+            { lastEdited, composeBody: body, composeMarkdown: body }, { stripHtml }
+          )?.html ?? "";
+          const html = convert(previous);
+          result.html = convert(source.slice(0, index)) + html + convert(source.slice(index + previous.length));
+          result.htmlText = stripHtml(result.html);
+          composeSignatureRef.current = { ...signature, html };
+        }
         setComposeHtml(result.html);
         setComposeHtmlText(result.htmlText);
         // Force the Lexical editor to seed from the converted HTML instead of
@@ -290,8 +336,8 @@ function ReadyComposeMessageField({
       const nextText = computeBodyOnSwitchToText(
         {
           lastEdited,
-          composeHtml,
-          composeHtmlText,
+          composeHtml: currentHtml,
+          composeHtmlText: currentHtmlText,
           composeMarkdown: currentMarkdown,
           composeQuotedParts,
           composeQuotedHtml,
@@ -311,9 +357,22 @@ function ReadyComposeMessageField({
       const nextMd = computeMarkdownOnSwitchToMarkdown({
         lastEdited,
         composeBody: currentBody,
-        composeHtml
+        composeHtml: currentHtml
       });
-      if (nextMd !== null) setComposeMarkdown(nextMd);
+      if (nextMd !== null) {
+        const signature = composeSignatureRef?.current;
+        // Track the exact converted block only when the source block is still
+        // unchanged. Edited signatures must keep their original boundary.
+        if (signature && composeSignatureRef) {
+          const source = lastEdited === "html" ? currentHtml : currentBody;
+          const previous = lastEdited === "html" ? signature.html : signature.text;
+          if (previous && !replaceSignatureBlock(source, previous, "", lastEdited === "html" ? "" : "\n\n").conflict) {
+            const markdown = computeMarkdownOnSwitchToMarkdown({ lastEdited, composeBody: signature.text, composeHtml: signature.html });
+            if (markdown !== null) composeSignatureRef.current = { ...signature, markdown };
+          }
+        }
+        setComposeMarkdown(nextMd);
+      }
       setComposeTab("markdown");
     }
   };
@@ -465,14 +524,12 @@ function ReadyComposeMessageField({
                 value={composeSignatureId || "__none"}
                 onValueChange={(value) => {
                   if (value === "__none") {
-                    setComposeSignatureId("");
                     applySignatureToCompose(null);
                     setSignatureMenuOpen(false);
                     return;
                   }
                   const signature = accountSignatures.find((entry) => entry.id === value);
                   if (!signature) return;
-                  setComposeSignatureId(signature.id);
                   applySignatureToCompose(signature);
                   setSignatureMenuOpen(false);
                 }}
@@ -648,7 +705,7 @@ function ReadyComposeMessageField({
       {composeTab === "html" && (
         <div className={`${styles.composeWriting} ${styles.composeWritingHtml}`}>
           <ComposeEditor
-            ref={composeEditorRef}
+            editorRef={composeEditorRef}
             initialHtml={composeHtml}
             resetKey={composeEditorReset}
             quotedMessage={{
@@ -669,13 +726,18 @@ function ReadyComposeMessageField({
             onInlineImage={handleInlineImage}
             onFilesDrop={addDroppedFiles}
             onChange={(nextHtml, nextText) => {
+              const initialSignature = !composeEditorInitRef.current && composeSignatureRef?.current;
+              if (initialSignature) {
+                const serialized = findSerializedSignatureBlock(nextHtml, initialSignature.text);
+                if (serialized && composeSignatureRef) composeSignatureRef.current = { ...initialSignature, html: serialized };
+              }
               setComposeHtml(nextHtml);
               setComposeHtmlText(nextText);
               composeEditorInitRef.current = true;
               // Quoted-node syncs and editor seeding fire onChange without
               // altering the exported content — don't mark the draft dirty
               // unless the HTML or text actually changed.
-              if (nextHtml === composeHtml && nextText === composeHtmlText) {
+              if ((initialSignature && nextText === composeHtmlText) || (nextHtml === composeHtml && nextText === composeHtmlText)) {
                 return;
               }
               composeDirtyRef.current = true;

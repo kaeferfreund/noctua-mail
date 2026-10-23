@@ -1,5 +1,11 @@
 "use client";
 
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+import { senderMessages, isSenderMessageId } from "@/lib/senderMessages";
+
+import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
+import { resolveSignatureTemplate } from "@/lib/signatureTemplates";
+import { readSenderError } from "./senderErrors";
 import { getSendWarnings, type SendOutcome } from "./sendOutcome";
 import {
   forwardRef,
@@ -131,7 +137,7 @@ export type ComposeOrchestratorHandle = {
   /** Restore a saved handoff while retaining reply/forward send semantics. */
   openDetachedCompose: (
     draft: Message | null,
-    context: { mode: ComposeMode; sourceMessage: Message | null }
+    context: { mode: ComposeMode; sourceMessage: Message | null; identityId?: string; signatureInitialized?: boolean }
   ) => Promise<void>;
   /** Imperative setter used by MailClient's list selection auto-minimize. */
   setComposeView: React.Dispatch<React.SetStateAction<"inline" | "modal" | "minimized">>;
@@ -140,6 +146,7 @@ export type ComposeOrchestratorHandle = {
 export type ComposeOrchestratorProps = {
   // Account context
   ownerUserId?: string;
+  senderSettingsLoader?: (apiFetch: ComposeOrchestratorProps["apiFetch"], accountId: string) => SenderSettings | Promise<SenderSettings>;
   activeAccountId: string;
   currentAccount: Account | null;
   accountDateFormat: AccountDateFormat;
@@ -266,6 +273,7 @@ export type ComposeMirror = {
 function ComposeOrchestratorImpl(
   {
     activeAccountId,
+    senderSettingsLoader = loadSenderSettingsSnapshot,
     ownerUserId,
     currentAccount,
     accountDateFormat,
@@ -315,7 +323,44 @@ function ComposeOrchestratorImpl(
   }: ComposeOrchestratorProps,
   ref: React.ForwardedRef<ComposeOrchestratorHandle>
 ) {
+  const [sender, setSender] = useState<SenderSettings | null>(null);
+  const [senderLoading, setSenderLoading] = useState(true);
+  const [retrySender, setRetrySender] = useState<(() => void) | null>(null);
+  const { messages: senderCopy, renderMessage } = useSenderMessages();
+  const [senderError, setSenderError] = useState<string | null>(null);
+  const signatureConfigKey = JSON.stringify([accountSignatures, defaultSignatureId]);
   const composeState = useComposeState();
+  const previousSenderAccountRef = useRef(activeAccountId);
+  useEffect(() => {
+    let active = true;
+    const refresh = async (event?: Event) => {
+      const accountId = (event as CustomEvent | undefined)?.detail?.accountId;
+      if (accountId && accountId !== activeAccountId) return;
+      setSenderLoading(true);
+      try {
+        const snapshot = await senderSettingsLoader(apiFetch, activeAccountId);
+        if (active) { setSender(snapshot); setSenderError(null); setRetrySender(null); }
+      } catch (error) {
+        if (active) { setSender(null); setSenderError(senderMessages.identityLoadFailed); setRetrySender(() => () => { if (active) void refresh(); }); }
+      } finally { if (active) setSenderLoading(false); }
+    };
+    const storageRefresh = (event: StorageEvent) => {
+      if (event.key !== SENDER_SETTINGS_STORAGE_KEY || !event.newValue) return;
+      try {
+        const receipt = JSON.parse(event.newValue) as { accountId?: string };
+        if (receipt.accountId === activeAccountId) void refresh();
+      } catch { /* Ignore malformed refresh receipts. */ }
+    };
+    // Refresh explicit mailbox switches, while keeping initial login/settings warm-up lazy.
+    const changedAccount = Boolean(previousSenderAccountRef.current && activeAccountId && previousSenderAccountRef.current !== activeAccountId);
+    previousSenderAccountRef.current = activeAccountId;
+    if (changedAccount) void refresh();
+    // Every open also loads its own snapshot before initialization.
+    window.addEventListener("storage", storageRefresh);
+    window.addEventListener(SENDER_SETTINGS_CHANGED, refresh);
+    window.addEventListener("noctua:account-prefs-changed", refresh);
+    return () => { active = false; window.removeEventListener("storage", storageRefresh); window.removeEventListener(SENDER_SETTINGS_CHANGED, refresh); window.removeEventListener("noctua:account-prefs-changed", refresh); };
+  }, [activeAccountId, ownerUserId, apiFetch, signatureConfigKey, senderSettingsLoader]);
   const mobileView = useMobileComposeView(isMobile, composeState.composeView, composeState.setComposeView);
   const compose = { ...composeState, ...mobileView };
   const [detachingCompose, setDetachingCompose] = useState(false);
@@ -329,6 +374,7 @@ function ComposeOrchestratorImpl(
   const sendOperationRef = useRef<{ accountId: string; sessionVersion: number } | null>(null);
   const composeInitRef = useRef<{ token: number; key: string | null }>({ token: 0, key: null });
   const {
+    composeIdentityId,
     composeOpen,
     setComposeOpen,
     composeView,
@@ -459,8 +505,11 @@ function ComposeOrchestratorImpl(
     onDraftSavedAtChange?.(draftSavedAt);
   }, [draftSavedAt, onDraftSavedAtChange]);
 
+  const senderCanCompose = sender?.account.id === activeAccountId &&
+    (sender.account.accessRole === "editor" || sender.account.accessRole === "manager") && currentAccount?.accessRole !== "viewer";
+  const availableSignatures = sender?.account.settings?.signatures ?? accountSignatures;
   const selectedSignature =
-    accountSignatures.find((signature) => signature.id === composeSignatureId) ?? null;
+    availableSignatures.find((signature) => signature.id === composeSignatureId) ?? null;
 
   const composeTranslation = useComposeTranslation({
     activeAccountId,
@@ -568,6 +617,7 @@ function ComposeOrchestratorImpl(
     compose,
     currentAccount,
     defaultSignatureId,
+    sender,
     accountDateFormat,
     stripHtml,
     normalizeHtmlDerivedText,
@@ -604,6 +654,9 @@ function ComposeOrchestratorImpl(
     flushPendingDraftSaves
   } = useDraftManager({
     activeAccountId,
+    identityId: composeIdentityId,
+    identityReady: Boolean(sender?.identities.some(item => item.id === composeIdentityId && item.enabled)) && !senderLoading && senderCanCompose,
+    onEffectiveIdentity: compose.setComposeIdentityId,
     composeOpen,
     composeTab,
     composeTo,
@@ -651,7 +704,8 @@ function ComposeOrchestratorImpl(
   });
 
   useComposeDraftAutoSave({
-    composeOpen: composeOpen && !deliveredWarnings.length,
+    composeOpen: composeOpen && !deliveredWarnings.length && !senderLoading && Boolean(sender?.identities.some(item => item.id === composeIdentityId && item.enabled)) && senderCanCompose,
+    identityId: composeIdentityId,
     sendingMail,
     draftSaving,
     composeTo,
@@ -751,6 +805,8 @@ function ComposeOrchestratorImpl(
       version: 1 as const,
       accountId: activeAccountId,
       ownerUserId,
+      identityId: composeIdentityId,
+      signatureInitialized: true,
       mode: composeMode,
       sourceMessageId: composeReplyMessage?.id ?? null,
       draftId: composeDraftIdRef.current,
@@ -813,6 +869,7 @@ function ComposeOrchestratorImpl(
     activeAccountId,
     ownerUserId,
     attachmentLoadState,
+    composeIdentityId,
     cancelDraftAutoSave,
     composeDraftIdRef,
     composeMode,
@@ -893,6 +950,10 @@ function ComposeOrchestratorImpl(
     // button's `disabled` alone is too late, it only applies once React has
     // re-rendered.
     if (sendingMailRef.current || deliveredRef.current) return;
+    if (senderLoading || sender?.account.id !== activeAccountId || !senderCanCompose || !sender.identities.some(item => item.id === composeIdentityId && item.enabled)) {
+      setSenderError(senderMessages.chooseEnabledSender); return;
+    }
+    setSenderError(null);
     if (attachmentLoadState) {
       reportError(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]);
       return;
@@ -937,6 +998,7 @@ function ComposeOrchestratorImpl(
       sendOperation.sessionVersion = composeSessionVersionRef.current;
       const { text, html, markdown, attachments, composeFormat } = buildComposePayload();
       const smtpPayload = buildSendPayload(composeMode, {
+        identityId: composeIdentityId,
         composeTo,
         composeCc,
         composeBcc,
@@ -961,6 +1023,7 @@ function ComposeOrchestratorImpl(
         const sendResult = (await res.json().catch(() => null)) as
           | (SendOutcome & {
               ok?: boolean;
+              identityId?: string;
               sentFolderId?: string | null;
               sentMessageUid?: number | null;
               messageId?: string | null;
@@ -970,7 +1033,7 @@ function ComposeOrchestratorImpl(
             })
           | null;
         delivered = true;
-        if (isSendSession()) deliveredRef.current = true;
+        if (isSendSession()) { deliveredRef.current = true; if (sendResult?.identityId) compose.setComposeIdentityId(sendResult.identityId); }
         acceptedWarnings = getSendWarnings(sendResult);
         if (sendResult?.inviteWarning) acceptedWarnings.push(sendResult.inviteWarning);
         if (isSendSession()) setDeliveredWarnings(acceptedWarnings);
@@ -1049,7 +1112,9 @@ function ComposeOrchestratorImpl(
         }
         clearRecipientSuggestionCache(activeAccountId);
       } else {
-        reportError(await readErrorMessage(res));
+        const message = await readSenderError(res, readErrorMessage);
+        if (isSendSession()) setSenderError(message);
+        reportError(renderMessage(message));
       }
     } catch (error) {
       if (delivered) {
@@ -1089,7 +1154,8 @@ function ComposeOrchestratorImpl(
     }
     if (prefill.subject) compose.setComposeSubject(prefill.subject);
     if (prefill.body) {
-      compose.setComposeBody(prefill.body);
+      const signature = compose.composeSignatureRef.current;
+      compose.setComposeBody([prefill.body, signature?.text].filter(Boolean).join("\n\n"));
       // The HTML editor reads from composeHtml — escape minimally so user-entered
       // angle brackets render as text, not as HTML tags.
       const escapedHtml = prefill.body
@@ -1097,9 +1163,9 @@ function ComposeOrchestratorImpl(
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>");
-      compose.setComposeHtml(`<p>${escapedHtml}</p>`);
-      compose.setComposeHtmlText(prefill.body);
-      compose.setComposeMarkdown(prefill.body);
+      compose.setComposeHtml(`<p>${escapedHtml}</p>${signature?.html ?? ""}`);
+      compose.setComposeHtmlText([prefill.body, signature?.text].filter(Boolean).join("\n\n"));
+      compose.setComposeMarkdown([prefill.body, signature?.markdown ?? signature?.text].filter(Boolean).join("\n\n"));
       compose.setComposeEditorReset((prev) => prev + 1);
     }
   };
@@ -1108,7 +1174,9 @@ function ComposeOrchestratorImpl(
     mode: ComposeMode,
     message?: Message,
     asNew = false,
-    prefill?: ComposeOpenPrefill
+    prefill?: ComposeOpenPrefill,
+    restoredIdentityId?: string,
+    skipSignature = false
   ) => {
     // Opening a forward or draft awaits network fetches. Impatient repeat
     // clicks must not each open their own compose session (every one would
@@ -1123,74 +1191,93 @@ function ComposeOrchestratorImpl(
       composeScopeRef.current.ownerUserId !== ownerUserId ||
       composeSessionVersionRef.current !== initSessionVersion;
 
-    // Reset the delivery receipt only in the same batch that replaces all fields.
-    const openInitializedCompose = (source?: Message, options?: Parameters<typeof openComposeInternal>[3]) => {
-      openComposeInternal(mode, source, asNew, options);
-      initSessionVersion = composeSessionVersionRef.current;
-      deliveredRef.current = false;
-      setDeliveredWarnings([]);
-    };
-    abortComposeAttachmentLoads();
-    resetComposeTranslation();
-    if (!message) {
-      openInitializedCompose();
-      if (prefill) applyComposePrefill(prefill);
-      return true;
-    }
-
-    const preferredComposeTab = getPreferredComposeTab(message.id);
-
-    const getComposeSourceMessage = (clickedMessage: Message) => {
-      const cachedMessage = messageById.get(clickedMessage.id);
-      if (!cachedMessage) return clickedMessage;
-
-      const scoreMessage = (candidate: Message) =>
-        (hasHtmlContent(candidate.htmlBody) ? 2 : 0) +
-        ((candidate.body ?? "").trim().length > 0 ? 1 : 0);
-
-      return scoreMessage(clickedMessage) >= scoreMessage(cachedMessage)
-        ? clickedMessage
-        : cachedMessage;
-    };
-
-    const hydrateDraftComposeMetadata = async (msg: Message) => {
-      if (!isDraftMessage(msg)) return msg;
-      if (msg.draftInvite) return msg;
-      const source = msg.source ?? (msg.hasSource
-        ? await apiFetch(buildAccountMessageSourcePath(msg.accountId, msg.id))
-            .then(async (response) => {
-              if (!response.ok) return "";
-              const data = (await response.json().catch(() => null)) as { source?: string } | null;
-              return data?.source ?? "";
-            })
-            .catch(() => "")
-        : "");
-      const draftInvite = source ? extractComposeInviteDraftFromSource(source) : null;
-      return draftInvite ? { ...msg, source, draftInvite } : msg;
-    };
-
-    const afterOpen = async (msg: Message) => {
-      const messageWithDraftMetadata = await hydrateDraftComposeMetadata(msg);
-      if (isStale()) return;
-      if (mode === "edit" || mode === "forward") {
-        const {
-          attachments,
-          deferred,
-          message: hydratedMessage
-        } = await loadComposeSourceAttachments(messageWithDraftMetadata);
+    try {
+      setSenderLoading(true);
+      setSenderError(null);
+      setRetrySender(null);
+      let snapshot: SenderSettings;
+      try {
+        const request = senderSettingsLoader(apiFetch, activeAccountId);
+        snapshot = request instanceof Promise ? await request : request;
         if (isStale()) return;
-        openInitializedCompose(hydratedMessage, { preferredComposeTab });
-        setComposeAttachments(attachments);
-        startComposeAttachmentLoads(messageWithDraftMetadata, deferred);
+        if (ownerUserId && snapshot.user.id !== ownerUserId) return;
+        if (restoredIdentityId) snapshot = { ...snapshot, prefs: { ...snapshot.prefs, defaultIdentityId: restoredIdentityId } };
+        setSender(snapshot); setSenderError(null);
+      } catch (error) {
+        if (!isStale()) {
+          setSender(null); setSenderError(senderMessages.identityLoadFailed);
+          setRetrySender(() => () => { if (!isStale()) void openCompose(mode, message, asNew, prefill, restoredIdentityId, skipSignature); });
+        }
+        throw error;
+      } finally { if (!isStale()) setSenderLoading(false); }
+
+      // Reset the delivery receipt only in the same batch that replaces all fields.
+      const openInitializedCompose = (source?: Message, options?: Parameters<typeof openComposeInternal>[3]) => {
+        openComposeInternal(mode, source, asNew, { ...options, sender: snapshot, skipSignature });
+        initSessionVersion = composeSessionVersionRef.current;
+        deliveredRef.current = false;
+        setDeliveredWarnings([]);
+      };
+      abortComposeAttachmentLoads();
+      resetComposeTranslation();
+      if (!message) {
+        openInitializedCompose();
+        if (prefill) applyComposePrefill(prefill);
         return true;
       }
 
-      if (isStale()) return;
-      openInitializedCompose(messageWithDraftMetadata, { preferredComposeTab });
-      return true;
-    };
+      const preferredComposeTab = getPreferredComposeTab(message.id);
 
-    try {
+      const getComposeSourceMessage = (clickedMessage: Message) => {
+        const cachedMessage = messageById.get(clickedMessage.id);
+        if (!cachedMessage) return clickedMessage;
+
+        const scoreMessage = (candidate: Message) =>
+          (hasHtmlContent(candidate.htmlBody) ? 2 : 0) +
+          ((candidate.body ?? "").trim().length > 0 ? 1 : 0);
+
+        return scoreMessage(clickedMessage) >= scoreMessage(cachedMessage)
+          ? clickedMessage
+          : cachedMessage;
+      };
+
+      const hydrateDraftComposeMetadata = async (msg: Message) => {
+        if (!isDraftMessage(msg)) return msg;
+        if (msg.draftInvite) return msg;
+        const source = msg.source ?? (msg.hasSource
+          ? await apiFetch(buildAccountMessageSourcePath(msg.accountId, msg.id))
+              .then(async (response) => {
+                if (!response.ok) return "";
+                const data = (await response.json().catch(() => null)) as { source?: string } | null;
+                return data?.source ?? "";
+              })
+              .catch(() => "")
+          : "");
+        const draftInvite = source ? extractComposeInviteDraftFromSource(source) : null;
+        return draftInvite ? { ...msg, source, draftInvite } : msg;
+      };
+
+      const afterOpen = async (msg: Message) => {
+        const messageWithDraftMetadata = await hydrateDraftComposeMetadata(msg);
+        if (isStale()) return;
+        if (mode === "edit" || mode === "forward") {
+          const {
+            attachments,
+            deferred,
+            message: hydratedMessage
+          } = await loadComposeSourceAttachments(messageWithDraftMetadata);
+          if (isStale()) return;
+          openInitializedCompose(hydratedMessage, { preferredComposeTab });
+          setComposeAttachments(attachments);
+          startComposeAttachmentLoads(messageWithDraftMetadata, deferred);
+          return true;
+        }
+
+        if (isStale()) return;
+        openInitializedCompose(messageWithDraftMetadata, { preferredComposeTab });
+        return true;
+      };
+
       const resolved = getComposeSourceMessage(message);
       const hasText = Boolean((resolved.body ?? "").trim());
       const hasHtml = hasHtmlContent(resolved.htmlBody);
@@ -1214,26 +1301,31 @@ function ComposeOrchestratorImpl(
     mode: ComposeMode,
     message?: Message,
     asNew = false,
-    prefill?: ComposeOpenPrefill
+    prefill?: ComposeOpenPrefill,
+    restoredIdentityId?: string,
+    skipSignature = false
   ) => {
     try {
-      await initializeCompose(mode, message, asNew, prefill);
+      await initializeCompose(mode, message, asNew, prefill, restoredIdentityId, skipSignature);
     } catch (error) {
       console.error("[noctua] failed to open composer:", error);
       reportError(
-        error instanceof Error && error.message.trim()
-          ? `Failed to open composer: ${error.message}`
-          : "Failed to open composer."
+        error instanceof Error && isSenderMessageId(error.message)
+          ? renderMessage(error.message)
+          : error instanceof Error && error.message.trim()
+            ? `Failed to open composer: ${error.message}`
+            : "Failed to open composer."
       );
     }
   };
 
   const openDetachedCompose = async (
     draft: Message | null,
-    context: { mode: ComposeMode; sourceMessage: Message | null }
+    context: { mode: ComposeMode; sourceMessage: Message | null; identityId?: string; signatureInitialized?: boolean }
   ) => {
     if (!draft) {
-      if (!await initializeCompose(context.mode, context.sourceMessage ?? undefined)) return;
+      if (!await initializeCompose(context.mode, context.sourceMessage ?? undefined, false, undefined, context.identityId, context.signatureInitialized)) return;
+      if (context.identityId) compose.setComposeIdentityId(context.identityId);
     } else {
       // Draft fields and attachments must be initialized through edit mode,
       // but reply/forward behavior is semantic state that is not encoded
@@ -1249,6 +1341,7 @@ function ComposeOrchestratorImpl(
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
     return getDraftChangeState({
+      identityId: composeIdentityId,
       draftId: composeDraftId,
       lastSavedHash: lastDraftHashRef.current,
       to: composeTo,
@@ -1264,7 +1357,8 @@ function ComposeOrchestratorImpl(
   const canSaveCurrentDraft =
     composeOpen &&
     Boolean(composeDraftId) &&
-    !attachmentLoadState &&
+    !attachmentLoadState && !senderLoading && senderCanCompose &&
+    Boolean(sender?.identities.some(item => item.id === composeIdentityId && item.enabled)) &&
     currentDraftChangeState.canManualSave;
   const hasUnsavedChanges =
     composeOpen &&
@@ -1349,13 +1443,15 @@ function ComposeOrchestratorImpl(
       composeSignatureId={composeSignatureId}
       signatureMenuOpen={signatureMenuOpen}
       selectedSignature={selectedSignature}
-      accountSignatures={accountSignatures}
+      accountSignatures={availableSignatures}
       composeTextRef={composeTextRef}
       composeBodyDebounceRef={composeBodyDebounceRef}
       composeBodyLastUpdateRef={composeBodyLastUpdateRef}
       composeMarkdownRef={composeMarkdownRef}
       composeDirtyRef={composeDirtyRef}
       composeEditorInitRef={composeEditorInitRef}
+      composeSignatureRef={compose.composeSignatureRef}
+      composeEditorSnapshotRef={compose.composeEditorSnapshotRef}
       composeLastEditedRef={composeLastEditedRef}
       composeSessionVersionRef={composeSessionVersionRef}
       stripHtml={stripHtml}
@@ -1437,7 +1533,25 @@ function ComposeOrchestratorImpl(
     composeShowBcc,
     composeOpenedAt,
     activeAccountId,
-    fromValue,
+    fromValue: sender?.identities.find(item => item.id === composeIdentityId) ? (() => {
+      const identity = sender.identities.find(item => item.id === composeIdentityId)!;
+      return identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email;
+    })() : compose.composeUnavailableFrom ?? fromValue,
+    identities: sender?.account.id === activeAccountId ? sender.identities : [],
+    identityId: composeIdentityId,
+    identityDisabled: senderLoading || !senderCanCompose || sendingMail || draftSaving,
+    sendDisabled: senderLoading || !senderCanCompose || !sender?.identities.some(item => item.id === composeIdentityId && item.enabled),
+    onSenderRetry: senderError && !senderLoading ? retrySender ?? undefined : undefined,
+    senderMessage: senderError ? renderMessage(senderError) : draftSaveError ? renderMessage(draftSaveError) : (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? senderCopy.unavailableDraft : compose.composeSenderWarnings.map(renderMessage).join(" ")),
+    onIdentityChange: (id) => {
+      const identity = sender?.identities.find(item => item.id === id && item.enabled);
+      if (!identity || sendingMail || !senderCanCompose) return;
+      compose.setComposeIdentityId(id); compose.setComposeUnavailableFrom(undefined);
+      composeDirtyRef.current = true; setSenderError(null); setDraftSaveError(null);
+      const template = resolveSignatureTemplate(sender?.account.settings, sender?.prefs ?? {}, identity);
+      // Render using the newly chosen identity without changing the active mailbox.
+      applySignatureToCompose(template.body ? { id: template.id, body: template.body } : null, identity);
+    },
     inReplyToMessage: composeReplyMessage,
     composeInviteDraft: currentComposeInviteDraft,
     composeFieldsReset: composeEditorReset,
@@ -1505,6 +1619,8 @@ function ComposeOrchestratorImpl(
         />
       ),
       resetSession: () => {
+        setRetrySender(null);
+        setSenderError(null);
         composeInitRef.current = { token: composeInitRef.current.token + 1, key: null };
         sendOperationRef.current = null;
         deliveredRef.current = false;
@@ -1520,6 +1636,9 @@ function ComposeOrchestratorImpl(
 
   return (
     <ComposeContextProvider value={contextValue}>
+      {senderError && retrySender && !composeOpen && <div role="alert">
+        {renderMessage(senderError)} <button type="button" disabled={senderLoading} onClick={retrySender}>{senderCopy.retrySender}</button>
+      </div>}
       <ComposeModal isMobile={isMobile} open={isMobile ? composeOpen : showComposeModal} />
       <ComposeMinimized open={!isMobile && showComposeMinimized} />
       {!isMobile && inlineSlotEl &&

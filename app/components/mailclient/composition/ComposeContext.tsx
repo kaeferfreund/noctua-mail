@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 import type React from "react";
-import type { Attachment, Message, RecipientSuggestion } from "@/lib/data";
+import type { Attachment, Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import type {
   ComposeMode,
@@ -28,6 +28,13 @@ export type ComposeContextValue = {
   // Derived / snapshot data
   activeAccountId: string | null;
   fromValue: string;
+  identities?: SenderIdentity[];
+  identityId?: string;
+  identityDisabled?: boolean;
+  sendDisabled?: boolean;
+  senderMessage?: string | null;
+  onSenderRetry?: () => void;
+  onIdentityChange?: (id: string) => void;
   inReplyToMessage: Message | null;
   composeInviteDraft: ComposeInviteDraft | null;
 

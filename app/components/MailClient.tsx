@@ -1,4 +1,7 @@
 "use client";
+
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
+
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
@@ -407,6 +410,7 @@ export default function MailClient({
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
+  const { messages: senderMessages } = useSenderMessages();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
@@ -4331,6 +4335,15 @@ export default function MailClient({
     return () => window.clearInterval(timer);
   }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
 
+  useEffect(() => {
+    let active = true;
+    const refreshSenders = () => { void apiFetch("/api/accounts", { cache: "no-store" }).then(async response => {
+      if (response.ok) { const refreshedAccounts = await response.json(); if (active) setAccounts(refreshedAccounts); }
+    }).catch(() => reportError(senderMessages.identityRefreshFailed)); };
+    window.addEventListener("noctua:sender-settings-changed", refreshSenders);
+    return () => { active = false; window.removeEventListener("noctua:sender-settings-changed", refreshSenders); };
+  }, [apiFetch, reportError, currentUser?.id, senderMessages.identityRefreshFailed]);
+
   // Initial sync on login (once per session per account). For existing accounts,
   // sync only the active folder first so new mail appears before any broader repair work.
   useEffect(() => {
@@ -5943,7 +5956,16 @@ export default function MailClient({
           isExistingAccount={isExistingAccount}
           onClose={() => setManageOpen(false)}
           onTabChange={setManageTab}
-          onSave={manageTab === "account" ? saveAccount : saveAccountSettings}
+          onSave={manageTab === "account" ? saveAccount : manageTab === "signatures" ? async account => {
+            const response = await apiFetch(`/api/accounts/${encodeURIComponent(account.id)}/settings`, {
+              method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ settings: { signatures: account.settings?.signatures ?? [], defaultSignatureId: account.settings?.defaultSignatureId ?? "" }, teamDefaults: true })
+            });
+            if (!response.ok) { reportError(await readErrorMessage(response)); return; }
+            const { notifySenderSettingsChanged } = await import("@/lib/ui/senderSettings");
+            notifySenderSettingsChanged(account.id);
+            setManageOpen(false);
+          } : saveAccountSettings}
           onDelete={() => deleteAccount(editingAccount.id)}
           isAdminUser={isAdminUser}
           onNotifySuccess={(title, description) => {
