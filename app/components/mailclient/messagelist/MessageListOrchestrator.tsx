@@ -180,7 +180,8 @@ export type MessageListOrchestratorMutationInputs = {
   threadScopeMessages: Message[];
   visibleMessages: VisibleMessageEntry[];
   sortedMessages: Message[];
-  navigationRows?: Message[];
+  // The renderer's current navigation rows, read when an action needs them.
+  getNavigationRows?: () => Message[];
   collapsedThreads: Record<string, boolean>;
   hasFilteredSearchCriteria: boolean;
   viewMessage: Message | null;
@@ -332,7 +333,7 @@ export default function MessageListOrchestrator({
     const removed = new Set(removedIds);
     if (!removed.has(current.activeMessageId) && !removed.has(current.viewMessage?.id ?? "")) return false;
     const next = nextMessageAfterRemoval(
-      navigationRows ?? current.navigationRows ?? current.visibleMessages.map(item => item.message), removed
+      navigationRows ?? current.getNavigationRows?.() ?? current.visibleMessages.map(item => item.message), removed
     );
     current.setActiveMessageId(next?.id ?? "");
     current.setViewMessage(next);
@@ -375,7 +376,7 @@ export default function MessageListOrchestrator({
 
   const { handleDeleteMessage, handleDeleteMessagesByIds } = useMessageDeleteActions({
     continueAfterRemoval,
-    navigationRows: mutationInputs.navigationRows,
+    getNavigationRows: mutationInputs.getNavigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     activeMessageId: mutationInputs.activeMessageId,
     supportsThreads: mutationInputs.supportsThreads,
@@ -434,7 +435,7 @@ export default function MessageListOrchestrator({
     toggleFlaggedFlag
   } = useMessageMutations({
     continueAfterRemoval,
-    navigationRows: mutationInputs.navigationRows,
+    getNavigationRows: mutationInputs.getNavigationRows,
     activeAccountId: mutationInputs.activeAccountId,
     searchScope: mutationInputs.searchScope,
     viewMessage: mutationInputs.viewMessage,

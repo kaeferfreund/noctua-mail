@@ -106,7 +106,7 @@ type DeleteAssociationLookupResponse = {
 
 type UseMessageDeleteActionsOptions = {
   continueAfterRemoval?: ContinueAfterRemoval;
-  navigationRows?: Message[];
+  getNavigationRows?: () => Message[];
   activeAccountId: string;
   activeMessageId: string;
   supportsThreads: boolean;
@@ -150,7 +150,7 @@ type UseMessageDeleteActionsOptions = {
 
 export function useMessageDeleteActions({
   continueAfterRemoval,
-  navigationRows,
+  getNavigationRows,
   activeAccountId,
   activeMessageId,
   supportsThreads,
@@ -592,6 +592,8 @@ export function useMessageDeleteActions({
       }
     ) => {
       if (targets.length === 0) return;
+      // The renderer order at the start of the operation (see the continuation below).
+      const navigationRows = getNavigationRows?.();
       markDeleteReconcileSuppression?.(targets);
       const targetIds = new Set(targets.map((item) => item.id));
       const { activeWasDeleted, nextActiveId } = resolveDeleteNextActiveId(
@@ -674,7 +676,7 @@ export function useMessageDeleteActions({
     },
     [
       continueAfterRemoval,
-      navigationRows,
+      getNavigationRows,
       clearSelectionState,
       deleteMessagesPermanently,
       findTrashFolderId,
