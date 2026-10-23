@@ -332,6 +332,12 @@ describe("statement budget", () => {
     // Per mailbox (unchanged here): warm getAccountDb (3 master, phase 2) plus 3 shard reads.
     expect({ scoped, foreign, full }).toEqual({ scoped: 3 + 6 + 1, foreign: 1, full: 3 + 6 * ACCOUNTS.length + 1 });
   });
+  test("/api/auth/me: session guard, user, selection pre-read, selection write, one access read", async () => {
+    const counts: Record<string, number> = {};
+    for (const key of ["1", "2", "12"]) counts[key] = await countExecutions(async () => (await meGET(req("/api/auth/me", viewers[key].jar))).text());
+    // 7 guard statements + user + candidates projection + session UPDATE + 4 access statements.
+    expect(counts).toEqual({ 1: 14, 2: 14, 12: 14 });
+  });
   test("members: owner read plus one member statement, independent of the directory size", async () => {
     expect(await countExecutions(() => listAccountMembers(ACCOUNTS[6]))).toBe(2);
   });
