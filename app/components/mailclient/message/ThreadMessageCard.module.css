@@ -607,3 +607,8 @@
   .metaSegmentDate { max-width: 100%; }
   .metaValue { min-width: 0; overflow-wrap: anywhere; }
 }
+
+@media print {
+  .toCopy, .moreButton, .compactActions { display: none !important; }
+  .metaValue, .metaValueText, .toValue { overflow: visible; max-height: none; white-space: normal; }
+}
