@@ -128,3 +128,19 @@ test("round-two copy follows the reviewed leaf values and folder plural grammar"
   ] as const) expect(t("Shell.status.attention", { count })).toBe(expected);
   expect(getTranslator("en")("Shell.loading.mailbox")).toBe("Add mailbox");
 });
+
+test("reminder leads read in whole minutes, hours or days in both locales", () => {
+  const de = getTranslator("de"), en = getTranslator("en");
+  for (const [unit, count, german, english] of [
+    ["start", 0, "Erinnerung: zu Beginn", "Reminder: at start"],
+    ["minute", 1, "Erinnerung: 1 Minute vorher", "Reminder: 1 minute before"],
+    ["minute", 15, "Erinnerung: 15 Minuten vorher", "Reminder: 15 minutes before"],
+    ["hour", 1, "Erinnerung: 1 Stunde vorher", "Reminder: 1 hour before"],
+    ["hour", 2, "Erinnerung: 2 Stunden vorher", "Reminder: 2 hours before"],
+    ["day", 1, "Erinnerung: 1 Tag vorher", "Reminder: 1 day before"],
+    ["day", 2, "Erinnerung: 2 Tage vorher", "Reminder: 2 days before"]
+  ] as const) {
+    expect(de("Shell.status.reminderLead", { unit, count })).toBe(german);
+    expect(en("Shell.status.reminderLead", { unit, count })).toBe(english);
+  }
+});

@@ -29,7 +29,7 @@ import {
   BottomStatusTriggerButton,
   type BottomStatusTone
 } from "./BottomStatusSection";
-import { buildUpcomingEntries, type UpcomingEntry } from "./upcomingEntries";
+import { buildUpcomingEntries, reminderLeadUnit, type UpcomingEntry } from "./upcomingEntries";
 import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
@@ -344,7 +344,7 @@ export default function UpcomingStatusPopover({
                                 {reminder ? (
                                   <Flex align="center" gap="1" className="reminder-meta-row">
                                     <Text size="1" color="gray">
-                                      {t("reminderLead", { minutes: reminder.leadMinutes })}
+                                      {t("reminderLead", reminderLeadUnit(reminder.leadMinutes))}
                                     </Text>
                                   </Flex>
                                 ) : null}

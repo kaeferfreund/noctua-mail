@@ -15,6 +15,18 @@ export const DEFAULT_UPCOMING_WINDOW_MS = 28 * 24 * 60 * 60 * 1000;
 export const DEFAULT_UPCOMING_CAP = 10;
 
 /**
+ * Expresses a reminder lead in the largest unit that divides it evenly, so
+ * 1440 reads as one day and 120 as two hours while 90 stays 90 minutes.
+ * Feeds the `Shell.status.reminderLead` select/plural message.
+ */
+export function reminderLeadUnit(leadMinutes: number): { unit: "start" | "day" | "hour" | "minute"; count: number } {
+  if (leadMinutes <= 0) return { unit: "start", count: 0 };
+  if (leadMinutes % 1440 === 0) return { unit: "day", count: leadMinutes / 1440 };
+  if (leadMinutes % 60 === 0) return { unit: "hour", count: leadMinutes / 60 };
+  return { unit: "minute", count: leadMinutes };
+}
+
+/**
  * Unified row shown in the "Upcoming" popover.
  *
  * - Entries backed by a calendar event carry `event`.

@@ -244,7 +244,7 @@
       "deleteReminderError": "Failed to delete reminder.",
       "openSourceMail": "Open source mail",
       "duration": "Duration: {value}",
-      "reminderLead": "Reminder: {minutes} minutes before",
+      "reminderLead": "Reminder: {unit, select, start {at start} day {{count, plural, one {# day} other {# days}} before} hour {{count, plural, one {# hour} other {# hours}} before} other {{count, plural, one {# minute} other {# minutes}} before}}",
       "repeats": "Repeats: {value}",
       "deleteReminder": "Delete reminder",
       "process": {
