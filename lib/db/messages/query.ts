@@ -32,13 +32,13 @@ import {
 } from "../../messageFlags";
 import {
   buildMessageGroupKey,
-  buildInviteDeckGroupKeyFromEvent,
   buildInviteDeckGroupKeyFromBounds,
   buildTimeGroupKey,
   EVENT_GROUP_BY,
   INVITE_DECK_GROUP_BY,
   sortGroupsForGroupBy
 } from "../../messageGrouping";
+import { buildInviteDeckGroupKeyFromEvent } from "../../inviteDeckGrouping";
 import type { MessageListSortBy } from "../../messageListSort";
 import {
   DEFAULT_THREAD_DATE_SOURCE,

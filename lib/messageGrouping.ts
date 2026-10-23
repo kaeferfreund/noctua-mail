@@ -110,10 +110,12 @@ export function sortGroupsForGroupBy<T extends { key: string }>(groups: T[], gro
   });
 }
 
-// The recurrence-backed variant lives in `inviteDeckGrouping.ts` (it needs
-// `rrule` via `reminderRecurrence`); re-exported here so existing
-// server-side importers keep resolving it from this module.
-export { buildInviteDeckGroupKeyFromEvent } from "./inviteDeckGrouping";
+// The recurrence-backed variant (`buildInviteDeckGroupKeyFromEvent`)
+// lives in `inviteDeckGrouping.ts`: it needs `rrule` via
+// `reminderRecurrence`, and even a re-export from here was enough for the
+// bundler to keep that graph in the main route's first load (verified
+// against production builds). Server-side callers import it from there
+// directly; this module stays recurrence-free for its client importers.
 
 export function buildInviteDeckGroupKeyFromBounds(
   event: InviteDeckEventBounds,
