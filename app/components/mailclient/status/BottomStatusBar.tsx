@@ -149,6 +149,7 @@ export default function BottomStatusBar({
         onOpenChange={handleCalendarPanelOpenChange}
         onOpenSidebar={onOpenCalendarSidebar}
         triggerLabel={t("calendar")}
+        triggerTitle={t("openCalendar")}
         onOpenMessage={onOpenCalendarMessage}
         onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid}
       />}
