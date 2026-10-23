@@ -27,4 +27,13 @@ for(const [email,role] of [['alex@example.test','admin'],['jo@example.test','use
 const account={id:'qa-shared',email:'demo@monkeydent.test',name:'QA Shared',avatar:'',ownerUserId:seeds[0].id,imap:{host:'127.0.0.1',port:imapPort,secure:false,user:'demo@monkeydent.test',password:'demo'},smtp:{host:'127.0.0.1',port:smtpPort,secure:false,user:'demo@monkeydent.test',password:'demo'}};
 persistAccountRow(db,account);
 insertUserAccountLinkRow(db,seeds[0].id,account.id,'manager');
+if (process.env.QA_DEEP_LINKS_FIXTURE === "1") {
+ for (const [id, name, email, owner] of [
+  ["qa-second", "QA Second", "second@example.test", seeds[0].id],
+  ["qa-private", "QA Private", "private@example.test", seeds[1].id]
+ ] as const) {
+  persistAccountRow(db, { ...account, id, name, email, ownerUserId: owner });
+  insertUserAccountLinkRow(db, owner, id, "manager");
+ }
+}
 await Bun.write(process.env.QA_SHELL_SEED_FILE,JSON.stringify(seeds));closeAllDbConnections();
