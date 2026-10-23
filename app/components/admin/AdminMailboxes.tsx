@@ -10,6 +10,7 @@ import MembersTabContent from "@/app/components/account-settings/tabs/MembersTab
 import { Button } from "@/app/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";
 import AdminConfirmDialog from "./AdminConfirmDialog";
+import { adminActionRow, adminHeaderRow } from "./adminLayout";
 import type { AdminAccount, AdminUser } from "./types";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
@@ -95,10 +96,10 @@ export default function AdminMailboxes({ apiFetch = fetch, users, currentUserId,
     catch (error) { setError(error); }
     finally { setBusy(false); }
   };
-  return <section className="space-y-4" aria-label={t("tabs.mailboxes")}><div className="flex justify-between gap-2"><h3 className="font-medium">{t("tabs.mailboxes")}</h3><div className="flex gap-2"><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("mailboxes.refresh")}</Button><Button onClick={() => setCreating(true)}>{t("mailboxes.create")}</Button></div></div>
+  return <section className="space-y-4" aria-label={t("tabs.mailboxes")}><div className={adminHeaderRow}><h3 className="font-medium">{t("tabs.mailboxes")}</h3><div className={adminActionRow}><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("mailboxes.refresh")}</Button><Button onClick={() => setCreating(true)}>{t("mailboxes.create")}</Button></div></div>
     {Boolean(error) && !deleting && <p role="alert">{formatAdminError(error, t, locale)}</p>}{busy && <p role="status">{t("loading")}</p>}
     {accounts.map(account => <div key={account.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"><div className="min-w-0 break-words">{account.name || account.email}<p className="text-sm text-muted-foreground">{account.email} · {t("mailboxes.memberCount", {count: account.members.length})}</p>{account.members.length === 0 && <p className="text-sm font-medium">{t("mailboxes.noMembers")}</p>}</div>
-      <div className="flex gap-2"><Button variant="outline" onClick={() => setMembers(account)}>{t("mailboxes.manageMembers")}</Button><Button variant="destructive" onClick={() => { setError(null); setDeleting(account); }}>{t("mailboxes.delete")}</Button></div></div>)}
+      <div className={adminActionRow}><Button variant="outline" onClick={() => setMembers(account)}>{t("mailboxes.manageMembers")}</Button><Button variant="destructive" onClick={() => { setError(null); setDeleting(account); }}>{t("mailboxes.delete")}</Button></div></div>)}
     {creating && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUserId} onAccessChanged={onAccessChanged} onClose={() => setCreating(false)} onCreated={() => void load()} />}
     {deleting && <AdminConfirmDialog title={t("mailboxes.delete")} description={t("mailboxes.deleteConfirm", {email: deleting.email})} busy={busy} error={error ? formatAdminError(error, t, locale) : undefined} onCancel={() => setDeleting(null)} onConfirm={() => void remove()} />}
     {members && <Dialog open onOpenChange={open => { if (!open) setMembers(null); }}><DialogContent className="sm:max-w-3xl" aria-describedby={undefined}><DialogTitle>{t("mailboxes.membersTitle", {email: members.email})}</DialogTitle><div className="max-h-[70dvh] overflow-auto"><MembersTabContent accountId={members.id} admin initialMembers={members.members} users={users} apiFetch={apiFetch} onChanged={() => void load()} /></div></DialogContent></Dialog>}

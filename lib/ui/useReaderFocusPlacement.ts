@@ -4,12 +4,17 @@ import { useEffect, useRef, type RefObject } from "react";
 const focusReaderBack = () =>
   document.querySelector<HTMLButtonElement>('[data-reader-toolbar] button')?.focus({ preventScroll: true });
 
-/** Covers explicit entry, saved-preference entry, and an exhausted reading sequence. */
-export function useReaderFocusPlacement(focused: boolean, activeId: string,
+/**
+ * Covers explicit entry, saved-preference entry, and an exhausted reading sequence.
+ * `readerId` is the message the reader shows: exit focuses its row (or the list
+ * while that row is not rendered). The last shown message stays the target when
+ * the reader closes in the same commit that leaves focus.
+ */
+export function useReaderFocusPlacement(focused: boolean, readerId: string,
   listRef: RefObject<HTMLDivElement | null>, scrollRef: RefObject<number | null>) {
   const wasFocused = useRef(false);
-  const selectedId = useRef(activeId);
-  useEffect(() => { selectedId.current = activeId; }, [activeId]);
+  const selectedId = useRef(readerId);
+  useEffect(() => { if (readerId) selectedId.current = readerId; }, [readerId]);
   useEffect(() => {
     if (focused === wasFocused.current) return;
     wasFocused.current = focused;

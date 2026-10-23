@@ -8,6 +8,15 @@ key are unknown senders, regardless of the stored From display string.
 Unknown senders can use Load once but cannot
 match or save an Always load permission.
 
+The reader sanitizes a message for both modes in one call
+(`sanitizeHtmlForDisplayPair`): the markup is normalized once, CSS filter
+results are memoized for that call only, and the allow pass is skipped when the
+block pass rewrote no remote image source. The two outputs are then identical
+and no "remote content blocked" banner shows, exactly as with two separate
+passes. Any future mode-dependent sanitizer logic must report through the same
+rewrite hook. `lib/html/sanitize.pair.test.ts` compares both modes byte for
+byte with a frozen copy of the earlier sanitizer.
+
 IMAP ingestion now serializes decoded envelope names and mailbox local parts
 with the shared RFC 5322 address helpers. This applies to full and lightweight
 sync, header fallback, single-message sync, Sent-copy readback, drafts,

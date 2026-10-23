@@ -2846,7 +2846,7 @@ export default function MailClient({
     changeReaderLayout("focus");
   }, [handleSelectMessage, isMobile, changeReaderLayout, readerFocused]);
   const closeReaderFocus = useCallback(() => changeReaderLayout("split"), [changeReaderLayout]);
-  useReaderFocusPlacement(readerFocused, activeMessageId, listPaneRef, readerListScrollRef);
+  useReaderFocusPlacement(readerFocused, activeMessage?.id ?? "", listPaneRef, readerListScrollRef);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isMobile || !activeMessage) return;
@@ -5708,7 +5708,7 @@ export default function MailClient({
                   }}
                   isDone={hasDoneFlag(activeMessage)}
                   busy={pendingMessageActions.has(activeMessage.id)}
-                  menu={renderMessageMenu(activeMessage, "thread")}
+                  renderMenu={() => renderMessageMenu(activeMessage, "thread")}
                   openWindow={() => handleOpenInNewWindow(activeMessage)}
                   position={readerNavigation.position}
                   total={readerNavigation.total}

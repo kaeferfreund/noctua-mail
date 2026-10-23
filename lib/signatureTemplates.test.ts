@@ -36,4 +36,19 @@ describe("signature templates", () => {
     const html = "<p>Note</p><p>Regards<br>Alex edited</p>";
     expect(replaceSignatureBlock(html, "<p>Regards<br>Alex</p>", "<p>Jo</p>", "")).toEqual({ body: html, conflict: true });
   });
+  test("QA-201 inserts the signature into an untouched editor without a conflict", () => {
+    for (const body of ["", "\n", "  \n\n", " \n"]) {
+      expect(replaceSignatureBlock(body, undefined, "Regards\nJo", "\n\n")).toEqual({ body: "Regards\nJo", conflict: false });
+      expect(replaceSignatureBlock(body, undefined, "Regards\\,\nJo \\/ jo@example\\.test", "\n\n")).toEqual({ body: "Regards\\,\nJo \\/ jo@example\\.test", conflict: false });
+    }
+    for (const body of ["<p><br></p>", '<p dir="ltr"><br></p>', '<p class="editor-paragraph"><span style="white-space: pre-wrap;"> </span></p>', "<p>&nbsp;</p><p><br></p>"]) {
+      expect(replaceSignatureBlock(body, undefined, "<p>Regards<br>Jo</p>", "")).toEqual({ body: "<p>Regards<br>Jo</p>", conflict: false });
+    }
+  });
+  test("QA-201 still asks before appending a signature to authored text or media", () => {
+    expect(replaceSignatureBlock("\nHello\n", undefined, "Regards\nJo", "\n\n")).toEqual({ body: "\nHello\n\n\nRegards\nJo", conflict: true });
+    for (const body of ["<p>Hello</p>", '<p><img src="cid:synthetic"></p>']) {
+      expect(replaceSignatureBlock(body, undefined, "<p>Jo</p>", "")).toEqual({ body: `${body}<p>Jo</p>`, conflict: true });
+    }
+  });
 });
