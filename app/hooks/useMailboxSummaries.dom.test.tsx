@@ -3,6 +3,7 @@ import { act, cleanup, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
 import { MailboxRows, ViewRow } from "@/app/components/shell/ShellSidebar";
 import type { ShellAccount } from "@/app/components/shell/types";
 import { useTranslations } from "next-intl";
@@ -44,13 +45,13 @@ function harness() {
   function View({ sessionKey, authState = "selected" }: { sessionKey: string | null; authState?: MailboxState | null }) {
     const t = useTranslations("Views");
     const rows = useMailboxSummaries({ sessionKey, authState, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
-    return <Theme><SidebarProvider><output>{JSON.stringify(rows)}</output>
+    return <Theme><TooltipProvider><SidebarProvider><output>{JSON.stringify(rows)}</output>
       <MailboxRows accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
       <ul>{COLLAB_FOLDERS.map(folder => {
         const count = collaborationViewCount(folder.id, rows.find(row => row.accountId === mailbox.accountId));
         return <ViewRow key={folder.id} view={{ ...folder, ...getVirtualFolderLabels(folder, t), icon: null, count, countAriaLabel: `${count ?? 0} threads`, active: false, onSelect: () => {} }} />;
       })}</ul>
-    </SidebarProvider></Theme>;
+    </SidebarProvider></TooltipProvider></Theme>;
   }
   const view = render(<View sessionKey="synthetic-session-a" />);
   const send = async (event: object, index = sources.length - 1) => {

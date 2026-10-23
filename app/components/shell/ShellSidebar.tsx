@@ -14,6 +14,7 @@ import { Button } from "@/app/components/ui/button";
 import ShellUserMenu, { type ShellUserMenuProps } from "./ShellUserMenu";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
 import {
   Sidebar,
   useSidebar,
@@ -66,6 +67,10 @@ export type ShellSidebarProps = {
   folders: FolderSidebarPaneProps;
 };
 
+/** Active mailbox and view rows share the accent fill, which reads stronger
+ * than the neutral hover fill in both colour schemes. */
+const ACTIVE_ROW_CLASS = "data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]";
+
 export function MailboxRows({
   accounts,
   activeAccountId,
@@ -93,7 +98,7 @@ export function MailboxRows({
                     ? t("mailboxes.summary", { email: account.email, unread: summary.unread ?? "—", assignedToMe: summary.assignedToMe, unassignedOpen: summary.unassignedOpen, state: t(`mailboxes.watcherStates.${summary.watcher.state}`) })
                     : account.email}
                   aria-current={account.id === activeAccountId ? "true" : undefined}
-                  className={cn("data-[active=true]:bg-[var(--iris-3)] data-[active=true]:text-[var(--iris-11)]", summary && "pr-32")}
+                  className={cn(ACTIVE_ROW_CLASS, summary && "pr-32")}
                 >
                   <Avatar size="sm">
                     {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
@@ -130,22 +135,30 @@ export function ViewRow({ view }: { view: ShellView }) {
   const locale = useLocale();
   const t = useTranslations("Shell");
   const tv = useTranslations("Views");
+  const { isMobile } = useSidebar();
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
     <SidebarMenuItem className={styles.viewRow}>
+      {/* A row-bound tooltip instead of a native title: it opens beside the
+          row under the pointer or keyboard focus and stays inside the viewport. */}
       <SidebarMenuButton
-        className={styles.viewButton}
+        className={cn(styles.viewButton, ACTIVE_ROW_CLASS)}
         data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
-        title={view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description })}
+        tooltip={{
+          children: view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description }),
+          hidden: isMobile,
+          collisionPadding: 8,
+          className: styles.viewTooltip
+        }}
       >
         {view.icon}
         <span className={cn(styles.viewLabel, view.emphasize && "font-semibold")}>{view.name}</span>
       </SidebarMenuButton>
       {showCount ? (
         <SidebarMenuBadge
-          className={cn("bg-sidebar-accent", styles.viewCount)}
+          className={styles.viewCount}
           title={view.countTitle ?? view.rowTitle}
           aria-label={view.countAriaLabel ?? t("mailboxes.unread", {count: view.count ?? 0})}
         >
@@ -251,11 +264,17 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <SidebarGroup>
                 <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <SidebarMenu>
-                    {viewRows.map((view) => (
-                      <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
-                    ))}
-                  </SidebarMenu>
+                  {/* The row descriptions are plain text: closing them as soon as
+                      the pointer leaves a row means the next row's description
+                      replaces it at once, without Radix's grace area keeping the
+                      previous row's text over a neighbouring row. */}
+                  <TooltipProvider disableHoverableContent>
+                    <SidebarMenu>
+                      {viewRows.map((view) => (
+                        <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
+                      ))}
+                    </SidebarMenu>
+                  </TooltipProvider>
                 </SidebarGroupContent>
               </SidebarGroup>
             ) : null}
