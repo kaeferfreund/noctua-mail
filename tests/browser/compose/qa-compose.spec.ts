@@ -45,9 +45,9 @@ async function signIn(page: Page, person?: {email:string;password:string;totpURI
   await page.reload();
   await expect(page.getByRole('button', {name:'Toggle sidebar',exact:true})).toBeVisible();
 }
-async function openCompose(page: Page, labels = {newMail:'New mail', subject:'Subject:'}) {
-  await page.getByRole('button', {name:labels.newMail,exact:true}).click();
-  await expect(page.getByLabel(labels.subject,{exact:true})).toBeVisible();
+async function openCompose(page: Page, newMail = 'New mail', subjectLabel = 'Subject:') {
+  await page.getByRole('button', {name:newMail,exact:true}).click();
+  await expect(page.getByLabel(subjectLabel,{exact:true})).toBeVisible();
   await expect(page.locator('[data-lexical-editor="true"]')).toBeVisible();
 }
 
@@ -315,9 +315,10 @@ for (const locale of ['de', 'en'] as const) {
     const seed=JSON.parse(readFileSync(process.env.COMPOSE_QA_SEED_FILE!, 'utf8'));
     const mailbox=`/api/accounts/${encodeURIComponent(seed.accountId)}`;
     const headers={origin:new URL(page.url()).origin};
-    const ui=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8'));
-    const copy=ui.Compose;
-    // Locale-specific UI copy comes from the same catalogs the app renders.
+    const catalog=JSON.parse(readFileSync(path.join('messages',`${locale}.json`),'utf8'));
+    const copy=catalog.Compose;
+    // Shell, reader and compose copy follow the UI language; read it from the catalogs the app renders.
+    const chrome={toggleSidebar:catalog.Shell.sidebar.toggle as string,newMail:catalog.Shell.compose.new as string,drafts:catalog.Folders.drafts as string,editDraft:catalog.Reader.editDraft as string};
     // The relative save time always contains a number; "not saved yet" never does.
     const draftSaved=new RegExp(copy.draft.savedAgo.split('{time}').map((part:string)=>part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*\\d.*'));
     expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:locale}})).status()).toBe(200);
@@ -341,8 +342,8 @@ for (const locale of ['de', 'en'] as const) {
       expect((await page.request.put(`${mailbox}/prefs`,{headers,data:{defaultIdentityId:sender.id,signatureOverride:''}})).status()).toBe(200);
       await page.goto('/');
       await expect(page.locator('html')).toHaveAttribute('lang',locale);
-      await page.getByRole('button',{name:ui.Shell.sidebar.toggle,exact:true}).click();
-      await openCompose(page,{newMail:ui.Shell.compose.new,subject:copy.fields.subject});
+      await page.getByRole('button',{name:chrome.toggleSidebar,exact:true}).click();
+      await openCompose(page,chrome.newMail,copy.fields.subject);
       await expect(page.getByLabel(copy.from,{exact:true})).toContainText(sender.email);
       subject=`Synthetic editor space ${locale} ${state} ${Date.now()}`;
       const saved=page.waitForResponse(response=>response.url().endsWith('/drafts/save')&&response.request().postDataJSON().subject===subject);
@@ -354,10 +355,10 @@ for (const locale of ['de', 'en'] as const) {
     }
     async function reopen() {
       await page.goto('/');
-      await page.getByRole('button',{name:ui.Shell.sidebar.toggle,exact:true}).click();
-      await page.getByRole('button',{name:new RegExp(ui.Folders.drafts)}).first().click();
+      await page.getByRole('button',{name:chrome.toggleSidebar,exact:true}).click();
+      await page.getByRole('button',{name:new RegExp(chrome.drafts)}).first().click();
       await page.getByText(subject,{exact:true}).first().click();
-      await page.getByRole('button',{name:ui.Reader.editDraft,exact:true}).click();
+      await page.getByRole('button',{name:chrome.editDraft,exact:true}).click();
       await expect(page.getByLabel(copy.fields.subject,{exact:true})).toHaveValue(subject);
     }
     async function matrix(sender:{email:string;displayName:string},state:string) {
