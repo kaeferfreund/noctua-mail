@@ -5267,7 +5267,7 @@ export default function MailClient({
   });
 
 
-  const rootFolders = accountFolders.filter((folder) => !folder.parentId);
+  const rootFolders = useMemo(() => accountFolders.filter((folder) => !folder.parentId), [accountFolders]);
   const virtualFoldersForPane = useMemo(
     () =>
       VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
@@ -5433,9 +5433,8 @@ export default function MailClient({
             accounts,
             summaries: mailboxSummaries,
             activeAccountId,
-            onSwitch: (accountId: string) => {
-              void switchAccount(accountId);
-            },
+            // The sidebar shows the clicked row as pending until this settles.
+            onSwitch: switchAccount,
             onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
           views: {
