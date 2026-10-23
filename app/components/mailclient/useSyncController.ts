@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { folderIdBelongsToAccount, isAccountFolder } from "@/lib/folderAccount";
 
 import type { OwnAddressInput } from "@/lib/ownAddresses";
@@ -153,6 +155,7 @@ export function useSyncController({
   inboxFolder,
   currentKeyRef
 }: UseSyncControllerParams) {
+  const tn = useTranslations("Notifications");
   // Assign during render: async callbacks from the previous account can run before effects.
   const currentAccountIdRef = useRef(activeAccountId);
   currentAccountIdRef.current = activeAccountId;
@@ -380,7 +383,7 @@ export function useSyncController({
   const runSyncJob = async (payload: SyncJobRequest): Promise<SyncJobResult> => {
     const requestAccountId = currentAccountIdRef.current;
     if (payload.folderId != null && !folderIdBelongsToAccount(payload.accountId, payload.folderId)) {
-      throw new FullSyncDebugCancelledError("Folder does not belong to the sync account.");
+      throw new FullSyncDebugCancelledError("Folder does not belong to the sync account.", "folder_account_mismatch");
     }
     const syncMode = payload.mode ?? (payload.fullSync ? "full" : "recent");
     console.info("[noctua][sync] sync requested", {
@@ -395,7 +398,7 @@ export function useSyncController({
     });
     await requestFullSyncConfirmation(payload);
     if (currentAccountIdRef.current !== requestAccountId) {
-      throw new FullSyncDebugCancelledError("Mailbox selection changed before sync started.");
+      throw new FullSyncDebugCancelledError("Mailbox selection changed before sync started.", "mailbox_selection_changed");
     }
 
     const {
@@ -439,8 +442,12 @@ export function useSyncController({
       if (isFullSyncDebugCancelledError(error)) {
         pushNotice({
           type: "warning",
-          title: "Full sync cancelled",
-          description: error.message,
+          title: tn("fullSyncCancelled"),
+          description: error.reasonCode === "mailbox_selection_changed"
+            ? tn("syncCancelledSelectionChanged")
+            : error.reasonCode === "folder_account_mismatch"
+              ? tn("folderAccountMismatch")
+              : tn("syncCancelledBeforeStart"),
           durationMs: 10000
         });
         return;
@@ -452,7 +459,7 @@ export function useSyncController({
       }
       reportError(error instanceof Error ? error.message : fallbackMessage);
     },
-    [notifyMailServerUnreachable, pushNotice, reportError]
+    [notifyMailServerUnreachable, pushNotice, reportError, tn]
   );
 
   const planNewSyncCandidates = async (

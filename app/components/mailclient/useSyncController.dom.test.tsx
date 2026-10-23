@@ -4,6 +4,8 @@ import { useRef } from "react";
 import type { Folder } from "@/lib/data";
 import { useSyncController, type UseSyncControllerParams } from "./useSyncController";
 
+import { I18nTestProvider } from "@/lib/i18n/testRender";
+
 afterEach(cleanup);
 const noop = () => {};
 const folder = (accountId: string): Folder => ({ id: `${accountId}:INBOX`, accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" });
@@ -27,7 +29,7 @@ function mount(confirm: UseSyncControllerParams["confirmFullSyncStart"] = async 
     refreshMailboxData: async () => true, refreshFolders: async () => [folder(accountId)], refreshPendingCalendarReminders: async () => {},
     setFolders: noop, setMessages: noop, setActiveFolderId: noop, isNotificationSuppressedFolder: () => false,
     updateMessagesWithCurrentResultPrune: noop, confirmFullSyncStart: confirm, currentKeyRef: useRef(accountId)
-  }), { initialProps: { accountId: "synthetic-a", folderId: "synthetic-a:INBOX" } });
+  }), { initialProps: { accountId: "synthetic-a", folderId: "synthetic-a:INBOX" }, wrapper: I18nTestProvider });
   return { ...hook, jobs };
 }
 

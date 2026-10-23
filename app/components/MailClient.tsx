@@ -380,11 +380,13 @@ type ActiveTopicSuggestionsResponse = {
 };
 
 import { useTranslations } from "next-intl";
+import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 
 export default function MailClient({
   buildVersionLabel = ""
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
+  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -491,68 +493,7 @@ export default function MailClient({
   const activeTopicSuggestionCacheKey =
     activeAccountId && activeTopicId ? `${activeAccountId}:${activeTopicId}` : "";
 
-  const readErrorMessage = useCallback(async (res: Response) => {
-    const responsePath = (() => {
-      if (!res.url) return null;
-      try {
-        const url = new URL(res.url);
-        return `${url.pathname}${url.search}`;
-      } catch {
-        return null;
-      }
-    })();
-    const withRequestPath = (message: string) => {
-      if (!responsePath) return message;
-      const normalized = message.trim();
-      if (!normalized) return message;
-      const statusOnly = normalized === String(res.status);
-      const statusPrefix = normalized.startsWith(`${res.status}`);
-      const statusTextOnly =
-        res.statusText && normalized.toLowerCase() === res.statusText.toLowerCase();
-      const requestFailedOnly = normalized === `Request failed (${res.status})`;
-      if (statusOnly || statusPrefix || statusTextOnly || requestFailedOnly) {
-        return `${normalized} ${responsePath}`.trim();
-      }
-      return message;
-    };
-    try {
-      const data = (await res.json()) as {
-        message?: string;
-        error?: string;
-        stack?: string;
-        details?: string;
-        code?: string;
-        accountId?: string;
-        reauthRequired?: boolean;
-        repairAllowed?: boolean;
-      };
-      const resolvedAccountId =
-        data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
-      if (data?.code === "mailbox_credentials_invalid") {
-        if (data.repairAllowed && resolvedAccountId) {
-          setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
-          return "Mailbox credentials need repair.";
-        }
-        setReloginAccountId("");
-        return "Mailbox unavailable; contact a manager.";
-      }
-      // Personal auth 401 is logout. Form proof/permission failures use 403.
-      if (res.status === 401 && !responsePath?.startsWith("/api/ba/")) setAuthState("unauth");
-      const parts = [data?.message, data?.error, data?.details, data?.stack].filter(
-        (value) => value && typeof value === "string"
-      ) as string[];
-      if (parts.length) return withRequestPath(parts.join("\n"));
-    } catch {
-      // ignore
-    }
-    try {
-      const text = await res.text();
-      if (text) return withRequestPath(text.slice(0, 2000));
-    } catch {
-      // ignore
-    }
-    return withRequestPath(`Request failed (${res.status})`);
-  }, []);
+  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription });
 
   const {
     exceptionEntries,
@@ -662,7 +603,6 @@ export default function MailClient({
   const [bulkContextMenuSelection, setBulkContextMenuSelection] = useState<string[]>([]);
   const bulkContextMenuReturnFocusRef = useRef<HTMLElement | null>(null);
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
-  const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
   useEffect(() => deferUntilIdle(() => {
