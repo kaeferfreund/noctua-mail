@@ -74,7 +74,7 @@
       "manager": "Verwalter"
     },
     "tabs": {
-      "account": "Konto",
+      "account": "Postfach",
       "signatures": "Signaturen",
       "preferences": "Persönliche Einstellungen",
       "categorization": "Kategorisierung",
@@ -165,8 +165,8 @@
     },
     "threadsCount": "{count, plural, one {# Thread} other {# Threads}}",
     "refreshTitle": "Neuladen erforderlich",
-    "refreshDescription": "Ein neuer Build ist verfügbar. Diese Version ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.",
-    "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neuer Build: {version}.",
+    "refreshDescription": "Eine neue Version ist verfügbar. Sie ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.",
+    "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neue Version: {version}.",
     "refreshNow": "Jetzt neu laden",
     "status": {
       "activity": "Aktivität und Kalender",
@@ -199,7 +199,7 @@
       "mailbox": "Postfach",
       "syncingScope": "„{scope}“ wird synchronisiert ({mode}{percent, select, none {} other {, {percent}}}) …",
       "syncRetryScope": "{mode}: {retry} {scope}",
-      "syncingFolders": "„{folder}“ wird synchronisiert{more, plural, =0 {} other { und # weitere}} …",
+      "syncingFolders": "{more, plural, =0 {„{folder}“ wird synchronisiert …} one {„{folder}“ und # weiterer Ordner werden synchronisiert …} other {„{folder}“ und # weitere Ordner werden synchronisiert …}}",
       "syncingMailbox": "Postfach wird synchronisiert …",
       "openSource": "Ursprüngliche E-Mail öffnen",
       "openCalendar": "Kalender öffnen",
@@ -208,7 +208,7 @@
       "duration": "(Dauer: {duration})",
       "reminderBefore": "Erinnerung: {lead} vorher",
       "repeats": "Wiederholung: {summary}",
-      "upcomingSummary": "{count, number} · {title} um {dateTime}",
+      "upcomingSummary": "{count, number} · {title} · {dateTime}",
       "phases": {
         "starting": "Vorbereitung",
         "fetching": "Abrufen",
@@ -219,7 +219,7 @@
       },
       "modes": {
         "full": "Vollständige Synchronisierung",
-        "recent": "Synchronisierung letzter Nachrichten",
+        "recent": "Synchronisierung der letzten Nachrichten",
         "new": "Synchronisierung neuer Nachrichten",
         "repair": "Reparatursynchronisierung"
       }
@@ -1109,17 +1109,17 @@
   },
   "Views": {
     "focused": {
-      "name": "Fokus",
+      "name": "Ungelesen & unbeantwortet",
       "description": "Hier findest du ungelesene, unbeantwortete Nachrichten ohne Newsletter.",
-      "badgeLabel": "Fokus"
+      "badgeLabel": "Ungelesen & unbeantwortet"
     },
     "actionQueue": {
-      "name": "Aufgaben",
+      "name": "Markiert & Aufgaben",
       "description": "Hier findest du markierte Nachrichten sowie offene und erledigte Aufgaben.",
       "badgeLabel": "Markiert oder Aufgabe"
     },
     "inviteDeck": {
-      "name": "Einladungen",
+      "name": "Kalendereinladungen",
       "description": "Hier findest du deine Kalendereinladungen.",
       "badgeLabel": "Kalendereinladungen"
     },
@@ -1130,7 +1130,7 @@
     },
     "unassigned": {
       "name": "Nicht zugewiesen",
-      "description": "Hier findest du Threads ohne Zuständigkeit.",
+      "description": "Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.",
       "badgeLabel": "Nicht zugewiesen"
     },
     "open": {

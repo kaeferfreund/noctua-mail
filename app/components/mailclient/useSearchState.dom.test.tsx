@@ -46,7 +46,7 @@ test("changing locale preserves the selected virtual view and its protocol filte
   const hook = renderHook(() => useSearchState({ activeAccountId: "synthetic", activeFolderId: "", setActiveFolderId: () => {}, accountFolders: [], folderById: new Map(), query: "", setQuery: () => {},
     isRelatedSearch: false, relatedRestoreRef: { current: null }, relatedQueryId: null, virtualDefaultExcludedFolderIdsKey: "", apiFetch: async () => Response.json({ total: 0 }) }), { wrapper });
   act(() => hook.result.current.actions.activateVirtualFolder("virtual:action-queue"));
-  expect(hook.result.current.state.activeVirtualFolder?.name).toBe("Aufgaben");
+  expect(hook.result.current.state.activeVirtualFolder?.name).toBe("Markiert & Aufgaben");
   expect(hook.result.current.state.activeVirtualFolder?.badgeLabel).toBe("Markiert oder Aufgabe");
   locale = "en";
   hook.rerender();
