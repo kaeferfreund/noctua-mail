@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { deleteMcpTokenAccountRows } from "./db/mcpTokens";
 import type { AccountRole } from "./data";
 import { getDb } from "./db/connection";
 import { resolveAccountRoleRow } from "./db/accountAccess";
@@ -43,9 +44,9 @@ export async function changeAccountMember(accountId: string, userId: string, act
     } else {
       if (!previous) throw new MembershipError("not_member", "User is not a mailbox member", 404);
       db.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(userId, accountId);
-      // A revoked primary must not invalidate a multi-mailbox token's other memberships.
-      db.prepare(`DELETE FROM mcp_tokens WHERE createdByUserId=? AND accountId=? AND NOT EXISTS
-        (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id AND a.accountId<>?)`).run(userId, accountId, accountId);
+      // Drop the mailbox from this user's tokens: delete tokens with no mailbox left, move the
+      // primary of multi-mailbox tokens so their other memberships keep working (review P2-1).
+      deleteMcpTokenAccountRows(db, accountId, userId);
       db.prepare("DELETE FROM user_account_prefs WHERE userId=? AND accountId=?").run(userId, accountId);
       const now = Date.now();
       db.prepare(`INSERT INTO admin_lifecycle_operations(id,actorUserId,targetUserId,action,payload,state,createdAt,updatedAt)
