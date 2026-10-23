@@ -1,5 +1,6 @@
 import { getFolderDisplayPath, folderNameMatches } from "@/lib/i18n/folderNames";
 import { useLocale } from "next-intl";
+import { memo, useCallback, useMemo } from "react";
 import type React from "react";
 import type { Folder } from "@/lib/data";
 import type { SyncTriggerOptions } from "../types";
@@ -38,7 +39,7 @@ type FolderTreeProps = {
   };
 };
 
-export default function FolderTree({ state, actions }: FolderTreeProps) {
+function FolderTree({ state, actions }: FolderTreeProps) {
   const locale = useLocale();
   const {
     rootFolders,
@@ -56,15 +57,31 @@ export default function FolderTree({ state, actions }: FolderTreeProps) {
 
   const folderQueryText = folderQuery.trim().toLowerCase();
 
-  const hasFolderMatch = (folder: Folder): boolean => {
+  const hasFolderMatch = useCallback(function matches(folder: Folder): boolean {
     if (!folderQueryText) return true;
     if (folderNameMatches(folder, folderQueryText, locale)) return true;
     const children = folderTree.get(folder.id) ?? [];
-    return children.some((child) => hasFolderMatch(child));
-  };
+    return children.some((child) => matches(child));
+  }, [folderQueryText, folderTree, locale]);
 
-  const folderPathLabel = (folder: Folder) =>
-    getFolderDisplayPath(folder.id, id => folderById.get(id), locale);
+  const folderPathLabel = useCallback(
+    (folder: Folder) => getFolderDisplayPath(folder.id, id => folderById.get(id), locale),
+    [folderById, locale]
+  );
+  const helpers = useMemo(() => ({ hasFolderMatch, folderPathLabel }), [hasFolderMatch, folderPathLabel]);
+  const nodeState = useMemo(() => ({
+    folderTree,
+    folderById,
+    folderQueryText,
+    searchScope,
+    activeFolderId,
+    collapsedFolders,
+    syncingFolders,
+    deletingFolderIds,
+    draggingMessageIds,
+    dragOverFolderId
+  }), [folderTree, folderById, folderQueryText, searchScope, activeFolderId, collapsedFolders,
+    syncingFolders, deletingFolderIds, draggingMessageIds, dragOverFolderId]);
 
   return (
     <>
@@ -74,22 +91,24 @@ export default function FolderTree({ state, actions }: FolderTreeProps) {
           folder={folder}
           depth={0}
           forceShow={false}
-          state={{
-            folderTree,
-            folderById,
-            folderQueryText,
-            searchScope,
-            activeFolderId,
-            collapsedFolders,
-            syncingFolders,
-            deletingFolderIds,
-            draggingMessageIds,
-            dragOverFolderId
-          }}
+          state={nodeState}
           actions={actions}
-          helpers={{ hasFolderMatch, folderPathLabel }}
+          helpers={helpers}
         />
       ))}
     </>
   );
 }
+
+function shallowEqual<T extends object>(a: T, b: T): boolean {
+  const keys = Object.keys(a) as (keyof T)[];
+  return keys.length === Object.keys(b).length && keys.every(key => Object.is(a[key], b[key]));
+}
+
+/**
+ * Callers pass fresh `state` / `actions` objects on every render; the tree
+ * re-renders only when one of their members changed. Unrelated shell renders
+ * (list rows arriving, search state) then skip every folder node.
+ */
+export default memo(FolderTree, (prev, next) =>
+  shallowEqual(prev.state, next.state) && shallowEqual(prev.actions, next.actions));

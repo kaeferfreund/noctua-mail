@@ -1,9 +1,9 @@
 import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
+import { memo, useState } from "react";
 import type React from "react";
 import { Folder as FolderIcon, MoreVertical } from "lucide-react";
-import { Badge, DropdownMenu } from "@radix-ui/themes";
+import { Badge, DropdownMenu, IconButton } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import type { Folder } from "@/lib/data";
@@ -51,7 +51,7 @@ type FolderTreeNodeProps = {
   };
 };
 
-export default function FolderTreeNode({
+function FolderTreeNodeView({
   folder,
   depth,
   forceShow,
@@ -87,6 +87,13 @@ export default function FolderTreeNode({
   } = actions;
   const { hasFolderMatch, folderPathLabel } = helpers;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // The Radix menu + tooltip and the count title cost real work per folder and
+  // are rarely used, so they are built on the first sign of interest in this
+  // row (pointer over it, focus in it) and kept from then on. The active and
+  // syncing rows show their action button without hover, so they mount it
+  // right away and keyboard users always reach the real menu trigger.
+  const [isEngaged, setIsEngaged] = useState(false);
+  const engage = () => setIsEngaged(true);
 
   const isCollapsed = collapsedFolders[folder.id] ?? false;
   const hasChildren = (folderTree.get(folder.id) ?? []).length > 0;
@@ -98,10 +105,13 @@ export default function FolderTreeNode({
     ? folderNameMatches(folder, folderQueryText, locale)
     : true;
   const childNodes = folderTree.get(folder.id) ?? [];
-  const fullPath = folderPathLabel(folder);
-  const folderTitle = getFolderCountTitle(fullPath, folder.count ?? 0, folder.unreadCount ?? 0, locale);
+  const folderTitle = isEngaged
+    ? getFolderCountTitle(folderPathLabel(folder), folder.count ?? 0, folder.unreadCount ?? 0, locale)
+    : undefined;
   const isDeleting = deletingFolderIds.has(folder.id);
   const isSyncingFolder = syncingFolders.has(folder.id);
+  const isActive = searchScope === "folder" && folder.id === activeFolderId;
+  const mountMenu = isEngaged || isActive || isSyncingFolder;
 
   return (
     <div
@@ -111,15 +121,17 @@ export default function FolderTreeNode({
       }`}
     >
       <div
-        className={`${styles.treeRow} ${
-          searchScope === "folder" && folder.id === activeFolderId ? styles.treeRowActive : ""
-        } ${isDeleting ? styles.treeRowDisabled : ""}`}
+        className={`${styles.treeRow} ${isActive ? styles.treeRowActive : ""} ${
+          isDeleting ? styles.treeRowDisabled : ""
+        }`}
         data-syncing={isSyncingFolder ? "true" : "false"}
         data-menu-open={isMenuOpen ? "true" : "false"}
         title={folderTitle}
         data-folder-id={folder.id}
         role="button"
         tabIndex={0}
+        onPointerEnter={engage}
+        onFocus={engage}
         onClick={() => {
           if (isDeleting) return;
           clearSearch();
@@ -200,49 +212,68 @@ export default function FolderTreeNode({
           </Badge>
         ) : null}
         <span className={styles.treeActions}>
-          <DropdownMenu.Root open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-            <DropdownMenu.Trigger>
-              <TooltipIconButton
-                className={styles.treeAction}
-                variant="ghost"
-                size="1"
-                tooltip={t("folderActions")}
-                disabled={isDeleting}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <MoreVertical size={14} />
-              </TooltipIconButton>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" className={styles.menuContent}>
-              <DropdownMenu.Item
-                disabled={isDeleting || isSyncingFolder}
-                onSelect={() => {
-                  syncAccount(folder.id, "full", {
-                    recategorizeFolder: true,
-                    fullSyncReason: t("manualFolderSyncReason")
-                  });
-                }}
-              >{t("sync")}</DropdownMenu.Item>
-              <DropdownMenu.Item
-                disabled={isDeleting}
-                onSelect={() => {
-                  handleCreateSubfolder(folder);
-                }}
-              >{t("createSubfolder")}</DropdownMenu.Item>
-              <DropdownMenu.Item
-                disabled={isDeleting}
-                onSelect={() => {
-                  handleRenameFolderItem(folder);
-                }}
-              >{t("rename")}</DropdownMenu.Item>
-              <DropdownMenu.Item
-                disabled={isDeleting}
-                onSelect={() => {
-                  handleDeleteFolderItem(folder);
-                }}
-              >{t("delete")}</DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+          {mountMenu ? (
+            <DropdownMenu.Root open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <DropdownMenu.Trigger>
+                <TooltipIconButton
+                  className={styles.treeAction}
+                  variant="ghost"
+                  size="1"
+                  tooltip={t("folderActions")}
+                  disabled={isDeleting}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <MoreVertical size={14} />
+                </TooltipIconButton>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end" className={styles.menuContent}>
+                <DropdownMenu.Item
+                  disabled={isDeleting || isSyncingFolder}
+                  onSelect={() => {
+                    syncAccount(folder.id, "full", {
+                      recategorizeFolder: true,
+                      fullSyncReason: t("manualFolderSyncReason")
+                    });
+                  }}
+                >{t("sync")}</DropdownMenu.Item>
+                <DropdownMenu.Item
+                  disabled={isDeleting}
+                  onSelect={() => {
+                    handleCreateSubfolder(folder);
+                  }}
+                >{t("createSubfolder")}</DropdownMenu.Item>
+                <DropdownMenu.Item
+                  disabled={isDeleting}
+                  onSelect={() => {
+                    handleRenameFolderItem(folder);
+                  }}
+                >{t("rename")}</DropdownMenu.Item>
+                <DropdownMenu.Item
+                  disabled={isDeleting}
+                  onSelect={() => {
+                    handleDeleteFolderItem(folder);
+                  }}
+                >{t("delete")}</DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          ) : (
+            <IconButton
+              className={styles.treeAction}
+              variant="ghost"
+              size="1"
+              aria-label={t("folderActions")}
+              aria-haspopup="menu"
+              aria-expanded={false}
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.stopPropagation();
+                engage();
+                setIsMenuOpen(true);
+              }}
+            >
+              <MoreVertical size={14} />
+            </IconButton>
+          )}
         </span>
       </div>
       {!isCollapsed && hasChildren && (
@@ -263,3 +294,8 @@ export default function FolderTreeNode({
     </div>
   );
 }
+
+// Children recurse through the memoized component, so an unchanged subtree is
+// skipped as a whole.
+const FolderTreeNode = memo(FolderTreeNodeView);
+export default FolderTreeNode;
