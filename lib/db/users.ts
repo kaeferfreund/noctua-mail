@@ -43,6 +43,26 @@ export async function getUsers() {
   return rows.map(mapUserRow);
 }
 
+/** Link holders plus the owner of one mailbox, with their raw link role; never scans the whole directory. */
+export function readAccountMemberRows(db: any, accountId: string, ownerUserId: string | null): Array<{ user: User; linkRole: string | null }> {
+  return (db.query(`SELECT ${USER_ROW_SELECT}, ua.role AS linkRole FROM users p JOIN auth_user u ON u.id=p.id
+    LEFT JOIN user_accounts ua ON ua.accountId=?1 AND ua.userId=p.id
+    WHERE p.id IN (SELECT userId FROM user_accounts WHERE accountId=?1 UNION SELECT ?2)`)
+    .all(accountId, ownerUserId) as Array<StoredUserRow & { linkRole: string | null }>)
+    .map(row => ({ user: mapUserRow(row), linkRole: row.linkRole }));
+}
+
+/** Member counts as `readAccountMemberRows(...).length`: links and owner, deduplicated, only existing users. */
+export function countAccountMembers(db: any, accountIds: readonly string[]): Map<string, number> {
+  if (!accountIds.length) return new Map();
+  const rows = db.query(`SELECT m.accountId AS accountId, COUNT(*) AS memberCount
+    FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1))
+      UNION SELECT id, ownerUserId FROM accounts WHERE id IN (SELECT value FROM json_each(?1)) AND ownerUserId IS NOT NULL) m
+    JOIN users p ON p.id=m.userId JOIN auth_user u ON u.id=p.id
+    GROUP BY m.accountId`).all(JSON.stringify(accountIds)) as Array<{ accountId: string; memberCount: number }>;
+  return new Map(rows.map(row => [row.accountId, row.memberCount]));
+}
+
 /** Bounded manager directory; select only the identity fields needed for membership. */
 export async function listAccountMemberCandidates(accountId: string, query = "", limit = 25) {
   const db = await getDb();
