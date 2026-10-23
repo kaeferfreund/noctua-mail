@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
+    ] },
+    // Font and icon file names are stable but not content-hashed, so they
+    // get a bounded, revalidating cache instead of `immutable`. No rule for
+    // /runtime-config.js: it is regenerated per deployment and must stay
+    // revalidated on every load.
+    { source: "/fonts/:path*", headers: [
+      {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
+    ] },
+    { source: "/icons/:path*", headers: [
+      {key:"Cache-Control",value:"public, max-age=86400, stale-while-revalidate=604800"}
     ] }];
   },
   output: 'standalone',
