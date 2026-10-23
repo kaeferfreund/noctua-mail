@@ -15,6 +15,7 @@ import type { SearchBadgesState } from "./useSearchState";
 import { buildMessageListQueryUrl } from "./messageListQueryUrl";
 import type { ThreadDateSource } from "@/lib/threadDate";
 import type { MessageListSortBy } from "@/lib/messageListSort";
+import type { MailboxViewCache } from "./mailboxViewCache";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -45,6 +46,8 @@ export type UseMessageDataParams = {
   setCollapsedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setCollapsedThreads: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   currentKeyRef: React.MutableRefObject<string>;
+  // Recently visited lists: a revisit shows the cached first page while it is re-read.
+  viewCache?: MailboxViewCache;
 };
 
 export function useMessageData({
@@ -71,7 +74,8 @@ export function useMessageData({
   relatedContext,
   setCollapsedGroups,
   setCollapsedThreads,
-  currentKeyRef
+  currentKeyRef,
+  viewCache
 }: UseMessageDataParams) {
   const [authoritativeRevision, setAuthoritativeRevision] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -103,6 +107,11 @@ export function useMessageData({
     controller: AbortController;
     timer: number;
   } | null>(null);
+  // Size of the last first page read for the key on screen; a list paged further is
+  // cached as its first page only.
+  const firstPageSizeRef = useRef<{ key: string; itemCount: number; loadedCount: number } | null>(null);
+  // A new key's first load reads page 1 even if it runs before the page reset renders.
+  const firstLoadKeyRef = useRef<string | null>(null);
 
   // Cleanup filteredSearchRefreshTimer and the page load on unmount
   useEffect(() => {
@@ -121,28 +130,6 @@ export function useMessageData({
       }
     };
   }, []);
-
-  // Reset list state when the query key changes
-  useEffect(() => {
-    if (filteredSearchRefreshTimerRef.current !== null) {
-      window.clearTimeout(filteredSearchRefreshTimerRef.current);
-      filteredSearchRefreshTimerRef.current = null;
-    }
-    setMessages([]);
-    setMessagesPage(1);
-    setHasMoreMessages(true);
-    setLoadedMessageCount(0);
-    setTotalMessages(null);
-    lastRequestRef.current = null;
-    setGroupMeta([]);
-    setMessageListError(null);
-    const superseded = inFlightLoadRef.current;
-    if (superseded && superseded.key !== messagesKey) {
-      superseded.controller.abort();
-      inFlightLoadRef.current = null;
-      setLoadingMessages(false);
-    }
-  }, [messagesKey]);
 
   const logListReplacement = (
     source: string,
@@ -204,6 +191,75 @@ export function useMessageData({
       searchBadges: { attachments: searchBadges.attachments },
       effectiveSearchBadges
     });
+
+  // Free-text and related searches are not cached: every query is a new key and
+  // would push the visited mailboxes out.
+  const cacheableView = Boolean(viewCache) && !query.trim();
+  const firstPageUrl = buildQueryUrl(1);
+
+  // Reset list state when the query key changes; a list visited earlier starts from
+  // its cached first page and the page-1 load below re-reads it. A layout effect, so
+  // the new key never paints the previous key's rows or an empty list first.
+  useLayoutEffect(() => {
+    if (filteredSearchRefreshTimerRef.current !== null) {
+      window.clearTimeout(filteredSearchRefreshTimerRef.current);
+      filteredSearchRefreshTimerRef.current = null;
+    }
+    const cached = cacheableView ? viewCache?.readList(firstPageUrl, activeAccountId) ?? null : null;
+    setMessages(cached?.rows ?? []);
+    setMessagesPage(1);
+    setHasMoreMessages(cached?.hasMore ?? true);
+    setLoadedMessageCount(cached?.loadedCount ?? 0);
+    setTotalMessages(cached?.total ?? null);
+    lastRequestRef.current = null;
+    firstLoadKeyRef.current = messagesKey;
+    // Nothing for the new key is on screen from a read yet.
+    shownPageKeyRef.current = null;
+    setGroupMeta(cached?.groupMeta ?? []);
+    setMessageListError(null);
+    if (cached) {
+      setCollapsedGroups((prev) => mergeCollapsedGroupsWithMeta(prev, cached.groupMeta));
+      setCollapsedThreads((prev) => mergeCollapsedThreadsWithMessages(prev, cached.rows));
+    }
+    const superseded = inFlightLoadRef.current;
+    if (superseded && superseded.key !== messagesKey) {
+      superseded.controller.abort();
+      inFlightLoadRef.current = null;
+      setLoadingMessages(false);
+    }
+    // Only a key change resets the list; the URL and cache inputs are derived from the same render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messagesKey]);
+
+  // The first page on screen, with local changes (read state, deletions, moves), is
+  // what a revisit shows. Only a list confirmed by a read for this key is written; an
+  // emptied list drops the entry, so a revisit loads as usual.
+  useEffect(() => {
+    if (!viewCache || !cacheableView || shownPageKeyRef.current !== messagesKey) return;
+    const firstPage = firstPageSizeRef.current?.key === messagesKey ? firstPageSizeRef.current : null;
+    if (messagesPage > 1 && !firstPage) return;
+    const pagedFurther = messagesPage > 1 && firstPage !== null;
+    viewCache.writeList(firstPageUrl, {
+      accountId: activeAccountId,
+      rows: pagedFurther ? messages.slice(0, firstPage.itemCount) : messages,
+      groupMeta,
+      hasMore: pagedFurther || hasMoreMessages,
+      total: totalMessages,
+      loadedCount: pagedFurther ? firstPage.loadedCount : loadedMessageCount
+    });
+  }, [viewCache, cacheableView, messagesKey, firstPageUrl, activeAccountId, messages, groupMeta, hasMoreMessages,
+    totalMessages, loadedMessageCount, messagesPage]);
+
+  // The server denied the mailbox: nothing it showed stays on screen or in the cache.
+  const dropDeniedList = (status: number, showsList: boolean) => {
+    if (status !== 401 && status !== 403) return;
+    viewCache?.dropAccount(activeAccountId);
+    if (!showsList) return;
+    setMessages([]);
+    setGroupMeta([]);
+    setLoadedMessageCount(0);
+    setTotalMessages(null);
+  };
 
   const dropFirstPagePrefetch = useCallback(() => {
     const prefetch = firstPagePrefetchRef.current;
@@ -278,10 +334,12 @@ export function useMessageData({
     const loadMessages = async () => {
       if (!activeAccountId) return;
       if (searchScope === "folder" && !isRelatedSearch && !activeFolderId) return;
-      if (inFlightLoadRef.current || !hasMoreMessages) return;
+      const page = firstLoadKeyRef.current === messagesKey ? 1 : messagesPage;
+      // A first page is always read: a cached first page may say there is no more.
+      if (inFlightLoadRef.current || (!hasMoreMessages && page > 1)) return;
       if (
         lastRequestRef.current?.key === messagesKey &&
-        lastRequestRef.current?.page === messagesPage
+        lastRequestRef.current?.page === page
       ) {
         return;
       }
@@ -289,11 +347,12 @@ export function useMessageData({
       const requestMutationVersion = messageMutationVersionRef.current;
       const load = { key: requestKey, controller: new AbortController() };
       inFlightLoadRef.current = load;
-      lastRequestRef.current = { key: requestKey, page: messagesPage };
+      lastRequestRef.current = { key: requestKey, page };
+      if (page === 1) firstLoadKeyRef.current = null;
       try {
         setLoadingMessages(true);
-        const url = buildQueryUrl(messagesPage);
-        const prefetched = messagesPage === 1 ? takeFirstPagePrefetch(url) : null;
+        const url = buildQueryUrl(page);
+        const prefetched = page === 1 ? takeFirstPagePrefetch(url) : null;
         if (prefetched) {
           load.controller.signal.addEventListener("abort", () => prefetched.controller.abort(), { once: true });
         }
@@ -332,7 +391,7 @@ export function useMessageData({
           }
           setAuthoritativeRevision(value => value + 1);
           setMessages((prev) => {
-            if (messagesPage === 1) {
+            if (page === 1) {
               logListReplacement("loadMessages-page1", prev, items);
               return items;
             }
@@ -352,7 +411,7 @@ export function useMessageData({
           });
           setLoadedMessageCount((prev) =>
             mergeLoadedMessageCount({
-              page: messagesPage,
+              page,
               previousCount: prev,
               itemCount: items.length,
               baseCount: data?.baseCount
@@ -360,8 +419,13 @@ export function useMessageData({
           );
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
-          if (messagesPage === 1) {
+          if (page === 1) {
             shownPageKeyRef.current = requestKey;
+            firstPageSizeRef.current = {
+              key: requestKey,
+              itemCount: items.length,
+              loadedCount: resolveLoadedMessageCount(items.length, data?.baseCount)
+            };
             const nextMeta = Array.isArray(data?.groups)
               ? data.groups
               : computeGroupMeta(items);
@@ -372,6 +436,7 @@ export function useMessageData({
           setMessageListError(null);
         } else {
           shownPageKeyRef.current = null;
+          dropDeniedList(messagesRes.status, true);
           const errorMessage = await readErrorMessage(messagesRes);
           reportError(errorMessage);
           setMessageListError(errorMessage || "Failed to load messages.");
@@ -413,6 +478,7 @@ export function useMessageData({
       const messageRes = await apiFetch(buildQueryUrl(1));
       if (!messageRes.ok) {
         shownPageKeyRef.current = null;
+        dropDeniedList(messageRes.status, currentKeyRef.current === requestKey);
         const message = await readErrorMessage(messageRes);
         reportError(message || "Failed to refresh mailbox data.");
         setMessageListError(message || "Failed to load messages.");
@@ -447,6 +513,11 @@ export function useMessageData({
         return false;
       }
       shownPageKeyRef.current = requestKey;
+      firstPageSizeRef.current = {
+        key: requestKey,
+        itemCount: nextMessages.length,
+        loadedCount: resolveLoadedMessageCount(nextMessages.length, messageData?.baseCount)
+      };
       setAuthoritativeRevision(value => value + 1);
       setMessages((prev) => {
         logListReplacement("refreshMailboxData", prev, nextMessages);

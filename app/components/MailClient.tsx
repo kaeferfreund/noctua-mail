@@ -207,6 +207,7 @@ import {
 } from "./mailclient/useSearchState";
 import { useReminderNotifications } from "./mailclient/useReminderNotifications";
 import { useMessageData } from "./mailclient/useMessageData";
+import { useMailboxViewCache } from "./mailclient/mailboxViewCache";
 import { useThreadContent } from "./mailclient/useThreadContent";
 import { useSyncController } from "./mailclient/useSyncController";
 import { registerRecentLocalDraftSave } from "./mailclient/recentLocalDraftSaves";
@@ -1288,6 +1289,13 @@ export default function MailClient({
     threadsAllowed &&
     (threadsMode === "on" || (threadsMode === "scope" && threadsScopeAvailable));
 
+  const accountIds = useMemo(() => accounts.map(account => account.id), [accounts]);
+  const viewCache = useMailboxViewCache({
+    sessionKey: authState === "ok" ? currentUser?.id ?? null : null,
+    accountIds,
+    activeAccountId,
+    folders
+  });
   // useMessageData: manages message list state, loading, and refresh
   const {
     messages,
@@ -1334,7 +1342,8 @@ export default function MailClient({
     relatedContext,
     setCollapsedGroups,
     setCollapsedThreads,
-    currentKeyRef
+    currentKeyRef,
+    viewCache
   });
   refreshMailboxDataRef.current = refreshMailboxData;
   setMessagesRef.current = setMessages;
@@ -1754,7 +1763,8 @@ export default function MailClient({
     setEditingAccount,
     setDeletingFolderIds,
     prefetchFirstPage,
-    dropFirstPagePrefetch
+    dropFirstPagePrefetch,
+    viewCache
   });
 
   const preferToDisplay = isDraftsFolder(activeFolderId) || isSentFolder(activeFolderId);
