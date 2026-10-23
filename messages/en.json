@@ -486,7 +486,12 @@
       "delete": "Delete mailbox",
       "deleteConfirm": "Permanently delete {email} and its local data?",
       "membersTitle": "Members of {email}",
-      "memberCount": "{count, plural, one {# member} other {# members}}"
+      "memberCount": "{count, plural, one {# member} other {# members}}",
+      "selfGrantTitle": "Give yourself access?",
+      "selfGrantHelp": "The shared mailbox was created. It has no members yet. Explicitly grant yourself access or add members later.",
+      "grantAccess": "Grant access",
+      "later": "Later",
+      "noMembers": "No members yet – nobody can see this mailbox"
     },
     "users": {
       "refresh": "Refresh users",
