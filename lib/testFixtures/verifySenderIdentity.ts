@@ -41,7 +41,7 @@ await api.mergeUserAccountPrefs(editor.user.id, accountId, { defaultIdentityId: 
 await api.saveFoldersForAccount(accountId, ["Drafts", "Sent", "INBOX"].map(name => ({ id: `${accountId}:${name}`, accountId, name, count: 0, specialUse: `\\${name}` })));
 
 let rejectCopyRecipient = false;
-const sink = await startSmtpSink({ rejectRecipient: address => rejectCopyRecipient && address === "copy@example.test" ? "550 5.1.1 Synthetic recipient rejected" : undefined, port: 0, out: `${process.env.TMPDIR}/sender-smtp-${crypto.randomUUID()}` });
+const sink = await startSmtpSink({ rejectRecipient: address => rejectCopyRecipient && address === "copy@example.test" ? "550 5.1.1 Synthetic recipient rejected" : undefined, port: 0 });
 account.smtp = { host: "127.0.0.1", port: sink.port, secure: false, user: demoUser, password: demoPass };
 await api.upsertAccount(account);
 const smtpActual = { ...await import("../serverSmtp") };
