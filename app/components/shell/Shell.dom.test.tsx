@@ -106,7 +106,7 @@ describe("shell sidebar", () => {
     const switched: string[] = [];
     let syncs = 0;
     const view = renderSidebar([account("z", "Zulu"), account("a", "Alpha"), account("team", "Team", "example.test", true)],
-      (id) => switched.push(id), () => { syncs++; });
+      (id) => { switched.push(id); }, () => { syncs++; });
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[aria-current], button[title$='@example.test']")]
       .filter((row) => row.getAttribute("aria-label") !== "User menu");
     expect(rows.map((row) => row.textContent)).toEqual(["ALAlpha", "ZUZulu", "TETeam"]);
