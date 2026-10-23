@@ -758,8 +758,8 @@ type SearchCandidateResolution =
  * top-level list call). Never carries user query content — no tokens, no
  * raw query, no error text that could embed them; only the reason code, a
  * hash of the account id, the cap, counts and, for `fts_error`, the SQLite
- * error name/code. `candidateCapExceeded` is the aggregation flag for
- * measuring cap fallovers in production logs.
+ * error name/code plus a derived `errorClass`. `candidateCapExceeded` is the
+ * aggregation flag for measuring cap fallovers in production logs.
  */
 function logSearchFallback(params: {
   accountId: string;
@@ -771,6 +771,7 @@ function logSearchFallback(params: {
   candidateCapExceeded: boolean;
   errorName?: string;
   errorCode?: string;
+  errorClass?: FtsErrorClass;
 }) {
   console.warn("[fts-search] legacy fallback", {
     reason: params.reason,
@@ -781,7 +782,8 @@ function logSearchFallback(params: {
     ...(params.oversizedTokenCount !== undefined ? { oversizedTokenCount: params.oversizedTokenCount } : {}),
     ...(params.observedCandidates !== undefined ? { observedCandidates: params.observedCandidates } : {}),
     ...(params.errorName !== undefined ? { errorName: params.errorName } : {}),
-    ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {})
+    ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {}),
+    ...(params.errorClass !== undefined ? { errorClass: params.errorClass } : {})
   });
 }
 
@@ -791,20 +793,40 @@ function maxFtsDrivenCandidates(): number {
 }
 
 /**
+ * `index`: the FTS table is missing or corrupt (owners: FTS identity /
+ * repair). `syntax`: FTS5 rejected the MATCH expression (owners: search
+ * token building). `other`: anything else, e.g. SQLITE_BUSY.
+ */
+type FtsErrorClass = "index" | "syntax" | "other";
+
+function classifyFtsError(code: string | undefined, message: string): FtsErrorClass {
+  if (code?.startsWith("SQLITE_CORRUPT")) return "index";
+  if (/^no such table: /.test(message) || /^vtable constructor failed: /.test(message)) return "index";
+  if (/^fts5: (syntax error|parser stack overflow)/.test(message)) return "syntax";
+  return "other";
+}
+
+/**
  * A statement touching the FTS v3 table failed during resolution. Keeps
- * only the SQLite error name/code for the fallback log line — never the
- * message, which can embed the MATCH text.
+ * only the SQLite error name/code and the class derived from the message
+ * for the fallback log line — never the message itself, which can embed
+ * the MATCH text.
  */
 class FtsCandidateError extends Error {
   readonly errorName: string;
   readonly errorCode?: string;
+  readonly errorClass: FtsErrorClass;
 
   constructor(cause: unknown) {
     super("FTS candidate query failed");
     this.name = "FtsCandidateError";
-    const fields = cause as { name?: unknown; code?: unknown } | null;
+    const fields = cause as { name?: unknown; code?: unknown; message?: unknown } | null;
     this.errorName = typeof fields?.name === "string" ? fields.name : "Error";
     this.errorCode = typeof fields?.code === "string" ? fields.code : undefined;
+    this.errorClass = classifyFtsError(
+      this.errorCode,
+      typeof fields?.message === "string" ? fields.message : ""
+    );
   }
 }
 
@@ -827,7 +849,8 @@ function resolveSearchCandidateIds(
     return resolveDrivenSearchCandidateIds(db, accountId, params);
   } catch (error) {
     if (!(error instanceof FtsCandidateError)) throw error;
-    // Missing/corrupt FTS: the legacy clause decides the outcome. It may
+    // FTS read failed (missing/corrupt index, MATCH syntax, BUSY …; see
+    // `errorClass` in the log line): the legacy clause decides the outcome. It may
     // still answer (e.g. its MATCH subquery is never reached when the
     // scope has no rows) or raise the same error to the caller.
     const tokenCount = Math.max(params.ftsTokenQueries.length, params.attachmentFilenameTerms.length);
@@ -838,7 +861,8 @@ function resolveSearchCandidateIds(
       tokenCount,
       candidateCapExceeded: false,
       errorName: error.errorName,
-      errorCode: error.errorCode
+      errorCode: error.errorCode,
+      errorClass: error.errorClass
     });
     return { kind: "legacy", fallback: { reason: "fts_error", tokenCount } };
   }
