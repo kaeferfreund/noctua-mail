@@ -150,3 +150,30 @@ describe("first page requested alongside a mailbox switch", () => {
     }
   });
 });
+
+describe("refresh after a sync that wrote nothing", () => {
+  it("keeps a first page already on screen and re-reads one that failed or is still loading", async () => {
+    const h = mount();
+    await waitFor(() => expect(h.pending("account-a")).toHaveLength(1));
+    // Still loading: the refresh reads the page.
+    let refreshed: Promise<boolean> | undefined;
+    act(() => { refreshed = h.result.current.refreshMailboxData({ skipIfCurrent: true }); });
+    expect(h.pending("account-a")).toHaveLength(2);
+    await h.release(h.pending("account-a")[1], page("account-a", 1, false));
+    await act(async () => { await refreshed; });
+    await h.release(h.pending("account-a")[0], page("account-a", 1, false));
+    await waitFor(() => expect(h.result.current.loadingMessages).toBe(false));
+    // On screen: nothing is requested.
+    await act(async () => { expect(await h.result.current.refreshMailboxData({ skipIfCurrent: true })).toBe(true); });
+    expect(h.held).toHaveLength(0);
+    // A failed refresh clears it; the next skip-if-current refresh reads again.
+    act(() => { refreshed = h.result.current.refreshMailboxData(); });
+    await h.release(h.held[0], new Response("nope", { status: 500 }));
+    await act(async () => { await refreshed; });
+    act(() => { refreshed = h.result.current.refreshMailboxData({ skipIfCurrent: true }); });
+    expect(h.held).toHaveLength(1);
+    await h.release(h.held[0], page("account-a", 3, false));
+    await act(async () => { await refreshed; });
+    expect(h.result.current.messages.map(message => message.id)).toEqual(["account-a-m3", "account-a-m4"]);
+  });
+});

@@ -679,7 +679,7 @@ export default function MailClient({
   const [pendingSelectionScrollMessageId, setPendingSelectionScrollMessageId] = useState<
     string | null
   >(null);
-  const refreshMailboxDataRef = useRef<() => Promise<boolean>>(async () => false);
+  const refreshMailboxDataRef = useRef<(options?: { skipIfCurrent?: boolean }) => Promise<boolean>>(async () => false);
   const setMessagesRef = useRef<React.Dispatch<React.SetStateAction<Message[]>>>(() => {});
   const updateMessagesRef = useRef<(updater: (message: Message) => Message | null, options?: { source?: string }) => void>(() => {});
   const forwardMessageResultPruneUpdate = useCallback(
@@ -862,7 +862,7 @@ export default function MailClient({
     reportError,
     pushNotice,
     showNotification,
-    refreshMailboxData: () => refreshMailboxDataRef.current(),
+    refreshMailboxData: (options) => refreshMailboxDataRef.current(options),
     refreshFolders,
     refreshPendingCalendarReminders,
     setFolders,
