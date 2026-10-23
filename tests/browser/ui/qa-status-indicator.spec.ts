@@ -268,6 +268,50 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
   });
 }
 
+// FullCalendar's href-less date labels report tabIndex 0; Radix then picked one
+// as the popover's last tabbable element and Tab left the popover. Walk the real
+// tab order with the keyboard: it must wrap inside the popover both ways.
+test("desktop calendar popover keeps Tab and Shift+Tab inside the popover", async ({ page }) => {
+  test.skip(baseline);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator('[data-status-indicator]')).toHaveAttribute("data-status-indicator", "idle", { timeout: 120000 });
+  expect(await post(page, "/api/accounts/qa-shared/calendar/events", {
+    summary: "Synthetic tab loop", startAtMs: Date.now(), endAtMs: Date.now() + 3600000, allDay: true, sourceType: "local"
+  })).toBe(200);
+  await page.goto("/?openCalendar=1");
+  const popover = page.locator('[data-slot="popover-content"]');
+  await expect(popover.locator(".fc-event").filter({ hasText: "Synthetic tab loop" }).first()).toBeVisible();
+  const first = popover.getByRole("button", { name: "Neue E-Mails abrufen", exact: true });
+  await first.focus();
+  const focused = () => page.evaluate(() => {
+    const element = document.activeElement as HTMLElement | null;
+    const popover = document.querySelector('[data-slot="popover-content"]');
+    return { inside: !!element && !!popover?.contains(element), first: element?.textContent === "Neue E-Mails abrufen",
+      event: !!element?.closest(".fc-event"), label: element?.getAttribute("aria-label") ?? element?.textContent?.trim().slice(0, 60) ?? "" };
+  });
+  const order: string[] = [];
+  let wrapped = false, events = 0;
+  for (let step = 0; step < 120 && !wrapped; step++) {
+    await page.keyboard.press("Tab");
+    const now = await focused();
+    expect(now.inside, `Tab ${step + 1} after ${order.at(-1)}`).toBe(true);
+    if (now.first) wrapped = true; else { order.push(now.label); if (now.event) events++; }
+  }
+  expect(wrapped).toBe(true);
+  expect(events).toBeGreaterThan(0);
+  await page.keyboard.press("Shift+Tab");
+  const last = await focused();
+  expect(last.inside).toBe(true);
+  expect(last.label).toBe(order.at(-1));
+  await page.keyboard.press("Tab");
+  expect((await focused()).first).toBe(true);
+  await expect(popover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(page.locator('[data-status-indicator]')).toBeFocused();
+  writeFileSync(`${artifacts}/calendar-tab-loop.json`, JSON.stringify({ steps: order.length + 1, events, order }, null, 2) + "\n");
+});
+
 // Phone calendar in the fullscreen Sheet, including the 320x500 keyboard-
 // shortened viewport. Playwright's click() scrolls overflow:hidden ancestors
 // and would conceal clipped controls, so every control must already sit in
