@@ -1,3 +1,4 @@
+import { onShutdown } from "../../server/shutdown";
 // IMAP connection pool — idle-cache variant.
 //
 // Every fire-and-close IMAP op (poll, sync, mutation, folder listing)
@@ -297,3 +298,6 @@ export function __resetImapConnectionPoolForTests(): void {
 export function __getConnectedAtForTests(client: ImapFlow): number | undefined {
   return state.connectedAt.get(client);
 }
+
+// HTTP requests and workers drain before cached sockets are disposed.
+onShutdown("imap-pool", "close", drainImapConnectionPool);

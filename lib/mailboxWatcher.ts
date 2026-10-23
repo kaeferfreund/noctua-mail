@@ -1,3 +1,4 @@
+import { assertServerRunning, onShutdown } from "./server/shutdown";
 import { createHmac } from "crypto";
 import type { ImapFlow } from "imapflow";
 import type { Account } from "./data";
@@ -280,43 +281,38 @@ export class MailboxWatcher {
       entry.client?.close();
       cancelled.push(cancelWatcherSyncJobs(entry.account.id));
     }
-    await this.reloadTask;
-    await Promise.all([
-      ...cancelled,
-      ...[...this.entries.values()].map((entry) => this.stopEntry(entry, true))
-    ]);
-    this.entries.clear();
-    if (this.ownsScheduler) await releaseScheduler(this.owner);
+    const failures: unknown[] = [];
+    try {
+      await this.reloadTask.catch(error => { failures.push(error); });
+      const results = await Promise.allSettled([
+        ...cancelled,
+        ...[...this.entries.values()].map((entry) => this.stopEntry(entry, true))
+      ]);
+      for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+      this.entries.clear();
+    } finally {
+      if (this.ownsScheduler) await releaseScheduler(this.owner);
+    }
+    if (failures.length) throw new AggregateError(failures, "Mailbox watcher shutdown failed");
   }
 }
 
 const runtime = globalThis as typeof globalThis & {
   __noctuaMailboxWatcher?: MailboxWatcher;
-  __noctuaMailboxWatcherShutdown?: () => void;
 };
 export function startMailboxWatcher(): MailboxWatcher | null {
+  assertServerRunning();
   if (process.env.NOCTUA_MAILBOX_WATCHER !== "1" || !teamFeaturesSupported()) return null;
   if (runtime.__noctuaMailboxWatcher) return runtime.__noctuaMailboxWatcher;
   const watcher = new MailboxWatcher();
   runtime.__noctuaMailboxWatcher = watcher;
-  const shutdown = () => {
-    void stopMailboxWatcher().catch(() => { console.error("[mailbox-watcher] shutdown failed"); });
-  };
-  runtime.__noctuaMailboxWatcherShutdown = shutdown;
-  process.once("SIGTERM", shutdown);
-  process.once("SIGINT", shutdown);
+  onShutdown("mailbox-watcher", "stop", stopMailboxWatcher);
   return watcher;
 }
 
 export async function stopMailboxWatcher() {
   const watcher = runtime.__noctuaMailboxWatcher;
   if (!watcher) return;
-  const shutdown = runtime.__noctuaMailboxWatcherShutdown;
-  if (shutdown) {
-    process.off("SIGTERM", shutdown);
-    process.off("SIGINT", shutdown);
-    delete runtime.__noctuaMailboxWatcherShutdown;
-  }
   await watcher.stop();
   if (runtime.__noctuaMailboxWatcher === watcher) delete runtime.__noctuaMailboxWatcher;
 }

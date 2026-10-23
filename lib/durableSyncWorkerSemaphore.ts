@@ -1,3 +1,4 @@
+import { assertServerRunning, onShutdown } from "./server/shutdown";
 import {
   heartbeatWorkers, LEASE_MS, newLeaseOwner, promoteWorker, queueWorker,
   removeWorker, reserveWorker, spawnLeasedWorker
@@ -17,9 +18,23 @@ export class DurableSyncWorkerSemaphore {
   // is permission to bypass a still-persisted queue head or occupied slot.
   private cleanup = new Map<string, { confirmedExit: boolean; done: () => void; promise: Promise<void> }>();
 
-  constructor(readonly capacity: number) {}
+  private stopping = false;
+  constructor(readonly capacity: number) {
+    onShutdown(`admission:${this.owner}:stop`, "stop", () => {
+      this.stopping = true;
+      for (const id of this.waiting.keys()) this.cancel(id);
+    });
+    onShutdown(`admission:${this.owner}:drain`, "drain", async () => {
+      while (this.pumpPromise || this.cleanup.size || this.active.size) {
+        await this.pump();
+        if (this.active.size || this.cleanup.size) await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      clearTimeout(this.timer);
+    });
+  }
 
   enqueue(id: string, priority: number, start: (release: () => Promise<void>) => void, accountId = id) {
+    assertServerRunning();
     this.waiting.set(id, { priority, start, accountId });
     return this.pump();
   }
@@ -82,6 +97,7 @@ export class DurableSyncWorkerSemaphore {
         // Reconcile that release before deciding whether capacity is available.
         await this.reconcileCleanup();
         if (!await reserveWorker(id, this.owner, this.capacity)) continue;
+        if (this.stopping) this.waiting.delete(id);
         if (!this.waiting.delete(id)) { void this.requestCleanup(id, false); continue; }
         this.active.add(id);
         let releasing: Promise<void> | undefined;

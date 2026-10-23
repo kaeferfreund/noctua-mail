@@ -1,3 +1,4 @@
+import { workerSafePoint } from "./server/workerLifecycle";
 import { getOwnAddresses } from "./ownAddresses";
 import {
   recordMailboxSync,
@@ -256,6 +257,7 @@ export async function runSyncOperationBatched(
   clientId?: string,
   options?: SyncOperationOptions
 ): Promise<SyncOperationResult> {
+  workerSafePoint();
   const accounts = await getAccounts();
   const account = accounts.find((item) => item.id === payload.accountId);
 
@@ -633,6 +635,7 @@ export async function runSyncOperationBatched(
     resumeFromUid: payload.resumeFromUid,
     explicitUids: payload.backfillUids
   })) {
+    workerSafePoint();
     folders = batch.folders; // Keep latest folder list
     const batchMessages = batch.messages;
     totalCount = batch.totalProcessed;
@@ -867,6 +870,7 @@ export async function runSyncOperationBatched(
   }
 
   for (const invite of sortCalendarInviteImportsForProcessing(calendarInviteImports)) {
+    workerSafePoint();
     await processCalendarInviteForMessage({
       accountId: account.id,
       messageId: invite.messageId,

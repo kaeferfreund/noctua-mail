@@ -1,3 +1,5 @@
+import { assertServerRunning, isShuttingDown } from "./server/shutdown";
+import { trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { UnconfirmedWorkerExitError } from "./db/processLeases";
 import { DurableSyncWorkerSemaphore } from "./durableSyncWorkerSemaphore";
 import { randomUUID } from "crypto";
@@ -84,6 +86,7 @@ if (!runtimeState.__noctuaSyncJobsBootstrapped) {
   }
 }
 
+const workerStops = new Map<string, () => void>();
 const workerKills = new Map<string, () => void>();
 const workerCompletions = new Map<string, Promise<void>>();
 const jobClientIds = new WeakMap<SyncJob, string | undefined>();
@@ -98,7 +101,7 @@ export function cancelWatcherSyncJobs(accountId: string) {
     if (job.payload.accountId !== accountId || job.source !== "watcher" ||
         (job.status !== "running" && job.status !== "queued")) continue;
     const queued = workerSemaphore.cancel(job.id);
-    workerKills.get(job.id)?.();
+    (isShuttingDown() ? workerStops : workerKills).get(job.id)?.();
     const completion = workerCompletions.get(job.id);
     if (completion) pending.push(completion);
     markJobFailed(job, "Mailbox watcher stopped.");
@@ -387,6 +390,7 @@ async function readPipedOutput(
 
 /** Start the next queued job, or drop the account state when nothing is left. */
 function promoteNextQueuedJob(accountId: string, state: AccountSyncState) {
+  if (isShuttingDown()) { accountStates.delete(accountId); return; }
   while (state.queue.length > 0) {
     state.queue.sort((a, b) => (jobs.has(a.jobId) ? jobPriority(jobs.get(a.jobId)!) : 3) - (jobs.has(b.jobId) ? jobPriority(jobs.get(b.jobId)!) : 3));
     const next = state.queue.shift();
@@ -440,6 +444,7 @@ function spawnSyncWorker(job: SyncJob, clientId?: string) {
     job.status = "running";
     job.startedAt = Date.now();
     const completion = launchSyncWorker(job, release, clientId);
+    trackBackgroundWork(`sync:${job.id}`, completion);
     workerCompletions.set(job.id, completion);
     void completion.finally(() => { workerCompletions.delete(job.id); });
   }, job.payload.accountId);
@@ -468,8 +473,10 @@ async function launchSyncWorker(job: SyncJob, release: () => Promise<void>, clie
         }
       }
     ));
+    trackWorker(child);
+    workerStops.set(job.id, () => { try { child.kill("SIGTERM"); } catch { /* already exited */ } });
     job.pid = child.pid;
-    if (job.status === "failed") { try { child.kill("SIGKILL"); } catch { /* monitor still awaits exit */ } }
+    if (job.status === "failed") { try { child.kill(isShuttingDown() ? "SIGTERM" : "SIGKILL"); } catch { /* monitor still awaits exit */ } }
     workerKills.set(job.id, () => { try { child.kill("SIGKILL"); } catch { /* already dead */ } });
     console.info(
       `[sync] worker started ${JSON.stringify({
@@ -582,6 +589,7 @@ async function launchSyncWorker(job: SyncJob, release: () => Promise<void>, clie
         // Do not run another queued watcher worker with the same failing credentials/network.
         if (job.status === "failed" && job.source === "watcher") void cancelWatcherSyncJobs(job.payload.accountId);
         if (!exitConfirmed) return;
+        workerStops.delete(job.id);
         workerKills.delete(job.id);
         job.pid = undefined;
         scheduleCleanup(job.id);
@@ -652,6 +660,7 @@ function insertQueuedEntry(
 }
 
 export function startSyncJob(payload: SyncPayload, clientId?: string, source: SyncJobSource = "interactive") {
+  assertServerRunning();
   const normalizedPayload = normalizeSyncPayload(payload);
   const accountId = normalizedPayload.accountId;
   const existingState = accountStates.get(accountId);

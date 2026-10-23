@@ -108,6 +108,191 @@ export PORT=3654
 bun --bun .next/standalone/server.js
 ```
 
+## Graceful standalone shutdown
+
+`bun run build` packages an owned HTTP lifecycle into `.next/standalone/noctua-server.mjs`
+and changes only the generated `server.js` import of Next's launcher. Continue to run
+`bun --bun server.js` from the packaged directory. Copy `.next/static` to
+`.next/standalone/.next/static` and `public` to `.next/standalone/public` when assembling
+an installation. `build-scripts/prepareStandaloneShutdown.ts` asserts that exactly one known
+launcher import is present. This guard detects import-count/text drift only; it does not
+validate Next's internal API/ABI or lifecycle semantics. Recheck the launcher and cooperative
+cleanup adapter, run the probes below, and review parity on every Next upgrade.
+No installed Next files are patched.
+
+The launcher uses the installed Next `getRequestHandlers` initialization with its own HTTP
+server and `NEXT_MANUAL_SIG_HANDLE=1`. It does not invoke Next's `startServer` wrapper, so
+Next's competing SIGTERM/SIGINT listeners and signal exit codes (143/130) are never installed.
+`instrumentation.register()` and the launcher share one process-global shutdown coordinator,
+registered once across module graphs. Only a caller registering the HTTP stop/drain hooks may
+own process exit. This lifecycle is the production **standalone** contract.
+
+For **`bun --bun next start` / `bun --bun next dev`**, run from the project directory and leave
+`NEXT_MANUAL_SIG_HANDLE` **unset**. Instrumentation installs a non-exiting participant: on a signal
+it stops background admission, watcher/workers and SSE, and drains their lease cleanup. It never
+runs the coordinator's storage-close phase or calls `process.exit`, even at its cleanup deadline.
+The adapter registers an `onServerClose` callback through the installed Next
+`render-server.propagateServerField`; Next calls this after HTTP drain and awaits the participant
+before its own exit. Registration is deferred until Next initialization completes to avoid waiting
+on instrumentation itself. Adapter failures are logged explicitly. This internal integration, like
+the owned launcher, must be reviewed when upgrading Next.
+
+SQLite handles close synchronously on `exit` (also on natural `beforeExit`), after Next's request
+and `after()` cleanup. Pooled parent IMAP sockets are reclaimed by process teardown in this mode;
+watcher sockets and worker leases are explicitly drained first. Next retains its SIGTERM/SIGINT
+exit codes **143/130** for `next start`; its dev CLI controls the parent/child exit convention.
+Next's own HTTP drain has no application-imposed four-second cutoff. A supplemental Bun
+`next start` probe with the client's default keepalive completed its 1,500 ms response and exited
+143 after **7,547 ms** (clean leases, integrity `ok`), including the framework/Bun idle-socket wait.
+No keepalive timeout is changed. Keep the unit's outer safety margin; standalone remains the
+recommended systemd entrypoint.
+
+The owned launcher derives the internal origin and port from the bound listener, brackets IPv6
+addresses, maps wildcard `::` / `0.0.0.0` to `localhost`, and synchronizes `process.env.PORT`.
+It retains Next's process title, ignores `KEEP_ALIVE_TIMEOUT=0`, logs request/upgrade failures
+with the request URL, returns `Internal Server Error` on request failure, destroys failed upgrade
+sockets, and logs/exits 1 on post-listen HTTP server errors. Remaining wrapper differences are
+startup logging (`Ready on ...`, without Next's startup/network/experiment/timing lines) and the
+absence of an explicit Next trace flush at standalone exit. No Next telemetry flush is added.
+
+On SIGTERM or SIGINT, the coordinator immediately closes admission, then runs these phases:
+
+1. Stop HTTP accepts, close upgraded connections, abort watcher IDLE/reload/check loops,
+   signal only owned worker PIDs with SIGTERM, cancel queued admissions, and close authenticated
+   SSE streams. Bun needs another `closeIdleConnections()` after an active streaming response
+   finishes; otherwise a keepalive socket can retain the HTTP close callback.
+2. Await HTTP requests and Next's request lifecycle, stream cleanup/authorization reads,
+   worker monitors and positive child-exit confirmation. Release worker queue/slot records
+   only after confirmation, and release the watcher scheduler before closing storage.
+3. Drain cached IMAP connections and close auth, account-shard and master SQLite handles,
+   then exit **0**. No explicit checkpoint, `PRAGMA optimize` or `ANALYZE` runs.
+
+Workers abort IMAP network waits and stop between batches/write attempts. Immediate SQLite
+transactions execute synchronously and finish before a signal callback can run. Retry delays
+are cancellable during shutdown; normal deadlines, attempt budgets and retry policy stay intact.
+Interrupted durable identity scans remain queued and resume during the next server's
+instrumentation startup. A restarted watcher reconciles remote UIDs against committed messages,
+including a partially completed initial sync. Ordinary interactive sync/thread/category job handles
+are ephemeral; clients must resubmit an interrupted request after reconnecting. Their committed
+mailbox state remains intact. No lease schemas change.
+
+The coordinator has a **4-second** internal deadline, logging unfinished hook names before exiting
+0; owned workers have a **3.5-second** fallback. At the deadline, it leaves SQLite open rather
+than closing handles beneath unfinished work; process teardown recovers WAL state normally.
+Unconfirmed child exits retain their durable lease for the existing PID-based restart recovery.
+These timers cannot preempt a synchronous JS/SQLite operation; unusually long transactions or
+external SQLite contention can delay signal/timer delivery. Keep the outer systemd safety margin.
+Shutdown logs include active HTTP/SSE counts, registered drains and pending worker PIDs/job IDs.
+
+Recommended unit settings for the deployment owner (no unit is changed by the application):
+
+```ini
+[Service]
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=10s
+```
+
+`mixed` sends the initial signal to the main process, which coordinates its owned children;
+systemd retains its final cgroup SIGKILL fallback after 10 seconds. Use the Bun server as the
+main PID (`ExecStart=.../bun --bun .../server.js`, without an intervening shell).
+
+### Shutdown probe and acceptance evidence
+
+With an explicitly isolated synthetic data directory and the usual auth/encryption environment:
+
+```sh
+nice -n 10 bun scripts/checkGracefulShutdown.ts \
+  --port 3836 --data-dir /absolute/path/to/isolated-shutdown-data
+```
+
+The probe starts its own standalone child, waits for that child's readiness plus `/api/ba/ok`,
+sends SIGTERM only to its PID, and prints JSON containing exit code, signal and elapsed
+milliseconds. A nonzero exit, a duration of at least 5 seconds, or its owned-child SIGKILL
+fallback fails the check. It never attaches to an existing listener. It does not seed users
+or fixtures; use an empty isolated directory for the idle probe. For mailbox acceptance, use
+`doc/DEV-FIXTURES.md` with separate app/fixture ports and an MFA-authenticated synthetic user,
+keep `/api/me/events` open, and signal during a running initial sync.
+
+The local production acceptance on Bun 1.4.4 / Next 16.2.4 used app port 3836 and isolated
+IMAP/SMTP/control ports 3843/3844/3845, with all generated data inside this worktree's `.tmp`.
+The user was a synthetic admin with password/TOTP enrollment and manager membership of the
+fixture mailbox. State (b) had the original 60-message INBOX, an idling watcher, and one SSE
+client. State (c) appended 3,000 synthetic messages (3,060 total) and signalled a running initial
+sync after its first fetch progress. Each state used a separate datastore.
+
+Before the fix, idle exited in **60 ms with code 143**. Watcher/SSE and initial-sync cases both
+required the probe's SIGKILL at **10,022 ms** (code 137). `ss -tnp` showed the owned HTTP SSE socket
+and watcher IMAP socket in (b), plus a separate worker IMAP socket in (c). The watcher IMAP socket
+logged closure after SIGTERM, while the open SSE response retained Next's HTTP close wait.
+Bun's `process._getActiveHandles()` returned an empty list even for an explicitly listening HTTP
+server, so it was not usable as socket/timer evidence. The former DB SIGTERM listener also
+closed storage synchronously before watcher/worker lease cleanup could finish; that was an
+ordering defect independent of the retained SSE. No evidence implicated open SQLite statements
+as the event-loop blocker. Watcher polling and job/lease timers are now stopped or drained;
+TTL cleanup timers do no writes and cannot delay the coordinator's explicit exit.
+
+After the fix: **69 ms idle, 61 ms watcher/SSE, 155 ms initial sync**. The final initial-sync
+probe signalled after the first 300-message batch committed; restart against the same running
+fixture recovered all **3,060** messages and preserved all **300** previously committed message IDs
+(the restarted process subsequently shut down in **724 ms**, exit 0). All three exited 0 without the internal deadline or external
+SIGKILL. Read-only post-exit checks found zero `sync_worker_leases`, `sync_worker_queue` and
+`mailbox_watcher_lease` rows and `PRAGMA integrity_check = ok` in every master database.
+Validation: `bun run typecheck` passed with zero errors in 1,102 files; the production build
+passed; focused lifecycle/watcher/lease/stream tests passed (36 tests, 143 assertions).
+`bun run test:ci` passed: 2,509 backend tests / 8,490 assertions and 366 DOM tests / 2,133 assertions,
+zero failures. Lint retained exactly the baseline 1 error (`useCalendarConflicts.ts:58`) and
+25 warnings, with no new diagnostics. The isolated shutdown CLI probe on port 3837 exited 0
+in 686 ms. `git diff --check` passed.
+
+Round 2 also provides a production `next start` regression probe (no test route is shipped):
+
+```sh
+nice -n 10 bun scripts/checkNextStartShutdown.test.fixture.ts \
+  --port 3836 --data-dir /absolute/path/to/isolated-shutdown-data
+# With an already enrolled synthetic user's private cookie file and a fixture mailbox:
+NOCTUA_MAILBOX_WATCHER=1 nice -n 10 bun scripts/checkNextStartShutdown.test.fixture.ts \
+  --port 3836 --data-dir /absolute/path/to/isolated-shutdown-data \
+  --cookie-file /private/synthetic-cookie --wait-for-watcher --wait-for-worker
+```
+
+The probe preloads an isolated HTTP dispatch delay for only its marked request, sends SIGTERM
+while that 1,500 ms request is in flight, and requires a complete HTTP 200 response, exit 143,
+zero watcher/worker/queue rows and SQLite integrity `ok`. With a cookie it exercises the real
+authenticated `/api/auth/me` storage path after the signal. It only signals its own child and
+removes its preload files. It requests `Connection: close` to isolate HTTP response drain from
+framework/Bun idle keepalive retirement. The optional lease waits prove real live leases existed
+before signaling.
+Never supply a production data directory or session.
+
+Round 2 production evidence (Bun 1.4.4 / Next 16.2.4, synthetic fixture on 3843/3844/3845):
+`next start` completed the held response and exited 143 in **1,547 ms** idle and **1,582 ms** with
+**one watcher lease and one worker lease** present before SIGTERM. Both left all three lease/queue
+tables empty and integrity `ok`. The authenticated response completed after background cleanup,
+so storage remained available through HTTP drain. The `next dev` manual health/stop check returned
+HTTP 200, logged cooperative cleanup without adapter errors, and the dev CLI exited normally in
+**175 ms**. Standalone exited 0 in **121 ms idle**, **44 ms watcher + SSE** (EOF observed), and
+**282 ms during initial sync**, with no deadline or SIGKILL. The latter stopped after **300**
+committed messages; restart recovered **3,060** and preserved all **300** IDs, then exited 0 in
+**140 ms**. Watcher/SSE used the same 3,060-message synthetic fixture. Every standalone acceptance
+left all three lease/queue tables empty with integrity `ok`. The retry signal test interrupted a
+1,500 ms delay in under 500 ms; fake-timer tests prove zero stream timers/subscriptions after
+construction during shutdown and the unchanged default 120/240/480/960 ms retry schedule.
+
+Round 2 validation: typecheck passed with **0 errors / 1,107 files**; focused lifecycle, retry,
+stream and existing DB-contention tests passed **34 tests / 108 assertions**. Full `test:ci`
+passed **2,518 backend tests / 8,516 assertions** plus **366 DOM tests / 2,133 assertions**, zero
+failures. The production build passed; lint retained exactly the baseline **1 error / 25 warnings**,
+with no new diagnostics. `checkGracefulShutdown.ts` exited 0 in **121 ms idle** and **74 ms with
+the watcher enabled**. Actual packaged-server probes with `HOSTNAME=::` and `HOSTNAME=0.0.0.0`
+both reported a valid `__NEXT_PRIVATE_ORIGIN=http://localhost:3836`, `PORT=3836`, and Next's process
+title; four listener-origin unit cases also cover IPv6 loopback and OS-assigned ports.
+`git diff --check` passed. Recommended unit settings above remain unchanged.
+
+The coordinator unit suite proves ordering, repeated-signal idempotency, failure isolation and
+zero exit at the deadline. Independent-process tests prove committed transaction integrity,
+reclaiming a stopped worker lease and resuming the same interrupted durable identity scan.
+
 ## Storage Requirements & Architecture
 
 ### Database Architecture
