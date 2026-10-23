@@ -1,6 +1,6 @@
 .surface {
-  /* Status/calendar frames sit below dialogs; child pickers retain 9998. */
-  z-index: 9990;
+  /* Status/calendar frames sit below dialogs; child pickers stay above. */
+  z-index: var(--layer-floating);
 }
 
 .calendar {

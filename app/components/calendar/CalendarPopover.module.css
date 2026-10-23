@@ -1,6 +1,6 @@
 .floatingPanel {
   position: fixed;
-  z-index: 9990;
+  z-index: var(--layer-floating);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
