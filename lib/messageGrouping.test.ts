@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  buildMessageGroupKey,
   buildTimeGroupKey,
   buildWeekGroupKey,
   buildInviteDeckGroupKeyFromBounds,
@@ -35,6 +36,24 @@ describe("buildTimeGroupKey", () => {
     expect(buildTimeGroupKey(localDateMs(2026, 1, 27, 12), "date", nowMs)).toBe("Yesterday");
     expect(buildTimeGroupKey(localDateMs(2026, 1, 24, 12), "date", nowMs)).toBe("This Week");
     expect(buildTimeGroupKey(localDateMs(2026, 1, 10, 12), "date", nowMs)).toBe("Older");
+  });
+});
+
+describe("buildMessageGroupKey", () => {
+  const message = { dateValue: Date.UTC(2025, 11, 31, 22, 30), from: "Sender <sender@example.test>", folderId: "acc:INBOX" };
+
+  it("derives the year in the display zone, from the thread date when given", () => {
+    // 23:30 UTC on 31 Dec is already 1 Jan in Berlin.
+    expect(buildMessageGroupKey({ ...message, dateValue: Date.UTC(2025, 11, 31, 23, 30) }, "year")).toBe("2026");
+    expect(buildMessageGroupKey(message, "year")).toBe("2025");
+    expect(buildMessageGroupKey(message, "year", Date.UTC(2026, 0, 1, 12))).toBe("2026");
+  });
+
+  it("keeps non-date groupings independent of the date", () => {
+    expect(buildMessageGroupKey(message, "domain")).toBe("example.test");
+    expect(buildMessageGroupKey(message, "sender")).toBe("Sender <sender@example.test>");
+    expect(buildMessageGroupKey(message, "folder")).toBe("acc:INBOX");
+    expect(buildMessageGroupKey(message, "none")).toBe("All");
   });
 });
 
