@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Button } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import {
   AArrowDown,
   AArrowUp,
@@ -251,6 +252,7 @@ function ComposeToolbar({
   onExitSource: () => void;
 }) {
   const [editor] = useLexicalComposerContext();
+  const t = useTranslations("Editor");
   const [isTableFocused, setIsTableFocused] = useState(false);
   const isTableFocusedRef = useRef(false);
 
@@ -296,7 +298,7 @@ function ComposeToolbar({
   };
 
   const toggleLink = () => {
-    const url = window.prompt("Enter URL");
+    const url = window.prompt(t("linkPrompt"));
     if (url === null) return;
     if (!url.trim()) {
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
@@ -375,69 +377,84 @@ function ComposeToolbar({
     }
   };
 
+  const sourceToggleLabel = showSource ? t("toolbar.visualEditor") : t("toolbar.sourceHtml");
+
   const toolbarButtons: Array<{
-    title: string;
+    id: string;
+    label: string;
     icon: React.ReactNode;
     onClick: () => void;
     requiresTableFocus?: boolean;
   }> = [
     {
-      title: "Bold",
+      id: "bold",
+      label: t("toolbar.bold"),
       icon: <ComposeToolbarIcon base={<BoldIcon size={14} />} />,
       onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold")
     },
     {
-      title: "Italic",
+      id: "italic",
+      label: t("toolbar.italic"),
       icon: <ComposeToolbarIcon base={<ItalicIcon size={14} />} />,
       onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic")
     },
     {
-      title: "Underline",
+      id: "underline",
+      label: t("toolbar.underline"),
       icon: <ComposeToolbarIcon base={<UnderlineIcon size={14} />} />,
       onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline")
     },
     {
-      title: "Strikethrough",
+      id: "strikethrough",
+      label: t("toolbar.strikethrough"),
       icon: <ComposeToolbarIcon base={<StrikethroughIcon size={14} />} />,
       onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, "strikethrough")
     },
     {
-      title: "Increase text size",
+      id: "increaseTextSize",
+      label: t("toolbar.increaseTextSize"),
       icon: <ComposeToolbarIcon base={<AArrowUp size={14} />} />,
       onClick: () => adjustTextSize("increase")
     },
     {
-      title: "Decrease text size",
+      id: "decreaseTextSize",
+      label: t("toolbar.decreaseTextSize"),
       icon: <ComposeToolbarIcon base={<AArrowDown size={14} />} />,
       onClick: () => adjustTextSize("decrease")
     },
     {
-      title: "Clear formatting",
+      id: "clearFormatting",
+      label: t("toolbar.clearFormatting"),
       icon: <ComposeToolbarIcon base={<RemoveFormattingIcon size={14} />} />,
       onClick: clearFormatting
     },
     {
-      title: "Bulleted list",
+      id: "bulletedList",
+      label: t("toolbar.bulletedList"),
       icon: <ComposeToolbarIcon base={<ListIcon size={14} />} />,
       onClick: () => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)
     },
     {
-      title: "Numbered list",
+      id: "numberedList",
+      label: t("toolbar.numberedList"),
       icon: <ComposeToolbarIcon base={<ListOrdered size={14} />} />,
       onClick: () => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)
     },
     {
-      title: "Remove list",
+      id: "removeList",
+      label: t("toolbar.removeList"),
       icon: <ComposeToolbarIcon base={<ListX size={14} />} />,
       onClick: () => editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined)
     },
     {
-      title: "Link",
+      id: "link",
+      label: t("toolbar.link"),
       icon: <ComposeToolbarIcon base={<LinkIcon size={14} />} />,
       onClick: toggleLink
     },
     {
-      title: "Insert table",
+      id: "insertTable",
+      label: t("toolbar.insertTable"),
       icon: (
         <ComposeToolbarIcon
           base={<TableIcon size={14} />}
@@ -447,7 +464,8 @@ function ComposeToolbar({
       onClick: insertTable
     },
     {
-      title: "Insert row above",
+      id: "insertRowAbove",
+      label: t("toolbar.insertRowAbove"),
       icon: (
         <ComposeToolbarIcon
           base={<Rows3 size={14} />}
@@ -461,7 +479,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Insert row below",
+      id: "insertRowBelow",
+      label: t("toolbar.insertRowBelow"),
       icon: (
         <ComposeToolbarIcon
           base={<Rows3 size={14} />}
@@ -475,7 +494,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Delete row",
+      id: "deleteRow",
+      label: t("toolbar.deleteRow"),
       icon: (
         <ComposeToolbarIcon
           base={<Rows3 size={14} />}
@@ -486,7 +506,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Insert column left",
+      id: "insertColumnLeft",
+      label: t("toolbar.insertColumnLeft"),
       icon: (
         <ComposeToolbarIcon
           base={<Columns3 size={14} />}
@@ -500,7 +521,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Insert column right",
+      id: "insertColumnRight",
+      label: t("toolbar.insertColumnRight"),
       icon: (
         <ComposeToolbarIcon
           base={<Columns3 size={14} />}
@@ -514,7 +536,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Delete column",
+      id: "deleteColumn",
+      label: t("toolbar.deleteColumn"),
       icon: (
         <ComposeToolbarIcon
           base={<Columns3 size={14} />}
@@ -525,7 +548,8 @@ function ComposeToolbar({
       requiresTableFocus: true
     },
     {
-      title: "Delete table",
+      id: "deleteTable",
+      label: t("toolbar.deleteTable"),
       icon: (
         <ComposeToolbarIcon
           base={<TableIcon size={14} />}
@@ -552,14 +576,14 @@ function ComposeToolbar({
     <div className={styles.composeToolbar} ref={toolbarRef}>
       {toolbarButtons.map((item) => (
         <Button
-          key={item.title}
+          key={item.id}
           type="button"
           size="1"
           variant="soft"
           color="gray"
           className={styles.composeToolbarButton}
-          title={item.title}
-          aria-label={item.title}
+          title={item.label}
+          aria-label={item.label}
           onClick={item.onClick}
           disabled={Boolean(showSource || (item.requiresTableFocus && !isTableFocused))}
         >
@@ -572,14 +596,19 @@ function ComposeToolbar({
         variant={showSource ? "solid" : "soft"}
         color="gray"
         className={styles.composeToolbarButton}
-        title={showSource ? "Visual editor" : "Source HTML"}
-        aria-label={showSource ? "Visual editor" : "Source HTML"}
+        title={sourceToggleLabel}
+        aria-label={sourceToggleLabel}
         onClick={toggleSource}
       >
         <ComposeToolbarIcon base={<Code2 size={14} />} />
       </Button>
     </div>
   );
+}
+
+function ComposePlaceholder() {
+  const t = useTranslations("Editor");
+  return <div className={styles.composeEditorPlaceholder}>{t("placeholder")}</div>;
 }
 
 function readFileAsDataUrl(file: File): Promise<string | null> {
@@ -1106,7 +1135,7 @@ const ComposeEditor = forwardRef<ComposeEditorHandle, ComposeEditorProps>(functi
         {quotedMessage && <QuotedMessagePlugin config={quotedMessage} />}
         <RichTextPlugin
           contentEditable={<ComposeEditable onInlineImage={onInlineImage} onFilesDrop={onFilesDrop} />}
-          placeholder={<div className={styles.composeEditorPlaceholder}>Write your message…</div>}
+          placeholder={<ComposePlaceholder />}
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />

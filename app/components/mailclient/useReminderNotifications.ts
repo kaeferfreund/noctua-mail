@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Account, CalendarEvent } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { buildAccountCalendarEventsPath } from "@/lib/accountApiPaths";
@@ -64,9 +65,16 @@ export function useReminderNotifications({
     accountsRef.current = accounts;
   }, [accounts]);
 
+  // Read through a ref so reportError keeps its identity across a language
+  // switch (it feeds bootstrap/effect dependencies; see the 97dd982 regression).
+  const tn = useTranslations("Notifications");
+  const tnRef = useRef(tn);
+  useEffect(() => {
+    tnRef.current = tn;
+  }, [tn]);
   const reportError = useCallback(
     (message: string, meta?: { requestPath?: string; status?: number }) => {
-      const normalized = message?.trim() || "Unexpected error.";
+      const normalized = message?.trim() || tnRef.current("unexpectedError");
       const entry: ExceptionEntry = {
         id: makeClientId(),
         message: normalized,
@@ -77,7 +85,7 @@ export function useReminderNotifications({
       setExceptionEntries((prev) => [entry, ...prev].slice(0, 30));
       pushNotice({
         type: "error",
-        title: "Operation failed",
+        title: tnRef.current("operationFailed"),
         description: normalized.split("\n")[0]?.slice(0, 220),
         fullDetail: normalized,
         durationMs: NOTICE_TIMEOUTS.error

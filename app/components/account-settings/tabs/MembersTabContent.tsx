@@ -95,7 +95,7 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
     {cleanupPending && <p role="status">{t("members.cleanup")}</p>}
     {loading && <p role="status">{t("members.loading")}</p>}
     {Boolean(error) && !pending && <p role="alert" className="text-destructive">{formatAdminError(error, adminT, locale)}</p>}
-    <table className="w-full text-left text-sm"><caption className="sr-only">{t("members.caption")}</caption>
+    <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("members.caption")}</caption>
       <thead><tr><th>{t("members.member")}</th><th>{t("members.role")}</th><th>{t("members.status")}</th><th>{t("members.actions")}</th></tr></thead>
       <tbody>{members.map(member => {
         const lastManager = !member.disabled && member.role === "manager" && enabledManagers <= 1;
@@ -106,8 +106,8 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
           </select></td><td>{member.disabled ? t("members.disabled") : t("members.enabled")}</td>
           <td><Button variant="outline" disabled={busy || member.isOwner || lastManager || !actor} title={member.isOwner ? t("members.ownerCannotRemove") : lastManager ? t("members.lastManager") : undefined}
             onClick={() => { setError(null); setPending({ member, role: null }); }}>{t("members.remove")}</Button></td></tr>;
-      })}</tbody></table>
-    {!admin && <form className="flex items-end gap-3" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
+      })}</tbody></table></div>
+    {!admin && <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
       <label className="grid gap-1 text-sm">{t("members.find")}<Input value={query} maxLength={128} onChange={event => setQuery(event.target.value)} /></label><Button disabled={directoryLoading}>{t("members.search")}</Button>
       <p className="text-sm text-muted-foreground">{t("members.searchHelp")}</p>
     </form>}

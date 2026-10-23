@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, Copy } from "lucide-react";
 import { Badge, Button, Card, Flex, Select, Text, TextField } from "@radix-ui/themes";
 import {
@@ -8,7 +9,9 @@ import {
   buildAccountMcpTokensPath
 } from "@/lib/accountApiPaths";
 import type { AccountDateFormat, McpTokenMetadata } from "@/lib/data";
-import { formatAccountTimestampLabel } from "@/lib/dateFormatting";
+import { formatAccountIntl } from "@/lib/dateFormatting";
+import { formatDate } from "@/lib/i18n/format";
+import { timeZone, type UiLocale } from "@/lib/i18n/config";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import type { mintMcpToken } from "@/lib/mcpAuth";
 
@@ -34,14 +37,38 @@ type ListTokensResponse = {
 };
 
 const EXPIRY_PRESETS = [
-  { value: "30d", label: "30 days" },
-  { value: "90d", label: "90 days" },
-  { value: "180d", label: "180 days" },
-  { value: "custom", label: "Custom" }
+  { value: "30d", days: 30 },
+  { value: "90d", days: 90 },
+  { value: "180d", days: 180 },
+  { value: "custom", days: null }
 ] as const;
 
-function formatTimestamp(value: number | null, accountDateFormat?: AccountDateFormat) {
-  return formatAccountTimestampLabel(value, accountDateFormat);
+const TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone
+};
+const PRESET_TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone
+};
+
+/** UI-locale timestamp; an explicit account date-format preset keeps its numeric order. */
+function formatTimestamp(value: number, locale: UiLocale, accountDateFormat?: AccountDateFormat) {
+  const date = new Date(value);
+  if (!accountDateFormat || accountDateFormat === "locale") return formatDate(date, locale, TIMESTAMP_OPTIONS);
+  const options = accountDateFormat === "mdy"
+    ? { ...PRESET_TIMESTAMP_OPTIONS, hour12: true }
+    : { ...PRESET_TIMESTAMP_OPTIONS, hourCycle: "h23" as const };
+  return formatAccountIntl(date, accountDateFormat, options, locale);
 }
 
 function toDateTimeLocalValue(value: number) {
@@ -74,6 +101,8 @@ export default function McpTabContent({
   apiFetch,
   onClose
 }: Props) {
+  const t = useTranslations("Settings");
+  const locale = useLocale();
   const request = apiFetch ?? fetch;
   const [tokens, setTokens] = useState<McpTokenMetadata[]>([]);
   const [label, setLabel] = useState("");
@@ -95,8 +124,8 @@ export default function McpTabContent({
 
   const readError = useCallback(async (response: Response) => {
     const data = (await response.json().catch(() => null)) as { message?: string } | null;
-    return data?.message ?? `Request failed (${response.status})`;
-  }, []);
+    return data?.message ?? t("mcp.requestFailed", { status: response.status });
+  }, [t]);
 
   const loadTokens = useCallback(async () => {
     if (!accountId) {
@@ -114,11 +143,11 @@ export default function McpTabContent({
       const data = (await response.json()) as ListTokensResponse;
       setTokens(data.ok && Array.isArray(data.tokens) ? data.tokens : []);
     } catch {
-      setError("Failed to load MCP tokens.");
+      setError(t("mcp.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [accountId, readError, request]);
+  }, [accountId, readError, request, t]);
 
   useEffect(() => {
     if (isActive && isExistingAccount) {
@@ -161,7 +190,7 @@ export default function McpTabContent({
     try {
       const ttlSeconds = ttlFromPreset(expiryPreset, customExpiresAt);
       if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) {
-        setError("Choose an expiry between one minute and one year from now.");
+        setError(t("mcp.invalidExpiry"));
         return;
       }
       const response = await request(buildAccountMcpTokensPath(accountId), {
@@ -174,7 +203,7 @@ export default function McpTabContent({
       });
       const data = (await response.json().catch(() => null)) as CreateTokenResponse | null;
       if (!response.ok || !data?.ok || typeof data.token !== "string" || !data.tokenRecord?.id) {
-        setError(data?.message ?? "Failed to create MCP token.");
+        setError(data?.message ?? t("mcp.createFailed"));
         return;
       }
       const tokenRecord = data.tokenRecord;
@@ -185,15 +214,15 @@ export default function McpTabContent({
       setExpiryPreset("180d");
       setCustomExpiresAt(toDateTimeLocalValue(Date.now() + 180 * 24 * 60 * 60 * 1000));
     } catch {
-      setError("Failed to create MCP token.");
+      setError(t("mcp.createFailed"));
     } finally {
       setCreating(false);
     }
-  }, [accountId, customExpiresAt, expiryPreset, label, request, loadTokens]);
+  }, [accountId, customExpiresAt, expiryPreset, label, request, loadTokens, t]);
 
   const handleDelete = useCallback(async (tokenId: string) => {
     if (!accountId) return;
-    const confirmed = window.confirm("Delete this MCP token?");
+    const confirmed = window.confirm(t("mcp.deleteConfirm"));
     if (!confirmed) return;
     setDeletingId(tokenId);
     setError("");
@@ -207,24 +236,30 @@ export default function McpTabContent({
       }
       setTokens((current) => current.filter((item) => item.id !== tokenId));
     } catch {
-      setError("Failed to delete MCP token.");
+      setError(t("mcp.deleteFailed"));
     } finally {
       setDeletingId("");
     }
-  }, [accountId, readError, request]);
+  }, [accountId, readError, request, t]);
 
   if (!isExistingAccount) {
     return null;
   }
+
+  const timestampLabel = (value: number | null) =>
+    value == null || !Number.isFinite(value) ? t("mcp.never") : formatTimestamp(value, locale, accountDateFormat);
 
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
       <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "var(--space-2)" }}>
         <Card>
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">MCP server</Text>
+            <Text size="3" weight="medium">{t("mcp.serverHeading")}</Text>
             <Text size="2" color="gray">
-              Use the MCP endpoint below with an <code>Authorization: Bearer &lt;token&gt;</code> header.
+              {t.rich("mcp.endpointHint", {
+                header: "Authorization: Bearer <token>",
+                code: (chunks) => <code>{chunks}</code>
+              })}
             </Text>
             <Flex align="center" gap="2" wrap="wrap">
               <Text size="2" style={{ fontFamily: "var(--font-mono)" }}>
@@ -234,7 +269,7 @@ export default function McpTabContent({
                 size="1"
                 variant="soft"
                 onClick={() => void handleCopy(serverUrl)}
-                tooltip={copiedValue === serverUrl ? "Copied server URL" : "Copy server URL"}
+                tooltip={copiedValue === serverUrl ? t("mcp.copiedServerUrl") : t("mcp.copyServerUrl")}
               >
                 {copiedValue === serverUrl ? <Check size={14} /> : <Copy size={14} />}
               </TooltipIconButton>
@@ -244,23 +279,23 @@ export default function McpTabContent({
 
         <Card style={{ marginTop: "var(--space-4)" }}>
           <Flex direction="column" gap="3">
-            <Text size="3" weight="medium">Create token</Text>
+            <Text size="3" weight="medium">{t("mcp.createHeading")}</Text>
             <Flex direction="column" gap="2">
-              <Text size="2" color="gray">Label</Text>
+              <Text size="2" color="gray">{t("mcp.label")}</Text>
               <TextField.Root
                 value={label}
                 onChange={(event) => setLabel(event.target.value)}
-                placeholder="My MCP client"
+                placeholder={t("mcp.labelPlaceholder")}
               />
             </Flex>
             <Flex direction="column" gap="2">
-              <Text size="2" color="gray">Expiry</Text>
+              <Text size="2" color="gray">{t("mcp.expiry")}</Text>
               <Select.Root value={expiryPreset} onValueChange={(value) => setExpiryPreset(value as typeof expiryPreset)}>
                 <Select.Trigger />
                 <Select.Content>
                   {EXPIRY_PRESETS.map((preset) => (
                     <Select.Item key={preset.value} value={preset.value}>
-                      {preset.label}
+                      {preset.days === null ? t("mcp.presetCustom") : t("mcp.presetDays", { days: preset.days })}
                     </Select.Item>
                   ))}
                 </Select.Content>
@@ -268,7 +303,7 @@ export default function McpTabContent({
             </Flex>
             {expiryPreset === "custom" && (
               <Flex direction="column" gap="2">
-                <Text size="2" color="gray">Custom expiry</Text>
+                <Text size="2" color="gray">{t("mcp.customExpiry")}</Text>
                 <TextField.Root
                   type="datetime-local"
                   value={customExpiresAt}
@@ -281,18 +316,18 @@ export default function McpTabContent({
                 onClick={() => void handleCreate()}
                 disabled={!accountId || !label.trim() || creating}
               >
-                {creating ? "Creating..." : "Create token"}
+                {creating ? t("mcp.creating") : t("mcp.create")}
               </Button>
               <Text size="1" color="gray">
-                The token secret is shown once and cannot be retrieved later.
+                {t("mcp.secretShownOnce")}
               </Text>
             </Flex>
             {createdSecret && (
               <Card variant="surface">
                 <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium">New token</Text>
+                  <Text size="2" weight="medium">{t("mcp.newToken")}</Text>
                   <Text size="1" color="gray">
-                    Copy this now. It will not be shown again.
+                    {t("mcp.copyNow")}
                   </Text>
                   <Text
                     size="1"
@@ -308,7 +343,7 @@ export default function McpTabContent({
                       size="1"
                       variant="soft"
                       onClick={() => void handleCopy(createdSecret)}
-                      tooltip={copiedValue === createdSecret ? "Copied token" : "Copy token"}
+                      tooltip={copiedValue === createdSecret ? t("mcp.copiedToken") : t("mcp.copyToken")}
                     >
                       {copiedValue === createdSecret ? <Check size={14} /> : <Copy size={14} />}
                     </TooltipIconButton>
@@ -321,15 +356,15 @@ export default function McpTabContent({
 
         <Flex direction="column" gap="3" style={{ marginTop: "var(--space-4)" }}>
           <Flex align="center" justify="between">
-            <Text size="3" weight="medium">Active tokens</Text>
+            <Text size="3" weight="medium">{t("mcp.activeTokens")}</Text>
             <Badge color="gray" variant="soft">
               {tokens.length}
             </Badge>
           </Flex>
           {loading ? (
-            <Text size="2" color="gray">Loading MCP tokens...</Text>
+            <Text size="2" color="gray">{t("mcp.loadingTokens")}</Text>
           ) : tokens.length === 0 ? (
-            <Text size="2" color="gray">No MCP tokens created for this account.</Text>
+            <Text size="2" color="gray">{t("mcp.noTokens")}</Text>
           ) : (
             tokens.map((token) => (
               <Card key={token.id}>
@@ -338,7 +373,10 @@ export default function McpTabContent({
                     <Flex direction="column" gap="1">
                       <Text size="2" weight="medium">{token.label}</Text>
                       <Text size="1" color="gray">
-                        Token ending in <code>{token.tokenSuffix}</code>
+                        {t.rich("mcp.tokenSuffix", {
+                          suffix: token.tokenSuffix,
+                          code: (chunks) => <code>{chunks}</code>
+                        })}
                       </Text>
                     </Flex>
                     <Button
@@ -348,12 +386,12 @@ export default function McpTabContent({
                       disabled={deletingId === token.id}
                       onClick={() => void handleDelete(token.id)}
                     >
-                      {deletingId === token.id ? "Deleting..." : "Delete"}
+                      {deletingId === token.id ? t("mcp.deleting") : t("common.delete")}
                     </Button>
                   </Flex>
-                  <Text size="1" color="gray">Created: {formatTimestamp(token.createdAt, accountDateFormat)}</Text>
-                  <Text size="1" color="gray">Expires: {formatTimestamp(token.expiresAt, accountDateFormat)}</Text>
-                  <Text size="1" color="gray">Last used: {formatTimestamp(token.lastUsedAt, accountDateFormat)}</Text>
+                  <Text size="1" color="gray">{t("mcp.created", { date: timestampLabel(token.createdAt) })}</Text>
+                  <Text size="1" color="gray">{t("mcp.expires", { date: timestampLabel(token.expiresAt) })}</Text>
+                  <Text size="1" color="gray">{t("mcp.lastUsed", { date: timestampLabel(token.lastUsedAt) })}</Text>
                 </Flex>
               </Card>
             ))
@@ -372,7 +410,7 @@ export default function McpTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)", flexShrink: 0 }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          Close
+          {t("close")}
         </Button>
       </Flex>
     </Flex>

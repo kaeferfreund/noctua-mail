@@ -4,6 +4,7 @@ import { prepareSignatureTemplate, renderSignatureTemplate, replaceSignatureBloc
 import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type React from "react";
 import { useMemo } from "react";
+import { useLocale } from "next-intl";
 import type { Account, AccountDateFormat, Message, SenderIdentity } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { assembleQuotedHtml } from "@/lib/html";
@@ -42,6 +43,7 @@ export function useComposeController({
   findMessageByMessageId
 }: UseComposeControllerParams) {
   const { messages: senderMessages } = useSenderMessages();
+  const locale = useLocale();
   // Recompute the orchestrator's render-time draft status after the lazy load.
   useMarkdownConverters(compose.composeOpen);
   const {
@@ -175,6 +177,7 @@ export function useComposeController({
         accountEmail: options?.sender?.account.email ?? currentAccount?.email ?? "",
         ownAddresses: options?.sender?.account.ownAddresses ?? currentAccount?.ownAddresses,
         accountDateFormat,
+        locale,
         preferredComposeTab: options?.preferredComposeTab,
         findMessageByMessageId
       },

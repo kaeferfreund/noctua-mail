@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import SendWarnings from "./SendWarnings";
 import { Button, Text } from "@radix-ui/themes";
 import styles from "./Compose.module.css";
@@ -41,14 +42,15 @@ export default function ComposeActions({
   handleSendMail,
   formatRelativeTime
 }: ComposeActionsProps) {
-  if (deliveredWarnings.length) return <div className={styles.composeFooter}><SendWarnings warnings={deliveredWarnings} /><Button onClick={handleCancel}>Close</Button></div>;
+  const t = useTranslations("Compose");
+  if (deliveredWarnings.length) return <div className={styles.composeFooter}><SendWarnings warnings={deliveredWarnings} /><Button onClick={handleCancel}>{t("actions.close")}</Button></div>;
   return (
     <div className={styles.composeFooter}>
       <div className={styles.composeDraftMeta}>
         {composeOpen && (
           <Text
             size="1"
-            title={composeDraftId ? `Draft: ${composeDraftId}` : undefined}
+            title={composeDraftId ? t("draft.idTitle", { id: composeDraftId }) : undefined}
             className={`${styles.composeDraftStatus} ${
               draftSaveError
                 ? styles.composeDraftStatusError
@@ -58,12 +60,12 @@ export default function ComposeActions({
             }`}
           >
             {draftSaving
-              ? "Saving draft…"
+              ? t("draft.saving")
               : draftSaveError
-                ? "Draft save failed"
+                ? t("draft.saveFailedStatus")
                 : draftSavedAt
-                  ? `Draft saved ${formatRelativeTime(draftSavedAt)}`
-                  : "Draft not saved yet"}
+                  ? t("draft.savedAgo", { time: formatRelativeTime(draftSavedAt) })
+                  : t("draft.notSavedYet")}
           </Text>
         )}
       </div>
@@ -77,7 +79,7 @@ export default function ComposeActions({
               onClick={handleDiscardDraft}
               disabled={busy || discardingDraft || draftSaving}
             >
-              Discard Draft
+              {t("actions.discardDraft")}
             </Button>
             <Button
               size="2"
@@ -86,7 +88,7 @@ export default function ComposeActions({
               onClick={handleSaveDraft}
               disabled={busy || draftSaving || !canSaveDraft}
             >
-              {draftSaving ? "Saving..." : "Save draft"}
+              {draftSaving ? t("actions.saving") : t("actions.saveDraft")}
             </Button>
           </>
         )}
@@ -97,7 +99,7 @@ export default function ComposeActions({
           onClick={handleCancel}
           disabled={busy || sendingMail || discardingDraft || draftSaving}
         >
-          Cancel
+          {t("actions.cancel")}
         </Button>
         <Button
           size="2"
@@ -105,15 +107,15 @@ export default function ComposeActions({
           disabled={sendDisabled || busy || sendingMail || Boolean(attachmentLoadState)}
           title={
             attachmentLoadState === "error"
-              ? "Retry or remove the attachments that failed to load"
+              ? t("actions.attachmentsFailedTitle")
               : undefined
           }
         >
           {sendingMail
-            ? "Sending..."
+            ? t("actions.sending")
             : attachmentLoadState === "loading"
-              ? "Loading attachments…"
-              : "Send"}
+              ? t("actions.loadingAttachments")
+              : t("actions.send")}
         </Button>
       </div>
     </div>
