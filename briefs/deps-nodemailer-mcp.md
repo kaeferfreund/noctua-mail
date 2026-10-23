@@ -36,13 +36,15 @@ The app creates a fresh McpServer per POST with a custom StatelessJsonResponseTr
 
 ## Gates
 
+For `TMPDIR=...` below, the exact value was `$PWD/.deps-scratch/tmp` in this worktree.
+
 - `nice -n 10 bun run typecheck`: passed after each upgrade (0 errors in 1,173 files). Removing stubs initially found the punycode default-import error and consequent implicit-any diagnostic; the one-line namespace import fixes both.
 - `nice -n 10 bun test lib/mail lib/outboundAuthorization.routes.test.ts lib/senderIdentity.test.ts lib/mcpAuth.identities.test.ts scripts/dev-fixture/fixture.test.ts`: **332 pass, 0 fail**, 995 assertions, 30 files (Bun substring matching also includes mailbox integration tests).
 - `TMPDIR=... nice -n 10 bun test ./app/api/mcp/route.test.ts ./lib/mcpAuth.identities.test.ts`: **6 pass, 0 fail**, 146 assertions, 2 files.
 - `TMPDIR=... nice -n 10 bun run lint`: exit 1, exactly baseline **1 error + 25 warnings**; existing `useCalendarConflicts.ts:58` react-hooks/set-state-in-effect. No unrelated lint edits.
 - `TMPDIR=... nice -n 10 bun run build`: exit 0; compiled successfully; standalone includes nodemailer **10.2.1**, traces nodemailer under route NFT manifests, and produces `.next/standalone/noctua-server.mjs`.
 - `nice -n 10 bun --env-file=.env.local --env-file=.deps-scratch/live.env scripts/checkGracefulShutdown.ts --port 3793 --data-dir /home/monkey/code/noctua-mail/data/noctua-data-wt-deps-mailer`: passed, exit **0**, graceful child exit 0 in **121 ms**, forced=false.
-- First `TMPDIR=... nice -n 10 bun run test:ci`: **2753 pass, 1 fail**, 300 files, 636.63s; failed identities REST viewer-prefs test with SQLiteError SQLITE_BUSY in Better Auth fixture creation, so DOM phase did not run. Isolated exact-file retry: **3 pass, 0 fail**, 28 assertions, 5.04s. Full CI retry: **exit 0**, **2754 unit pass, 0 fail** (300 files) followed by **433 DOM pass, 0 fail** (52 files, 2553 assertions, 65.55s).
+- First `TMPDIR=... nice -n 10 bun run test:ci`: **2753 pass, 1 fail**, 300 files, 636.63s; failed identities REST viewer-prefs test with SQLiteError SQLITE_BUSY in Better Auth fixture creation, so DOM phase did not run. Isolated exact-file retry: **3 pass, 0 fail**, 28 assertions, 5.04s. Full CI retry: **exit 0**, **2754 unit pass, 0 fail** (300 files, 489.87s) followed by **433 DOM pass, 0 fail** (52 files, 2553 assertions, 65.55s).
 - Existing stress script is `test:stress` (no `stress` script); running `TMPDIR=... nice -n 10 bun run test:stress` → `bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3`. Result pending.
 
 Temporary test directories were placed on the worktree filesystem via TMPDIR to avoid filling /tmp. Test-owned sockets use the existing test harness ephemeral ports; the manual app/fixture check uses only 3793/3794.
