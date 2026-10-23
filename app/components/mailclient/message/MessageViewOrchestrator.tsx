@@ -24,6 +24,7 @@ import MessageViewPane from "./MessageViewPane";
 import ThreadSubject from "./ThreadSubject";
 import paneStyles from "./MessageViewPane.module.css";
 import ThreadView from "./ThreadView";
+import type { ThreadWindowState } from "../useThreadContent";
 import type { ThreadViewCardProps } from "./ThreadView";
 import ThreadTopicSuggestionsRow from "./ThreadTopicSuggestionsRow";
 import TopicBadge from "../TopicBadge";
@@ -178,6 +179,10 @@ export type MessageViewOrchestratorBodyInputs = {
   threadContentById: Record<string, Message[]>;
   threadContentLoading: string | null;
   threadContentErrorById: Record<string, string>;
+  // Bounded-window paging of the active thread; its placeholders resolve
+  // "In Reply To" links to parents that are not loaded.
+  threadWindow?: ThreadWindowState | null;
+  onLoadThreadPage?: (direction: "older" | "newer") => void;
   composeDraftId: string | null;
   // Compose-mode + focus target used by the thread-auto-collapse effect
   // that runs when the user opens a reply / forward inside the active
@@ -375,6 +380,8 @@ function MessageViewOrchestratorImpl(
     threadContentById,
     threadContentLoading,
     threadContentErrorById,
+    threadWindow,
+    onLoadThreadPage,
     composeDraftId,
     composeMode,
     composeThreadFocusMessageId,
@@ -390,13 +397,18 @@ function MessageViewOrchestratorImpl(
   // receive only their resolved target, so unrelated sibling updates stay local.
   const enhancedMessageByMessageId = useMemo(() => {
     const lookup = new Map(messageByMessageId);
+    threadWindow?.placeholders.forEach((message) => {
+      if (message.messageId && message.accountId === activeAccountId && !lookup.has(message.messageId)) {
+        lookup.set(message.messageId, message);
+      }
+    });
     activeThread.forEach((message) => {
       if (message.messageId && message.accountId === activeAccountId) {
         lookup.set(message.messageId, message);
       }
     });
     return lookup;
-  }, [messageByMessageId, activeThread, activeAccountId]);
+  }, [messageByMessageId, activeThread, activeAccountId, threadWindow?.placeholders]);
 
   const [topicSuggestionExplanationOpen, setTopicSuggestionExplanationOpen] = useState(false);
   const [topicSuggestionExplanationLoading, setTopicSuggestionExplanationLoading] = useState(false);
@@ -779,6 +791,8 @@ function MessageViewOrchestratorImpl(
                 threadContentById={threadContentById}
                 threadContentLoading={threadContentLoading}
                 threadContentErrorById={threadContentErrorById}
+                threadWindow={threadWindow}
+                onLoadThreadPage={onLoadThreadPage}
                 composeDraftId={composeDraftId}
                 composeReplyMessageId={inlineComposePlacement.composeReplyMessageId}
                 renderComposeInlineCard={

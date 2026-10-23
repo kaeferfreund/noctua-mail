@@ -21,7 +21,7 @@ test("200-message thread isolates card state and sibling collaboration; callback
     showComposeInline: false, composeDraftId: null, composeReplyMessageId: null,
     renderComposeInlineCard: null, threadContentById: {}, threadContentLoading: null,
     threadContentErrorById: {},
-    messageCardProps: {...shared, pendingMessageActions: new Set(), collapsedMessages: Object.fromEntries(messages.slice(6).map(m => [m.id, true])), messageTabs: {}, messageContentLoading: {}, messageFontScale: {}, messageZoom: {}, messageByMessageId: new Map(), threadViewMode: "compact", getImapFlagBadges: message => {
+    messageCardProps: {...shared, pendingMessageActions: new Set(), collapsedMessages: Object.fromEntries(messages.map((m, i) => [m.id, i >= 6])), messageTabs: {}, messageContentLoading: {}, messageFontScale: {}, messageZoom: {}, messageByMessageId: new Map(), threadViewMode: "compact", getImapFlagBadges: message => {
       renders.set(message.id, (renders.get(message.id) ?? 0) + 1); return [];
     }, renderQuickActions: message => <button onClick={() => calls.push(`mailbox-a:owner:${message.id}`)}>Synthetic action {message.id}</button>}
   };
@@ -78,7 +78,8 @@ test("orchestrator keeps sibling cards idle through real collapse, tab, font, zo
   fireEvent.click(card.getByRole("button", {name: "Collapse message"}));
   expect([...renders.keys()]).toEqual([messages[0].id]);
   renders.clear();
-  fireEvent.click(view.getByRole("button", {name: /Synthetic Sender.*Synthetic review body/}));
+  // Siblings without a collapse entry start collapsed; the first compact row is messages[0].
+  fireEvent.click(view.getAllByRole("button", {name: /Synthetic Sender.*Synthetic review body/})[0]);
   expect([...renders.keys()]).toEqual([messages[0].id]);
   const expanded = within(view.container.querySelector("article")!);
   fireEvent.keyDown(expanded.getByRole("button", {name: "Display options"}), {key: "Enter"});

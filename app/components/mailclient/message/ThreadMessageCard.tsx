@@ -10,6 +10,7 @@ import { badgeColors, getFlagBadgeColor, getPriorityBadgeColor } from "@/lib/ui/
 import {
   hasMeaningfulHtmlText,
   hasTextContent,
+  isMessageContentUnloaded,
   needsMessageContentHydration
 } from "@/lib/ui/messageView";
 import { getMessageDateDisplay } from "@/lib/dateFormatting";
@@ -247,7 +248,10 @@ function ThreadMessageCard({
   const hasText = hasTextContent(message.body);
   const preferTextTab = hasHtml && hasText && !hasMeaningfulHtmlText(message.htmlBody);
   const hasSource = Boolean(message.hasSource);
+  // Header rows arrive without content; expanded cards read it on demand.
+  const contentUnloaded = isMessageContentUnloaded(message);
   const needsContentHydration = needsMessageContentHydration(message);
+  const needsContentRead = contentUnloaded || needsContentHydration;
   const contentLoading = bodyLoading || messageContentLoading;
   const translationShowing = Boolean(translationEnabled && translation?.showing);
   // Normalize to a supported code so an invalid persisted/overridden language
@@ -302,7 +306,7 @@ function ThreadMessageCard({
 
   useEffect(() => {
     if (isCollapsed) return;
-    if (!needsContentHydration) return;
+    if (!needsContentRead) return;
     if (contentLoading) return;
     if (bodyLoadError) return;
     void ensureMessageContent(message);
@@ -311,7 +315,7 @@ function ThreadMessageCard({
     contentLoading,
     ensureMessageContent,
     isCollapsed,
-    needsContentHydration,
+    needsContentRead,
     message
   ]);
 
@@ -518,14 +522,22 @@ function ThreadMessageCard({
   // Set once the body renders; drives the header's display options.
   let bodyView: { tabs: MessageTab[]; currentTab: MessageTab; defaultTab: MessageTab } | null =
     null;
-  if (bodyLoadError && needsContentHydration) {
+  if (bodyLoadError && needsContentRead) {
     content = wrapPanel(
       "load-error",
       <div className={styles.bodyLoadError} role="alert" aria-live="polite">
-        <span className={styles.bodyLoadErrorLabel}>{bodyLoadError}</span>
+        <span className={styles.bodyLoadErrorLabel}>{t("loadContentFailed")}</span>
+        <Button
+          size="1"
+          variant="soft"
+          color="gray"
+          onClick={() => void ensureMessageContent(message, { manual: true })}
+        >
+          {t("retryLoad")}
+        </Button>
       </div>
     );
-  } else if (contentLoading && needsContentHydration) {
+  } else if ((contentLoading && needsContentHydration) || contentUnloaded) {
     content = wrapPanel(
       "loading",
       <div className={styles.bodyLoading} role="status" aria-live="polite">

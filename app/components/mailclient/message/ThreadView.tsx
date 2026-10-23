@@ -4,11 +4,15 @@ import type { MessageTranslationEntry } from "./messageTranslation";
 import type { MessageTab } from "./types";
 import { resolveInReplyToRef } from "../utils/messageHelpers";
 import type { Message } from "@/lib/data";
-import { Text } from "@radix-ui/themes";
-import { needsMessageContentHydration } from "@/lib/ui/messageView";
+import { Button, Text } from "@radix-ui/themes";
 import ThreadMessageCard from "./ThreadMessageCard";
 import type { ThreadMessageCardProps } from "./ThreadMessageCard";
-import { getRenderedThreadMessages } from "./threadViewState";
+import {
+  getDefaultExpandedMessageIds,
+  getRenderedThreadMessages,
+  isThreadMessageCollapsed
+} from "./threadViewState";
+import type { ThreadWindowState } from "../useThreadContent";
 import styles from "./ThreadView.module.css";
 
 export type ThreadViewCardProps = Omit<ThreadMessageCardProps,
@@ -19,6 +23,7 @@ export type ThreadViewCardProps = Omit<ThreadMessageCardProps,
   collapsedMessages: Record<string, boolean>;
   messageTabs: Record<string, MessageTab>;
   messageContentLoading: Record<string, boolean>;
+  messageContentErrorById?: Record<string, string>;
   messageFontScale: Record<string, number>;
   messageZoom: Record<string, number>;
   messageTranslations?: Record<string, MessageTranslationEntry>;
@@ -33,6 +38,9 @@ type ThreadViewProps = {
   threadContentById: Record<string, Message[]>;
   threadContentLoading: string | null;
   threadContentErrorById: Record<string, string>;
+  /** Paging state of the active thread's bounded window, when it is windowed. */
+  threadWindow?: ThreadWindowState | null;
+  onLoadThreadPage?: (direction: "older" | "newer") => void;
   messageCardProps: ThreadViewCardProps;
   composeDraftId: string | null;
   composeReplyMessageId: string | null;
@@ -47,6 +55,8 @@ export default function ThreadView({
   threadContentById,
   threadContentLoading,
   threadContentErrorById,
+  threadWindow,
+  onLoadThreadPage,
   messageCardProps,
   composeDraftId,
   composeReplyMessageId,
@@ -56,77 +66,87 @@ export default function ThreadView({
   // Keep collection identity out of the memoized cards. Shared handlers stay
   // unwrapped so changed closures (mailbox, role, policy) remain observable.
   const { pendingMessageActions, collapsedMessages, messageTabs,
-    messageContentLoading, messageFontScale, messageZoom, messageTranslations,
-    messageByMessageId, ...sharedCardProps } = messageCardProps;
+    messageContentLoading, messageContentErrorById, messageFontScale, messageZoom,
+    messageTranslations, messageByMessageId, ...sharedCardProps } = messageCardProps;
+  if (!activeMessage) {
+    return showComposeInline ? null : (
+      <Text size="2" color="gray" className={styles.empty}>{t("selectThread")}</Text>
+    );
+  }
+  const activeThreadId = activeMessage.threadId ?? activeMessage.messageId ?? activeMessage.id;
+  const activeThreadError = activeThreadId ? threadContentErrorById[activeThreadId] : "";
+  const visibleThread = getRenderedThreadMessages({
+    activeMessage,
+    activeThread,
+    supportsThreads,
+    threadContentById,
+    threadContentLoading,
+    showComposeInline,
+    composeDraftId
+  });
+  const defaultExpandedIds = getDefaultExpandedMessageIds(visibleThread, activeMessage.id);
+  const { threadViewMode } = messageCardProps;
+  const windowLoading = threadWindow?.loading ?? null;
+  const newestVisibleId = visibleThread.reduce<Message | null>(
+    (newest, message) => (!newest || message.dateValue >= newest.dateValue ? message : newest),
+    null
+  )?.id;
+  const renderPageControl = (direction: "older" | "newer") => (
+    <div key={`page-${direction}`} className={styles.pageControl} data-reader-print-exclude="">
+      <Button
+        size="1"
+        variant="soft"
+        color="gray"
+        disabled={Boolean(windowLoading)}
+        onClick={() => onLoadThreadPage?.(direction)}
+      >
+        {windowLoading === direction
+          ? t("loadingMessages")
+          : t(direction === "older" ? "loadOlderMessages" : "loadNewerMessages")}
+      </Button>
+      {threadWindow?.error ? (
+        <Text size="1" color="red" role="alert">{t("threadLoadError")}</Text>
+      ) : null}
+    </div>
+  );
   return (
     <>
-      {activeMessage ? (
-        (() => {
-          const activeThreadId =
-            activeMessage.threadId ?? activeMessage.messageId ?? activeMessage.id;
-          const isThreadLoading = Boolean(
-            activeThreadId && threadContentLoading === activeThreadId
-          );
-          const activeThreadError = activeThreadId ? threadContentErrorById[activeThreadId] : "";
-          const activeMessageFromThread =
-            activeThread.find((item) => item.id === activeMessage.id) ?? activeMessage;
-          const activeMessageBodyLoading =
-            isThreadLoading && needsMessageContentHydration(activeMessageFromThread);
-          const activeMessageBodyError =
-            !isThreadLoading &&
-            Boolean(activeThreadError) &&
-            needsMessageContentHydration(activeMessageFromThread);
-          const visibleThread = getRenderedThreadMessages({
-            activeMessage,
-            activeThread,
-            supportsThreads,
-            threadContentById,
-            threadContentLoading,
-            showComposeInline,
-            composeDraftId
-          });
-          const { threadViewMode } = messageCardProps;
-          return (
-            <>
-              {visibleThread.map((message) => {
-                const reply = resolveInReplyToRef(message, messageByMessageId);
-                const isCompactCollapsed =
-                  threadViewMode === "compact" && Boolean(collapsedMessages[message.id]);
-                return (
-                <div
-                  key={message.id}
-                  className={`${styles.threadItem} ${isCompactCollapsed ? styles.compactThreadItem : ""}`}
-                >
-                  <ThreadMessageCard
-                    message={message}
-                    bodyLoading={activeMessageBodyLoading && message.id === activeMessageFromThread.id}
-                    bodyLoadError={
-                      activeMessageBodyError && message.id === activeMessageFromThread.id
-                        ? activeThreadError
-                        : null
-                    }
-                    {...sharedCardProps}
-                    actionPending={pendingMessageActions.has(message.id)}
-                    isCollapsed={Boolean(collapsedMessages[message.id])}
-                    messageTab={messageTabs[message.id]}
-                    contentLoading={Boolean(messageContentLoading[message.id])}
-                    fontScale={messageFontScale[message.id] ?? 1}
-                    zoomValue={messageZoom[message.id] ?? 1}
-                    translation={messageTranslations?.[message.id]}
-                    replyTarget={reply?.target}
-                    replyReferenceId={reply?.refId}
-                    replyIsForward={reply?.isForward}
-                  />
-                  {composeReplyMessageId === message.id && renderComposeInlineCard?.()}
-                </div>
-                );
-              })}
-            </>
-          );
-        })()
-      ) : showComposeInline ? null : (
-        <Text size="2" color="gray" className={styles.empty}>{t("selectThread")}</Text>
-      )}
+      {activeThreadError ? (
+        <div className={styles.pageControl} role="alert" data-reader-print-exclude="">
+          <Text size="1" color="red">{t("threadLoadError")}</Text>
+        </div>
+      ) : null}
+      {threadWindow?.hasOlder && onLoadThreadPage ? renderPageControl("older") : null}
+      {visibleThread.map((message) => {
+        const reply = resolveInReplyToRef(message, messageByMessageId);
+        const isCollapsed = isThreadMessageCollapsed(message.id, collapsedMessages, defaultExpandedIds);
+        const isCompactCollapsed = threadViewMode === "compact" && isCollapsed;
+        return (
+          <React.Fragment key={message.id}>
+            {threadWindow?.hasNewer && onLoadThreadPage && message.id === newestVisibleId
+              ? renderPageControl("newer")
+              : null}
+            <div className={`${styles.threadItem} ${isCompactCollapsed ? styles.compactThreadItem : ""}`}>
+              <ThreadMessageCard
+                message={message}
+                bodyLoadError={messageContentErrorById?.[message.id] ?? null}
+                {...sharedCardProps}
+                actionPending={pendingMessageActions.has(message.id)}
+                isCollapsed={isCollapsed}
+                messageTab={messageTabs[message.id]}
+                contentLoading={Boolean(messageContentLoading[message.id])}
+                fontScale={messageFontScale[message.id] ?? 1}
+                zoomValue={messageZoom[message.id] ?? 1}
+                translation={messageTranslations?.[message.id]}
+                replyTarget={reply?.target}
+                replyReferenceId={reply?.refId}
+                replyIsForward={reply?.isForward}
+              />
+              {composeReplyMessageId === message.id && renderComposeInlineCard?.()}
+            </div>
+          </React.Fragment>
+        );
+      })}
     </>
   );
 }
