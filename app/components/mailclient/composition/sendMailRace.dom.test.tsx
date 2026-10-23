@@ -1,6 +1,6 @@
 // Runs only under `bun run test:dom`, which preloads lib/testSetupDom.ts to
 // register happy-dom before any component module loads.
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import React from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
@@ -20,6 +20,7 @@ type ApiCall = { url: string; method: string; body?: unknown; signal?: AbortSign
 
 type RenderComposeOptions = {
   isMobile?: boolean;
+  followComposeOpen?: boolean;
   onOutcome?: (outcome: string, id: string | null, warnings?: string[]) => void;
   onNotice?: (notice: { type: string; title: string; description?: string }) => void;
   refreshMailboxData?: () => Promise<void>;
@@ -149,6 +150,13 @@ function renderCompose(options: RenderComposeOptions = {}) {
     detachedWindow: options.detachedWindow ?? false
   } as unknown as React.ComponentProps<typeof ComposeOrchestrator>;
 
+  function LiveCompose() {
+    const [open, setOpen] = React.useState(false);
+    const onMirror = React.useCallback((mirror: { composeOpen: boolean }) => setOpen(mirror.composeOpen), []);
+    return <ComposeOrchestrator ref={handleRef} {...props} showComposeModal={open} onComposeMirrorChange={onMirror} />;
+  }
+  const composer = options.followComposeOpen ? <LiveCompose /> : <ComposeOrchestrator ref={handleRef} {...props} />;
+
   // The orchestrator is a sibling of the shell; its inline portal must
   // not rely on a React keydown handler on the shell to guard Bold.
   const renderTree = (inlineCard: React.ReactNode = null) => (
@@ -156,12 +164,10 @@ function renderCompose(options: RenderComposeOptions = {}) {
       {options.onSidebarToggle && <SidebarProvider onOpenChange={options.onSidebarToggle}>
         <SidebarInset>{inlineCard}</SidebarInset>
       </SidebarProvider>}
-      <ComposeOrchestrator ref={handleRef} {...props} />
+      {composer}
     </Theme>
   );
-  const view = render(options.onSidebarToggle ? renderTree() : <Theme>
-    <ComposeOrchestrator ref={handleRef} {...props} />
-  </Theme>);
+  const view = render(options.onSidebarToggle ? renderTree() : <Theme>{composer}</Theme>);
 
   const sendButton = () =>
     [...view.baseElement.querySelectorAll("button")].find((button) =>
@@ -804,3 +810,86 @@ for (const mode of ["forward", "edit"] as const) {
     expect(JSON.stringify(sent[0].body)).toContain("Synthetic B content");
   });
 }
+
+describe("compose QA regressions", () => {
+  for (const variant of ["inline", "modal"] as const) {
+    it(`associates visible captions in ${variant} compose`, async () => {
+      const h = renderCompose({ onSidebarToggle: () => {}, showComposeInline: variant === "inline", showComposeModal: variant === "modal" });
+      await act(async () => { await h.handleRef.current!.openCompose("new"); });
+      if (variant === "inline") act(h.mountInlineCard);
+      fireEvent.click(h.view.getByRole("button", { name: "Show Cc and Bcc" }));
+      for (const caption of ["To", "Cc", "Bcc", "Subject"]) {
+        const field = h.view.getByLabelText(`${caption}:`) as HTMLInputElement;
+        expect(field.id).toBe(`compose-${variant}-${caption.toLowerCase()}`);
+      }
+    });
+  }
+
+  it("preserves 30 synchronous keystrokes across autosave ticks and sends the current fields", async () => {
+    const h = renderCompose({ holdDraftSaves: false });
+    await act(async () => { await h.handleRef.current!.openCompose("new"); });
+    // Capture only the real autosave debounce; suggestion and Radix timers keep
+    // their normal timing. Drive save completions between rapid input bursts.
+    const realSetTimeout = window.setTimeout.bind(window);
+    const ticks = new Map<number, () => void>();
+    let timerId = 100000;
+    const timeoutSpy = spyOn(window, "setTimeout").mockImplementation(((callback: () => void, delay?: number, ...args: unknown[]) => {
+      if (delay === 2000) { ticks.set(++timerId, callback); return timerId; }
+      return realSetTimeout(callback, delay, ...args);
+    }) as typeof window.setTimeout);
+    const realClearTimeout = window.clearTimeout.bind(window);
+    const clearSpy = spyOn(window, "clearTimeout").mockImplementation(((id?: number) => {
+      if (id !== undefined && ticks.delete(id)) return;
+      realClearTimeout(id);
+    }) as typeof window.clearTimeout);
+    try {
+      fireEvent.click(h.view.getByRole("button", { name: "Show Cc and Bcc" }));
+      const values = { "To:": "recipient@example.test", "Cc:": "copy@example.test", "Bcc:": "hidden@example.test", "Subject:": "0123456789abcdefghijklmnopqrst" };
+      for (const [caption, value] of Object.entries(values)) {
+        const input = h.view.getByLabelText(caption) as HTMLInputElement;
+        for (const char of value) {
+          // Each event appends to what a keyboard sees, so any stale overwrite
+          // affects subsequent characters instead of being masked by .fill().
+          fireEvent.change(input, { target: { value: input.value + char } });
+          if (input.value.length % 5 === 0) {
+            await act(async () => {
+              const due = [...ticks.values()]; ticks.clear();
+              due.forEach(tick => tick());
+            });
+          }
+        }
+        expect(input.value).toBe(value);
+      }
+      expect(h.countDraftSaves()).toBeGreaterThan(0);
+      await act(async () => { fireEvent.click(h.sendButton()!); });
+      const sent = h.calls.find(call => call.url.includes("/smtp/send"))!.body as Record<string, unknown>;
+      expect(sent.subject).toBe(values["Subject:"]);
+      expect(sent.to).toBe(values["To:"]);
+      expect(sent.cc).toBe(values["Cc:"]);
+      expect(sent.bcc).toBe(values["Bcc:"]);
+    } finally { timeoutSpy.mockRestore(); clearSpy.mockRestore(); }
+  });
+
+  for (const isMobile of [false, true]) {
+    it(`traps focus, dismisses with Escape and restores the opener (${isMobile ? "mobile" : "desktop"})`, async () => {
+      const opener = document.createElement("button");
+      opener.textContent = "Synthetic compose opener";
+      document.body.append(opener);
+      opener.focus();
+      const h = renderCompose({ isMobile, followComposeOpen: true, holdDraftSaves: false });
+      try {
+        await act(async () => { await h.handleRef.current!.openCompose("new"); });
+        const dialog = h.view.getByRole("dialog", { name: "New message" });
+        expect(dialog.getAttribute("aria-modal")).toBe("true");
+        const send = h.sendButton()!;
+        act(() => send.focus());
+        fireEvent.keyDown(send, { key: "Tab", code: "Tab" });
+        expect(dialog.contains(document.activeElement)).toBe(true);
+        act(() => send.focus());
+        fireEvent.keyDown(dialog, { key: "Escape", code: "Escape" });
+        await waitFor(() => expect(h.view.queryByRole("dialog") === null).toBe(true));
+        await waitFor(() => expect(document.activeElement === opener).toBe(true));
+      } finally { cleanup(); opener.remove(); }
+    });
+  }
+});
