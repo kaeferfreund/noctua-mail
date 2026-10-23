@@ -66,3 +66,16 @@ describe("message catalogs", () => {
     });
   }
 });
+
+test("admin self-grant copy is explicit in both locales and uses German mailbox roles", () => {
+  const t = getTranslator("de");
+  expect(t("Admin.mailboxes.selfGrantTitle")).toBe("Dir selbst Zugriff geben?");
+  expect(t("Admin.mailboxes.noMembers")).toBe("Noch keine Mitglieder – niemand sieht dieses Postfach");
+  expect((["manager", "editor", "viewer"] as const).map(role => t(`Admin.roles.${role}`))).toEqual(["Verwalter", "Bearbeiter", "Leser"]);
+  for (const locale of ["de", "en"] as const) {
+    const translate = getTranslator(locale);
+    for (const key of ["selfGrantTitle", "selfGrantHelp", "grantAccess", "later", "noMembers"] as const) {
+      expect(translate(`Admin.mailboxes.${key}`)).not.toBe(`Admin.mailboxes.${key}`);
+    }
+  }
+});
