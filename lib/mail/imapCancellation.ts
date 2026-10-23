@@ -36,3 +36,7 @@ export async function withImapDeadline<T>(deadlineAt: number, work: () => Promis
   try { return await Promise.race([cancellation.run(controller.signal, work), expired]); }
   finally { clearTimeout(timer); }
 }
+
+export function withImapCancellation<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  return cancellation.run(signal, work);
+}

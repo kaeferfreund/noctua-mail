@@ -3,6 +3,8 @@ let startupInitialized = false;
 export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") return;
   if (startupInitialized) return;
+  const { installShutdownCoordinator } = await import("@/lib/server/shutdown");
+  installShutdownCoordinator();
   const { installBackendConsoleTimestamps } = await import("@/lib/logging/backendConsole");
   installBackendConsoleTimestamps();
   const { assertImapSecretKeyConfigured } = await import("@/lib/secret");
@@ -10,6 +12,7 @@ export async function register() {
   const { getAuth } = await import("@/lib/betterAuth");
   // getAuth locks the datastore before initializing the master DB and auth.
   await getAuth();
+  (await import("@/lib/threadRecomputeJobs")).resumeIdentityRecomputeJobs();
   if (process.env.NOCTUA_MAILBOX_WATCHER === "1") (await import("@/lib/mailboxWatcher")).startMailboxWatcher();
   startupInitialized = true;
 }

@@ -1,3 +1,4 @@
+import { isWorkerStopping } from "../server/workerLifecycle";
 import { bindWorkerProcess } from "../db/processLeases";
 import { recomputeThreadIdsForAccount, recomputeThreadsForAccount } from "@/lib/db";
 
@@ -17,6 +18,7 @@ export async function runThreadRecomputeCli(argv = process.argv) {
     if (!argv.includes("--identities")) await recomputeThreadIdsForAccount(accountId);
     await recomputeThreadsForAccount(accountId);
   } catch (error) {
+      if (isWorkerStopping()) return;
     console.error(
       error instanceof Error ? error.message : "Thread recompute failed."
     );

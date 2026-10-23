@@ -1,3 +1,4 @@
+import { workerSafePoint } from "./server/workerLifecycle";
 type DbWriteRetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -57,6 +58,7 @@ export async function withDbWriteRetry<T>(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      workerSafePoint();
       const result = await fn();
       if (retries > 0) {
         console.info("[db-write-retry] success", {

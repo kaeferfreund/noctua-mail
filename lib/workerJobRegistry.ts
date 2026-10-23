@@ -1,3 +1,4 @@
+import { assertServerRunning, trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { createBoundedWorkerJobRegistry } from "./boundedWorkerJobRegistry";
 import { randomUUID } from "crypto";
 
@@ -81,6 +82,7 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
   };
 
   const startJob = (accountId: string, args: string[] = []) => {
+    assertServerRunning();
     const id = randomUUID();
     const job: WorkerJobRecord = {
       id,
@@ -107,9 +109,10 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
           stderr: config.spawnStderr ?? "pipe"
         }
       );
+      trackWorker(child);
       job.pid = child.pid;
 
-      void (async () => {
+      const completion = (async () => {
         const exitCode = await child.exited;
         let stderrText = "";
         if (config.readStderrText !== false && child.stderr) {
@@ -129,6 +132,7 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
         }
         scheduleCleanup(job.id);
       })();
+      trackBackgroundWork(`worker-monitor:${child.pid}`, completion);
     } catch (error) {
       job.status = "failed";
       job.finishedAt = Date.now();
@@ -140,5 +144,5 @@ export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
   };
 
   const getLatestJob = (accountId: string) => [...jobs.values()].filter(job => job.accountId === accountId).at(-1) ?? null;
-  return { getJob, startJob, getLatestJob, settleJob: async (_id: string) => { void _id; } };
+  return { getJob, startJob, getLatestJob, settleJob: async (_id: string) => { void _id; }, resumeJobs: () => {} };
 }
