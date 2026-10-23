@@ -72,3 +72,24 @@ for (const locale of ["de", "en"] as const) for (const enabled of [true, false])
     expect(view.getByRole("button", { name: messages.closeComposer })).toBeTruthy();
   });
 }
+
+for (const locale of ["de", "en"] as const) test(`keyboard scroll area contains metadata, body and footer: ${locale}`, () => {
+  const { view } = renderHeader({ locale, enabled: false, email: "unavailable@example.test", displayName: "Synthetic unavailable sender" });
+  const messages = getMessages(locale).Compose;
+  const from = view.getByLabelText(messages.from, { exact: true });
+  const to = view.getByLabelText("To:", { exact: true });
+  const subject = view.getByLabelText("Subject:", { exact: true });
+  const editor = view.getByLabelText("Synthetic body");
+  const cancel = view.getByRole("button", { name: "Cancel" });
+  // Geometry and the single active scroll ancestor are checked in Chromium.
+  // Keep the footer in the same structural area, so it can scroll with the
+  // fields when the keyboard leaves too little room for fixed actions.
+  const body = editor.parentElement!;
+  const area = body.parentElement!;
+  expect(body.contains(from)).toBe(true);
+  expect(body.contains(to)).toBe(true);
+  expect(body.contains(subject)).toBe(true);
+  expect(area.contains(cancel)).toBe(true);
+  expect(cancel.parentElement!.parentElement!.parentElement).toBe(area);
+  expect(area.contains(view.getByRole("button", { name: messages.closeComposer }))).toBe(false);
+});

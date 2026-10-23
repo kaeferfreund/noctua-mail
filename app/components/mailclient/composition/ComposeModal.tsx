@@ -1,5 +1,5 @@
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Dock, ExternalLink, X } from "lucide-react";
 import { MinusIcon } from "@radix-ui/react-icons";
@@ -14,6 +14,28 @@ type ComposeModalProps = {
   open: boolean;
   isMobile?: boolean;
 };
+
+function revealFocusedEditor(area: HTMLDivElement, target: EventTarget | null) {
+  // Tall/desktop layouts use display: contents. At short heights reveal the
+  // entire input, since native contenteditable focus may expose only its caret.
+  if (area.clientHeight > 0 && target instanceof HTMLElement && area.contains(target) && target.matches('[data-lexical-editor="true"]')) {
+    target.scrollIntoView({ block: "end" });
+  }
+}
+
+function ComposeScrollArea({ children }: { children: ReactNode }) {
+  const areaRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    // A keyboard can shrink the viewport while the editor already has focus.
+    const observer = new ResizeObserver(() => revealFocusedEditor(area, document.activeElement));
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
+  return <div className={styles.composeScrollArea} ref={areaRef}
+    onFocusCapture={event => revealFocusedEditor(event.currentTarget, event.target)}>{children}</div>;
+}
 
 export default function ComposeModal({ open, isMobile = false }: ComposeModalProps) {
   const {
@@ -166,59 +188,61 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             </TooltipIconButton>
           </div>
         </div>
-        {!deliveredWarnings?.length && <div className={styles.composeBody}>
-          <ComposeFields
-            key={`modal-fields-${composeFieldsReset}`}
-            variant="modal"
-            composeSubject={composeSubject}
-            composeTo={composeTo}
-            composeCc={composeCc}
-            composeBcc={composeBcc}
-            composeShowBcc={composeShowBcc}
-            composeOpenedAt={composeOpenedAt}
-            activeAccountId={activeAccountId}
-            fromValue={fromValue}
+        <ComposeScrollArea>
+          {!deliveredWarnings?.length && <div className={styles.composeBody}>
+            <ComposeFields
+              key={`modal-fields-${composeFieldsReset}`}
+              variant="modal"
+              composeSubject={composeSubject}
+              composeTo={composeTo}
+              composeCc={composeCc}
+              composeBcc={composeBcc}
+              composeShowBcc={composeShowBcc}
+              composeOpenedAt={composeOpenedAt}
+              activeAccountId={activeAccountId}
+              fromValue={fromValue}
               identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onSenderRetry={onSenderRetry} onIdentityChange={onIdentityChange}
-            inReplyToMessage={inReplyToMessage}
-            onJumpToMessage={jumpToMessage}
-            setComposeSubject={setComposeSubject}
-            setComposeTo={setComposeTo}
-            setComposeCc={setComposeCc}
-            setComposeBcc={setComposeBcc}
-            setComposeShowBcc={setComposeShowBcc}
-            applyRecipientSelection={applyRecipientSelection}
-            loadRecipientOptions={loadRecipientOptions}
-            getComposeToken={getComposeToken}
-            markComposeDirty={markComposeDirty}
+              inReplyToMessage={inReplyToMessage}
+              onJumpToMessage={jumpToMessage}
+              setComposeSubject={setComposeSubject}
+              setComposeTo={setComposeTo}
+              setComposeCc={setComposeCc}
+              setComposeBcc={setComposeBcc}
+              setComposeShowBcc={setComposeShowBcc}
+              applyRecipientSelection={applyRecipientSelection}
+              loadRecipientOptions={loadRecipientOptions}
+              getComposeToken={getComposeToken}
+              markComposeDirty={markComposeDirty}
+            />
+            {composeMessageField}
+          </div>}
+          <ComposeActions
+            deliveredWarnings={deliveredWarnings}
+            composeDraftId={composeDraftId}
+            composeOpen={composeOpen}
+            canSaveDraft={canSaveDraft}
+            draftSaving={draftSaving}
+            draftSaveError={draftSaveError}
+            draftSavedAt={draftSavedAt}
+            sendingMail={sendingMail}
+            discardingDraft={discardingDraft}
+            busy={detachingCompose}
+            attachmentLoadState={attachmentLoadState}
+            handleDiscardDraft={handleDiscardDraft}
+            handleSaveDraft={handleSaveDraft}
+            handleCancel={() => {
+              if (detachedWindow) {
+                closeDetachedCompose();
+                return;
+              }
+              setComposeOpen(false);
+              setComposeView("inline");
+            }}
+            handleSendMail={handleSendMail}
+            sendDisabled={sendDisabled}
+            formatRelativeTime={formatRelativeTime}
           />
-          {composeMessageField}
-        </div>}
-        <ComposeActions
-          deliveredWarnings={deliveredWarnings}
-          composeDraftId={composeDraftId}
-          composeOpen={composeOpen}
-          canSaveDraft={canSaveDraft}
-          draftSaving={draftSaving}
-          draftSaveError={draftSaveError}
-          draftSavedAt={draftSavedAt}
-          sendingMail={sendingMail}
-          discardingDraft={discardingDraft}
-          busy={detachingCompose}
-          attachmentLoadState={attachmentLoadState}
-          handleDiscardDraft={handleDiscardDraft}
-          handleSaveDraft={handleSaveDraft}
-          handleCancel={() => {
-            if (detachedWindow) {
-              closeDetachedCompose();
-              return;
-            }
-            setComposeOpen(false);
-            setComposeView("inline");
-          }}
-          handleSendMail={handleSendMail}
-          sendDisabled={sendDisabled}
-          formatRelativeTime={formatRelativeTime}
-        />
+        </ComposeScrollArea>
         {!isMobile && <div
           className={styles.composeResizer}
           onPointerDown={(event) => {

@@ -1,7 +1,7 @@
 // Run against an isolated production build and synthetic SMTP fixture. See
 // doc/DEV-FIXTURES.md; COMPOSE_QA_SEED_FILE supplies an enrolled synthetic user
 // (email/password/totpURI/accountId), COMPOSE_QA_OUTBOX the fixture capture dir.
-import {test, expect, type Page} from '@playwright/test';
+import {test, expect, type Page, type Locator} from '@playwright/test';
 import {readFileSync, readdirSync} from 'node:fs';
 import path from 'node:path';
 import {totpFromUri} from '../../helpers/totp';
@@ -411,21 +411,141 @@ for (const locale of ['de', 'en'] as const) {
           expect(persisted.status()).toBe(200);
           expect((await persisted.json()).message.body).toContain(marker.trim());
         }
-        measurements.push({locale,state,theme,width,header:await subtitle.locator('../..').evaluate(el=>el.getBoundingClientRect().height),from:(await from.boundingBox())!.height,editor:geometry.height,visibleEditor:geometry.visibleHeight,closeRight:bounds[0].x+bounds[0].width,typing:true});
+        measurements.push({locale,state,theme,width,metadata:await page.locator('[class*=composeBody] > [class*=composeGrid]').evaluate(el=>el.clientHeight),header:await subtitle.locator('../..').evaluate(el=>el.getBoundingClientRect().height),from:(await from.boundingBox())!.height,editor:geometry.height,visibleEditor:geometry.visibleHeight,closeRight:bounds[0].x+bounds[0].width,typing:true});
         console.log(JSON.stringify({finding:'P2-G',...measurements.at(-1) as object}));
+      }
+    }
+    async function keyboardMatrix(state:string) {
+      for(const theme of ['light','dark'] as const) for(const width of [320,390]) {
+        await test.step(`keyboard ${locale}/${state}/${theme}/${width}x500`,async()=>{
+          await page.setViewportSize({width,height:844});
+          await page.emulateMedia({colorScheme:theme});
+          await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);document.documentElement.style.colorScheme=theme;document.querySelectorAll('.radix-themes').forEach(el=>{el.classList.remove('light','dark');el.classList.add(theme);});},theme);
+          const editor=page.locator('[data-lexical-editor="true"]');
+          await editor.click();
+          await page.setViewportSize({width,height:500});
+          const area=page.locator('[class*=composeScrollArea]');
+          const grid=page.locator('[class*=composeBody] > [class*=composeGrid]');
+          const body=page.locator('[class*=composeBody]');
+          expect(await body.evaluate(el=>getComputedStyle(el).overflowY)).toBe('visible');
+          expect(await grid.evaluate(el=>({height:el.clientHeight,scroll:el.scrollHeight,overflow:getComputedStyle(el).overflowY}))).toMatchObject({overflow:'visible'});
+          expect(await grid.evaluate(el=>el.clientHeight)).toBeGreaterThan(0);
+          expect(await area.evaluate(el=>getComputedStyle(el).overflowY)).toBe('auto');
+          // Only the shared area may actually scroll. A zero-height metadata
+          // viewport or clipping editor ancestor must not be hidden by .click().
+          expect(await editor.evaluate(el=>{
+            const scrolls=[];
+            for(let p=el.parentElement;p;p=p.parentElement) {
+              const style=getComputedStyle(p);
+              if(['auto','scroll','hidden'].includes(style.overflowY)&&p.scrollHeight>p.clientHeight) scrolls.push(p.className);
+            }
+            return scrolls;
+          })).toEqual([await area.getAttribute('class')]);
+          async function visibleEditor() {
+            return editor.evaluate(el=>{
+              const r=el.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);
+              for(let p=el.parentElement;p;p=p.parentElement) if(['auto','scroll','hidden','clip'].includes(getComputedStyle(p).overflowY)) {const b=p.getBoundingClientRect();top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}
+              const metadata=el.closest('[class*=composeBody]')?.querySelector('[class*=composeGrid]');
+              if(metadata&&getComputedStyle(metadata).position==='sticky') top=Math.max(top,metadata.getBoundingClientRect().bottom);
+              return Math.max(0,bottom-top);
+            });
+          }
+          // Resizing with focus already in the editor must reveal it too.
+          await expect.poll(visibleEditor).toBeGreaterThanOrEqual(96);
+          const resizeVisible=await visibleEditor();
+          // Focus must reveal the input without test-side scrollIntoView(),
+          // locator clicks or programmatic scroll offsets.
+          await editor.evaluate(el=>{el.blur();el.focus();});
+          await expect.poll(visibleEditor).toBeGreaterThanOrEqual(96);
+          const focusedVisible=await visibleEditor();
+          const hit=async(target:Locator)=>target.evaluate(el=>{
+            const r=el.getBoundingClientRect();let top=0,bottom=innerHeight;
+            for(let p=el.parentElement;p;p=p.parentElement) if(['auto','scroll','hidden','clip'].includes(getComputedStyle(p).overflowY)) {const b=p.getBoundingClientRect();top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}
+            return r.top>=top&&r.bottom<=bottom&&el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));
+          });
+          async function wheelTo(target:Locator,click=true) {
+            for(let attempt=0;attempt<30&&!await hit(target);attempt++) {
+              const a=(await area.boundingBox())!,b=(await target.boundingBox())!;
+              await page.mouse.move(a.x+4,a.y+a.height/2);
+              await page.mouse.wheel(0,b.y+b.height/2<a.y+a.height/2?-80:80);
+              await page.waitForTimeout(150);
+            }
+            expect(await hit(target)).toBe(true);
+            const b=(await target.boundingBox())!;
+            await page.mouse.move(b.x+b.width/2,b.y+b.height/2);
+            if(click) await page.mouse.click(b.x+b.width/2,b.y+b.height/2);
+            return b;
+          }
+          const from=page.getByLabel(copy.from,{exact:true});
+          await wheelTo(from);
+          await expect(page.getByRole('listbox')).toBeVisible();
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('listbox')).toHaveCount(0);
+          const fromBox=await from.boundingBox();
+          for(const label of ['To:','Subject:']) {
+            const field=page.getByLabel(label,{exact:true});
+            await wheelTo(field);
+            await expect(field).toBeFocused();
+            if(label==='Subject:') {
+              await page.keyboard.press('End');
+              await page.keyboard.type('.');
+              await page.keyboard.press('Backspace');
+            }
+          }
+          await wheelTo(editor);
+          await page.keyboard.type(' Synthetic keyboard access.');
+          await expect(editor).toContainText('Synthetic keyboard access.');
+          await expect.poll(visibleEditor).toBeGreaterThanOrEqual(96);
+          const cancel=page.getByRole('button',{name:'Cancel',exact:true});
+
+          // Exercise every saved-draft footer action with a real pointer,
+          // including disabled controls, without discarding/sending the draft.
+          const actionBounds=[];
+          for(const name of ['Discard Draft','Save draft','Cancel','Send']) {
+            const action=page.getByRole('button',{name,exact:true});
+            const b=await wheelTo(action,false);
+            expect(b.width).toBeGreaterThanOrEqual(44);expect(b.height).toBeGreaterThanOrEqual(44);
+            actionBounds.push({name,...b});
+          }
+          const forward=await area.evaluate(el=>el.scrollTop);
+          expect(forward).toBeGreaterThan(0);
+          const cancelBox=await cancel.boundingBox();
+          // Return to metadata by wheel, then repeat pointer access to all
+          // fields. No locator action may silently scroll a clipped ancestor.
+          const a=(await area.boundingBox())!;
+          await page.mouse.move(a.x+4,a.y+a.height/2);
+          await page.mouse.wheel(0,-1000);
+          await expect.poll(()=>area.evaluate(el=>el.scrollTop)).toBe(0);
+          await wheelTo(from);
+          await page.keyboard.press('Escape');
+          await expect(page.getByRole('listbox')).toHaveCount(0);
+          for(const label of ['To:','Subject:']) await wheelTo(page.getByLabel(label,{exact:true}));
+          expect(await area.evaluate(el=>el.scrollTop)).toBeLessThan(forward);
+          const close=page.getByRole('button',{name:copy.closeComposer,exact:true});
+          const closeBox=(await close.boundingBox())!;
+          expect(closeBox.width).toBeGreaterThanOrEqual(44);expect(closeBox.height).toBeGreaterThanOrEqual(44);
+          expect(await hit(close)).toBe(true);
+          const measurement={locale,state,theme,width,height:500,metadata:await grid.evaluate(el=>el.clientHeight),resizeVisible,focusedVisible,fromBox,cancelBox,closeBox,actionBounds,forward,back:await area.evaluate(el=>el.scrollTop),fromToSubjectHit:true,typing:true};
+          console.log(JSON.stringify({finding:'P2 keyboard',...measurement}));
+          await info.attach(`keyboard-${locale}-${state}-${theme}-${width}`,{body:JSON.stringify(measurement),contentType:'application/json'});
+          await page.setViewportSize({width,height:844});
+        });
       }
     }
     try {
       const long=await identity(longEmail,longName);
       await openFresh(long,'enabled long');
       await matrix(long,'enabled long');
+      await keyboardMatrix('enabled');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       expect((await page.request.patch(`${mailbox}/identities/${long.id}`,{headers,data:{enabled:false}})).status()).toBe(200);
       await reopen();
       await matrix(long,'unavailable');
+      await keyboardMatrix('unavailable');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       await reopen();
       await matrix(long,'reopened unavailable draft');
+      await keyboardMatrix('reopened unavailable draft');
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       for(const [state,email,displayName] of [
         ['80-char name',`${'b'.repeat(47)}@example.test`,'N'.repeat(80)],
