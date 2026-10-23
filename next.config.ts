@@ -46,10 +46,11 @@ const nextConfig: NextConfig = {
       // parse5 8.0.1 depends on entities ^8 and resolves the hoisted copy above.
       // parse5 8.0.0 nested entities ^6, so package.json starts the range at 8.0.1.
       "./node_modules/parse5/**",
-      // sanitize-html 2.17 and html-to-text 10 use htmlparser2 10, which still
-      // depends on entities ^7. That copy lives at
-      // node_modules/htmlparser2/node_modules/entities. The hoisted entities 8
-      // package is ESM-only, so the worker must keep this nested CJS copy.
+      // sanitize-html 2.18 (and @types/sanitize-html 2.16.2) use htmlparser2 12,
+      // the hoisted copy here, with entities 8 and domhandler 6. html-to-text 10
+      // keeps htmlparser2 10 with entities 7 nested under
+      // node_modules/html-to-text/node_modules; the tracer follows that copy
+      // from html-to-text's own imports.
       "./node_modules/htmlparser2/**"
     ],
     "/api/accounts/*/threads/recompute": workerRuntimeTraceFiles,
