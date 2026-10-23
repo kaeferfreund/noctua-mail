@@ -316,4 +316,102 @@ describe("FTS-driven search candidates differential", () => {
     }
     expect(legacySeen.some((sql) => sql.includes("IN (SELECT accountId, messageId FROM"))).toBe(true);
   });
+
+  test("all-oversized-token fallback logs exactly once per search without query content", async () => {
+    const accountId = fixture.a.accountId;
+    const warnings: unknown[][] = [];
+    const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+    process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = "3";
+    try {
+      // Kill-switch legacy (the differential reference) must not log.
+      process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH = "1";
+      const legacy = await listMessages({ accountId, page: 1, pageSize: 10, query: "needle" });
+      delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+      expect(warnings).toHaveLength(0);
+
+      // "needle" matches more than the cap of 3, so every token is
+      // oversized: driven mode falls back to legacy and logs once,
+      // while the payload stays byte-identical to the legacy payload.
+      const first = await listMessages({ accountId, page: 1, pageSize: 10, query: "needle" });
+      expect(JSON.stringify(first)).toBe(JSON.stringify(legacy));
+      expect(warnings).toHaveLength(1);
+      const second = await listThreads({ accountId, page: 1, pageSize: 10, query: "needle" });
+      expect(second.total).toBeGreaterThan(0);
+      expect(warnings).toHaveLength(2);
+
+      for (const args of warnings) {
+        expect(args[0]).toBe("[fts-search] legacy fallback");
+        const serialized = JSON.stringify(args);
+        // No user query content and no raw account id in the log line.
+        expect(serialized).not.toContain("needle");
+        expect(serialized).not.toContain(accountId);
+        const fields = args[1] as Record<string, unknown>;
+        expect(fields.reason).toBe("all_tokens_oversized");
+        expect(fields.candidateCapExceeded).toBe(true);
+        expect(fields.cap).toBe(3);
+        expect(fields.tokenCount).toBe(1);
+        expect(fields.oversizedTokenCount).toBe(1);
+        expect(String(fields.accountHash)).toMatch(/^[0-9a-f]{12}$/);
+      }
+    } finally {
+      delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+      delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+      spy.mockRestore();
+    }
+  });
+
+  test("oversized-token probe and driven hits do not log a fallback", async () => {
+    const accountId = fixture.a.accountId;
+    const warnings: unknown[][] = [];
+    const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+    process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = "3";
+    try {
+      // "gamma" fits under the cap and "needle" is probed against it:
+      // the driven path still answers, so no fallback line is emitted.
+      const probed = await listMessages({ accountId, page: 1, pageSize: 50, query: "needle gamma" });
+      expect(probed.items.map((m) => m.id).sort()).toEqual(["alpha-1", "multi-1"]);
+      await listMessages({ accountId, page: 1, pageSize: 50, query: "xyzzy" });
+      expect(warnings).toHaveLength(0);
+    } finally {
+      delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+      spy.mockRestore();
+    }
+  });
+
+  test("candidate-cap fallback (combined MATCH) logs once without query content", async () => {
+    const accountId = fixture.a.accountId;
+    const warnings: unknown[][] = [];
+    const spy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      warnings.push(args);
+    });
+    process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = "1";
+    try {
+      process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH = "1";
+      const legacy = await listMessages({
+        accountId, page: 1, pageSize: 10, query: "needle gamma", fields: ["subject", "body"]
+      } as Parameters<typeof listMessages>[0]);
+      delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+      const driven = await listMessages({
+        accountId, page: 1, pageSize: 10, query: "needle gamma", fields: ["subject", "body"]
+      } as Parameters<typeof listMessages>[0]);
+      expect(JSON.stringify(driven)).toBe(JSON.stringify(legacy));
+      expect(warnings).toHaveLength(1);
+      const serialized = JSON.stringify(warnings[0]);
+      expect(serialized).not.toContain("needle");
+      expect(serialized).not.toContain("gamma");
+      expect(serialized).not.toContain(accountId);
+      const fields = warnings[0][1] as Record<string, unknown>;
+      expect(fields.reason).toBe("candidate_cap_exceeded");
+      expect(fields.candidateCapExceeded).toBe(true);
+      expect(fields.cap).toBe(1);
+    } finally {
+      delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+      delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+      spy.mockRestore();
+    }
+  });
 });
