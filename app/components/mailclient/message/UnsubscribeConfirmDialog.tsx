@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import React from "react";
 import { AlertDialog, Button, Flex, Text } from "@radix-ui/themes";
 import AlertDialogContent from "./AlertDialogContent";
@@ -13,10 +14,11 @@ export default function UnsubscribeConfirmDialog({
   onOpenChange,
   resolveUnsubscribeConfirm
 }: UnsubscribeConfirmDialogProps) {
+  const t = useTranslations("Reader");
   return (
     <AlertDialog.Root open={Boolean(unsubscribeConfirm)} onOpenChange={onOpenChange}>
       <AlertDialogContent size="2">
-        <AlertDialog.Title size="3">Unsubscribe from mailing list?</AlertDialog.Title>
+        <AlertDialog.Title size="3">{t("unsubscribeTitle")}</AlertDialog.Title>
         <AlertDialog.Description>
           {unsubscribeConfirm?.sender && (
             <>
@@ -31,19 +33,13 @@ export default function UnsubscribeConfirmDialog({
                 {unsubscribeConfirm.listId}
               </Text>
             </>
-          )}
-          This will send a one-click unsubscribe request to the sender.
-        </AlertDialog.Description>
+          )}{t("unsubscribeDescription")}</AlertDialog.Description>
         <Flex gap="3" mt="4" justify="end">
           <AlertDialog.Cancel>
-            <Button variant="soft" color="gray" onClick={() => resolveUnsubscribeConfirm(false)}>
-              Cancel
-            </Button>
+            <Button variant="soft" color="gray" onClick={() => resolveUnsubscribeConfirm(false)}>{t("cancel")}</Button>
           </AlertDialog.Cancel>
           <AlertDialog.Action>
-            <Button variant="solid" color="blue" onClick={() => resolveUnsubscribeConfirm(true)}>
-              Unsubscribe
-            </Button>
+            <Button variant="solid" color="blue" onClick={() => resolveUnsubscribeConfirm(true)}>{t("unsubscribe")}</Button>
           </AlertDialog.Action>
         </Flex>
       </AlertDialogContent>

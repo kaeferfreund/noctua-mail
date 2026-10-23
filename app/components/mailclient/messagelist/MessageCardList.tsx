@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
@@ -33,6 +34,7 @@ export default function MessageCardList({
   helpers,
   refs
 }: MessageCardListProps) {
+  const t = useTranslations("List");
   const {
     groupedMessages,
     collapsedGroups,
@@ -384,8 +386,8 @@ export default function MessageCardList({
               }}
               deleteTitle={
                 isTrashFolder(message.folderId)
-                  ? "Delete permanently"
-                  : "Move to Trash"
+                  ? t("deletePermanent")
+                  : t("moveTrash")
               }
               renderSelectIndicators={renderSelectIndicators(message)}
               fromText={item.fromText}

@@ -1,5 +1,8 @@
 "use client";
 
+import { formatNumber } from "@/lib/i18n/format";
+
+import { useLocale, useTranslations } from "next-intl";
 import { DropdownMenu } from "@radix-ui/themes";
 import { ListChecks, SquareDashed, SquareStack } from "lucide-react";
 import ToolbarButton from "@/app/components/ToolbarButton";
@@ -15,7 +18,7 @@ export type SelectionActionsMenuProps = BulkActionMenuItemsProps & {
   onClearSelection: () => void;
 };
 
-const countFormat = new Intl.NumberFormat();
+
 
 /**
  * Header menu for the selected messages: the right-click bulk menu's actions,
@@ -34,16 +37,18 @@ export default function SelectionActionsMenu({
   onClearSelection,
   ...itemProps
 }: SelectionActionsMenuProps) {
+  const locale = useLocale();
+  const t = useTranslations("List");
   const { ids } = useSelectionSnapshot(selectionStore);
   const count = ids.size;
   const disabled = count === 0 && !hasActiveMessage;
-  const countText = countFormat.format(count);
+  const countText = formatNumber(count, locale);
   const showCount = count >= 2;
   const tooltip = disabled
-    ? "Message actions: nothing selected"
+    ? t("actionsNothingSelected")
     : count === 0
-      ? "Message actions: open message"
-      : `Message actions: ${countText} selected`;
+      ? t("actionsOpenMessage")
+      : t("actionsSelected", { count });
 
   return (
     <DropdownMenu.Root>
@@ -65,25 +70,25 @@ export default function SelectionActionsMenu({
               ) : null}
             </span>
           }
-          label={showCount ? `${countText} selected` : undefined}
+          label={showCount ? t("selectedCount", { count }) : undefined}
           labelClassName="hidden @3xl/header:inline-block"
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start" sideOffset={6} className={menuStyles.menuContent}>
-        <DropdownMenu.Label>{count === 0 ? "Open message" : `${countText} selected`}</DropdownMenu.Label>
+        <DropdownMenu.Label>{count === 0 ? t("openMessage") : t("selectedCount", { count })}</DropdownMenu.Label>
         <BulkActionMenuItems {...itemProps} />
         <DropdownMenu.Separator />
         <DropdownMenu.Item onSelect={onSelectAll}>
           <span className={menuStyles.menuIcon}>
             <SquareStack size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Select all</span>
+          <span className={menuStyles.menuLabel}>{t("selectAll")}</span>
         </DropdownMenu.Item>
         <DropdownMenu.Item disabled={count === 0} onSelect={onClearSelection}>
           <span className={menuStyles.menuIcon}>
             <SquareDashed size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Clear selection</span>
+          <span className={menuStyles.menuLabel}>{t("clearSelection")}</span>
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

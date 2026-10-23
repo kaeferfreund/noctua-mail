@@ -1,5 +1,5 @@
 import addressParser from "nodemailer/lib/addressparser/index.js";
-import punycode from "nodemailer/lib/punycode/index.js";
+import * as punycode from "nodemailer/lib/punycode/index.js";
 
 const FREE_MAIL_DOMAINS = new Set([
   "gmail.com",

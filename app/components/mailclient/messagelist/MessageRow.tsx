@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { memo, useEffect, useRef, useState } from "react";
 import type React from "react";
@@ -172,6 +173,8 @@ function MessageRow({
   topicColorRows,
   senderIconsEnabled = true
 }: MessageRowProps) {
+  const locale = useLocale();
+  const t = useTranslations("List");
   const [optimisticSelected, setOptimisticSelected] = useState<boolean | null>(null);
   const [optimisticActive, setOptimisticActive] = useState(false);
   const clearTimerRef = useRef<number | null>(null);
@@ -237,9 +240,9 @@ function MessageRow({
   const dateDisplay = getMessageListDateDisplay(
     displayDateValue ?? message.dateValue,
     displayDate ?? message.date,
-    dateFormat
+    dateFormat, locale
   );
-  const size = showSize ? describeMessageSize(message.sizeBytes) : null;
+  const size = showSize ? describeMessageSize(message.sizeBytes, locale) : null;
   const firstTopicColor = topicColorRows ? (messageTopics?.[0]?.color ?? null) : null;
   const topicTintVar = firstTopicColor ? ({ "--topic-tint": `var(--${firstTopicColor}-a3)`, "--topic-tint-selected": `var(--${firstTopicColor}-a4)` } as React.CSSProperties) : undefined;
 
@@ -328,7 +331,8 @@ function MessageRow({
           <Checkbox
             size="1"
             checked={checkboxState ?? effectiveSelected}
-            aria-label="Select message"
+            data-message-select="message"
+            aria-label={t("selectMessage")}
             onClick={handleCheckboxClick}
             disabled={isDisabled}
           />
@@ -345,7 +349,7 @@ function MessageRow({
             title={fromLineTooltip}
           >
             <span className={styles.fromContent}>
-              {!seen && <VisuallyHidden>Unread</VisuallyHidden>}
+              {!seen && <VisuallyHidden>{t("unread")}</VisuallyHidden>}
               {!showRecipientIcon && (
                 <SenderIcon
                   accountId={message.accountId}
@@ -358,7 +362,7 @@ function MessageRow({
                 />
               )}
               {showRecipientIcon && (
-                <span className={styles.recipientIcon} title="Recipients" aria-label="Recipients">
+                <span className={styles.recipientIcon} title={t("recipients")} aria-label={t("recipients")}>
                   <MoveRight size={12} />
                 </span>
               )}
@@ -368,9 +372,7 @@ function MessageRow({
         </FromAddressHoverCard>
         <div data-message-cell="actions" className={actionsClassName}>
           {showNewBadge && (
-            <Badge size="1" variant="soft" color={badgeColors.new} className={badgeStyles.badge}>
-              New
-            </Badge>
+            <Badge size="1" variant="soft" color={badgeColors.new} className={badgeStyles.badge}>{t("new")}</Badge>
           )}
           {size && (
             <Text as="span" size="1" className={styles.size} title={size.title}>
@@ -387,7 +389,8 @@ function MessageRow({
                 variant="ghost"
                 color="gray"
                 tooltip={deleteTitle}
-                aria-label="Delete"
+                data-message-action="delete"
+                aria-label={t("delete")}
                 disabled={isDisabled}
                 onClick={onDelete}
               >
@@ -397,7 +400,8 @@ function MessageRow({
                 size="1"
                 variant="ghost"
                 color="gray"
-                tooltip="Find related"
+                data-message-action="related"
+                tooltip={t("findRelated")}
                 disabled={isDisabled}
                 onClick={onShowRelated}
               >
@@ -443,7 +447,7 @@ function MessageRow({
               className={`${styles.threadCaret} ${
                 isThreadCaretOpen ? styles.threadCaretOpen : ""
               }`}
-              title={isThreadCaretOpen ? "Collapse thread" : "Expand thread"}
+              title={isThreadCaretOpen ? t("collapseThread") : t("expandThread")}
               onPointerDown={(event) => {
                 event.stopPropagation();
               }}
@@ -481,7 +485,7 @@ function MessageRow({
                 className={`${badgeStyles.badge} ${styles.threadIndicator}`}
               >
                 <GitBranch size={12} />
-                <span>{threadSize}</span>
+                <span title={t("threadMessageCount", { count: threadSize ?? 0 })}>{threadSize}</span>
               </Badge>
             )}
             {(threadHasAttachments ?? showAttachmentIcon) && (
@@ -490,8 +494,8 @@ function MessageRow({
                 variant="soft"
                 color={badgeColors.attachment}
                 className={badgeStyles.badge}
-                title="Attachments"
-                aria-label="Attachments"
+                title={t("attachments")}
+                aria-label={t("attachments")}
               >
                 <Paperclip size={12} />
               </Badge>
@@ -502,8 +506,8 @@ function MessageRow({
                 variant="soft"
                 color={badgeColors.calendarInvite}
                 className={badgeStyles.badge}
-                title="Calendar invite"
-                aria-label="Calendar invite"
+                title={t("calendarInvite")}
+                aria-label={t("calendarInvite")}
               >
                 <CalendarDays size={12} />
               </Badge>

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { act, cleanup, render, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import type { Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState } from "./types";
@@ -88,7 +89,7 @@ function setup({
     apiFetch, readErrorMessage: async () => "Calendar deletion failed.", reportError, pushNotice,
     confirmDelete, undoMoveOperation: async () => {}, noticeSuccessTimeout: 1000
   };
-  const hook = renderHook(() => useMessageDeleteActions(options));
+  const hook = renderHook(() => useMessageDeleteActions(options), { wrapper: I18nTestProvider });
   const remove = (ids = targets.threadIds, selectedIds = targets.ids) => act(async () => {
     await hook.result.current.handleDeleteMessagesByIds(ids, { selectedIds });
   });
@@ -116,7 +117,7 @@ describe("bulk delete with collapsed threads", () => {
     expect(fixture.confirmDelete).toHaveBeenCalledTimes(1);
     expect(fixture.moveMessagesToFolder.mock.calls[0]![1]?.messageIds).toEqual(targets.threadIds);
     expect(fixture.selectionStore.getIds().size).toBe(0);
-    expect(fixture.pushNotice.mock.calls[0]![0]).toMatchObject({ title: "Moved 4 messages to Trash.", actionLabel: "Undo" });
+    expect(fixture.pushNotice.mock.calls[0]![0]).toMatchObject({ title: "Moved 4 messages to Trash.", actionKind: "undo" });
   });
 
   it("does not ask an extra question when all target messages are selected rows", async () => {

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { memo } from "react";
 import type React from "react";
 import { CaretRightIcon } from "@radix-ui/react-icons";
@@ -30,6 +31,7 @@ function ThreadMarkers({
   onToggleThread,
   onToggleNested
 }: ThreadMarkersProps) {
+  const t = useTranslations("List");
   const markers: React.ReactNode[] = [];
 
   if (depth === 0 && threadIndex === 0 && threadSize > 1) {
@@ -44,7 +46,7 @@ function ThreadMarkers({
           className={`${styles.threadCaret} ${
             compactRootLayout ? styles.threadCaretCompact : ""
           } ${isCollapsed ? "" : styles.threadCaretOpen}`}
-          title={isCollapsed ? "Expand thread" : "Collapse thread"}
+          title={isCollapsed ? t("expandThread") : t("collapseThread")}
           onClick={(event) => {
             event.stopPropagation();
             onToggleThread?.();
@@ -89,7 +91,7 @@ function ThreadMarkers({
         className={`${styles.nestedThreadCaret} ${
           compactRootLayout ? styles.nestedThreadCaretCompact : ""
         } ${isNestedCollapsed ? "" : styles.nestedThreadCaretOpen}`}
-        title={isNestedCollapsed ? "Expand" : "Collapse"}
+        title={isNestedCollapsed ? t("expand") : t("collapse")}
         onClick={(event) => {
           event.stopPropagation();
           onToggleNested?.();

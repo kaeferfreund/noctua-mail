@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import HtmlMessage from "./HtmlMessage";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { legacyUnkeyedSenders, senderPermissionLookupCases } from "@/lib/testFixtures/senderPermissions";

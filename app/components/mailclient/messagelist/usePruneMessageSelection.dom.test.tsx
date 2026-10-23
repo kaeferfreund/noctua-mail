@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { useEffect, useRef, useState } from "react";
-import { act, cleanup, render, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
 import type { Message } from "@/lib/data";

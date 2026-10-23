@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Folder as FolderIcon, Check } from "lucide-react";
 import { Dialog, TextField } from "@radix-ui/themes";
@@ -40,6 +41,7 @@ export default function CopyToAccountDialog({
   onOpenChange,
   onConfirm
 }: CopyToAccountDialogProps) {
+  const t = useTranslations("Reader");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,7 +69,7 @@ export default function CopyToAccountDialog({
     setError(null);
     apiFetch(buildAccountDestinationFoldersPath(selectedAccountId))
       .then(async (res) => {
-        if (!res.ok) throw new Error(`Failed to load folders (${res.status})`);
+        if (!res.ok) throw new Error(t("foldersLoadStatus", { status: res.status }));
         return (await res.json()) as Folder[];
       })
       .then((data) => {
@@ -77,7 +79,7 @@ export default function CopyToAccountDialog({
       .catch(() => {
         if (cancelled) return;
         setFolders([]);
-        setError("Could not load folders for this account.");
+        setError(t("foldersLoadFailed"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -85,7 +87,7 @@ export default function CopyToAccountDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedAccountId, apiFetch]);
+  }, [open, selectedAccountId, apiFetch, t]);
 
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
   const folderById = useMemo(
@@ -122,11 +124,7 @@ export default function CopyToAccountDialog({
   const hasNoResults =
     folderQueryText.length > 0 && !rootFolders.some((folder) => hasFolderMatch(folder));
 
-  const verb = mode === "move" ? "Move" : "Copy";
-  // messageCount can be 0 for a thread-based request (messageIds empty but a
-  // threadMove is set), so fall back to a countless label rather than "0 messages".
-  const subject = messageCount === 1 ? "message" : messageCount > 1 ? `${messageCount} messages` : "messages";
-  const title = `${verb} ${subject} to account`;
+  const title = t("copyAccountTitle", { mode, count: messageCount });
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -142,14 +140,14 @@ export default function CopyToAccountDialog({
         <div className={styles.dialogHeader}>
           <Dialog.Title className={styles.dialogTitle}>{title}</Dialog.Title>
           <Dialog.Close>
-            <TooltipIconButton variant="ghost" size="1" tooltip="Close">
+            <TooltipIconButton variant="ghost" size="1" tooltip={t("close")}>
               <X size={14} />
             </TooltipIconButton>
           </Dialog.Close>
         </div>
 
         <div className={styles.recentSection} style={{ padding: "8px 6px 8px" }}>
-          <div className={styles.sectionLabel}>Account</div>
+          <div className={styles.sectionLabel}>{t("account")}</div>
           {accounts.map((account) => {
             const selected = account.id === selectedAccountId;
             return (
@@ -175,7 +173,7 @@ export default function CopyToAccountDialog({
             ref={searchInputRef}
             size="2"
             type="search"
-            placeholder="Search folders"
+            placeholder={t("searchFolders")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={styles.searchInput}
@@ -186,7 +184,7 @@ export default function CopyToAccountDialog({
                   size="1"
                   variant="ghost"
                   onClick={() => setQuery("")}
-                  tooltip="Clear search"
+                  tooltip={t("clearSearch")}
                 >
                   <X size={12} />
                 </TooltipIconButton>
@@ -197,15 +195,15 @@ export default function CopyToAccountDialog({
 
         <div className={styles.scrollArea}>
           <div className={styles.folderSection}>
-            {!folderQueryText && <div className={styles.sectionLabel}>Folders</div>}
+            {!folderQueryText && <div className={styles.sectionLabel}>{t("folders")}</div>}
             {loading ? (
-              <div className={styles.emptyState}>Loading folders…</div>
+              <div className={styles.emptyState}>{t("loadingFolders")}</div>
             ) : error ? (
               <div className={styles.emptyState}>{error}</div>
             ) : hasNoResults ? (
-              <div className={styles.emptyState}>No folders match &ldquo;{query}&rdquo;</div>
+              <div className={styles.emptyState}>{t("noMatchingFolders", { query })}</div>
             ) : rootFolders.length === 0 ? (
-              <div className={styles.emptyState}>No folders available.</div>
+              <div className={styles.emptyState}>{t("noFolders")}</div>
             ) : (
               rootFolders.map((folder) => (
                 <FolderPickerNode

@@ -2,7 +2,8 @@
 // register happy-dom before any component module loads.
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import React from "react";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
 import type { Message } from "@/lib/data";
@@ -602,7 +603,8 @@ describe("mobile compose", () => {
 describe("mobile composer accessibility", () => {
   it("restores the sidebar header trigger when its compose opener unmounts", async () => {
     const header = document.createElement("button");
-    header.setAttribute("aria-label", "Toggle sidebar");
+    header.setAttribute("aria-label", "Navigation umschalten");
+    header.setAttribute("data-shell-action", "toggle-sidebar");
     const opener = document.createElement("button");
     document.body.append(header, opener);
     opener.focus();

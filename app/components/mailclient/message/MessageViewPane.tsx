@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 import type React from "react";
 import { Button } from "@radix-ui/themes";
@@ -14,6 +15,7 @@ type MessageViewPaneProps = {
 };
 
 export default function MessageViewPane({ children, header }: MessageViewPaneProps) {
+  const t = useTranslations("Reader");
   const back = useMobileBack();
   const [linkPreviewUrl, setLinkPreviewUrl] = useState<string | null>(null);
   const handleLinkPreviewChange = useCallback((nextValue: string | null) => {
@@ -22,7 +24,7 @@ export default function MessageViewPane({ children, header }: MessageViewPanePro
 
   return (
     <section className={styles.pane}>
-      {back ? <div className={styles.mobileHeader}><Button variant="ghost" onClick={back} aria-label="Back to messages"><ArrowLeft size={18} />Back</Button></div> : null}
+      {back ? <div className={styles.mobileHeader}><Button variant="ghost" onClick={back} aria-label={t("backMessages")}><ArrowLeft size={18} />{t("back")}</Button></div> : null}
       {header && <div className={styles.threadHeader}>{header}</div>}
       <div className={styles.threadViewShell}>
         <MessageLinkPreviewProvider value={handleLinkPreviewChange}>

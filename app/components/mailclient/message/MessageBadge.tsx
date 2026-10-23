@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { CalendarDays, Flag, Sparkles, Square, SquareCheckBig } from "lucide-react";
 import { Badge } from "@radix-ui/themes";
@@ -12,18 +13,19 @@ export type MessageBadgeProps = {
   onClick?: (event: React.MouseEvent) => void;
 };
 
-const badgeConfig: Record<
-  MessageBadgeKind,
-  { icon: React.ElementType; label: string; title: string }
-> = {
-  flagged: { icon: Flag, label: "Flagged", title: "Unflag message" },
-  todo: { icon: Square, label: "To-Do", title: "Mark as Done" },
-  done: { icon: SquareCheckBig, label: "Done", title: "Mark as To-Do" },
-  calendar: { icon: CalendarDays, label: "Calendar Invite", title: "Calendar Invite" },
-  "ai-modified": { icon: Sparkles, label: "AI Modified", title: "Modified over MCP" }
-};
-
 export default function MessageBadge({ kind, showLabel = false, onClick }: MessageBadgeProps) {
+  const t = useTranslations("Reader");
+  const badgeConfig: Record<
+    MessageBadgeKind,
+    { icon: React.ElementType; label: string; title: string }
+  > = {
+    flagged: { icon: Flag, label: t("flagged"), title: t("unflagMessage") },
+    todo: { icon: Square, label: t("todo"), title: t("markDone") },
+    done: { icon: SquareCheckBig, label: t("done"), title: t("markTodo") },
+    calendar: { icon: CalendarDays, label: t("calendarInviteBadge"), title: t("calendarInviteBadge") },
+    "ai-modified": { icon: Sparkles, label: t("aiModified"), title: t("modifiedMcp") }
+  };
+
   const config = badgeConfig[kind];
   const Icon = config.icon;
 

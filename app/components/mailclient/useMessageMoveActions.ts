@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type React from "react";
 import { useCallback } from "react";
 import { buildAccountMessagesActionPath } from "@/lib/accountApiPaths";
@@ -31,6 +33,7 @@ type MoveNoticeInput = {
   type: "success";
   title: string;
   description?: string;
+  actionKind?: "undo";
   actionLabel?: string;
   onAction?: () => void;
   durationMs?: number | null;
@@ -153,6 +156,7 @@ export function useMessageMoveActions({
   markMessagesMutated,
   applyDeleteReconcileSuppression
 }: UseMessageMoveActionsOptions) {
+  const tn = useTranslations("Notifications");
 
   const clearSelectionState = useCallback(() => {
     selectionStore.clearSelection();
@@ -363,33 +367,26 @@ export function useMessageMoveActions({
         if (clearSelectionOnSuccess && movedCount > 0) {
           clearSelectionState();
         }
-        const destinationName = folderById.get(destinationFolderId)?.name ?? "folder";
+        const destinationName = folderById.get(destinationFolderId)?.name ?? tn("folder");
         const singleTarget =
           movedCount === 1
             ? messages.find((item) => movedPreviousIds.has(item.id)) ?? null
             : null;
         const singleSubject =
-          movedCount === 1 ? getMessageSubjectForNotice(singleTarget) : undefined;
+          movedCount === 1 ? getMessageSubjectForNotice(singleTarget, tn("noSubject")) : undefined;
         if (showNotice) {
           pushNotice({
             type: "success",
-            title:
-              queued
-                ? movedCount === 1
-                  ? `Moving message to ${destinationName} in background.`
-                  : `Moving ${movedCount} messages to ${destinationName} in background.`
-                : movedCount === 1
-                  ? `Moved message to ${destinationName}.`
-                  : `Moved ${movedCount} messages to ${destinationName}.`,
+            title: tn(queued ? "movingBackground" : "moved", { count: movedCount, destination: destinationName }),
             description: singleSubject,
-            actionLabel: mappedUndoTargets.length > 0 ? "Undo" : undefined,
+            actionKind: mappedUndoTargets.length > 0 ? "undo" : undefined,
             onAction:
               mappedUndoTargets.length > 0
                 ? () =>
                     void undoMoveOperation(
                       mappedUndoTargets,
                       activeAccountId,
-                      mappedUndoTargets.length === 1 ? "Move undone." : "Moves undone."
+                      tn("moveUndone", { count: mappedUndoTargets.length })
                     )
                 : undefined,
             durationMs: noticeSuccessTimeout
@@ -415,7 +412,7 @@ export function useMessageMoveActions({
         };
       } catch {
         if (reportErrorOnFailure) {
-          reportError("Failed to move messages.");
+          reportError(tn("moveFailed"));
         }
         return null;
       } finally {
@@ -438,6 +435,7 @@ export function useMessageMoveActions({
       messages,
       noticeSuccessTimeout,
       pushNotice,
+      tn,
       readErrorMessage,
       reportError,
       searchScope,

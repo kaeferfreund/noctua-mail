@@ -1,3 +1,5 @@
+import type { UiLocale } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 import type { Folder } from "@/lib/data";
 import { getFolderSpecialKind, type FolderSpecialKind } from "@/lib/specialFolders";
 
@@ -19,10 +21,11 @@ export function getFolderBadgeKind(
 export function getFolderCountTitle(
   folderPath: string,
   totalCount: number,
-  unreadCount: number
+  unreadCount: number,
+  locale: UiLocale = "de"
 ): string {
   const normalizedTotalCount = Math.max(0, totalCount);
   const normalizedUnreadCount = Math.max(0, unreadCount);
 
-  return `${folderPath} (${normalizedTotalCount} Messages, ${normalizedUnreadCount} Unread)`;
+  return getTranslator(locale)("List.folderCountTitle", { path: folderPath, total: normalizedTotalCount, unread: normalizedUnreadCount });
 }

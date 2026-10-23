@@ -1,6 +1,7 @@
+import { render } from "@/lib/i18n/testRender";
 import { afterEach, expect, test } from "bun:test";
 import { useLayoutEffect, useState } from "react";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, waitFor } from "@testing-library/react";
 import type { Folder, Message } from "@/lib/data";
 import { useMessageMutations } from "./useMessageMutations";
 import { applyFolderStreamUpdates, type FolderStreamUpdate } from "./folderStreamUpdates";

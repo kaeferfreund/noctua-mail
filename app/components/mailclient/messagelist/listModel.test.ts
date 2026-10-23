@@ -1,3 +1,4 @@
+import { buildMessageGroupKey, buildTimeGroupKey } from "@/lib/messageGrouping";
 import { describe, expect, it, test } from "bun:test";
 import type { Message } from "@/lib/data";
 import {
@@ -266,4 +267,67 @@ describe("getMessageListRowKey", () => {
       )
     ).toBe("msg-2");
   });
+});
+
+test("Berlin time buckets display loaded-row counts while host-local server totals await alignment", () => {
+  for (const [groupBy, key] of [["date", "Today"], ["week", "2026-W43"], ["year", "2026"]]) {
+    const messages = [makeMessage({ id: "berlin-1", groupKey: key }), makeMessage({ id: "berlin-2", groupKey: key })];
+    const groups = buildGroupedMessages({
+      listScopeMessages: messages, supportsThreads: false,
+      groupMeta: [{ key, label: key, count: 1 }, { key: "stale-host-bucket", label: "stale-host-bucket", count: 20 }],
+      groupBy, buildThreadTree: () => [], flattenThread: () => [], isFlaggedMessage: () => false, computeGroupMeta: () => []
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ key, count: 2, countIsLoaded: true, items: messages });
+  }
+  const groups = buildGroupedMessages({
+    listScopeMessages: [makeMessage({ groupKey: "sender@example.test" })], supportsThreads: false,
+    groupMeta: [{ key: "sender@example.test", label: "sender@example.test", count: 10 }], groupBy: "sender",
+    buildThreadTree: () => [], flattenThread: () => [], isFlaggedMessage: () => false, computeGroupMeta: () => []
+  });
+  expect(groups[0]?.count).toBe(10);
+  expect(groups[0]?.countIsLoaded).toBeUndefined();
+});
+
+// Exercise the real merged metadata path: server keys can be absent or disagree
+// with Berlin while a page is only partly loaded.
+
+function mergedTimeGroups(groupBy: string, dates: string[], serverKeys: string[], now?: string) {
+  const listScopeMessages = dates.map((date, i) => {
+    const message = makeMessage(`synthetic-boundary-${i}`, `thread-${i}`, Date.parse(date));
+    message.groupKey = groupBy === "date"
+      ? buildTimeGroupKey(message.dateValue, groupBy, Date.parse(now!))
+      : buildMessageGroupKey(message, groupBy);
+    return message;
+  });
+  return buildGroupedMessages({
+    listScopeMessages, supportsThreads: false,
+    groupMeta: serverKeys.map(key => ({ key, label: `opaque ${key}`, count: 999 })), groupBy,
+    buildThreadTree: () => [], flattenThread: () => [], isFlaggedMessage: () => false,
+    computeGroupMeta: () => []
+  });
+}
+
+for (const [name, now, dates, serverKeys, expected] of [
+  ["UTC 22:30 today/yesterday", "2026-10-23T00:15:00+02:00",
+    ["2026-10-22T22:30:00Z", "2026-10-22T23:45:00+02:00"], ["Today"], ["Today", "Yesterday"]],
+  ["spring DST 23-hour day", "2026-03-30T00:15:00+02:00",
+    ["2026-03-28T23:30:00+01:00", "2026-03-29T12:00:00+02:00"], ["Yesterday"], ["Yesterday", "This Week"]],
+  ["autumn DST 25-hour day", "2026-10-26T00:15:00+01:00",
+    ["2026-10-24T12:00:00+02:00", "2026-10-25T00:30:00+02:00"], ["This Week"], ["Yesterday", "This Week"]]
+] as const) test(`merged Berlin date groups: ${name}`, () => {
+  const groups = mergedTimeGroups("date", [...dates], [...serverKeys], now);
+  expect(groups.map(g => g.key)).toEqual([...expected]);
+  expect(groups.map(g => [g.count, g.countIsLoaded])).toEqual([[1, true], [1, true]]);
+});
+
+for (const [name, groupBy, dates, serverKeys, expected] of [
+  ["Monday rollover", "week", ["2026-10-26T00:15:00+01:00", "2026-10-25T23:30:00+01:00"], ["2026-W42"], ["2026-W43", "2026-W42"]],
+  ["week-zero rollover", "week", ["2026-01-05T00:15:00+01:00", "2026-01-04T23:30:00+01:00"], ["2026-W00"], ["2026-W01", "2026-W00"]],
+  ["week/year rollover", "week", ["2027-01-01T00:15:00+01:00", "2026-12-31T23:30:00+01:00"], ["2026-W52"], ["2027-W00", "2026-W52"]],
+  ["year rollover", "year", ["2027-01-01T00:15:00+01:00", "2026-12-31T23:30:00+01:00"], ["2026"], ["2027", "2026"]]
+] as const) test(`merged Berlin ${name} sorts missing client keys chronologically`, () => {
+  const groups = mergedTimeGroups(groupBy, [...dates], [...serverKeys]);
+  expect(groups.map(g => g.key)).toEqual([...expected]);
+  expect(groups.map(g => [g.count, g.countIsLoaded])).toEqual([[1, true], [1, true]]);
 });

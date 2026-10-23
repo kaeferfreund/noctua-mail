@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import type React from "react";
 import { buildAccountFoldersPath, buildAccountMessageActionPath, buildAccountMessagesActionPath } from "@/lib/accountApiPaths";
 import type { Folder, Message } from "@/lib/data";
@@ -84,6 +85,7 @@ export function useMessageMutations({
   const folderRefreshGeneration = useRef(0);
   useEffect(() => () => { folderRefreshGeneration.current += 1; }, [activeAccountId]);
 
+  const tn = useTranslations("Notifications");
   const reconcileMessageFlags = useCallback((
     message: Message,
     flags: string[],
@@ -168,12 +170,12 @@ export function useMessageMutations({
     if (data.skipped && data.skipped.length > 0) {
       pushNotice({
         type: "warning",
-        title: `Skipped ${data.skipped.length} message${data.skipped.length === 1 ? "" : "s"}`,
+        title: tn("skipped", { count: data.skipped.length }),
         description: data.skipped[0]?.reason
       });
     }
     return data.results ?? [];
-  }, [activeAccountId, apiFetch, pushNotice, reportResponseError]);
+  }, [activeAccountId, apiFetch, pushNotice, reportResponseError, tn]);
 
   const reconcileMoveMutation = useCallback((
     message: Message,
@@ -225,8 +227,8 @@ export function useMessageMutations({
     pushNotice({
       type: "success",
       title: successTitle,
-      description: getMessageSubjectForNotice(message),
-      actionLabel: destinationFolderId ? "Undo" : undefined,
+      description: getMessageSubjectForNotice(message, tn("noSubject")),
+      actionKind: destinationFolderId ? "undo" : undefined,
       onAction:
         destinationFolderId
           ? () => undoMoveOperation([undoTarget], activeAccountId, undoSuccessMessage)
@@ -243,7 +245,8 @@ export function useMessageMutations({
     shouldKeepMessageInCurrentResults,
     undoMoveOperation,
     updateMessagesWithCurrentResultPrune,
-    viewMessage?.id
+    viewMessage?.id,
+    tn
   ]);
 
   const handleArchiveMessage = useCallback(async (message: Message) => {
@@ -270,11 +273,11 @@ export function useMessageMutations({
         destinationMailbox: data.archiveMailbox,
         flags: data.flags,
         source: "archive-message",
-        successTitle: "Message archived.",
-        undoSuccessMessage: "Archive undone."
+        successTitle: tn("archived"),
+        undoSuccessMessage: tn("archiveUndone")
       });
     } catch {
-      reportError("Failed to archive message.");
+      reportError(tn("archiveFailed"));
     }
   }, [
     activeAccountId,
@@ -282,7 +285,8 @@ export function useMessageMutations({
     applyMoveReconcileSuppression,
     readErrorMessage,
     reconcileMoveMutation,
-    reportError
+    reportError,
+    tn
   ]);
 
   const handleUnsubscribe = useCallback(
@@ -328,8 +332,8 @@ export function useMessageMutations({
         if (data.method === "one-click") {
           pushNotice({
             type: "success",
-            title: "Unsubscribed",
-            description: "Unsubscribe request sent successfully.",
+            title: tn("unsubscribed"),
+            description: tn("unsubscribeSent"),
             durationMs: NOTICE_TIMEOUTS.success
           });
         } else if (data.method === "browser" && data.url) {
@@ -347,7 +351,7 @@ export function useMessageMutations({
         });
       }
     },
-    [activeAccountId, apiFetch, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions]
+    [activeAccountId, apiFetch, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
   );
 
   const handleMarkSpam = useCallback(async (message: Message) => {
@@ -375,11 +379,11 @@ export function useMessageMutations({
         destinationMailbox: data.junkMailbox,
         flags: data.flags,
         source: "mark-spam",
-        successTitle: "Message marked as spam.",
-        undoSuccessMessage: "Spam action undone."
+        successTitle: tn("markedSpam"),
+        undoSuccessMessage: tn("spamUndone")
       });
     } catch {
-      reportError("Failed to mark message as spam.");
+      reportError(tn("spamFailed"));
     } finally {
       setPendingMessageActions((prev) => {
         const next = new Set(prev);
@@ -394,7 +398,8 @@ export function useMessageMutations({
     readErrorMessage,
     reconcileMoveMutation,
     reportError,
-    setPendingMessageActions
+    setPendingMessageActions,
+    tn
   ]);
 
   const handleMarkNotSpam = useCallback(async (message: Message) => {
@@ -422,11 +427,11 @@ export function useMessageMutations({
         destinationMailbox: data.inboxMailbox,
         flags: data.flags,
         source: "mark-not-spam",
-        successTitle: "Message marked as not spam.",
-        undoSuccessMessage: "Not-spam action undone."
+        successTitle: tn("markedNotSpam"),
+        undoSuccessMessage: tn("notSpamUndone")
       });
     } catch {
-      reportError("Failed to mark message as not spam.");
+      reportError(tn("notSpamFailed"));
     } finally {
       setPendingMessageActions((prev) => {
         const next = new Set(prev);
@@ -441,7 +446,8 @@ export function useMessageMutations({
     readErrorMessage,
     reconcileMoveMutation,
     reportError,
-    setPendingMessageActions
+    setPendingMessageActions,
+    tn
   ]);
 
   // A folder:update can arrive before the mutation response. Never add a
@@ -485,11 +491,11 @@ export function useMessageMutations({
       applyFlagsResults([{ message, nextFlags: flags }], "update-flag-state");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {
-      reportError("Failed to update message flag.");
+      reportError(tn("flagFailed"));
     }
   }, [
     applyFlagsResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
-    requestMessageFlagMutation
+    requestMessageFlagMutation, tn
   ]);
 
   const updateKeywordFlag = useCallback(async (
@@ -503,11 +509,11 @@ export function useMessageMutations({
       applyFlagsResults([{ message, nextFlags: flags }], "update-keyword-flag");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {
-      reportError("Failed to update message keyword.");
+      reportError(tn("keywordFailed"));
     }
   }, [
     applyFlagsResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
-    requestMessageFlagMutation
+    requestMessageFlagMutation, tn
   ]);
 
   const applyBulkFlagResults = useCallback((
@@ -537,11 +543,11 @@ export function useMessageMutations({
       applyBulkFlagResults(messages, results, "update-flag-state-bulk");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {
-      reportError("Failed to update message flag.");
+      reportError(tn("flagFailed"));
     }
   }, [
     applyBulkFlagResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
-    requestBulkFlagMutation
+    requestBulkFlagMutation, tn
   ]);
 
   const updateKeywordFlagBulk = useCallback(async (
@@ -556,11 +562,11 @@ export function useMessageMutations({
       applyBulkFlagResults(messages, results, "update-keyword-flag-bulk");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {
-      reportError("Failed to update message keyword.");
+      reportError(tn("keywordFailed"));
     }
   }, [
     applyBulkFlagResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
-    requestBulkFlagMutation
+    requestBulkFlagMutation, tn
   ]);
 
   const handleSetCategory = useCallback(async (
@@ -619,11 +625,11 @@ export function useMessageMutations({
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
       pushNotice({
         type: "success",
-        title: category ? "Category updated." : "Category removed.",
-        description: getMessageSubjectForNotice(message)
+        title: category ? tn("categoryUpdated") : tn("categoryRemoved"),
+        description: getMessageSubjectForNotice(message, tn("noSubject"))
       });
     } catch {
-      reportError("Failed to update category.");
+      reportError(tn("categoryFailed"));
     } finally {
       setPendingMessageActions((prev) => {
         const next = new Set(prev);
@@ -632,10 +638,22 @@ export function useMessageMutations({
       });
     }
   }, [
-    activeAccountId, apiFetch, hasFilteredSearchCriteria, pushNotice, queueFilteredSearchRefresh, readErrorMessage,
-    reportError, setActiveMessageId, setActiveTopicSuggestionMessages, setPendingMessageActions, setViewMessage,
-    shouldKeepMessageInCurrentResults, updateMessagesWithCurrentResultPrune, updateThreadCacheWithCategory,
-    viewMessage?.id
+    activeAccountId,
+    apiFetch,
+    hasFilteredSearchCriteria,
+    pushNotice,
+    queueFilteredSearchRefresh,
+    readErrorMessage,
+    reportError,
+    setActiveMessageId,
+    setActiveTopicSuggestionMessages,
+    setPendingMessageActions,
+    setViewMessage,
+    shouldKeepMessageInCurrentResults,
+    updateMessagesWithCurrentResultPrune,
+    updateThreadCacheWithCategory,
+    viewMessage?.id,
+    tn
   ]);
 
   const transitionTodoState = useCallback(async (
@@ -735,11 +753,11 @@ export function useMessageMutations({
       reconcileMessageFlags(message, finalFlags, "toggle-todo-flag");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {
-      reportError("Failed to update To-Do flag.");
+      reportError(tn("todoFailed"));
     }
   }, [
     hasFilteredSearchCriteria, queueFilteredSearchRefresh, reconcileMessageFlags, reportError,
-    requestMessageFlagMutation, transitionTodoState
+    requestMessageFlagMutation, transitionTodoState, tn
   ]);
 
   const toggleFlaggedFlag = useCallback(async (

@@ -6,14 +6,14 @@ import { saveMessageSource } from "./storage";
 import { ingestSenderPermissionMessage, ingestedSenderCases } from "./testFixtures/ingestedSenders";
 import { legacyUnkeyedSenders } from "./testFixtures/senderPermissions";
 
-test("senderKey migration is additive, nullable and leaves the v2 writer guard/version intact", () => {
+test("senderKey migration is additive, nullable and leaves the v3 writer guard/version intact", () => {
   const db = new Database(":memory:") as Database & { function(name: string, callback: () => number): void };
   try {
     initAccountSchema(db);
     db.exec(`INSERT INTO messages (id, accountId, folderId, threadId, subject, fromAddr, toAddr, preview, date, dateValue, body)
       VALUES ('legacy', 'synthetic', 'inbox', 'thread', 'Synthetic', 'trusted@example.test', 'team@example.test', '', '', 0, '')`);
-    db.exec("ALTER TABLE messages DROP COLUMN senderKey; ALTER TABLE messages DROP COLUMN sourceSha256; PRAGMA user_version = 2");
-    // initAccountSchema already installs the production writer-v2 guards.
+    db.exec("ALTER TABLE messages DROP COLUMN senderKey; ALTER TABLE messages DROP COLUMN sourceSha256");
+    // initAccountSchema already installs the production writer-v3 guards.
     initAccountSchema(db);
     initAccountSchema(db);
     const column = (db.prepare("PRAGMA table_info(messages)").all() as { name: string; notnull: number }[])
@@ -21,9 +21,9 @@ test("senderKey migration is additive, nullable and leaves the v2 writer guard/v
     expect(column?.notnull).toBe(0);
     expect(db.prepare("SELECT sourceSha256 FROM messages WHERE id = 'legacy'").get()).toEqual({ sourceSha256: null });
     expect(db.prepare("SELECT senderKey FROM messages WHERE id = 'legacy'").get()).toEqual({ senderKey: null });
-    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 2 });
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'noctua_writer_v2_messages_update'").get()).toBeTruthy();
-    db.function("noctua_writer_v2", () => 1);
+    expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'noctua_writer_v3_messages_update'").get()).toBeTruthy();
+    db.function("noctua_writer_v3", () => 1);
     expect(() => db.exec("UPDATE messages SET senderKey = NULL")).toThrow();
   } finally { db.close(); }
 });

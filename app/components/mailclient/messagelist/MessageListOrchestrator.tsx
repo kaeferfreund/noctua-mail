@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type React from "react";
 import {
   useDeferredValue,
@@ -301,6 +302,7 @@ export default function MessageListOrchestrator({
   activeVirtualFolderName,
   mutationInputs
 }: MessageListOrchestratorProps) {
+  const t = useTranslations("List");
   // Render the list with a deferred value so rapid header toggles (e.g.
   // keyboard shortcuts stepping through views) don't block the UI while
   // the new view's layout computes.
@@ -501,12 +503,12 @@ export default function MessageListOrchestrator({
                 ) : (
                   <>
                     <Text size="1" color="gray">
-                      Searching
+                      {t("searching")}
                     </Text>
                     <div
                       className={listMetaStyles.searchCriteria}
-                      aria-label={searchCriteriaLabel || "all messages"}
-                      title={searchCriteriaLabel || "All messages"}
+                      aria-label={searchCriteriaLabel || t("allMessagesLower")}
+                      title={searchCriteriaLabel || t("allMessages")}
                     >
                       {searchCriteriaBadges.map((badge) => (
                         <Badge
@@ -529,7 +531,7 @@ export default function MessageListOrchestrator({
                 variant="ghost"
                 color="gray"
                 onClick={onClearSearch}
-                tooltip="Clear search"
+                tooltip={t("clearSearch")}
               >
                 <X size={12} />
               </TooltipIconButton>
@@ -539,9 +541,7 @@ export default function MessageListOrchestrator({
 
         {showListLoadingState && sortedMessagesCount === 0 && (
           <Card size="1" className={listMetaStyles.loadingCard}>
-            <Text size="1" color="gray">
-              Loading messages…
-            </Text>
+            <Text size="1" color="gray">{t("loadingMessages")}</Text>
           </Card>
         )}
 
@@ -568,22 +568,20 @@ export default function MessageListOrchestrator({
             }`}
           >
             {messageListError
-              ? `Failed to load messages. ${messageListError}`
+              ? t("loadFailed", { error: messageListError })
               : emptyListSyncing
-                ? "Syncing messages…"
+                ? t("syncingMessages")
                 : searchActive || isRelatedSearch
-                  ? "No messages match this search."
+                  ? t("noSearchResults")
                   : activeVirtualFolderName
-                    ? `No messages in ${activeVirtualFolderName}.`
-                    : "No messages in this folder."}
+                    ? t("emptyNamedFolder", { folder: activeVirtualFolderName })
+                    : t("emptyFolder")}
           </div>
         )}
 
         {listLoading && sortedMessagesCount > 0 && (
           <Card size="1" className={listMetaStyles.loadingCard}>
-            <Text size="1" color="gray">
-              Loading more…
-            </Text>
+            <Text size="1" color="gray">{t("loadingMore")}</Text>
           </Card>
         )}
       </div>

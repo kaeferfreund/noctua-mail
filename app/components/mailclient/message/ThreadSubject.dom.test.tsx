@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from "bun:test";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import ThreadSubject from "./ThreadSubject";
 afterEach(cleanup);
 it("QA-005 keeps the full subject accessible and offers expansion and collapse", () => {

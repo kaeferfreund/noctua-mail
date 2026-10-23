@@ -1,3 +1,6 @@
+import { displayDayNumber } from "@/lib/i18n/format";
+import { getTranslator } from "@/lib/i18n/translator";
+import type { UiLocale } from "@/lib/i18n/config";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type RelativeTimeGroupMeta = {
@@ -10,85 +13,80 @@ export type RelativeTimeGroup<T> = RelativeTimeGroupMeta & {
   items: T[];
 };
 
-function getLocalDayStartMs(timestampMs: number) {
-  const date = new Date(timestampMs);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+function getWeekStart(dayNumber: number) {
+  const dayOfWeek = new Date(dayNumber * DAY_MS).getUTCDay();
+  return dayNumber - (dayOfWeek + 6) % 7;
 }
 
-function getLocalWeekStartMs(timestampMs: number) {
-  const date = new Date(timestampMs);
-  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayOfWeek = dayStart.getDay();
-  const daysSinceMonday = (dayOfWeek + 6) % 7;
-  dayStart.setDate(dayStart.getDate() - daysSinceMonday);
-  return dayStart.getTime();
-}
-
-function getRelativeTimeGroupMeta(timestampMs: number, nowMs: number): RelativeTimeGroupMeta {
+function getRelativeTimeGroupMeta(timestampMs: number, nowMs: number, locale: UiLocale): RelativeTimeGroupMeta {
+  const t = getTranslator(locale);
   if (!Number.isFinite(timestampMs)) {
     return {
       key: "no-date",
-      label: "No date",
+      label: t("List.relativeGroups.noDate"),
       order: 9_000
     };
   }
 
-  const targetDayStartMs = getLocalDayStartMs(timestampMs);
-  const nowDayStartMs = getLocalDayStartMs(nowMs);
-  const dayOffset = Math.floor((targetDayStartMs - nowDayStartMs) / DAY_MS);
+  const targetDay = displayDayNumber(timestampMs);
+  const today = displayDayNumber(nowMs);
+  const dayOffset = targetDay - today;
   if (dayOffset < 0) {
     return {
       key: "past",
-      label: "Past",
+      label: t("List.relativeGroups.past"),
       order: 0
     };
   }
   if (dayOffset === 0) {
     return {
       key: "today",
-      label: "Today",
+      label: t("List.relativeGroups.today"),
       order: 100
     };
   }
   if (dayOffset === 1) {
     return {
       key: "tomorrow",
-      label: "Tomorrow",
+      label: t("List.relativeGroups.tomorrow"),
       order: 200
     };
   }
 
-  const thisWeekStartMs = getLocalWeekStartMs(nowMs);
-  const nextWeekStartMs = thisWeekStartMs + 7 * DAY_MS;
-  const weekAfterNextStartMs = nextWeekStartMs + 7 * DAY_MS;
+  const thisWeekStart = getWeekStart(today);
+  const nextWeekStart = thisWeekStart + 7;
+  const weekAfterNextStart = nextWeekStart + 7;
 
-  if (targetDayStartMs < nextWeekStartMs) {
+  if (targetDay < nextWeekStart) {
     return {
       key: "this-week",
-      label: "This Week",
+      label: t("List.relativeGroups.thisWeek"),
       order: 300
     };
   }
-  if (targetDayStartMs < weekAfterNextStartMs) {
+  if (targetDay < weekAfterNextStart) {
     return {
       key: "next-week",
-      label: "Next Week",
+      label: t("List.relativeGroups.nextWeek"),
       order: 400
     };
   }
 
-  const weeks = Math.floor((targetDayStartMs - thisWeekStartMs) / (7 * DAY_MS));
+  const weeks = Math.floor((targetDay - thisWeekStart) / 7);
   return {
     key: `in-${weeks}-weeks`,
-    label: `In ${weeks} week${weeks === 1 ? "" : "s"}`,
+    label: t("List.relativeGroups.inWeeks", { count: weeks }),
     order: 600 + weeks
   };
 }
 
+// Legacy callers outside this slice retain English until they pass their UI locale.
+// The reader passes the resolved next-intl locale explicitly.
 export function groupItemsByRelativeTime<T>(
   items: T[],
   getTimestampMs: (item: T) => number,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  locale: UiLocale = "en"
 ): RelativeTimeGroup<T>[] {
   const sorted = items
     .map((item, index) => ({
@@ -105,7 +103,7 @@ export function groupItemsByRelativeTime<T>(
 
   const groupedMap = new Map<string, RelativeTimeGroup<T>>();
   sorted.forEach(({ item, timestampMs }) => {
-    const meta = getRelativeTimeGroupMeta(timestampMs, nowMs);
+    const meta = getRelativeTimeGroupMeta(timestampMs, nowMs, locale);
     const existing = groupedMap.get(meta.key);
     if (existing) {
       existing.items.push(item);
@@ -119,6 +117,6 @@ export function groupItemsByRelativeTime<T>(
 
   return Array.from(groupedMap.values()).sort((left, right) => {
     if (left.order !== right.order) return left.order - right.order;
-    return left.label.localeCompare(right.label);
+    return left.key.localeCompare(right.key);
   });
 }

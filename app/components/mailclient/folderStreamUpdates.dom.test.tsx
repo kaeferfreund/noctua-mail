@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
+import { render } from "@/lib/i18n/testRender";
 import { useEffect, useState } from "react";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import type { Folder } from "@/lib/data";
 import FolderTreeNode from "./folder/FolderTreeNode";

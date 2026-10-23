@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import type React from "react";
 import { Folder as FolderIcon, MoreVertical } from "lucide-react";
@@ -57,6 +58,8 @@ export default function FolderTreeNode({
   actions,
   helpers
 }: FolderTreeNodeProps) {
+  const locale = useLocale();
+  const t = useTranslations("List");
   const {
     folderTree,
     folderQueryText,
@@ -95,7 +98,7 @@ export default function FolderTreeNode({
     : true;
   const childNodes = folderTree.get(folder.id) ?? [];
   const fullPath = folderPathLabel(folder);
-  const folderTitle = getFolderCountTitle(fullPath, folder.count ?? 0, folder.unreadCount ?? 0);
+  const folderTitle = getFolderCountTitle(fullPath, folder.count ?? 0, folder.unreadCount ?? 0, locale);
   const isDeleting = deletingFolderIds.has(folder.id);
   const isSyncingFolder = syncingFolders.has(folder.id);
 
@@ -188,7 +191,7 @@ export default function FolderTreeNode({
             variant="soft"
             color={badgeColors.unread}
             className={styles.treeUnreadBadge}
-            aria-label={`${folder.unreadCount} unread`}
+            aria-label={t("unreadCount", { count: folder.unreadCount ?? 0 })}
             title={folderTitle}
           >
             {folder.unreadCount}
@@ -201,7 +204,7 @@ export default function FolderTreeNode({
                 className={styles.treeAction}
                 variant="ghost"
                 size="1"
-                tooltip="Folder actions"
+                tooltip={t("folderActions")}
                 disabled={isDeleting}
                 onClick={(event) => event.stopPropagation()}
               >
@@ -214,36 +217,28 @@ export default function FolderTreeNode({
                 onSelect={() => {
                   syncAccount(folder.id, "full", {
                     recategorizeFolder: true,
-                    fullSyncReason: "Manual full folder sync from the folder tree."
+                    fullSyncReason: t("manualFolderSyncReason")
                   });
                 }}
-              >
-                Sync
-              </DropdownMenu.Item>
+              >{t("sync")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 disabled={isDeleting}
                 onSelect={() => {
                   handleCreateSubfolder(folder);
                 }}
-              >
-                Create Subfolder
-              </DropdownMenu.Item>
+              >{t("createSubfolder")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 disabled={isDeleting}
                 onSelect={() => {
                   handleRenameFolderItem(folder);
                 }}
-              >
-                Rename
-              </DropdownMenu.Item>
+              >{t("rename")}</DropdownMenu.Item>
               <DropdownMenu.Item
                 disabled={isDeleting}
                 onSelect={() => {
                   handleDeleteFolderItem(folder);
                 }}
-              >
-                Delete
-              </DropdownMenu.Item>
+              >{t("delete")}</DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </span>
