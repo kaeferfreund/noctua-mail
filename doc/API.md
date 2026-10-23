@@ -52,6 +52,18 @@ Same-origin rejection is HTTP 403 `{ok:false,code:"invalid_origin"}`; wrong medi
 415 `{ok:false,code:"json_required"}`. A nonempty comment DELETE body returns
 400 `{ok:false,code:"unexpected_body"}`.
 
+## IMAP folder events
+
+`GET /api/accounts/{accountId}/imap/stream` emits `folder:update` with an array of
+`{id, uidNext?, unseen?, exists?}`. `unseen` is the unread **count** from IMAP
+STATUS (UNSEEN); SELECT/EXAMINE's UNSEEN response is a first-unseen sequence
+number and must never populate this field. `exists` is the total message count.
+Initial connection, EXISTS and flag changes refresh watched-folder counts with
+STATUS; background polling uses STATUS for other folders. Omitted counts leave
+the client's known values unchanged. Field names and count semantics are unchanged;
+the initial event previously violated this contract. After local sync completes,
+these counts agree with `GET /api/accounts/{accountId}/folders` for synced folders.
+
 ## Mailbox summaries and user events
 
 `GET /api/me/mailboxes/summary` requires an active MFA session, without requiring a selected

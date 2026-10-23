@@ -26,6 +26,10 @@ class FakeClient extends EventEmitter {
   connects = 0;
   statuses = 0;
   uidNext = 2;
+  selectedUidNext = 1;
+  unseen = 0;
+  messages = 1;
+  statusQueries: unknown[] = [];
   connectGate?: Promise<void>;
   statusGate?: Promise<void>;
   fetchGate?: Promise<void>;
@@ -35,8 +39,11 @@ class FakeClient extends EventEmitter {
   constructor() { super(); clients.push(this); configure(this); }
   async connect() { this.connects++; await this.connectGate; if (this.connectError) throw this.connectError; }
   async logout() { this.logouts++; this.closed = true; this.idleGate.resolve(); }
-  async mailboxOpen() { return { uidNext: 1, uidValidity: 1n, exists: 0 }; }
-  async status() { this.statuses++; await this.statusGate; return { uidNext: this.uidNext, unseen: 0, messages: 1 }; }
+  async mailboxOpen() { return { uidNext: this.selectedUidNext, uidValidity: 1n, exists: this.messages, unseen: 1 }; }
+  async status(_mailbox?: string, query?: unknown) {
+    this.statuses++; this.statusQueries.push(query); await this.statusGate;
+    return { uidNext: this.uidNext, uidValidity: 1n, unseen: this.unseen, messages: this.messages };
+  }
   async *fetch() { await this.fetchGate; yield { uid: 1, envelope: { subject: "Synthetic private envelope" } }; }
   async idle() { await this.idleGate.promise; if (this.idleError) throw this.idleError; }
 }
@@ -87,6 +94,41 @@ async function initial(stream: Awaited<ReturnType<typeof open>>) {
 const authError = () => Object.assign(new Error("Synthetic opaque upstream failure"), { authenticationFailed: true, serverResponseCode: "AUTHENTICATIONFAILED" });
 
 describe("production IMAP stream acceptance", () => {
+  test("QA-006 folder counts use STATUS for initial SELECT, EXISTS, flags, poll and reconnect", async () => {
+    const f = await fixture();
+    configure = client => { client.messages = 300; client.unseen = 110; client.uidNext = 301; client.selectedUidNext = 301; };
+    const stream = await open(f);
+    const readEvent = async () => {
+      const chunk = new TextDecoder().decode((await stream.reader.read()).value);
+      return { event: chunk.split("\n")[0], data: JSON.parse(chunk.split("data: ")[1]) };
+    };
+    expect(await readEvent()).toEqual({ event: "event: folder:update", data: [
+      { id: `${f.id}:INBOX`, uidNext: 301, exists: 300, unseen: 110 }
+    ] });
+    await until(() => timers.size === 2);
+    expect(clients[0].statusQueries[0]).toEqual({ uidNext: true, uidValidity: true, messages: true, unseen: true });
+    clients[0].messages = 305; clients[0].unseen = 115; clients[0].uidNext = 306;
+    clients[0].emit("exists");
+    expect((await readEvent()).event).toBe("event: new");
+    expect((await readEvent()).data).toEqual([{ id: `${f.id}:INBOX`, uidNext: 306, exists: 305, unseen: 115 }]);
+    for (const unseen of [105, 115, 0]) {
+      clients[0].unseen = unseen;
+      clients[0].emit("flags", { uid: 1, flags: unseen === 115 ? [] : ["\\Seen"] });
+      expect((await readEvent()).event).toBe("event: flags:update");
+      expect((await readEvent()).data[0].unseen).toBe(unseen);
+    }
+    // EXISTS can change counts without advancing UIDNEXT (e.g. reconciliation).
+    clients[0].unseen = 110; clients[0].emit("exists");
+    expect((await readEvent()).data[0].unseen).toBe(110);
+    await [...timers.values()].find(t => t.ms === 123456)!.callback();
+    expect((await readEvent()).data).toEqual([{ id: `${f.id}:Archive`, uidNext: 301, exists: 300, unseen: 110 }]);
+    await stream.reader.cancel();
+    const reconnected = await open(f);
+    const reconnect = new TextDecoder().decode((await reconnected.reader.read()).value);
+    expect(JSON.parse(reconnect.split("data: ")[1])[0].unseen).toBe(110);
+    await until(() => timers.size === 2);
+  });
+
   test.each(["fetch", "poll", "connect"])("revocation during pending %s blocks the next sensitive enqueue", async (phase: string) => {
     const f = await fixture();
     const gate = deferred();
@@ -96,9 +138,10 @@ describe("production IMAP stream acceptance", () => {
     else {
       await initial(stream);
       if (phase === "fetch") {
+        const statusesBefore = clients[0].statuses;
         clients[0].fetchGate = gate.promise;
         clients[0].emit("exists");
-        await until(() => clients[0].statuses > 0);
+        await until(() => clients[0].statuses > statusesBefore);
       } else {
         configure = client => { client.statusGate = gate.promise; };
         void [...timers.values()].find(t => t.ms === 123456)!.callback();
