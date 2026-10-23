@@ -48,6 +48,10 @@ test("split/focus round trip keeps the list node, its selection and scroll posit
   fireEvent.click(row); fireEvent.doubleClick(row);
   expect(layout(view.container)).toBe("focus");
   expect(localStorage.getItem(READER_LAYOUT_KEY)).toBe("focus");
+  expect(view.getByRole("group", { name: "Message reading controls" })).toBeTruthy();
+  const position = view.container.querySelector("[data-reader-position]")!;
+  expect(position.getAttribute("aria-live")).toBe("polite");
+  expect(document.getElementById(position.getAttribute("aria-describedby")!)?.textContent).toBe("Message 1 of 2 visible rows");
   fireEvent.click(view.getByRole("button", { name: "Back to messages" }));
   expect(layout(view.container)).toBe("split");
   expect(view.getByTestId("row")).toBe(row);
