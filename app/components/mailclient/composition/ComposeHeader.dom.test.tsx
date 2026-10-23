@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { getMessages } from "@/lib/i18n/translator";
+import type { Message } from "@/lib/data";
 import { ComposeContextProvider, type ComposeContextValue } from "./ComposeContext";
 import ComposeModal from "./ComposeModal";
 
@@ -14,9 +15,9 @@ afterEach(async () => {
 
 // CSS geometry/clamping runs in the production browser matrix; happy-dom
 // protects the complete accessible text retained by that visual truncation.
-function renderHeader({ width = 320, theme = "light", enabled = true, email, displayName, locale = "en" }: {
+function renderHeader({ width = 320, theme = "light", enabled = true, email, displayName, locale = "en", inReplyToMessage = null }: {
   width?: number; theme?: "light" | "dark"; enabled?: boolean;
-  email: string; displayName: string; locale?: "de" | "en";
+  email: string; displayName: string; locale?: "de" | "en"; inReplyToMessage?: Message | null;
 }) {
   const sender = `${displayName} <${email}>`;
   let closed = 0;
@@ -25,7 +26,7 @@ function renderHeader({ width = 320, theme = "light", enabled = true, email, dis
     composeMode: "new", composeOpen: true, composeView: "modal", composeTo: "", composeCc: "", composeBcc: "", composeSubject: "",
     composeShowBcc: false, composeOpenedAt: "", activeAccountId: "synthetic", fromValue: sender,
     identities: [{ id: "long", accountId: "synthetic", email, displayName, enabled, isDefault: false, createdBy: "synthetic-user", createdAt: 0, updatedAt: 0 }], identityId: "long", onIdentityChange: noop,
-    composeDraftId: null, composeFieldsReset: 0, composeDragActive: false, composeSize: { width, height: 844 }, inReplyToMessage: null, composeInviteDraft: null,
+    composeDraftId: null, composeFieldsReset: 0, composeDragActive: false, composeSize: { width, height: 844 }, inReplyToMessage, composeInviteDraft: null,
     canSaveDraft: false, attachmentLoadState: null, draftSaving: false, draftSaveError: null, draftSavedAt: null,
     sendingMail: false, discardingDraft: false, detachingCompose: false, detachedWindow: false,
     composeModalRef: createRef(), composeResizeRef: { current: null }, composeCardRef: createRef(),
@@ -108,3 +109,12 @@ test("German header, window controls and footer actions use the catalog copy", (
   expect(closed()).toBe(2);
   expect(view.queryByText(/New message|Cancel|Send$|Draft not saved/)).toBeNull();
 });
+
+for (const [locale, label] of [["de", "Antwort auf:"], ["en", "In Reply To:"]] as const) {
+  test(`${locale}: the in-reply-to row label is UI copy while subject and sender stay verbatim`, () => {
+    const inReplyToMessage = { id: "synthetic-original", subject: "Synthetic original subject", from: "Synthetic Sender <sender@example.test>" } as Message;
+    const { view } = renderHeader({ locale, email: "sender@example.test", displayName: "Synthetic Sender", inReplyToMessage });
+    expect(view.getByText(label, { exact: true })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Synthetic original subject — Synthetic Sender <sender@example.test>" })).toBeTruthy();
+  });
+}
