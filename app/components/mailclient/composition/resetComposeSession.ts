@@ -2,6 +2,9 @@ import type { ComposeState } from "./useComposeState";
 
 type ResettableComposeState = Pick<
   ComposeState,
+  | "setComposeIdentityId"
+  | "setComposeUnavailableFrom"
+  | "setComposeSenderWarnings"
   | "setComposeOpen"
   | "setComposeView"
   | "setComposeDraftId"
@@ -90,6 +93,9 @@ export function resetComposeSession(compose: ResettableComposeState) {
   compose.composeResizeRef.current = null;
   compose.composeMarkdownRef.current = "";
 
+  compose.setComposeIdentityId(undefined);
+  compose.setComposeUnavailableFrom(undefined);
+  compose.setComposeSenderWarnings([]);
   compose.setComposeOpen(false);
   compose.setComposeView("inline");
   compose.setComposeDraftId(null);

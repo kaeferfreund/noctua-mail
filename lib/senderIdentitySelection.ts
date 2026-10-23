@@ -1,3 +1,4 @@
+import { senderMessages } from "@/lib/senderMessages";
 import type { Message, SenderIdentity, UserAccountPrefs } from "./data";
 import { parseAddressEmails } from "./ownAddresses";
 
@@ -20,7 +21,7 @@ export function resolveComposeIdentity(input: {
   const personal = enabled.find(identity => identity.id === input.prefs?.defaultIdentityId);
   const mailbox = enabled.find(identity => identity.isDefault);
   const warnings = input.prefs?.defaultIdentityId && !personal
-    ? ["Your default identity is unavailable. Choose an enabled identity in Preferences, or re-enable it."] : [];
+    ? [senderMessages.personalDefaultUnavailable] : [];
   const message = input.message;
   if (input.mode === "draft" && message) {
     const from = parseAddressEmails(message.from);
@@ -28,7 +29,7 @@ export function resolveComposeIdentity(input: {
       ? identities.find(identity => identity.id === message.senderIdentityId)
       : from.length === 1 ? identities.find(identity => identity.email === from[0]) : undefined;
     return { identity, unavailableIdentityId: identity?.enabled ? undefined : message.senderIdentityId ?? identity?.id,
-      warnings: identity?.enabled ? warnings : [...warnings, "The saved draft identity is unavailable. Review From and save the draft."] };
+      warnings: identity?.enabled ? warnings : [...warnings, senderMessages.savedIdentityUnavailable] };
   }
   if ((input.mode === "reply" || input.mode === "replyAll") && message) {
     const tiers = [parseAddressEmails(message.from), parseAddressEmails(message.to),

@@ -1,3 +1,4 @@
+import { SignatureTemplateError } from "@/lib/signatureTemplates";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { NextResponse } from "next/server";
 import { requireAccountContext, getAccountIdFromParams, type AccountContext, type AccountRouteParams } from "./accountContext";
@@ -14,6 +15,7 @@ export async function applyMailboxPatch(context: AccountContext, patch: MailboxP
     const account = await updateMailboxCredentials(context.accountId, patch, { userId: context.userId, clientId: context.clientId }, verification);
     return NextResponse.json(sanitizeAccountForClient({ ...account, ownAddresses: await getAccountOwnAddresses(context.accountId) }, { role: context.role, viewerUserId: context.userId, memberCount: (await listAccountMembers(context.accountId)).length }));
   } catch (error) {
+    if (error instanceof SignatureTemplateError) return NextResponse.json({ ok: false, code: error.code, message: error.message, placeholder: error.placeholder }, { status: error.status });
     if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
     if (error instanceof MailboxCredentialError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
     throw error;

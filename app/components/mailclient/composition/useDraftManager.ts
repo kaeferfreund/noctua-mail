@@ -1,3 +1,4 @@
+import { readSenderError } from "./senderErrors";
 import { loadMarkdownConverters } from "@/lib/markdownConvert";
 import { useEffect, useRef } from "react";
 import type React from "react";
@@ -20,6 +21,9 @@ import type {
 } from "./composeTypes";
 
 export type UseDraftManagerParams = {
+  identityId?: string;
+  identityReady?: boolean;
+  onEffectiveIdentity?: (id: string) => void;
   // Account context
   activeAccountId: string | null;
 
@@ -86,6 +90,9 @@ export type UseDraftManagerParams = {
 
 export function useDraftManager(params: UseDraftManagerParams) {
   const {
+    identityId,
+    identityReady = true,
+    onEffectiveIdentity,
     activeAccountId,
     composeOpen,
     composeTab,
@@ -149,7 +156,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
   }, [composeOpen, activeAccountId, apiFetch]);
 
   const saveDraftNow = async (payload: DraftSavePayload, hash: string) => {
-    if (!activeAccountId) return;
+    if (!activeAccountId || !identityReady) return;
     const requestAccountId = activeAccountId;
     const requestScopeVersion = accountScopeVersionRef.current;
     const requestComposeSessionVersion = composeSessionVersionRef.current;
@@ -178,15 +185,17 @@ export function useDraftManager(params: UseDraftManagerParams) {
       });
       if (!isCurrentRequest()) return;
       if (!res.ok) {
-        const message = await readErrorMessage(res);
+        const message = await readSenderError(res, readErrorMessage);
         if (!isCurrentRequest()) return;
         reportError(message);
         setDraftSaveError(message || "Draft save failed.");
         return;
       }
       const previousDraftId = composeDraftIdRef.current;
-      const data = (await res.json()) as { draftId?: string | null; message?: Message | null };
+      const data = (await res.json()) as { identityId?: string; draftId?: string | null; message?: Message | null };
       if (!isCurrentRequest()) return;
+      const effectiveId = data.identityId ?? data.message?.senderIdentityId;
+      if (effectiveId && (!currentDraftHashRef.current || currentDraftHashRef.current === hash)) onEffectiveIdentity?.(effectiveId);
       const savedDraft = data?.message ? { ...data.message, draftInvite: payload.invite ?? null } : null;
       if (data?.draftId) {
         if (previousDraftId && previousDraftId !== data.draftId) {
@@ -342,7 +351,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
   };
 
   const handleSaveDraft = async () => {
-    if (!composeOpen || !activeAccountId) return;
+    if (!composeOpen || !activeAccountId || !identityReady) return;
     const sessionVersion = composeSessionVersionRef.current;
     const scopeVersion = accountScopeVersionRef.current;
     const isCurrent = () => composeSessionVersionRef.current === sessionVersion &&
@@ -357,6 +366,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
     const { hash, canManualSave } = getDraftChangeState({
+      identityId,
       draftId: composeDraftIdRef.current,
       lastSavedHash: lastDraftHashRef.current,
       to: composeTo,
@@ -371,6 +381,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
     if (!canManualSave) return;
     const payload: DraftSavePayload = buildDraftSavePayload(
       {
+        identityId,
         to: composeTo,
         cc: composeCc,
         bcc: composeBcc,
@@ -385,13 +396,14 @@ export function useDraftManager(params: UseDraftManagerParams) {
   };
 
   const saveDraftForHandoff = async () => {
-    if (!composeOpen || !activeAccountId) {
+    if (!composeOpen || !activeAccountId || !identityReady) {
       return { draftId: null, hasContent: false, saved: false };
     }
     await loadMarkdownConverters();
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
     const changeState = getDraftChangeState({
+      identityId,
       draftId: composeDraftIdRef.current,
       lastSavedHash: lastDraftHashRef.current,
       to: composeTo,
@@ -407,6 +419,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
     if (changeState.canManualSave) {
       const payload = buildDraftSavePayload(
         {
+          identityId,
           to: composeTo,
           cc: composeCc,
           bcc: composeBcc,

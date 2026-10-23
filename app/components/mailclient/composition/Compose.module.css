@@ -39,7 +39,13 @@
   border-bottom: 1px solid var(--gray-a5);
 }
 
+.composeHeaderText {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
 .composeHeaderActions {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -50,9 +56,15 @@
 }
 
 .composeSubtitle {
+  display: block;
+  overflow-wrap: anywhere;
   margin: 4px 0 0 0;
   font-size: 12px;
   color: var(--gray-a11);
+}
+
+.composeScrollArea {
+  display: contents;
 }
 
 .composeBody {
@@ -131,14 +143,14 @@
 
 .composeGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   width: 100%;
 }
 
 .composeGridRow {
   display: grid;
-  grid-template-columns: 84px 1fr;
+  grid-template-columns: 84px minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
 }
@@ -150,6 +162,7 @@
 }
 
 .composeInputWrap {
+  min-width: 0;
   position: relative;
   flex: 1;
 }
@@ -464,4 +477,92 @@
   .composeActions > button { min-width: 44px; min-height: 44px; }
   .composeResizer { display: none; }
   .composeHeader { padding: 12px; }
+  .composeHeaderActions > button { min-width: 44px; min-height: 44px; margin: 0; }
+}
+
+.composeFromTrigger {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 36px;
+}
+.composeFromTrigger > :first-child {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.composeFromMenu {
+  width: calc(100vw - 32px);
+  max-width: calc(100vw - 32px);
+}
+.composeFromMenu :global(.rt-SelectItem) {
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (width < 768px) {
+  .composeModal { --compose-editor-input-min-height: 120px; }
+
+  /* Clamp only the presentation: the complete sender remains text and title. */
+  .composeSubtitle {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .composeFromTrigger > :first-child {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Reserve the editor's intrinsic toolbar + input minimum. Long warnings or
+     recipient fields scroll here instead of taking that space from the body. */
+  .composeBody > .composeGrid {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .composeModal .composeMessageField { min-height: min-content; }
+}
+
+/* A keyboard-sized viewport cannot fit both metadata and the editor beside a
+   fixed saved-draft footer. Scroll them together, with the header still outside
+   the scroll area, so native focus scrolling can reveal every field/action. */
+@media (width < 768px) and (height <= 600px) {
+  .composeHeader { flex-shrink: 0; }
+
+  .composeScrollArea {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .composeBody {
+    flex: none;
+    overflow: visible;
+  }
+
+  .composeBody > .composeGrid {
+    min-height: min-content;
+    overflow: visible;
+    /* Keep sender/recipient fields reachable while the editor and saved-draft
+       actions move through the same scroll area. No nested metadata viewport. */
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-panel-solid);
+  }
+
+  .composeModal .composeMessageField {
+    flex: none;
+    overflow: visible;
+  }
 }
