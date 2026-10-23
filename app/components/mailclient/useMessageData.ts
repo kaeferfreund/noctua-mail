@@ -88,14 +88,19 @@ export function useMessageData({
   const lastRequestRef = useRef<{ key: string; page: number } | null>(null);
   const messageMutationVersionRef = useRef(0);
   const listReplacementLogFingerprintRef = useRef("");
+  // The page load in flight. A load for a superseded key is aborted, so it never
+  // holds back the first page of the new key.
+  const inFlightLoadRef = useRef<{ key: string; controller: AbortController } | null>(null);
 
-  // Cleanup filteredSearchRefreshTimer on unmount
+  // Cleanup filteredSearchRefreshTimer and the page load on unmount
   useEffect(() => {
     return () => {
       if (filteredSearchRefreshTimerRef.current !== null) {
         window.clearTimeout(filteredSearchRefreshTimerRef.current);
         filteredSearchRefreshTimerRef.current = null;
       }
+      inFlightLoadRef.current?.controller.abort();
+      inFlightLoadRef.current = null;
     };
   }, []);
 
@@ -113,6 +118,12 @@ export function useMessageData({
     lastRequestRef.current = null;
     setGroupMeta([]);
     setMessageListError(null);
+    const superseded = inFlightLoadRef.current;
+    if (superseded && superseded.key !== messagesKey) {
+      superseded.controller.abort();
+      inFlightLoadRef.current = null;
+      setLoadingMessages(false);
+    }
   }, [messagesKey]);
 
   const logListReplacement = (
@@ -181,7 +192,7 @@ export function useMessageData({
     const loadMessages = async () => {
       if (!activeAccountId) return;
       if (searchScope === "folder" && !isRelatedSearch && !activeFolderId) return;
-      if (loadingMessages || !hasMoreMessages) return;
+      if (inFlightLoadRef.current || !hasMoreMessages) return;
       if (
         lastRequestRef.current?.key === messagesKey &&
         lastRequestRef.current?.page === messagesPage
@@ -190,10 +201,13 @@ export function useMessageData({
       }
       const requestKey = messagesKey;
       const requestMutationVersion = messageMutationVersionRef.current;
+      const load = { key: requestKey, controller: new AbortController() };
+      inFlightLoadRef.current = load;
       lastRequestRef.current = { key: requestKey, page: messagesPage };
       try {
         setLoadingMessages(true);
-        const messagesRes = await apiFetch(buildQueryUrl(messagesPage));
+        const messagesRes = await apiFetch(buildQueryUrl(messagesPage), { signal: load.controller.signal });
+        if (load.controller.signal.aborted) return;
         if (messagesRes.ok) {
           const data = (await messagesRes.json()) as {
             items: Message[];
@@ -270,11 +284,16 @@ export function useMessageData({
           setMessageListError(errorMessage || "Failed to load messages.");
         }
       } catch {
+        if (load.controller.signal.aborted) return;
         lastRequestRef.current = null;
         reportError("Failed to load messages.");
         setMessageListError("Failed to load messages.");
       } finally {
-        setLoadingMessages(false);
+        // Only the current load owns the flag; a superseded one was released on abort.
+        if (inFlightLoadRef.current === load) {
+          inFlightLoadRef.current = null;
+          setLoadingMessages(false);
+        }
       }
     };
 
