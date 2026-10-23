@@ -130,6 +130,31 @@ describe("bodyless guards abandon a stalled body", () => {
     }
   }
 
+  test("a rejected body is cancelled without waiting for a cancel that never settles", async () => {
+    // Bun's request stream settles cancel() only when the client sends more; a
+    // stalled client never does. One chunk arrives, then the source stalls.
+    const stalled = (headers: Record<string, string> = {}) => {
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new TextEncoder().encode("abc")); },
+        cancel() { cancelled = true; return new Promise<void>(() => {}); }
+      });
+      return { request: largeRequest("/api/synthetic", "POST", body, { "content-type": "text/plain", ...headers }), cancelled: () => cancelled };
+    };
+    for (const [guard, code] of [[requireBodylessSameOrigin, "unexpected_body"], [requireMutationSameOrigin, "json_required"]] as const) {
+      for (const headers of [{}, { "content-length": "3" }]) {
+        const { request, cancelled } = stalled(headers);
+        const response = await guard(request);
+        expect(response?.status).toBe(400);
+        expect((await response!.json()).code).toBe(code);
+        expect(cancelled()).toBe(true);
+      }
+    }
+    const { request, cancelled } = stalled();
+    expect((await logout(request)).status).toBe(400);
+    expect(cancelled()).toBe(true);
+  });
+
   test("a stalled chunked text/plain body is rejected at the read deadline, before any session check", async () => {
     for (const chunks of ["", "3\r\nabc\r\n"]) {
       jest.useFakeTimers();
