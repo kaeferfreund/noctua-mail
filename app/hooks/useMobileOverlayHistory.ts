@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef } from "react";
+
+import { UrlHistoryContext } from "./UrlHistoryContext";
 
 type Overlay = { id: number; close: () => void; pushed: boolean };
 const overlays: Overlay[] = [];
@@ -10,7 +12,9 @@ let returning = false;
 let listening = false;
 let deferred: Array<() => void> = [];
 
-export const isMobileOverlayPop = (event: Event) => consumedPops.has(event);
+/** Classify from current state too: a window listener may run before onPop. */
+export const isMobileOverlayPop = (event: PopStateEvent) => consumedPops.has(event) || returning ||
+  (overlays.length > 0 && overlays.at(-1)!.id !== event.state?.noctuaMobileOverlay);
 
 function pushOverlay(overlay: Overlay) {
   overlay.pushed = true;
@@ -56,10 +60,11 @@ export function afterMobileOverlayNavigation(callback: () => void) {
 
 /** Every mobile Sheet gets a history entry, including nested Sheets. */
 export function useMobileOverlayHistory(open: boolean, close: () => void) {
+  const urlManaged = useContext(UrlHistoryContext);
   const closeRef = useRef(close);
   useLayoutEffect(() => { closeRef.current = close; }, [close]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || urlManaged) return;
     const overlay: Overlay = { id: ++nextId, close: () => closeRef.current(), pushed: false };
     overlays.push(overlay);
     if (!returning) pushOverlay(overlay);
@@ -74,5 +79,5 @@ export function useMobileOverlayHistory(open: boolean, close: () => void) {
       }
       updateListener();
     };
-  }, [open]);
+  }, [open, urlManaged]);
 }

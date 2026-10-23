@@ -92,15 +92,20 @@ async function mount() {
     expect(listRequestsSinceClick().filter(id => id === "account-b")).toHaveLength(1);
     expect(listSignals.filter(entry => entry.accountId === "account-b").every(entry => entry.signal?.aborted)).toBe(true);
   };
-  return { view, active, shown, clickInOrder, settled, callsSinceClick, listRequestsSinceClick, expectOnlyAbortedFirstPageOfB };
+  return { view, row, active, shown, clickInOrder, settled, callsSinceClick, listRequestsSinceClick, expectOnlyAbortedFirstPageOfB };
 }
 
 describe("rapid mailbox switching on the real MailClient", () => {
   it("A -> B -> C ends on C; no list or topic of B", async () => {
     const h = await mount();
-    await h.clickInOrder("account-b", "account-c");
+    await h.clickInOrder("account-b");
+    expect(h.row(names["account-b"])?.getAttribute("aria-busy")).toBe("true");
+    await act(async () => { await delay(150); });
+    expect(h.row(names["account-b"])?.getAttribute("aria-busy")).toBe("true");
+    await h.clickInOrder("account-c");
     await h.settled();
     expect(h.active()).toContain(names["account-c"]);
+    expect(h.row(names["account-c"])?.getAttribute("aria-busy")).not.toBe("true");
     expect(server.selected).toBe("account-c");
     expect(applied).toEqual(["account-b", "account-c"]);
     expect(h.shown).toEqual(["account-a", "account-c"]);
