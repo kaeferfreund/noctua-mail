@@ -48,7 +48,7 @@ The focused DOM suites are `lib/ui/readerFocus.dom.test.tsx` and
 `tests/browser/ui/qa-reader-focus.spec.ts`, included in
 `playwright.qa-round2.config.ts` and compatible with the existing synthetic QA
 fixture/session. `READER_FOCUS_EVIDENCE_DIR` optionally overrides the screenshot
-destination (default `artifacts/reader-focus`).
+destination (default `../briefs/reader-focus-evidence`).
 
 ### Merge rehearsal notes
 
@@ -111,7 +111,7 @@ three QA browser cases pass on 3870 with the dev protocol fixture on 3871–3873
 this includes full-width reader printing, detached-window opening, done/undone,
 keyboard navigation, persisted layout and unchanged 390 px mobile history.
 
-Screenshots in `artifacts/reader-focus/`: `reader-focus-light-1280.png`,
+Screenshots in `../briefs/reader-focus-evidence/`: `reader-focus-light-1280.png`,
 `reader-focus-dark-1280.png`, `reader-focus-light-1024.png`,
 `reader-focus-dark-1024.png`, and `reader-mobile-390.png`. All correspondence and
 accounts in these artifacts are synthetic.

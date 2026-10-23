@@ -4,7 +4,7 @@ import path from "node:path";
 import { signInQa } from "./qaRound2Session";
 
 test.use({ locale: "en-GB" });
-const evidence = process.env.READER_FOCUS_EVIDENCE_DIR ?? "artifacts/reader-focus";
+const evidence = process.env.READER_FOCUS_EVIDENCE_DIR ?? "../briefs/reader-focus-evidence";
 const rows = (page: Page) => page.locator('[data-message-list-row="true"]');
 const panes = (page: Page) => page.locator('[data-reader-layout]');
 const toolbar = (page: Page) => page.locator('[data-reader-toolbar]');
