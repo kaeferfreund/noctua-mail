@@ -39,6 +39,7 @@ function readSidebarCookie(): boolean {
 }
 
 export type AppShellProps = {
+  onReaderNavigate?: () => void;
   mobileNavigation?: { messageId: string | null; clearMessage: () => void };
   sidebar: ShellSidebarProps;
   header: ShellHeaderProps;
@@ -60,7 +61,7 @@ export type AppShellProps = {
  * navigation state; all data state and handler bags stay in MailClient and
  * arrive as props.
  */
-export default function AppShell({ sidebar, header, panes, statusBar, overlays, notices, mobileNavigation }: AppShellProps) {
+export default function AppShell({ sidebar, header, panes, statusBar, overlays, notices, mobileNavigation, onReaderNavigate }: AppShellProps) {
   // Hydrate the saved cookie without a synchronous setState effect. Changes
   // made through SidebarProvider drive local state and update its cookie.
   const isMobile = useIsMobile();
@@ -83,13 +84,13 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
         <ShellSidebar
           {...sidebar}
           notices={noticePlacement === "sidebar" ? notices?.("sidebar") : null}
-          onNavigate={isMobile ? mobileNavigation?.clearMessage : undefined}
+          onNavigate={isMobile ? mobileNavigation?.clearMessage : onReaderNavigate}
         />
         <SidebarInset className={`${styles.workspace} h-auto min-h-0 min-w-0 overflow-hidden md:rounded-xl md:shadow-xs`}>
           <ShellHeader
             {...header}
             // On phones an open message covers the list, so its controls go too.
-            toolbar={isMobile && navigation.view === "thread" ? undefined : header.toolbar}
+            toolbar={(isMobile && navigation.view === "thread") || (!isMobile && panes.readerLayout === "focus") ? undefined : header.toolbar}
             indicators={statusBar}
           />
           <ShellPanes {...panes} mobileView={navigation.view} />

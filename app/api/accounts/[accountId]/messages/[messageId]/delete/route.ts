@@ -12,7 +12,7 @@ type Params = AccountRouteParams & {
 };
 
 export async function POST(request: Request, { params }: Params) {
-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
+  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { messageId: rawMessageId } = await params;
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";

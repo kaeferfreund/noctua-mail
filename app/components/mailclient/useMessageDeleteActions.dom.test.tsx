@@ -40,12 +40,14 @@ function setup({
   action = "cancel",
   permanent = false,
   calendar = false,
-  linkedFailure = false
+  linkedFailure = false,
+  continuation
 }: {
   action?: DeleteConfirmAction;
   permanent?: boolean;
   calendar?: boolean;
   linkedFailure?: boolean;
+  continuation?: Parameters<typeof useMessageDeleteActions>[0]["continueAfterRemoval"];
 } = {}) {
   const currentMessages = messages.map((message) => ({
     ...message, folderId: permanent ? "acc:Trash" : "acc:INBOX"
@@ -74,6 +76,7 @@ function setup({
   const pushNotice = mock((_notice: Parameters<Parameters<typeof useMessageDeleteActions>[0]["pushNotice"]>[0]) => {});
   const reportError = mock(() => {});
   const options: Parameters<typeof useMessageDeleteActions>[0] = {
+    continueAfterRemoval: continuation, navigationRows: [currentMessages[0], currentMessages[3]],
     activeAccountId: "acc", activeMessageId: "", supportsThreads: true,
     collapsedThreads: {}, includeFlaggedGroup: false, searchScope: "folder",
     activeFolderId: permanent ? "acc:Trash" : "acc:INBOX",
@@ -162,4 +165,12 @@ describe("bulk delete with collapsed threads", () => {
     expect(fixture.reportError).toHaveBeenCalledTimes(1);
     expect([...fixture.selectionStore.getIds()]).toEqual(targets.ids);
   });
+});
+
+it("successful delete consults the current reader even when selection was empty at request start", async () => {
+  const continuation = mock((_ids: string[], _rows?: Message[]) => true);
+  const fixture = setup({ continuation });
+  await fixture.remove(["root", "single"], ["root", "single"]);
+  expect(continuation).toHaveBeenCalledTimes(1);
+  expect(continuation.mock.calls[0]).toEqual([["root", "single"], fixture.options.navigationRows]);
 });

@@ -51,3 +51,9 @@
     display: none !important;
   }
 }
+
+@media (width >= 768px) {
+  .panes[data-reader-layout="focus"] > [id="list"],
+  .panes[data-reader-layout="focus"] > [id="list"] + [data-slot="resizable-handle"] { display: none !important; }
+  .panes[data-reader-layout="focus"] > [id="reader"] { flex: 1 1 0 !important; min-width: 0; }
+}

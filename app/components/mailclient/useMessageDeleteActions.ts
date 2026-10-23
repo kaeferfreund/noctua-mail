@@ -12,6 +12,7 @@ import type { Folder, Message } from "@/lib/data";
 import type { DeleteConfirmAction, DeleteConfirmState } from "./types";
 import type { LinkedCalendarEventDetail } from "./utils/deleteConfirm";
 import type { SelectionStore } from "./messagelist/selectionStore";
+import { nextMessageAfterRemoval, type ContinueAfterRemoval } from "./messagelist/successfulRemoval";
 import { resolveCollapsedThreadSelectionTarget } from "./messagelist/listSelection";
 import type { MoveMessagesToFolder, UndoMoveTarget } from "./useMessageMoveActions";
 import {
@@ -104,6 +105,8 @@ type DeleteAssociationLookupResponse = {
 };
 
 type UseMessageDeleteActionsOptions = {
+  continueAfterRemoval?: ContinueAfterRemoval;
+  navigationRows?: Message[];
   activeAccountId: string;
   activeMessageId: string;
   supportsThreads: boolean;
@@ -146,6 +149,8 @@ type UseMessageDeleteActionsOptions = {
 };
 
 export function useMessageDeleteActions({
+  continueAfterRemoval,
+  navigationRows,
   activeAccountId,
   activeMessageId,
   supportsThreads,
@@ -524,23 +529,9 @@ export function useMessageDeleteActions({
       if (!activeMessageId || !targetIds.has(activeMessageId)) {
         return { activeWasDeleted: false, nextActiveId: "" };
       }
-      let nextActiveId = (() => {
-        const indices = visibleMessages
-          .map((item, index) => (targetIds.has(item.message.id) ? index : -1))
-          .filter((idx) => idx >= 0);
-        if (indices.length === 0) return "";
-        const maxIndex = Math.max(...indices);
-        const minIndex = Math.min(...indices);
-        for (let i = maxIndex + 1; i < visibleMessages.length; i += 1) {
-          const candidate = visibleMessages[i]?.message?.id;
-          if (candidate && !targetIds.has(candidate)) return candidate;
-        }
-        for (let i = minIndex - 1; i >= 0; i -= 1) {
-          const candidate = visibleMessages[i]?.message?.id;
-          if (candidate && !targetIds.has(candidate)) return candidate;
-        }
-        return "";
-      })();
+      let nextActiveId = nextMessageAfterRemoval(
+        visibleMessages.map(item => item.message), targetIds
+      )?.id ?? "";
       if (threadIdForFallback && !nextActiveId) {
         const threadRoot = visibleMessages.find(
           (item) => item.threadId === threadIdForFallback
@@ -644,7 +635,10 @@ export function useMessageDeleteActions({
           permanentlyDeletedCount += deletedIds.length;
           removedIds.push(...deletedIds);
         }
-        if (activeWasDeleted) {
+        // Keep the operation's renderer order even if the move has already
+        // removed its row; the continuation checks the latest reader selection.
+        const continued = continueAfterRemoval?.(removedIds, navigationRows) ?? false;
+        if (!continueAfterRemoval && activeWasDeleted) {
           if (nextActiveId) {
             const nextActiveMessage = messages.find((m) => m.id === nextActiveId) ?? null;
             setActiveMessageId(nextActiveId);
@@ -656,7 +650,7 @@ export function useMessageDeleteActions({
             setViewMessage(null);
             selectionStore.clearSelection();
           }
-        } else if (options.clearSelectionWhenActiveRemains) {
+        } else if (!continued && options.clearSelectionWhenActiveRemains) {
           clearSelectionState();
         }
         await refreshFolders();
@@ -679,6 +673,8 @@ export function useMessageDeleteActions({
       }
     },
     [
+      continueAfterRemoval,
+      navigationRows,
       clearSelectionState,
       deleteMessagesPermanently,
       findTrashFolderId,
