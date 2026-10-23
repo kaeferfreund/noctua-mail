@@ -112,7 +112,7 @@ export type UseSyncControllerParams = {
     tag: string,
     opts?: { messageId?: string | null; accountId?: string | null; url?: string }
   ) => Promise<boolean>;
-  refreshMailboxData: () => Promise<boolean>;
+  refreshMailboxData: (options?: { skipIfCurrent?: boolean }) => Promise<boolean>;
   refreshFolders: () => Promise<Folder[] | null>;
   refreshPendingCalendarReminders: () => Promise<void>;
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
@@ -319,7 +319,7 @@ export function useSyncController({
         }
         const status = data.job?.status;
         if (status === "done") {
-          return data.job?.result ?? { count: 0 };
+          return { ...(data.job?.result ?? { count: 0 }), completedMode: progress?.mode ?? requestedMode };
         }
         if (status === "failed") {
           throw new Error(data.job?.error || "Sync job failed.");
@@ -535,10 +535,14 @@ export function useSyncController({
         triggerId: options?.triggerId,
         skipFullSyncConfirm: options?.skipFullSyncConfirm
       });
+      // A "new" sync that wrote no message changed nothing the list or the virtual
+      // counts show; only a list that is not on screen yet (or failed) is re-read.
+      const wroteNothing = mode === "new" && syncResult.count === 0 &&
+        syncResult.completedMode === "new" && !syncResult.newMessages?.length;
       if (allowRefresh && currentKeyRef.current === selectionKey) {
-        setSyncCompletionVersion((v) => v + 1);
+        if (!wroteNothing) setSyncCompletionVersion((v) => v + 1);
         if (currentViewIncludesFolder(folderId)) {
-          await refreshMailboxData();
+          await refreshMailboxData(wroteNothing ? { skipIfCurrent: true } : undefined);
         }
       }
       return syncResult;

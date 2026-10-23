@@ -94,6 +94,8 @@ export function useMessageData({
   // Page 1 of another mailbox's inbox, requested while the switch to it persists the
   // selection and reads its folders. Only that mailbox's first page-1 load may take it,
   // and only with a byte-identical URL; any other outcome aborts it.
+  // The key whose first page is on screen from a successful read; cleared by errors.
+  const shownPageKeyRef = useRef<string | null>(null);
   const firstPagePrefetchRef = useRef<{
     accountId: string;
     url: string;
@@ -359,6 +361,7 @@ export function useMessageData({
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (messagesPage === 1) {
+            shownPageKeyRef.current = requestKey;
             const nextMeta = Array.isArray(data?.groups)
               ? data.groups
               : computeGroupMeta(items);
@@ -368,12 +371,14 @@ export function useMessageData({
           }
           setMessageListError(null);
         } else {
+          shownPageKeyRef.current = null;
           const errorMessage = await readErrorMessage(messagesRes);
           reportError(errorMessage);
           setMessageListError(errorMessage || "Failed to load messages.");
         }
       } catch {
         if (load.controller.signal.aborted) return;
+        shownPageKeyRef.current = null;
         lastRequestRef.current = null;
         reportError("Failed to load messages.");
         setMessageListError("Failed to load messages.");
@@ -392,9 +397,14 @@ export function useMessageData({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAccountId, hasMoreMessages, loadingMessages, messagesKey, messagesPage, authState]);
 
-  const refreshMailboxData = async (): Promise<boolean> => {
+  // skipIfCurrent: the caller knows the server data behind the list did not change
+  // (a "new" sync that wrote nothing); a first page already on screen is kept.
+  const refreshMailboxData = async (options?: { skipIfCurrent?: boolean }): Promise<boolean> => {
     if (searchScope === "folder" && !isRelatedSearch && !activeFolderId) {
       return false;
+    }
+    if (options?.skipIfCurrent && shownPageKeyRef.current === messagesKey) {
+      return true;
     }
     setRefreshingMessages(true);
     const requestKey = messagesKey;
@@ -402,6 +412,7 @@ export function useMessageData({
     try {
       const messageRes = await apiFetch(buildQueryUrl(1));
       if (!messageRes.ok) {
+        shownPageKeyRef.current = null;
         const message = await readErrorMessage(messageRes);
         reportError(message || "Failed to refresh mailbox data.");
         setMessageListError(message || "Failed to load messages.");
@@ -435,6 +446,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
+      shownPageKeyRef.current = requestKey;
       setAuthoritativeRevision(value => value + 1);
       setMessages((prev) => {
         logListReplacement("refreshMailboxData", prev, nextMessages);
