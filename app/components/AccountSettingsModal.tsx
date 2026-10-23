@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
@@ -88,6 +91,7 @@ export default function AccountSettingsModal({
   onUpdateRecipientAlias,
   onDeleteRecipientAlias
 }: Props) {
+  const t = useTranslations("Settings");
   const isMobile = useIsMobile();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
@@ -131,19 +135,19 @@ export default function AccountSettingsModal({
 
   const tabItems = useMemo<OverflowTabItem[]>(() => {
     const items: OverflowTabItem[] = [
-      { value: "account", label: "Account" },
-      { value: "signatures", label: "Signatures", disabled: !isExistingAccount },
-      { value: "preferences", label: "Preferences", disabled: !isExistingAccount },
-      { value: "categorization", label: "Categorization", disabled: !isExistingAccount },
-      { value: "topics", label: "Topics", disabled: !isExistingAccount },
-      { value: "calendar", label: "Calendar", disabled: !isExistingAccount },
-      { value: "translation", label: "Translation", disabled: !isExistingAccount },
-      { value: "recipient-aliases", label: "Recipient Aliases", disabled: !isExistingAccount },
-      { value: "mcp", label: "MCP", disabled: !isExistingAccount }
+      { value: "account", label: t("tabs.account") },
+      { value: "signatures", label: t("tabs.signatures"), disabled: !isExistingAccount },
+      { value: "preferences", label: t("tabs.preferences"), disabled: !isExistingAccount },
+      { value: "categorization", label: t("tabs.categorization"), disabled: !isExistingAccount },
+      { value: "topics", label: t("tabs.topics"), disabled: !isExistingAccount },
+      { value: "calendar", label: t("tabs.calendar"), disabled: !isExistingAccount },
+      { value: "translation", label: t("tabs.translation"), disabled: !isExistingAccount },
+      { value: "recipient-aliases", label: t("tabs.recipient-aliases"), disabled: !isExistingAccount },
+      { value: "mcp", label: t("tabs.mcp"), disabled: !isExistingAccount }
     ];
-    items.push({ value: "members", label: "Members", disabled: !isExistingAccount });
+    items.push({ value: "members", label: t("tabs.members"), disabled: !isExistingAccount });
     return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
-  }, [initialAccount.accessRole, isExistingAccount]);
+  }, [initialAccount.accessRole, isExistingAccount, t]);
   const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;
@@ -207,9 +211,9 @@ export default function AccountSettingsModal({
         <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
           <Flex align="center" justify="between" style={{ paddingBottom: "var(--space-2)", flexShrink: 0 }}>
             <SettingsTitle>
-              Account settings
+              {t("accountTitle")}
             </SettingsTitle>
-            <TooltipIconButton variant="ghost" tooltip="Close" onClick={onClose}>
+            <TooltipIconButton variant="ghost" tooltip={t("close")} onClick={onClose}>
               <X size={18} />
             </TooltipIconButton>
           </Flex>

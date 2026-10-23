@@ -86,3 +86,25 @@ Round 2 evidence is stored outside the source checkout at
 [briefs/status-bar-compact-evidence/round2](/home/monkey/code/noctua-mail/briefs/status-bar-compact-evidence/round2/).
 The status browser suite accepts `QA_STATUS_ARTIFACTS` for this destination;
 without it, captures stay in ignored `.tmp/qa-status-indicator`.
+
+## Round 2 integration decisions
+
+Merged `origin/fix/i18n-views` at `992b220bd65d8fcb3540b58a3a835d48d47a0e2e`
+with `--no-ff`; fetch on 2026-10-23 found no newer head.
+
+- BottomStatusBar (2 hunks): keep compact imports and unified owner, mobile
+  routing, bounded calendar body and calendar layer; discard translated old footer.
+- ProcessStatusPopover (2): keep compact imports, named mailbox/folder scopes,
+  retained failed jobs, retry/details and embedded rendering; keep singular
+  `phase`/`mode` keys and absolute localized update times.
+- ExceptionStatusPopover (5): keep locale imports/declaration, embedded frame,
+  compact trigger/title/heading and `exception.empty`; retain absolute timestamps.
+- UpcomingStatusPopover (11): keep locale type, delete error, embedded frame,
+  trigger/title/heading/close, source/calendar action labels, duration `{value}`,
+  lead `{minutes}`, repeats `{value}`, and `reminder.empty`. Shared handlers stay.
+- de (1) / en (3): use exactly the compact `Shell.status` object (57 leaves);
+  discard the former status aliases/plural `phases`/`modes`. Keep all other
+  i18n-views catalog additions, including Views, Folders, refresh and topic picker.
+- MailClient/useSearchState auto-merges retained; verify through DOM/browser gates.
+
+If i18n-views moves again before round 10, repeat the merge using these decisions.

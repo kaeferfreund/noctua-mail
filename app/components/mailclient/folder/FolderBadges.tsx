@@ -1,3 +1,5 @@
+import { useLocale } from "next-intl";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { Badge } from "@radix-ui/themes";
 import { Archive, FileText, Folder, Inbox, Send, ShieldOff, Trash2 } from "lucide-react";
 import type { Folder as MailFolder } from "@/lib/data";
@@ -18,6 +20,7 @@ export default function FolderBadges({
   threadPathById,
   onSelectFolder
 }: FolderBadgesProps) {
+  const locale = useLocale();
   if (folderIds.length === 0) return null;
   return (
     <span className={styles.badges}>
@@ -25,7 +28,7 @@ export default function FolderBadges({
         const folder = folderById(folderId);
         const label = getFolderBadgeLabel(folder, folderId);
         const kind = getFolderBadgeKind(folder);
-        const name = folder?.name ?? folderId;
+        const name = folder ? getFolderDisplayName(folder, locale) : folderId;
 
         return (
           <Badge key={folderId} size="1" variant="soft" color={badgeColors.folder} asChild>

@@ -72,7 +72,21 @@
       "viewer": "Leser",
       "editor": "Bearbeiter",
       "manager": "Verwalter"
-    }
+    },
+    "tabs": {
+      "account": "Konto",
+      "signatures": "Signaturen",
+      "preferences": "Persönliche Einstellungen",
+      "categorization": "Kategorisierung",
+      "topics": "Themen",
+      "calendar": "Kalender",
+      "translation": "Übersetzung",
+      "recipient-aliases": "Empfänger-Aliasse",
+      "mcp": "MCP",
+      "members": "Mitglieder"
+    },
+    "accountTitle": "Postfacheinstellungen",
+    "close": "Schließen"
   },
   "Pwa": {
     "description": "Moderner Webmail-Client als Prototyp"
@@ -115,7 +129,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Meine Postfächer",
+      "mine": "Eigene Postfächer",
       "shared": "Gemeinsame Postfächer",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
@@ -128,7 +142,15 @@
       "unassigned": "{count} offen und nicht zugewiesen",
       "watcher": "Überwachung: {state}",
       "summary": "{email}\n{unread} ungelesen · {assignedToMe} mir zugewiesen · {unassignedOpen} offen und nicht zugewiesen\nÜberwachung: {state}",
-      "other": "Sonstige"
+      "other": "Sonstige",
+      "watcherStates": {
+        "disabled": "Deaktiviert",
+        "starting": "Startet",
+        "idling": "Wartet auf neue E-Mails",
+        "backoff": "Wartet auf erneuten Versuch",
+        "auth_failed": "Anmeldung fehlgeschlagen",
+        "stopped": "Angehalten"
+      }
     },
     "views": "Ansichten",
     "topics": "Themen",
@@ -141,6 +163,11 @@
     "loading": {
       "mailbox": "Postfach hinzufügen"
     },
+    "threadsCount": "{count, plural, one {# Thread} other {# Threads}}",
+    "refreshTitle": "Neuladen erforderlich",
+    "refreshDescription": "Ein neuer Build ist verfügbar. Diese Version ist möglicherweise mit deiner aktuellen Sitzung nicht kompatibel.",
+    "refreshMandatory": "Lade die Seite neu, bevor du fortfährst. Neuer Build: {version}.",
+    "refreshNow": "Jetzt neu laden",
     "status": {
       "label": "Aktivität und Kalender",
       "syncing": "Synchronisiert …",
@@ -211,6 +238,47 @@
       },
       "updatedAt": "Zuletzt aktualisiert: {time}",
       "calendarEvent": "Kalendertermin"
+    },
+    "topicPicker": {
+      "title": "Themen",
+      "empty": "Noch keine Themen. Erstelle unten ein Thema.",
+      "suggested": "Vorgeschlagen",
+      "all": "Alle Themen",
+      "name": "Themenname",
+      "shortName": "Kurzname für die Nachrichtenliste (optional)",
+      "noColor": "Keine Farbe",
+      "createAdd": "Erstellen und hinzufügen",
+      "cancel": "Abbrechen",
+      "new": "Neues Thema",
+      "apply": "Anwenden",
+      "colors": {
+        "gray": "Grau",
+        "red": "Rot",
+        "orange": "Orange",
+        "amber": "Bernstein",
+        "yellow": "Gelb",
+        "lime": "Limette",
+        "green": "Grün",
+        "teal": "Blaugrün",
+        "cyan": "Cyan",
+        "sky": "Himmelblau",
+        "blue": "Blau",
+        "indigo": "Indigo",
+        "violet": "Violett",
+        "purple": "Purpur",
+        "pink": "Rosa",
+        "brown": "Braun",
+        "crimson": "Karminrot",
+        "ruby": "Rubinrot",
+        "tomato": "Tomatenrot",
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "grass": "Grasgrün",
+        "mint": "Minze",
+        "jade": "Jade",
+        "iris": "Iris",
+        "plum": "Pflaume"
+      }
     }
   },
   "Search": {
@@ -1053,5 +1121,63 @@
     "keywordFailed": "Nachrichtenschlagwort konnte nicht aktualisiert werden.",
     "categoryFailed": "Kategorie konnte nicht aktualisiert werden.",
     "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden."
+  },
+  "Views": {
+    "focused": {
+      "name": "Fokus",
+      "description": "Hier findest du ungelesene, unbeantwortete Nachrichten ohne Newsletter.",
+      "badgeLabel": "Fokus"
+    },
+    "actionQueue": {
+      "name": "Aufgaben",
+      "description": "Hier findest du markierte Nachrichten sowie offene und erledigte Aufgaben.",
+      "badgeLabel": "Markiert oder Aufgabe"
+    },
+    "inviteDeck": {
+      "name": "Einladungen",
+      "description": "Hier findest du deine Kalendereinladungen.",
+      "badgeLabel": "Kalendereinladungen"
+    },
+    "assignedToMe": {
+      "name": "Mir zugewiesen",
+      "description": "Hier findest du Threads, die dir zugewiesen sind.",
+      "badgeLabel": "Mir zugewiesen"
+    },
+    "unassigned": {
+      "name": "Nicht zugewiesen",
+      "description": "Hier findest du Threads ohne Zuständigkeit.",
+      "badgeLabel": "Nicht zugewiesen"
+    },
+    "open": {
+      "name": "Offen",
+      "description": "Hier findest du Threads, die noch nicht erledigt sind.",
+      "badgeLabel": "Offen"
+    },
+    "inbox": {
+      "name": "Posteingang",
+      "description": "Hier findest du deine eingehenden Nachrichten."
+    },
+    "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "unreadLabel": "Ungelesen: {count, number}",
+    "pendingCount": "{count, plural, one {# offene Aufgabe} other {# offene Aufgaben}}",
+    "pendingLabel": "Aufgaben: {count, number}",
+    "countTitle": "{description} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
+    "rowTitle": "{name}: {description}",
+    "viewScope": "in „{name}“",
+    "everywhereScope": "überall",
+    "folderScope": "im Ordner „{name}“",
+    "currentFolderScope": "im aktuellen Ordner",
+    "allFieldsScope": "in allen Feldern",
+    "fieldsScope": "in den Feldern {fields}",
+    "filterCriteria": "Filter: {badges}",
+    "queryCriteria": "„{query}“"
+  },
+  "Folders": {
+    "inbox": "Posteingang",
+    "sent": "Gesendet",
+    "drafts": "Entwürfe",
+    "trash": "Papierkorb",
+    "spam": "Spam",
+    "archive": "Archiv"
   }
 }

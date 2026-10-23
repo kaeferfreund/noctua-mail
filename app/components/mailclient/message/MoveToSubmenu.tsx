@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+
+import { useLocale, useTranslations } from "next-intl";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useState } from "react";
@@ -30,6 +32,7 @@ export default function MoveToSubmenu({
   onMoveToOther,
   disabled
 }: MoveToSubmenuProps) {
+  const locale = useLocale();
   const t = useTranslations("Reader");
   const isMobile = useIsMobile();
   const [recentFolders, setRecentFolders] = useState<Folder[]>([]);
@@ -55,7 +58,7 @@ export default function MoveToSubmenu({
             <span className={styles.menuIcon}>
               <FolderInput size={14} />
             </span>
-            <span className={styles.menuLabel}>{folder.name}</span>
+            <span className={styles.menuLabel}>{getFolderDisplayName(folder, locale)}</span>
           </DropdownMenu.Item>
         ))}
         {recentFolders.length > 0 && <DropdownMenu.Separator />}
