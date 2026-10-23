@@ -43,6 +43,7 @@ describe("buildSentInvite", () => {
   it("builds REQUEST ICS plus a sent-invite calendar event", () => {
     const result = buildSentInvite({
       account: buildAccount(),
+      sender: { id: "primary", email: "owner@example.test", displayName: "Owner Example" },
       invite: buildInvite(),
       subject: "Planning session",
       to: "Alice <alice@example.test>, owner@example.test",
@@ -90,6 +91,7 @@ describe("buildSentInvite", () => {
   it("builds a self-only invite that is immediately accepted locally", () => {
     const result = buildSentInvite({
       account: buildAccount(),
+      sender: { id: "primary", email: "owner@example.test", displayName: "Owner Example" },
       invite: buildInvite({ recurrenceRule: undefined }),
       subject: "Solo block",
       to: "Owner Example <owner@example.test>",

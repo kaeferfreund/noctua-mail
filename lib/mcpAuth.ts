@@ -12,7 +12,7 @@ import { withDbWriteRetry } from "./dbWriteRetry";
 export type McpAccountContext = { accountId: string; account: Account; role: AccountRole; tokenRecord: McpTokenMetadata };
 export const hashMcpToken = (token: string) => createHash("sha256").update(token).digest("hex");
 /** One synchronous snapshot: creator, both MFA records, generation and current bound-mailbox role. */
-function liveToken(db: any, where: string, value: string): McpAccountContext | null {
+function liveToken(db: any, where: string, value: string, authorize?: (db: import("bun:sqlite").Database, context: McpAccountContext) => void): McpAccountContext | null {
   return db.transaction(() => {
   const row = db.prepare(`SELECT t.* FROM mcp_tokens t JOIN users p ON p.id=t.createdByUserId
     JOIN auth_user u ON u.id=p.id JOIN auth_security_state st ON st.userId=u.id
@@ -34,7 +34,9 @@ function liveToken(db: any, where: string, value: string): McpAccountContext | n
   // Same scoped read snapshot as the live membership check. Only address data is
   // attached; personal prefs and identity configuration are never token output.
   mapped.ownAddresses = getOwnAddresses(mapped, listSenderIdentityRows(db, row.accountId));
-  return { accountId: row.accountId, account: mapped, role, tokenRecord: mapMcpTokenRow(row) };
+  const context = { accountId: row.accountId, account: mapped, role, tokenRecord: mapMcpTokenRow(row) };
+  authorize?.(db, context);
+  return context;
   }).deferred();
 }
 export async function validateMcpToken(token: string): Promise<McpAccountContext | null> {
@@ -46,11 +48,17 @@ export function validateMcpTokenRow(db:import("bun:sqlite").Database,token:strin
   return liveToken(db, "t.tokenHash", hashMcpToken(token));
 }
 /** Tools recheck by id so batched calls and downgrades cannot reuse a role snapshot. */
-export async function resolveMcpToolContext(tokenId: string, accountId: string, minRole: AccountRole = "viewer"): Promise<McpAccountContext> {
-  const context = liveToken(await getDb(), "t.id", tokenId);
+export async function resolveMcpToolContext(tokenId: string, accountId: string, minRole: AccountRole = "viewer", authorize?: (db: import("bun:sqlite").Database) => void): Promise<McpAccountContext> {
+  return resolveMcpToolContextRow(await getDb(), tokenId, accountId, minRole, authorize);
+}
+/** Reuse the bearer policy while holding the caller's immediate write transaction. */
+export function resolveMcpToolContextRow(db: import("bun:sqlite").Database, tokenId: string, accountId: string, minRole: AccountRole = "viewer", authorize?: (db: import("bun:sqlite").Database) => void): McpAccountContext {
+  const context = liveToken(db, "t.id", tokenId, (db, live) => {
+    if (live.accountId !== accountId) throw new Error("MCP token is bound to another mailbox");
+    if (!roleAtLeast(live.role, minRole)) throw new Error("Insufficient mailbox role");
+    authorize?.(db);
+  });
   if (!context) throw new Error("Unauthorized MCP token");
-  if (context.accountId !== accountId) throw new Error("MCP token is bound to another mailbox");
-  if (!roleAtLeast(context.role, minRole)) throw new Error("Insufficient mailbox role");
   return context;
 }
 export async function mintMcpToken(session: ActiveUserSession, accountId: string, label: string, ttlSeconds: number) {

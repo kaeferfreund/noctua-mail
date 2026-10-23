@@ -1,3 +1,6 @@
+import type { SenderIdentity } from "./data";
+import { SenderIdentityError } from "./senderIdentityError";
+import { normalizeIdentityEmail } from "./ownAddresses";
 import { isOwnAddress, ownAddressList, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { CalendarAttendeePreview, CalendarEventPreview } from "./calendar";
 import type { CalendarEvent, CalendarParticipationStatus } from "./data";
@@ -113,4 +116,14 @@ export function formatCalendarParticipationLabel(status?: CalendarParticipationS
     default:
       return "";
   }
+}
+
+/** RSVP must answer the saved attendee, never an unrelated mailbox default. */
+export function resolveCalendarSenderIdentity(accountId: string, event: Pick<CalendarEvent, "myAttendeeEmail">,
+  identities: readonly SenderIdentity[], identityId?: unknown) {
+  const email = event.myAttendeeEmail ? normalizeIdentityEmail(event.myAttendeeEmail) : null;
+  const identity = identities.find(item => item.accountId === accountId && item.enabled && item.email === email &&
+    (identityId === undefined || item.id === identityId));
+  if (!identity) throw new SenderIdentityError("identity_unavailable", 409, "The invitation attendee has no matching enabled sender identity.");
+  return identity;
 }

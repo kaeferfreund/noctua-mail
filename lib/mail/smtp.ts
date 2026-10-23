@@ -1,3 +1,6 @@
+import { stripBccHeader } from "./stripBccHeader";
+import { configuredReplyTo, type ResolvedSender } from "../sendIdentity";
+import addressParser from "nodemailer/lib/addressparser/index.js";
 import type { Account } from "@/lib/data";
 import nodemailer from "nodemailer";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
@@ -18,7 +21,6 @@ type MailPayload = {
   messageId?: string;
   inReplyTo?: string;
   references?: string[];
-  replyTo?: string;
   xForwardedMessageId?: string;
   headers?: Record<string, string>;
   attachments?: Array<{
@@ -30,13 +32,13 @@ type MailPayload = {
   }>;
 };
 
-function buildMailOptions(account: Account, mail: MailPayload) {
+function buildMailOptions(mail: MailPayload, sender: ResolvedSender) {
   const to = mail.to?.trim() || undefined;
   const cc = mail.cc?.trim() || undefined;
   const bcc = mail.bcc?.trim() || undefined;
   const fromValue = {
-    name: account.name,
-    address: account.email
+    name: sender.displayName,
+    address: sender.email
   };
   const attachments = mail.attachments?.map((attachment) => ({
     filename: attachment.filename,
@@ -50,7 +52,8 @@ function buildMailOptions(account: Account, mail: MailPayload) {
     to,
     cc,
     bcc,
-    replyTo: mail.replyTo,
+    replyTo: configuredReplyTo(sender),
+    envelope: { from: sender.email, to: [to, cc, bcc].flatMap(value => value ? addressParser(value, { flatten: true }).map(entry => entry.address).filter(Boolean) : []) },
     messageId: mail.messageId,
     inReplyTo: mail.inReplyTo,
     references: mail.references,
@@ -80,8 +83,8 @@ function createSmtpTransport(account: Account) {
   });
 }
 
-export async function buildRawMessage(account: Account, mail: MailPayload) {
-  const mailOptions = buildMailOptions(account, mail);
+export async function buildRawMessage(account: Account, mail: MailPayload, sender: ResolvedSender) {
+  const mailOptions = buildMailOptions(mail, sender);
   const raw = await new Promise<Buffer>((resolve, reject) => {
     const composer = new MailComposer(mailOptions);
     const compiled = composer.compile();
@@ -100,17 +103,17 @@ export async function buildRawMessage(account: Account, mail: MailPayload) {
   return raw;
 }
 
-export async function sendSmtpMessage(account: Account, mail: MailPayload) {
+export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => Promise<unknown>) {
+  const mailOptions = buildMailOptions(mail, sender);
+  const raw = await buildRawMessage(account, mail, sender);
+
+  await beforeSend?.();
   const transporter = createSmtpTransport(account);
-
-  const mailOptions = buildMailOptions(account, mail);
-  const raw = await buildRawMessage(account, mail);
-
   let info: unknown;
   try {
-    info = await transporter.sendMail(mailOptions);
+    info = await transporter.sendMail({ envelope: mailOptions.envelope, raw: stripBccHeader(raw) });
   } catch (error) {
-    throw markSmtpUpstreamFailure(error);
+    throw markSmtpUpstreamFailure(error, sender.email);
   }
   return { messageId: (info as any)?.messageId ?? null, raw };
 }
@@ -135,8 +138,10 @@ export async function sendSmtpMessage(account: Account, mail: MailPayload) {
 export async function sendRawSmtpMessage(
   account: Account,
   raw: Buffer | string,
-  envelope: { from: string; to: string[] }
+  envelope: { from: string; to: string[] },
+  beforeSend?: () => Promise<unknown>
 ) {
+  await beforeSend?.();
   const transporter = createSmtpTransport(account);
 
   let info: unknown;
@@ -149,7 +154,7 @@ export async function sendRawSmtpMessage(
       raw
     });
   } catch (error) {
-    throw markSmtpUpstreamFailure(error);
+    throw markSmtpUpstreamFailure(error, envelope.from);
   }
   return { messageId: (info as any)?.messageId ?? null };
 }

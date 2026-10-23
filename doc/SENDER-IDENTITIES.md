@@ -1,8 +1,9 @@
-# Sender identities (slice 1)
+# Sender identities (slices 1–2)
 
 Slice 1 implements configuration, personal preferences, delivery observations and
-own-address recognition. Compose and transport still use the primary From until
-slices 2/3 supply identity selection and authoritative send validation.
+own-address recognition. Slice 2 implements authoritative sender selection and
+validation for transport, drafts, calendar and MCP. Slice 3 supplies the compose,
+settings and signature UI; older clients use the server default resolver.
 
 ## Types and serialization
 
@@ -127,7 +128,8 @@ manager edits mailbox identities/default/templates; editor/viewer may inspect
 identities and change their own prefs, while composing/sending requires editor+.
 Read-only disabled identities are already visible to viewer mailbox members;
 MCP's internal own-address context uses the same scope, never foreign identities,
-personal overrides or credentials. Identity MCP CRUD is not shipped yet.
+personal overrides or credentials. Slice 2 adds the actor-aware identity MCP tools
+documented below.
 
 Save identities through POST/PATCH/DELETE and personal changes through PUT prefs,
 separately from `/settings`; never post a whole identities array or personal
@@ -168,8 +170,9 @@ shard-v2 writer guards; the combined regression gates verify the port.
 
 Follow the source design `briefs/sender-identities-design.md` §§3.2–3.5, 4–7 and 9,
 and the ownership handoff in [TEAM-INBOX §9](TEAM-INBOX.md#9-work-breakdown-branches).
-This branch starts at team-auth `2458a09` and will be ported after integration of
+The original Slice 1 branch started at team-auth `2458a09`, with a handoff after
 thread-collaboration `133bddc`, mailbox-watcher `bd7eb5f`, and collab-ui `1d0f0ce`.
+Those dependencies are integrated in the Slice 2 base, round 4 `435ba5d`.
 Keep collaboration's immediate writer transaction, messageRowIds, remap hooks and
 stable thread IDs; add metadata snapshots inside that lock and never use a
 Message-ID-only fallback as copy evidence. Preserve watcher UIDVALIDITY/folder/
@@ -199,3 +202,159 @@ hash/autosave/detach behavior, settings saves and refresh, personal versus mailb
 defaults, shared signature resolution/rendering/preview and insertion exactly once
 for all compose modes. Reuse the prior compose/settings owners' contracts; do not
 add a second insertion effect. Stage 4 owns provider verification and go-live.
+
+## Slice 2 — authoritative sending (done)
+
+The server now supports configured sender identities across direct send, draft save/
+send, calendar RSVP/new invitations, and MCP draft creation. Slice 3 supplies the
+visible compose/settings controls; older compose clients can omit identityId and use
+the server resolver. Configuration is an application allowlist, not proof of provider
+send-as authorization. Stage 4 retains the provider probe/go-live gate.
+
+
+Review round 2 closes the final-boundary gap: `lib/outboundAuthorization.ts` reuses
+the live HTTP session/account and MCP token/role policies, then checks identity
+availability/configuration in the final actor snapshot. Direct send, draft save/
+send, RSVP (including local-only participation), MCP draft creation, own sender
+preferences and identity create/update all recheck immediately before their first
+effect. SMTP repeats the check after MIME composition; DB write retries recheck inside
+the immediate transaction.
+Post-acceptance Sent, attribution and cleanup remain independent of later access
+revocation. Tests in `lib/outboundAuthorization.routes.test.ts` are named
+`final boundary <path>: mid-request revocation, disabled user/identity, role downgrade and live credentials`
+for `direct`, `draft-save`, `draft-send`, `calendar-respond`, `mcp-create-draft`,
+`mcp-set-preferences`, `mcp-create-identity`, and `mcp-update-identity`. Each child
+fixture verifies zero transport, APPEND, cleanup and persisted data changes after
+revocation; sending paths also verify revocation during transport preparation and
+accepted delivery surviving revocation. Viewer preferences and editing disabled
+identities retain their documented permissions.
+
+Every tagged SMTP failure now maps to a sanitized structured error, with
+`smtp_upstream_error` (502) covering protocol failures and otherwise unknown errors.
+The real `554 5.7.1 synthetic-provider-private-detail` greeting is exercised through
+Nodemailer on direct, draft and RSVP routes in `verifySenderIdentity.ts`; responses
+exclude provider text and preserve drafts. `lib/mail/smtpError.test.ts` covers all
+Nodemailer error classes, unknown future codes and errors without a code.
+
+Published contracts, with regression anchors:
+
+- **Done: direct-send input/output and transport.** `POST .../smtp/send` accepts
+  `identityId?`, returns effective `identityId`, rejects arbitrary `from/envelopeFrom`,
+  resolves the current actor's defaults/in-account reply evidence, and validates before
+  invitation/network work. Explicit unknown/foreign IDs are `identity_not_found`;
+  disabled IDs are `identity_unavailable`. Canonical From, explicit SMTP MAIL FROM,
+  configured Reply-To and `reply_to_managed` are shared across paths. Tests:
+  `sender identity routes: validation before network, canonical envelope, draft preservation, RSVP, MCP live roles`
+  (`lib/sendIdentity.routes.test.ts`, isolated fixture `verifySenderIdentity.ts` checks
+  both the mocked raw-transport envelope and real SMTP sink envelope).
+- **Done: SMTP rejection codes.** Shared tagged mapper distinguishes sender (including
+  deferred RCPT/DATA ownership rejection), recipient, message, temporary, configuration
+  and timeout errors. See `doc/API.md` for exact statuses/fields. Tests:
+  `classifies MAIL sender without exposing provider detail`,
+  `classifies deferred sender at RCPT without exposing provider detail`,
+  `classifies deferred sender at DATA without exposing provider detail`,
+  `classifies recipient without exposing provider detail`,
+  `classifies message without exposing provider detail`, and
+  `keeps 4xx transient and authentication config drift separate from permanent sender rejection`.
+  The route fixture also proves partial RCPT acceptance sends exactly once.
+- **Done: draft-save/send shapes and restoration.** Save accepts/returns `identityId`,
+  `Message.senderIdentityId` stores the marker; missing IDs on edits preserve saved
+  From. Disabled/unknown selections remain unavailable until explicitly repaired.
+  Send validates one raw From, current name/Reply-To, matching marker/metadata, and
+  Sender/Resent conflicts before SMTP. `draft_identity_changed` and
+  `identity_unavailable` preserve draft and avoid cleanup/Sent/attribution. Marker is
+  removed from wire/Sent, Bcc only from wire. Tests: route fixture above plus
+  `draft identity validates raw headers and strips marker/Bcc only from outer headers`,
+  every `draft rejects ...` case in `lib/draftIdentity.test.ts`, and
+  `legacy known From resolves without marker, unknown/disabled/foreign identities never fall back`.
+  Hidden payload/hash plumbing is covered by
+  `identity-only changes mark the draft dirty and travel in the saved payload` and
+  `plumbs an optional identity without generating a Reply-To override`, and
+  `draft REST schema accepts the existing compose builder's attachment metadata`.
+- **Done: RSVP attendee and invitation organizer authorization.** RSVP selects only
+  the enabled identity for `event.myAttendeeEmail`; optional identityId cannot change
+  that attendee. Missing/stale/disabled attendees return `identity_unavailable`.
+  The reply's From/envelope/ICS attendee agree; new invitation ORGANIZER/self-attendee
+  use the selected identity, while RSVP leaves an existing organizer unchanged.
+  Tests: route fixture above and `lib/calendarReply.test.ts`/`lib/mail/sentInvite.test.ts`.
+- **Done: actor-aware MCP schemas and authorization.** `list_sender_identities`,
+  `create_sender_identity`, `update_sender_identity`, `get_sender_preferences`,
+  `set_sender_preferences`, and `create_draft_message` publish input/output schemas.
+  Draft creation uses creator prefs and returns identityId. Token mailbox binding,
+  current manager/editor/viewer roles, same-mailbox identity/signature references,
+  private own prefs and audited mutations use existing services. Errors are structured
+  `{ok:false,code,message}` with `isError:true`; role denials retain MCP conventions.
+  Tests: route fixture above (schema advertisement, manager create/update/disable/audit,
+  own defaults, foreign references, editor/viewer downgrades and revocation) and
+  `lib/mcpAuth.identities.test.ts`. No new MCP send tool was introduced.
+- **Done: collaboration integration.** `completeSend` is untouched. Shared Sent,
+  early sent_by actor attribution, reply flags, absolute deadline, cleanup/tombstone,
+  and accepted-but-Sent-warning contracts are preserved. Identity appears in stored
+  From; identity.createdBy never becomes the sending actor. Tests:
+  `real IMAP/SMTP: direct, draft, calendar; lost APPEND acknowledgement, absolute deadline, stale folder, draft files and shared Sent`
+  runs all 31 original fixture scenarios; the identity fixture additionally sends
+  manager-created aliases as a different editor and checks the stored actor.
+
+### Slice 3 handoff and integration round 5
+
+Use `lib/sendIdentity.ts` for the server resolver contract, `lib/draftSchemas.ts` for
+save shape, and `lib/draftIdentity.ts` for strict send checks. `buildRawMessage` and
+`sendSmtpMessage` require a third resolved-sender argument; no Account impersonation
+or primary-address fallback exists in transport. Routes use `serverSmtp` wrappers.
+Explicit identity choice must travel through UI state, autosave, detached handoff and
+builders; this slice adds optional builder/hash fields but no UI selection or settings.
+Draft-send accepts no identity override. Refresh From/name/Reply-To by reviewing and
+saving when `draft_identity_changed` is returned; never retry under a different sender.
+
+The shared signature renderer/initializer has not landed in this base. Slice 3 must
+implement it once for UI and call it once in MCP `createDraftMessage` before saving,
+using the token creator's profile/prefs and resolved identity. No signature is appended
+at raw send. Keep reopened shared-draft text and existing insertion tracking intact.
+All remaining UI/signature work from the Slice 1 handoff remains owned by Slice 3.
+
+For integration round 5: no changes were made to `lib/mail/completeSend.ts` or to
+stored-message serialization/ingestion in `messageFromAppendedDraft`. `lib/drafts.ts`
+changes are limited to imports/types, identity propagation in mode inputs, save-time
+resolution/preservation and MIME marker, and send-time raw validation/envelope/header
+stripping/effective-ID return. Merge the round-5 ingestion/address serialization changes
+alongside these, preserving its senderKey/sourceSha256 additions. Do not replace the
+new ingestion implementation with this branch's base implementation.
+
+Household choices remain design §10: address/mailbox/alias mapping (including five
+MonkeyDent areas versus four addresses), manager-owned brand/person display names,
+Reply-To and mailbox/personal defaults, personal signature text/overrides, and the
+controlled probe sink/forwarder-conversion plan. These choices affect initial defaults
+and Stage 4 enablement; no live addresses or provider credentials were used here.
+
+Round-2 `lib/drafts.ts` hunks only: authorization import; optional authorization
+source on save/send parameters; save check after MIME build and before replacement/
+APPEND; send check before the raw transport plus the same check passed to transport
+for its final boundary. No ingestion/serialization edits; `completeSend.ts` remains
+unchanged.
+
+### Round-2 verification (2026-10-23)
+
+Bun 1.4.4; heavy gates ran sequentially with `nice -n 15`, worktree-local
+TMPDIR and synthetic loopback fixtures only. No timeout, retry budget or existing
+assertion was weakened.
+
+- `bun run typecheck`: zero errors in 1,103 files.
+- Focused route/transport/MCP/draft/calendar gates: 90 passed, zero failed,
+  253 assertions across 12 files (37.42s). Includes all 31 real IMAP/SMTP send
+  scenarios and private-greeting sanitization on direct, draft and RSVP paths.
+- `timeout 1800 bun run test:ci`: 2,559 server tests, zero failed, 8,561 assertions,
+  278 files (379.74s); then 366 DOM tests, zero failed, 2,134 assertions,
+  40 files (35.66s).
+- `timeout 2400 bun run test:stress`: seed 1337, rerun-each=3; final run 7,677
+  passed, zero failed, 25,683 assertions, 278 files (1067.51s). All 24 executions
+  of the new boundary tests and all three 31-scenario send-fixture runs passed.
+- The initial stress run had 7,676 passed and one `SQLITE_BUSY` failure in Better
+  Auth's adapter during fixture-session creation in `senderIdentityMetadata.test.ts`
+  (25,677 assertions, 1082.59s). The same test's other two repetitions passed.
+  Its isolated randomized retry passed 15 tests / 90 assertions (5.89s), followed
+  by the complete successful stress rerun above, with unchanged code and limits.
+- `timeout 600 bun run lint`: exit 1 at the stated baseline: one pre-existing
+  `useCalendarConflicts.ts:58` error and 25 warnings; no changed-file findings.
+- `timeout 1200 bun run build`: exit 0, including production TypeScript validation.
+- `git diff --check`: exit 0. Protected paths and `completeSend.ts` are unchanged;
+  the five localized `drafts.ts` hunks are listed above.

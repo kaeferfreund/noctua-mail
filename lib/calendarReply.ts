@@ -1,3 +1,5 @@
+import type { ResolvedSender } from "./sendIdentity";
+import { SenderIdentityError } from "./senderIdentityError";
 import type {
   Account,
   CalendarEvent,
@@ -48,8 +50,8 @@ function buildReplySubject(partstat: CalendarParticipationStatus, summary: strin
   return `Tentative: ${trimmedSummary}`;
 }
 
-function buildReplyText(account: Account, partstat: CalendarParticipationStatus, summary: string) {
-  const actor = account.name?.trim() || account.email;
+function buildReplyText(sender: ResolvedSender, partstat: CalendarParticipationStatus, summary: string) {
+  const actor = sender.displayName.trim() || sender.email;
   if (partstat === "ACCEPTED") {
     return `${actor} accepted the invitation "${summary}".`;
   }
@@ -64,6 +66,7 @@ export function buildCalendarReplyPayload(
   event: CalendarEvent,
   partstat: CalendarParticipationStatus,
   options?: {
+    sender?: ResolvedSender;
     scope?: CalendarParticipationScope;
     occurrenceStartAtMs?: number;
   }
@@ -84,13 +87,13 @@ export function buildCalendarReplyPayload(
     throw new Error("Missing organizer email in calendar invite.");
   }
 
-  const attendee =
-    findCalendarAttendeeForEmail(baseEvent?.attendeeDetails, event.myAttendeeEmail ?? account.email) ??
-    findCalendarAttendeeForEmail(baseEvent?.attendeeDetails, account.email);
-  const attendeeEmail = attendee?.email?.trim() || event.myAttendeeEmail?.trim() || account.email;
-  if (!attendeeEmail) {
-    throw new Error("Missing attendee email for RSVP reply.");
+  const attendeeEmail = event.myAttendeeEmail?.trim();
+  if (!attendeeEmail || (options?.sender && options.sender.email !== attendeeEmail.toLowerCase())) {
+    throw new SenderIdentityError("identity_unavailable", 409, "The invitation attendee has no matching enabled sender identity.");
   }
+  const attendee = findCalendarAttendeeForEmail(baseEvent?.attendeeDetails, attendeeEmail);
+  if (!attendee) throw new SenderIdentityError("identity_unavailable", 409, "The invitation no longer contains this attendee.");
+  const sender = options?.sender ?? { id: "", email: attendeeEmail, displayName: account.name };
 
   const summary = event.summary.trim() || baseEvent?.summary?.trim() || "Calendar Event";
   const now = new Date();
@@ -113,7 +116,7 @@ export function buildCalendarReplyPayload(
       : `DTSTART:${formatEventDate(dtstartAtMs, false)}`,
     `SUMMARY:${escapeIcsText(summary)}`,
     `ORGANIZER:mailto:${organizerEmail}`,
-    `ATTENDEE;CN=${escapeIcsText(attendee?.name?.trim() || account.name || attendeeEmail)};PARTSTAT=${partstat};RSVP=FALSE:mailto:${attendeeEmail}`
+    `ATTENDEE;CN=${escapeIcsText(attendee?.name?.trim() || sender.displayName || attendeeEmail)};PARTSTAT=${partstat};RSVP=FALSE:mailto:${attendeeEmail}`
   ];
   if (occurrenceStartAtMs !== undefined) {
     lines.push(
@@ -130,7 +133,7 @@ export function buildCalendarReplyPayload(
   return {
     to: organizerEmail,
     subject: buildReplySubject(partstat, summary),
-    text: buildReplyText(account, partstat, summary),
+    text: buildReplyText(sender, partstat, summary),
     ics: lines.map(foldLine).join("\r\n"),
     attendeeEmail
   };

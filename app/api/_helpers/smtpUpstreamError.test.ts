@@ -52,3 +52,11 @@ describe("smtpUpstreamErrorResponse", () => {
     ).toBeNull();
   });
 });
+
+it("never falls through for a tagged unknown SMTP failure", async () => {
+  const response = smtpUpstreamErrorResponse(markSmtpUpstreamFailure(new Error("synthetic-provider-private-detail")), { accountId: "synthetic", op: "test" });
+  expect(response?.status).toBe(502);
+  const body = await response!.json();
+  expect(body.code).toBe("smtp_upstream_error");
+  expect(JSON.stringify(body)).not.toContain("synthetic-provider-private-detail");
+});

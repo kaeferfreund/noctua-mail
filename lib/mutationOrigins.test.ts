@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { createAuthenticatedTestSession } from "./testAuthHarness";
+import { createAuthenticatedTestSession, syntheticRequestIp } from "./testAuthHarness";
 import { dbModulePromise } from "./testDbHarness";
 
 const root = path.resolve("app/api");
@@ -34,7 +34,9 @@ describe("complete API mutation origin inventory", () => {
   test.each(inventory)("foreign Origin plus text/plain rejected by $method $file", async ({ file, method }: { file: string; method: string }) => {
     const route = await import(path.join(root, file));
     const params = { accountId, messageId: "synthetic-message", attachmentId: "synthetic-attachment", folderId: `${accountId}:INBOX`, userId: "synthetic-user", tokenId: "synthetic-token", eventId: "synthetic-event", topicId: "synthetic-topic", aliasId: "synthetic-alias", draftId: "synthetic-draft" };
-    const request = new Request(file === "ba/[...all]/route.ts" ? `http://localhost:3000/api/ba/${method === "POST" ? "sign-in/email" : "unsupported-"+method}` : `http://localhost:3000/api/${file}`, { method, headers: fixture.jar.headers({ origin: "https://foreign.example.test", "content-type": "text/plain" }), body: '{"data":{"replace":true}}' });
+    // This inventory tests media type/origin rejection, independently of the
+    // shared sign-in limiter exercised by other randomized test files.
+    const request = new Request(file === "ba/[...all]/route.ts" ? `http://localhost:3000/api/ba/${method === "POST" ? "sign-in/email" : "unsupported-"+method}` : `http://localhost:3000/api/${file}`, { method, headers: fixture.jar.headers({ "x-forwarded-for": syntheticRequestIp(), origin: "https://foreign.example.test", "content-type": "text/plain" }), body: '{"data":{"replace":true}}' });
     const response: Response = await route[method](request, { params: Promise.resolve(params) });
     // The library rejects text/plain before origin parsing; unsupported BA paths stay unavailable.
     if (file === "ba/[...all]/route.ts") expect(response.status).toBe(method === "POST" ? 415 : 404);

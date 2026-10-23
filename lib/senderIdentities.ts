@@ -1,3 +1,5 @@
+import type { AuthorizedOutboundActor, OutboundWriteAuthorization } from "./outboundAuthorization";
+import { SenderIdentityError } from "./senderIdentityError";
 import { startIdentityRecomputeJob, getIdentityRecomputeJob, settleIdentityRecomputeAdmission } from "./threadRecomputeJobs";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
@@ -20,10 +22,8 @@ export const updateSenderIdentitySchema = z.object({
   displayName: text.optional(), replyTo: address.nullable().optional(), signatureId: optionalId.nullable().optional(),
   isDefault: z.boolean().optional(), enabled: z.boolean().optional()
 }).strict();
-export class SenderIdentityError extends Error {
-  constructor(public code: string, public status: number, message: string) { super(message); }
-}
-export type IdentityActor = { userId: string; clientId?: string };
+export { SenderIdentityError } from "./senderIdentityError";
+export type IdentityActor = { userId: string; clientId?: string; beforeWrite?: OutboundWriteAuthorization };
 
 export function assertIdentitySignaturesAvailable(db: Database, accountId: string, signatureIds: readonly string[]) {
   const used = listSenderIdentityRows(db, accountId).find(identity => identity.signatureId && !signatureIds.includes(identity.signatureId));
@@ -33,7 +33,7 @@ export function assertIdentitySignaturesAvailable(db: Database, accountId: strin
 /** Authorization, validation, promotion and audit share one master immediate transaction. */
 async function mutate(accountId: string, identityId: string | null, input: unknown, actor: IdentityActor, database?: Database) {
   const db = database ?? await getDb();
-  return withDbWriteRetry("mutateSenderIdentity", () => db.transaction(() => {
+  const writeIdentity = db.transaction((authorization?: AuthorizedOutboundActor) => {
     if (resolveAccountRoleRow(db, actor.userId, accountId) !== "manager") {
       throw new SenderIdentityError("forbidden", 403, "Manager role required");
     }
@@ -68,9 +68,14 @@ async function mutate(accountId: string, identityId: string | null, input: unkno
     const fields = ["displayName", "replyTo", "signatureId", "enabled", "isDefault"] as const;
     const changedFields = previous ? fields.filter(key => previous[key] !== next[key]) : ["email", ...fields];
     if (!changedFields.length) return next;
+    authorization?.assertCurrent(db);
     persistSenderIdentityMutation(db, next, previous, identities, changedFields, actor);
     return next;
-  }).immediate());
+  });
+  return withDbWriteRetry("mutateSenderIdentity", async () => {
+    const authorization = await actor.beforeWrite?.();
+    return writeIdentity.immediate(authorization);
+  });
 }
 export async function createSenderIdentity(accountId: string, input: unknown, actor: IdentityActor, db?: Database) {
   const identity = await mutate(accountId, null, input, actor, db);

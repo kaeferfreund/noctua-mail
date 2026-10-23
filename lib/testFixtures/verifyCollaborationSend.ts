@@ -36,7 +36,7 @@ try {
     for (const scenario of entry === "single-draft" ? ["appended"] as const : scenarios) {
       if (scenario === "cleanup-deadline" && !isDraft || scenario === "flag-deadline" && entry !== "direct") continue;
       const deadlineScenario = scenario === "deadline" || scenario === "cleanup-deadline" || scenario === "flag-deadline";
-      const f = await createCollabFixture();
+      const f = await createCollabFixture({ email: demoUser });
       f.account.email = demoUser;
       f.account.imap = { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass };
       f.account.smtp = { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass };
@@ -138,10 +138,12 @@ try {
         else process.env.NOCTUA_POST_SEND_TIMEOUT_MS = previousTimeout;
       }
       if (scenario === "smtp-failed") {
-        // Preserve the existing SMTP rejection contract: direct/draft rethrow EAUTH;
-        // calendar wraps it in its existing 400 response. Neither is a delivered send.
-        if (sendError) assert.equal((sendError as { code: string }).code, "EAUTH");
-        else { assert.ok(response); assert.equal(response.status, 400); assert.equal((await response.json()).ok, false); }
+        assert.equal(sendError, undefined, "SMTP authentication errors use the shared configuration-drift contract");
+        assert.ok(response);
+        assert.equal(response.status, 502);
+        const failure = await response.json();
+        assert.equal(failure.ok, false);
+        assert.equal(failure.code, "smtp_configuration_error");
         assert.equal(smtp.received.length, beforeSmtp);
         assert.equal(appendAttempts, 0);
         if (draftId) assert.ok(await f.api.getMessageById(f.accountId, draftId));
@@ -220,7 +222,7 @@ try {
       cases++;
     }
   }
-  const fresh = await createCollabFixture();
+  const fresh = await createCollabFixture({ email: demoUser });
   fresh.account.email = demoUser;
   fresh.account.imap = { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass };
   fresh.account.smtp = { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass };
