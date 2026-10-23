@@ -42,7 +42,7 @@ describe("account shard key migration", () => {
       expect(db.prepare("SELECT accountId FROM message_calendar_events").get()?.accountId).toBe("a");
       expect(db.prepare("SELECT rootMessageId FROM threads").get()?.rootMessageId).toBe("a-row");
       expect(db.prepare("SELECT accountId FROM thread_topics").get()?.accountId).toBe("a");
-      expect(db.prepare("SELECT accountId FROM message_fts_v2 WHERE message_fts_v2 MATCH 'syntheticfirstword'").all()).toEqual([{ accountId: "a" }]);
+      expect(db.prepare("SELECT accountId FROM message_fts_v3 WHERE message_fts_v3 MATCH 'syntheticfirstword'").all()).toEqual([{ accountId: "a" }]);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE name='legacy_subject_index'").get()).not.toBeNull();
       expect(db.prepare("SELECT name FROM sqlite_master WHERE name='legacy_message_trigger'").get()).not.toBeNull();
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -95,7 +95,7 @@ describe("account shard key migration", () => {
         });
         expect(db.prepare("SELECT accountId,filename FROM attachments").all()).toEqual([{ accountId: "a", filename: "A.pdf" }]);
         expect(db.prepare("SELECT COUNT(*) AS n FROM messages").get().n).toBe(2);
-        expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(2);
+        expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v3").get().n).toBe(2);
         expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
         expect(shardWriterGuardsInstalled(db)).toBe(true);
         const schemaVersion = db.prepare("PRAGMA schema_version").get().schema_version;
@@ -153,7 +153,7 @@ describe("account shard key migration", () => {
     } finally { db.close(); }
   });
 
-  for (const failurePoint of ["ALTER TABLE message_fts RENAME", "CREATE TRIGGER IF NOT EXISTS", "PRAGMA user_version ="]) {
+  for (const failurePoint of ["CREATE TABLE message_fts_identity", "CREATE TRIGGER", "PRAGMA user_version ="]) {
     test(`failure after ${failurePoint} rolls back keys, FTS, guards and format version together`, () => {
       const db = legacyDb();
       const before = db.prepare("SELECT * FROM sqlite_master ORDER BY name").all();
@@ -188,10 +188,10 @@ describe("account shard key migration", () => {
       const previouslyPreparedDelete = old.prepare("DELETE FROM attachments WHERE messageId='a-row'");
       writer = new Database(file);
       initAccountSchema(writer);
-      expect(() => previouslyPreparedDelete.run()).toThrow("no such function: noctua_writer_v2");
+      expect(() => previouslyPreparedDelete.run()).toThrow("no such function: noctua_writer_v3");
       expect(() => old!.prepare("DELETE FROM message_fts WHERE messageId='a-row'")).toThrow("cannot modify message_fts because it is a view");
       expect(writer.prepare("SELECT COUNT(*) AS n FROM attachments").get().n).toBe(1);
-      expect(writer.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(2);
+      expect(writer.prepare("SELECT COUNT(*) AS n FROM message_fts_v3").get().n).toBe(2);
     } finally { old?.close(); writer?.close(); legacy.close(); rmSync(dir, { recursive: true, force: true }); }
   });
 
@@ -201,15 +201,15 @@ describe("account shard key migration", () => {
       initAccountSchema(db);
       // Synthetic round-1 format: composite keys and account-linked FTS, but
       // no writer guards, read-only legacy view or declared format version.
-      for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v2_%'").all()) {
+      for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v3_%'").all()) {
         db.exec(`DROP TRIGGER "${name}"`);
       }
-      db.exec("DROP VIEW message_fts; ALTER TABLE message_fts_v2 RENAME TO message_fts; PRAGMA user_version=0");
+      db.exec("DROP VIEW message_fts; DROP VIEW message_fts_v2; DROP TABLE message_fts_identity; ALTER TABLE message_fts_v3 RENAME TO message_fts; PRAGMA user_version=1");
       const beforeFts = db.prepare("SELECT rowid,* FROM message_fts ORDER BY rowid").all();
       const messageRootPage = db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage;
       initAccountSchema(db);
       expect(db.prepare("SELECT rootpage FROM sqlite_master WHERE name='messages'").get().rootpage).toBe(messageRootPage);
-      expect(db.prepare("SELECT rowid,* FROM message_fts_v2 ORDER BY rowid").all()).toEqual(beforeFts);
+      expect(db.prepare("SELECT rowid,* FROM message_fts_v3 ORDER BY rowid").all()).toEqual(beforeFts);
       expect(db.prepare("SELECT type FROM sqlite_master WHERE name='message_fts'").get().type).toBe("view");
       expect(db.prepare("PRAGMA user_version").get().user_version).toBe(SHARD_FORMAT_VERSION);
       const schemaVersion = db.prepare("PRAGMA schema_version").get().schema_version;
@@ -238,7 +238,7 @@ describe("account shard key migration", () => {
       const repeatedMs = performance.now() - reopen;
       expect(db.prepare("PRAGMA schema_version").get().schema_version).toBe(version);
       expect(db.prepare("SELECT COUNT(*) AS n FROM messages").get().n).toBe(50000);
-      expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v2").get().n).toBe(50000);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM message_fts_v3").get().n).toBe(50000);
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       console.info(`[shard-migration-timing] 50000 messages: migration=${migratedMs.toFixed(2)}ms repeat=${repeatedMs.toFixed(2)}ms`);
     } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }

@@ -374,6 +374,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ## Backup & Restore
 
 See [STORAGE.md](STORAGE.md) for detailed information about which data is stored where.
+For the one-way shard upgrade, follow the stopped backup, verification and restore procedure in [FTS v3 migration](FTS-V3-MIGRATION.md).
 
 ### What to Backup
 
