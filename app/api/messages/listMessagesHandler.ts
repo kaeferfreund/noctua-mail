@@ -3,6 +3,7 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { compressedJsonResponse } from "@/app/api/_helpers/compressedJson";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { rejectOverlongSearchQuery } from "@/app/api/_helpers/searchQueryLength";
 import { ensureMessageSourceSizes, listMessages } from "@/lib/db";
@@ -76,7 +77,7 @@ export async function handleListMessagesRequest(
     });
     await enrichMessagesWithThreadTopics(data.items, { accountId });
     await enrichMessagesWithThreadCollab(data.items, { accountId });
-    return NextResponse.json({
+    return compressedJsonResponse(request, {
       items: data.items,
       groups: data.groups,
       page,
