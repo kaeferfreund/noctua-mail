@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles";
 
 // Next walks parent lockfiles and otherwise picks /home/monkey as the
@@ -59,4 +60,4 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['rrule', 'imapflow', 'mailparser', 'nodemailer', 'html-to-text', 'sanitize-html']
 };
 
-export default nextConfig;
+export default createNextIntlPlugin("./i18n/request.ts")(nextConfig);

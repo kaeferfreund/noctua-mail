@@ -451,6 +451,8 @@ export type User = {
   disabled: boolean;
   twoFactorEnabled: boolean;
   passkeyCount: number;
+  /** App-wide language; null follows the device/header. */
+  uiLocale: "de" | "en" | null;
 };
 
 /** Membership role on a mailbox, ordered `viewer < editor < manager`. */

@@ -1,3 +1,4 @@
+import { isUiLocale, type UiLocalePreference } from "../i18n/config";
 import type { AccountRole, User, UserAccountLink } from "../data";
 import { isAccountRole } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
@@ -253,4 +254,13 @@ export async function listUserAccountLinksForUser(userId: string): Promise<UserA
     )
     .all(userId) as StoredUserAccountLinkRow[];
   return rows.map(mapUserAccountLinkRow);
+}
+
+/** App-wide personal setting; never changes Better Auth identity/security tables. */
+export async function setUserUiLocale(userId: string, uiLocale: UiLocalePreference): Promise<{ uiLocale: UiLocalePreference } | null> {
+  if (uiLocale !== null && !isUiLocale(uiLocale)) throw new Error("Invalid UI locale");
+  return withDbWriteRetry("setUserUiLocale", async () => {
+    const db = await getDb();
+    return db.prepare("UPDATE users SET uiLocale=? WHERE id=? RETURNING uiLocale").get(uiLocale, userId) as { uiLocale: UiLocalePreference } | null;
+  });
 }

@@ -94,7 +94,7 @@ describe("initMasterSchema: clean install", () => {
     expect(warnCalls).toEqual([]);
     expect(errorCalls).toEqual([]);
 
-    expect(columnNames(db, "users")).toEqual(["id", "email", "role", "createdAt"]);
+    expect(columnNames(db, "users")).toEqual(["id", "email", "role", "createdAt", "uiLocale"]);
     expect(columnNames(db, "user_accounts")).toEqual(
       expect.arrayContaining(["role", "grantedByUserId", "grantedAt"])
     );
@@ -154,6 +154,11 @@ describe("initMasterSchema: legacy install", () => {
     runMigrationQuietly(db);
 
     expect(db.prepare("SELECT id,email,role,createdAt FROM users WHERE id=?").get("user-legacy")).toEqual({id:"user-legacy",email:"legacy@example.test",role:"user",createdAt:1});
+    expect(db.prepare("SELECT uiLocale FROM users WHERE id=?").get("user-legacy")).toEqual({uiLocale:null});
+    db.prepare("UPDATE users SET uiLocale='en' WHERE id=?").run("user-legacy");
+    runMigrationQuietly(db);
+    expect(db.prepare("SELECT uiLocale FROM users WHERE id=?").get("user-legacy")).toEqual({uiLocale:"en"});
+    expect(() => db.prepare("UPDATE users SET uiLocale='fr' WHERE id=?").run("user-legacy")).toThrow();
     // Links that predate roles were self-created, so they become managers.
     expect(
       db
