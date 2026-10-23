@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useRef, type Dispatch, type SetStateAction } from "react";
 import { MobileStatusFocusContext, restoreStatusFocus } from "@/app/components/shell/MobileStatusFocus";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { Activity } from "lucide-react";
@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
 import type { AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
-import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
+import type { BuildIdentity } from "@/lib/buildVersion";
 import type { CalendarReminder } from "../utils/calendarReminders";
 import type { ExceptionEntry, SyncJobProgress } from "../types";
 import {
@@ -24,6 +24,7 @@ import ProcessStatusPopover from "./ProcessStatusPopover";
 import UpcomingStatusPopover from "./UpcomingStatusPopover";
 import ExceptionStatusPopover from "./ExceptionStatusPopover";
 import CalendarPopover from "@/app/components/calendar/CalendarPopover";
+import BuildInfo from "./BuildInfo";
 
 export type BottomStatusPanel = "process" | "exception" | "reminder" | "calendar" | "mail-check" | null;
 
@@ -54,6 +55,7 @@ type BottomStatusBarProps = {
   onFindRelatedCalendarInviteUid?: (uid: string) => void;
   calendarFirstDay?: 0 | 1;
   accountDateFormat?: AccountDateFormat;
+  buildInfo: BuildIdentity | null;
 };
 
 export default function BottomStatusBar({
@@ -82,39 +84,16 @@ export default function BottomStatusBar({
   onOpenCalendarMessage,
   onFindRelatedCalendarInviteUid,
   calendarFirstDay,
-  accountDateFormat
+  accountDateFormat,
+  buildInfo
 }: BottomStatusBarProps) {
   const t = useTranslations("Shell.status");
   const isMobile = useIsMobile();
   const indicatorRef = useRef<HTMLButtonElement>(null);
-  const [currentTimeMs, setCurrentTimeMs] = useState<number | null>(null);
   const processPanelOpen = openPanel === "process";
   const exceptionPanelOpen = openPanel === "exception";
   const reminderPanelOpen = openPanel === "reminder";
   const calendarPanelOpen = openPanel === "calendar";
-
-  const currentDateTimeLabel = useMemo(
-    () => (currentTimeMs === null ? "" : formatAccountMediumDateTime(currentTimeMs, accountDateFormat) ?? ""),
-    [currentTimeMs, accountDateFormat]
-  );
-
-  useEffect(() => {
-    let intervalId: number | null = null;
-    const tick = () => {
-      setCurrentTimeMs(Date.now());
-    };
-    tick();
-    const timeoutId = window.setTimeout(() => {
-      tick();
-      intervalId = window.setInterval(tick, 60_000);
-    }, 60_000 - (Date.now() % 60_000));
-    return () => {
-      window.clearTimeout(timeoutId);
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, []);
 
   const handleProcessPanelOpenChange = (open: boolean) => {
     setOpenPanel((current) => (open ? "process" : current === "process" ? null : current));
@@ -169,10 +148,11 @@ export default function BottomStatusBar({
         firstDay={calendarFirstDay}
         onOpenChange={handleCalendarPanelOpenChange}
         onOpenSidebar={onOpenCalendarSidebar}
-        triggerLabel={currentDateTimeLabel}
+        triggerLabel={t("calendar")}
         onOpenMessage={onOpenCalendarMessage}
         onFindRelatedByInviteUid={onFindRelatedCalendarInviteUid}
       />}
+      {!isMobile && <BuildInfo info={buildInfo} className="bottom-center-build" />}
       <ExceptionStatusPopover
         open={exceptionPanelOpen}
         onOpenChange={handleExceptionPanelOpenChange}
