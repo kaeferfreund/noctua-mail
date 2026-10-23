@@ -466,6 +466,52 @@ describe("FTS-driven search candidates differential", () => {
     }
   });
 
+  test("fts_error lines classify the injected SQLite error without logging its text", async () => {
+    const accountId = fixture.a.accountId;
+    const sqliteError = (code: string, message: string) =>
+      Object.assign(new Error(message), { name: "SQLiteError", code });
+    const cases = [
+      { error: sqliteError("SQLITE_ERROR", 'fts5: syntax error near "needle"'), errorClass: "syntax" },
+      { error: sqliteError("SQLITE_ERROR", "fts5: parser stack overflow"), errorClass: "syntax" },
+      { error: sqliteError("SQLITE_ERROR", "no such table: message_fts_v3"), errorClass: "index" },
+      { error: sqliteError("SQLITE_ERROR", "vtable constructor failed: message_fts_v3"), errorClass: "index" },
+      { error: sqliteError("SQLITE_CORRUPT_VTAB", "database disk image is malformed"), errorClass: "index" },
+      { error: sqliteError("SQLITE_BUSY", "database is locked"), errorClass: "other" },
+      { error: sqliteError("SQLITE_ERROR", "no such column: needle"), errorClass: "other" },
+      { error: new Error("needle"), errorClass: "other" }
+    ];
+    process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH = "1";
+    const legacy = await listMessages({ accountId, page: 1, pageSize: 10, query: "needle" });
+    delete process.env.NOCTUA_DISABLE_FTS_DRIVEN_SEARCH;
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    for (const { error, errorClass } of cases) {
+      const warnings: unknown[][] = [];
+      const warnSpy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+        warnings.push(args);
+      });
+      // Only the resolution MATCH fails; the legacy statements still answer.
+      const prepareSpy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) =>
+        sql.includes("MATCH ? AND accountId")
+          ? ({ all: () => { throw error; } } as unknown as ReturnType<typeof prepare>)
+          : prepare(sql)
+      );
+      let driven: unknown;
+      try {
+        driven = await listMessages({ accountId, page: 1, pageSize: 10, query: "needle" });
+      } finally {
+        prepareSpy.mockRestore();
+        warnSpy.mockRestore();
+      }
+      expect(JSON.stringify(driven)).toBe(JSON.stringify(legacy));
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0][1]).toMatchObject({ reason: "fts_error", errorClass });
+      const serialized = JSON.stringify(warnings[0]);
+      for (const secret of [error.message, "needle", "syntax error", "overflow", "no such", "vtable", "malformed", "locked", accountId]) {
+        expect(serialized).not.toContain(secret);
+      }
+    }
+  });
+
   test("candidate-cap fallback (combined MATCH) logs once without query content", async () => {
     const accountId = fixture.a.accountId;
     const warnings: unknown[][] = [];
@@ -647,6 +693,7 @@ describe("FTS-driven search on a corrupt FTS shard", () => {
           candidateCapExceeded: false,
           errorName: "SQLiteError",
           errorCode: expectedError[corruption].code,
+          errorClass: "index",
           cap: 2000
         });
         expect(String(fallbacks[0].accountHash)).toMatch(/^[0-9a-f]{12}$/);
@@ -684,7 +731,7 @@ describe("FTS-driven search on a corrupt FTS shard", () => {
       const { driven, fallbacks } = await runBothCaptured(run);
       expect(driven.ok).toBe(true);
       expect(fallbacks).toHaveLength(1);
-      expect(fallbacks[0]).toMatchObject({ reason: "fts_error", errorCode: "SQLITE_CORRUPT" });
+      expect(fallbacks[0]).toMatchObject({ reason: "fts_error", errorCode: "SQLITE_CORRUPT", errorClass: "index" });
     }
   });
 });
