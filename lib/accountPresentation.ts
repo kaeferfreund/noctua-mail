@@ -1,5 +1,11 @@
 import type { Account, AccountRole } from "@/lib/data";
 
+/** Mailbox and member list order: display name (or email), normalized email, then id. */
+export function compareDisplayOrder(a: { name?: string | null; email: string; id: string }, b: { name?: string | null; email: string; id: string }) {
+  return (a.name || a.email).localeCompare(b.name || b.email, "en") ||
+    a.email.trim().toLowerCase().localeCompare(b.email.trim().toLowerCase(), "en") || a.id.localeCompare(b.id, "en");
+}
+
 export function sanitizeAccountForClient(account: Account, options: { role: AccountRole; viewerUserId: string; memberCount: number }): Account {
   const manager = options.role === "manager";
   return {

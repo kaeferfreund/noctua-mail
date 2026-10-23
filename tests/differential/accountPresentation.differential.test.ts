@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setSystemTime, test } from "bun:
 import { Database } from "bun:sqlite";
 import { createAuthenticatedTestSession, getSharedTestAuthHarness } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
-import { getDb } from "../../lib/db/connection";
+import { getAccountDb, getAuthDb, getDb } from "../../lib/db/connection";
 import { recordMailboxSync } from "../../lib/db/mailboxSummary";
 import { listAccessibleAccountsForUser, listAccountMembers, listAccountMembersForRole } from "@/lib/accountAccess";
 import { getUserMailboxSummary } from "@/lib/mailboxSummary";
@@ -22,6 +22,7 @@ import * as legacy from "./legacyAccountPresentation";
 type Hook = { pattern: RegExp; shard: boolean; fn: () => void; fired: boolean };
 let hooks: Hook[] = [];
 let suspended = 0;
+let executions: number | null = null;
 let masterHandle: object | undefined;
 const proto = Database.prototype as any;
 const originals = { prepare: proto.prepare, query: proto.query };
@@ -33,6 +34,7 @@ function wrapStatement(db: object, stmt: any, sql: string) {
     if (typeof original !== "function") continue;
     stmt[method] = (...args: unknown[]) => {
       const result = original.apply(stmt, args);
+      if (executions !== null) executions++;
       if (!suspended) for (const hook of hooks) {
         if (hook.fired || !hook.pattern.test(sql) || hook.shard === (db === masterHandle || (db as any).filename === (masterHandle as any)?.filename)) continue;
         hook.fired = true; suspended++; try { hook.fn(); } finally { suspended--; }
@@ -41,6 +43,23 @@ function wrapStatement(db: object, stmt: any, sql: string) {
     };
   }
   return stmt;
+}
+/** Executed statements (all handles) of one call; the budgets below keep per-account reads from coming back. */
+async function countExecutions(run: () => Promise<unknown>) {
+  executions = 0;
+  try { await run(); return executions; } finally { executions = null; }
+}
+/**
+ * Earlier test files in the same process may leave an own `prepare`/`query` property on a shared handle
+ * (a spy restored by assignment, possibly bound), which would bypass the prototype hooks. Drop leftovers
+ * that are plain native methods; anything else is a live patch and fails the suite.
+ */
+function unshadow(db: object) {
+  for (const method of ["prepare", "query"] as const) {
+    if (!Object.hasOwn(db, method)) continue;
+    if (!/\[native code\]/.test(Function.prototype.toString.call((db as any)[method]))) throw new Error(`differential hooks cannot observe a patched ${method}`);
+    delete (db as any)[method];
+  }
 }
 /** Fire fn once, right after the first matching statement on the master file (shard=false) or a shard (shard=true). */
 function afterFirst(pattern: RegExp, shard: boolean, fn: () => void) { hooks.push({ pattern, shard, fn, fired: false }); }
@@ -114,6 +133,7 @@ beforeAll(async () => {
   await h.seedSessionSecurity(login.session!.session.id, restricted.id, "setup");
   for (const id of ACCOUNTS.slice(1)) await h.addMembership(restricted.id, id, "editor");
   restrictedJar = login.jar; restrictedId = restricted.id;
+  for (const db of [master, await getAuthDb(), ...await Promise.all([...ACCOUNTS, "diff-solo", "diff-pair"].map(id => getAccountDb(id)))]) unshadow(db);
 });
 afterAll(() => { proto.prepare = originals.prepare; proto.query = originals.query; setSystemTime(); });
 
@@ -293,5 +313,15 @@ describe("/api/auth/me", () => {
     expect(body.accounts.find(account => account.id === ACCOUNTS[0])?.accessRole).toBe("editor");
     expect(ids).toContain(body.accountId);
     expect(ids.sort()).toEqual([...v.accountIds, ACCOUNTS[0]].sort());
+  });
+});
+
+describe("statement budget", () => {
+  test("access list: candidates, roles, member counts, identities", async () => {
+    for (const key of ["1", "2", "12"]) expect(await countExecutions(() => listAccessibleAccountsForUser(viewers[key].user.id))).toBe(4);
+    expect(await countExecutions(() => listAccessibleAccountsForUser(viewers.disabled.user.id))).toBe(2);
+  });
+  test("members: owner read plus one member statement, independent of the directory size", async () => {
+    expect(await countExecutions(() => listAccountMembers(ACCOUNTS[6]))).toBe(2);
   });
 });

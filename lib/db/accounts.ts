@@ -1,5 +1,5 @@
 import { getOwnAddresses } from "../ownAddresses";
-import { listSenderIdentityRows } from "./senderIdentities";
+import { listSenderIdentityRows, listSenderIdentityRowsForAccounts } from "./senderIdentities";
 import { recordAdminAuditRow } from "./adminAudit";
 import { revokeAuthStreams } from "../authStreams";
 import type { Account } from "../data";
@@ -39,18 +39,35 @@ export async function getStoredAccounts() {
   return (db.prepare(`SELECT * FROM accounts`).all() as any[]).map(mapAccountRow);
 }
 
-export async function getAccountsForUser(userId: string) {
-  const db = await getDb();
-  const rows = db
-    .prepare(
-      `SELECT DISTINCT a.*
+/** Membership candidates (link or owner), ordered by id; an optional scope only narrows them. */
+function accountCandidateSql(columns: string, scoped: boolean) {
+  return `SELECT DISTINCT ${columns}
        FROM accounts a
        LEFT JOIN user_accounts ua ON ua.accountId = a.id
-       WHERE ua.userId = ? OR a.ownerUserId = ?
-       ORDER BY a.id ASC`
-    )
-    .all(userId, userId) as any[];
-  return rows.map((row) => { const account = mapAccountRow(row); return { ...account, ownAddresses: getOwnAddresses(account, listSenderIdentityRows(db, account.id)) }; }) as Account[];
+       WHERE (ua.userId = ? OR a.ownerUserId = ?)${scoped ? " AND a.id IN (SELECT value FROM json_each(?))" : ""}
+       ORDER BY a.id ASC`;
+}
+
+/** Candidate rows without own addresses; one statement. */
+export function readAccountRowsForUser(db: any, userId: string, scope?: readonly string[]): Account[] {
+  const statement = db.query(accountCandidateSql("a.*", !!scope));
+  return (statement.all(...(scope ? [userId, userId, JSON.stringify(scope)] : [userId, userId])) as any[]).map(mapAccountRow);
+}
+
+/** Selection pre-read: only the fields the deterministic default needs. */
+export function readAccountSelectionCandidates(db: any, userId: string): Array<Pick<Account, "id" | "name" | "email">> {
+  return db.query(accountCandidateSql("a.id, a.name, a.email", false)).all(userId, userId);
+}
+
+/** Adds `ownAddresses` exactly as the per-account reads do, with one batched identity statement. */
+export function withOwnAddresses(db: any, accounts: Account[]): Account[] {
+  const identities = listSenderIdentityRowsForAccounts(db, accounts.map(account => account.id));
+  return accounts.map(account => ({ ...account, ownAddresses: getOwnAddresses(account, identities.get(account.id)) }));
+}
+
+export async function getAccountsForUser(userId: string) {
+  const db = await getDb();
+  return withOwnAddresses(db, readAccountRowsForUser(db, userId));
 }
 
 export async function saveAccounts(nextAccounts: Account[]) {
