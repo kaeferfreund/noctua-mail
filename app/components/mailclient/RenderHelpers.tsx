@@ -9,8 +9,8 @@ import MessageMenu from "./message/MessageMenu";
 import MessageSourcePanel from "./message/MessageSourcePanel";
 import { getFolderSpecialKind } from "@/lib/specialFolders";
 
-const MarkdownPanel = dynamic(() => import("./message/MarkdownPanel"), {
-  loading: () => <div role="status">Loading Markdown…</div>
+export const MarkdownPanel = dynamic(() => import("./message/MarkdownPanel"), {
+  loading: () => <div aria-hidden="true" className="min-h-6" />
 });
 
 export const renderQuickActions = (
