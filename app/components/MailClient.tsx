@@ -5464,8 +5464,8 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
-    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
-    {adminOpen && <AdminPanel isAdminUser={isAdminUser} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
+    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
+    {adminOpen && <AdminPanel isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </>;
   if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
