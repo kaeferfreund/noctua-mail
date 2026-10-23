@@ -53,6 +53,7 @@ export type ComposeSelectionState = {
 };
 
 export type ComposeSignatureState = {
+  markdown?: string;
   id: string;
   text: string;
   html: string;

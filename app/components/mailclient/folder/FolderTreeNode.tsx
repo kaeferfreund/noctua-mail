@@ -1,3 +1,4 @@
+import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import type React from "react";
@@ -94,7 +95,7 @@ export default function FolderTreeNode({
     return null;
   }
   const matchesQuery = folderQueryText
-    ? folder.name.toLowerCase().includes(folderQueryText)
+    ? folderNameMatches(folder, folderQueryText, locale)
     : true;
   const childNodes = folderTree.get(folder.id) ?? [];
   const fullPath = folderPathLabel(folder);
@@ -116,6 +117,7 @@ export default function FolderTreeNode({
         data-syncing={isSyncingFolder ? "true" : "false"}
         data-menu-open={isMenuOpen ? "true" : "false"}
         title={folderTitle}
+        data-folder-id={folder.id}
         role="button"
         tabIndex={0}
         onClick={() => {
@@ -182,7 +184,7 @@ export default function FolderTreeNode({
           {specialIcon ?? <FolderIcon size={14} />}
         </span>
         <span className={`${styles.treeName} ${folder.unreadCount ? styles.treeNameUnread : ""}`}>
-          <span className={styles.treeNameText}>{folder.name}</span>
+          <span className={styles.treeNameText}>{getFolderDisplayName(folder, locale)}</span>
           {isSyncingFolder && <span className={styles.treeSyncSpinner} aria-hidden="true" />}
         </span>
         {folder.unreadCount ? (

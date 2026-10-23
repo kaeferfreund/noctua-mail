@@ -85,7 +85,7 @@
 
 .composeEditorInput {
   flex: 1;
-  min-height: 0;
+  min-height: var(--compose-editor-input-min-height, 0);
   outline: none;
   font-family: var(--font-sans);
   font-size: 14px;

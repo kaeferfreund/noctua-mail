@@ -1,3 +1,4 @@
+import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { useLocale } from "next-intl";
 import { useCallback } from "react";
 import type React from "react";
@@ -30,8 +31,8 @@ export function useMessageListHelpers({
   );
 
   const threadPathById = useCallback(
-    (id: string) => id.replace(`${activeAccountId}:`, ""),
-    [activeAccountId]
+    (id: string) => getFolderDisplayPath(id, folderById, locale, activeAccountId),
+    [activeAccountId, folderById, locale]
   );
 
   const renderSelectIndicators = useCallback(

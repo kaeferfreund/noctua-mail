@@ -41,7 +41,7 @@ test("215-character client IDs never reach unauthorized status logs, account con
     const context = await resolve(request(f.jar.header()), id);
     expect(context).toHaveProperty("clientId", undefined);
   }
-  const worker = spyOn(syncJobs, "startSyncJob").mockReturnValue({ id: "synthetic-job", status: "queued" } as ReturnType<typeof syncJobs.startSyncJob>);
+  const worker = spyOn(syncJobs, "startSyncJob").mockResolvedValue({ id: "synthetic-job", status: "queued" } as Awaited<ReturnType<typeof syncJobs.startSyncJob>>);
   try {
     expect((await handleSyncStartRequest(request(f.jar.header(), "POST"), { accountId: id })).status).toBe(202);
     expect(worker.mock.calls[0][1]).toBeUndefined();

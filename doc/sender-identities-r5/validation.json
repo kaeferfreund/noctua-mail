@@ -1,0 +1,302 @@
+{
+  "implementationCommit": "6b0b57add4e82fdc7fdda8219f246b97da0a2897",
+  "status": "complete_with_unchanged_lint_baseline",
+  "inheritedVerificationProcess": 2196345,
+  "verificationPolicy": "Sequential gates, TMPDIR inside wt-sender-2/.tmp; no gates overlapped accepted timed measurements. Resume existing runner rather than duplicate it.",
+  "completedGates": [
+    {
+      "gate": "install",
+      "exit": 0,
+      "seconds": 0.27,
+      "command": "nice -n 10 bun install --frozen-lockfile"
+    },
+    {
+      "gate": "lockfile",
+      "exit": 0,
+      "seconds": 0.01,
+      "command": "nice -n 10 git diff --quiet HEAD -- bun.lock"
+    },
+    {
+      "gate": "typecheck",
+      "exit": 0,
+      "seconds": 0.54,
+      "command": "nice -n 10 bun run typecheck"
+    },
+    {
+      "gate": "focused-1",
+      "exit": 0,
+      "seconds": 43.9,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "focused-2",
+      "exit": 0,
+      "seconds": 45.45,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "focused-3",
+      "exit": 0,
+      "seconds": 42.55,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "probes-5",
+      "exit": 0,
+      "seconds": 21.78,
+      "command": "nice -n 10 bun test lib/outboundWrite.revocation.test.ts lib/outboundWrite.test.ts lib/processLeases.hint.test.ts --rerun-each=5"
+    },
+    {
+      "gate": "ci",
+      "exit": 0,
+      "seconds": 510.43,
+      "command": "nice -n 10 timeout 1800 bun run test:ci"
+    },
+    {
+      "gate": "stress",
+      "exit": 0,
+      "seconds": 1321.23,
+      "command": "nice -n 10 timeout 2400 bun run test:stress"
+    },
+    {
+      "gate": "lint",
+      "exit": 1,
+      "seconds": 51.25,
+      "command": "nice -n 10 timeout 600 bun run lint"
+    },
+    {
+      "gate": "build",
+      "exit": 0,
+      "seconds": 90.8,
+      "command": "nice -n 10 timeout 1200 bun run build"
+    },
+    {
+      "gate": "fixture-send",
+      "exit": 0,
+      "seconds": 15.15,
+      "command": "nice -n 10 bun --preload ./lib/testSetupEnv.ts ./lib/testFixtures/verifyCollaborationSend.ts"
+    },
+    {
+      "gate": "whitespace",
+      "exit": 0,
+      "seconds": 0.02,
+      "command": "nice -n 10 git diff --check"
+    }
+  ],
+  "probeSummary": {
+    "guardRevocationAndAdmission": {
+      "passed": 95,
+      "failed": 0,
+      "cases": 19,
+      "repetitions": 5,
+      "assertions": 820
+    },
+    "revocation": {
+      "draftSeriesOccurrence": "committed membership revoke after failed master BEGIN: 403, no SQL/FTS/file effects",
+      "duringPlanning": "real committed revoke denied by final live assertion before any effect"
+    },
+    "rollback": "shard COMMIT BUSY after observed file publication: SQL/source/attachments restored before fresh authorization returns 403",
+    "r3": "Existing outboundAuthorization route and child-fixture microtask/same-continuation probes retained and included in focused and CI gates."
+  },
+  "lintBaseline": {
+    "errors": 1,
+    "warnings": 25,
+    "unchangedErrorFile": "app/components/calendar/useCalendarConflicts.ts:58",
+    "unchangedFrom": "d5ae17b"
+  },
+  "remaining": [],
+  "timedMeasurementsAudited": true,
+  "mergedStageValidated": false,
+  "implementationCommits": [
+    "6b0b57add4e82fdc7fdda8219f246b97da0a2897",
+    "88c42f64c62208cad0d50016f004734b226424da"
+  ],
+  "priorVerification": [
+    {
+      "gate": "install",
+      "exit": 0,
+      "seconds": 0.04,
+      "command": "nice -n 10 bun install --frozen-lockfile"
+    },
+    {
+      "gate": "lockfile",
+      "exit": 0,
+      "seconds": 0.01,
+      "command": "nice -n 10 git diff --quiet HEAD -- bun.lock"
+    },
+    {
+      "gate": "typecheck",
+      "exit": 0,
+      "seconds": 0.49,
+      "command": "nice -n 10 bun run typecheck"
+    },
+    {
+      "gate": "focused-1",
+      "exit": 0,
+      "seconds": 51.35,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "focused-2",
+      "exit": 0,
+      "seconds": 43.07,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "focused-3",
+      "exit": 0,
+      "seconds": 45.09,
+      "command": "nice -n 10 bun test --timeout 20000 lib/sendIdentity.routes.test.ts lib/senderIdentities.test.ts lib/outboundWrite.test.ts lib/draftIdentity.test.ts lib/senderIdentitySelection.test.ts lib/senderIdentity.test.ts lib/db.calendarEvents.test.ts lib/calendarReply.test.ts lib/outboundAuthorization.routes.test.ts lib/mcpAuth.identities.test.ts lib/accountPrefs.identities.test.ts lib/calendarParticipation.test.ts lib/db/senderIdentityFixes.test.ts lib/db/senderIdentityMetadata.test.ts lib/calendarEventDiffFormat.test.ts lib/calendarInviteScope.test.ts lib/calendarEventDiff.test.ts lib/calendarInviteProcessing.test.ts lib/calendarEventSnapshot.test.ts lib/db.calendarConflicts.test.ts lib/calendarTimezones.test.ts lib/calendarEventStatus.test.ts lib/calendarOccurrences.test.ts lib/calendarIcs.test.ts lib/calendarReminderReschedule.test.ts lib/calendarSeriesTruncation.test.ts lib/calendarInviteStatePersistence.test.ts lib/fullcalendarRecurrence.test.ts lib/calendarImportClient.test.ts lib/calendarInviteProcessor.test.ts lib/calendarSeriesReanchor.test.ts lib/calendar.test.ts lib/calendarInviteSearch.test.ts lib/calendarEventDeletion.test.ts lib/calendarEventEmailSnapshot.test.ts lib/dbWriteRetry.test.ts lib/outboundWrite.revocation.test.ts lib/processLeases.hint.test.ts lib/processLeases.integration.test.ts"
+    },
+    {
+      "gate": "probes-5",
+      "exit": 0,
+      "seconds": 21.94,
+      "command": "nice -n 10 bun test lib/outboundWrite.revocation.test.ts lib/outboundWrite.test.ts lib/processLeases.hint.test.ts --rerun-each=5"
+    },
+    {
+      "gate": "ci",
+      "exit": 0,
+      "seconds": 466.85,
+      "command": "nice -n 10 timeout 1800 bun run test:ci"
+    },
+    {
+      "gate": "stress",
+      "exit": 1,
+      "seconds": 1356.46,
+      "command": "nice -n 10 timeout 2400 bun run test:stress"
+    },
+    {
+      "gate": "lint",
+      "exit": 1,
+      "seconds": 46.52,
+      "command": "nice -n 10 timeout 600 bun run lint"
+    },
+    {
+      "gate": "build",
+      "exit": 0,
+      "seconds": 62.63,
+      "command": "nice -n 10 timeout 1200 bun run build"
+    },
+    {
+      "gate": "fixture-send",
+      "exit": 0,
+      "seconds": 14.81,
+      "command": "nice -n 10 bun --preload ./lib/testSetupEnv.ts ./lib/testFixtures/verifyCollaborationSend.ts"
+    },
+    {
+      "gate": "whitespace",
+      "exit": 0,
+      "seconds": 0.01,
+      "command": "nice -n 10 git diff --check"
+    }
+  ],
+  "priorStress": {
+    "passed": 8329,
+    "failed": 2,
+    "tests": 8331,
+    "seed": 1337,
+    "failureCause": "Raw fixture master writes collided with background identity worker lease writes; fixed in 88c42f6 with the existing bounded coarse retry helper. All assertions and timeouts retained.",
+    "bunReportedSeconds": 1350.23,
+    "wallSeconds": 1356.46
+  },
+  "targetedReruns": {
+    "metadata": {
+      "passed": 50,
+      "failed": 0,
+      "repetitions": 10
+    },
+    "routeFixture": {
+      "passed": 10,
+      "failed": 0,
+      "repetitions": 10
+    }
+  },
+  "harnessTemplatesMatchPreservedR4": true,
+  "controlArchiveChecks": {
+    "base": {
+      "lib/authStreams.ts": true,
+      "lib/db/accountAccess.ts": true,
+      "lib/db/senderIdentities.ts": true,
+      "lib/db/messages/upsert.ts": true,
+      "lib/db/processLeases.ts": true,
+      "lib/dbWriteRetry.ts": true
+    },
+    "r4": {
+      "lib/authStreams.ts": true,
+      "lib/db/accountAccess.ts": true,
+      "lib/db/senderIdentities.ts": true,
+      "lib/db/messages/upsert.ts": true,
+      "lib/db/processLeases.ts": true,
+      "lib/dbWriteRetry.ts": true
+    }
+  },
+  "guardArchiveChecks": {
+    "r4": true,
+    "r5": true
+  },
+  "finalCI": {
+    "serverPassed": 2777,
+    "domPassed": 433,
+    "failed": 0,
+    "seconds": 510.43
+  },
+  "finalCodeHead": "88c42f64c62208cad0d50016f004734b226424da",
+  "gatesAllExitZero": false,
+  "knownBaselineExceptions": [
+    "lint"
+  ],
+  "scratchRemoved": true,
+  "productionHashesVerified": true,
+  "totals": {
+    "focused": {
+      "passedPerRun": 292,
+      "runs": 3,
+      "failed": 0,
+      "files": 39
+    },
+    "probes": {
+      "passed": 95,
+      "failed": 0,
+      "cases": 19,
+      "repetitions": 5,
+      "assertions": 820
+    },
+    "ci": {
+      "serverPassed": 2777,
+      "domPassed": 433,
+      "failed": 0
+    },
+    "stress": {
+      "passed": 8331,
+      "failed": 0,
+      "files": 303,
+      "seed": 1337,
+      "repetitions": 3,
+      "bunReportedSeconds": 1307.97,
+      "wallSeconds": 1321.23
+    },
+    "fixtureSend": {
+      "passed": 31,
+      "failed": 0
+    },
+    "typecheck": {
+      "errors": 0,
+      "files": 1178
+    },
+    "lint": {
+      "exit": 1,
+      "errors": 1,
+      "warnings": 25,
+      "baselineUnchanged": true
+    },
+    "build": {
+      "exit": 0
+    },
+    "bunLockUnchanged": true,
+    "diffCheck": {
+      "exit": 0
+    }
+  },
+  "ownedAppAndTestProcessesRemaining": []
+}

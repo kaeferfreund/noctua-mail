@@ -1,6 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+
+import { useLocale, useTranslations } from "next-intl";
 
 import type React from "react";
 import { useId, useMemo } from "react";
@@ -108,6 +110,7 @@ function FilterGroup({ label, children }: { label: string; children: React.React
  * used to offer as three dropdown menus, now in one popover (design §7.2).
  */
 export default function ShellSearch({ state, actions }: ShellSearchProps) {
+  const locale = useLocale();
   const t = useTranslations("Search");
   const {
     query,
@@ -142,16 +145,16 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
   const currentFolder = currentFolderId ? (folderById.get(currentFolderId) ?? null) : null;
   const currentFolderPath = useMemo(() => {
     if (!currentFolder) return "";
-    const parts = [currentFolder.name];
+    const parts = [getFolderDisplayName(currentFolder, locale)];
     let parentId = currentFolder.parentId ?? null;
     while (parentId) {
       const parent = folderById.get(parentId);
       if (!parent) break;
-      parts.unshift(parent.name);
+      parts.unshift(getFolderDisplayName(parent, locale));
       parentId = parent.parentId ?? null;
     }
     return parts.join("/");
-  }, [currentFolder, folderById]);
+  }, [currentFolder, folderById, locale]);
 
   const handleScopeChange = (nextScope: SearchScope) => {
     if (nextScope === searchScope) return;
@@ -176,7 +179,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
     searchScope === "all"
       ? t("placeholder.everywhere")
       : currentFolder
-        ? t("placeholder.folder", {folder: currentFolder.name})
+        ? t("placeholder.folder", {folder: getFolderDisplayName(currentFolder, locale)})
         : t("placeholder.messages");
 
   return (

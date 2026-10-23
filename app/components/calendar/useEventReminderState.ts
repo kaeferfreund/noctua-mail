@@ -77,19 +77,25 @@ export function useEventReminderState({
   // The recurrence resolver is dynamic-imported (it pulls in `rrule`);
   // until it lands a recurring event reports "cannot schedule yet" rather
   // than guessing from the series start. Once loaded it is a plain
-  // synchronous function, so the per-render evaluation below is unchanged.
+  // synchronous function evaluated on every render against `nowMs`.
   const resolveNextReminderOccurrence = useNextReminderOccurrenceResolver(
     Boolean(recurrenceRule?.trim())
   );
 
-  // Evaluated on every render rather than memoized. `Date.now()` has to
-  // stay fresh so the Schedule button doesn't sit enabled after the
-  // event has already started; memoizing would pin the timestamp for
-  // as long as the other deps don't change. The recurrence resolver is
-  // cheap enough that per-render evaluation is a non-issue.
+  // Start with the same value on the server and the first client render.
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now());
+    const firstTick = window.setTimeout(updateNow, 0);
+    const timer = window.setInterval(updateNow, 1000);
+    return () => {
+      window.clearTimeout(firstTick);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const canScheduleReminder = (() => {
-    if (typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return false;
-    const nowMs = Date.now();
+    if (nowMs === null || typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return false;
     if (!recurrenceRule?.trim()) return canonicalStartMs > nowMs;
     if (!resolveNextReminderOccurrence) return false;
     const next = resolveNextReminderOccurrence({

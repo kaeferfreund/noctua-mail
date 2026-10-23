@@ -1,4 +1,6 @@
 import { parseAddressEmails } from "../../ownAddresses";
+import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
+import { withOutboundWrite } from "../../outboundWrite";
 /**
  * The single write path that takes a batch of parsed RFC 5322 messages
  * and installs them into the local SQLite store. The function is large
@@ -39,7 +41,6 @@ import { stageMessageFiles } from "../../storage";
 import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
-import { withDbWriteRetry } from "../../dbWriteRetry";
 import { normalizeImapFlags, preserveLocalOnlyMessageFlags } from "../../messageFlags";
 import {
   normalizeCalendarEventUid,
@@ -97,9 +98,9 @@ export async function upsertMessages(
   folderId: string | null,
   nextMessages: Message[],
   replaceExisting = false,
-  options: { recomputeThreads?: boolean } = {}
+  options: { recomputeThreads?: boolean; beforeWrite?: OutboundWriteAuthorization; replaceDraftId?: string } = {}
 ) {
-  return withDbWriteRetry("upsertMessages", async () => {
+  return withOutboundWrite("upsertMessages", options.beforeWrite, async authorizedWrite => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
     if (nextMessages.some(message => message.accountId !== accountId)) {
       throw new Error("Message accountId must match the destination account; message belongs to another account");
@@ -362,6 +363,7 @@ export async function upsertMessages(
     const replacedByHeader = new Map<string, ReplacedRow>();
     const upsertBatch = (batch: Message[], shouldDeleteAttachments: boolean) => {
       batch.forEach((message) => {
+        const prepared = preparedMessages.get(message)!;
         // Resolve the prior same copy before selecting a storage row ID. In
         // particular, a now-free base ID must not erase a shared-shard variant.
         const priorCopy = message.messageId
@@ -559,7 +561,7 @@ export async function upsertMessages(
         // stored .eml still backs.
         const sizeBytes =
           message.source !== undefined
-            ? Buffer.byteLength(message.source)
+            ? prepared.sourceSizeBytes!
             : typeof message.sizeBytes === "number" && Number.isFinite(message.sizeBytes)
               ? message.sizeBytes
               : typeof existingRow?.sizeBytes === "number"
@@ -577,7 +579,7 @@ export async function upsertMessages(
           manualCategoryState === "cleared"
             ? ["manual-category:cleared", "manual-feedback:negative"]
             : message.categorySignals;
-        const fromEmail = parseAddressEmails(message.from)[0] ?? null;
+        const fromEmail = prepared.fromEmail;
         // Attachment URLs embed the message id as a path segment
         // (/messages/<id>/attachments/<att>), so a collision variant must
         // rewrite that segment. Sanitization baked the base id into htmlBody
@@ -696,6 +698,12 @@ export async function upsertMessages(
       });
     };
 
+    // Input-only parsing and MIME sizing need neither writer lock. Repeat on
+    // each whole attempt, before the final live authorization assertion.
+    const preparedMessages = new Map(nextMessages.map(message => [message, {
+      fromEmail: parseAddressEmails(message.from)[0] ?? null,
+      sourceSizeBytes: message.source === undefined ? undefined : Buffer.byteLength(message.source)
+    }]));
     const files = await stageMessageFiles(accountId, nextMessages.map(message => ({
       source: message.source,
       attachments: (message.attachments ?? []).flatMap(attachment => {
@@ -709,9 +717,22 @@ export async function upsertMessages(
     // Message rewrite and metadata remap are a single immediate unit. In
     // particular, a split spanning batches must see every final message id.
     try {
-      const collabChanges = db.transaction(() => {
+      const collabChanges = authorizedWrite(db, () => {
         try {
           captureIdentitySnapshots();
+          if (options.replaceDraftId) {
+            const previous = findMessageById.get(accountId, options.replaceDraftId) as ReplacedRow | undefined;
+            if (previous) {
+              replacedById.set(previous.id, previous);
+              if (previous.messageId) replacedByHeader.set(previous.messageId, previous);
+              if (previous.threadId) dedupedThreadIds.add(previous.threadId);
+              deleteAttachmentsForMessage.run(accountId, previous.id);
+              deleteCalendarEventsForMessage.run(accountId, previous.id);
+              deleteFts.run(accountId, previous.id);
+              deleteMessageById.run(accountId, previous.id);
+            }
+          }
+
           if (replaceExisting) {
             // Capture identities under the same writer lock as delete + remap.
             const replacedRows = db.prepare(`SELECT id,threadId,messageId,dateValue FROM messages
@@ -735,7 +756,7 @@ export async function upsertMessages(
           files.rollback();
           throw error;
         }
-      }).immediate();
+      });
       for (const event of collabChanges) publishThreadCollabEvent(event);
     } catch (error) {
       // Also cover a commit failure, after the callback has returned.

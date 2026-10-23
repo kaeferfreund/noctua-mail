@@ -1,3 +1,5 @@
+import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
+import { useLocale } from "next-intl";
 import { useState } from "react";
 import type React from "react";
 import { Folder as FolderIcon } from "lucide-react";
@@ -32,6 +34,7 @@ export default function FolderPickerNode({
   folderSpecialIcon,
   hasFolderMatch
 }: FolderPickerNodeProps) {
+  const locale = useLocale();
   const isCollapsed = collapsedFolders[folder.id] ?? false;
   const childNodes = folderTree.get(folder.id) ?? [];
   const hasChildren = childNodes.length > 0;
@@ -42,13 +45,14 @@ export default function FolderPickerNode({
   }
 
   const matchesQuery = folderQueryText
-    ? folder.name.toLowerCase().includes(folderQueryText)
+    ? folderNameMatches(folder, folderQueryText, locale)
     : true;
 
   return (
     <div className={styles.treeNode}>
       <div
         className={styles.treeRow}
+        data-folder-id={folder.id}
         role="button"
         tabIndex={0}
         style={{ paddingLeft: `${6 + depth * 2}px` }}
@@ -74,7 +78,7 @@ export default function FolderPickerNode({
           {specialIcon ?? <FolderIcon size={14} />}
         </span>
         <span className={styles.treeName}>
-          <span className={styles.treeNameText}>{folder.name}</span>
+          <span className={styles.treeNameText}>{getFolderDisplayName(folder, locale)}</span>
         </span>
       </div>
       {!isCollapsed && hasChildren && (
