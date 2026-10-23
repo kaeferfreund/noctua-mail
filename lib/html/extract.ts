@@ -39,13 +39,18 @@ function splitConcatenatedHtmlDocuments(input: string) {
   return segments.filter(Boolean);
 }
 
+/** Media and tables are content even without visible text. */
+export function hasRenderableHtmlMedia(html: string) {
+  return /<(img|table|svg|video|iframe|canvas|object|embed)\b/i.test(html);
+}
+
 function scoreHtmlDocument(html: string) {
   const visibleText = extractVisibleHtmlText(html);
   return {
     html,
     visibleTextLength: visibleText.length,
     hasMeaningfulText: /[\p{L}\p{N}]/u.test(visibleText),
-    hasRenderableMedia: /<(img|table|svg|video|iframe|canvas|object|embed)\b/i.test(html),
+    hasRenderableMedia: hasRenderableHtmlMedia(html),
     htmlLength: html.length
   };
 }

@@ -10,11 +10,12 @@ import {
   isQuoteBoundaryText,
   isTableLayoutTag,
   rewriteHtmlViewportHeightUnits,
-  sanitizeHtmlForDisplay,
+  sanitizeHtmlForDisplayPair,
   shouldCollapseQuote,
   shouldShowHtmlViewerFrame,
   stripBodyHeightStyles,
-  stripConditionalComments
+  stripConditionalComments,
+  type SanitizedHtmlPair
 } from "@/lib/html";
 import { useMessageLinkPreview } from "@/app/components/mailclient/message/MessageLinkPreviewContext";
 import { Button } from "@/app/components/ui/button";
@@ -453,7 +454,7 @@ function HtmlMessage({
   accountId,
   senderKey,
   messageId,
-  sanitizeHtml = sanitizeHtmlForDisplay
+  sanitizeHtmlPair = sanitizeHtmlForDisplayPair
 }: {
   html: string;
   darkMode: boolean;
@@ -462,8 +463,8 @@ function HtmlMessage({
   accountId?: string;
   senderKey?: string | null;
   messageId?: string;
-  /** Display sanitizer. Dark mode and font scale do not change its output. */
-  sanitizeHtml?: (input: string, mode?: RemoteContentMode) => string;
+  /** Display sanitizer for both policies. Dark mode and font scale do not change its output. */
+  sanitizeHtmlPair?: (input: string) => SanitizedHtmlPair;
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // Theme, zoom and font changes rebuild the whole srcdoc, which would silently
@@ -477,8 +478,10 @@ function HtmlMessage({
   const remote = useRemoteContent(accountId, senderKey, messageId ?? html);
   const remoteContent = remote.allowed ? "allow" : "block";
   // Theme and zoom only change the wrapper, not the sanitized message.
-  const blockedHtml = useMemo(() => sanitizeHtml(cleanedHtml), [cleanedHtml, sanitizeHtml]);
-  const allowedHtml = useMemo(() => sanitizeHtmlForDisplay(cleanedHtml, "allow"), [cleanedHtml]);
+  const { block: blockedHtml, allow: allowedHtml } = useMemo(
+    () => sanitizeHtmlPair(cleanedHtml),
+    [cleanedHtml, sanitizeHtmlPair]
+  );
   const hasRemoteContent = blockedHtml !== allowedHtml;
   const safeHtml = remote.allowed ? allowedHtml : blockedHtml;
 

@@ -334,7 +334,7 @@
     },
     "placeholder": {
       "everywhere": "E-Mails überall suchen",
-      "folder": "E-Mails in {folder} suchen",
+      "folder": "{folder} durchsuchen",
       "messages": "E-Mails suchen"
     },
     "clear": "Suche leeren",
@@ -543,6 +543,7 @@
       "label": "Zuständig",
       "unassigned": "Nicht zugewiesen",
       "me": "Ich",
+      "meNamed": "Ich ({name})",
       "searchPlaceholder": "Mitglieder suchen …",
       "search": "Mitglieder suchen",
       "noMembers": "Keine Mitglieder gefunden.",

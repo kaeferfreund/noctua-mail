@@ -5,11 +5,15 @@ import { fileURLToPath } from "node:url";
 import { signInQa, recordQa } from "./qaRound2Session";
 
 test.use({ locale: "en-GB" });
-// Evidence stays outside the checkout: ROOT/briefs next to the ROOT/wt-* worktrees,
-// resolved from this file rather than the working directory. Preserved rounds
-// live in sibling directories, so the default never overwrites them.
+// Runs in the round-two QA suite and needs its fixture (QA synthetic rows across
+// several pages); without it the paging and print cases fail:
+//   QA_ROUND2_FIXTURE=1 QA_SHELL_PORT=<port> bun scripts/runQaShellBrowserTests.ts \
+//     --config=playwright.qa-round2.config.ts qa-reader-focus
+// Evidence defaults to the untracked <checkout>/.tmp/reader-focus-evidence, resolved
+// from this file rather than the working directory; READER_FOCUS_EVIDENCE_DIR
+// redirects it (for example to a preserved review directory).
 const evidence = path.resolve(process.env.READER_FOCUS_EVIDENCE_DIR
-  ?? path.join(fileURLToPath(new URL("../../../../", import.meta.url)), "briefs", "reader-focus-evidence", "latest"));
+  ?? path.join(fileURLToPath(new URL("../../../", import.meta.url)), ".tmp", "reader-focus-evidence"));
 const rows = (page: Page) => page.locator('[data-message-list-row="true"]');
 const panes = (page: Page) => page.locator('[data-reader-layout]');
 const toolbar = (page: Page) => page.locator('[data-reader-toolbar]');
@@ -126,11 +130,18 @@ test("reader focus: Enter and Shift+Enter entries leave with one Escape although
     await expect(page.getByRole("tooltip", { name: "Back to messages (Escape)" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
-    // Exit focuses the selected row, or the list container while that row is not yet rendered.
-    await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[id="list"]') !== null)).toBe(true);
+    // Exit focuses the reader's row, or the list container while that row is not
+    // yet rendered; never another row.
+    const exitFocus = () => page.evaluate(() => {
+      const active = document.activeElement;
+      if (!active?.closest('[id="list"]')) return null;
+      return active.closest<HTMLElement>("[data-message-id]")?.dataset.messageId ?? "list";
+    });
+    await expect.poll(exitFocus).not.toBeNull();
+    const focus = await exitFocus();
+    expect([id, "list"]).toContain(focus);
     await expect(page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`)).toHaveAttribute("data-selected", "true");
-    recordQa(`reader-focus-escape-${entry === "Enter" ? "enter" : "shift-enter"}`, { id, escapePresses: 1,
-      focus: await page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.messageId ?? document.activeElement?.tagName) });
+    recordQa(`reader-focus-escape-${entry === "Enter" ? "enter" : "shift-enter"}`, { id, escapePresses: 1, focus });
   }
 });
 

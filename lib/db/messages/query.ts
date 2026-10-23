@@ -13,6 +13,7 @@ import { hydrateIdentityMetadata } from "./identityMetadata";
  * `getAccountDb`, not in this module's query logic.
  */
 import { SHARD_FTS_TABLE } from "../shardFormat";
+import { searchTokenSpellings } from "./searchSpellingVariants";
 import { simpleParser } from "mailparser";
 import { backfillMessageSenderKey } from "./senderKey";
 import type { Attachment, Message } from "../../data";
@@ -482,10 +483,18 @@ function buildScopedFtsTokenQueries(tokens: string[], columns: string[]) {
   if (columns.length === 0 || tokens.length === 0) return [];
   return tokens
     .map((token) => {
-      const ftsToken = buildFtsTokenQuery(token);
-      if (!ftsToken) return null;
-      const orParts = columns.map((col) => `${col}:${ftsToken}`);
-      return orParts.length > 1 ? `(${orParts.join(" OR ")})` : orParts[0];
+      const ftsTokens = searchTokenSpellings(token)
+        .map(buildFtsTokenQuery)
+        .filter((ftsToken): ftsToken is string => Boolean(ftsToken));
+      if (ftsTokens.length === 0) return null;
+      if (ftsTokens.length === 1) {
+        const orParts = columns.map((col) => `${col}:${ftsTokens[0]}`);
+        return orParts.length > 1 ? `(${orParts.join(" OR ")})` : orParts[0];
+      }
+      // German spelling variants are ORed inside the token's group. One
+      // column filter over the OR is the same set as one `col:spelling`
+      // term per pair, and several times cheaper for FTS5 to evaluate.
+      return `{${columns.join(" ")}} : (${ftsTokens.join(" OR ")})`;
     })
     .filter((token): token is string => Boolean(token));
 }
@@ -690,8 +699,9 @@ function parseSearchInput(
   const columns = normalizeSearchFields(fields);
   const includeAttachmentFilenames = shouldSearchAttachmentFilenames(fields);
   const ftsTokenQueries = buildScopedFtsTokenQueries(queryTokens, columns);
+  // Per token: the lower-case token, then its spelling variants (ORed).
   const attachmentFilenameTerms = includeAttachmentFilenames
-    ? queryTokens.map((token) => token.toLowerCase())
+    ? queryTokens.map((token) => searchTokenSpellings(token).map((spelling) => spelling.toLowerCase()))
     : [];
   return {
     ftsTokenQueries,
@@ -853,8 +863,18 @@ class FtsCandidateError extends Error {
 type SearchCandidateParams = {
   ftsTokenQueries: string[];
   rawQuery: string;
-  attachmentFilenameTerms: string[];
+  attachmentFilenameTerms: string[][];
 };
+
+/** One token's filename match: any of its spellings (see `parseSearchInput`). */
+function attachmentFilenameLikeSql(filenameSql: string, terms: string[]) {
+  const parts = terms.map(() => `lower(COALESCE(${filenameSql}, '')) LIKE ?`);
+  return parts.length > 1 ? `(${parts.join(" OR ")})` : parts[0];
+}
+
+function attachmentFilenameLikeArgs(terms: string[]) {
+  return terms.map((term) => `%${term}%`);
+}
 
 function resolveSearchCandidateIds(
   db: any,
@@ -935,19 +955,19 @@ function resolveDrivenSearchCandidateIds(
     }
     return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
   };
-  const attachmentIdsForTerm = (term: string) => {
+  const attachmentIdsForTerms = (terms: string[]) => {
     const rows = db
       .prepare(
-        `SELECT messageId FROM attachments WHERE accountId = ? AND lower(COALESCE(filename, '')) LIKE ? LIMIT ?`
+        `SELECT messageId FROM attachments WHERE accountId = ? AND ${attachmentFilenameLikeSql("filename", terms)} LIMIT ?`
       )
-      .all(accountId, `%${term}%`, fetchLimit) as Array<{ messageId: string }>;
+      .all(accountId, ...attachmentFilenameLikeArgs(terms), fetchLimit) as Array<{ messageId: string }>;
     return { ids: rows.map((row) => row.messageId), truncated: rows.length > cap };
   };
   // Legacy per-token clause restricted to an already bounded id set; used
   // for tokens too unselective to materialize on their own.
   const probeToken = (
     ids: string[],
-    token: { ftsTokenQuery?: string; attachmentTerm?: string }
+    token: { ftsTokenQuery?: string; attachmentTerms?: string[] }
   ): Set<string> => {
     const tokenParts: string[] = [];
     const tokenArgs: any[] = [];
@@ -957,16 +977,16 @@ function resolveDrivenSearchCandidateIds(
       );
       tokenArgs.push(token.ftsTokenQuery);
     }
-    if (token.attachmentTerm) {
+    if (token.attachmentTerms?.length) {
       tokenParts.push(
         `EXISTS (
           SELECT 1
           FROM attachments a
           WHERE a.accountId = m.accountId AND a.messageId = m.id
-            AND lower(COALESCE(a.filename, '')) LIKE ?
+            AND ${attachmentFilenameLikeSql("a.filename", token.attachmentTerms)}
         )`
       );
-      tokenArgs.push(`%${token.attachmentTerm}%`);
+      tokenArgs.push(...attachmentFilenameLikeArgs(token.attachmentTerms));
     }
     if (tokenParts.length === 0 || ids.length === 0) return new Set(ids);
     let rows: Array<{ id: string }>;
@@ -997,11 +1017,11 @@ function resolveDrivenSearchCandidateIds(
       tokenIntersection = new Set(combined.ids);
     } else {
       const tokenCount = Math.max(ftsTokenQueries.length, attachmentFilenameTerms.length);
-      const oversizedTokens: Array<{ ftsTokenQuery?: string; attachmentTerm?: string }> = [];
+      const oversizedTokens: Array<{ ftsTokenQuery?: string; attachmentTerms?: string[] }> = [];
       for (let index = 0; index < tokenCount; index += 1) {
         const ftsTokenQuery = ftsTokenQueries[index];
-        const attachmentTerm = attachmentFilenameTerms[index];
-        if (!ftsTokenQuery && !attachmentTerm) continue;
+        const attachmentTerms = attachmentFilenameTerms[index];
+        if (!ftsTokenQuery && !attachmentTerms?.length) continue;
         const tokenIds = new Set<string>();
         let truncated = false;
         if (ftsTokenQuery) {
@@ -1009,13 +1029,13 @@ function resolveDrivenSearchCandidateIds(
           truncated = truncated || part.truncated;
           for (const id of part.ids) tokenIds.add(id);
         }
-        if (attachmentTerm) {
-          const part = attachmentIdsForTerm(attachmentTerm);
+        if (attachmentTerms?.length) {
+          const part = attachmentIdsForTerms(attachmentTerms);
           truncated = truncated || part.truncated;
           for (const id of part.ids) tokenIds.add(id);
         }
         if (truncated || tokenIds.size > cap) {
-          oversizedTokens.push({ ftsTokenQuery, attachmentTerm });
+          oversizedTokens.push({ ftsTokenQuery, attachmentTerms });
           continue;
         }
         if (tokenIntersection === null) {
@@ -1071,7 +1091,7 @@ function applySearchQueryFilters(params: {
   args: any[];
   ftsTokenQueries: string[];
   rawQuery: string;
-  attachmentFilenameTerms: string[];
+  attachmentFilenameTerms: string[][];
   messageAlias?: string;
   candidates?: SearchCandidateResolution;
 }) {
@@ -1124,17 +1144,17 @@ function applySearchQueryFilters(params: {
         );
         params.args.push(ftsTokenQuery);
       }
-      const attachmentTerm = attachmentFilenameTerms[index];
-      if (attachmentTerm) {
+      const attachmentTerms = attachmentFilenameTerms[index];
+      if (attachmentTerms?.length) {
         tokenParts.push(
           `EXISTS (
             SELECT 1
             FROM attachments a
             WHERE a.accountId = ${messageAlias}.accountId AND a.messageId = ${messageAlias}.id
-              AND lower(COALESCE(a.filename, '')) LIKE ?
+              AND ${attachmentFilenameLikeSql("a.filename", attachmentTerms)}
           )`
         );
-        params.args.push(`%${attachmentTerm}%`);
+        params.args.push(...attachmentFilenameLikeArgs(attachmentTerms));
       }
       if (tokenParts.length === 0) continue;
       tokenClauses.push(tokenParts.length > 1 ? `(${tokenParts.join(" OR ")})` : tokenParts[0]);

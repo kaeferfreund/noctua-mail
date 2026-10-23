@@ -108,7 +108,7 @@ describe("ThreadCollaborationBar", () => {
     );
     expect(view.getByRole("button", { name: "2 internal notes" })).toBeTruthy();
     for (const [label, id] of [
-      ["Me", "alex"],
+      ["Me (Alex Example)", "alex"],
       ["Unassigned", null],
       ["Toni Example", "toni"],
     ] as const) {
@@ -117,6 +117,10 @@ describe("ThreadCollaborationBar", () => {
       expect(updates.at(-1)).toEqual({ assigneeUserId: id });
     }
     expect(view.queryByRole("option", { name: "Disabled Example" })).toBeNull();
+    // QA-212: the current user appears once, not as both "Me" and their name.
+    fireEvent.click(view.getByRole("combobox", { name: "Assignee" }));
+    expect((await view.findAllByRole("option")).map((option) => option.textContent)).toEqual(["Unassigned", "Me (Alex Example)", "Toni Example"]);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     fireEvent.pointerDown(
       view.getByRole("combobox", { name: "Thread status" }),
       { button: 0, ctrlKey: false, pointerType: "mouse" },

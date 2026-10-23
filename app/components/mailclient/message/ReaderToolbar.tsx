@@ -9,7 +9,7 @@ import styles from "./ReaderToolbar.module.css";
 type Props = {
   layout: ReaderLayout; showHint: boolean; dismissHint: () => void; toggleLayout: () => void; back: () => void;
   archive: () => void; spam: () => void; inSpam: boolean; remove: () => void; move: () => void; topics: () => void;
-  done: () => void; isDone: boolean; busy: boolean; menu: ReactNode; openWindow: () => void;
+  done: () => void; isDone: boolean; busy: boolean; renderMenu: () => ReactNode; openWindow: () => void;
   position: number; total: number; hasMore: boolean; previous: () => void; next: () => void;
   canPrevious: boolean; canNext: boolean; navigating: boolean;
 };
@@ -30,7 +30,7 @@ export default function ReaderToolbar(props: Props) {
           {action(t("moveTo"), <ArrowRightLeft size={17} />, props.move)}
           {action(t("topics"), <Tags size={17} />, props.topics)}
           {action(t(props.isDone ? "focus.markUndone" : "markDone"), <CheckCheck size={17} />, props.done)}
-          {props.menu}
+          {props.renderMenu()}
         </div>
         <div className={styles.navigation}>
           {action(t("openWindow"), <SquareArrowOutUpRight size={16} />, props.openWindow, false)}

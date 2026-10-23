@@ -334,7 +334,7 @@
     },
     "placeholder": {
       "everywhere": "Search messages everywhere",
-      "folder": "Search messages in {folder}",
+      "folder": "Search {folder}",
       "messages": "Search messages"
     },
     "clear": "Clear search",
@@ -543,6 +543,7 @@
       "label": "Assignee",
       "unassigned": "Unassigned",
       "me": "Me",
+      "meNamed": "Me ({name})",
       "searchPlaceholder": "Search members…",
       "search": "Search members",
       "noMembers": "No members found.",

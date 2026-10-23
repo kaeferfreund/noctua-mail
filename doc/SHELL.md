@@ -63,52 +63,45 @@ remote-content controls and collaboration bar.
 The focused DOM suites are `lib/ui/readerFocus.dom.test.tsx` and
 `lib/ui/readerNavigation.dom.test.tsx`. Browser coverage is
 `tests/browser/ui/qa-reader-focus.spec.ts`, included in
-`playwright.qa-round2.config.ts` and compatible with the existing synthetic QA
-fixture/session. `READER_FOCUS_EVIDENCE_DIR` optionally overrides the screenshot
-destination. The default is the absolute `ROOT/briefs/reader-focus-evidence/latest`,
-resolved from the spec file (ROOT is the directory holding the `wt-*` worktrees),
-so preserved round directories are never overwritten.
+`playwright.qa-round2.config.ts`. It uses the synthetic QA session and requires
+the round-two fixture (`QA_ROUND2_FIXTURE=1`, 300 synthetic INBOX messages); without
+it the saved-preference paging and print cases fail:
+
+```sh
+QA_ROUND2_FIXTURE=1 QA_SHELL_PORT=<port> bun scripts/runQaShellBrowserTests.ts \
+  --config=playwright.qa-round2.config.ts qa-reader-focus
+```
+
+Screenshots and PDFs go to the untracked `<checkout>/.tmp/reader-focus-evidence`,
+resolved from the spec file. `READER_FOCUS_EVIDENCE_DIR` redirects them, for
+example to a preserved review directory outside the checkout.
 
 ### Reader layouts: merge rehearsal notes
 
-Rehearsed with `git merge-tree --write-tree <ref> HEAD` (no worktree/index merge).
-The integration baseline is `origin/integration/stage` at `11dc3c5`; it merges
-cleanly. The following notes describe each conflict hunk against the requested
-other branch tips. These are instructions for the integrator, not changes to
-those branches.
+`origin/integration/stage` `e70c30b` (round 9) is merged into this branch. Its
+conflicts were the MailClient import hunk (both import sets kept), the lazy-admin
+Retry hunk (this branch's async `act` kept) and the round-two `testMatch` (both
+`qa-admin-self-grant` and `qa-reader-focus` kept); the round-8 notes for
+`feat/sender-identities-3` and `fix/admin-mailbox-self-grant` are resolved there.
 
-Against `origin/feat/sender-identities-3` (`e63a306`):
+Rehearsed with `git merge-tree --write-tree HEAD <ref>` (no worktree/index merge).
+These are instructions for the integrator, not changes to those branches:
 
-- `app/components/MailClient.tsx`, import hunk immediately after `"use client"`:
-  retain `useSenderMessages` and all four reader imports. Sender refresh effects,
-  signature save behavior and reader state/slots are independent and must remain.
-- `app/components/account-settings/tabs/PreferencesTabContent.tsx`, import hunk:
-  keep `useLocale`/`useTranslations` and import `ReactNode` alongside React hooks.
-  This conflict already comes from integration's localized preferences.
-- Same preferences file, default-signature label hunk: keep the sender branch's
-  `!senderPreferences` condition and the integration branch's translated
-  `t("preferences.signature")` label. Preserve its matching conditional close.
-- `lib/mail/resyncMessage.senderKey.test.ts`, first isolation-helper hunk: select
-  one fresh-process isolation implementation, preserving both protocol tests
-  and their assertions plus the unchanged 20-second child budget. Do not combine
-  two environment flags/helpers. The integration `runIsolated` implementation
-  already isolates the global IMAP mock and is suitable to retain.
-- Same test file, second test declaration hunk: retain its `test(...)` declaration
-  and `NOCTUA_RESYNC_TEST_CHILD` guard if retaining `runIsolated`; use the sender
-  branch's `realResyncTest(...)` declaration only with that branch's helper.
-- `messages/de.json` and `messages/en.json`, hunk 1 in `Settings`: merge sender
-  settings keys into the existing translated settings object, preserving both
-  key trees. Do not choose one complete object over the other.
-- Both catalogs, hunk 2 at the top-level `Compose`/`Errors` insertion: merge the
-  sender `Compose.sender`/`Errors.sender` subtrees and associated Compose keys
-  into integration's complete catalogs. Retain `Reader.focus` in both locales,
-  preserve other namespaces and rerun catalog parity/JSON parsing.
-
-Against `origin/fix/admin-mailbox-self-grant` (`b6c1ba9`):
-
-- `playwright.qa-round2.config.ts`, `testMatch` hunk: keep both alternatives,
-  `qa-admin-self-grant|qa-reader-focus`, alongside the existing specs. MailClient's
-  admin access-refresh props merge automatically with reader changes.
+- `origin/feat/build-info` `6307539` and `origin/fix/sidebar-views-row` `94f1a31`
+  merge cleanly.
+- `origin/feat/status-bar-compact` `a864dfc`, `app/components/shell/AppShell.tsx`
+  ShellHeader hunk: keep this branch's `toolbar` condition (phone thread or
+  desktop focus hides `header.toolbar`) and take compact's `indicators={statusBar}`.
+- Same branch, `doc/SHELL.md` (add/add): combine both documents under one title,
+  reader layout sections first, then the status indicator and its round records.
+  Split measures notices against the list, focus against `#reader`; the header
+  status stays visible in focus.
+- Same branch, `messages/de.json` status hunks: the conflict also occurs between
+  `e70c30b` and that branch and is not caused by reader focus; resolve as on
+  `deploy/dev-stage`.
+- `origin/feat/i18n-slice3` `7c05ea6`, `tests/browser/compose/qa-compose.spec.ts`:
+  the same conflict occurs between `e70c30b` and that branch; this branch does
+  not touch the file.
 
 The full CI run also exposed an existing lazy-admin DOM test synchronization
 issue: Retry resolves identity asynchronously, but the test inspected idle-task
