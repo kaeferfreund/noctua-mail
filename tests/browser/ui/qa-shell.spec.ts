@@ -238,11 +238,10 @@ test("QA-014: sidebar view rows keep the count inside the row highlight and desc
       badges: await page.locator('[data-view-id] ~ [data-sidebar="menu-badge"]').allTextContents() }));
   }
 });
-test("QA-014: the phone sheet and the collapsed sidebar show no view row description", async ({ page }) => {
-  const rowDescriptions = Object.values(viewDescriptions).flatMap(view => typeof view?.description === "string" ? [view.description] : []);
+test("QA-014: the phone sheet shows no view row description on hover or keyboard focus", async ({ page }) => {
   const descriptions = page.locator('[data-slot="tooltip-content"]');
-  // Phone sheet: neither the pointer resting on a row (past the 400 ms open delay) nor keyboard
-  // focus opens a description, and the row is not described by a hidden one.
+  // Neither the pointer resting on a row (past the 400 ms open delay) nor keyboard focus opens
+  // a description, and the row is not described by a hidden one.
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto("/");
   await page.locator('[data-slot="shell-header"]').getByRole("button", { name: "Toggle sidebar", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Sidebar", exact: true });
@@ -257,9 +256,12 @@ test("QA-014: the phone sheet and the collapsed sidebar show no view row descrip
   await expect(descriptions).toHaveCount(0);
   await expect(row).not.toHaveAttribute("aria-describedby");
   await page.screenshot({ path: ".tmp/qa-shell-views-sheet-390.png" });
-  // Collapsed (offcanvas) desktop sidebar: its off-screen rows leave the tab order, so moving
-  // focus backwards from the toggle never lands on a row or opens a detached description.
-  await page.setViewportSize({ width: 1440, height: 900 }); await page.goto("/");
+});
+test("QA-014: the collapsed sidebar keeps its rows out of the tab order and shows no description", async ({ page }) => {
+  const rowDescriptions = Object.values(viewDescriptions).flatMap(view => typeof view?.description === "string" ? [view.description] : []);
+  const descriptions = page.locator('[data-slot="tooltip-content"]');
+  // The collapsed offcanvas sidebar is off screen: moving focus backwards from the toggle never
+  // lands on one of its rows or opens a detached description.
   await expect(page.locator('[data-view-id="virtual:unassigned"]')).toBeInViewport();
   const toggle = page.locator('[data-slot="shell-header"]').getByRole("button", { name: "Toggle sidebar", exact: true });
   await toggle.click();
