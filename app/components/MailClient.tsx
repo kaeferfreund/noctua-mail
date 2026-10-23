@@ -296,7 +296,7 @@ import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 
 const AccountSettingsModal = dynamic(() => import("./AccountSettingsModal"), {
   ssr: false,
-  loading: () => <LazyDialogLoading label="Settings" />
+  loading: () => <LazyDialogLoading kind="settings" />
 });
 const AdminPanel = dynamic(() => import("./admin/AdminPanel"), {
   ssr: false,

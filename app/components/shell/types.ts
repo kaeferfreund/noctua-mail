@@ -90,12 +90,12 @@ export function groupMailboxes(accounts: readonly ShellAccount[]): Array<{
   accounts: ShellAccount[];
 }> {
   if (accounts.length <= 6) return [{ domain: null, accounts: [...accounts] }];
-  const groups = new Map<string, ShellAccount[]>();
+  const groups = new Map<string | null, ShellAccount[]>();
   for (const account of accounts) {
-    const domain = account.email.trim().split("@")[1]?.toLowerCase() || "Other";
+    const domain = account.email.trim().split("@")[1]?.toLowerCase() || null;
     const group = groups.get(domain) ?? [];
     group.push(account);
     groups.set(domain, group);
   }
-  return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([domain, rows]) => ({ domain, accounts: rows }));
+  return [...groups].sort(([a], [b]) => (a === null ? 1 : b === null ? -1 : a.localeCompare(b))).map(([domain, rows]) => ({ domain, accounts: rows }));
 }

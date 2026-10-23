@@ -1,4 +1,6 @@
 "use client";
+
+import { useTranslations } from "next-intl";
 import { Button } from "@/app/components/ui/button";
 import type { AccountRole } from "@/lib/data";
 import type { ThreadCollabController } from "@/app/hooks/useThreadCollab";
@@ -15,13 +17,14 @@ export default function ThreadCollaborationBar({
   onNote: () => void;
   onActivity: () => void;
 }) {
+  const t = useTranslations("Collaboration");
   const commentCount = collab.state?.commentCount ?? 0;
   const readOnly = collab.readDenied || !role || role === "viewer";
   return (
     <div
       onKeyDown={(e) => e.stopPropagation()}
       className="flex min-w-0 flex-col gap-2"
-      aria-label="Thread collaboration"
+      aria-label={t("bar.label")}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <AssigneeCombobox
@@ -44,9 +47,9 @@ export default function ThreadCollaborationBar({
           variant="ghost"
           size="sm"
           onClick={onActivity}
-          aria-label={`${commentCount} internal ${commentCount === 1 ? "note" : "notes"}`}
+          aria-label={t("bar.internalNoteCount", {count: commentCount})}
         >
-          {commentCount} {commentCount === 1 ? "note" : "notes"}
+          {t("bar.noteCount", {count: commentCount})}
         </Button>
         {!readOnly && (
           <Button
@@ -55,14 +58,12 @@ export default function ThreadCollaborationBar({
             onClick={onNote}
             disabled={!collab.state}
           >
-            Internal note
-          </Button>
+            {t("bar.note")}</Button>
         )}
       </div>
       {collab.loading && (
         <span role="status" className="text-xs text-muted-foreground">
-          Loading collaboration…
-        </span>
+          {t("bar.loading")}</span>
       )}
       {collab.error && (
         <div role="alert" className="text-sm text-destructive">
@@ -74,8 +75,7 @@ export default function ThreadCollaborationBar({
               void collab.reload().catch(() => {});
             }}
           >
-            Retry
-          </Button>
+            {t("bar.retry")}</Button>
         </div>
       )}
     </div>
