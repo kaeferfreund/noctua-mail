@@ -11,7 +11,7 @@ if (process.argv[2] === "synthetic-registry-account") {
     while (!process.env.NOCTUA_SYNTHETIC_RECOVER) { workerSafePoint(); await Bun.sleep(10); }
   });
 } else {
-  installShutdownCoordinator();
+  installShutdownCoordinator({ stop() {}, drain() {} });
   const registry = createWorkerJobRegistry({ scriptPath: "lib/testFixtures/gracefulRegistry.ts",
     registryName: "synthetic-shutdown-registry", maxConcurrentJobs: 1, sharedWorkerBudget: true });
   const db = await getDb();

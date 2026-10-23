@@ -64,6 +64,8 @@ export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => 
   let closed = false;
   let checking = false;
   let checkingTask: Promise<void> | undefined;
+  let liveness: ReturnType<typeof setInterval> | undefined;
+  let expiry: ReturnType<typeof setTimeout> | undefined;
   const close = () => {
     if (closed) return;
     closed = true;
@@ -78,14 +80,17 @@ export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => 
     void pending.finally(() => pendingCleanup.delete(pending));
   };
   const entry: Entry = { identity, close, accountChanged };
-  const liveness = setInterval(() => {
+  const registration = { close, get closed() { return closed; } };
+  // Cleanup is synchronous; transport constructors must observe the stopped state
+  // before they install their own subscriptions and heartbeat.
+  if (isShuttingDown()) { close(); return registration; }
+  liveness = setInterval(() => {
     if (checking || closed) return;
     checking = true;
     checkingTask = assertStreamAuthorized(identity).catch(close).finally(() => { checking = false; });
   }, 5_000);
-  const expiry = setTimeout(close, Math.max(0, Math.min(identity.expiresAt, identity.authenticatedAt + 86_400_000) - Date.now()));
+  expiry = setTimeout(close, Math.max(0, Math.min(identity.expiresAt, identity.authenticatedAt + 86_400_000) - Date.now()));
   liveness.unref?.(); expiry.unref?.();
   streams.add(entry);
-  if (isShuttingDown()) close();
-  return { close, get closed() { return closed; } };
+  return registration;
 }

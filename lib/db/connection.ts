@@ -286,6 +286,7 @@ function registerDbShutdownHooks() {
   shutdownHooksRegistered = true;
   onShutdown("db:close", "close", closeAllDbConnections);
   process.once("beforeExit", closeAllDbConnections);
+  process.once("exit", closeAllDbConnections);
 }
 
 export async function getDb() {

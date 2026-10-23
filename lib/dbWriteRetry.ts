@@ -1,4 +1,4 @@
-import { workerSafePoint } from "./server/workerLifecycle";
+import { workerPause, workerSafePoint } from "./server/workerLifecycle";
 type DbWriteRetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -8,12 +8,6 @@ type DbWriteRetryOptions = {
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_BASE_DELAY_MS = 120;
 const DEFAULT_MAX_DELAY_MS = 2_000;
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
 
 function getErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) {
@@ -94,7 +88,7 @@ export async function withDbWriteRetry<T>(
         elapsedMs: Date.now() - startedAt,
         error: getErrorSummary(error)
       });
-      await sleep(delayMs);
+      await workerPause(delayMs);
     }
   }
 

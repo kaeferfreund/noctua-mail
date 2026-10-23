@@ -4,6 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") return;
   if (startupInitialized) return;
   const { installShutdownCoordinator } = await import("@/lib/server/shutdown");
+  // Without HTTP lifecycle hooks this participates in Next-owned cleanup only.
   installShutdownCoordinator();
   const { installBackendConsoleTimestamps } = await import("@/lib/logging/backendConsole");
   installBackendConsoleTimestamps();
