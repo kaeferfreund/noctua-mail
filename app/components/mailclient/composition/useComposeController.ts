@@ -3,11 +3,11 @@ import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { prepareSignatureTemplate, renderSignatureTemplate, replaceSignatureBlock } from "@/lib/signatureTemplates";
 import type { SenderSettings } from "@/lib/ui/senderSettings";
 import type React from "react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useLocale } from "next-intl";
 import type { Account, AccountDateFormat, Message, SenderIdentity } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
-import { assembleQuotedHtml } from "@/lib/html";
+import { assembleQuotedHtml, extractVisibleHtmlText, hasRenderableHtmlMedia } from "@/lib/html";
 import { areMarkdownConvertersReady, loadMarkdownConverters } from "@/lib/markdownConvert";
 import { buildComposePayload as buildComposePayloadFn } from "./composeContentBuilder";
 import { computeComposeInitState } from "./composeInitState";
@@ -58,6 +58,11 @@ export function useComposeController({
     composeBodyDebounceRef,
     composeMarkdownRef
   } = compose;
+  // The body of an untouched unsigned message: either opened without a
+  // signature, or left after the tracked signature was removed from its start.
+  // While the body still matches, a new signature goes back to the start without
+  // asking (the forward header or quote is not authored text).
+  const unsignedBodyRef = useRef<{ tab: ComposeTab; body: string; separator: string } | null>(null);
 
   const applySignatureToCompose = (signature: { id: string; body: string } | null, selectedIdentity?: SenderIdentity) => {
     const identity = selectedIdentity ?? sender?.identities.find(item => item.id === compose.composeIdentityId);
@@ -68,9 +73,16 @@ export function useComposeController({
     if (!previous && !next) return true;
     const tab = compose.composeTab;
     const body = tab === "html" ? snapshot?.html ?? compose.composeHtml : tab === "markdown" ? compose.composeMarkdownRef.current : (compose.composeTextRef.current?.value ?? compose.composeBody);
-    const replacement = replaceSignatureBlock(body, tab === "html" ? previous?.html : tab === "markdown" ? previous?.markdown ?? previous?.text : previous?.text, tab === "html" ? next?.html ?? "" : tab === "markdown" ? next?.markdown ?? "" : next?.text ?? "", tab === "html" ? "" : "\n\n");
-    if (replacement.conflict && !window.confirm(next ? senderMessages.confirmKeepEditedSignature : senderMessages.confirmKeepEditedWithoutSignature)) return false;
-    const value = replacement.conflict ? [body, tab === "html" ? next?.html : tab === "markdown" ? next?.markdown : next?.text].filter(Boolean).join(tab === "html" ? "" : "\n\n") : replacement.body;
+    const previousBlock = tab === "html" ? previous?.html : tab === "markdown" ? previous?.markdown ?? previous?.text : previous?.text;
+    const nextBlock = tab === "html" ? next?.html ?? "" : tab === "markdown" ? next?.markdown ?? "" : next?.text ?? "";
+    const replacement = replaceSignatureBlock(body, previousBlock, nextBlock, tab === "html" ? "" : "\n\n");
+    const unsigned = unsignedBodyRef.current;
+    const untouched = replacement.conflict && !previous && next && unsigned?.tab === tab && (tab === "html"
+      ? extractVisibleHtmlText(body) === extractVisibleHtmlText(unsigned.body) && hasRenderableHtmlMedia(body) === hasRenderableHtmlMedia(unsigned.body)
+      : body === unsigned.body);
+    if (replacement.conflict && !untouched && !window.confirm(next ? senderMessages.confirmKeepEditedSignature : senderMessages.confirmKeepEditedWithoutSignature)) return false;
+    const value = untouched ? nextBlock + unsigned.separator + body : replacement.conflict ? [body, nextBlock].filter(Boolean).join(tab === "html" ? "" : "\n\n") : replacement.body;
+    unsignedBodyRef.current = previous && !next && !replacement.conflict && previousBlock && body.startsWith(previousBlock) ? { tab, body: value, separator: "" } : null;
     // A signature change is a body edit in the current representation. Cancel
     // delayed keystrokes so they cannot overwrite it after a format switch.
     if (composeBodyDebounceRef.current) {
@@ -188,6 +200,8 @@ export function useComposeController({
     compose.setComposeUnavailableFrom(fields.unavailableFrom);
     compose.setComposeSenderWarnings(fields.warnings);
     composeSignatureRef.current = fields.signature ?? null;
+    unsignedBodyRef.current = fields.unsignedBody === undefined ? null
+      : { tab: fields.composeTab, body: fields.unsignedBody, separator: fields.composeTab === "html" ? "" : "\n\n" };
     compose.setComposeSignatureId(fields.signature?.id ?? "");
 
     // Apply fields to state
