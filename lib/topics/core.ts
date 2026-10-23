@@ -238,11 +238,12 @@ export async function setThreadTopics(
       normalizedThreadId,
       accountId
     );
+    const insertTopic = db.prepare(
+      `INSERT OR IGNORE INTO thread_topics (threadId, topicId, accountId, assignedAt)
+       VALUES (?, ?, ?, ?)`
+    );
     for (const topicId of nextTopicIds) {
-      db.prepare(
-        `INSERT OR IGNORE INTO thread_topics (threadId, topicId, accountId, assignedAt)
-         VALUES (?, ?, ?, ?)`
-      ).run(normalizedThreadId, topicId, accountId, now);
+      insertTopic.run(normalizedThreadId, topicId, accountId, now);
     }
     rememberTopicLearningForThread(db, accountId, normalizedThreadId, nextTopicIds);
     const rows = db
