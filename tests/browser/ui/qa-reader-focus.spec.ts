@@ -261,7 +261,7 @@ test("reader focus: archive row action and toolbar use real HTTP and continue to
 
 test("reader focus: real print PDF excludes an unsent inline reply and internal controls", async ({ page }) => {
   await start(page);
-  await page.getByRole("textbox", { name: "Search messages in INBOX", exact: true }).fill('QA synthetic');
+  await page.getByRole("textbox", { name: "Search messages in Inbox", exact: true }).fill('QA synthetic');
   const printRow = rows(page).filter({ hasText: /QA synthetic [0-9]{3}/ }).first();
   await expect(printRow).toContainText("QA synthetic");
   await printRow.dblclick();
