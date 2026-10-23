@@ -4,10 +4,11 @@ import { defaultLocale, isUiLocale, type UiLocale } from "./config";
 export function acceptLanguageLocale(header?: string | null): UiLocale {
   const candidates = (header ?? "").split(",").map((entry, index) => {
     const [range, ...parameters] = entry.trim().split(";");
-    const language = range.toLowerCase();
-    const quality = parameters.find(parameter => /^\s*q\s*=/i.test(parameter));
-    const raw = quality?.split("=")[1]?.trim();
-    const q = raw === undefined ? 1 : /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/.test(raw) ? Number(raw) : 0;
+    const language = range.trim().toLowerCase();
+    const quality = parameters.length === 1
+      ? /^q\s*=\s*(0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/i.exec(parameters[0].trim())
+      : null;
+    const q = parameters.length === 0 ? 1 : quality ? Number(quality[1]) : 0;
     const base = /^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$/i.test(language) ? language.split("-")[0] : null;
     return { locale: isUiLocale(base) ? base : null, q, index };
   }).filter(candidate => candidate.locale && candidate.q > 0)

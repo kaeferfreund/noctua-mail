@@ -23,7 +23,19 @@ describe("locale resolution", () => {
     ["en;q=0.8,de;q=0.8", "en"], ["de;q=0.8,en;q=0.8", "de"],
     ["DE-at;q=0.7,EN-us;q=0.9", "en"], ["*,fr", "de"],
     ["en;q=garbage,de;q=0.8", "de"], ["en;q=1.2", "de"],
-    ["en;q=-1", "de"], ["en;q=0.000", "de"], ["en-;q=1", "de"]
+    ["en;q=-1", "de"], ["en;q=0.000", "de"], ["en-;q=1", "de"],
+    ["en ; q=1.0, de;q=0.5", "en"],
+    ["en\t;\tq=1.0, de;q=0.5", "en"],
+    [" \tEN-us \t; \tq \t= \t0.9 \t, de;q=0.5", "en"],
+    ["* ; q=1.0, en ; q=0.8, de;q=0.5", "en"],
+    ["*\t;\tQ = 1.0", "de"],
+    ["en ; Q = 1.0, de;q=0.5", "en"],
+    ["en ; q = nope, de;q=0.5", "de"],
+    ["en ; q = 0.1234, de;q=0.1", "de"],
+    ["en ; q=1=bad, de;q=0.5", "de"],
+    ["en ; q=1;q=0.5, de;q=0.5", "de"],
+    ["en ; invalid, de;q=0.5", "de"],
+    ["en ; q=1;, de;q=0.5", "de"]
   ] as const)("parses %s as %s", (header, expected) => {
     expect(acceptLanguageLocale(header)).toBe(expected);
   });
