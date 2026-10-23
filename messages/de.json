@@ -317,7 +317,7 @@
     },
     "placeholder": {
       "everywhere": "E-Mails überall suchen",
-      "folder": "E-Mails in {folder} suchen",
+      "folder": "{folder} durchsuchen",
       "messages": "E-Mails suchen"
     },
     "clear": "Suche leeren",

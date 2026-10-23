@@ -317,7 +317,7 @@
     },
     "placeholder": {
       "everywhere": "Search messages everywhere",
-      "folder": "Search messages in {folder}",
+      "folder": "Search {folder}",
       "messages": "Search messages"
     },
     "clear": "Clear search",
