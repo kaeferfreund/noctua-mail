@@ -1,3 +1,4 @@
+import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
@@ -46,6 +47,9 @@ export async function handleListMessagesRequest(
     }
     const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
     if (access instanceof NextResponse) return access;
+    const folderError = await validateAccountFolders(accountId,
+      [folderId, ...(excludedFolderIds ?? [])]);
+    if (folderError) return folderError;
     // Rows synced before `sizeBytes` existed have no size and would sink to the
     // bottom of a size-ordered page, so fill them in before the first such query.
     // A failed pass only costs ranking accuracy, so the list still renders.
