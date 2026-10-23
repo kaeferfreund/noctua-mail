@@ -1,30 +1,37 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+import { formatDate } from "@/lib/i18n/format";
+
 import { useCallback, useEffect, useState } from "react";
 import type { AdminAuditEntry } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
-import { adminRequest, errorMessage, type AdminFetch } from "@/app/hooks/useAdminApi";
+import { formatAdminError } from "@/lib/i18n/adminMessages";
+import { adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
 
 export default function AdminAuditLog({ apiFetch = fetch }: { apiFetch?: AdminFetch }) {
+  const t = useTranslations("Admin");
+  const locale = useLocale();
+  const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
   const [entries, setEntries] = useState<AdminAuditEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const load = useCallback(async (before?: string) => {
-    setBusy(true); setError("");
+    setBusy(true); setError(null);
     try {
       const data = await adminRequest<{ entries: AdminAuditEntry[]; nextCursor: string | null }>(apiFetch, `/api/admin/audit?limit=50${before === undefined ? "" : `&before=${encodeURIComponent(before)}`}`);
       setEntries(previous => before === undefined ? data.entries : [...previous, ...data.entries.filter(entry => !previous.some(old => old.id === entry.id))]);
       setNextCursor(data.nextCursor);
-    } catch (error) { setError(errorMessage(error)); }
+    } catch (error) { setError(error); }
     finally { setBusy(false); }
   }, [apiFetch]);
   useEffect(() => { void load(); }, [load]);
-  return <section className="space-y-4" aria-label="Audit log"><div className="flex items-center justify-between"><h3 className="font-medium">Audit log</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>Refresh audit</Button></div>
-    {error && <p role="alert">{error}</p>}
-    <table className="w-full text-left text-sm"><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target user / mailbox</th></tr></thead>
-      <tbody>{entries.map(entry => <tr key={entry.id} className="border-b"><td className="py-2">{new Date(entry.createdAt).toLocaleString()}</td><td>{entry.action}</td><td>{entry.actorUserId}</td><td>{entry.targetUserId ?? "—"} / {entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table>
-    {!busy && !entries.length && <p>No audit entries.</p>}
-    <Button variant="outline" disabled={busy || !nextCursor || !entries.length} onClick={() => void load(nextCursor ?? undefined)}>{busy ? "Loading…" : "Load older entries"}</Button>
+  return <section className="space-y-4" aria-label={t("audit.title")}><div className="flex items-center justify-between"><h3 className="font-medium">{t("audit.title")}</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("audit.refresh")}</Button></div>
+    {Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}
+    <table className="w-full text-left text-sm"><thead><tr><th>{t("audit.time")}</th><th>{t("audit.action")}</th><th>{t("audit.actor")}</th><th>{t("audit.target")}</th></tr></thead>
+      <tbody>{entries.map(entry => <tr key={entry.id} className="border-b"><td className="py-2">{dateTime(entry.createdAt)}</td><td>{entry.action}</td><td>{entry.actorUserId}</td><td>{entry.targetUserId ?? "—"} / {entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table>
+    {!busy && !entries.length && <p>{t("audit.empty")}</p>}
+    <Button variant="outline" disabled={busy || !nextCursor || !entries.length} onClick={() => void load(nextCursor ?? undefined)}>{busy ? t("loading") : t("audit.older")}</Button>
   </section>;
 }

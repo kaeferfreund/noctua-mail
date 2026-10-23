@@ -1,11 +1,11 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { useContext } from "react";
 import type { Message } from "@/lib/data";
 import {
   CollabRowsContext,
   memberName,
   memberInitials,
-  STATUS_LABELS,
   STATUS_STYLES,
   type CollabMember,
 } from "./types";
@@ -16,6 +16,7 @@ export default function CollabRowBadges({
   message: Pick<Message, "threadId" | "collab">;
   members?: CollabMember[];
 }) {
+  const t = useTranslations("Collaboration");
   const context = useContext(CollabRowsContext);
   const cached = context.threadCollabById.get(message.threadId);
   const state =
@@ -24,7 +25,7 @@ export default function CollabRowBadges({
       : message.collab;
   if (!state || (state.status === "open" && !state.assigneeUserId)) return null;
   const name = state.assigneeUserId
-    ? memberName(explicitMembers ?? context.members, state.assigneeUserId)
+    ? memberName(explicitMembers ?? context.members, state.assigneeUserId, t("formerMember"))
     : null;
   return (
     <span
@@ -34,7 +35,7 @@ export default function CollabRowBadges({
       {name && (
         <span
           title={name}
-          aria-label={`Assignee: ${name}`}
+          aria-label={t("assignee.named", {name})}
           className="inline-flex size-5 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground"
         >
           {!(explicitMembers ?? context.members).some(
@@ -50,7 +51,7 @@ export default function CollabRowBadges({
           className="rounded px-1.5 py-0.5"
           style={STATUS_STYLES[state.status]}
         >
-          {STATUS_LABELS[state.status]}
+          {t(`status.${state.status}`)}
         </span>
       )}
     </span>
