@@ -26,7 +26,7 @@ describe("me state and persisted selection contract",()=>{
   await h.addMembership(user.id,await account("Hidden"));
   const response=await GET(req(f.jar.header())); const body=await response.json();
   expect(response.status).toBe(200);
-  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User"},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:86400,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required",hasPassword:true,imapLoginAvailable:false}});
+  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User",uiLocale:null},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:86400,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required",hasPassword:true,imapLoginAvailable:false}});
   expect(JSON.stringify(body)).not.toContain("sessionToken");
  });
  test("zero memberships returns none",async()=>{

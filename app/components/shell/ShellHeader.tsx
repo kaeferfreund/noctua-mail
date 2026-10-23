@@ -61,7 +61,7 @@ export default function ShellHeader({ title, toolbar, search, sync, indicators }
   const fullTitle = segments.join(TITLE_SEPARATOR);
   const syncLabel = sync.isSyncing ? "Checking for new mail" : "Check for new mail";
   return (
-    <header data-slot="shell-header" className="@container/header flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6">
+    <header data-slot="shell-header" className="@container/header flex h-(--header-height) shrink-0 items-center gap-2 border-b px-4 lg:px-6 max-md:gap-0 max-md:px-2 max-md:[&_button]:min-h-11 max-md:[&_button]:min-w-11">
       <SidebarTrigger className="-ml-1 size-11 md:size-7" aria-label="Toggle sidebar" />
       <Separator orientation="vertical" className="mx-1 hidden md:block data-[orientation=vertical]:h-4" />
       {/* On phones the title takes the free space so the toolbar sits with search on the right. */}

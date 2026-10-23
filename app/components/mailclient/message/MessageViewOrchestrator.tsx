@@ -19,6 +19,8 @@ import { Flex, SegmentedControl } from "@radix-ui/themes";
 import type { Message, Topic } from "@/lib/data";
 
 import MessageViewPane from "./MessageViewPane";
+import ThreadSubject from "./ThreadSubject";
+import paneStyles from "./MessageViewPane.module.css";
 import ThreadView from "./ThreadView";
 import type { ThreadMessageCardProps } from "./ThreadMessageCard";
 import ThreadTopicSuggestionsRow from "./ThreadTopicSuggestionsRow";
@@ -685,10 +687,8 @@ function MessageViewOrchestratorImpl(
               const explanationThreadId = activeMessage.threadId ?? "";
               return (
                 <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 0 }}>
-                  <Flex align="center" gap="3">
-                    <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 16, lineHeight: 1.4, wordBreak: "break-word", overflowWrap: "anywhere", color: "var(--gray-12)" }}>
-                      {rootSubject || "(no subject)"}
-                    </span>
+                  <Flex align="center" gap="3" className={paneStyles.subjectRow}>
+                    <ThreadSubject key={rootSubject} subject={rootSubject} />
                     <SegmentedControl.Root
                       size="1"
                       value={threadViewMode}

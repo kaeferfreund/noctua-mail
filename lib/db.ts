@@ -148,6 +148,7 @@ export {
   normalizeUserEmail,
   removeUserAccountLink,
   setUserAccountRole,
+  setUserUiLocale,
   type UserRole
 } from "./db/users";
 

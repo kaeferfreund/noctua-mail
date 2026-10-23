@@ -16,7 +16,7 @@ export default function MailboxGate({ state, accounts, error, onAdd, onSwitch, o
   onAdmin?: () => void;
   onLogout: () => void;
 }) {
-  return <AuthFrame title={state === "none" ? "No mailbox yet" : state === "unselected" ? "Choose a mailbox" : "Loading your account"}>
+  return <AuthFrame authenticated title={state === "none" ? "No mailbox yet" : state === "unselected" ? "Choose a mailbox" : "Loading your account"}>
     {state === "none" && (onAdd ? <><p>Create a mailbox, then grant its members access in Admin.</p><Button onClick={onAdd}>Add a mailbox</Button></> : <p>Ask your admin to give you access to a mailbox.</p>)}
     {state === "unselected" && <ul className="space-y-2">{accounts.map(account => <li key={account.id}><Button variant="outline" onClick={() => onSwitch(account.id)}>{account.name || account.email} · {account.email}</Button></li>)}</ul>}
     <AuthError error={error} />

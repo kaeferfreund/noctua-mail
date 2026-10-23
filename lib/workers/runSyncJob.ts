@@ -1,3 +1,4 @@
+import { isWorkerStopping, workerPause } from "../server/workerLifecycle";
 import { getImapHttpError } from "@/lib/mail/imapError";
 import { drainImapConnectionPool } from "@/lib/mail/imap";
 import {
@@ -84,6 +85,7 @@ export async function runSyncJobCli(argv = process.argv) {
       await drainImapConnectionPool();
       return;
     } catch (error) {
+      if (isWorkerStopping()) return;
       const message = error instanceof Error ? error.message : String(error ?? "unknown error");
       const authError = getImapHttpError(error);
       const isNonRetryable = authError !== null ||
@@ -122,7 +124,7 @@ export async function runSyncJobCli(argv = process.argv) {
           updatedAt: Date.now()
         })}\n`
       );
-      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      await workerPause(delay);
     }
   }
 }

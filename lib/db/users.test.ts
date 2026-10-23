@@ -226,7 +226,7 @@ describe("authoritative joined user DTO",()=>{
       h.master.prepare("UPDATE users SET role='user' WHERE id=?").run(user.id);
     });
     const dto=await getUserById(user.id);
-    expect(dto).toEqual({id:user.id,email:user.email,name:"Authoritative",role:"admin",createdAt:expect.any(Number),hasPassword:true,twoFactorEnabled:true,passkeyCount:0,disabled:true});
+    expect(dto).toEqual({id:user.id,email:user.email,name:"Authoritative",role:"admin",createdAt:expect.any(Number),hasPassword:true,twoFactorEnabled:true,passkeyCount:0,disabled:true,uiLocale:null});
     expect(Number.isInteger(dto!.createdAt)).toBe(true);
     expect(JSON.stringify(dto)).not.toMatch(/passwordHash|passwordUpdatedAt|mustChangePassword|disabledAt|sessionToken|secret|backupCodes/);
     await withDbWriteRetry("test.dto",()=>h.master.prepare("UPDATE auth_user SET banExpires=? WHERE id=?").run(new Date(Date.now()-1000).toISOString(),user.id));

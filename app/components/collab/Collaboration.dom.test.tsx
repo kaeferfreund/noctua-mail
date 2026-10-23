@@ -232,7 +232,7 @@ describe("ThreadActivityPanel", () => {
         }}
       />,
     );
-    expect(view.container.querySelectorAll("strong").length).toBe(3);
+    await waitFor(() => expect(view.container.querySelectorAll("strong").length).toBe(3));
     expect(view.container.querySelector("script")).toBeNull();
     expect(view.getAllByText("Former member").length).toBe(1);
     expect(view.getAllByRole("button", { name: /Delete note/ }).length).toBe(1);
@@ -338,7 +338,7 @@ it("useThreadCollab optimistically publishes a mutation and rolls it back on fai
     ),
   ).toBe(true);
 });
-it("collaboration sidebar definitions activate their server badge filter and counts exclude folders", async () => {
+it("collaboration sidebar definitions activate their server badge filter; summary owns every collaboration count", async () => {
   const requests: URLSearchParams[] = [];
   const apiFetch = (async (url: RequestInfo | URL) => {
     requests.push(new URL(String(url), "http://example.test").searchParams);
@@ -391,9 +391,12 @@ it("collaboration sidebar definitions activate their server badge filter and cou
     );
     expect(view.getByTestId("scope").textContent).toBe("all:");
   }
-  await waitFor(() => expect(requests.length).toBe(7));
-  for (const request of requests)
-    expect(request.get("excludeFolderIds")).toBe("trash");
+  // All collaboration counts come from the canonical summary, leaving only
+  // the four existing non-collaboration view counts.
+  await waitFor(() => expect(requests.length).toBe(4));
+  expect(requests.map(request => [request.get("badges"), request.get("excludeFolderIds")]).sort()).toEqual([
+    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"]
+  ].sort());
 });
 
 it("retains note drafts through collapse and account/thread navigation and bounds long notes", async () => {
@@ -501,7 +504,7 @@ it("a collaboration GET 403 purges the account cache and disables writes without
     if (denyRead) return json({ message: "Mailbox access revoked" }, 403);
     return json({ ok: true, state, members, comments: [{ id: "cached-note" }], activity: [] });
   }) as typeof fetch;
-  const hook = renderHook(({ thread }) => useThreadCollab("a", thread, { apiFetch, onReadDenied: account => invalidated.push(account) }), { initialProps: { thread: state.threadId } });
+  const hook = renderHook(({ thread }) => useThreadCollab("a", thread, { apiFetch, currentUserId: "alex", onReadDenied: account => invalidated.push(account) }), { initialProps: { thread: state.threadId } });
   await waitFor(() => expect(hook.result.current.state).toBeTruthy());
   await act(async () => { await hook.result.current.update({ status: "waiting" }); });
   expect(hook.result.current.state?.status).toBe("open");

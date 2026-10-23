@@ -334,9 +334,10 @@ body {
 
 /* z-index ladder for fixed and portalled layers, lowest first:
      9990  floating calendar panel (CalendarPopover.module.css)
-     9994  shadcn overlays and dialog/sheet content (z-[9994] in
-           app/components/ui/{dialog,sheet}.tsx)
+     9994  base shadcn dialog/sheet content
      9995  Radix Themes dialog overlay (.rt-BaseDialogOverlay, below)
+     9996–9997  nested Settings/Admin dialogs and confirmations, assigned by
+           DialogLayerContext (app/components/ui/dialogLayers.ts)
      9998  shadcn popper content (z-[9998] in app/components/ui/{popover,
            select,dropdown-menu,tooltip}.tsx) and Radix Themes popper
            content (.rt-PopperContent, below)
@@ -345,8 +346,8 @@ body {
    and a fixed-position element always forms a stacking context, so without
    the lift a dialog opened from the calendar panel (e.g. EventDialog via the
    "＋ Event" button) would paint behind it. A Radix dialog opened from inside
-   a shadcn dialog or sheet (e.g. a confirm in the settings frame) has to
-   paint above that frame, hence shadcn 9994 < Radix 9995. */
+   a shadcn dialog or sheet has to paint above that frame. SettingsFrame seeds
+   the shared dialog context at its own layer so children paint above it. */
 .rt-BaseDialogOverlay {
   z-index: 9995;
 }

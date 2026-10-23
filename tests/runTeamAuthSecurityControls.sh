@@ -22,6 +22,8 @@ mkdir "$stage/source/node_modules"
 if [[ $# -eq 0 ]]; then
   set -- test --timeout 20000 tests/teamAuthSecurityControls.test.ts lib/teamAuthSlice5.test.ts app/api/admin/users/route.test.ts lib/db/authPolicy.test.ts lib/authLifetimeLock.test.ts
 fi
+# SWC's native loader rejects group-writable cache ancestors. Keep the sandbox
+# home/cache private even when the host uses a group-writable umask.
 nice -n 10 timeout --signal=TERM --kill-after=3 240 prlimit --cpu=180 --as=17179869184 --nproc=2048 --nofile=512 --fsize=67108864 --core=0 \
   bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL --clearenv \
   --ro-bind /usr /usr --ro-bind /lib /lib --symlink usr/bin /bin \
@@ -31,4 +33,4 @@ nice -n 10 timeout --signal=TERM --kill-after=3 240 prlimit --cpu=180 --as=17179
   --setenv HOME /scratch/home --setenv TMPDIR /scratch/tmp --setenv XDG_CACHE_HOME /scratch/cache \
   --setenv BUN_RUNTIME_TRANSPILER_CACHE_PATH 0 --setenv JSC_useJIT false \
   --setenv JSC_useGigacage false --setenv JSC_useWebAssembly false --setenv BETTER_AUTH_TELEMETRY 0 \
-  --chdir /app /bin/bash -c 'mkdir -p /scratch/home /scratch/tmp /scratch/cache; exec /tool/bun --no-env-file "$@"' review-sandbox "$@"
+  --chdir /app /bin/bash -c 'umask 077; mkdir -p /scratch/home /scratch/tmp /scratch/cache; exec /tool/bun --no-env-file "$@"' review-sandbox "$@"

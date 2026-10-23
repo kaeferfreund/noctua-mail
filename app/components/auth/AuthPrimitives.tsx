@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LanguageSelector from "@/app/components/i18n/LanguageSelector";
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
@@ -9,7 +10,7 @@ import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Button } from "@/app/components/ui/button";
 import { AuthClientError, authErrorMessage } from "@/lib/authClient";
 
-export function AuthFrame({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+export function AuthFrame({ title, description, children, authenticated = false }: { title: string; description?: string; children: ReactNode; authenticated?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [title]);
   return <div data-shell="" className="flex min-h-dvh items-center justify-center bg-muted/40 p-4 text-foreground">
@@ -18,7 +19,7 @@ export function AuthFrame({ title, description, children }: { title: string; des
         <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">{title}</h1>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
-      <CardContent className="space-y-4">{children}</CardContent>
+      <CardContent className="space-y-4">{children}<LanguageSelector authenticated={authenticated} /></CardContent>
     </Card>
   </div>;
 }

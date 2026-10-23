@@ -3,6 +3,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { createTestAuthHarness, createTempDir, TEST_BASE_URL, TEST_SECRET } from "../testAuthHarness";
 import { withDbWriteRetry } from "../dbWriteRetry";
+import { setActiveAccountId } from "../betterAuth";
 
 const execFileAsync = promisify(execFile);
 
@@ -196,4 +197,39 @@ test.each([
   ["invalid", 32768]
 ] as const)("shard cache override %s resolves to %i KiB", async (raw: string, expected: number) => {
   await checkShardConfiguration(raw, expected);
+});
+
+
+test("active mailbox updates yield to the master writer and never restore a concurrently revoked session", async () => {
+  const f = await createTestAuthHarness();
+  let locked = false;
+  let release: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const user = await f.createUser("mailbox-contention@example.test");
+    const { session, jar } = await f.signIn(user.email);
+    if (!session) throw new Error("Synthetic session missing");
+    const holdWriter = (revoke: boolean) => {
+      f.master.exec("BEGIN IMMEDIATE");
+      locked = true;
+      release = setTimeout(() => {
+        if (revoke) f.master.prepare("DELETE FROM auth_session WHERE token=?").run(session.session.token);
+        f.master.exec("COMMIT");
+        locked = false;
+      }, 25);
+    };
+    holdWriter(false);
+    const updated = await setActiveAccountId(f.auth, session.session.token, "synthetic-mailbox");
+    expect(updated).toMatchObject({ activeAccountId: "synthetic-mailbox" });
+    expect((await f.auth.api.getSession({ headers: jar.headers() }))?.session.activeAccountId).toBe("synthetic-mailbox");
+    holdWriter(true);
+    expect(await setActiveAccountId(f.auth, session.session.token, "another-synthetic-mailbox")).toBeNull();
+    expect(f.master.prepare("SELECT id FROM auth_session WHERE token=?").get(session.session.token)).toBeNull();
+    expect(await f.auth.api.getSession({ headers: jar.headers() })).toBeNull();
+    expect(f.master.prepare("PRAGMA busy_timeout").get().timeout).toBe(0);
+    expect(f.database.prepare("PRAGMA busy_timeout").get().timeout).toBe(0);
+  } finally {
+    if (release) clearTimeout(release);
+    if (locked) f.master.exec("ROLLBACK");
+    f.close();
+  }
 });
