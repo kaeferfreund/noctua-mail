@@ -4,11 +4,13 @@ import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { renderToString } from "react-dom/server";
+import { useEffect } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { Theme, Button as KeptButton } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
-import { SidebarInset, SidebarProvider } from "@/app/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, useSidebar } from "@/app/components/ui/sidebar";
+import { MOBILE_QUERY } from "@/app/hooks/use-mobile";
 import type { ShellAccount } from "./types";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
@@ -40,7 +42,8 @@ function renderSidebar(
   onSync = () => {},
   userOverrides: Partial<ShellSidebarProps["user"]> = {},
   views: ShellSidebarProps["views"] = { inbox: null, collab: [], virtual: [] },
-  locale: UiLocale = "en"
+  locale: UiLocale = "en",
+  sidebar: { open?: boolean; openMobile?: boolean } = {}
 ) {
   const props: ShellSidebarProps = {
     brand: { buildVersionLabel: "" },
@@ -66,7 +69,15 @@ function renderSidebar(
       handleDeleteFolderItem: async () => {}, folderSpecialIcon: () => null
     }
   };
-  return render(<I18nTestProvider locale={locale}><Theme><SidebarProvider><ShellSidebar {...props} /></SidebarProvider></Theme></I18nTestProvider>);
+  return render(<I18nTestProvider locale={locale}><Theme><SidebarProvider open={sidebar.open}>
+    {sidebar.openMobile ? <OpenMobileSheet /> : null}<ShellSidebar {...props} />
+  </SidebarProvider></Theme></I18nTestProvider>);
+}
+
+function OpenMobileSheet() {
+  const { setOpenMobile } = useSidebar();
+  useEffect(() => { setOpenMobile(true); }, [setOpenMobile]);
+  return null;
 }
 
 describe("shell sidebar", () => {
@@ -312,6 +323,37 @@ for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views 
     await waitFor(() => expect(page.getAllByRole("tooltip").map(tooltip => tooltip.textContent))
       .toEqual([t("Views.rowTitle", { name: views[index].name, description: views[index].description })]));
   }
+});
+
+for (const mode of ["collapsed sidebar", "phone sheet"] as const) it(`renders no view row description in the ${mode}`, async () => {
+  const original = window.matchMedia;
+  if (mode === "phone sheet") window.matchMedia = ((query: string) => query === MOBILE_QUERY
+    ? { matches: true, media: query, addEventListener() {}, removeEventListener() {} }
+    : original.call(window, query)) as typeof window.matchMedia;
+  try {
+    const t = getTranslator("en");
+    const virtual = VIRTUAL_FOLDERS.map(folder => ({
+      ...folder, ...getVirtualFolderLabels(folder, key => t(`Views.${key}`)), active: false, icon: null, count: 3, onSelect() {}
+    }));
+    const page = renderSidebar([], () => {}, () => {}, {}, { inbox: null, collab: [], virtual }, "en",
+      mode === "collapsed sidebar" ? { open: false } : { openMobile: true });
+    const buttons = await waitFor(() => {
+      const found = [...document.querySelectorAll<HTMLButtonElement>("[data-view-id]")];
+      expect(found).toHaveLength(VIRTUAL_FOLDERS.length);
+      return found;
+    });
+    // The collapsed offcanvas sidebar is off screen: none of its rows can take focus.
+    const container = document.querySelector('[data-slot="sidebar-container"]');
+    expect(container?.hasAttribute("inert") ?? false).toBe(mode === "collapsed sidebar");
+    for (const button of buttons) {
+      await act(async () => { button.focus(); });
+      fireEvent.pointerMove(button, { pointerType: "mouse" });
+      expect(button.hasAttribute("aria-describedby")).toBe(false);
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(page.queryAllByRole("tooltip")).toHaveLength(0);
+    expect(document.querySelector('[data-slot="tooltip-content"]')).toBeNull();
+  } finally { cleanup(); window.matchMedia = original; }
 });
 
 for (const locale of ["de", "en"] as const) it(`uses numeric view counts with complete accessible descriptions in ${locale}`, () => {
