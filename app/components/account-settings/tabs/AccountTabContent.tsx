@@ -56,7 +56,7 @@ export default function AccountTabContent({
           <Text size="3" weight="medium">
             {t("account.details")}
           </Text>
-          <Grid columns="2" gap="3">
+          <Grid columns={{ initial: "1", sm: "2" }} gap="3">
             <Field label={t("account.name")}>
               <TextField.Root
                 value={editingAccount.name}
@@ -96,7 +96,7 @@ export default function AccountTabContent({
               {t("account.probeResult", { tls: String(Boolean(imapProbe.tls)), starttls: String(Boolean(imapProbe.starttls)) })}
             </Text>
           )}
-          <Grid columns="3fr 1fr 2fr" gap="3">
+          <Grid columns={{ initial: "1", sm: "3fr 1fr 2fr" }} gap="3">
             <Field label={t("account.imapHost")}>
               <TextField.Root
                 value={editingAccount.imap.host}
@@ -190,7 +190,7 @@ export default function AccountTabContent({
               {t("account.probeResult", { tls: String(Boolean(smtpProbe.tls)), starttls: String(Boolean(smtpProbe.starttls)) })}
             </Text>
           )}
-          <Grid columns="3fr 1fr 2fr" gap="3">
+          <Grid columns={{ initial: "1", sm: "3fr 1fr 2fr" }} gap="3">
             <Field label={t("account.smtpHost")}>
               <TextField.Root
                 value={editingAccount.smtp.host}
