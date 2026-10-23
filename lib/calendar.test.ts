@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
-  buildCalendarRecurrenceSummary,
   formatCalendarEventDate,
   formatCalendarEventRange,
   parseIcsEvents
 } from "./calendar";
+import { buildCalendarRecurrenceSummary } from "./calendarRecurrenceSummary";
 
 function parseIcsEventInSubprocess(ics: string, timeZone: string) {
   const evalSource = `

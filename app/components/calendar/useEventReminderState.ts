@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AccountDateFormat } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
-import { resolveNextReminderOccurrence } from "@/lib/reminderRecurrence";
+import { useNextReminderOccurrenceResolver } from "./useLazyRecurrence";
 import {
   CALENDAR_REMINDER_LEAD_OPTIONS,
   deleteCalendarReminder,
@@ -74,6 +74,14 @@ export function useEventReminderState({
   const [savingReminder, setSavingReminder] = useState(false);
   const [deletingReminder, setDeletingReminder] = useState(false);
 
+  // The recurrence resolver is dynamic-imported (it pulls in `rrule`);
+  // until it lands a recurring event reports "cannot schedule yet" rather
+  // than guessing from the series start. Once loaded it is a plain
+  // synchronous function, so the per-render evaluation below is unchanged.
+  const resolveNextReminderOccurrence = useNextReminderOccurrenceResolver(
+    Boolean(recurrenceRule?.trim())
+  );
+
   // Evaluated on every render rather than memoized. `Date.now()` has to
   // stay fresh so the Schedule button doesn't sit enabled after the
   // event has already started; memoizing would pin the timestamp for
@@ -83,6 +91,7 @@ export function useEventReminderState({
     if (typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return false;
     const nowMs = Date.now();
     if (!recurrenceRule?.trim()) return canonicalStartMs > nowMs;
+    if (!resolveNextReminderOccurrence) return false;
     const next = resolveNextReminderOccurrence({
       eventStartAtMs: canonicalStartMs,
       eventEndAtMs: eventEndAtMs,
