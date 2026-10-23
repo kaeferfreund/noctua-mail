@@ -4946,15 +4946,17 @@ export default function MailClient({
 
   const syncNoticePaneRightOffset = useCallback(() => {
     if (typeof window === "undefined") return;
-    const pane = listPaneRef.current;
+    const pane = !isMobile && readerLayout === "focus"
+      ? document.getElementById("reader")
+      : listPaneRef.current;
     if (!pane) {
       setNoticePaneRightOffset(16);
       return;
     }
     const rect = pane.getBoundingClientRect();
-    const next = Math.max(0, Math.round(window.innerWidth - rect.right));
+    const next = Math.max(8, Math.round(window.innerWidth - rect.right));
     setNoticePaneRightOffset((prev) => (prev === next ? prev : next));
-  }, []);
+  }, [isMobile, readerLayout]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -4967,7 +4969,9 @@ export default function MailClient({
       });
     };
     scheduleSync();
-    const pane = listPaneRef.current;
+    const pane = !isMobile && readerLayout === "focus"
+      ? document.getElementById("reader")
+      : listPaneRef.current;
     let observer: ResizeObserver | null = null;
     if (pane && typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => {
