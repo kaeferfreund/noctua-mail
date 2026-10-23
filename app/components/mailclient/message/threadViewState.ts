@@ -1,4 +1,5 @@
 import type { Message } from "@/lib/data";
+import { isMessageContentUnloaded } from "@/lib/ui/messageView";
 
 export function getVisibleThreadMessages(params: {
   activeThread: Message[];
@@ -78,12 +79,55 @@ export function getComposeThreadFocusMessageId(params: {
   return composeReplyMessage?.id ?? activeMessage?.id ?? composeDraftId;
 }
 
-export function doesCachedThreadCoverMessages(params: {
-  activeThread: Message[];
-  cachedThread?: Message[];
+/**
+ * Cards without an explicit collapse entry open only for the selected message
+ * and the newest unread one. Collapsed cards never read their body.
+ */
+export function getDefaultExpandedMessageIds(
+  thread: Pick<Message, "id" | "seen" | "dateValue">[],
+  activeMessageId?: string | null
+) {
+  const ids = new Set<string>();
+  if (activeMessageId) ids.add(activeMessageId);
+  let newestUnread: Pick<Message, "id" | "dateValue"> | null = null;
+  thread.forEach((message) => {
+    if (message.seen) return;
+    if (!newestUnread || message.dateValue >= newestUnread.dateValue) newestUnread = message;
+  });
+  if (newestUnread) ids.add((newestUnread as Pick<Message, "id">).id);
+  return ids;
+}
+
+export function isThreadMessageCollapsed(
+  messageId: string,
+  collapsedMessages: Record<string, boolean>,
+  defaultExpandedIds: Set<string>
+) {
+  return collapsedMessages[messageId] ?? !defaultExpandedIds.has(messageId);
+}
+
+/**
+ * Print what the reader shows: expanded cards whose body has not been read
+ * yet are loaded first, so the printout never contains an empty body.
+ */
+export async function printWithLoadedBodies(params: {
+  renderedThread: Message[];
+  collapsedMessages: Record<string, boolean>;
+  activeMessageId?: string | null;
+  ensureMessageContent: (message: Message) => Promise<Message | null>;
+  print: () => void;
+  afterRender?: () => Promise<void>;
 }) {
-  const { activeThread, cachedThread } = params;
-  if (activeThread.length === 0) return true;
-  const cachedIds = new Set((cachedThread ?? []).map((message) => message.id));
-  return activeThread.every((message) => cachedIds.has(message.id));
+  const { renderedThread, collapsedMessages, activeMessageId, ensureMessageContent, print } = params;
+  const defaultExpandedIds = getDefaultExpandedMessageIds(renderedThread, activeMessageId);
+  const pending = renderedThread.filter(
+    (message) =>
+      !isThreadMessageCollapsed(message.id, collapsedMessages, defaultExpandedIds) &&
+      isMessageContentUnloaded(message)
+  );
+  if (pending.length > 0) {
+    await Promise.all(pending.map((message) => ensureMessageContent(message)));
+    await params.afterRender?.();
+  }
+  print();
 }

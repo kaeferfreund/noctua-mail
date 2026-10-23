@@ -14,19 +14,43 @@ export { hasHtmlContent, hasTextContent };
 
 export type ImapFlagBadge = { label: string; kind: string };
 
-type MessageContentState = Pick<Message, "body" | "htmlBody" | "hasSource" | "mailboxPath" | "imapUid">;
+type MessageContentFields = Pick<
+  Message,
+  "body" | "htmlBody" | "hasSource" | "mailboxPath" | "imapUid" | "contentState"
+>;
 
-export function needsMessageContentHydration(message?: MessageContentState | null) {
+function hasReadableContent(message: Pick<Message, "body" | "htmlBody">) {
+  return hasTextContent(message.body) || hasHtmlContent(message.htmlBody);
+}
+
+/**
+ * True while the payload does not carry the message content yet (header
+ * projection or a list row). The content is read from the local message detail
+ * route; an IMAP resync is never the first step.
+ */
+export function isMessageContentUnloaded(message?: MessageContentFields | null) {
   if (!message) return false;
-  if (hasTextContent(message.body) || hasHtmlContent(message.htmlBody)) return false;
+  if (hasReadableContent(message)) return false;
+  return message.contentState === "omitted" || message.contentState === undefined;
+}
+
+/**
+ * True only when the content is known to be absent locally and a resync can
+ * fetch it. Payloads that did not include the content (`omitted`) and messages
+ * whose stored source is legitimately empty never qualify.
+ */
+export function needsMessageContentHydration(message?: MessageContentFields | null) {
+  if (!message) return false;
+  if (hasReadableContent(message)) return false;
+  if (message.contentState === "omitted" || message.contentState === "empty") return false;
 
   const canResync =
     typeof message.mailboxPath === "string" &&
     message.mailboxPath.length > 0 &&
     typeof message.imapUid === "number" &&
     !Number.isNaN(message.imapUid);
-
-  return canResync && !Boolean(message.hasSource);
+  if (!canResync) return false;
+  return message.contentState === "missing" || !message.hasSource;
 }
 
 export function hasMeaningfulHtmlText(html?: string) {
