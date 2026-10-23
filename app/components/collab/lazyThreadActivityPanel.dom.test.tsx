@@ -1,7 +1,8 @@
 import { expect, it } from "bun:test";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { MessageLinkPreviewProvider } from "../mailclient/message/MessageLinkPreviewContext";
 import type { ThreadComment } from "./types";
 

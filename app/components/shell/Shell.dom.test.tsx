@@ -1,7 +1,8 @@
 // Uses the existing happy-dom harness through bun run test:dom.
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
-import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
 import { Theme, Button as KeptButton } from "@radix-ui/themes";
@@ -249,9 +250,9 @@ describe("saved shell hydration", () => {
     const error = spyOn(console, "error").mockImplementation((...args: unknown[]) => { errors.push(args); });
     const container = document.createElement("div");
     document.body.append(container);
-    const shell = <ThemeProvider attribute="class" storageKey="noctua:theme" forcedTheme="light">
+    const shell = <I18nTestProvider><ThemeProvider attribute="class" storageKey="noctua:theme" forcedTheme="light">
       <ThemeToggle /><ShellPanes list={<div>List</div>} reader={<div>Reader</div>} />
-    </ThemeProvider>;
+    </ThemeProvider></I18nTestProvider>;
     container.innerHTML = renderToString(shell);
     let root: ReturnType<typeof hydrateRoot> | undefined;
     try {

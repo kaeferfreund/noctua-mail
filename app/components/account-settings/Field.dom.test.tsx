@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Flex, Switch, TextArea, Theme } from "@radix-ui/themes";
 import { CreateMailbox } from "@/app/components/admin/AdminMailboxes";
 import Field from "./Field";

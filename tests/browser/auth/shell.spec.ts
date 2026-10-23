@@ -18,8 +18,8 @@ test(SCENARIOS.shellLogin, async ({ page }) => {
   await page.getByRole("combobox", { name: "Language", exact: true }).selectOption("de");
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
-  await expect(page.getByLabel("Invite code", { exact: true })).toHaveValue("synthetic-unsubmitted-invite");
-  await expect(page.getByLabel("Email", { exact: true })).toHaveValue("synthetic-locale@example.test");
+  await expect(page.getByLabel("Einladungscode", { exact: true })).toHaveValue("synthetic-unsubmitted-invite");
+  await expect(page.getByLabel("E-Mail", { exact: true })).toHaveValue("synthetic-locale@example.test");
   await page.getByRole("combobox", { name: "Sprache", exact: true }).selectOption("automatic");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
@@ -261,14 +261,14 @@ test(SCENARIOS.shellMailbox, async ({ page, seed }) => {
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   await expect(page.getByRole("combobox", { name: "Sprache", exact: true })).toHaveValue("de");
   expect((await api(page, "/api/auth/me")).body.user.uiLocale).toBe("de");
-  await page.getByRole("dialog", { name: "Account settings", exact: true }).getByRole("button", { name: "Close", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "Account settings", exact: true }).getByRole("button", { name: "Schließen", exact: true }).first().click();
   await expect(second).toHaveAttribute("aria-current", "true");
   await expect(subject).toHaveValue("Synthetic unsent locale draft");
   await expect(page.getByText("Synthetic locale body", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("button", { name: "User menu", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Profile & security", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "App password", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Benutzermenü", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Profil & Sicherheit", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "App-Passwort", exact: true })).toBeVisible();
   // A fresh login must prefer the personal language over this device's English cookie.
   await page.evaluate(async () => {
     const response = await fetch("/api/auth/logout", {method: "POST"});
