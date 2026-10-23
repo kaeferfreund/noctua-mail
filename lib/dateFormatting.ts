@@ -198,17 +198,19 @@ export function formatMessageDate(
 /**
  * Date line of a forwarded message's header block. It leaves the account, so
  * weekday, spelled-out month and time zone keep a recipient in another locale
- * from misreading day and month or the hour.
+ * from misreading day and month or the hour. A UI locale (captured when the
+ * draft is created) selects its language and the explicit display zone.
  */
 export function formatForwardedMessageDate(
   dateValue: number,
   fallbackDate: string,
-  preferredFormat?: AccountDateFormat
+  preferredFormat?: AccountDateFormat,
+  locale?: UiLocale
 ): string {
   if (!Number.isFinite(dateValue)) return fallbackDate;
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) return fallbackDate;
-  return formatAccountIntl(parsed, preferredFormat, FORWARDED_MESSAGE_DATE_OPTIONS);
+  return formatAccountIntl(parsed, preferredFormat, locale ? { ...FORWARDED_MESSAGE_DATE_OPTIONS, timeZone } : FORWARDED_MESSAGE_DATE_OPTIONS, locale);
 }
 
 /**

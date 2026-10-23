@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, Flex, Grid, Text } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import {
   buildAccountCategoriesDebugPath,
   buildAccountCategoriesModelResetPath
@@ -42,6 +43,7 @@ export default function CategorizationTabContent({
   apiFetch,
   readErrorMessage
 }: Props) {
+  const t = useTranslations("Settings");
   const [snapshot, setSnapshot] = useState<CategoryLearningDebugSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,22 +56,24 @@ export default function CategorizationTabContent({
       (async (res: Response) => {
         try {
           const data = (await res.json()) as { message?: string; error?: string };
-          return data?.message || data?.error || `Request failed (${res.status})`;
+          return data?.message || data?.error || t("categorization.requestFailed", { status: res.status });
         } catch {
-          return `Request failed (${res.status})`;
+          return t("categorization.requestFailed", { status: res.status });
         }
       }),
-    [readErrorMessage]
+    [readErrorMessage, t]
   );
 
   const formatTimestamp = (value?: number | null) =>
-    formatAccountTimestampLabel(value, accountDateFormat);
+    formatAccountTimestampLabel(value, accountDateFormat, t("categorization.never"));
 
+  // Category codes stay stable; only the presentation is translated. Unknown
+  // codes from the server are shown as is.
   const formatCategory = (value: string | null) => {
-    if (!value) return "none";
-    if (value === "newsletter") return "newsletter";
-    if (value === "notification") return "notification";
-    if (value === "transactional") return "transactional";
+    if (!value) return t("categorization.categories.none");
+    if (value === "newsletter" || value === "notification" || value === "transactional" || value === "uncategorized") {
+      return t(`categorization.categories.${value}`);
+    }
     return value;
   };
 
@@ -93,22 +97,20 @@ export default function CategorizationTabContent({
       }
       const data = (await res.json()) as CategoryDebugResponse;
       if (!data?.ok || !data.snapshot) {
-        setError(data?.message || "Invalid categorization debug response.");
+        setError(data?.message || t("categorization.invalidResponse"));
         return;
       }
       setSnapshot(data.snapshot);
     } catch {
-      setError("Failed to load categorization details.");
+      setError(t("categorization.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [accountId, readError, request]);
+  }, [accountId, readError, request, t]);
 
   const resetCategorizationModel = useCallback(async () => {
     if (!accountId) return;
-    const confirmed = window.confirm(
-      "Reset the categorization learning model for this account to the default baseline?"
-    );
+    const confirmed = window.confirm(t("categorization.confirmReset"));
     if (!confirmed) return;
     setResetting(true);
     setError("");
@@ -122,17 +124,17 @@ export default function CategorizationTabContent({
       }
       const data = (await res.json()) as CategoryModelResetResponse;
       if (!data?.ok) {
-        setError(data?.message || "Failed to reset categorization model.");
+        setError(data?.message || t("categorization.resetFailed"));
         return;
       }
       onModelResetSuccess?.();
       await loadCategorizationDebug();
     } catch {
-      setError("Failed to reset categorization model.");
+      setError(t("categorization.resetFailed"));
     } finally {
       setResetting(false);
     }
-  }, [accountId, loadCategorizationDebug, onModelResetSuccess, readError, request]);
+  }, [accountId, loadCategorizationDebug, onModelResetSuccess, readError, request, t]);
 
   useEffect(() => {
     if (!isActive || !accountId || !isExistingAccount) return;
@@ -145,7 +147,7 @@ export default function CategorizationTabContent({
         <Flex direction="column" gap="4">
           <Flex align="center" justify="between" gap="3" wrap="wrap">
             <Text size="2" color="gray">
-              Inspect learned category calibration and recent feedback events for this account.
+              {t("categorization.intro")}
             </Text>
             <Flex align="center" gap="2" wrap="wrap">
               <Button
@@ -155,7 +157,7 @@ export default function CategorizationTabContent({
                 onClick={() => void resetCategorizationModel()}
                 disabled={resetting || loading || !accountId}
               >
-                {resetting ? "Resetting..." : "Reset learning model"}
+                {resetting ? t("categorization.resetting") : t("categorization.reset")}
               </Button>
               <Button
                 size="1"
@@ -163,7 +165,7 @@ export default function CategorizationTabContent({
                 onClick={() => void loadCategorizationDebug()}
                 disabled={loading || resetting || !accountId}
               >
-                {loading ? "Refreshing..." : "Refresh"}
+                {loading ? t("categorization.refreshing") : t("categorization.refresh")}
               </Button>
             </Flex>
           </Flex>
@@ -179,25 +181,26 @@ export default function CategorizationTabContent({
           <Card size="2">
             <Flex direction="column" gap="2">
               <Text size="3" weight="medium">
-                Model
+                {t("categorization.modelTitle")}
               </Text>
               {snapshot?.model ? (
                 <Grid columns={{ initial: "1", sm: "2" }} gap="2">
-                  <Text size="2">Version: {snapshot.model.version}</Text>
-                  <Text size="2">Examples: {snapshot.model.examples}</Text>
-                  <Text size="2">Updated: {formatTimestamp(snapshot.model.updatedAt)}</Text>
-                  <Text size="2">Learning rate: {snapshot.model.learningRate}</Text>
-                  <Text size="2">L2: {snapshot.model.l2}</Text>
+                  <Text size="2">{t("categorization.version", { version: snapshot.model.version })}</Text>
+                  <Text size="2">{t("categorization.examples", { count: snapshot.model.examples })}</Text>
+                  <Text size="2">{t("categorization.updated", { time: formatTimestamp(snapshot.model.updatedAt) })}</Text>
+                  <Text size="2">{t("categorization.learningRate", { value: snapshot.model.learningRate })}</Text>
+                  <Text size="2">{t("categorization.l2", { value: snapshot.model.l2 })}</Text>
                   <Text size="2">
-                    Features:{" "}
-                    {categoryLabels
-                      .map((category) => `${category}=${snapshot.model?.featureCounts[category] ?? 0}`)
-                      .join(" · ")}
+                    {t("categorization.features", {
+                      list: categoryLabels
+                        .map((category) => t("categorization.featureCount", { category: formatCategory(category), count: snapshot.model?.featureCounts[category] ?? 0 }))
+                        .join(" · ")
+                    })}
                   </Text>
                 </Grid>
               ) : (
                 <Text size="2" color="gray">
-                  No learned model yet. Use message menu category actions to create feedback events.
+                  {t("categorization.noModel")}
                 </Text>
               )}
             </Flex>
@@ -206,29 +209,29 @@ export default function CategorizationTabContent({
           <Card size="2">
             <Flex direction="column" gap="2">
               <Text size="3" weight="medium">
-                Category Distribution
+                {t("categorization.distributionTitle")}
               </Text>
               <Flex direction="column" gap="1">
                 {(snapshot?.categoryCounts ?? []).map((entry) => (
                   <Text key={entry.category} size="2">
-                    {entry.category}: {entry.count}
+                    {t("categorization.distributionEntry", { category: formatCategory(entry.category), count: entry.count })}
                   </Text>
                 ))}
               </Flex>
-              <Text size="2">Manual category overrides: {snapshot?.manualCategorizedCount ?? 0}</Text>
+              <Text size="2">{t("categorization.manualOverrides", { count: snapshot?.manualCategorizedCount ?? 0 })}</Text>
             </Flex>
           </Card>
 
           <Card size="2">
             <Flex direction="column" gap="2">
               <Text size="3" weight="medium">
-                Feedback Events
+                {t("categorization.feedbackTitle")}
               </Text>
               <Text size="2">
-                Total: {snapshot?.feedback.totalEvents ?? 0} · Last: {formatTimestamp(snapshot?.feedback.lastEventAt)}
+                {t("categorization.feedbackSummary", { total: snapshot?.feedback.totalEvents ?? 0, last: formatTimestamp(snapshot?.feedback.lastEventAt) })}
               </Text>
               <Text size="2" weight="medium">
-                Top transitions
+                {t("categorization.topTransitions")}
               </Text>
               <Flex direction="column" gap="1">
                 {(snapshot?.feedback.transitions ?? []).slice(0, 8).map((entry) => (
@@ -236,12 +239,12 @@ export default function CategorizationTabContent({
                     key={`${entry.previousCategory ?? "none"}-${entry.nextCategory ?? "none"}-${entry.count}`}
                     size="2"
                   >
-                    {formatCategory(entry.previousCategory)} → {formatCategory(entry.nextCategory)}: {entry.count}
+                    {t("categorization.transition", { from: formatCategory(entry.previousCategory), to: formatCategory(entry.nextCategory), count: entry.count })}
                   </Text>
                 ))}
               </Flex>
               <Text size="2" weight="medium">
-                Recent events
+                {t("categorization.recentTitle")}
               </Text>
               <Flex direction="column" gap="1">
                 {(snapshot?.feedback.recent ?? []).map((entry) => (
@@ -249,13 +252,12 @@ export default function CategorizationTabContent({
                     key={`${entry.createdAt}-${entry.messageId}-${entry.previousCategory ?? "none"}-${entry.nextCategory ?? "none"}`}
                     size="2"
                   >
-                    {formatTimestamp(entry.createdAt)} · {formatCategory(entry.previousCategory)} →{" "}
-                    {formatCategory(entry.nextCategory)} · features: {entry.featureCount}
+                    {t("categorization.recentEntry", { time: formatTimestamp(entry.createdAt), from: formatCategory(entry.previousCategory), to: formatCategory(entry.nextCategory), count: entry.featureCount })}
                   </Text>
                 ))}
                 {(snapshot?.feedback.recent ?? []).length === 0 && (
                   <Text size="2" color="gray">
-                    No feedback events yet.
+                    {t("categorization.noFeedback")}
                   </Text>
                 )}
               </Flex>
@@ -265,18 +267,18 @@ export default function CategorizationTabContent({
           <Card size="2">
             <Flex direction="column" gap="2">
               <Text size="3" weight="medium">
-                Top Learned Features
+                {t("categorization.weightsTitle")}
               </Text>
               {!snapshot?.model ? (
                 <Text size="2" color="gray">
-                  No model weights available.
+                  {t("categorization.noWeights")}
                 </Text>
               ) : (
                 <Grid columns={{ initial: "1", sm: "3" }} gap="3">
                   {categoryLabels.map((category) => (
                     <Flex key={category} direction="column" gap="1">
                       <Text size="2" weight="medium">
-                        {category}
+                        {formatCategory(category)}
                       </Text>
                       {snapshot.model?.topWeights[category].length ? (
                         snapshot.model.topWeights[category].map((entry) => (
@@ -292,7 +294,7 @@ export default function CategorizationTabContent({
                         ))
                       ) : (
                         <Text size="1" color="gray">
-                          No features
+                          {t("categorization.noFeatures")}
                         </Text>
                       )}
                     </Flex>
@@ -312,10 +314,10 @@ export default function CategorizationTabContent({
         style={{ paddingTop: "var(--space-3)", borderTop: "1px solid var(--gray-a5)" }}
       >
         <Button size="2" variant="soft" color="gray" onClick={onClose}>
-          Close
+          {t("close")}
         </Button>
         <Button size="2" onClick={onSave} disabled>
-          Save
+          {t("common.save")}
         </Button>
       </Flex>
     </Flex>

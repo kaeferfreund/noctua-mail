@@ -1,4 +1,6 @@
 import { readSenderError } from "./senderErrors";
+import { useTranslations } from "next-intl";
+import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { loadMarkdownConverters } from "@/lib/markdownConvert";
 import { useEffect, useRef } from "react";
 import type React from "react";
@@ -139,6 +141,8 @@ export function useDraftManager(params: UseDraftManagerParams) {
     readErrorMessage,
     buildComposePayload
   } = params;
+  const t = useTranslations("Compose.draft");
+  const { renderMessage } = useSenderMessages();
   const activeAccountIdRef = useRef(activeAccountId);
   const accountScopeVersionRef = useRef(0);
   const draftSaveLoopPromiseRef = useRef<Promise<void> | null>(null);
@@ -187,8 +191,9 @@ export function useDraftManager(params: UseDraftManagerParams) {
       if (!res.ok) {
         const message = await readSenderError(res, readErrorMessage);
         if (!isCurrentRequest()) return;
-        reportError(message);
-        setDraftSaveError(message || "Draft save failed.");
+        // Keep sender catalog IDs in state; the notice needs rendered copy.
+        reportError(renderMessage(message));
+        setDraftSaveError(message || t("saveFailed"));
         return;
       }
       const previousDraftId = composeDraftIdRef.current;
@@ -232,8 +237,8 @@ export function useDraftManager(params: UseDraftManagerParams) {
       }
     } catch {
       if (!isCurrentRequest()) return;
-      reportError("Failed to save draft.");
-      setDraftSaveError("Draft save failed.");
+      reportError(t("saveFailedNotice"));
+      setDraftSaveError(t("saveFailed"));
     } finally {
       if (!isCurrentRequest()) return;
       setDraftSaving(false);
@@ -331,7 +336,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
         }
         await refreshFolders();
       } catch {
-        reportError("Failed to discard draft.");
+        reportError(t("discardFailed"));
         discarded = false;
       } finally {
         setDiscardingDraft(false);
@@ -359,7 +364,7 @@ export function useDraftManager(params: UseDraftManagerParams) {
     try {
       await loadMarkdownConverters();
     } catch {
-      if (isCurrent()) reportError("Failed to load composer. Please retry.");
+      if (isCurrent()) reportError(t("loadComposerFailed"));
       return;
     }
     if (!isCurrent()) return;

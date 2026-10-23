@@ -281,8 +281,8 @@ export default function AccountSettingsModal({
                 onSave={handleSave}
                 onModelResetSuccess={() =>
                   onNotifySuccess?.(
-                    "Categorization model reset",
-                    "Default baseline model restored for this account."
+                    t("modal.modelResetTitle"),
+                    t("modal.modelResetDescription")
                   )
                 }
                 apiFetch={apiFetch}
@@ -353,13 +353,13 @@ export default function AccountSettingsModal({
                 aliases={recipientAliases}
                 apiFetch={apiFetch}
                 onCreateAlias={onCreateRecipientAlias ?? (async () => {
-                  throw new Error("Recipient alias creation is unavailable.");
+                  throw new Error(t("modal.aliasCreateUnavailable"));
                 })}
                 onUpdateAlias={onUpdateRecipientAlias ?? (async () => {
-                  throw new Error("Recipient alias update is unavailable.");
+                  throw new Error(t("modal.aliasUpdateUnavailable"));
                 })}
                 onDeleteAlias={onDeleteRecipientAlias ?? (async () => {
-                  throw new Error("Recipient alias deletion is unavailable.");
+                  throw new Error(t("modal.aliasDeleteUnavailable"));
                 })}
                 onAliasesChanged={onRecipientAliasesChanged}
                 onClose={onClose}
@@ -372,7 +372,7 @@ export default function AccountSettingsModal({
 
           </Tabs.Root>
           {deleteConfirm && (initialAccount.isOwner === true || isAdminUser) && <AdminConfirmDialog
-            title="Delete mailbox" description={`Permanently delete ${localAccount.email} and its local data?`}
+            title={t("modal.deleteTitle")} description={t("modal.deleteDescription", { email: localAccount.email })}
             busy={false} onCancel={() => setDeleteConfirm(false)} onConfirm={() => { setDeleteConfirm(false); onDelete(); }} />}
 
         </Flex>

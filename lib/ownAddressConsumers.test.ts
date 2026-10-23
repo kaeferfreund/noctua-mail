@@ -13,7 +13,7 @@ const message: Message = { id: "synthetic", accountId: "a", folderId: "a:INBOX",
 describe("own-address consumers", () => {
   test("compose self reply and reply-all exclude every own address while external Reply-To is retained", () => {
     const compose = (mode: "reply" | "replyAll", source = message) => computeComposeInitState(mode, source, false,
-      { accountEmail: "primary@example.test", ownAddresses, accountDateFormat: "locale" },
+      { accountEmail: "primary@example.test", ownAddresses, accountDateFormat: "locale", locale: "en" },
       { stripHtml: value => value, normalizeHtmlDerivedText: value => value });
     expect(compose("reply").composeTo).toBe("customer@example.test");
     const all = compose("replyAll");
@@ -41,7 +41,7 @@ test("address-like display names never change reply-all, classifier or topic dec
     const canonical = address.replace("bücher", "xn--bcher-kva");
     expect(getCollapsedThreadIconParticipant([{ message: { ...message, from: entry }, depth: 0 }], ownAddresses)?.fromEmail).toBe(canonical);
     const all = computeComposeInitState("replyAll", { ...message, from: "sender@example.test", to: entry, cc: "" }, false,
-      { accountEmail: "primary@example.test", ownAddresses, accountDateFormat: "locale" },
+      { accountEmail: "primary@example.test", ownAddresses, accountDateFormat: "locale", locale: "en" },
       { stripHtml: value => value, normalizeHtmlDerivedText: value => value });
     expect(all.composeCc).toContain(address);
     expect(classifyCategoryFromMetadata({ from: entry }, { context: { accountEmail: ownAddresses } }).signals).not.toContain("skip:sender-is-account");
