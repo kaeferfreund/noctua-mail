@@ -1,0 +1,1763 @@
+$ bun test --timeout 20000 --parallel=4
+bun test v1.4.4 (38afee6c8) 4x PARALLEL
+
+lib/db.attachmentUrls.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-NGp0Ag",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-NGp0Ag/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.calendarConflicts.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xLpIfB",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xLpIfB/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.calendarEvents.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JchB0h",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JchB0h/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.collisionVariantInlineImages.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-4hMT5A",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-4hMT5A/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.draftTombstones.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-wLdiam",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-wLdiam/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/_helpers/enrichMessagesWithThreadCollab.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-jEGhhX",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-jEGhhX/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.folders.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Uf3Fgd",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Uf3Fgd/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/_helpers/smtpUpstreamError.test.ts:
+[smtp] upstream failure {
+  accountId: "synthetic",
+  op: "test",
+  code: undefined,
+  command: undefined,
+}
+
+lib/mail/sourceOwnership.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-SEpDDl",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-SEpDDl/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/calendar/conflicts/[eventId]/resolve/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tN2KgA",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tN2KgA/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.mailboxState.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-oHnJO1",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-oHnJO1/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mail/syncMessageSanitizer.sizes.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vy9OCE",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vy9OCE/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/accountRouteRoles.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-rarBlO",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-rarBlO/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.messageSizes.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Y5JcOT",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Y5JcOT/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.messagesCore.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-svtwXK",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-svtwXK/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.sameFolderMessageCopies.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-LYpTSj",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-LYpTSj/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/auth.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-R8EeBU",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-R8EeBU/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-7jKnS6",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-7jKnS6/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mailboxSummary.mcp.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-VHCczX",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-VHCczX/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.senderKey.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Xs8eY2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Xs8eY2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:
+[imap] folder.consistency unavailable account=acc-consistency-unreachable-88b9478c-a6a6-4a33-a128-d89b7ac61753 error=Peer certificate is empty for hostname "imap.example.com"
+
+lib/db.sharedShard.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-IpEFJq",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-IpEFJq/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mailboxSummary.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-S842dX",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-S842dX/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/accountDbProbes.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-56SsHB",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-56SsHB/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/identities/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ksT4LV",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ksT4LV/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/accountKeys.test.ts:
+[shard-migration-timing] 50000 messages: migration=3227.85ms repeat=10.77ms
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-1w04lV",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-1w04lV/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[imap] imap.connect mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 1ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 1ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 1ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 1ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.connect mailbox=poll account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 1ms
+[imap] imap.status mailbox=Archive account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.connect mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+[imap] imap.status mailbox=INBOX account=stream-9f3379e2-ae7b-46db-958f-9f4670348948 0ms
+
+lib/db/adminAudit.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WBfxKN",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WBfxKN/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-29180b19-2090-40e1-9b38-37dfbe2eb451 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-29180b19-2090-40e1-9b38-37dfbe2eb451 0ms
+[imap] imap.status mailbox=INBOX account=stream-29180b19-2090-40e1-9b38-37dfbe2eb451 0ms
+[imap] imap.status mailbox=INBOX account=stream-29180b19-2090-40e1-9b38-37dfbe2eb451 7ms
+[imap] imap.fetch mailbox=INBOX account=stream-29180b19-2090-40e1-9b38-37dfbe2eb451 0ms
+[imap] imap.connect mailbox=INBOX account=stream-b2ce1b38-b747-45c7-8882-a620e3d3f85e 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-b2ce1b38-b747-45c7-8882-a620e3d3f85e 0ms
+[imap] imap.status mailbox=INBOX account=stream-b2ce1b38-b747-45c7-8882-a620e3d3f85e 0ms
+[imap] imap.connect mailbox=poll account=stream-b2ce1b38-b747-45c7-8882-a620e3d3f85e 0ms
+[imap] imap.status mailbox=Archive account=stream-b2ce1b38-b747-45c7-8882-a620e3d3f85e 10ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-8c192d7c-9b6c-4208-bbb9-4b270a08a704 5ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-8c192d7c-9b6c-4208-bbb9-4b270a08a704 0ms
+[imap] imap.status mailbox=INBOX account=stream-8c192d7c-9b6c-4208-bbb9-4b270a08a704 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.status mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.connect mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.status mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 0ms
+[imap] imap.connect mailbox=poll account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 1ms
+[imap] imap.status mailbox=Archive account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 5ms
+[imap] imap.status mailbox=INBOX account=stream-a9413439-016e-4286-8d71-69bfab30aaa5 1ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.status mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.connect mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.status mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.connect mailbox=poll account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+[imap] imap.status mailbox=Archive account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 5ms
+[imap] imap.status mailbox=INBOX account=stream-a27dab96-3d94-486f-9505-d8efe5a9ec16 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:22:31.442Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.status mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.connect mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.status mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.connect mailbox=poll account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+[imap] imap.status mailbox=Archive account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 6ms
+[imap] imap.status mailbox=INBOX account=stream-bcf2af0c-bc72-450b-9c92-16e45e5733d7 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-42f6ed75-d60c-44b2-ad2d-b58e0a774469 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-c254b7f2-690d-4a6f-bd74-8b1eb2c29fbe 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-09bd36a5-6901-41ec-9f71-6aaca3fd4681 1ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-893d337d-e8e5-4b7d-a427-6175644ed047 0ms error=Synthetic opaque upstream failure
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:22:35.706Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-89e7ee3c-cf56-4c7a-bb98-9ce2c42d7c10 0ms error=Synthetic opaque upstream failure
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-b0a7bdd9-9b36-4a36-a490-e84f3bcd05f4 0ms error=Synthetic opaque upstream failure
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-4f8bd073-4eec-4729-995f-f30461868d93 0ms error=Synthetic opaque upstream failure
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-276cc9fb-5581-4a68-a84e-8bad03d86b70 0ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-276cc9fb-5581-4a68-a84e-8bad03d86b70","clientId":null,"mailbox":"INBOX","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-0c4270b7-c6fe-42a6-b9f4-81e92c9985e6 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-0c4270b7-c6fe-42a6-b9f4-81e92c9985e6 0ms
+[imap] imap.status mailbox=INBOX account=stream-0c4270b7-c6fe-42a6-b9f4-81e92c9985e6 0ms
+[imap] imap.connect mailbox=poll account=stream-0c4270b7-c6fe-42a6-b9f4-81e92c9985e6 0ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-0c4270b7-c6fe-42a6-b9f4-81e92c9985e6","clientId":null,"mailbox":"poll","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-a827e826-4250-48dc-bd40-996a05c4c577 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a827e826-4250-48dc-bd40-996a05c4c577 0ms
+[imap] imap.status mailbox=INBOX account=stream-a827e826-4250-48dc-bd40-996a05c4c577 0ms
+[imap] imap.status mailbox=INBOX account=stream-a827e826-4250-48dc-bd40-996a05c4c577 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-a827e826-4250-48dc-bd40-996a05c4c577 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-8593055a-f1aa-4acd-9afa-8fb987e2384f 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-8593055a-f1aa-4acd-9afa-8fb987e2384f 0ms
+[imap] imap.status mailbox=INBOX account=stream-8593055a-f1aa-4acd-9afa-8fb987e2384f 0ms
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-27c27b20-b850-4c18-a03a-3993e1dead77 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-27c27b20-b850-4c18-a03a-3993e1dead77 0ms
+[imap] imap.status mailbox=INBOX account=stream-27c27b20-b850-4c18-a03a-3993e1dead77 0ms
+[imap] imap.connect mailbox=poll account=stream-27c27b20-b850-4c18-a03a-3993e1dead77 0ms
+[imap] imap.status mailbox=Archive account=stream-27c27b20-b850-4c18-a03a-3993e1dead77 0ms error=Synthetic opaque upstream failure
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/mcp-tokens/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/noctua-data",
+  dbPath: "/home/monkey/code/noctua-mail/noctua-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.sharedShard.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ISUKjV",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ISUKjV/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mailboxWatcher.integration.test.ts:
+WATCHER_FIXTURE independent watcher graphs: one IDLE owner, orderly takeover
+WATCHER_FIXTURE injection ingested in 419ms
+WATCHER_FIXTURE UIDVALIDITY browser-before-repair: OLD=0 NEW=1 reused UID=61 replacement subject/body, watermarks and pending moves cleared
+WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61
+WATCHER_FIXTURE UIDVALIDITY direct-new and resumed-full reset re-ingest replacement UID=61
+WATCHER_FIXTURE auth_failed suspended: 0 new authentication attempts over 800ms (minimum reconnect=150ms)
+WATCHER_FIXTURE shared shard: both accounts retain rows, thread indexes and FTS for identical RFC Message-IDs
+WATCHER_FIXTURE PASS bootstrap=60 injected=1 flags=ok expunge=ok periodic-Sent=ok singleton=ok DB-credentials=ok auth-reload=ok add/remove=ok events=ok shutdown=ok
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-G5u4su",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-G5u4su/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mcpAuth.identities.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WwGyju",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WwGyju/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/membershipCleanup.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-VwDx9O",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-VwDx9O/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/messages/[messageId]/source/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Z58Dke",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Z58Dke/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/messageHtmlRoute.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Db7PWY",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Db7PWY/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/messages/flags/bulk/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vl1Tz2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vl1Tz2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/connection.auth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "isolated-write",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 20,
+  elapsedMs: 0,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "isolated-write",
+  retries: 1,
+  elapsedMs: 24,
+}
+
+lib/messageMoveJobs.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/noctua-data",
+  dbPath: "/home/monkey/code/noctua-mail/noctua-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[move-jobs] failed to move IMAP message batch {
+  accountId: "acc-move-jobs",
+  messageIds: [ "m-1", "m-2" ],
+  sourceMailboxPath: "Source",
+  sourceUidSample: [ 20, 21 ],
+  destinationMailboxPath: "Target",
+  error: warn: move failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/messageMoveJobs.test.ts:157:44)
+,
+}
+
+lib/messageMovePersistence.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-zF7iKE",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-zF7iKE/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mutationOrigins.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-bLZXlu",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-bLZXlu/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:22:51.166Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:22:52.814Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:22:54.476Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/sync/new-candidates/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-YZAqz8",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-YZAqz8/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/connection.auth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 139,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 147,
+}
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 126,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 128,
+}
+
+app/api/accounts/[accountId]/sync/new-candidates/route.test.ts:
+[imap] sync.new-candidates unavailable account=acc-new-candidates-f2b3b540-0e0b-4287-a4cc-10ff2fbdbb4a error=Peer certificate is empty for hostname "imap.example.test"
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/ftsIdentity.test.ts:
+[shard-format-v3] dropped 2 orphan FTS rows
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-P0CwHe",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-P0CwHe/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/threads/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Yofu4X",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Yofu4X/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/mailboxSummary.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-chMA1E",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-chMA1E/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/mcpTokens.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-IXLiRR",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-IXLiRR/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/messages/query.threadSelector.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-oc6rOF",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-oc6rOF/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/translation/compose/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-p8cQYr",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-p8cQYr/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/messages/query.unassigned.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OCsSrb",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OCsSrb/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/messages/retrieval.orphanedNullUid.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-DvyLPo",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-DvyLPo/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/messages/senderKey.retrieval.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Jyohas",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Jyohas/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/messages/utility.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-abokcq",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-abokcq/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/senderIdentityFixes.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-jAJfKl",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-jAJfKl/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/admin/invites/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xjVTpk",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xjVTpk/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/admin/users/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-BdrquI",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-BdrquI/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/authStreams.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-kl8yiq",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-kl8yiq/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/betterAuth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/senderIdentityMetadata.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OX1Tfs",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OX1Tfs/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/betterAuth.test.ts:
+2026-10-23T11:23:14.923Z WARN [Better Auth]: Password is too short
+
+lib/db/shardFormat.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-4HIaPZ",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-4HIaPZ/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/stableLoops.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-v6ePa1",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-v6ePa1/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[RECOMPUTE CATEGORIES] Starting for account collab-2a6cb8ac-47c5-48fa-9f39-8f06d4b7fdfc
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+[RECOMPUTE CATEGORIES] Starting for account collab-2a6cb8ac-47c5-48fa-9f39-8f06d4b7fdfc
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+
+lib/db/threadCollab.remap.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-N3GJMs",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-N3GJMs/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/processLeases.integration.test.ts:
+LEASE_PROOF independent-graph admission: 4 processes, maximum 2 workers
+LEASE_PROOF restart recovery: expired live orphan retained; dead orphan reclaimed; stale child rejected
+LEASE_PROOF starvation bound: watcher admitted after 8 interactive bypasses
+LEASE_PROOF confirmed-exit failure: a live recorded PID retains capacity
+LEASE_PROOF scheduler: independent graphs share one owner, dead-owner takeover and orderly handoff pass
+LEASE_PROOF production monitor: SIGKILL waits for confirmed exit, rejected exit retains capacity
+LEASE_PROOF PASS
+
+lib/db/threadCollab.statements.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Xhs2IV",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Xhs2IV/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/threadCollab.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-V6Lv4b",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-V6Lv4b/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/betterAuth.test.ts:
+2026-10-23T11:23:20.156Z WARN [Better Auth]: Invalid password
+
+lib/db/threads.recompute.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OyNAoo",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-OyNAoo/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/betterAuth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/userAccountPrefs.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-O4H1yV",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-O4H1yV/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/betterAuth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:23:21.314Z ERROR [Better Auth]: Invalid origin: https://evil.example
+
+lib/db/users.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-0p4yag",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-0p4yag/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/dbWriteRetry.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 120,
+  elapsedMs: 0,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 2,
+  attempts: 5,
+  delayMs: 240,
+  elapsedMs: 120,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 3,
+  attempts: 5,
+  delayMs: 480,
+  elapsedMs: 360,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 4,
+  attempts: 5,
+  delayMs: 960,
+  elapsedMs: 840,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic-budget",
+  retries: 4,
+  elapsedMs: 1800,
+}
+retry shutdown proof {
+  durationMs: 161,
+  delayMs: 1500,
+}
+
+lib/recipientAliases.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-eC85C9",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-eC85C9/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/auth/bodyLimit.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-0da0b5",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-0da0b5/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/boundedWorkerJobRegistry.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-gNvvys",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-gNvvys/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/drafts.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tAyyIm",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tAyyIm/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/sameFolderMessageCopies.consistency.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-KALOJp",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-KALOJp/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/caldav/emailEventImporter.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/noctua-data",
+  dbPath: "/home/monkey/code/noctua-mail/noctua-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/caldav/sync.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Rc2KNS",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Rc2KNS/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/calendarEventEmailSnapshot.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-iacLK2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-iacLK2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/calendarInviteProcessor.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/noctua-data",
+  dbPath: "/home/monkey/code/noctua-mail/noctua-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "fails@example.test",
+  actionType: "invitation",
+  error: 1072 |   });
+1073 | 
+1074 |   test("returns failures for groups that throw while leaving other imports intact", async () => {
+1075 |     // Two events in one ICS — make the upsert fail for the first one only.
+1076 |     upsertCalendarEventByUid.mockImplementationOnce(async () => {
+1077 |       throw new Error("db unavailable");
+                       ^
+error: db unavailable
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.test.ts:1077:17)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.ts:659:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.test.ts:1095:26)
+,
+}
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "lookup-fails@example.test",
+  actionType: "unknown",
+  error: 1117 | 
+1118 |   test("isolates a per-group failure when the existing-event lookup throws", async () => {
+1119 |     // First group's lookup blows up; second group should still process fine.
+1120 |     getCalendarEventByUid
+1121 |       .mockImplementationOnce(async () => {
+1122 |         throw new Error("lookup failed");
+                         ^
+error: lookup failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.test.ts:1122:19)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.ts:563:35)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/calendarInviteProcessor.test.ts:1140:26)
+,
+}
+
+lib/calendarInviteSearch.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-qpZWKD",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-qpZWKD/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/calendarInviteStatePersistence.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-dOytmt",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-dOytmt/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/calendarReminderReschedule.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vw9Gtt",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-vw9Gtt/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/crossAccountCopy.test.ts:
+[cross-account-copy] failed to read back appended message {
+  destinationMailboxPath: "Archive",
+  uid: 4242,
+  error: warn: read-back boom
+      at syncImapMessage (/home/monkey/code/noctua-mail/wt-test-parallel/lib/crossAccountCopy.test.ts:80:37)
+      at copyMessageToAccount (/home/monkey/code/noctua-mail/wt-test-parallel/lib/crossAccountCopy.ts:135:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/crossAccountCopy.test.ts:163:26)
+,
+}
+
+lib/db.accounts.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Dm2RsN",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-Dm2RsN/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.addressSearchIndex.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ToJjhH",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ToJjhH/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.aiFlags.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-UhUPd7",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-UhUPd7/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.filters.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-mnujNN",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-mnujNN/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.revision.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JbtHhv",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JbtHhv/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+R6-server interleaved final revisions {"A":7,"B":2}
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.revision.test.ts:
+R6-migration 0 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 1 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 2 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 3 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.revision.test.ts:
+R6-lifecycle actual service {"revision":1,"live":[1,1],"hidden":[0,0],"restored":[1,1]}
+R6-lifecycle public deletion/reimport {"revision":1,"lengths":[1,0,1]}
+
+lib/syncJobs.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-rroytN",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-rroytN/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[sync] worker started {"jobId":"861c654b-e627-479d-aefb-d72e259cc329","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"62df183c-a915-4725-aba1-2def1f1a514d","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Archive","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"8083b56a-a5b2-41ca-b054-c6760d6deaa6","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"e6cd0204-8735-44b7-870b-e69b9fc572d9","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"2a39085c-cbdb-43bf-87f2-ec20c0e74584","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"0af81154-83b6-4b93-9a76-0f7b8f69c610","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"8f6bfaad-da73-41dc-ab22-b458e6eb6c8a","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"41565d24-1ffe-496c-97fa-f8f42f6e43c8","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"6772a422-700c-47d3-ba8b-0150bdd90ca8","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"7ba8c4fe-67a1-48aa-b0ad-7295bef3a1c9","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"b026db62-36e6-4a42-95a3-e3190e159981","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Archive","mode":"full","pid":2811160}
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/syncJobs.test.ts:
+[sync] worker started {"jobId":"19232231-ee9d-4f3f-95a8-b777fc389c00","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"4f38af63-7f5f-4955-af20-d2e5a779ffd8","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"2a8143f2-aba8-4fa3-bf85-24e2fe3a035c","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Archive","mode":"new","pid":2811160}
+
+app/api/auth/me/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WpfqgF",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-WpfqgF/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/syncJobs.test.ts:
+[sync] worker started {"jobId":"be516955-aa4e-4f80-8e95-f1f9fa9e81e4","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"e55ffc76-6863-4bc4-aeec-1efe2ec1cace","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:Sent","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"df0f654f-6ae5-4219-96ab-25c6575eab59","accountId":"acc-busy-7","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"4aaee6aa-01b7-4447-97b6-ca5724e258ce","accountId":"acc-busy-8","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"abbe39ff-1c81-4f03-b670-00cb09c93ef7","accountId":"acc-interactive-11","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"a631527a-c3cf-4a27-a1a9-ef495dd8d5bb","accountId":"acc-watcher-10","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"3353866c-8fe2-49ee-9285-84340aaa270b","accountId":"acc-sweep-9","mode":"full","pid":2811160}
+[sync] worker started {"jobId":"facfb7a6-0486-4e35-80eb-5f890b67eab3","accountId":"acc-busy-head-12","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"d7f70a86-d9f1-489f-a263-0d54ece987c0","accountId":"acc-busy-head-13","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"a042d570-8240-4527-afc7-82bd2c611091","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:INBOX","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"e72fac55-621a-4146-9be8-32bc4d03a03c","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:Archive","mode":"full","pid":2811160}
+[sync] worker started {"jobId":"e19b774e-11d1-4bc5-a097-e0fc23c2b3aa","accountId":"acc-busy-cancel-15","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"5e3566ee-fd7e-43cf-af0c-14f369d2e498","accountId":"acc-busy-cancel-16","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"f3694f36-694e-4631-9595-a083306e4c62","accountId":"acc-joined-watcher-18","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"b49a2b98-587d-423e-9453-038e584ad6e6","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","pid":2811160}
+[sync] worker failed {"jobId":"b49a2b98-587d-423e-9453-038e584ad6e6","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","exitCode":1,"error":"Sync worker exited with code 1"}
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/syncJobs.test.ts:
+[sync] worker started {"jobId":"ad1231ae-8f6a-4521-a9d7-217a1ea74cb1","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:initial","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"11d722cd-1276-4cee-8a2b-43b6e437872a","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-0","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"d7452848-6a44-4aaa-8308-781d63ca4051","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-1","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"67303c30-4d8a-40dc-b31a-445e674db6f4","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-2","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"be7d2be4-05f3-4851-b2ee-5c68a5ec47f1","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-3","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"30794a82-898f-4247-aa10-043cc9772de6","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-4","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"f6b7303f-7199-4cbb-819a-7c0a0cc35e93","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-5","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"723f1974-e374-45cc-a03e-efe19f9fc58b","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-6","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"b1eea25c-4f0d-438d-a590-ae805298d230","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-7","mode":"new","pid":2811160}
+[sync] worker started {"jobId":"8f957f5c-c2c1-4e1d-8033-a8365045f9ed","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:INBOX","mode":"repair","pid":2811160}
+[sync] worker started {"jobId":"a15c6643-ed26-40c2-a00c-0239b753106d","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-8","mode":"new","pid":2811160}
+
+lib/teamAuthContracts.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-CZRghx",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-CZRghx/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/userEvents.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JzJaxW",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-JzJaxW/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/auth/preferences/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-kOEFfD",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-kOEFfD/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+scripts/dev-fixture/fixture.test.ts:
+{"src":"connection","msg":"Established TCP connection","cid":"uc66fwje0u5pui9g3xwl","secure":false,"host":"127.0.0.1","servername":false,"port":44323,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":41716}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44323,"localAddress":"127.0.0.1","localPort":41716,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":44323,"cid":"uc66fwje0u5pui9g3xwl"}
+{"src":"auth","msg":"User authenticated","cid":"uc66fwje0u5pui9g3xwl","user":"demo@monkeydent.test"}
+[imap] connect account=fixture 24ms
+[imap] logout account=fixture 4ms
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44323,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"src":"connection","msg":"Established TCP connection","cid":"dcqusb98yco339v0k50u","secure":false,"host":"127.0.0.1","servername":false,"port":44323,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":41728}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44323,"localAddress":"127.0.0.1","localPort":41728,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":44323,"cid":"dcqusb98yco339v0k50u"}
+{"err":{"response":"2 NO [AUTHENTICATIONFAILED] Invalid fixture credentials","responseStatus":"NO","executedCommand":"2 AUTHENTICATE PLAIN","responseText":"Invalid fixture credentials","serverResponseCode":"AUTHENTICATIONFAILED","authenticationFailed":true},"cid":"dcqusb98yco339v0k50u"}
+[imap] connect account=fixture 6ms error=Command failed
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44323,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+
+app/api/auth/reauth/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xygL2x",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-xygL2x/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-H1YOoD",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-H1YOoD/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.send.test.ts:
+PASS fixture direct appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture direct failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture direct SMTP rejected: no delivery, no Sent APPEND
+PASS fixture direct lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture direct stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct flag-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture draft failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture draft SMTP rejected: no delivery, no Sent APPEND
+PASS fixture draft lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft cleanup-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture calendar failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture calendar SMTP rejected: no delivery, no Sent APPEND
+PASS fixture calendar lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture single-draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and own Sent files verified
+PASS fixture new outbound: Sent ingested and attributed without reply activity
+PASS 31 fixture send scenarios
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-G2vijw",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-G2vijw/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadLookup.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-f65lT0",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-f65lT0/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadTopicSearch.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tDBjni",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-tDBjni/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/topicSuggestions.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ybgUS2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ybgUS2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/topicsTransfer.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-hkM54i",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-hkM54i/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/calendar/import/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-KxATS3",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-KxATS3/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/testAuthHarness.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/testAuthHarness.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "testAuthHarness.createUser",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 108,
+  elapsedMs: 14,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.createUser",
+  retries: 1,
+  elapsedMs: 136,
+}
+[db-write-retry] retry {
+  operation: "testAuthHarness.linkAccount",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 109,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.linkAccount",
+  retries: 1,
+  elapsedMs: 117,
+}
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.api.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-x3tYcg",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-x3tYcg/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/mcp/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-GGNxQi",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-GGNxQi/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice3.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-AlDMK2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-AlDMK2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/probe/route.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ytNe93",
+  dbPath: "/home/monkey/code/noctua-mail/wt-test-parallel/.tmp/parallel/tmp/mywebmail-test-db-ytNe93/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T11:24:29.156Z ERROR [Better Auth]: Error 244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+# SERVER_ERROR:  244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-test-parallel/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+ 2804 pass
+ 0 fail
+ 15275 expect() calls
+Ran 2804 tests across 304 files. [150.78s]

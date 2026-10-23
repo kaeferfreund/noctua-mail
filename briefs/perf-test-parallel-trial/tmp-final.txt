@@ -1,0 +1,4 @@
+    128 boundary-smtp
+    681 mywebmail-test-db
+     16 sender-smtp
+3.5G	tmp
