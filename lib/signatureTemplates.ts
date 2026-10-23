@@ -1,6 +1,6 @@
 import { senderMessages } from "@/lib/senderMessages";
 import type { AccountSettings, SenderIdentity, UserAccountPrefs } from "./data";
-import { escapeHtml } from "./html";
+import { escapeHtml, extractVisibleHtmlText, hasRenderableHtmlMedia } from "./html";
 
 export type SignatureUser = { name?: string | null; email: string };
 export type SignatureBlock = { id: string; text: string; html: string; markdown?: string };
@@ -72,9 +72,14 @@ export function resolveSignatureTemplate(settings: AccountSettings | undefined, 
   return { id: "", body: "", warnings };
 }
 
+/** An untouched editor still serializes as "\n" or an empty paragraph; neither is authored text. */
+function isBlankComposeBody(body: string, separator: string) {
+  return separator === "\n\n" ? !body.trim() : !extractVisibleHtmlText(body) && !hasRenderableHtmlMedia(body);
+}
+
 /** Only an exact, unique tracked block can be removed. Edited/ambiguous text survives. */
 export function replaceSignatureBlock(body: string, previous: string | undefined, next: string, separator: string) {
-  if (!previous) return { body: [body, next].filter(Boolean).join(separator), conflict: Boolean(body) };
+  if (!previous) return isBlankComposeBody(body, separator) ? { body: next, conflict: false } : { body: [body, next].filter(Boolean).join(separator), conflict: true };
   const index = body.indexOf(previous);
   const exactTextBlock = separator !== "\n\n" || ((index === 0 || body.slice(0, index).endsWith("\n\n")) && (index + previous.length === body.length || body.slice(index + previous.length).startsWith("\n\n")));
   if (index < 0 || !exactTextBlock || body.indexOf(previous, index + previous.length) !== -1) return { body, conflict: true };
