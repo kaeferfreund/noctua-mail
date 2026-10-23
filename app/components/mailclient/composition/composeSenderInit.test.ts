@@ -11,7 +11,7 @@ const sender: SenderSettings = { account: { id: "a", email: "primary@example.tes
   prefs: { defaultIdentityId: "alias" }, user: { name: "Synthetic Jo", email: "jo@example.test" }, warnings: [] };
 const message = { id: "draft", accountId: "a", from: "customer@example.test", to: "alias@example.test", subject: "Question", body: "Original", htmlBody: "<p>Original</p>", dateValue: 1, date: "2026-01-01", attachments: [] } as unknown as Message;
 const deps = { stripHtml: (value: string) => value.replace(/<[^>]*>/g, ""), normalizeHtmlDerivedText: (value: string) => value };
-const init = (mode: Parameters<typeof computeComposeInitState>[0], tab: "text" | "html" | "markdown", source: Message | undefined, context = sender) => computeComposeInitState(mode, source, false, { accountEmail: sender.account.email, accountDateFormat: "locale", preferredComposeTab: tab, sender: context }, deps);
+const init = (mode: Parameters<typeof computeComposeInitState>[0], tab: "text" | "html" | "markdown", source: Message | undefined, context = sender) => computeComposeInitState(mode, source, false, { accountEmail: sender.account.email, accountDateFormat: "locale", locale: "en", preferredComposeTab: tab, sender: context }, deps);
 
 describe("sender compose initializer", () => {
   for (const mode of ["new", "reply", "replyAll", "forward"] as const) for (const tab of ["text", "html", "markdown"] as const) test(`${mode}/${tab}: inserts signature exactly once before quotes and establishes stable body`, async () => {

@@ -130,3 +130,12 @@ test("round-two copy follows the reviewed leaf values and folder plural grammar"
   ] as const) expect(t("Shell.status.syncingFolders", { folder: "Posteingang", more })).toBe(expected);
   expect(getTranslator("en")("Shell.loading.mailbox")).toBe("Add mailbox");
 });
+
+test("generated correspondence keeps user text opaque and uses recognizable German markers", () => {
+  const t = getTranslator("de");
+  expect(t("Compose.generated.replyHeader", { date: "01.01.2024, 13:00", sender: "Synthetic {opaque} <a@example.test>" }))
+    .toBe("Am 01.01.2024, 13:00 schrieb Synthetic {opaque} <a@example.test>:");
+  expect(getTranslator("en")("Compose.generated.replyHeader", { date: "01/01/2024, 13:00", sender: "Synthetic" }))
+    .toBe("On 01/01/2024, 13:00, Synthetic wrote:");
+  expect(Object.values(de.Compose.generated.forwardFields)).toEqual(["Von", "Antwort an", "Datum", "Betreff", "An", "Cc"]);
+});
