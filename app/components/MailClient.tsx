@@ -5363,7 +5363,7 @@ export default function MailClient({
             },
             onLogout: () => { void logout(); }
           },
-          brand: { buildVersionLabel },
+          brand: { buildInfo },
           mailboxes: {
             accounts,
             summaries: mailboxSummaries,

@@ -40,10 +40,11 @@ function renderSidebar(
   onSync = () => {},
   userOverrides: Partial<ShellSidebarProps["user"]> = {},
   views: ShellSidebarProps["views"] = { inbox: null, collab: [], virtual: [] },
-  locale: UiLocale = "en"
+  locale: UiLocale = "en",
+  buildInfo: ShellSidebarProps["brand"]["buildInfo"] = null
 ) {
   const props: ShellSidebarProps = {
-    brand: { buildVersionLabel: "" },
+    brand: { buildInfo },
     mailboxes: { accounts, activeAccountId: accounts[0]?.id ?? "", onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined },
     compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
     sync: { isSyncing: false, onCheckNewMail: onSync },
@@ -73,6 +74,20 @@ describe("shell sidebar", () => {
   for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
     const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
     expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
+  });
+
+  it("labels the brand with the same short commit and Berlin build time as the status popover", () => {
+    const buildInfo = { hash: "0ac6cfa3d9e1b2c4f5a6b7c8d9e0f1a2b3c4d5e6", shortHash: "0ac6cfa", builtAt: "2026-10-23T13:16:05Z" };
+    for (const [locale, label, title] of [
+      ["de", "Build 0ac6cfa · 23.10.2026, 15:16", "Commit 0ac6cfa3d9e1b2c4f5a6b7c8d9e0f1a2b3c4d5e6, gebaut 2026-10-23T13:16:05Z"],
+      ["en", "Build 0ac6cfa · 23/10/2026, 15:16", "Commit 0ac6cfa3d9e1b2c4f5a6b7c8d9e0f1a2b3c4d5e6, built 2026-10-23T13:16:05Z"]
+    ] as const) {
+      const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, {}, undefined, locale, buildInfo);
+      expect(view.getByText(label).getAttribute("title")).toBe(title);
+      cleanup();
+    }
+    const plain = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {});
+    expect(plain.queryByText(/^Build /)).toBeNull();
   });
 
   it("sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable", () => {
