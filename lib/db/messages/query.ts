@@ -605,6 +605,11 @@ function hasAddressSearchFilters(filters: AddressSearchFilters) {
   );
 }
 
+/** Own addresses only resolve "from:me" / "with:me": an empty query never reads them. */
+async function getSearchOwnAddresses(accountId: string, query?: string | null) {
+  return query?.trim() ? getAccountOwnAddresses(accountId) : [];
+}
+
 function parseSearchInput(
   raw: string | null | undefined,
   fields?: string[] | null,
@@ -1431,7 +1436,7 @@ async function getGroupCounts(params: {
   } =
     params;
   const db = await getAccountDb(accountId);
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -1686,7 +1691,7 @@ async function getTotalCount(params: {
     participants
   } =
     params;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -2350,7 +2355,7 @@ export async function listMessages(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
 
   const {
     ftsTokenQueries,
@@ -2668,7 +2673,7 @@ export async function listThreads(params: {
   } = params;
   const db = await getAccountDb(accountId);
   const offset = (page - 1) * pageSize;
-  const accountEmail = await getAccountOwnAddresses(accountId);
+  const accountEmail = await getSearchOwnAddresses(accountId, query);
   const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
   const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
 

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { createSharedShardFixture } from "../../testSharedShardHarness";
+import { getDb } from "../connection";
 import { updateThreadCollabState } from "../threadCollab";
 import { listThreads } from "./query";
 
@@ -227,6 +228,27 @@ describe("thread selector flagged EXISTS differential", () => {
           (!options.folderId || row.folderId === options.folderId) &&
           (!("query" in options) || row.subject.includes("needle"))).length);
       }
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("an empty query does not read the own addresses; from:me still does", async () => {
+    const master = await getDb();
+    const query = master.query.bind(master);
+    let identityReads = 0;
+    const spy = spyOn(master, "query").mockImplementation((sql: string) => {
+      if (sql.includes("sender_identities")) identityReads++;
+      return query(sql);
+    });
+    const reads = async (search: string) => {
+      identityReads = 0;
+      await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "sender", query: search });
+      return identityReads;
+    };
+    try {
+      // listThreads, its total count and its sender group counts each resolve "me".
+      expect((await reads("from:me")) - (await reads(" "))).toBe(3);
     } finally {
       spy.mockRestore();
     }
