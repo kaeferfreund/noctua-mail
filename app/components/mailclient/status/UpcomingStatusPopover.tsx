@@ -173,7 +173,7 @@ export default function UpcomingStatusPopover({
   })();
   const upcomingStatusTone: BottomStatusTone = mergedCount > 0 ? "normal" : "muted";
   const groupedEntries = useMemo(
-    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs, Date.now(), locale),
+    () => groupItemsByRelativeTime(upcomingEntries, (entry) => entry.startAtMs, undefined, locale),
     [upcomingEntries, locale]
   );
   const [deletingReminderIds, setDeletingReminderIds] = useState<Set<string>>(new Set());
