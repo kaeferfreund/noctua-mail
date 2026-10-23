@@ -1,0 +1,134 @@
+(node:3594754) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/monkey/code/noctua-mail/briefs/perf-html-sanitize/node-build/bench.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/monkey/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{
+ "runtime": "node v24.22.1",
+ "diff": {
+  "inputs": 72,
+  "mismatches": [],
+  "hasRemoteMismatch": [],
+  "skipAllowTaken": 42,
+  "remoteInputs": 30
+ }
+}
+gmail-5k 5400 {
+  stripConditionalComments: 0.007,
+  shouldShowHtmlViewerFrame: 0.05,
+  normalizeHtmlStructure: 0.426,
+  sanitizeHtmlCore_block_noCss: 0.39,
+  privateCss_all_calls_one_pass: 0.018,
+  sanitizeHtmlForDisplay_block: 0.84,
+  sanitizeHtmlForDisplay_allow: 0.846,
+  today_pair: 1.663,
+  A_sharedNormalize_pair: 1.386,
+  B_sharedCss_pair: 1.229,
+  C_skipAllow_pair: 0.838,
+  D_skipAllowNoMemo_pair: 0.847,
+  buildPreviewDocument: 0.13
+}
+legacy-table-54k 54381 {
+  stripConditionalComments: 0.059,
+  shouldShowHtmlViewerFrame: 0.045,
+  normalizeHtmlStructure: 4.211,
+  sanitizeHtmlCore_block_noCss: 13.205,
+  privateCss_all_calls_one_pass: 4.258,
+  sanitizeHtmlForDisplay_block: 23.925,
+  sanitizeHtmlForDisplay_allow: 22.38,
+  today_pair: 46.604,
+  A_sharedNormalize_pair: 42.546,
+  B_sharedCss_pair: 31.383,
+  C_skipAllow_pair: 30.762,
+  D_skipAllowNoMemo_pair: 42.226,
+  buildPreviewDocument: 5.548
+}
+newsletter-120k 122708 {
+  stripConditionalComments: 0.141,
+  shouldShowHtmlViewerFrame: 0.032,
+  normalizeHtmlStructure: 9.554,
+  sanitizeHtmlCore_block_noCss: 17.763,
+  privateCss_all_calls_one_pass: 8.856,
+  sanitizeHtmlForDisplay_block: 37.876,
+  sanitizeHtmlForDisplay_allow: 37.92,
+  today_pair: 77.374,
+  A_sharedNormalize_pair: 70.876,
+  B_sharedCss_pair: 49.493,
+  C_skipAllow_pair: 61.806,
+  D_skipAllowNoMemo_pair: 78.954,
+  buildPreviewDocument: 7.924
+}
+newsletter-300k 307988 {
+  stripConditionalComments: 0.534,
+  shouldShowHtmlViewerFrame: 0.033,
+  normalizeHtmlStructure: 30.471,
+  sanitizeHtmlCore_block_noCss: 54.528,
+  privateCss_all_calls_one_pass: 23.459,
+  sanitizeHtmlForDisplay_block: 122.561,
+  sanitizeHtmlForDisplay_allow: 166.159,
+  today_pair: 325.753,
+  A_sharedNormalize_pair: 185.818,
+  B_sharedCss_pair: 136.156,
+  C_skipAllow_pair: 126.715,
+  D_skipAllowNoMemo_pair: 196.764,
+  buildPreviewDocument: 20.418
+}
+newsletter-unique-120k 137694 {
+  stripConditionalComments: 0.229,
+  shouldShowHtmlViewerFrame: 0.03,
+  normalizeHtmlStructure: 12.369,
+  sanitizeHtmlCore_block_noCss: 26.632,
+  privateCss_all_calls_one_pass: 18.851,
+  sanitizeHtmlForDisplay_block: 41.981,
+  sanitizeHtmlForDisplay_allow: 44.412,
+  today_pair: 94.913,
+  A_sharedNormalize_pair: 93.334,
+  B_sharedCss_pair: 68.97,
+  C_skipAllow_pair: 77.711,
+  D_skipAllowNoMemo_pair: 82.275,
+  buildPreviewDocument: 7.108
+}
+outlook-300k 308950 {
+  stripConditionalComments: 0.781,
+  shouldShowHtmlViewerFrame: 0.047,
+  normalizeHtmlStructure: 21.277,
+  sanitizeHtmlCore_block_noCss: 39.901,
+  privateCss_all_calls_one_pass: 18.469,
+  sanitizeHtmlForDisplay_block: 87.927,
+  sanitizeHtmlForDisplay_allow: 87.217,
+  today_pair: 180.873,
+  A_sharedNormalize_pair: 153.868,
+  B_sharedCss_pair: 106.176,
+  C_skipAllow_pair: 106.932,
+  D_skipAllowNoMemo_pair: 151.591,
+  buildPreviewDocument: 15.45
+}
+outlook-54k 57433 {
+  stripConditionalComments: 0.075,
+  shouldShowHtmlViewerFrame: 0.045,
+  normalizeHtmlStructure: 3.786,
+  sanitizeHtmlCore_block_noCss: 7.249,
+  privateCss_all_calls_one_pass: 3.665,
+  sanitizeHtmlForDisplay_block: 15.795,
+  sanitizeHtmlForDisplay_allow: 15.833,
+  today_pair: 32.389,
+  A_sharedNormalize_pair: 28.689,
+  B_sharedCss_pair: 19.999,
+  C_skipAllow_pair: 20.076,
+  D_skipAllowNoMemo_pair: 27.909,
+  buildPreviewDocument: 2.504
+}
+outlook-5k 6972 {
+  stripConditionalComments: 0.011,
+  shouldShowHtmlViewerFrame: 0.037,
+  normalizeHtmlStructure: 0.409,
+  sanitizeHtmlCore_block_noCss: 0.796,
+  privateCss_all_calls_one_pass: 0.545,
+  sanitizeHtmlForDisplay_block: 1.929,
+  sanitizeHtmlForDisplay_allow: 1.897,
+  today_pair: 3.831,
+  A_sharedNormalize_pair: 3.372,
+  B_sharedCss_pair: 2.665,
+  C_skipAllow_pair: 2.657,
+  D_skipAllowNoMemo_pair: 3.426,
+  buildPreviewDocument: 0.293
+}

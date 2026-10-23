@@ -1,0 +1,2 @@
+load before bun bench: 9.06 8.96 6.13 17/1765 3590606
+load after bun bench: 8.54 9.09 6.42 17/1623 3594530

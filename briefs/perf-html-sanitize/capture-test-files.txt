@@ -1,0 +1,10 @@
+app/globals.test.ts
+app/components/HtmlMessage.test.ts
+app/components/HtmlMessage.memo.dom.test.tsx
+app/components/HtmlMessage.privacy.dom.test.tsx
+app/components/calendar/CalendarEventEmailSnapshot.test.tsx
+lib/html.test.ts
+lib/calendarInviteProcessor.test.ts
+lib/calendarEventEmailSnapshot.test.ts
+lib/html.safeLinks.test.ts
+lib/html/remoteContent.test.ts
