@@ -45,7 +45,7 @@ For `TMPDIR=...` below, the exact value was `$PWD/.deps-scratch/tmp` in this wor
 - `TMPDIR=... nice -n 10 bun run build`: exit 0; compiled successfully; standalone includes nodemailer **10.2.1**, traces nodemailer under route NFT manifests, and produces `.next/standalone/noctua-server.mjs`.
 - `nice -n 10 bun --env-file=.env.local --env-file=.deps-scratch/live.env scripts/checkGracefulShutdown.ts --port 3793 --data-dir /home/monkey/code/noctua-mail/data/noctua-data-wt-deps-mailer`: passed, exit **0**, graceful child exit 0 in **121 ms**, forced=false.
 - First `TMPDIR=... nice -n 10 bun run test:ci`: **2753 pass, 1 fail**, 300 files, 636.63s; failed identities REST viewer-prefs test with SQLiteError SQLITE_BUSY in Better Auth fixture creation, so DOM phase did not run. Isolated exact-file retry: **3 pass, 0 fail**, 28 assertions, 5.04s. Full CI retry: **exit 0**, **2754 unit pass, 0 fail** (300 files, 489.87s) followed by **433 DOM pass, 0 fail** (52 files, 2553 assertions, 65.55s).
-- Existing stress script is `test:stress` (no `stress` script); running `TMPDIR=... nice -n 10 bun run test:stress` → `bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3`. Result pending.
+- Existing stress script is `test:stress` (no `stress` script); running `TMPDIR=... nice -n 10 bun run test:stress` → `bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3`. **Exit 0: 8262 pass, 0 fail**, 33927 assertions, 300 files, 1422.20s.
 
 Temporary test directories were placed on the worktree filesystem via TMPDIR to avoid filling /tmp. Test-owned sockets use the existing test harness ephemeral ports; the manual app/fixture check uses only 3793/3794.
 
@@ -68,4 +68,4 @@ Setup corrections: the first shutdown attempt incorrectly passed the exported he
 - MCP owner: re-run route/identity tests after the upcoming mcpServer.ts fix. Current six identity tools and actor-aware draft schemas work without edits. This bump does not add HTTP request-size/batch limits to the custom route.
 - Dependency owner: preserve mailparser's exact nested 10.2.0; regenerate the lockfile with Bun when combining the sibling imapflow upgrade. The older spike's 8.0.5 assumptions must not be reintroduced.
 
-No pushes, merges, rebases, stashes, PRs, other-worktree edits or real mailbox operations were performed. Cleanup/final status will be recorded after remaining gates finish.
+No pushes, merges, rebases, stashes, PRs, other-worktree edits or real mailbox operations were performed. Both requested commits are complete. Working tree is clean and `git diff --check` passes. Temporary test databases, logs, scripts, invite/auth configuration and the first run’s `undefined/` fixture outbox were deleted. The initially empty dedicated live-data directory was restored to empty after recording proof. No app/test/fixture processes remain, and ports 3793/3794 have no listeners. Ignored installed dependencies and the requested production build remain available.

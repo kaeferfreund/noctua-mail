@@ -1,0 +1,36 @@
+{
+  "timings": [
+    {
+      "label": "real remap 1000 notes + 1000 activities (production code)",
+      "ms": 14.772655,
+      "min": 14.33513099999999,
+      "max": 15.429620999999997,
+      "last": {
+        "events": [
+          {
+            "accountId": "a0",
+            "threadId": "old",
+            "revision": 2
+          },
+          {
+            "accountId": "a0",
+            "threadId": "t0",
+            "revision": 2
+          }
+        ],
+        "comments": {
+          "n": 1000,
+          "r": 2
+        },
+        "activities": {
+          "n": 1001
+        }
+      }
+    }
+  ],
+  "load": [
+    11.55,
+    8.47,
+    6.6
+  ]
+}

@@ -3,6 +3,7 @@
 Worktree: `/home/monkey/code/noctua-mail/wt-deps-imapflow`  
 Branch: `chore/deps-imapflow2`  
 Base: `9424150f5aa0a446ed9bc03ed199e6825129467d`  
+Commit: `ac566eb57a704b7967e738db4a0b29e27866cd55` — `chore(deps): upgrade imapflow to 2.9.x`  
 Runtime: Bun 1.4.4 / Next 16.2.4 / React 19.2.5. Synthetic mail only.
 
 ## Summary
@@ -12,7 +13,8 @@ Runtime: Bun 1.4.4 / Next 16.2.4 / React 19.2.5. Synthetic mail only.
 - Added one imapflow trace include to the existing sync-route `outputFileTracingIncludes`: Next otherwise traced only the ESM export, leaving the CJS root and legacy require paths unavailable in standalone. Both exports and legacy deep paths resolve after the include. The next-intl wrapper and `serverExternalPackages` (including imapflow) are intact.
 - No edits to `connectionPool.ts`, `imapCancellation.ts`, `mailboxWatcher.ts`, `syncJobs.ts`, `lib/workers/**`, or `idle.ts`. No close/logout/abort changes were needed.
 - Live dev acceptance passed signup, password login, mandatory TOTP enrollment and fresh MFA login, full sync, folders, threads, attachments, IDLE injection and poll. Populated standalone SIGTERM passed in **63 ms**, with the pool drained, SSE EOF, zero fixture connections, empty lease/queue tables and database integrity `ok`.
-- CI passed **2,754 backend + 433 DOM tests**, zero failures. Stress and the final commit remain pending.
+- Typecheck, build, standalone packaging, live acceptance and shutdown gates passed. CI passed **2,754 backend + 433 DOM tests**; randomized stress passed **8,262 tests**, all with zero failures. Lint retains exactly the baseline **1 error + 25 warnings**. The first CI attempt had SQLite I/O errors; the successful rerun and stress used worktree-local TMPDIR.
+- Committed as **ac566eb** (`chore(deps): upgrade imapflow to 2.9.x`), eight files / 30 insertions / 36 deletions. Working tree is clean. Owned processes are stopped and proof/test scratch has been deleted.
 
 ## Call sites and minimal source changes
 
@@ -72,17 +74,17 @@ imapflow now uses the existing hoisted socks 2.8.10 instead of its nested 2.8.9.
 
 ## Gates
 
-Every heavy command ran with `nice -n 10` in the assigned worktree. Stress details will be finalized after the last suite exits.
+Every heavy command ran with `nice -n 10` in the assigned worktree.
 
 - `bun run typecheck`: exit **0**, **0 errors / 1,175 files** after build/dev type generation. It also passed immediately after the guards (1,173 files before generated build/dev types).
 - `bun run lint`: exit **1**, exactly the supplied baseline **1 error + 25 warnings**, including the final rerun. The error remains `useCalendarConflicts.ts`, `react-hooks/set-state-in-effect`; no lint suppression or unrelated fix was added.
 - `bun run test:ci`: exit **0** with `TMPDIR=/home/monkey/code/noctua-mail/wt-deps-imapflow/.tmp/imapflow2-proof/tmp`: **2,754 backend pass / 0 fail**, 11,309 assertions, 300 files, 468.30 s; **433 DOM pass / 0 fail**, 2,550 assertions, 52 files, 68.49 s. The initial default-TMPDIR run failed with SQLite I/O errors (**2,043 pass / 599 fail**, 2,642 tests; DOM not reached). The retry isolated scratch from shared `/tmp`; no database/test implementation was changed to address that failure. Completed CI scratch was deleted before stress.
-- Stress: the package script is `test:stress`, not `stress`; final run pending.
+- `TMPDIR=/home/monkey/code/noctua-mail/wt-deps-imapflow/.tmp/imapflow2-proof/tmp nice -n 10 bun run test:stress`: exit **0**, **8,262 pass / 0 fail**, 33,927 assertions, 300 files, 1,445.05 s. This executes `bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3`; the repository has `test:stress`, not a `stress` script. All three real mailbox-watcher fixture runs passed bootstrap, injection, flags, expunge, periodic Sent, credential reload, events and shutdown. Real synthetic IMAP/SMTP send scenarios, including lost APPEND acknowledgement and deadlines, passed too.
 - `bun run build`: passed. Repeated after adding the dual-export trace include; passed again, including standalone shutdown launcher preparation.
 - `bun build-scripts/verifyStandaloneWorkerBuild.ts`: passed.
 - Standalone ESM, CJS, legacy deep-path and pino resolution checks: passed.
 - `bun scripts/checkGracefulShutdown.ts --port 3791 --data-dir /home/monkey/code/noctua-mail/data/noctua-data-wt-deps-imapflow`: mandatory probe passed with watcher disabled (**505 ms**) and with `NOCTUA_MAILBOX_WATCHER=1` (**52 ms**). Both exited 0, signal null, forced false. These final probes ran before creating the synthetic mailbox; the populated-watcher proof below is additional. Timing was measured on the shared box; the supplied baseline was 102/75 ms.
-- `git diff --check`: passed; final clean-tree verification pending commit.
+- `git diff --check`: passed. Commit **ac566eb57a704b7967e738db4a0b29e27866cd55** contains all eight changed files, including `bun.lock`. `git status --short` is empty after commit. No push or PR was performed.
 
 ## Live synthetic acceptance
 

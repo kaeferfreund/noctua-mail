@@ -1,0 +1,805 @@
+{
+  "routes": [
+    {
+      "route": "/",
+      "raw": 2207028,
+      "gzip": 669487
+    },
+    {
+      "route": "/message/window",
+      "raw": 1513116,
+      "gzip": 460526
+    },
+    {
+      "route": "/compose/window",
+      "raw": 1418354,
+      "gzip": 433720
+    },
+    {
+      "route": "/calendar/window",
+      "raw": 1247909,
+      "gzip": 374915
+    },
+    {
+      "route": "/calendar/import",
+      "raw": 703868,
+      "gzip": 210442
+    },
+    {
+      "route": "/reset-password",
+      "raw": 683403,
+      "gzip": 208439
+    },
+    {
+      "route": "/_not-found",
+      "raw": 628281,
+      "gzip": 186759
+    }
+  ],
+  "chunks": [
+    {
+      "file": "10lv37.e6ibm0.js",
+      "raw": 875701,
+      "gzip": 305567,
+      "routes": [],
+      "packages": [
+        [
+          "@uiw/react-md-editor",
+          859973
+        ],
+        [
+          "unknown",
+          1059
+        ]
+      ]
+    },
+    {
+      "file": "0h4t8iys.pj_t.js",
+      "raw": 496136,
+      "gzip": 143975,
+      "routes": [
+        "/"
+      ],
+      "packages": [
+        [
+          "application",
+          495832
+        ]
+      ]
+    },
+    {
+      "file": "07nq131smk5-4.js",
+      "raw": 411079,
+      "gzip": 126631,
+      "routes": [],
+      "packages": [
+        [
+          "lexical",
+          409143
+        ],
+        [
+          "unknown",
+          1951
+        ]
+      ]
+    },
+    {
+      "file": "06tsq1_h-3c28.js",
+      "raw": 314207,
+      "gzip": 94484,
+      "routes": [
+        "/message/window",
+        "/compose/window",
+        "/calendar/window"
+      ],
+      "packages": [
+        [
+          "unknown",
+          184813
+        ],
+        [
+          "parse5",
+          128848
+        ]
+      ]
+    },
+    {
+      "file": "0ggw_r.w8rtd2.js",
+      "raw": 314207,
+      "gzip": 95154,
+      "routes": [
+        "/"
+      ],
+      "packages": [
+        [
+          "unknown",
+          184813
+        ],
+        [
+          "parse5",
+          128848
+        ]
+      ]
+    },
+    {
+      "file": "0ppyefdteyhz8.js",
+      "raw": 264810,
+      "gzip": 77897,
+      "routes": [],
+      "packages": [
+        [
+          "@fullcalendar/core",
+          264651
+        ],
+        [
+          "unknown",
+          20
+        ]
+      ]
+    },
+    {
+      "file": "030lje4w49skv.js",
+      "raw": 226465,
+      "gzip": 71591,
+      "routes": [
+        "/",
+        "/message/window",
+        "/compose/window",
+        "/calendar/window",
+        "/calendar/import",
+        "/reset-password",
+        "/_not-found"
+      ],
+      "packages": [
+        [
+          "next",
+          207134
+        ],
+        [
+          "unknown",
+          19036
+        ]
+      ]
+    },
+    {
+      "file": "0ldsqb0408gaj.js",
+      "raw": 182633,
+      "gzip": 59183,
+      "routes": [],
+      "packages": [
+        [
+          "parse5",
+          152209
+        ],
+        [
+          "hast-util-to-html",
+          11259
+        ],
+        [
+          "hast-util-from-parse5",
+          3196
+        ],
+        [
+          "hastscript",
+          2991
+        ],
+        [
+          "unknown",
+          1192
+        ]
+      ]
+    },
+    {
+      "file": "1027a53uzko92.js",
+      "raw": 182633,
+      "gzip": 59155,
+      "routes": [],
+      "packages": [
+        [
+          "parse5",
+          152209
+        ],
+        [
+          "hast-util-to-html",
+          11259
+        ],
+        [
+          "hast-util-from-parse5",
+          3196
+        ],
+        [
+          "hastscript",
+          2991
+        ],
+        [
+          "unknown",
+          1192
+        ]
+      ]
+    },
+    {
+      "file": "01ohvbq7a~9wj.js",
+      "raw": 153723,
+      "gzip": 44174,
+      "routes": [],
+      "packages": [
+        [
+          "unknown",
+          44766
+        ],
+        [
+          "micromark-core-commonmark",
+          29069
+        ],
+        [
+          "mdast-util-to-markdown",
+          18789
+        ],
+        [
+          "property-information",
+          18009
+        ],
+        [
+          "trough",
+          10651
+        ],
+        [
+          "mdast-util-from-markdown",
+          10388
+        ],
+        [
+          "unified",
+          9362
+        ]
+      ]
+    },
+    {
+      "file": "1695z--pnke7..js",
+      "raw": 153723,
+      "gzip": 44107,
+      "routes": [],
+      "packages": [
+        [
+          "unknown",
+          44766
+        ],
+        [
+          "micromark-core-commonmark",
+          29069
+        ],
+        [
+          "mdast-util-to-markdown",
+          18789
+        ],
+        [
+          "property-information",
+          18009
+        ],
+        [
+          "trough",
+          10651
+        ],
+        [
+          "mdast-util-from-markdown",
+          10388
+        ],
+        [
+          "unified",
+          9362
+        ]
+      ]
+    },
+    {
+      "file": "0nzxgt1.5pdz3.js",
+      "raw": 153723,
+      "gzip": 43813,
+      "routes": [],
+      "packages": [
+        [
+          "unknown",
+          44766
+        ],
+        [
+          "micromark-core-commonmark",
+          29069
+        ],
+        [
+          "mdast-util-to-markdown",
+          18789
+        ],
+        [
+          "property-information",
+          18009
+        ],
+        [
+          "trough",
+          10651
+        ],
+        [
+          "mdast-util-from-markdown",
+          10388
+        ],
+        [
+          "unified",
+          9362
+        ]
+      ]
+    },
+    {
+      "file": "08oifa2eo7hqr.js",
+      "raw": 150200,
+      "gzip": 45671,
+      "routes": [
+        "/"
+      ],
+      "packages": [
+        [
+          "unknown",
+          94165
+        ],
+        [
+          "%40radix-ui",
+          31717
+        ],
+        [
+          "application",
+          22496
+        ],
+        [
+          "lucide-react",
+          876
+        ]
+      ]
+    },
+    {
+      "file": "01d053sft-yth.js",
+      "raw": 150200,
+      "gzip": 45297,
+      "routes": [
+        "/message/window"
+      ],
+      "packages": [
+        [
+          "unknown",
+          94165
+        ],
+        [
+          "%40radix-ui",
+          31717
+        ],
+        [
+          "application",
+          22496
+        ],
+        [
+          "lucide-react",
+          876
+        ]
+      ]
+    },
+    {
+      "file": "01_79j-qbttu9.js",
+      "raw": 150200,
+      "gzip": 45328,
+      "routes": [
+        "/compose/window"
+      ],
+      "packages": [
+        [
+          "unknown",
+          94165
+        ],
+        [
+          "%40radix-ui",
+          31717
+        ],
+        [
+          "application",
+          22496
+        ],
+        [
+          "lucide-react",
+          876
+        ]
+      ]
+    },
+    {
+      "file": "11ue2jytkbcin.js",
+      "raw": 136911,
+      "gzip": 37594,
+      "routes": [
+        "/",
+        "/message/window",
+        "/compose/window",
+        "/calendar/window",
+        "/calendar/import",
+        "/reset-password",
+        "/_not-found"
+      ],
+      "packages": [
+        [
+          "unknown",
+          76276
+        ],
+        [
+          "next",
+          60011
+        ]
+      ]
+    },
+    {
+      "file": "03~yq9q893hmn.js",
+      "raw": 112594,
+      "gzip": 39961,
+      "routes": [],
+      "packages": []
+    },
+    {
+      "file": "03qqh89wbt5rj.js",
+      "raw": 100301,
+      "gzip": 29533,
+      "routes": [
+        "/",
+        "/compose/window"
+      ],
+      "packages": [
+        [
+          "application",
+          100085
+        ]
+      ]
+    },
+    {
+      "file": "00-u3h8g6cv8s.js",
+      "raw": 98553,
+      "gzip": 30526,
+      "routes": [
+        "/message/window"
+      ],
+      "packages": [
+        [
+          "application",
+          49133
+        ],
+        [
+          "lucide-react",
+          30316
+        ],
+        [
+          "unknown",
+          18426
+        ]
+      ]
+    },
+    {
+      "file": "17202.ly6wn4z.js",
+      "raw": 98553,
+      "gzip": 30620,
+      "routes": [
+        "/"
+      ],
+      "packages": [
+        [
+          "application",
+          49133
+        ],
+        [
+          "lucide-react",
+          30316
+        ],
+        [
+          "unknown",
+          18426
+        ]
+      ]
+    },
+    {
+      "file": "069nh9__-znz3.js",
+      "raw": 71513,
+      "gzip": 22167,
+      "routes": [
+        "/message/window"
+      ],
+      "packages": [
+        [
+          "%40radix-ui",
+          57710
+        ],
+        [
+          "react-remove-scroll-bar",
+          10242
+        ],
+        [
+          "unknown",
+          1921
+        ],
+        [
+          "aria-hidden",
+          1424
+        ]
+      ]
+    },
+    {
+      "file": "0vlok-zm8sd0d.js",
+      "raw": 71513,
+      "gzip": 22364,
+      "routes": [
+        "/"
+      ],
+      "packages": [
+        [
+          "%40radix-ui",
+          57710
+        ],
+        [
+          "react-remove-scroll-bar",
+          10242
+        ],
+        [
+          "unknown",
+          1921
+        ],
+        [
+          "aria-hidden",
+          1424
+        ]
+      ]
+    },
+    {
+      "file": "0zh0vggdk8fyl.js",
+      "raw": 71513,
+      "gzip": 22253,
+      "routes": [
+        "/compose/window"
+      ],
+      "packages": [
+        [
+          "%40radix-ui",
+          57710
+        ],
+        [
+          "react-remove-scroll-bar",
+          10242
+        ],
+        [
+          "unknown",
+          1921
+        ],
+        [
+          "aria-hidden",
+          1424
+        ]
+      ]
+    },
+    {
+      "file": "0mpwwk.jnjza9.js",
+      "raw": 71513,
+      "gzip": 22196,
+      "routes": [
+        "/calendar/window"
+      ],
+      "packages": [
+        [
+          "%40radix-ui",
+          57710
+        ],
+        [
+          "react-remove-scroll-bar",
+          10242
+        ],
+        [
+          "unknown",
+          1921
+        ],
+        [
+          "aria-hidden",
+          1424
+        ]
+      ]
+    },
+    {
+      "file": "15i7qdd2~_bk9.js",
+      "raw": 58655,
+      "gzip": 20766,
+      "routes": [
+        "/",
+        "/message/window",
+        "/compose/window",
+        "/calendar/window",
+        "/calendar/import",
+        "/reset-password",
+        "/_not-found"
+      ],
+      "packages": [
+        [
+          "%40radix-ui",
+          54563
+        ],
+        [
+          "unknown",
+          3852
+        ]
+      ]
+    },
+    {
+      "file": "0-2~3usm75doz.js",
+      "raw": 57208,
+      "gzip": 16969,
+      "routes": [
+        "/",
+        "/message/window",
+        "/calendar/window",
+        "/calendar/import"
+      ],
+      "packages": [
+        [
+          "rrule",
+          57051
+        ]
+      ]
+    },
+    {
+      "file": "0ymqlp1zl19m..js",
+      "raw": 55929,
+      "gzip": 13876,
+      "routes": [],
+      "packages": [
+        [
+          "application",
+          55777
+        ]
+      ]
+    },
+    {
+      "file": "0i.l9589uvx0j.js",
+      "raw": 54763,
+      "gzip": 12984,
+      "routes": [
+        "/",
+        "/message/window",
+        "/compose/window",
+        "/calendar/window",
+        "/calendar/import",
+        "/reset-password",
+        "/_not-found"
+      ],
+      "packages": [
+        [
+          "next",
+          40023
+        ],
+        [
+          "unknown",
+          14380
+        ]
+      ]
+    },
+    {
+      "file": "0i4mfk.c_i187.js",
+      "raw": 53244,
+      "gzip": 11073,
+      "routes": [
+        "/",
+        "/message/window",
+        "/compose/window",
+        "/calendar/window",
+        "/calendar/import",
+        "/reset-password",
+        "/_not-found"
+      ],
+      "packages": [
+        [
+          "next",
+          37930
+        ],
+        [
+          "unknown",
+          14908
+        ]
+      ]
+    },
+    {
+      "file": "14qt5.99tekf7.js",
+      "raw": 52753,
+      "gzip": 18824,
+      "routes": [
+        "/message/window"
+      ],
+      "packages": [
+        [
+          "cn",
+          25640
+        ],
+        [
+          "unknown",
+          23868
+        ],
+        [
+          "application",
+          2743
+        ]
+      ]
+    },
+    {
+      "file": "0hm.atx4b-_.7.js",
+      "raw": 49656,
+      "gzip": 17742,
+      "routes": [
+        "/compose/window"
+      ],
+      "packages": [
+        [
+          "cn",
+          25640
+        ],
+        [
+          "unknown",
+          20771
+        ],
+        [
+          "application",
+          2743
+        ]
+      ]
+    },
+    {
+      "file": "07aqyfkvl2tjj.js",
+      "raw": 49111,
+      "gzip": 19124,
+      "routes": [
+        "/reset-password"
+      ],
+      "packages": [
+        [
+          "cn",
+          25640
+        ],
+        [
+          "application",
+          15274
+        ],
+        [
+          "unknown",
+          7828
+        ]
+      ]
+    }
+  ],
+  "css": [
+    {
+      "file": "021~f7g5qg6by.css",
+      "raw": 813605,
+      "gzip": 104366
+    },
+    {
+      "file": "0qu0~z84y~52n.css",
+      "raw": 69405,
+      "gzip": 10458
+    },
+    {
+      "file": "0noi2-ob-4sjl.css",
+      "raw": 40508,
+      "gzip": 5987
+    },
+    {
+      "file": "0q-x3e2ad5f50.css",
+      "raw": 38772,
+      "gzip": 6760
+    },
+    {
+      "file": "09y4etq6z2_fr.css",
+      "raw": 15163,
+      "gzip": 3296
+    },
+    {
+      "file": "0~w59ptewcwf2.css",
+      "raw": 5334,
+      "gzip": 1015
+    },
+    {
+      "file": "0mj~q050190bl.css",
+      "raw": 4645,
+      "gzip": 1229
+    }
+  ]
+}

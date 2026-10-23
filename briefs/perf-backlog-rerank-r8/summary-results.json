@@ -1,0 +1,33 @@
+{
+  "timings": [
+    {
+      "label": "accessible 12 populated / 2 users",
+      "ms": 3.745113999999944,
+      "min": 3.437191999999982,
+      "max": 165.55155200000002,
+      "prepares": 61,
+      "cachedQueries": 0
+    },
+    {
+      "label": "summary 12 populated / 2 users",
+      "ms": 19.591779000000088,
+      "min": 18.939493000000084,
+      "max": 24.257901000000174,
+      "prepares": 157,
+      "cachedQueries": 24
+    },
+    {
+      "label": "summary event scope one account but loads all access metadata",
+      "ms": 12.375193000000081,
+      "min": 12.08471099999997,
+      "max": 24.414502999999968,
+      "prepares": 69,
+      "cachedQueries": 2
+    }
+  ],
+  "load": [
+    10.52,
+    7.83,
+    6.33
+  ]
+}
