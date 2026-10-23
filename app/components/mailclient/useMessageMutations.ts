@@ -248,7 +248,7 @@ export function useMessageMutations({
     shouldKeepMessageInCurrentResults,
     undoMoveOperation,
     updateMessagesWithCurrentResultPrune,
-    viewMessage?.id,
+    viewMessage,
     tn
   ]);
 
@@ -288,7 +288,6 @@ export function useMessageMutations({
       reportError(tn("archiveFailed"));
     }
   }, [
-    activeAccountId,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
@@ -396,7 +395,6 @@ export function useMessageMutations({
       });
     }
   }, [
-    activeAccountId,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
@@ -442,7 +440,6 @@ export function useMessageMutations({
       });
     }
   }, [
-    activeAccountId,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     readErrorMessage,
