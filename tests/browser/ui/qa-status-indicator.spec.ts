@@ -7,7 +7,7 @@ import { totpFromUri } from "../../helpers/totp";
 // QA_SHELL_FIXTURE_{IMAP,SMTP,CONTROL}_PORT=3876/3877/3878.
 test.use({ locale: "de-DE" });
 let cookies: Awaited<ReturnType<BrowserContext["cookies"]>>;
-const artifacts = "doc/screenshots/status-indicator";
+const artifacts = process.env.QA_STATUS_ARTIFACTS ?? ".tmp/qa-status-indicator";
 const baseline = process.env.QA_STATUS_BASELINE === "1";
 const metrics: unknown[] = [];
 const gains: unknown[] = [];
