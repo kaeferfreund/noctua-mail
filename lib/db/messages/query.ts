@@ -787,9 +787,27 @@ function logSearchFallback(params: {
   });
 }
 
+const DEFAULT_FTS_DRIVEN_MAX_CANDIDATES = 2000;
+// Portable SQLite default for bound variables per statement. Bun's build
+// accepts 250,000, but every consuming statement re-prepares with one
+// placeholder per candidate, so larger caps only add prepare cost.
+const FTS_DRIVEN_MAX_CANDIDATES_LIMIT = 32_766;
+let clampedCandidateCapWarnedFor: number | undefined;
+
 function maxFtsDrivenCandidates(): number {
   const override = Number(process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES);
-  return Number.isFinite(override) && override >= 1 ? Math.floor(override) : 2000;
+  if (!Number.isFinite(override) || override < 1) return DEFAULT_FTS_DRIVEN_MAX_CANDIDATES;
+  const configured = Math.floor(override);
+  if (configured <= FTS_DRIVEN_MAX_CANDIDATES_LIMIT) return configured;
+  // Once per configured value, not per search.
+  if (clampedCandidateCapWarnedFor !== configured) {
+    clampedCandidateCapWarnedFor = configured;
+    console.warn("[fts-search] NOCTUA_FTS_DRIVEN_MAX_CANDIDATES above maximum, clamped", {
+      configured,
+      max: FTS_DRIVEN_MAX_CANDIDATES_LIMIT
+    });
+  }
+  return FTS_DRIVEN_MAX_CANDIDATES_LIMIT;
 }
 
 /**

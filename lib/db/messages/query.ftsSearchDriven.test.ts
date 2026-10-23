@@ -512,6 +512,63 @@ describe("FTS-driven search candidates differential", () => {
     }
   });
 
+  test("candidate cap env: default for invalid values, clamped to 32,766 with one warning per value", async () => {
+    const accountId = fixture.a.accountId;
+    const fetchLimits: unknown[] = [];
+    const warnings: unknown[][] = [];
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const prepareSpy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes("MATCH ? AND accountId")) return statement;
+      return {
+        all: (...args: unknown[]) => {
+          fetchLimits.push(args[2]);
+          return statement.all(...args);
+        }
+      } as unknown as ReturnType<typeof prepare>;
+    });
+    const warnSpy = spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      // "2.9" floors to a cap of 3, below needle's hit count: that search's
+      // own fallback line is not what this test counts.
+      if (args[0] !== "[fts-search] legacy fallback") warnings.push(args);
+    });
+    const effectiveFetchLimit = async (value: string | undefined) => {
+      if (value === undefined) delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+      else process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES = value;
+      fetchLimits.length = 0;
+      await listMessages({ accountId, page: 1, pageSize: 10, query: "needle" });
+      expect(fetchLimits).toHaveLength(1);
+      return fetchLimits[0];
+    };
+    try {
+      expect(await effectiveFetchLimit(undefined)).toBe(2001);
+      for (const invalid of ["", "abc", "0", "-5", "Infinity", "NaN"]) {
+        expect(await effectiveFetchLimit(invalid)).toBe(2001);
+      }
+      expect(await effectiveFetchLimit("2.9")).toBe(3);
+      expect(await effectiveFetchLimit("32766")).toBe(32767);
+      expect(warnings).toHaveLength(0);
+
+      for (let index = 0; index < 3; index += 1) {
+        expect(await effectiveFetchLimit("32767")).toBe(32767);
+      }
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toEqual([
+        "[fts-search] NOCTUA_FTS_DRIVEN_MAX_CANDIDATES above maximum, clamped",
+        { configured: 32767, max: 32766 }
+      ]);
+      expect(await effectiveFetchLimit("1e9")).toBe(32767);
+      expect(await effectiveFetchLimit("1e9")).toBe(32767);
+      expect(warnings).toHaveLength(2);
+      expect(warnings[1][1]).toEqual({ configured: 1e9, max: 32766 });
+      expect(JSON.stringify(warnings)).not.toContain("needle");
+    } finally {
+      delete process.env.NOCTUA_FTS_DRIVEN_MAX_CANDIDATES;
+      prepareSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   test("candidate-cap fallback (combined MATCH) logs once without query content", async () => {
     const accountId = fixture.a.accountId;
     const warnings: unknown[][] = [];
