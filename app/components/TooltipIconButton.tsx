@@ -1,5 +1,6 @@
 import { forwardRef, type ComponentPropsWithoutRef, type FocusEvent } from "react";
 import { IconButton, Tooltip } from "@radix-ui/themes";
+import { markTooltipEscape } from "@/lib/ui/tooltipEscape";
 
 type TooltipIconButtonProps = Omit<ComponentPropsWithoutRef<typeof IconButton>, "title"> & {
   tooltip: string;
@@ -24,7 +25,7 @@ const TooltipIconButton = forwardRef<HTMLButtonElement, TooltipIconButtonProps>(
     };
 
     return (
-      <Tooltip content={tooltip} side={tooltipSide}>
+      <Tooltip content={tooltip} side={tooltipSide} onEscapeKeyDown={markTooltipEscape}>
         <IconButton aria-label={tooltip} {...props} ref={ref} onFocus={handleFocus} />
       </Tooltip>
     );

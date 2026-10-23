@@ -81,6 +81,8 @@ export type MessageListViewRefs = {
 };
 
 export type MessageListViewActions = {
+  onOpenReader?: (message: Message) => void;
+  onNavigationRowsChange?: (rows: Message[]) => void;
   setSortKey: React.Dispatch<React.SetStateAction<SortKey>>;
   setSortDir: React.Dispatch<React.SetStateAction<"asc" | "desc">>;
   setCollapsedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;

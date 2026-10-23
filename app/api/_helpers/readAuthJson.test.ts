@@ -1,6 +1,6 @@
-import { expect, test } from "bun:test";
+import { expect, jest, test } from "bun:test";
 import { NextResponse } from "next/server";
-import { AUTH_JSON_BODY_LIMIT, readAuthJson } from "./readAuthJson";
+import { AUTH_JSON_BODY_LIMIT, BODY_READ_TIMEOUT_MS, BodyReadTimeoutError, readAuthJson } from "./readAuthJson";
 
 function streamed(chunks: Uint8Array[]) {
   let reads = 0;
@@ -47,5 +47,30 @@ test("bounded auth JSON preserves BOM handling and malformed/empty JSON errors",
   expect(await readAuthJson(new Request("http://localhost:3000", { method: "POST", body: '\uFEFF{"ok":true}' }))).toEqual({ ok: true });
   for (const body of [undefined, "", "{", " ".repeat(AUTH_JSON_BODY_LIMIT)]) {
     await expect(readAuthJson(new Request("http://localhost:3000", { method: "POST", body }))).rejects.toBeInstanceOf(SyntaxError);
+  }
+});
+
+test("bounded auth JSON abandons a stalled body at the read deadline and cancels it", async () => {
+  jest.useFakeTimers();
+  try {
+    let cancelled = false;
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      // One chunk, then the source stalls: no further chunk and no close.
+      pull(controller) { if (!sent) { sent = true; controller.enqueue(new TextEncoder().encode("{")); } },
+      cancel() { cancelled = true; }
+    }, { highWaterMark: 0 });
+    const request = new Request("http://localhost:3000", { method: "POST", body });
+    const pending = readAuthJson(request);
+    const settled = pending.then(() => "resolved", error => error);
+    await Promise.resolve();
+    jest.advanceTimersByTime(BODY_READ_TIMEOUT_MS - 1);
+    expect(await Promise.race([settled, new Promise(resolve => setImmediate(() => resolve("pending")))])).toBe("pending");
+    jest.advanceTimersByTime(1);
+    expect(await settled).toBeInstanceOf(BodyReadTimeoutError);
+    expect(cancelled).toBe(true);
+    expect(request.body!.locked).toBe(false);
+  } finally {
+    jest.useRealTimers();
   }
 });

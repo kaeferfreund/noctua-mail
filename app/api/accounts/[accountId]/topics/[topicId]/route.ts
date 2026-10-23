@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(request: Request, { params }: Params) {
-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
+  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
   const { topicId: rawTopicId } = await params;
   const topicId = typeof rawTopicId === "string" ? rawTopicId.trim() : "";
