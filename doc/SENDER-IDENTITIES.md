@@ -1,8 +1,9 @@
-# Sender identities (slice 1)
+# Sender identities (slices 1–2)
 
 Slice 1 implements configuration, personal preferences, delivery observations and
-own-address recognition. Compose and transport still use the primary From until
-slices 2/3 supply identity selection and authoritative send validation.
+own-address recognition. Slice 2 implements authoritative sender selection and
+validation for transport, drafts, calendar and MCP. Slice 3 supplies the compose,
+settings and signature UI; older clients use the server default resolver.
 
 ## Types and serialization
 
@@ -127,7 +128,8 @@ manager edits mailbox identities/default/templates; editor/viewer may inspect
 identities and change their own prefs, while composing/sending requires editor+.
 Read-only disabled identities are already visible to viewer mailbox members;
 MCP's internal own-address context uses the same scope, never foreign identities,
-personal overrides or credentials. Identity MCP CRUD is not shipped yet.
+personal overrides or credentials. Slice 2 adds the actor-aware identity MCP tools
+documented below.
 
 Save identities through POST/PATCH/DELETE and personal changes through PUT prefs,
 separately from `/settings`; never post a whole identities array or personal
@@ -168,8 +170,9 @@ shard-v2 writer guards; the combined regression gates verify the port.
 
 Follow the source design `briefs/sender-identities-design.md` §§3.2–3.5, 4–7 and 9,
 and the ownership handoff in [TEAM-INBOX §9](TEAM-INBOX.md#9-work-breakdown-branches).
-This branch starts at team-auth `2458a09` and will be ported after integration of
+The original Slice 1 branch started at team-auth `2458a09`, with a handoff after
 thread-collaboration `133bddc`, mailbox-watcher `bd7eb5f`, and collab-ui `1d0f0ce`.
+Those dependencies are integrated in the Slice 2 base, round 4 `435ba5d`.
 Keep collaboration's immediate writer transaction, messageRowIds, remap hooks and
 stable thread IDs; add metadata snapshots inside that lock and never use a
 Message-ID-only fallback as copy evidence. Preserve watcher UIDVALIDITY/folder/
