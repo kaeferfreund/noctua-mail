@@ -33,7 +33,7 @@
         "cn": "^0.5.0",
         "entities": "^8.1.0",
         "html-to-text": "^10.0.1",
-        "imapflow": "^1.7.8",
+        "imapflow": "^2.9.1",
         "lexical": "^0.52.0",
         "lucide-react": "^1.61.0",
         "mailparser": "^3.12.3",
@@ -742,7 +742,7 @@
 
     "@unrs/resolver-binding-darwin-arm64": ["@unrs/resolver-binding-darwin-arm64@1.11.1", "", { "os": "darwin", "cpu": "arm64" }, ""],
 
-    "@zone-eu/mailsplit": ["@zone-eu/mailsplit@5.4.16", "", { "dependencies": { "libbase64": "1.3.0", "libmime": "5.4.3", "libqp": "2.1.1" } }, "sha512-zQ9iXvlT3Wi/hazeC1MdI4rQc1UJwJ6IQ6QzSZ5KDxLZZWQSazWLOzImLFluXadKShJ9WJvI1xH+AyVS8b9azg=="],
+    "@zone-eu/mailsplit": ["@zone-eu/mailsplit@5.4.29", "", { "dependencies": { "libbase64": "1.4.1", "libmime": "5.6.3", "libqp": "3.0.1" } }, "sha512-CCUNycmUjrV5M0wNf23waWAt9eOHczhjLbUQS7k0FNJvR0py9VSqHFt+tSl/D0+XI73VLG0U+PwYtq9R0zsm9Q=="],
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
@@ -986,7 +986,7 @@
 
     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
 
-    "encoding-japanese": ["encoding-japanese@2.3.0", "", {}, "sha512-eQyh1vzHz13DUkZcJO+0IOAoKXRQwKV5IBffeuYsWZyRLGiSzfzXObCqWvqFXdX0UU8qOk+lBXbkUhMCpdJe4Q=="],
+    "encoding-japanese": ["encoding-japanese@2.4.0", "", {}, "sha512-PE0KjlsDy9JSsoU4C2Q8NXb1kC4c+bZRac9ZvHXUE4q1Ht63gScKMdEy9jst9+Fi3M4eDkqzkEhBZvix4blP2A=="],
 
     "enhanced-resolve": ["enhanced-resolve@5.26.0", "", { "dependencies": { "graceful-fs": "^4.2.4", "tapable": "^2.3.3" } }, "sha512-9vhedylFonb2YGogzUKX6+Ja72gOJbN1QHAqdrvqLwhdl/QWbKopzoUC9EbQNVsAns/bx/4uyqalrQAoy1IByw=="],
 
@@ -1218,7 +1218,7 @@
 
     "ignore": ["ignore@5.3.2", "", {}, ""],
 
-    "imapflow": ["imapflow@1.7.8", "", { "dependencies": { "@zone-eu/mailsplit": "5.4.16", "encoding-japanese": "2.3.0", "iconv-lite": "0.7.3", "libbase64": "1.3.0", "libmime": "5.4.3", "libqp": "2.1.1", "pino": "10.3.1", "socks": "2.8.9" } }, "sha512-dJoCIdZOJh26Rn2PdwEzwj0bRDgGBxxX38pio534FagIHVuR2l0SAfLr6sJo32YfuJHiSs/U2ntNDHnMg3/Hlg=="],
+    "imapflow": ["imapflow@2.9.1", "", { "dependencies": { "@zone-eu/mailsplit": "5.4.29", "encoding-japanese": "2.4.0", "iconv-lite": "0.7.3", "libbase64": "1.4.1", "libmime": "5.6.3", "libqp": "3.0.1", "pino": "10.3.1", "socks": "2.8.10" } }, "sha512-hOq2/+T+WnQzRy7D40gYlio25nG+c9bhtrxowokOQM57SwZFqRbqAtxFQcIpx82lhYBPQEEVVjmkYpd9Fplj7g=="],
 
     "import-fresh": ["import-fresh@3.3.1", "", { "dependencies": { "parent-module": "^1.0.0", "resolve-from": "^4.0.0" } }, "sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ=="],
 
@@ -1374,11 +1374,11 @@
 
     "lib0": ["lib0@0.2.117", "", { "dependencies": { "isomorphic.js": "^0.2.4" }, "bin": { "0serve": "bin/0serve.js", "0gentesthtml": "bin/gentesthtml.js", "0ecdsa-generate-keypair": "bin/0ecdsa-generate-keypair.js" } }, "sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw=="],
 
-    "libbase64": ["libbase64@1.3.0", "", {}, ""],
+    "libbase64": ["libbase64@1.4.1", "", {}, "sha512-Nyh3H90B3gRtrcxIe56Ayy7635J0jmh6AbxbQgQae8wrSPQMH5wFqJChiMTB13yKG512L3YspbA5DzumhFTITA=="],
 
-    "libmime": ["libmime@5.4.3", "", { "dependencies": { "encoding-japanese": "2.3.0", "iconv-lite": "0.7.3", "libbase64": "1.3.0", "libqp": "2.1.1" } }, "sha512-di9BoDabBUMqjeD/wGj+hHpSgdqAph5ui7w6OdY6NpzU6O6VFLQsMOg9tqCjm/zf9OHzAM9EZxSOF7uIb8O8Hw=="],
+    "libmime": ["libmime@5.6.3", "", { "dependencies": { "encoding-japanese": "2.4.0", "iconv-lite": "0.7.3", "libbase64": "1.4.1", "libqp": "3.0.1" } }, "sha512-cuTUW/Jybvh5O4/U9p61gyutHOjDtZyGQYuY99+bfnaFwqcDf2Nb+R6hMHY6DDen2H9wLKQSMpofWUgn2TI5JQ=="],
 
-    "libqp": ["libqp@2.1.1", "", {}, ""],
+    "libqp": ["libqp@3.0.1", "", {}, "sha512-7QZxpPX25pga1WiMueduWxmrHMVBFrZPH6ZUaozGYa/H98JH6NVBSET3qVw+4NxzoraIW7rJ81YxSU9IalvCpg=="],
 
     "lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
@@ -2206,8 +2206,6 @@
 
     "imapflow/iconv-lite": ["iconv-lite@0.7.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ=="],
 
-    "imapflow/socks": ["socks@2.8.9", "", { "dependencies": { "ip-address": "^10.1.1", "smart-buffer": "^4.2.0" } }, "sha512-LJhUYUvItdQ0LkJTmPeaEObWXAqFyfmP85x0tch/ez9cahmhlBBLbIqDFnvBnUJGagb0JbIQrkBs1wJ+yRYpEw=="],
-
     "is-bun-module/semver": ["semver@7.7.3", "", { "bin": "bin/semver.js" }, ""],
 
     "is-inside-container/is-docker": ["is-docker@3.0.0", "", { "bin": { "is-docker": "cli.js" } }, "sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ=="],
@@ -2217,10 +2215,6 @@
     "log-symbols/chalk": ["chalk@5.6.2", "", {}, "sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA=="],
 
     "log-symbols/is-unicode-supported": ["is-unicode-supported@1.3.0", "", {}, "sha512-43r2mRvz+8JRIKnWJ+3j8JtjRKZ6GmjzfaE/qiBJnikNnYv/6bagRJ1kUhNk8R5EX/GkobD+r+sfxCPJsiKBLQ=="],
-
-    "mailparser/@zone-eu/mailsplit": ["@zone-eu/mailsplit@5.4.29", "", { "dependencies": { "libbase64": "1.4.1", "libmime": "5.6.3", "libqp": "3.0.1" } }, "sha512-CCUNycmUjrV5M0wNf23waWAt9eOHczhjLbUQS7k0FNJvR0py9VSqHFt+tSl/D0+XI73VLG0U+PwYtq9R0zsm9Q=="],
-
-    "mailparser/libmime": ["libmime@5.6.3", "", { "dependencies": { "encoding-japanese": "2.4.0", "iconv-lite": "0.7.3", "libbase64": "1.4.1", "libqp": "3.0.1" } }, "sha512-cuTUW/Jybvh5O4/U9p61gyutHOjDtZyGQYuY99+bfnaFwqcDf2Nb+R6hMHY6DDen2H9wLKQSMpofWUgn2TI5JQ=="],
 
     "mailparser/nodemailer": ["nodemailer@10.2.0", "", {}, "sha512-/XyGw6kX2stMdKGUJdAQmYAeY1FscWfdRydfd2NtK3A3KDfUUXCqZzExSNAt2xhh90X2qLCR+o2Gd48YPJcJwA=="],
 
@@ -2375,18 +2369,6 @@
     "hast-util-from-html/parse5/entities": ["entities@6.0.1", "", {}, "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="],
 
     "hast-util-raw/parse5/entities": ["entities@6.0.1", "", {}, "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g=="],
-
-    "mailparser/@zone-eu/mailsplit/libbase64": ["libbase64@1.4.1", "", {}, "sha512-Nyh3H90B3gRtrcxIe56Ayy7635J0jmh6AbxbQgQae8wrSPQMH5wFqJChiMTB13yKG512L3YspbA5DzumhFTITA=="],
-
-    "mailparser/@zone-eu/mailsplit/libqp": ["libqp@3.0.1", "", {}, "sha512-7QZxpPX25pga1WiMueduWxmrHMVBFrZPH6ZUaozGYa/H98JH6NVBSET3qVw+4NxzoraIW7rJ81YxSU9IalvCpg=="],
-
-    "mailparser/libmime/encoding-japanese": ["encoding-japanese@2.4.0", "", {}, "sha512-PE0KjlsDy9JSsoU4C2Q8NXb1kC4c+bZRac9ZvHXUE4q1Ht63gScKMdEy9jst9+Fi3M4eDkqzkEhBZvix4blP2A=="],
-
-    "mailparser/libmime/iconv-lite": ["iconv-lite@0.7.3", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ=="],
-
-    "mailparser/libmime/libbase64": ["libbase64@1.4.1", "", {}, "sha512-Nyh3H90B3gRtrcxIe56Ayy7635J0jmh6AbxbQgQae8wrSPQMH5wFqJChiMTB13yKG512L3YspbA5DzumhFTITA=="],
-
-    "mailparser/libmime/libqp": ["libqp@3.0.1", "", {}, "sha512-7QZxpPX25pga1WiMueduWxmrHMVBFrZPH6ZUaozGYa/H98JH6NVBSET3qVw+4NxzoraIW7rJ81YxSU9IalvCpg=="],
 
     "next/postcss/nanoid": ["nanoid@3.3.11", "", { "bin": "bin/nanoid.cjs" }, ""],
 
