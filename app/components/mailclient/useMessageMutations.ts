@@ -18,7 +18,7 @@ import type { ContinueAfterRemoval } from "./messagelist/successfulRemoval";
 
 type UseMessageMutationsProps = {
   continueAfterRemoval?: ContinueAfterRemoval;
-  navigationRows?: Message[];
+  getNavigationRows?: () => Message[];
   activeAccountId: string;
   searchScope: "folder" | "all";
   viewMessage: Message | null;
@@ -60,11 +60,13 @@ type MoveReconcileParams = {
   source: string;
   successTitle: string;
   undoSuccessMessage: string;
+  // The renderer order when the command started.
+  navigationRows?: Message[];
 };
 
 export function useMessageMutations({
   continueAfterRemoval,
-  navigationRows,
+  getNavigationRows,
   activeAccountId,
   searchScope,
   viewMessage,
@@ -222,7 +224,7 @@ export function useMessageMutations({
     // Let the shared continuation inspect the current reader, rather than the
     // view captured when this request started.
     if (continueAfterRemoval && (!movedMessage || !shouldKeepMessageInCurrentResults(movedMessage))) {
-      continueAfterRemoval([message.id], navigationRows);
+      continueAfterRemoval([message.id], params.navigationRows);
     } else if (transition.kind === "clear") {
       setViewMessage(null);
       setActiveMessageId("");
@@ -249,7 +251,6 @@ export function useMessageMutations({
   }, [
     activeAccountId,
     continueAfterRemoval,
-    navigationRows,
     evictMessageCaches,
     pushNotice,
     searchScope,
@@ -271,6 +272,7 @@ export function useMessageMutations({
 
   const handleArchiveMessage = useCallback(async (message: Message) => {
     try {
+      const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message.id, "archive");
       if (!res.ok) {
@@ -291,6 +293,7 @@ export function useMessageMutations({
         destinationMailbox: data.archiveMailbox,
         flags: data.flags,
         source: "archive-message",
+        navigationRows,
         successTitle: tn("archived"),
         undoSuccessMessage: tn("archiveUndone")
       });
@@ -300,6 +303,7 @@ export function useMessageMutations({
   }, [
     requestMessageCommand,
     applyMoveReconcileSuppression,
+    getNavigationRows,
     readErrorMessage,
     reconcileMoveMutation,
     reportError,
@@ -372,6 +376,7 @@ export function useMessageMutations({
   const handleMarkSpam = useCallback(async (message: Message) => {
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
+      const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message.id, "spam");
       if (!res.ok) {
@@ -392,6 +397,7 @@ export function useMessageMutations({
         destinationMailbox: data.junkMailbox,
         flags: data.flags,
         source: "mark-spam",
+        navigationRows,
         successTitle: tn("markedSpam"),
         undoSuccessMessage: tn("spamUndone")
       });
@@ -407,6 +413,7 @@ export function useMessageMutations({
   }, [
     requestMessageCommand,
     applyMoveReconcileSuppression,
+    getNavigationRows,
     readErrorMessage,
     reconcileMoveMutation,
     reportError,
@@ -417,6 +424,7 @@ export function useMessageMutations({
   const handleMarkNotSpam = useCallback(async (message: Message) => {
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
+      const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message.id, "not-spam");
       if (!res.ok) {
@@ -437,6 +445,7 @@ export function useMessageMutations({
         destinationMailbox: data.inboxMailbox,
         flags: data.flags,
         source: "mark-not-spam",
+        navigationRows,
         successTitle: tn("markedNotSpam"),
         undoSuccessMessage: tn("notSpamUndone")
       });
@@ -452,6 +461,7 @@ export function useMessageMutations({
   }, [
     requestMessageCommand,
     applyMoveReconcileSuppression,
+    getNavigationRows,
     readErrorMessage,
     reconcileMoveMutation,
     reportError,
