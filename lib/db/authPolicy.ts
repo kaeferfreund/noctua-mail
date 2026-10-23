@@ -143,6 +143,10 @@ const provisioningIndexName = "idx_user_provisioning_active_email";
 const provisioningPredicate = "state IN ('reserved','auth_created','cleanup_required')";
 const provisioningIndexDdl = `CREATE UNIQUE INDEX ${provisioningIndexName}
   ON user_provisioning(normalizedEmail) WHERE ${provisioningPredicate}`;
+const provisioningUserIndexName = "idx_user_provisioning_user_state";
+const provisioningUserIndexDdl = `CREATE INDEX ${provisioningUserIndexName}
+  ON user_provisioning(userId,state)`;
+const provisioningUserIndexMigration = "user-provisioning-user-state-index-v1";
 
 function validateProvisioningIndex(db: Database) {
   const valid = () => {
@@ -167,6 +171,30 @@ function validateProvisioningIndex(db: Database) {
     }
   }
   if (!valid()) throw new Error("Malformed auth provisioning uniqueness index at startup");
+}
+
+function validateProvisioningUserIndex(db: Database) {
+  const valid = () => {
+    const index = db.prepare("PRAGMA index_list(user_provisioning)").all()
+      .find((row: { name: string }) => row.name === provisioningUserIndexName);
+    if (!index || index.unique !== 0 || index.partial !== 0) return false;
+    const columns = db.prepare(`PRAGMA index_xinfo(${provisioningUserIndexName})`).all()
+      .filter((row: { key: number }) => row.key === 1);
+    return columns.length === 2 && columns[0].name === "userId" && columns[1].name === "state" &&
+      columns.every((column: { coll: string; desc: number }) => column.coll === "BINARY" && column.desc === 0) &&
+      normalizedSql(schemaSql(db, "index", provisioningUserIndexName) ?? "") === normalizedSql(provisioningUserIndexDdl);
+  };
+  if (!valid()) {
+    // A covering user seek keeps completed history out of other users' probes.
+    // Missing/changed indexes are repaired atomically, including on older masters.
+    try {
+      db.exec(`DROP INDEX IF EXISTS ${provisioningUserIndexName}`);
+      db.exec(provisioningUserIndexDdl);
+    } catch (cause) {
+      throw new Error("Cannot repair auth provisioning user index at startup", { cause });
+    }
+  }
+  if (!valid()) throw new Error("Malformed auth provisioning user index at startup");
 }
 
 /** Determine installation status before creating anything that could reset counters. */
@@ -237,6 +265,7 @@ export function installAuthControlPlane(db: Database) {
     ensureTableColumns(db, "mcp_tokens", [["securityGeneration", "INTEGER"]]);
     ensureInviteIssuerSchema(db);
     validateProvisioningIndex(db);
+    validateProvisioningUserIndex(db);
 
     // Never choose a legacy ID by email. An explicit operator ID binding is the
     // only allowed import; even that must not bind two different identities.
@@ -275,6 +304,7 @@ export function installAuthControlPlane(db: Database) {
     db.exec(migrationsDdl);
     db.exec("INSERT OR IGNORE INTO auth_control_plane_installation(id,version) VALUES(1,1)");
     db.prepare("INSERT OR IGNORE INTO noctua_auth_migrations(id) VALUES(?)").run(installationMigration);
+    db.prepare("INSERT OR IGNORE INTO noctua_auth_migrations(id) VALUES(?)").run(provisioningUserIndexMigration);
   }).immediate();
 }
 
