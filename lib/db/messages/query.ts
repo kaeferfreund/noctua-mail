@@ -2356,12 +2356,6 @@ export async function listThreads(params: {
           `
           SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
           FROM threads t
-          LEFT JOIN (
-            SELECT DISTINCT m.threadId
-            FROM messages m
-            WHERE m.accountId = ? AND m.flagged = 1 AND COALESCE(m.deleted, 0) = 0
-          ) flaggedThreads
-            ON flaggedThreads.threadId = t.threadId
           WHERE t.accountId = ?
             AND EXISTS (
               SELECT 1
@@ -2371,12 +2365,16 @@ export async function listThreads(params: {
                 AND COALESCE(m.deleted, 0) = 0
             )
           ORDER BY
-            CASE WHEN flaggedThreads.threadId IS NULL THEN 0 ELSE 1 END DESC,
+            EXISTS (
+              SELECT 1 FROM messages mf
+              WHERE mf.accountId = t.accountId AND mf.flagged = 1
+                AND mf.threadId = t.threadId AND COALESCE(mf.deleted, 0) = 0
+            ) DESC,
             t.${threadDateColumn} DESC
           LIMIT ? OFFSET ?
         `
         )
-        .all(accountId, accountId, pageSize, offset) as any[];
+        .all(accountId, pageSize, offset) as any[];
     } else {
       threadRows = db
         .prepare(
@@ -2439,11 +2437,9 @@ export async function listThreads(params: {
   } else {
     const threadFilterSql = `SELECT DISTINCT m.threadId FROM messages m WHERE ${where}`;
     const flaggedOrderArgs: any[] = [];
-    let flaggedJoinSql = "";
     let threadOrderSql = `t.${threadDateColumn} DESC`;
     if (shouldPrioritizeFlaggedThreads) {
-      let flaggedWhere = "mf.accountId = ? AND mf.flagged = 1";
-      flaggedOrderArgs.push(accountId);
+      let flaggedWhere = "mf.accountId = t.accountId AND mf.flagged = 1 AND mf.threadId = t.threadId";
       flaggedWhere = applyVisibleMessageFilters(flaggedWhere, "mf");
       flaggedWhere = applyExcludedFolderFilters(
         flaggedWhere,
@@ -2451,16 +2447,8 @@ export async function listThreads(params: {
         excludedFolderIds,
         "mf"
       );
-      flaggedJoinSql = `
-        LEFT JOIN (
-          SELECT DISTINCT mf.threadId
-          FROM messages mf
-          WHERE ${flaggedWhere}
-        ) flaggedThreads
-          ON flaggedThreads.threadId = t.threadId
-      `;
       threadOrderSql =
-        `CASE WHEN flaggedThreads.threadId IS NULL THEN 0 ELSE 1 END DESC, t.${threadDateColumn} DESC`;
+        `EXISTS (SELECT 1 FROM messages mf WHERE ${flaggedWhere}) DESC, t.${threadDateColumn} DESC`;
     }
 
     threadRows = db
@@ -2468,14 +2456,13 @@ export async function listThreads(params: {
         `
         SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
         FROM threads t
-        ${flaggedJoinSql}
         WHERE t.accountId = ?
           AND t.threadId IN (${threadFilterSql})
         ORDER BY ${threadOrderSql}
         LIMIT ? OFFSET ?
       `
       )
-      .all(...flaggedOrderArgs, accountId, ...args, pageSize, offset) as any[];
+      .all(accountId, ...args, ...flaggedOrderArgs, pageSize, offset) as any[];
 
     const threadTotalRow = db
       .prepare(
