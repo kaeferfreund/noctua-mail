@@ -148,6 +148,13 @@ describe("thread selector flagged EXISTS differential", () => {
     await differential({ badges: ["assigned-to-me"] }, false);
   });
 
+  test("unassigned selector excludes closed threads with and without flagged-set replay", async () => {
+    const ids = await differential({ badges: ["unassigned"] }, false);
+    expect(ids.sort()).toEqual([2, 8, 11, 14, 20, 23].map(threadId).sort());
+    const withOpen = await differential({ badges: ["unassigned", "open"] }, false);
+    expect(withOpen.sort()).toEqual(ids);
+  });
+
   test("search, address, attachment and other badge modes retain their ordering contracts", async () => {
     for (const options of [
       { query: "needle" }, { query: "message-1-0" }, { query: "in:Archive" },
