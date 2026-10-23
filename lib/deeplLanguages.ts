@@ -3,9 +3,7 @@
  * imports so both the settings UI (client) and the translate route (server)
  * can share the list and validation.
  */
-export type DeeplTargetLanguage = { code: string; label: string };
-
-export const DEEPL_TARGET_LANGUAGES: DeeplTargetLanguage[] = [
+export const DEEPL_TARGET_LANGUAGES = [
   { code: "EN-US", label: "English (American)" },
   { code: "EN-GB", label: "English (British)" },
   { code: "DE", label: "German" },
@@ -23,11 +21,15 @@ export const DEEPL_TARGET_LANGUAGES: DeeplTargetLanguage[] = [
   { code: "TR", label: "Turkish" },
   { code: "UK", label: "Ukrainian" },
   { code: "AR", label: "Arabic" }
-];
+] as const;
+
+/** Stable protocol code; UI labels come from Settings.translation.languages. */
+export type DeeplTargetLanguageCode = (typeof DEEPL_TARGET_LANGUAGES)[number]["code"];
+export type DeeplTargetLanguage = { code: DeeplTargetLanguageCode; label: string };
 
 export const DEFAULT_DEEPL_TARGET_LANG = "EN-US";
 
-export function isSupportedDeeplTargetLang(code: string): boolean {
+export function isSupportedDeeplTargetLang(code: string): code is DeeplTargetLanguageCode {
   return DEEPL_TARGET_LANGUAGES.some((language) => language.code === code);
 }
 

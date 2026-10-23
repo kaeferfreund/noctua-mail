@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import type { RecipientAlias } from "@/lib/data";
 import RecipientAliasManager from "./RecipientAliasManager";
 import DialogTitleBar from "./message/DialogTitleBar";
@@ -28,7 +29,8 @@ export default function RecipientAliasDialog({
   onUpdateAlias,
   onDeleteAlias
 }: RecipientAliasDialogProps) {
-  const title = initialAliasId ? "Manage Recipient Aliases" : "Create Mailing List Alias";
+  const t = useTranslations("Settings.recipientAliases");
+  const title = initialAliasId ? t("dialogManageTitle") : t("dialogCreateTitle");
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
