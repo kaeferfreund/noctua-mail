@@ -1,4 +1,5 @@
 import { seedSenderIdentityRow } from "./senderIdentities";
+import { isUiLocale } from "../i18n/config";
 import type {
   Account,
   AdminAuditEntry,
@@ -45,7 +46,7 @@ export function mapInviteRow(row: any): InviteCode {
  * password hash is never selected: `hasPassword` is derived in SQL so the
  * hash cannot leak through the row or the mapped `User`.
  */
-export const USER_ROW_SELECT = `p.id, u.email, u.name, u.role, p.createdAt,
+export const USER_ROW_SELECT = `p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale,
   EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.password IS NOT NULL) AS hasPassword,
   (u.banned=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now'))) AS disabled,
   u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_passkey k WHERE k.userId=u.id) AS passkeyCount`;
@@ -53,12 +54,13 @@ export const USER_ROW_SELECT = `p.id, u.email, u.name, u.role, p.createdAt,
 export type StoredUserRow = {
   id?: string | null; email?: string | null; name?: string | null; role?: string | null;
   createdAt?: number | null; hasPassword?: number | null; disabled?: number | null;
-  twoFactorEnabled?: number | null; passkeyCount?: number | null;
+  twoFactorEnabled?: number | null; passkeyCount?: number | null; uiLocale?: string | null;
 };
 
 export function mapUserRow(row: StoredUserRow): User {
   const name = row.name == null ? "" : String(row.name).trim();
   return { id: String(row.id ?? ""), email: String(row.email ?? ""), name: name || null,
+    uiLocale: isUiLocale(row.uiLocale) ? row.uiLocale : null,
     role: row.role === "admin" ? "admin" : "user", createdAt: Number(row.createdAt ?? 0),
     hasPassword: Boolean(Number(row.hasPassword ?? 0)), disabled: Boolean(Number(row.disabled ?? 0)),
     twoFactorEnabled: Boolean(Number(row.twoFactorEnabled ?? 0)), passkeyCount: Number(row.passkeyCount ?? 0) };

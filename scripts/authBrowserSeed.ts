@@ -4,6 +4,8 @@ import {getAuth} from "../lib/betterAuth";
 import {getDb,closeAllDbConnections} from "../lib/db/connection";
 import {persistAccountRow} from "../lib/db/rowParsers";
 import {insertUserAccountLinkRow} from "../lib/db/users";
+import {saveFoldersForAccount} from "../lib/db/folders";
+import {upsertMessages} from "../lib/db/messages";
 import {createInviteCode} from "../lib/db/inviteCodes";
 import {withAuthProof} from "../lib/authPolicyContext";
 import {totpFromUri} from "../tests/helpers/totp";
@@ -35,6 +37,14 @@ for(const [index,[scenarioId,scenario]] of Object.entries(SCENARIOS).entries()) 
         imap: {host: "imap.example.invalid", port: 993, secure: true, user: email, password: ""},
         smtp: {host: "smtp.example.invalid", port: 465, secure: true, user: email, password: ""}});
       insertUserAccountLinkRow(db, user.user.id, id, "manager");
+      if (id === "synthetic-mailbox-b") {
+        const folderId = `${id}:INBOX`;
+        await saveFoldersForAccount(id, [{id: folderId, accountId: id, name: "INBOX", count: 1, specialUse: "\\Inbox"}]);
+        await upsertMessages(id, folderId, [{id: "synthetic-i18n-message", messageId: "<i18n@example.test>", threadId: "<i18n@example.test>",
+          accountId: id, folderId, subject: "Synthetic locale thread", from: "Synthetic Sender", fromEmail: "sender@example.test",
+          to: email, preview: "Synthetic locale body", body: "Synthetic locale body", date: new Date().toISOString(), dateValue: Date.now(),
+          unread: false, seen: true, flags: ["\\Seen"]}]);
+      }
     }
   }
   seeds[scenario]={email:user.user.email,password,totpURI:seed.totpURI,backupCodes:seed.backupCodes,userId:user.user.id,...(scenarioId==="activatedSignup"?{inviteCode:(await createInviteCode({role:"user",email:"new-person@example.test"})).code}:{})};

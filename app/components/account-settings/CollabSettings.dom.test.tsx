@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import MembersTabContent from "./tabs/MembersTabContent";
 import PreferencesTabContent from "./tabs/PreferencesTabContent";
