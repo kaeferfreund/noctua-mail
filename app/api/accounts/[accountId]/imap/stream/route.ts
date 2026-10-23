@@ -245,24 +245,29 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           });
           sessionRegistered = true;
           await enforceCapacity();
-          await send("folder:update", [
-            {
+          // SELECT/EXAMINE UNSEEN is the first unseen sequence number. Only
+          // STATUS UNSEEN is an unread count, including for a selected mailbox.
+          const readFolderStatus = () => logImapOp(
+            "imap.status",
+            { ...logContext, mailbox },
+            () => client.status(mailbox, {
+              uidNext: true, uidValidity: true, messages: true, unseen: true
+            })
+          );
+          const sendFolderStatus = (status: Awaited<ReturnType<typeof readFolderStatus>>) =>
+            send("folder:update", [{
               id: folder.id,
-              uidNext: lastUidNext,
-              unseen: (mailboxInfo as any)?.unseen ?? 0,
-              exists: (mailboxInfo as any)?.exists ?? 0
-            }
-          ]);
+              uidNext: status.uidNext,
+              unseen: status.unseen,
+              exists: status.messages
+            }]);
+          await sendFolderStatus(await readFolderStatus());
 
           const fetchNew = async () => {
             const watcher = sessions.get(folder.id);
             if (stopped || !watcher) return;
             const previousUidNext = watcher.lastUidNext;
-            const status = await logImapOp(
-              "imap.status",
-              { ...logContext, mailbox },
-              async () => await client.status(mailbox, { uidNext: true, uidValidity: true })
-            );
+            const status = await readFolderStatus();
             // Reconcile resets even if the server reuses the previous UIDs.
             const currentState = await getMailboxState(accountId, folder.id);
             await saveMailboxState({ accountId, folderId: folder.id, mailboxPath: mailbox,
@@ -270,7 +275,10 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               highestUid: currentState?.highestUid, highestModSeq: currentState?.highestModSeq,
               supportsQresync });
             const uidNext = status?.uidNext ?? previousUidNext;
-            if (uidNext <= previousUidNext) return;
+            if (uidNext <= previousUidNext) {
+              await sendFolderStatus(status);
+              return;
+            }
             const range = { uid: `${previousUidNext}:${uidNext - 1}` };
             const items = await logImapOp(
               "imap.fetch",
@@ -320,6 +328,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               highestUid: currentHighestUid ?? null,
               supportsQresync
             });
+            await sendFolderStatus(status);
           };
 
           // Event listeners are fire-and-forget; a rejection from fetchNew
@@ -351,6 +360,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
               folderId: folder.id,
               uid,
               flags: normalizeImapFlags(Array.from(info.flags ?? []))
+            });
+            void readFolderStatus().then(sendFolderStatus).catch((error: unknown) => {
+              void send("error", error);
             });
           });
 

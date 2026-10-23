@@ -58,6 +58,7 @@ import {
 } from "./syncJobTypes";
 import { applyFlagsToMessage } from "./utils/messageHelpers";
 import { prioritizeFolderIds, prioritizeFolders } from "./utils/folderHelpers";
+import { applyFolderStreamUpdates, type FolderStreamUpdate } from "./folderStreamUpdates";
 import { withCalendarInviteFlag } from "@/lib/messageFlags";
 import { SYNC_STATUS_POLL_INTERVAL_MS, SYNC_STATUS_RUNNING_POLL_INTERVAL_MS } from "./constants";
 
@@ -1197,26 +1198,9 @@ export function useSyncController({
       });
       source.addEventListener("folder:update", (event) => {
         try {
-          const data = JSON.parse((event as MessageEvent).data) as Array<{
-            id: string;
-            uidNext?: number;
-            unseen?: number;
-            exists?: number;
-          }>;
+          const data = JSON.parse((event as MessageEvent).data) as FolderStreamUpdate[];
           if (Array.isArray(data)) {
-            setFolders((prev) =>
-              prev.map((folder) => {
-                const update = data.find((item) => item.id === folder.id);
-                if (!update) return folder;
-                const nextCount =
-                  typeof update.exists === "number" ? update.exists : folder.count;
-                const nextUnread =
-                  typeof update.unseen === "number"
-                    ? update.unseen
-                    : folder.unreadCount ?? folder.count;
-                return { ...folder, count: nextCount, unreadCount: nextUnread };
-              })
-            );
+            setFolders((prev) => applyFolderStreamUpdates(prev, data));
             data.forEach((item) => {
               if (typeof item.uidNext === "number") {
                 lastUidNextByFolderRef.current[item.id] = item.uidNext;
