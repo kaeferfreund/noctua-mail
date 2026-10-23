@@ -142,7 +142,7 @@ describe("bodyless guards abandon a stalled body", () => {
       return { request: largeRequest("/api/synthetic", "POST", body, { "content-type": "text/plain", ...headers }), cancelled: () => cancelled };
     };
     for (const [guard, code] of [[requireBodylessSameOrigin, "unexpected_body"], [requireMutationSameOrigin, "json_required"]] as const) {
-      for (const headers of [{}, { "content-length": "3" }]) {
+      for (const headers of [{}, { "content-length": "3" }] as Record<string, string>[]) {
         const { request, cancelled } = stalled(headers);
         const response = await guard(request);
         expect(response?.status).toBe(400);
