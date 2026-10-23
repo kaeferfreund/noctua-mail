@@ -67,3 +67,17 @@ catalog parity is green with 57 new `Shell.status` keys. Lint stays at the
 supplied baseline of one existing error and 25 warnings. Production build and
 all four browser scenarios pass. Complete CI and merge results are recorded in
 `screenshots/status-indicator/verification.json`.
+
+Integration dry run of implementation commit `bbcec12` against
+`origin/integration/stage` (`11dc3c5`) is clean: merge-tree exit 0, tree
+`389c6975226d7e663ef9b109a870b5306da14916`. There are no conflict files or
+conflict hunks to resolve. `origin/feat/reader-focus` is absent from the remote,
+so its requested merge-tree comparison cannot yet run; preserve this “Status
+indicator” section alongside that branch's reader section when it is published.
+
+Final `bun run test:ci`: exit 0, **2,806 server tests** (304 files, 15,507
+assertions, 632.37s) and **487 DOM tests** (59 files, 2,757 assertions, 87.92s),
+zero failures. Two earlier development runs had timeouts in existing auth/lazy
+suites and a SQLite contention failure; those tests pass unchanged in the final
+complete run. No timeout, retry budget or existing assertion was relaxed.
+The implementation and validation notes are committed locally; nothing is pushed.
