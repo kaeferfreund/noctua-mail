@@ -18,7 +18,7 @@ describe("collaboration badges and account isolation", () => {
       string[],
       string[]
     ]> = [
-        [["assigned-to-me"], ["mine"]], [["unassigned"], ["default", "closed", "progress", "waiting"]],
+        [["assigned-to-me"], ["mine"]], [["unassigned"], ["default", "progress", "waiting"]],
         [["open"], ["default", "mine", "other", "progress", "waiting"]], [["closed"], ["closed"]],
         [["in-progress"], ["progress"]], [["waiting"], ["waiting"]], [["unassigned", "open"], ["default", "progress", "waiting"]]
       ];
