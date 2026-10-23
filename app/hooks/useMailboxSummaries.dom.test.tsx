@@ -5,7 +5,8 @@ import { Theme } from "@radix-ui/themes";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
 import { MailboxRows, ViewRow } from "@/app/components/shell/ShellSidebar";
 import type { ShellAccount } from "@/app/components/shell/types";
-import { COLLAB_FOLDERS } from "@/app/components/mailclient/useSearchState";
+import { useTranslations } from "next-intl";
+import { COLLAB_FOLDERS, getVirtualFolderLabels } from "@/app/components/mailclient/useSearchState";
 import { collaborationViewCount } from "./mailboxSummaryEvents";
 import { useMailboxSummaries } from "./useMailboxSummaries";
 import type { MailboxState } from "@/lib/authClient";
@@ -41,12 +42,13 @@ function harness() {
     return new Response(body, { headers: { "Content-Type": "text/event-stream" } });
   };
   function View({ sessionKey, authState = "selected" }: { sessionKey: string | null; authState?: MailboxState | null }) {
+    const t = useTranslations("Views");
     const rows = useMailboxSummaries({ sessionKey, authState, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
     return <Theme><SidebarProvider><output>{JSON.stringify(rows)}</output>
       <MailboxRows accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
       <ul>{COLLAB_FOLDERS.map(folder => {
         const count = collaborationViewCount(folder.id, rows.find(row => row.accountId === mailbox.accountId));
-        return <ViewRow key={folder.id} view={{ ...folder, icon: null, count, countAriaLabel: `${count ?? 0} threads`, active: false, onSelect: () => {} }} />;
+        return <ViewRow key={folder.id} view={{ ...folder, ...getVirtualFolderLabels(folder, t), icon: null, count, countAriaLabel: `${count ?? 0} threads`, active: false, onSelect: () => {} }} />;
       })}</ul>
     </SidebarProvider></Theme>;
   }
@@ -66,8 +68,8 @@ test("sidebar shows inactive and personal badges and view counts; burst SSE appl
   const h = harness(); await h.read();
   expect(h.sourceRequests).toHaveLength(1); expect(h.snapshots).toHaveLength(0);
   expect(h.view.getByLabelText("Unread count unavailable")).toBeTruthy();
-  expect(h.view.getByLabelText("Watcher: idling")).toBeTruthy();
-  expect(h.view.getAllByRole("button")[0].getAttribute("title")).toContain("Watcher: idling");
+  expect(h.view.container.querySelector('[data-watcher-state="idling"]')).toBeTruthy();
+  expect(h.view.getAllByRole("button")[0].getAttribute("title")).toContain("Watcher: Listening for new mail");
   expect(h.view.getByLabelText("2 unread")).toBeTruthy();
   expect(h.view.getByLabelText("3 threads")).toBeTruthy();
   for (const unread of [7, 8, 9]) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread, assignedToMe: 8, unassignedOpen: 7, open: 10, watcher: { state: "auth_failed", lastEventAt: 1234 } });
@@ -78,7 +80,7 @@ test("sidebar shows inactive and personal badges and view counts; burst SSE appl
   expect(h.view.getByLabelText("7 threads")).toBeTruthy();
   expect(h.snapshots).toHaveLength(0);
   expect(h.view.getByLabelText("10 threads")).toBeTruthy();
-  expect(h.view.getByLabelText("Watcher: auth_failed")).toBeTruthy();
+  expect(h.view.container.querySelector('[data-watcher-state="auth_failed"]')).toBeTruthy();
   for (const revision of [2, 2, 1, 3]) await h.send({ type: "thread-collab", accountId: mailbox.accountId, threadId: "synthetic-thread", revision });
   expect(h.threadChanges).toEqual([mailbox.accountId, mailbox.accountId]);
   expect(h.snapshots).toHaveLength(0);
@@ -251,13 +253,13 @@ test("unknown mailbox during pending GET is repaired by exactly one coalesced ca
 test("watcher transition replaces stale state and timestamp incrementally; legacy events share one metadata repair", async () => {
   const h = harness(); await h.read([{ ...mailbox, watcher: { state: "idling", lastEventAt: 1234 } }]);
   await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 2, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "auth_failed" } });
-  expect(h.view.getByLabelText("Watcher: auth_failed")).toBeTruthy();
+  expect(h.view.container.querySelector('[data-watcher-state="auth_failed"]')).toBeTruthy();
   expect(JSON.parse(h.view.container.querySelector("output")!.textContent!)[0].watcher).toEqual({ state: "auth_failed" });
   expect(h.snapshots).toHaveLength(0);
   for (let i = 0; i < 20; i++) await h.send({ type: "mailbox-summary", accountId: mailbox.accountId, unread: 3, assignedToMe: 3, unassignedOpen: 4 });
   expect(h.snapshots).toHaveLength(1);
   await h.read([{ ...mailbox, watcher: { state: "backoff" } }]);
-  expect(h.view.getByLabelText("Watcher: backoff")).toBeTruthy();
+  expect(h.view.container.querySelector('[data-watcher-state="backoff"]')).toBeTruthy();
   expect(h.requests.filter(path => path.endsWith("/summary"))).toHaveLength(2);
   expect(h.snapshots).toHaveLength(0);
 });

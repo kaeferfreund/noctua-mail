@@ -66,3 +66,36 @@ describe("message catalogs", () => {
     });
   }
 });
+
+
+test("views use reviewed German copy, independent of admin invitations and protocol IDs", () => {
+  expect(Object.values(de.Views).filter(value => typeof value === "object").map(view => view.name)).toEqual([
+    "Fokus", "Aufgaben", "Einladungen", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Posteingang"
+  ]);
+  const t = getTranslator("de");
+  expect(t("Views.actionQueue.description")).toContain("erledigte Aufgaben");
+  expect(t("Views.viewScope", { name: "Synthetic {opaque}" })).toBe("in „Synthetic {opaque}“");
+  expect(t("Views.countTitle", { description: "Einladungen", total: 1, unread: 1 })).toBe("Einladungen (1 Nachricht, 1 ungelesen)");
+  expect(t("Views.countTitle", { description: "Einladungen", total: 3, unread: 2 })).toBe("Einladungen (3 Nachrichten, 2 ungelesen)");
+  expect(t("Views.pendingCount", { count: 1 })).toBe("1 offene Aufgabe");
+  expect(t("Views.pendingCount", { count: 3 })).toBe("3 offene Aufgaben");
+});
+
+test("both catalogs preserve the same ICU argument and rich-tag names", () => {
+  function argumentsIn(message: string): string[] {
+    const names = new Set<string>();
+    function visit(nodes: ReturnType<typeof parse>) {
+      for (const node of nodes) {
+        if (node.type !== 0 && "value" in node && typeof node.value === "string") names.add(node.value);
+        if ("options" in node) for (const option of Object.values(node.options)) visit(option.value);
+        if ("children" in node) visit(node.children);
+      }
+    }
+    visit(parse(message));
+    return [...names].sort();
+  }
+  const english = leaves(en);
+  for (const [key, message] of Object.entries(leaves(de))) {
+    expect(argumentsIn(message), key).toEqual(argumentsIn(english[key]));
+  }
+});

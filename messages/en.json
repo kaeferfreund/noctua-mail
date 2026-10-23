@@ -72,7 +72,21 @@
       "viewer": "viewer",
       "editor": "editor",
       "manager": "manager"
-    }
+    },
+    "tabs": {
+      "account": "Account",
+      "signatures": "Signatures",
+      "preferences": "Preferences",
+      "categorization": "Categorization",
+      "topics": "Topics",
+      "calendar": "Calendar",
+      "translation": "Translation",
+      "recipient-aliases": "Recipient Aliases",
+      "mcp": "MCP",
+      "members": "Members"
+    },
+    "accountTitle": "Account settings",
+    "close": "Close"
   },
   "Pwa": {
     "description": "Modern webmail client prototype"
@@ -128,7 +142,15 @@
       "unassigned": "{count} unassigned open",
       "watcher": "Watcher: {state}",
       "summary": "{email}\n{unread} unread · {assignedToMe} assigned to me · {unassignedOpen} unassigned open\nWatcher: {state}",
-      "other": "Other"
+      "other": "Other",
+      "watcherStates": {
+        "disabled": "Disabled",
+        "starting": "Starting",
+        "idling": "Listening for new mail",
+        "backoff": "Waiting to retry",
+        "auth_failed": "Authentication failed",
+        "stopped": "Stopped"
+      }
     },
     "views": "Views",
     "topics": "Topics",
@@ -140,6 +162,108 @@
     "build": "Build {version}",
     "loading": {
       "mailbox": "Postfach hinzufügen"
+    },
+    "threadsCount": "{count, plural, one {# thread} other {# threads}}",
+    "refreshTitle": "Refresh required",
+    "refreshDescription": "A newer build is available, and this version may be incompatible with your current session.",
+    "refreshMandatory": "Refresh is mandatory before continuing. New build: {version}.",
+    "refreshNow": "Refresh now",
+    "status": {
+      "activity": "Activity and calendar",
+      "check": "Check for new mail",
+      "processes": "Processes",
+      "mailCheck": "Mail check",
+      "mailCheckStatus": "Mail check: {state}",
+      "reminders": "Reminders",
+      "exceptions": "Exceptions",
+      "exceptionCount": "Exceptions ({count, number})",
+      "calendar": "Calendar",
+      "idle": "Idle",
+      "polling": "Polling",
+      "upcoming": "Upcoming",
+      "none": "None",
+      "error": "Error",
+      "closeProcesses": "Close processes",
+      "clearExceptions": "Clear exceptions",
+      "closeUpcoming": "Close upcoming",
+      "copyError": "Copy error",
+      "noExceptions": "No exceptions.",
+      "relogin": "Re-login",
+      "noProcesses": "No active processes.",
+      "nothingUpcoming": "Nothing upcoming.",
+      "preparingSync": "Preparing sync…",
+      "recomputingThreads": "Recomputing threads…",
+      "recomputingCategories": "Recomputing categories…",
+      "retry": "Retrying…",
+      "retryCount": "Retrying ({attempt, number}/{max, number})…",
+      "mailbox": "Mailbox",
+      "syncingScope": "Syncing {scope} ({mode}{percent, select, none {...} other {, {percent}}})",
+      "syncRetryScope": "{mode}: {retry} {scope}",
+      "syncingFolders": "Syncing {folder}{more, plural, =0 {} other { +# more}}...",
+      "syncingMailbox": "Syncing mailbox...",
+      "openSource": "Open source mail",
+      "openCalendar": "Open calendar",
+      "deleteReminder": "Delete reminder",
+      "deleteReminderFailed": "Failed to delete reminder.",
+      "duration": "(Duration: {duration})",
+      "reminderBefore": "Reminder: {lead} before",
+      "repeats": "Repeats: {summary}",
+      "upcomingSummary": "{count, number} · {title} @ {dateTime}",
+      "phases": {
+        "starting": "Preparing",
+        "fetching": "Fetching",
+        "finalizing": "Finalizing",
+        "done": "Done",
+        "failed": "Failed",
+        "retrying": "Retrying"
+      },
+      "modes": {
+        "full": "Full sync",
+        "recent": "Recent sync",
+        "new": "New sync",
+        "repair": "Repair sync"
+      }
+    },
+    "topicPicker": {
+      "title": "Topics",
+      "empty": "No topics yet. Create one below.",
+      "suggested": "Suggested",
+      "all": "All topics",
+      "name": "Topic name",
+      "shortName": "Short name for message list (optional)",
+      "noColor": "No color",
+      "createAdd": "Create & add",
+      "cancel": "Cancel",
+      "new": "New topic",
+      "apply": "Apply",
+      "colors": {
+        "gray": "Gray",
+        "red": "Red",
+        "orange": "Orange",
+        "amber": "Amber",
+        "yellow": "Yellow",
+        "lime": "Lime",
+        "green": "Green",
+        "teal": "Teal",
+        "cyan": "Cyan",
+        "sky": "Sky",
+        "blue": "Blue",
+        "indigo": "Indigo",
+        "violet": "Violet",
+        "purple": "Purple",
+        "pink": "Pink",
+        "brown": "Brown",
+        "crimson": "Crimson",
+        "ruby": "Ruby",
+        "tomato": "Tomato",
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "grass": "Grass",
+        "mint": "Mint",
+        "jade": "Jade",
+        "iris": "Iris",
+        "plum": "Plum"
+      }
     }
   },
   "Search": {
@@ -982,5 +1106,63 @@
     "keywordFailed": "Failed to update message keyword.",
     "categoryFailed": "Failed to update category.",
     "todoFailed": "Failed to update To-Do flag."
+  },
+  "Views": {
+    "focused": {
+      "name": "Focused",
+      "description": "Unread, unanswered, not newsletters",
+      "badgeLabel": "Focused"
+    },
+    "actionQueue": {
+      "name": "Action Queue",
+      "description": "Flagged messages and open or completed to-dos",
+      "badgeLabel": "Flagged or To-Do"
+    },
+    "inviteDeck": {
+      "name": "Invite Deck",
+      "description": "Your calendar invitations",
+      "badgeLabel": "Calendar invitations"
+    },
+    "assignedToMe": {
+      "name": "Assigned to me",
+      "description": "Conversations assigned to you",
+      "badgeLabel": "Assigned to me"
+    },
+    "unassigned": {
+      "name": "Unassigned",
+      "description": "Conversations without an assignee",
+      "badgeLabel": "Unassigned"
+    },
+    "open": {
+      "name": "Open",
+      "description": "Conversations that are not closed",
+      "badgeLabel": "Open"
+    },
+    "inbox": {
+      "name": "Inbox",
+      "description": "Your incoming mail"
+    },
+    "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "unreadLabel": "Unread: {count, number}",
+    "pendingCount": "{count, plural, one {# to-do} other {# to-dos}}",
+    "pendingLabel": "To-Do: {count, number}",
+    "countTitle": "{description} ({total, plural, one {# message} other {# messages}}, {unread, plural, one {# unread} other {# unread}})",
+    "rowTitle": "{name}: {description}",
+    "viewScope": "in {name}",
+    "everywhereScope": "everywhere",
+    "folderScope": "in {name}",
+    "currentFolderScope": "in current folder",
+    "allFieldsScope": "in all fields",
+    "fieldsScope": "in fields {fields}",
+    "filterCriteria": "filter {badges}",
+    "queryCriteria": "\"{query}\""
+  },
+  "Folders": {
+    "inbox": "Inbox",
+    "sent": "Sent",
+    "drafts": "Drafts",
+    "trash": "Trash",
+    "spam": "Spam",
+    "archive": "Archive"
   }
 }
