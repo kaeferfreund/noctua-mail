@@ -135,20 +135,24 @@ export function ViewRow({ view }: { view: ShellView }) {
   const locale = useLocale();
   const t = useTranslations("Shell");
   const tv = useTranslations("Views");
-  const { isMobile } = useSidebar();
+  const { isMobile, state } = useSidebar();
   const showCount = typeof view.count === "number" && view.count > 0;
   return (
     <SidebarMenuItem className={styles.viewRow}>
       {/* A row-bound tooltip instead of a native title: it opens beside the
-          row under the pointer or keyboard focus and stays inside the viewport. */}
+          row under the pointer or keyboard focus and stays inside the viewport.
+          It is not rendered in the phone sheet (no room beside it) or while
+          the offcanvas sidebar is collapsed (no row on screen): without a
+          preflight `[hidden]` rule the content's `hidden` attribute would not
+          hide it. `hidden: false` drops the icon-rail default attribute. */}
       <SidebarMenuButton
         className={cn(styles.viewButton, ACTIVE_ROW_CLASS)}
         data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
-        tooltip={{
+        tooltip={isMobile || state === "collapsed" ? undefined : {
           children: view.rowTitle ?? tv("rowTitle", { name: view.name, description: view.description }),
-          hidden: isMobile,
+          hidden: false,
           collisionPadding: 8,
           className: styles.viewTooltip
         }}
@@ -267,8 +271,11 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                   {/* The row descriptions are plain text: closing them as soon as
                       the pointer leaves a row means the next row's description
                       replaces it at once, without Radix's grace area keeping the
-                      previous row's text over a neighbouring row. */}
-                  <TooltipProvider disableHoverableContent>
+                      previous row's text over a neighbouring row. A pointer
+                      passing over the list opens nothing until it rests on a row;
+                      once a description is open, the neighbouring row's replaces
+                      it without a new delay. */}
+                  <TooltipProvider disableHoverableContent delayDuration={400} skipDelayDuration={150}>
                     <SidebarMenu>
                       {viewRows.map((view) => (
                         <ViewRow key={view.id} view={{ ...view, onSelect: closeAfter(view.onSelect, true) }} />
