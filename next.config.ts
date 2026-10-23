@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
     root: projectDir
   },
   typedRoutes: false,
+  // The type gate is `bun check` in the `build` script, after `next build` so
+  // the generated .next/types are checked too; it reports the same errors as
+  // Next's tsc pass, which would otherwise take most of a cold build.
+  typescript: { ignoreBuildErrors: true },
   // Worker subprocesses execute TS entrypoints from ./scripts at runtime.
   // Standalone builds only ship traced files, so include the worker source tree
   // and its local TS dependencies explicitly for the routes that launch them.

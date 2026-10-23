@@ -15,7 +15,7 @@
   "type": "module",
   "scripts": {
     "dev": "ENV_FILE=${ENV_FILE:-.env.local} bun --bun build-scripts/generateRuntimeConfig.ts && bun --env-file=${ENV_FILE:-.env.local} --bun next dev",
-    "build": "bun --bun build-scripts/generateBuildVersion.ts && bun --bun next build && bun build-scripts/prepareStandaloneShutdown.ts",
+    "build": "bun --bun build-scripts/generateBuildVersion.ts && bun --bun next build && bun check && bun build-scripts/prepareStandaloneShutdown.ts",
     "start": "ENV_FILE=${ENV_FILE:-.env.local} bun --bun build-scripts/generateRuntimeConfig.ts && bun --env-file=${ENV_FILE:-.env.local} --bun next start",
     "lint": "eslint .",
     "typecheck": "bun check",
