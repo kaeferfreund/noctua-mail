@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { memo, useEffect, useMemo, useRef } from "react";
 import {
   QUOTE_TEXT_SCAN_LIMIT,
@@ -223,7 +224,7 @@ function countVisibleTextChars(node: Node): number {
   return total;
 }
 
-function collapseQuotedContent(doc: Document, expanded: boolean) {
+function collapseQuotedContent(doc: Document, expanded: boolean, toggleLabel: string) {
   const root = doc.querySelector(`.${NOCTUA_EMAIL_CONTENT_CLASS}`);
   if (!root) return null;
 
@@ -248,8 +249,8 @@ function collapseQuotedContent(doc: Document, expanded: boolean) {
   details.className = NOCTUA_QUOTE_COLLAPSE_CLASS;
   details.open = expanded;
   const summary = doc.createElement("summary");
-  summary.title = "Show or hide quoted text";
-  summary.setAttribute("aria-label", "Show or hide quoted text");
+  summary.title = toggleLabel;
+  summary.setAttribute("aria-label", toggleLabel);
   summary.textContent = "•••";
   // The quote gets its own wrapper because a height animation needs a single
   // box to drive, and <details> itself must keep the summary at full height.
@@ -470,6 +471,7 @@ function HtmlMessage({
   // still starts collapsed.
   const quoteStateRef = useRef({ html: "", expanded: false });
   const setLinkPreviewUrl = useMessageLinkPreview();
+  const t = useTranslations("Reader");
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
   const remote = useRemoteContent(accountId, senderKey, messageId ?? html);
@@ -655,7 +657,7 @@ function HtmlMessage({
       removeQuoteToggleListener?.();
       removeQuoteToggleListener = null;
 
-      const collapsed = collapseQuotedContent(doc, quoteStateRef.current.expanded);
+      const collapsed = collapseQuotedContent(doc, quoteStateRef.current.expanded, t("quotedText"));
       if (!collapsed) return;
 
       const { details, content } = collapsed;
@@ -729,23 +731,23 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, zoom]);
+  }, [darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, t, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>
       {!remote.allowed && hasRemoteContent && (
         <div role="status" className="flex flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-          <span>Remote content blocked</span>
-          <Button variant="outline" size="sm" onClick={remote.loadOnce}>Load once</Button>
-          <Button variant="ghost" size="sm" disabled={!remote.canAlwaysAllow || remote.saving} onClick={() => void remote.alwaysAllow()}>Always load from this sender</Button>
-          {!remote.canAlwaysAllow && <span>Sender unknown until the original message is available or resynced.</span>}
+          <span>{t("remoteBlocked")}</span>
+          <Button variant="outline" size="sm" onClick={remote.loadOnce}>{t("loadOnce")}</Button>
+          <Button variant="ghost" size="sm" disabled={!remote.canAlwaysAllow || remote.saving} onClick={() => void remote.alwaysAllow()}>{t("alwaysLoadSender")}</Button>
+          {!remote.canAlwaysAllow && <span>{t("unknownSender")}</span>}
           {remote.error && <span role="alert">{remote.error}</span>}
         </div>
       )}
       <iframe
         ref={iframeRef}
         className={styles.frame}
-        title="HTML message"
+        title={t("htmlMessage")}
         scrolling="no"
         sandbox="allow-same-origin"
         referrerPolicy="no-referrer"

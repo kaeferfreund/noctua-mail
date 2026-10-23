@@ -1,0 +1,674 @@
+[
+  {
+    "file": "lib/db/translations.ts",
+    "line": 59,
+    "table": "message_translations",
+    "sql": "INSERT OR REPLACE INTO message_translations\n         (messageId, targetLang, format, marker, translatedText, detectedSourceLang, createdAt)\n       VALUES (?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/topics.ts",
+    "line": 81,
+    "table": "topic_learning_signals",
+    "sql": "DELETE FROM topic_learning_signals\n     WHERE ?"
+  },
+  {
+    "file": "lib/db/topics.ts",
+    "line": 94,
+    "table": "topic_signal_exclusions",
+    "sql": "INSERT OR REPLACE INTO topic_signal_exclusions (\n      accountId, topicId, signalType, signalValue, createdAt\n    ) VALUES (?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/topics.ts",
+    "line": 109,
+    "table": "topic_signal_exclusions",
+    "sql": "DELETE FROM topic_signal_exclusions WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/topics.ts",
+    "line": 114,
+    "table": "topic_signal_exclusions",
+    "sql": "DELETE FROM topic_signal_exclusions\n     WHERE accountId = ?\n       AND topicId IN (?)"
+  },
+  {
+    "file": "lib/db/topics.ts",
+    "line": 135,
+    "table": "topic_learning_signals",
+    "sql": "INSERT OR IGNORE INTO topic_learning_signals (accountId, topicId, threadId, signalType, signalValue)\n     VALUES (?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 33,
+    "table": "thread_signals",
+    "sql": "INSERT OR REPLACE INTO thread_signals (accountId, threadId, signalType, signalValue)\n     VALUES (?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 80,
+    "table": "thread_signals",
+    "sql": "DELETE FROM thread_signals\n       WHERE accountId = ?\n         AND threadId IN (?)"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 119,
+    "table": "thread_signals",
+    "sql": "DELETE FROM thread_signals WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 169,
+    "table": "thread_topics",
+    "sql": "DELETE FROM thread_topics\n       WHERE accountId = ?\n         AND threadId IN (?)\n         AND NOT EXISTS (\n           SELECT 1\n           FROM messages m\n           WHERE m.accountId = thread_topics.accountId\n             AND m.threadId = thread_topics.threadId\n         )"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 257,
+    "table": "threads",
+    "sql": "\n    UPDATE threads AS t\n    SET latestReceivedDateValue = (\n      SELECT ?\n      FROM messages m\n      WHERE m.accountId = t.accountId\n        AND m.threadId = t.threadId\n    )\n    WHERE t.accountId = ?\n      AND t.threadId IN (?)\n      AND t.latestReceivedDateValue IS NULL\n  "
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 290,
+    "table": "threads",
+    "sql": "DELETE FROM threads WHERE accountId = ? AND threadId IN (?)"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 293,
+    "table": "threads",
+    "sql": "\n      INSERT OR REPLACE INTO threads (\n        threadId,\n        accountId,\n        rootMessageId,\n        latestMessageId,\n        latestDateValue,\n        latestReceivedDateValue,\n        messageCount,\n        unreadCount\n      )\n      SELECT\n        m.threadId,\n        m.accountId,\n        MIN(m.id) FILTER (WHERE m.rn_asc = 1) as rootMessageId,\n        MIN(m.id) FILTER (WHERE m.rn_desc = 1) as latestMessageId,\n        MAX(m.dateValue) as latestDateValue,\n        ? as latestReceivedDateValue,\n        COUNT(*) as messageCount,\n        SUM(CASE WHEN m.unread = 1 THEN 1 ELSE 0 END) as unreadCount\n      FROM (\n        SELECT *,\n          ROW_NUMBER() OVER (PARTITION BY accountId, threadId ORDER BY dateValue ASC) as rn_asc,\n          ROW_NUMBER() OVER (PARTITION BY accountId, threadId ORDER BY dateValue DESC) as rn_desc\n        FROM messages\n        WHERE accountId = ? AND threadId IN (?)\n      ) m\n      GROUP BY m.threadId, m.accountId\n    "
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 325,
+    "table": "threads",
+    "sql": "DELETE FROM threads WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 327,
+    "table": "threads",
+    "sql": "\n    INSERT OR REPLACE INTO threads (\n      threadId,\n      accountId,\n      rootMessageId,\n      latestMessageId,\n      latestDateValue,\n      latestReceivedDateValue,\n      messageCount,\n      unreadCount\n    )\n    SELECT\n      m.threadId,\n      m.accountId,\n      MIN(m.id) FILTER (WHERE m.rn_asc = 1) as rootMessageId,\n      MIN(m.id) FILTER (WHERE m.rn_desc = 1) as latestMessageId,\n      MAX(m.dateValue) as latestDateValue,\n      ? as latestReceivedDateValue,\n      COUNT(*) as messageCount,\n      SUM(CASE WHEN m.unread = 1 THEN 1 ELSE 0 END) as unreadCount\n    FROM (\n      SELECT *,\n        ROW_NUMBER() OVER (PARTITION BY accountId, threadId ORDER BY dateValue ASC) as rn_asc,\n        ROW_NUMBER() OVER (PARTITION BY accountId, threadId ORDER BY dateValue DESC) as rn_desc\n      FROM messages\n      WHERE accountId = ?\n    ) m\n    GROUP BY m.threadId, m.accountId\n  "
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 370,
+    "table": "topic_learning_signals",
+    "sql": "DELETE FROM topic_learning_signals WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/threads.ts",
+    "line": 447,
+    "table": "messages",
+    "sql": "UPDATE messages SET threadId = ?, parentId = ? WHERE id = ?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 77,
+    "table": "thread_collab_state",
+    "sql": "INSERT INTO thread_collab_state\n    (accountId,threadId,status,assigneeUserId,assignedByUserId,assignedAt,statusChangedAt,\n     statusChangedByUserId,commentCount,lastActivityAt,updatedAt,updatedByUserId)\n    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accountId,threadId) DO UPDATE SET\n    status=excluded.status,assigneeUserId=excluded.assigneeUserId,assignedByUserId=excluded.assignedByUserId,\n    assignedAt=excluded.assignedAt,statusChangedAt=excluded.statusChangedAt,\n    statusChangedByUserId=excluded.statusChangedByUserId,commentCount=excluded.commentCount,\n    lastActivityAt=excluded.lastActivityAt,updatedAt=excluded.updatedAt,updatedByUserId=excluded.updatedByUserId"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 92,
+    "table": "thread_activity",
+    "sql": "INSERT INTO thread_activity (id,accountId,threadId,type,actorUserId,actorClientId,payload,createdAt) VALUES (?,?,?,?,?,?,?,?)"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 139,
+    "table": "thread_comments",
+    "sql": "INSERT INTO thread_comments (id,accountId,threadId,authorUserId,body,createdAt,updatedAt,deletedAt) VALUES (?,?,?,?,?,?,?,NULL)"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 147,
+    "table": "thread_comments",
+    "sql": "UPDATE thread_comments SET body=?,updatedAt=? WHERE accountId=? AND threadId=? AND id=?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 157,
+    "table": "thread_comments",
+    "sql": "UPDATE thread_comments SET deletedAt=?,updatedAt=?\n    WHERE accountId=? AND threadId=? AND id=? AND deletedAt IS NULL RETURNING id"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 260,
+    "table": "thread_collab_state",
+    "sql": "DELETE FROM thread_collab_state WHERE accountId=? AND threadId=?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 261,
+    "table": "thread_topics",
+    "sql": "DELETE FROM thread_topics WHERE accountId=? AND threadId=?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 265,
+    "table": "thread_topics",
+    "sql": "INSERT OR IGNORE INTO thread_topics\n      (accountId,threadId,topicId,assignedAt) VALUES (?,?,?,?)"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 268,
+    "table": "thread_comments",
+    "sql": "UPDATE thread_comments SET threadId=?\n      WHERE accountId=? AND threadId=? AND id=?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 271,
+    "table": "thread_activity",
+    "sql": "UPDATE thread_activity SET threadId=?\n      WHERE accountId=? AND threadId=? AND id=?"
+  },
+  {
+    "file": "lib/db/threadCollab.ts",
+    "line": 322,
+    "table": "sent_by",
+    "sql": "INSERT INTO sent_by(accountId,messageId,userId,sentAt) VALUES(?,?,?,?)\n        ON CONFLICT(accountId,messageId) DO NOTHING RETURNING messageId"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 287,
+    "table": "message_calendar_events",
+    "sql": "UPDATE message_calendar_events\n     SET eventUidKey = ?\n     WHERE accountId = ? AND messageId = ? AND eventUid = ?"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 489,
+    "table": "calendar_events",
+    "sql": "UPDATE calendar_events SET eventUidKey = ? WHERE id = ?"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 536,
+    "table": "calendar_events",
+    "sql": "UPDATE calendar_events\n     SET status = ?, updatedAtMs = ?\n     WHERE id = ?"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 578,
+    "table": "calendar_events",
+    "sql": "UPDATE calendar_events\n     SET attendees = ?, myPartstat = ?, myPartstatUpdatedAtMs = ?, myAttendeeEmail = ?, replyRequested = ?, updatedAtMs = ?\n     WHERE id = ?"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 1359,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET categoryManualState = 'cleared'\n       WHERE category IS NULL\n         AND COALESCE(categorySignals, '') LIKE '%manual-category:cleared%'"
+  },
+  {
+    "file": "lib/db/schema.ts",
+    "line": 1458,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n     SET eventUidKey = ?\n     WHERE id = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 103,
+    "table": "messages",
+    "sql": "DELETE FROM messages WHERE accountId = ? AND folderId = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 104,
+    "table": "messages",
+    "sql": "DELETE FROM messages WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 108,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments WHERE messageId IN (SELECT id FROM messages WHERE accountId = ? AND folderId = ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 111,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments WHERE messageId IN (SELECT id FROM messages WHERE accountId = ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 115,
+    "table": "message_calendar_events",
+    "sql": "DELETE FROM message_calendar_events\n           WHERE accountId = ?\n             AND messageId IN (SELECT id FROM messages WHERE accountId = ? AND folderId = ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 119,
+    "table": "message_calendar_events",
+    "sql": "DELETE FROM message_calendar_events WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 121,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments WHERE messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 124,
+    "table": "message_calendar_events",
+    "sql": "DELETE FROM message_calendar_events WHERE accountId = ? AND messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 142,
+    "table": "messages",
+    "sql": "DELETE FROM messages WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 155,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts WHERE messageId IN (SELECT id FROM messages WHERE accountId = ? AND folderId = ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 158,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts WHERE messageId IN (SELECT id FROM messages WHERE accountId = ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 161,
+    "table": "attachments",
+    "sql": "INSERT OR REPLACE INTO attachments (id, messageId, filename, contentType, size, inline, cid, url)\n       VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 165,
+    "table": "message_calendar_events",
+    "sql": "INSERT OR REPLACE INTO message_calendar_events (\n         accountId,\n         messageId,\n         eventUid,\n         eventUidKey,\n         eventFirstStartAtMs,\n         eventLastEndAtMs,\n         inviteActionType,\n         processedAtMs,\n         processedByUserId,\n         processedAutomatically,\n         unprocessedReason,\n         snapshotJson,\n         snapshotVersion\n       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 182,
+    "table": "messages",
+    "sql": "\n      INSERT OR REPLACE INTO messages (\n        id, accountId, folderId, threadId, parentId, messageId, inReplyTo, \"references\", xForwardedMessageId, xComposeFormat, quotedHtmlEdited,\n        subject, fromAddr, fromEmail, replyToAddr, toAddr, ccAddr, bccAddr, mailboxPath, imapUid, preview, date, dateValue,\n        body, htmlBody, priority, hasSource, unread, flags, seen, answered, flagged, deleted, draft, recent,\n        category, categoryScore, categorySignals, categoryManualState, listUnsubscribe, listId, sizeBytes\n      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n    "
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 190,
+    "table": "message_fts",
+    "sql": "\n      INSERT INTO message_fts (messageId, subject, fromAddr, toAddr, ccAddr, bccAddr, body, preview)\n      VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n    "
+  },
+  {
+    "file": "lib/db/messages/upsert.ts",
+    "line": 194,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts WHERE messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/sizes.ts",
+    "line": 66,
+    "table": "messages",
+    "sql": "UPDATE messages SET sizeBytes = ? WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 86,
+    "table": "messages",
+    "sql": "UPDATE messages\n         SET folderId = ?,\n             mailboxPath = ?,\n             imapUid = NULL,\n             pendingMoveSourceFolderId = NULL,\n             pendingMoveSourceMailboxPath = NULL,\n             pendingMoveSourceUid = NULL,\n             pendingMoveStartedAt = NULL\n         WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 100,
+    "table": "messages",
+    "sql": "UPDATE messages\n         SET folderId = ?,\n             mailboxPath = ?,\n             imapUid = ?,\n             pendingMoveSourceFolderId = NULL,\n             pendingMoveSourceMailboxPath = NULL,\n             pendingMoveSourceUid = NULL,\n             pendingMoveStartedAt = NULL\n         WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 113,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET folderId = ?,\n           mailboxPath = ?,\n           pendingMoveSourceFolderId = NULL,\n           pendingMoveSourceMailboxPath = NULL,\n           pendingMoveSourceUid = NULL,\n           pendingMoveStartedAt = NULL\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 177,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET folderId = ?,\n           mailboxPath = ?,\n           imapUid = NULL,\n           pendingMoveSourceFolderId = ?,\n           pendingMoveSourceMailboxPath = ?,\n           pendingMoveSourceUid = ?,\n           pendingMoveStartedAt = ?\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 273,
+    "table": "messages",
+    "sql": "UPDATE messages\n         SET folderId = ?,\n             mailboxPath = ?,\n             imapUid = NULL,\n             pendingMoveSourceFolderId = NULL,\n             pendingMoveSourceMailboxPath = NULL,\n             pendingMoveSourceUid = NULL,\n             pendingMoveStartedAt = NULL\n         WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 285,
+    "table": "messages",
+    "sql": "UPDATE messages\n         SET folderId = ?,\n             mailboxPath = ?,\n             imapUid = ?,\n             pendingMoveSourceFolderId = NULL,\n             pendingMoveSourceMailboxPath = NULL,\n             pendingMoveSourceUid = NULL,\n             pendingMoveStartedAt = NULL\n         WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 303,
+    "table": "messages",
+    "sql": "UPDATE messages\n         SET folderId = ?,\n             mailboxPath = ?,\n             pendingMoveSourceFolderId = NULL,\n             pendingMoveSourceMailboxPath = NULL,\n             pendingMoveSourceUid = NULL,\n             pendingMoveStartedAt = NULL\n         WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/move.ts",
+    "line": 361,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET folderId = ? || substr(folderId, length(?) + 1),\n           mailboxPath = ? || substr(mailboxPath, length(?) + 1)\n       WHERE accountId = ?\n         AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')"
+  },
+  {
+    "file": "lib/db/messages/flags.ts",
+    "line": 36,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET flags = ?,\n           seen = ?,\n           answered = ?,\n           flagged = ?,\n           deleted = ?,\n           draft = ?,\n           recent = ?,\n           unread = ?\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/flags.ts",
+    "line": 81,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET flags = ?,\n           seen = ?,\n           answered = ?,\n           flagged = ?,\n           deleted = ?,\n           draft = ?,\n           recent = ?,\n           unread = ?\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/flags.ts",
+    "line": 130,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET category = ?, categoryScore = ?, categorySignals = ?, categoryManualState = NULL\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/draftTombstones.ts",
+    "line": 47,
+    "table": "draft_tombstones",
+    "sql": "INSERT INTO draft_tombstones (accountId, messageId, mailboxPath, createdAtMs)\n       VALUES (?, ?, ?, ?)\n       ON CONFLICT(accountId, messageId) DO UPDATE SET\n         mailboxPath = excluded.mailboxPath,\n         createdAtMs = excluded.createdAtMs"
+  },
+  {
+    "file": "lib/db/messages/draftTombstones.ts",
+    "line": 53,
+    "table": "draft_tombstones",
+    "sql": "DELETE FROM draft_tombstones WHERE accountId = ? AND createdAtMs < ?"
+  },
+  {
+    "file": "lib/db/messages/draftTombstones.ts",
+    "line": 108,
+    "table": "draft_tombstones",
+    "sql": "DELETE FROM draft_tombstones WHERE accountId = ? AND messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 92,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments WHERE messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 93,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts WHERE messageId = ?"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 94,
+    "table": "messages",
+    "sql": "DELETE FROM messages WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 140,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments\n           WHERE messageId IN (\n             SELECT id FROM messages\n             WHERE accountId = ? AND id IN (?)\n           )"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 147,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts\n           WHERE messageId IN (\n             SELECT id FROM messages\n             WHERE accountId = ? AND id IN (?)\n           )"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 153,
+    "table": "messages",
+    "sql": "DELETE FROM messages WHERE accountId = ? AND id IN (?)"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 209,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments\n         WHERE messageId IN (\n           SELECT id FROM messages\n           WHERE accountId = ? AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')\n         )"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 216,
+    "table": "message_fts",
+    "sql": "DELETE FROM message_fts\n         WHERE messageId IN (\n           SELECT id FROM messages\n           WHERE accountId = ? AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')\n         )"
+  },
+  {
+    "file": "lib/db/messages/delete.ts",
+    "line": 223,
+    "table": "messages",
+    "sql": "DELETE FROM messages\n         WHERE accountId = ? AND (folderId = ? OR folderId LIKE ? ESCAPE '\\')"
+  },
+  {
+    "file": "lib/db/messages/attachments.ts",
+    "line": 30,
+    "table": "messages",
+    "sql": "UPDATE messages SET imapUid = ? WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/attachments.ts",
+    "line": 47,
+    "table": "attachments",
+    "sql": "DELETE FROM attachments WHERE messageId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/messages/attachments.ts",
+    "line": 52,
+    "table": "messages",
+    "sql": "UPDATE messages SET imapUid = ? WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/mailboxSummary.ts",
+    "line": 40,
+    "table": "mailbox_summary",
+    "sql": "INSERT INTO mailbox_summary(accountId, watcherState) VALUES (?, ?)\n      ON CONFLICT(accountId) DO UPDATE SET watcherState = excluded.watcherState"
+  },
+  {
+    "file": "lib/db/mailboxSummary.ts",
+    "line": 48,
+    "table": "mailbox_summary",
+    "sql": "INSERT INTO mailbox_summary(accountId, lastSyncAt) VALUES (?, ?)\n      ON CONFLICT(accountId) DO UPDATE SET lastSyncAt = max(COALESCE(lastSyncAt, 0), excluded.lastSyncAt)"
+  },
+  {
+    "file": "lib/db/folders.ts",
+    "line": 68,
+    "table": "folders",
+    "sql": "INSERT OR REPLACE INTO folders (id, name, parentId, accountId, count, specialUse, flags, delimiter) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/folders.ts",
+    "line": 70,
+    "table": "folders",
+    "sql": "DELETE FROM folders WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/folders.ts",
+    "line": 146,
+    "table": "messages",
+    "sql": "UPDATE messages SET pendingMoveSourceFolderId=NULL,\n            pendingMoveSourceMailboxPath=NULL,pendingMoveSourceUid=NULL,pendingMoveStartedAt=NULL\n            WHERE accountId=? AND pendingMoveSourceFolderId=?"
+  },
+  {
+    "file": "lib/db/folders.ts",
+    "line": 150,
+    "table": "mailbox_state",
+    "sql": "INSERT OR REPLACE INTO mailbox_state\n          (folderId,accountId,mailboxPath,uidValidity,highestModSeq,highestUid,supportsQresync)\n          VALUES (?,?,?,?,?,?,?)"
+  },
+  {
+    "file": "lib/db/folders.ts",
+    "line": 176,
+    "table": "mailbox_state",
+    "sql": "UPDATE mailbox_state\n       SET highestUid = ?\n       WHERE accountId = ? AND folderId = ?\n         AND (highestUid IS NULL OR highestUid < ?)"
+  },
+  {
+    "file": "lib/db/categories.ts",
+    "line": 77,
+    "table": "category_model_state",
+    "sql": "INSERT OR REPLACE INTO category_model_state (accountId, modelJson, updatedAt) VALUES (?, ?, ?)"
+  },
+  {
+    "file": "lib/db/categories.ts",
+    "line": 98,
+    "table": "category_feedback_events",
+    "sql": "DELETE FROM category_feedback_events WHERE accountId = ?"
+  },
+  {
+    "file": "lib/db/categories.ts",
+    "line": 364,
+    "table": "messages",
+    "sql": "UPDATE messages\n       SET category = ?, categoryScore = ?, categorySignals = ?, categoryManualState = ?\n       WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/categories.ts",
+    "line": 377,
+    "table": "category_feedback_events",
+    "sql": "INSERT OR REPLACE INTO category_feedback_events\n       (id, accountId, messageId, previousCategory, nextCategory, featureJson, createdAt)\n       VALUES (?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/categories.ts",
+    "line": 454,
+    "table": "messages",
+    "sql": "UPDATE messages SET category = ?, categoryScore = ?, categorySignals = ? WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/calendar/suppressions.ts",
+    "line": 22,
+    "table": "calendar_event_suppressions",
+    "sql": "INSERT INTO calendar_event_suppressions (accountId, eventUidKey, createdAtMs)\n       VALUES (?, ?, ?)\n       ON CONFLICT(accountId, eventUidKey) DO NOTHING"
+  },
+  {
+    "file": "lib/db/calendar/suppressions.ts",
+    "line": 36,
+    "table": "calendar_event_suppressions",
+    "sql": "DELETE FROM calendar_event_suppressions WHERE accountId = ? AND eventUidKey = ?"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 484,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n       SET messageId = ?, eventUid = ?, eventUidKey = ?, eventTitle = ?, eventLocation = ?, eventDescription = ?, eventStartAtMs = ?, eventEndAtMs = ?, startTimezone = ?, recurrenceRule = ?, recurrenceDates = ?, excludedDates = ?, leadMinutes = ?, leadLabel = ?, updatedAtMs = ?, deletedAtMs = NULL\n       WHERE id = ?"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 508,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n         SET deletedAtMs = ?\n         WHERE id IN (?)"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 528,
+    "table": "calendar_reminders",
+    "sql": "INSERT INTO calendar_reminders (\n       id, accountId, userId, messageId, eventUid, eventUidKey, eventTitle, eventLocation, eventDescription, eventStartAtMs, eventEndAtMs, startTimezone, recurrenceRule, recurrenceDates, excludedDates, leadMinutes, leadLabel, createdAtMs, updatedAtMs, deletedAtMs\n     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 617,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n         SET deletedAtMs = ?\n         WHERE id = ? AND accountId = ? AND userId = ? AND deletedAtMs IS NULL"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 644,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n             SET deletedAtMs = ?\n             WHERE accountId = ? AND userId = ? AND deletedAtMs IS NULL\n               AND (\n                 lower(COALESCE(eventUidKey, eventUid, '')) = lower(?)\n                 OR (\n                   eventStartAtMs = ?\n                   AND lower(eventTitle) = lower(?)\n                 )\n               )"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 665,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n             SET deletedAtMs = ?\n             WHERE accountId = ? AND userId = ? AND deletedAtMs IS NULL\n               AND eventStartAtMs = ?\n               AND lower(eventTitle) = lower(?)"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 683,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n         SET deletedAtMs = ?, updatedAtMs = ?\n         WHERE accountId = ? AND userId = ? AND deletedAtMs IS NULL"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 742,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n         SET eventTitle = ?,\n             eventLocation = ?,\n             eventDescription = ?,\n             eventUidKey = ?,\n             eventStartAtMs = ?,\n             eventEndAtMs = ?,\n             startTimezone = ?,\n             recurrenceRule = ?,\n             recurrenceDates = ?,\n             excludedDates = ?,\n             updatedAtMs = ?,\n             messageId = COALESCE(?, messageId)\n         WHERE accountId = ? AND deletedAtMs IS NULL\n           AND lower(eventUid) = lower(?)"
+  },
+  {
+    "file": "lib/db/calendar/reminders.ts",
+    "line": 787,
+    "table": "calendar_reminders",
+    "sql": "UPDATE calendar_reminders\n         SET deletedAtMs = ?, updatedAtMs = ?\n         WHERE accountId = ? AND deletedAtMs IS NULL\n           AND lower(COALESCE(eventUidKey, eventUid, '')) = lower(?)"
+  },
+  {
+    "file": "lib/db/calendar/inviteStates.ts",
+    "line": 42,
+    "table": "message_calendar_events",
+    "sql": "INSERT INTO message_calendar_events (\n         accountId,\n         messageId,\n         eventUid,\n         eventUidKey,\n         eventFirstStartAtMs,\n         eventLastEndAtMs,\n         inviteActionType,\n         snapshotJson,\n         snapshotVersion\n       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n       ON CONFLICT(accountId, messageId, eventUid)\n       DO UPDATE SET\n         eventUidKey = excluded.eventUidKey,\n         eventFirstStartAtMs = excluded.eventFirstStartAtMs,\n         eventLastEndAtMs = excluded.eventLastEndAtMs,\n         inviteActionType = excluded.inviteActionType,\n         snapshotJson = COALESCE(excluded.snapshotJson, snapshotJson),\n         snapshotVersion = COALESCE(excluded.snapshotVersion, snapshotVersion)"
+  },
+  {
+    "file": "lib/db/calendar/inviteStates.ts",
+    "line": 158,
+    "table": "message_calendar_events",
+    "sql": "UPDATE message_calendar_events\n           SET processedAtMs = ?,\n               processedByUserId = ?,\n               processedAutomatically = ?,\n               unprocessedReason = NULL\n           WHERE accountId = ?\n             AND messageId = ?\n             AND lower(COALESCE(eventUidKey, eventUid, '')) IN (?)"
+  },
+  {
+    "file": "lib/db/calendar/inviteStates.ts",
+    "line": 199,
+    "table": "message_calendar_events",
+    "sql": "UPDATE message_calendar_events\n           SET processedAtMs = NULL,\n               processedByUserId = NULL,\n               processedAutomatically = NULL,\n               unprocessedReason = ?\n           WHERE accountId = ?\n             AND messageId = ?\n             AND lower(COALESCE(eventUidKey, eventUid, '')) IN (?)"
+  },
+  {
+    "file": "lib/db/calendar/inviteStates.ts",
+    "line": 228,
+    "table": "message_calendar_events",
+    "sql": "UPDATE message_calendar_events\n         SET processedAtMs = NULL,\n             processedByUserId = NULL,\n             processedAutomatically = NULL,\n             unprocessedReason = NULL\n         WHERE accountId = ? AND lower(COALESCE(eventUidKey, eventUid, '')) = lower(?)"
+  },
+  {
+    "file": "lib/db/calendar/inviteStates.ts",
+    "line": 293,
+    "table": "message_calendar_events",
+    "sql": "DELETE FROM message_calendar_events\n     WHERE accountId = ? AND messageId = ? AND lower(COALESCE(eventUidKey, eventUid, '')) = lower(?)"
+  },
+  {
+    "file": "lib/db/calendar/events.ts",
+    "line": 183,
+    "table": "calendar_participation_overrides",
+    "sql": "INSERT OR REPLACE INTO calendar_participation_overrides (\n      id, accountId, eventUid, occurrenceStartAtMs, partstat, attendeeEmail, updatedAtMs\n    ) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/calendar/events.ts",
+    "line": 205,
+    "table": "calendar_participation_overrides",
+    "sql": "DELETE FROM calendar_participation_overrides\n     WHERE accountId = ? AND eventUid = ? AND occurrenceStartAtMs = ?"
+  },
+  {
+    "file": "lib/db/calendar/events.ts",
+    "line": 366,
+    "table": "calendar_events",
+    "sql": "INSERT OR REPLACE INTO calendar_events (\n      id, accountId, calendarId, eventUid, summary, description, location,\n      startAtMs, endAtMs, allDay, startTimezone, endTimezone,\n      recurrenceRule, recurrenceDates, excludedDates,\n      status, organizer, attendees, myPartstat, myPartstatUpdatedAtMs, myAttendeeEmail, replyRequested,\n      remoteEtag, remoteHref, rawIcs, pendingRemoteSync, sourceType, messageId, occurrenceMessageIds,\n      sourceSubject, sourceFromAddr, sourceToAddr, sourceCcAddr, sourceBccAddr,\n      sourceDateMs, sourceBodyText, sourceBodyHtml, occurrenceSnapshots, occurrenceRecurrenceIds,\n      eventUidKey,\n      createdAtMs, updatedAtMs, deletedAtMs\n    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  },
+  {
+    "file": "lib/db/calendar/events.ts",
+    "line": 435,
+    "table": "calendar_events",
+    "sql": "DELETE FROM calendar_events WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/calendar/events.ts",
+    "line": 444,
+    "table": "calendar_events",
+    "sql": "UPDATE calendar_events SET deletedAtMs = ? WHERE accountId = ? AND id = ?"
+  },
+  {
+    "file": "lib/db/calendar/conflicts.ts",
+    "line": 56,
+    "table": "calendar_event_conflicts",
+    "sql": "INSERT INTO calendar_event_conflicts (\n        eventId, accountId, eventUid, summary, timeZone, allDay,\n        baseIcs, localIcs, remoteIcs, remoteEtag,\n        localChangedAtMs, remoteChangedAtMs, detectedAtMs\n      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n      ON CONFLICT(eventId) DO UPDATE SET\n        accountId = excluded.accountId,\n        eventUid = excluded.eventUid,\n        summary = excluded.summary,\n        timeZone = excluded.timeZone,\n        allDay = excluded.allDay,\n        baseIcs = excluded.baseIcs,\n        localIcs = excluded.localIcs,\n        remoteIcs = excluded.remoteIcs,\n        remoteEtag = excluded.remoteEtag,\n        localChangedAtMs = excluded.localChangedAtMs,\n        remoteChangedAtMs = excluded.remoteChangedAtMs"
+  },
+  {
+    "file": "lib/db/calendar/conflicts.ts",
+    "line": 122,
+    "table": "calendar_event_conflicts",
+    "sql": "DELETE FROM calendar_event_conflicts WHERE accountId = ? AND eventId = ?"
+  }
+]

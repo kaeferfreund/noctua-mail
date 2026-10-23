@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState, useCallback, useMemo, useRef } from "react";
 import { X, Clock, Folder as FolderIcon } from "lucide-react";
 import { Dialog, TextField } from "@radix-ui/themes";
@@ -57,6 +58,7 @@ export default function MoveToDialog({
   folderById,
   onMove
 }: MoveToDialogProps) {
+  const t = useTranslations("Reader");
   const [query, setQuery] = useState("");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +101,7 @@ export default function MoveToDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content
         className={styles.dialogContent}
-        aria-label="Move to folder"
+        aria-label={t("moveFolder")}
         aria-describedby={undefined}
         onOpenAutoFocus={(e) => {
           e.preventDefault();
@@ -107,9 +109,9 @@ export default function MoveToDialog({
         }}
       >
         <div className={styles.dialogHeader}>
-          <Dialog.Title className={styles.dialogTitle}>Move to...</Dialog.Title>
+          <Dialog.Title className={styles.dialogTitle}>{t("moveToDialog")}</Dialog.Title>
           <Dialog.Close>
-            <TooltipIconButton variant="ghost" size="1" tooltip="Close">
+            <TooltipIconButton variant="ghost" size="1" tooltip={t("close")}>
               <X size={14} />
             </TooltipIconButton>
           </Dialog.Close>
@@ -120,7 +122,7 @@ export default function MoveToDialog({
             ref={searchInputRef}
             size="2"
             type="search"
-            placeholder="Search folders"
+            placeholder={t("searchFolders")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className={styles.searchInput}
@@ -131,7 +133,7 @@ export default function MoveToDialog({
                   size="1"
                   variant="ghost"
                   onClick={() => setQuery("")}
-                  tooltip="Clear search"
+                  tooltip={t("clearSearch")}
                 >
                   <X size={12} />
                 </TooltipIconButton>
@@ -143,7 +145,7 @@ export default function MoveToDialog({
         <div className={styles.scrollArea}>
           {recentFolders.length > 0 && !folderQueryText && (
             <div className={styles.recentSection}>
-              <div className={styles.sectionLabel}>Recent</div>
+              <div className={styles.sectionLabel}>{t("recent")}</div>
               {recentFolders.map((folder) => {
                 const icon = folderSpecialIcon(folder);
                 return (
@@ -164,9 +166,9 @@ export default function MoveToDialog({
           )}
 
           <div className={styles.folderSection}>
-            {!folderQueryText && <div className={styles.sectionLabel}>Folders</div>}
+            {!folderQueryText && <div className={styles.sectionLabel}>{t("folders")}</div>}
             {hasNoResults ? (
-              <div className={styles.emptyState}>No folders match &ldquo;{query}&rdquo;</div>
+              <div className={styles.emptyState}>{t("noMatchingFolders", { query })}</div>
             ) : (
               rootFolders.map((folder) => (
                 <FolderPickerNode

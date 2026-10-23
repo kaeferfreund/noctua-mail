@@ -117,6 +117,7 @@ export async function getImapMailboxStatus(
       { mailbox: mailboxPath, ...logContext },
       () => client.status(mailboxPath, statusQuery)
     );
+    if (!status) throw new Error(`IMAP STATUS failed for ${mailboxPath}`);
     return {
       mailboxPath,
       uidNext: toFiniteNumber((status as { uidNext?: unknown })?.uidNext) ?? null,

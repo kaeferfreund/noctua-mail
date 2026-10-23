@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   AlertCircle,
@@ -23,6 +24,7 @@ export type InAppNotice = {
   fullDetail?: string;
   messageId?: string;
   ids?: string[];
+  actionKind?: "undo";
   actionLabel?: string;
   onAction?: () => void | Promise<void>;
   expiresAt?: number | null;
@@ -97,6 +99,7 @@ export default function InAppNoticeStack({
   state,
   actions
 }: InAppNoticeStackProps) {
+  const t = useTranslations("Notifications");
   const { inAppNotices } = state;
   const { onOpenNotice, onDismissNotice } = actions;
   const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
@@ -163,7 +166,7 @@ export default function InAppNoticeStack({
       className={[styles.stack, classNames.stack, className].filter(Boolean).join(" ")}
       style={style}
       role="region"
-      aria-label="Notifications"
+      aria-label={t("region")}
       aria-live="polite"
       data-placement={placement}
     >
@@ -222,7 +225,7 @@ export default function InAppNoticeStack({
               ) : null}
             </div>
             <div className={classNames.controls}>
-              {notice.actionLabel && notice.onAction ? (
+              {(notice.actionKind || notice.actionLabel) && notice.onAction ? (
                 <button
                   type="button"
                   className={classNames.action}
@@ -231,7 +234,7 @@ export default function InAppNoticeStack({
                     void runNoticeAction(notice);
                   }}
                 >
-                  {notice.actionLabel}
+                  {notice.actionKind === "undo" ? t("undo") : notice.actionLabel}
                 </button>
               ) : null}
               <button
@@ -241,8 +244,8 @@ export default function InAppNoticeStack({
                   event.stopPropagation();
                   handleDismiss(notice.id);
                 }}
-                aria-label="Dismiss notification"
-                title="Dismiss"
+                aria-label={t("dismissLabel")}
+                title={t("dismiss")}
               >
                 <X size={12} />
               </button>

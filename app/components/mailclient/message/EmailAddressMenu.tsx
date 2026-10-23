@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Copy, PenLine, Search } from "lucide-react";
 import { DropdownMenu } from "@radix-ui/themes";
@@ -20,6 +21,7 @@ export default function EmailAddressMenu({
   onSearchByAddress,
   onComposeTo
 }: EmailAddressMenuProps) {
+  const t = useTranslations("Reader");
   const [copiedItem, setCopiedItem] = useState<"full" | "email" | null>(null);
   const resetTimer = useRef<number | null>(null);
 
@@ -55,7 +57,7 @@ export default function EmailAddressMenu({
           type="button"
           className={styles.addressTrigger}
           title={tooltip}
-          aria-label={`Address actions for ${tooltip}`}
+          aria-label={t("addressActions", { address: tooltip })}
         >
           <span className={styles.addressLabel}>{label}</span>
           {displayName && (
@@ -69,19 +71,19 @@ export default function EmailAddressMenu({
           <span className={menuStyles.menuIcon}>
             <Search size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Find all messages with this address</span>
+          <span className={menuStyles.menuLabel}>{t("findAddress")}</span>
         </DropdownMenu.Item>
         <DropdownMenu.Item onSelect={() => onSearchByAddress("from", email)}>
           <span className={menuStyles.menuIcon}>
             <ArrowLeft size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Messages from this address</span>
+          <span className={menuStyles.menuLabel}>{t("fromAddress")}</span>
         </DropdownMenu.Item>
         <DropdownMenu.Item onSelect={() => onSearchByAddress("to", email)}>
           <span className={menuStyles.menuIcon}>
             <ArrowRight size={14} />
           </span>
-          <span className={menuStyles.menuLabel}>Messages to this address</span>
+          <span className={menuStyles.menuLabel}>{t("toAddress")}</span>
         </DropdownMenu.Item>
         {onComposeTo && (
           <>
@@ -90,7 +92,7 @@ export default function EmailAddressMenu({
               <span className={menuStyles.menuIcon}>
                 <PenLine size={14} />
               </span>
-              <span className={menuStyles.menuLabel}>Compose message to</span>
+              <span className={menuStyles.menuLabel}>{t("composeTo")}</span>
             </DropdownMenu.Item>
           </>
         )}
@@ -106,7 +108,7 @@ export default function EmailAddressMenu({
               {copiedItem === "full" ? <Check size={14} /> : <Copy size={14} />}
             </span>
             <span className={menuStyles.menuLabel}>
-              {copiedItem === "full" ? "Copied!" : "Copy name and email address"}
+              {copiedItem === "full" ? t("copied") : t("copyNameAddress")}
             </span>
           </DropdownMenu.Item>
         )}
@@ -120,7 +122,7 @@ export default function EmailAddressMenu({
             {copiedItem === "email" ? <Check size={14} /> : <Copy size={14} />}
           </span>
           <span className={menuStyles.menuLabel}>
-            {copiedItem === "email" ? "Copied!" : "Copy email address only"}
+            {copiedItem === "email" ? t("copied") : t("copyAddress")}
           </span>
         </DropdownMenu.Item>
       </DropdownMenu.Content>

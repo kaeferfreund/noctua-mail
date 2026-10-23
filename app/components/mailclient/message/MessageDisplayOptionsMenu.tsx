@@ -1,3 +1,5 @@
+import { useLocale, useTranslations } from "next-intl";
+import { formatNumber } from "@/lib/i18n/format";
 import { useId } from "react";
 import { ALargeSmall, Minus, Plus } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
@@ -9,36 +11,14 @@ import styles from "./MessageDisplayOptionsMenu.module.css";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import type { MessageTab } from "./types";
 
-const FORMAT_LABELS: Record<MessageTab, string> = {
-  html: "HTML",
-  text: "Plain text",
-  markdown: "Markdown",
-  source: "Source"
-};
-
 const SCALE_STEP = 0.1;
 
-const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
 
 type StepperLabels = {
   title: string;
   decrease: string;
   reset: string;
   increase: string;
-};
-
-const TEXT_SIZE_LABELS: StepperLabels = {
-  title: "Text size",
-  decrease: "Decrease text size",
-  reset: "Reset text size",
-  increase: "Increase text size"
-};
-
-const ZOOM_LABELS: StepperLabels = {
-  title: "Zoom",
-  decrease: "Zoom out",
-  reset: "Reset zoom",
-  increase: "Zoom in"
 };
 
 type MessageDisplayOptionsMenuProps = {
@@ -74,6 +54,30 @@ export default function MessageDisplayOptionsMenu({
   onAdjustZoom,
   onResetZoom
 }: MessageDisplayOptionsMenuProps) {
+  const t = useTranslations("Reader");
+  const locale = useLocale();
+  const formatPercent = (value: number) => formatNumber(value, locale, { style: "percent", maximumFractionDigits: 0 });
+  const FORMAT_LABELS: Record<MessageTab, string> = {
+    html: "HTML",
+    text: t("plainText"),
+    markdown: t("markdown"),
+    source: t("source")
+  };
+
+  const TEXT_SIZE_LABELS: StepperLabels = {
+    title: t("textSize"),
+    decrease: t("decreaseText"),
+    reset: t("resetText"),
+    increase: t("increaseText")
+  };
+
+  const ZOOM_LABELS: StepperLabels = {
+    title: t("zoom"),
+    decrease: t("zoomOut"),
+    reset: t("resetZoom"),
+    increase: t("zoomIn")
+  };
+
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const formatLabelId = useId();
   const textSizeLabelId = useId();
@@ -85,12 +89,12 @@ export default function MessageDisplayOptionsMenu({
   const showFormats = formats.length > 1;
   const summary = [
     format !== defaultFormat ? FORMAT_LABELS[format] : null,
-    showTextSize && textScale !== 1 ? `Text ${formatPercent(textScale)}` : null,
-    showZoom && zoom !== 1 ? `Zoom ${formatPercent(zoom)}` : null
+    showTextSize && textScale !== 1 ? t("textScale", { percent: formatPercent(textScale) }) : null,
+    showZoom && zoom !== 1 ? t("zoomScale", { percent: formatPercent(zoom) }) : null
   ]
     .filter(Boolean)
     .join(" · ");
-  const triggerLabel = summary ? `Display options (${summary})` : "Display options";
+  const triggerLabel = summary ? t("displayOptionsSummary", { summary }) : t("displayOptions");
 
   // The steppers are menu items (not plain buttons) so arrow keys reach them;
   // preventDefault keeps the menu open while the user steps the value. Focus
@@ -108,7 +112,7 @@ export default function MessageDisplayOptionsMenu({
       </DropdownMenu.Label>
       <DropdownMenu.Item
         className={styles.stepperItem}
-        aria-label={`${labels.decrease}, currently ${formatPercent(value)}`}
+        aria-label={t("stepperCurrent", { action: labels.decrease, percent: formatPercent(value) })}
         onSelect={(event) => {
           event.preventDefault();
           onAdjust(-SCALE_STEP);
@@ -118,7 +122,7 @@ export default function MessageDisplayOptionsMenu({
       </DropdownMenu.Item>
       <DropdownMenu.Item
         className={`${styles.stepperItem} ${styles.stepperValue}`}
-        aria-label={`${labels.reset} (currently ${formatPercent(value)})`}
+        aria-label={t("stepperReset", { action: labels.reset, percent: formatPercent(value) })}
         onSelect={(event) => {
           event.preventDefault();
           onReset();
@@ -128,7 +132,7 @@ export default function MessageDisplayOptionsMenu({
       </DropdownMenu.Item>
       <DropdownMenu.Item
         className={styles.stepperItem}
-        aria-label={`${labels.increase}, currently ${formatPercent(value)}`}
+        aria-label={t("stepperCurrent", { action: labels.increase, percent: formatPercent(value) })}
         onSelect={(event) => {
           event.preventDefault();
           onAdjust(SCALE_STEP);
@@ -171,9 +175,7 @@ export default function MessageDisplayOptionsMenu({
           >
             {showFormats ? (
               <>
-                <DropdownMenu.Label id={formatLabelId} className={styles.menuLabel}>
-                  Show as
-                </DropdownMenu.Label>
+                <DropdownMenu.Label id={formatLabelId} className={styles.menuLabel}>{t("showAs")}</DropdownMenu.Label>
                 <DropdownMenu.RadioGroup
                   value={format}
                   aria-labelledby={formatLabelId}

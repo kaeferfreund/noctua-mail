@@ -1,3 +1,5 @@
+import type { UiLocale } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "@/lib/ownAddresses";
 import type { Message, RecipientAlias } from "@/lib/data";
 import {
@@ -140,7 +142,7 @@ const getRecipientParticipantEntries = (
       const email = recipientEmail(recipient);
       if (email && isOwnAddress(email, ownAddresses)) return;
       const text = recipientDisplayValue(recipient);
-      const key = text.toLowerCase();
+      const key = `display:${text.toLowerCase()}`;
       if (seen.has(key)) return;
       seen.add(key);
       const participant = buildParticipant(recipient, text);
@@ -178,7 +180,8 @@ export function getMessageFromDisplay(
   userEmail?: OwnAddressInput,
   isInExpandedThread?: boolean,
   forceRecipientDisplay?: boolean,
-  findRecipientAlias?: FindRecipientAlias
+  findRecipientAlias?: FindRecipientAlias,
+  locale: UiLocale = "de"
 ): FromDisplayInfo {
   const normalized = normalizeWhitespace(fromValue);
   if (!normalized && !forceRecipientDisplay) return { text: "", tooltip: "" };
@@ -193,7 +196,7 @@ export function getMessageFromDisplay(
       findRecipientAlias
     );
     return {
-      text: recipientsDisplay || "(no recipients)",
+      text: recipientsDisplay || getTranslator(locale)("List.noRecipients"),
       tooltip: recipientTooltip(recipients),
       participants: recipientEntries.map(({ displayName, email }) => ({ displayName, email })),
       isFromUser,
@@ -214,7 +217,7 @@ export function getMessageFromDisplay(
       findRecipientAlias
     );
     return {
-      text: recipientsDisplay || "(no recipients)",
+      text: recipientsDisplay || getTranslator(locale)("List.noRecipients"),
       tooltip: recipientTooltip(recipients),
       participants: recipientEntries.map(({ displayName, email }) => ({ displayName, email })),
       isFromUser: true,
@@ -223,7 +226,7 @@ export function getMessageFromDisplay(
   }
 
   const displayName = extractDisplayName(normalized);
-  const displayText = isFromUser ? "Me" : (displayName || normalized);
+  const displayText = isFromUser ? getTranslator(locale)("List.me") : (displayName || normalized);
 
   return {
     text: displayText,
@@ -268,7 +271,8 @@ export function getCollapsedThreadFromDisplay(
   fullFlat: Array<{ message: Message; depth: number }>,
   userEmail?: OwnAddressInput,
   forceRecipientDisplay?: boolean,
-  findRecipientAlias?: FindRecipientAlias
+  findRecipientAlias?: FindRecipientAlias,
+  locale: UiLocale = "de"
 ): FromDisplayInfo {
   const seen = new Set<string>();
   const fromTexts: string[] = [];
@@ -296,7 +300,8 @@ export function getCollapsedThreadFromDisplay(
         userEmail,
         true,
         true,
-        findRecipientAlias
+        findRecipientAlias,
+        locale
       );
       const recipientEntries = getRecipientParticipantEntries(
         { to: message.to, cc: message.cc, bcc: message.bcc },
@@ -309,7 +314,7 @@ export function getCollapsedThreadFromDisplay(
         pushParticipant({
           text: entry.text,
           tooltip: entry.tooltip,
-          key: entry.text.toLowerCase(),
+          key: "participant:no-recipients",
           displayName: entry.text,
           email: ""
         });
@@ -323,12 +328,13 @@ export function getCollapsedThreadFromDisplay(
       userEmail,
       true,
       false,
-      findRecipientAlias
+      findRecipientAlias,
+      locale
     );
     pushParticipant({
       text: senderEntry.text,
       tooltip: senderEntry.tooltip,
-      key: senderEntry.text.toLowerCase(),
+      key: senderEntry.isFromUser ? "participant:self" : `display:${senderEntry.text.toLowerCase()}`,
       displayName: extractDisplayName(normalized) || senderEntry.text,
       email: recipientEmail(normalized) ?? ""
     });

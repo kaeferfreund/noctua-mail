@@ -7,6 +7,6 @@ export async function findImapMessageUid(account: Account, mailbox: string, mess
   return withPooledImapClient(account, buildLogContext(account, clientId), async client => {
     await client.mailboxOpen(mailbox);
     const uids = await client.search({ header: { "Message-ID": messageId } }, { uid: true });
-    return uids && uids.length ? Math.max(...uids) : null;
+    return Array.isArray(uids) && uids.length ? Math.max(...uids) : null;
   }, options);
 }

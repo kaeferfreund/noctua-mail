@@ -1,6 +1,7 @@
 // Runs only under `bun run test:dom` (preloads happy-dom before component load).
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import MessageRecipientMetaField from "./MessageRecipientMetaField";
 

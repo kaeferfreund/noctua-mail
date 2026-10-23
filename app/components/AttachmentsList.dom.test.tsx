@@ -1,6 +1,7 @@
 // Runs only under `bun run test:dom` (preloads happy-dom before component load).
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import type { Attachment } from "@/lib/data";
 import AttachmentsList from "./AttachmentsList";
 

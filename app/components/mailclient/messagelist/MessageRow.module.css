@@ -330,14 +330,14 @@
   /* Only the checkbox's 44px touch box; it stays right of the thread caret,
      which overhangs the first ~20px of the row. */
   .rowCompact :global([data-message-cell="unread"]) { grid-column: 1; grid-row: 1 / 3; justify-content: flex-end; }
-  .rowCompact :global([data-message-cell="unread"] > :not([aria-label="Select message"])) { display: none; }
-  .rowCompact :global([aria-label="Select message"]) { flex: 0 0 44px; width: 44px; height: 44px; }
+  .rowCompact :global([data-message-cell="unread"] > :not([data-message-select])) { display: none; }
+  .rowCompact :global([data-message-select]) { flex: 0 0 44px; width: 44px; height: 44px; }
   .rowCompact .from { grid-column: 2; grid-row: 1; min-width: 0; }
   .rowCompact .date { grid-column: 3; grid-row: 1; }
   .rowCompact .subjectRow { grid-column: 2 / 4; grid-row: 2; padding: 0; min-width: 0; }
   .rowCompact .subjectMeta, .rowCompact .metaRow, .rowCompact .size,
-  .rowCompact .actions > :global(:not([data-message-cell="date"]):not([aria-label="Message actions"])) { display: none; }
-  .rowCompact :global([aria-label="Message actions"]) { grid-column: 4; grid-row: 1 / 3; min-width: 44px; min-height: 44px; }
+  .rowCompact .actions > :global(:not([data-message-cell="date"]):not([data-message-action="menu"])) { display: none; }
+  .rowCompact :global([data-message-action="menu"]) { grid-column: 4; grid-row: 1 / 3; min-width: 44px; min-height: 44px; }
 }
 
 .mobileCollab { display: none; }

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import {
   CalendarCheck,
@@ -127,6 +128,7 @@ export default function CalendarEventDiffPanel({
   messageId: string;
   eventUid: string;
 }) {
+  const t = useTranslations("Reader");
   const dateFormat = useAccountDateFormat();
   const [entry, setEntry] = useState<DiffEntry | null | undefined>(undefined);
 
@@ -157,11 +159,9 @@ export default function CalendarEventDiffPanel({
     // against, so render nothing rather than an empty "What changed" panel.
     if (diff.reason === "no_current_snapshot") return null;
     return (
-      <section className={styles.panel} aria-label="Calendar update changes">
-        <p className={styles.heading}>What changed</p>
-        <p className={styles.muted}>
-          The previous version of this invite isn’t available locally, so we can’t show what changed.
-        </p>
+      <section className={styles.panel} aria-label={t("calendarChanges")}>
+        <p className={styles.heading}>{t("whatChanged")}</p>
+        <p className={styles.muted}>{t("previousInviteUnavailable")}</p>
       </section>
     );
   }
@@ -170,12 +170,10 @@ export default function CalendarEventDiffPanel({
   const isCancel = diff.kind === "cancel";
 
   return (
-    <section className={styles.panel} aria-label="Calendar update changes">
-      <p className={styles.heading}>{isCancel ? "Event cancelled" : "What changed"}</p>
+    <section className={styles.panel} aria-label={t("calendarChanges")}>
+      <p className={styles.heading}>{isCancel ? t("eventCancelled") : t("whatChanged")}</p>
       {rows.length === 0 && !isCancel ? (
-        <p className={styles.muted}>
-          The organizer sent an update but nothing visible changed (likely a re-sync).
-        </p>
+        <p className={styles.muted}>{t("inviteUnchanged")}</p>
       ) : (
         rows.map((row) => (
           <div key={row.key} className={row.indent ? styles.indent : undefined}>

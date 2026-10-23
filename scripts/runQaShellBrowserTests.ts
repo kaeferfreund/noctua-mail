@@ -1,5 +1,5 @@
 /** Production UI regression harness. Only synthetic data, an explicit app port and OS-assigned fixture ports. */
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -34,10 +34,33 @@ try {
   const { startImapServer } = await import("./dev-fixture/imap-server");
   const { startSmtpSink } = await import("./dev-fixture/smtp-sink");
   imap = await startImapServer({ host: "127.0.0.1", port: 0, controlPort: 0, user: "demo@monkeydent.test", pass: "demo", seed: "qa-shell" });
-  imap.store.append("INBOX", Buffer.from(`From: Synthetic Reader <reader@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-shell-long@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: ${"QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. ".repeat(4).trim()}\r\n\r\nSynthetic reader body for QA shell regressions.\r\n`));
+  const longSubject = "QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. ".repeat(4).trim();
+  if (process.env.QA_ROUND2_FIXTURE === "1") {
+    // The unread regression uses the reviewed 300-message / 110-unread fixture.
+    const { makeMessage } = await import("./dev-fixture/seed");
+    for (let n = 0; n < 240; n++) {
+      const isLongSubject = n === 239;
+      const subject = isLongSubject
+        ? longSubject
+        : `QA synthetic ${String(n).padStart(3, "0")}`;
+      imap.store.append("INBOX", makeMessage({ id: `qa-round2-${n}`, subject,
+        from: "Synthetic Reader <reader@example.test>", text: "Synthetic QA round two message.",
+        date: new Date(Date.now() + (isLongSubject ? 86400000 : 0)) }), n < 90 ? [] : ["\\Seen"]);
+    }
+    const inbox = imap.store.get("INBOX");
+    if (inbox.messages.length !== 300 || inbox.messages.filter(message => !message.flags.has("\\Seen")).length !== 110) {
+      throw new Error("Invalid round-two QA fixture counts");
+    }
+  } else {
+    imap.store.append("INBOX", Buffer.from(`From: Synthetic Reader <reader@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-shell-long@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: ${longSubject}\r\n\r\nSynthetic reader body for QA shell regressions.\r\n`));
+  }
   smtp = await startSmtpSink({ host: "127.0.0.1", port: 0, user: "demo@monkeydent.test", pass: "demo", out: path.join(scratch, "outbox"), deliver: source => { imap!.store.append("INBOX", source); } });
-  Object.assign(env, { QA_SHELL_IMAP_PORT: String(imap.port), QA_SHELL_SMTP_PORT: String(smtp.port), QA_SHELL_OUTBOX: path.join(scratch, "outbox") });
+  Object.assign(env, { QA_SHELL_IMAP_PORT: String(imap.port), QA_SHELL_SMTP_PORT: String(smtp.port), QA_SHELL_OUTBOX: path.join(scratch, "outbox"), COMPOSE_QA_OUTBOX: path.join(scratch, "outbox"), QA_SHELL_CONTROL_URL: `http://127.0.0.1:${imap.controlPort}` });
   await run(["tests/browser/ui/seedQaShell.ts"]);
+  const [composeUser] = JSON.parse(readFileSync(env.QA_SHELL_SEED_FILE, "utf8"));
+  const composeSeed = path.join(scratch, "compose-seed.json");
+  writeFileSync(composeSeed, JSON.stringify({ ...composeUser, accountId: "qa-shared" }));
+  Object.assign(env, { COMPOSE_QA_SEED_FILE: composeSeed });
   server = spawn("bun", ["--bun", "next", "start", "-p", String(port), "-H", "localhost"], { cwd: root, env, stdio: "inherit", detached: true });
   let ready = false;
   for (let attempt = 0; attempt < 120; attempt++) {

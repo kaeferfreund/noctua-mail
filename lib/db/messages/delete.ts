@@ -14,6 +14,7 @@
  * Every mutator runs inside `withDbWriteRetry` so transient SQLite
  * BUSY/LOCKED errors don't surface as user-visible failures.
  */
+import { DELETE_MESSAGE_FTS_SQL } from "../ftsIdentity";
 import { SHARD_FTS_TABLE } from "../shardFormat";
 import { withDbWriteRetry } from "../../dbWriteRetry";
 import { deleteMessageFiles } from "../../storage";
@@ -91,7 +92,7 @@ export async function deleteMessageById(accountId: string, messageId: string) {
       .get(accountId, messageId) as { threadId?: string | null } | undefined;
     db.transaction(() => {
       db.prepare(`DELETE FROM attachments WHERE accountId = ? AND messageId = ?`).run(accountId, messageId);
-      db.prepare(`DELETE FROM ${SHARD_FTS_TABLE} WHERE accountId = ? AND messageId = ?`).run(accountId, messageId);
+      db.prepare(DELETE_MESSAGE_FTS_SQL).run(accountId, messageId);
       db.prepare(`DELETE FROM messages WHERE accountId = ? AND id = ?`).run(accountId, messageId);
     })();
     if (row?.threadId) {
@@ -143,7 +144,7 @@ export async function deleteMessagesByIds(accountId: string, messageIds: string[
         ).run(accountId, ...chunk);
         db.prepare(
           `DELETE FROM ${SHARD_FTS_TABLE}
-           WHERE accountId = ? AND messageId IN (${placeholders})`
+           WHERE rowid IN (SELECT ftsRowid FROM message_fts_identity WHERE accountId = ? AND messageId IN (${placeholders}))`
         ).run(accountId, ...chunk);
         db.prepare(`DELETE FROM messages WHERE accountId = ? AND id IN (${placeholders})`).run(
           accountId,
@@ -210,10 +211,10 @@ export async function deleteMessagesByFolderPrefix(accountId: string, folderPref
       ).run(accountId, prefix, childPattern);
       db.prepare(
         `DELETE FROM ${SHARD_FTS_TABLE}
-         WHERE EXISTS (
-           SELECT 1 FROM messages m
-           WHERE m.accountId = ${SHARD_FTS_TABLE}.accountId AND m.id = ${SHARD_FTS_TABLE}.messageId
-             AND m.accountId = ? AND (m.folderId = ? OR m.folderId LIKE ? ESCAPE '\\')
+         WHERE rowid IN (
+           SELECT i.ftsRowid FROM message_fts_identity i JOIN messages m
+             ON m.accountId=i.accountId AND m.id=i.messageId
+           WHERE m.accountId = ? AND (m.folderId = ? OR m.folderId LIKE ? ESCAPE '\\')
          )`
       ).run(accountId, prefix, childPattern);
       db.prepare(

@@ -11,7 +11,8 @@ import {
 } from "./messageGrouping";
 
 function localDateMs(year: number, monthIndex: number, day: number, hour = 0) {
-  return new Date(year, monthIndex, day, hour).getTime();
+  // Fixtures represent Berlin wall time, independently of the test host zone.
+  return new Date(`${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00+01:00`).getTime();
 }
 
 describe("buildTimeGroupKey", () => {
@@ -38,7 +39,7 @@ describe("buildTimeGroupKey", () => {
 });
 
 describe("buildWeekGroupKey", () => {
-  it("matches SQLite-style local week buckets with Monday-based week numbering", () => {
+  it("keeps the existing Monday-based week keys with Monday-based week numbering", () => {
     expect(buildWeekGroupKey(localDateMs(2026, 0, 1, 12))).toBe("2026-W00");
     expect(buildWeekGroupKey(localDateMs(2026, 0, 5, 12))).toBe("2026-W01");
     expect(buildWeekGroupKey(localDateMs(2025, 11, 31, 12))).toBe("2025-W52");

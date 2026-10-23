@@ -19,8 +19,8 @@ type CrossFolderThreadPruneOptions = {
 /**
  * Get a safe display subject for notification messages
  */
-export function getMessageSubjectForNotice(message?: Message | null): string {
-  return message?.subject?.trim() || "(no subject)";
+export function getMessageSubjectForNotice(message?: Message | null, fallback = "(no subject)"): string {
+  return message?.subject?.trim() || fallback;
 }
 
 export function getMessageThreadKey(message: Pick<Message, "threadId" | "messageId" | "id">) {

@@ -1,3 +1,4 @@
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import type {
@@ -114,6 +115,8 @@ export default function CalendarEventPreview({
   readErrorMessage: (res: Response) => Promise<string>;
   reportError: (message: string) => void;
 }) {
+  const locale = useLocale();
+  const t = useTranslations("Reader");
   const attachment = useMemo(
     () => attachments.find((a) => isCalendarAttachment(a) && Boolean(a.url || a.dataUrl)) ?? null,
     [attachments]
@@ -189,8 +192,8 @@ export default function CalendarEventPreview({
       const displayRange = resolveEventDisplayRange(event, nowMs);
       return { event, index, displayStart: displayRange.start, displayEnd: displayRange.end, displayStartAtMs: displayRange.startAtMs };
     });
-    return groupItemsByRelativeTime(entries, (e) => e.displayStartAtMs, nowMs);
-  }, [hasCurrentResult, result.events, mountTime]);
+    return groupItemsByRelativeTime(entries, (e) => e.displayStartAtMs, nowMs, locale);
+  }, [hasCurrentResult, result.events, mountTime, locale]);
 
   const inviteMutationGroupByUid = useMemo(() => {
     const map = new Map<string, CalendarInviteMutationGroup>();
@@ -349,7 +352,7 @@ export default function CalendarEventPreview({
         await refreshStoredEvents();
         dispatchCalendarRemindersUpdatedEvent();
       } catch (error) {
-        reportError(error instanceof Error ? error.message : "Failed to process calendar invite.");
+        reportError(error instanceof Error ? error.message : t("calendarInviteFailed"));
       } finally {
         setProcessingInviteUid(null);
       }
@@ -363,7 +366,8 @@ export default function CalendarEventPreview({
       readErrorMessage,
       refreshStoredEvents,
       reportError,
-      sourceMessageRowId
+      sourceMessageRowId,
+      t
     ]
   );
 
@@ -382,7 +386,7 @@ export default function CalendarEventPreview({
       <div className={shellStyles.header}>
         <div className={shellStyles.title}>
           <CalendarDays size={14} />
-          <span>Calendar Event</span>
+          <span>{t("calendarEvent")}</span>
         </div>
         <InviteAttachmentControls
           downloadLabel={downloadFilename}
@@ -395,9 +399,9 @@ export default function CalendarEventPreview({
       </div>
 
       {loading ? (
-        <p className={styles.meta}>Loading event preview…</p>
+        <p className={styles.meta}>{t("loadingEvent")}</p>
       ) : hasError || events.length === 0 ? (
-        <p className={styles.meta}>Could not parse calendar event details.</p>
+        <p className={styles.meta}>{t("eventParseFailed")}</p>
       ) : (
         <div className={styles.eventGroups}>
           {groupedEvents.map((bucket) => (
@@ -446,7 +450,7 @@ export default function CalendarEventPreview({
                       key={`${reminderKey}-${reminderVersion}`}
                       accountId={accountId}
                       eventUid={event.uid}
-                      title={event.summary || "Untitled Event"}
+                      title={event.summary || t("untitledEvent")}
                       startMs={displayStart?.getTime()}
                       endMs={displayEnd?.getTime()}
                       allDay={event.allDay}
@@ -502,7 +506,7 @@ export default function CalendarEventPreview({
                           }
                         ]);
                       }}
-                      responseOccurrenceLabel={forceOccurrenceResponse ? "This occurrence" : "Next occurrence"}
+                      responseOccurrenceLabel={forceOccurrenceResponse ? t("thisOccurrence") : t("nextOccurrence")}
                       forceOccurrenceResponse={forceOccurrenceResponse}
                       inviteScopeLabel={inviteScopeLabel}
                       showEmailSnapshot={false}
@@ -544,7 +548,7 @@ export default function CalendarEventPreview({
             </section>
           ))}
           {events.length > 3 && (
-            <p className={styles.meta}>+{events.length - 3} more events in attachment</p>
+            <p className={styles.meta}>{t("moreEvents", { count: events.length - 3 })}</p>
           )}
         </div>
       )}

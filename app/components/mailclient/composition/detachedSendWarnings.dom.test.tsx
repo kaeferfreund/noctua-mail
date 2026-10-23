@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from "bun:test";
-import { act, cleanup, fireEvent, render, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
+import { render } from "@/lib/i18n/testRender";
 import InAppNoticeStack from "../InAppNoticeStack";
 import { useDetachedSendWarnings } from "./useDetachedSendWarnings";
 import {

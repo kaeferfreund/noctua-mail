@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { memo } from "react";
 import type React from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
@@ -29,11 +30,12 @@ function MessageGroupRow({
   onOpenChange,
   renderAsVirtualItem = true
 }: MessageGroupRowProps) {
+  const t = useTranslations("List");
   const isFlagged = group.key === "Flagged";
   const totalCount = group.count ?? group.items.length;
   const loadedCount = group.items.length;
   const isPartiallyLoaded = group.count !== undefined && loadedCount < group.count;
-  const countLabel = isPartiallyLoaded ? `${loadedCount} / ${totalCount}` : `${totalCount}`;
+  const countLabel = t("groupCount", { loaded: loadedCount, total: totalCount, partial: isPartiallyLoaded ? "yes" : "no" });
   const showCount = group.showCount ?? true;
   const isEmpty = loadedCount === 0;
   const canToggle = !isEmpty || group.allowToggleWhenEmpty === true;
@@ -68,7 +70,7 @@ function MessageGroupRow({
           {showCount && (
             <>
               {" "}
-              <span className={styles.count}>{countLabel}</span>
+              <span className={styles.count} title={group.countIsLoaded ? t("loadedGroupCount", { count: loadedCount }) : undefined}>{countLabel}</span>
             </>
           )}
         </button>

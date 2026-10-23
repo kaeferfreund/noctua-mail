@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import React from "react";
 import type { Message } from "@/lib/data";
 import { Text } from "@radix-ui/themes";
@@ -34,6 +35,7 @@ export default function ThreadView({
   composeReplyMessageId,
   renderComposeInlineCard
 }: ThreadViewProps) {
+  const t = useTranslations("Reader");
   return (
     <>
       {activeMessage ? (
@@ -90,9 +92,7 @@ export default function ThreadView({
           );
         })()
       ) : showComposeInline ? null : (
-        <Text size="2" color="gray" className={styles.empty}>
-          Select a message to view the thread.
-        </Text>
+        <Text size="2" color="gray" className={styles.empty}>{t("selectThread")}</Text>
       )}
     </>
   );
