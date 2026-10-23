@@ -2,6 +2,7 @@ import { getThreadCollabState } from "@/lib/threadCollab";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { compressedJsonResponse } from "@/app/api/_helpers/compressedJson";
 import {
   type AccountRouteParams,
   getAccountIdFromParams,
@@ -47,6 +48,6 @@ export async function GET(request: Request, { params }: Params) {
         );
       }
     }
-    return NextResponse.json({ ok: true, message });
+    return compressedJsonResponse(request, { ok: true, message });
   });
 }

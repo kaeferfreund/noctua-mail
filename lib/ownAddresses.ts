@@ -1,8 +1,32 @@
 import type { Account, SenderIdentity } from "./data";
 import addressParser from "nodemailer/lib/addressparser/index.js";
 
+// Both parsers below are pure but costly (tokenizer, one URL per address). A message
+// list derives sender and recipient labels from the same few header values hundreds
+// of times per render, so results are memoized in small bounded caches. Long values
+// (large recipient lists) are not kept.
+const ADDRESS_MEMO_LIMIT = 2000;
+const ADDRESS_MEMO_MAX_KEY_LENGTH = 512;
+
+function memoizeAddressResult<T>(cache: Map<string, T>, key: string, compute: (key: string) => T): T {
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+  const value = compute(key);
+  if (key.length > ADDRESS_MEMO_MAX_KEY_LENGTH) return value;
+  if (cache.size >= ADDRESS_MEMO_LIMIT) cache.delete(cache.keys().next().value as string);
+  cache.set(key, value);
+  return value;
+}
+
+const normalizedIdentityEmails = new Map<string, string | null>();
+const parsedAddressEmails = new Map<string, readonly string[]>();
+
 /** Canonical single addr-spec. Plus tags and dots are significant. */
 export function normalizeIdentityEmail(value: string): string | null {
+  return memoizeAddressResult(normalizedIdentityEmails, value, computeIdentityEmail);
+}
+
+function computeIdentityEmail(value: string): string | null {
   if (/[\x00-\x1f\x7f]/.test(value)) return null;
   const email = value.trim();
   if (email.length > 254 || !/^[^\s<>(),;:"\\@]+@[^\s<>(),;:"\\@]+$/.test(email)) return null;
@@ -21,8 +45,14 @@ export function normalizeIdentityEmail(value: string): string | null {
 
 /** Parse complete address entries, never substring-match another mailbox. */
 export function parseAddressEmails(value?: string | null): string[] {
+  if (!value) return [];
+  // Callers own the returned array; the memoized entry stays untouched.
+  return memoizeAddressResult(parsedAddressEmails, value, computeAddressEmails).slice();
+}
+
+function computeAddressEmails(value: string): readonly string[] {
   // HTAB is legal observed folding whitespace; configuration remains strict.
-  if (!value || /[\x00-\x08\x0a-\x1f\x7f]/.test(value)) return [];
+  if (/[\x00-\x08\x0a-\x1f\x7f]/.test(value)) return [];
   // This dependency-free Nodemailer submodule also runs in the browser. Its
   // mailbox parser separates comments, quoted names and groups from addr-specs.
   // Remove CFWS comments (including nested comments) and quoted display text

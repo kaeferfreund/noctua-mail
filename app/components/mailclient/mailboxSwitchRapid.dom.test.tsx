@@ -16,6 +16,8 @@ const account = (id: string) => ({
 const folders = (id: string) => [{ id: `${id}:INBOX`, accountId: id, name: "Inbox", specialUse: "\\Inbox", count: 0 }];
 let server: { selected: string; accounts: string[] };
 let calls: string[];
+// Abort signal of every list request, per mailbox.
+let listSignals: { accountId: string; signal?: AbortSignal | null }[];
 // Selection writes in the order the server applied them.
 let applied: string[];
 let pendingWrites: number;
@@ -26,13 +28,15 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 beforeEach(() => {
   server = { selected: "account-a", accounts: ["account-a", "account-b", "account-c"] };
-  calls = []; applied = []; pendingWrites = 0;
+  calls = []; applied = []; pendingWrites = 0; listSignals = [];
   switchDelayMs = () => 600;
   globalThis.EventSource = class extends EventTarget { close() {} } as unknown as typeof EventSource;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = (typeof input === "string" ? input : input instanceof URL ? input.href : input.url).replace(/^https?:\/\/[^/]+/, "");
     const path = url.split("?")[0];
     calls.push(url);
+    const listAccount = /^\/api\/accounts\/([^/]+)\/(threads|messages)$/.exec(path)?.[1];
+    if (listAccount) listSignals.push({ accountId: listAccount, signal: init?.signal });
     if (path === "/api/me/events") return new Response(new ReadableStream<Uint8Array>({ start() {} }), { headers: { "content-type": "text/event-stream" } });
     if (path === "/api/auth/me") return Response.json({ user: { id: "synthetic-user", email: "user@example.test", role: "user" },
       accounts: server.accounts.map(account), accountId: server.selected, mailboxState: "selected", security: {}, ttlSeconds: 3600 });
@@ -82,11 +86,17 @@ async function mount() {
   const callsSinceClick = () => calls.slice(mark);
   const listRequestsSinceClick = () => callsSinceClick().filter(url => /\/api\/accounts\/[^/]+\/(threads|messages)\?/.test(url))
     .map(url => /accounts\/([^/]+)\//.exec(url)![1]);
-  return { view, row, active, shown, clickInOrder, settled, callsSinceClick, listRequestsSinceClick };
+  // The click on B requests its inbox's first page alongside the switch; the
+  // superseded switch aborts it, and B is listed nowhere else.
+  const expectOnlyAbortedFirstPageOfB = () => {
+    expect(listRequestsSinceClick().filter(id => id === "account-b")).toHaveLength(1);
+    expect(listSignals.filter(entry => entry.accountId === "account-b").every(entry => entry.signal?.aborted)).toBe(true);
+  };
+  return { view, row, active, shown, clickInOrder, settled, callsSinceClick, listRequestsSinceClick, expectOnlyAbortedFirstPageOfB };
 }
 
 describe("rapid mailbox switching on the real MailClient", () => {
-  it("A -> B -> C ends on C; no list request or topic of B", async () => {
+  it("A -> B -> C ends on C; no list or topic of B", async () => {
     const h = await mount();
     await h.clickInOrder("account-b");
     expect(h.row(names["account-b"])?.getAttribute("aria-busy")).toBe("true");
@@ -101,7 +111,7 @@ describe("rapid mailbox switching on the real MailClient", () => {
     expect(h.shown).toEqual(["account-a", "account-c"]);
     const lists = h.listRequestsSinceClick();
     expect(lists.at(-1)).toBe("account-c");
-    expect(lists).not.toContain("account-b");
+    h.expectOnlyAbortedFirstPageOfB();
     expect(h.view.queryByText("Topic of Synthetic Beta")).toBeNull();
     expect(h.view.queryByText("Topic of Synthetic Alpha")).toBeNull();
   }, 20_000);
@@ -117,7 +127,7 @@ describe("rapid mailbox switching on the real MailClient", () => {
     expect(h.shown).toEqual(["account-a"]);
     // Returning to the mailbox still shown neither re-reads its folders nor lists B.
     expect(h.callsSinceClick()).not.toContain("/api/accounts/account-a/folders");
-    expect(h.listRequestsSinceClick()).not.toContain("account-b");
+    h.expectOnlyAbortedFirstPageOfB();
     expect(h.view.queryByText("Topic of Synthetic Beta")).toBeNull();
   }, 20_000);
 

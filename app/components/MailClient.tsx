@@ -18,6 +18,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
+import { applyMessageCollabUpdate, applyMessagesCollabUpdates, applyThreadCollabCacheUpdates } from "./mailclient/threadCollabUpdates";
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 import { getOwnAddresses } from "@/lib/ownAddresses";
@@ -31,7 +32,8 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState
+  useState,
+  useSyncExternalStore
 } from "react";
 import {
   Inbox,
@@ -91,6 +93,7 @@ import MessageListOrchestrator, {
 } from "./mailclient/messagelist/MessageListOrchestrator";
 import MessageListHeader from "./mailclient/messagelist/MessageListHeader";
 import { useMessageViewMode } from "./mailclient/messagelist/useMessageViewMode";
+import { createReaderRowsStore } from "./mailclient/messagelist/useReaderNavigationRows";
 import BulkActionContextMenu from "./mailclient/messagelist/BulkActionContextMenu";
 import SelectionActionsMenu from "./mailclient/messagelist/SelectionActionsMenu";
 import {
@@ -397,6 +400,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
+const skipReaderRowsSubscription = () => () => {};
+const NO_READER_ROWS: Message[] = [];
+const getNoReaderRows = () => NO_READER_ROWS;
+
 export default function MailClient({
   buildVersionLabel = "",
   buildInfo = null
@@ -419,10 +426,16 @@ export default function MailClient({
     readerLayout, changeLayout: changeReaderLayout, onSelect: selectReaderLayout,
     onNavigate: resetReaderLayout, hintMessageId: readerHintId, dismissHint: dismissReaderHint
   } = useReaderFocus(isMobile);
-  const [readerRows, setReaderRows] = useState<Message[]>([]);
-  const handleReaderRowsChange = useCallback((rows: Message[]) => {
-    setReaderRows(previous => previous.length === rows.length && previous.every((message, index) => message === rows[index]) ? previous : rows);
-  }, []);
+  // Only the focus reader renders from the navigation rows. In the other layouts the
+  // client neither reads nor subscribes to them, so a list change does not render it
+  // once more; actions read the rows on demand.
+  const [readerRowsStore] = useState(createReaderRowsStore);
+  const readerRowsRendered = !isMobile && readerLayout === "focus";
+  const readerRows = useSyncExternalStore(
+    readerRowsRendered ? readerRowsStore.subscribe : skipReaderRowsSubscription,
+    readerRowsRendered ? readerRowsStore.getRows : getNoReaderRows,
+    readerRowsRendered ? readerRowsStore.getRows : getNoReaderRows
+  );
   const readerListScrollRef = useRef<number | null>(null);
   const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
@@ -451,7 +464,6 @@ export default function MailClient({
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
   const [collabRevision, setCollabRevision] = useState(0);
   const [activeCollabRevision, setActiveCollabRevision] = useState(0);
-  const [messageTopicsById, setMessageTopicsById] = useState<Map<string, Topic[]>>(new Map());
   const [topicPickerOpen, setTopicPickerOpen] = useState(false);
   const [topicPickerMessage, setTopicPickerMessage] = useState<Message | null>(null);
   const [topicSuggestions, setTopicSuggestions] = useState<Topic[]>([]);
@@ -699,7 +711,7 @@ export default function MailClient({
   const [pendingSelectionScrollMessageId, setPendingSelectionScrollMessageId] = useState<
     string | null
   >(null);
-  const refreshMailboxDataRef = useRef<() => Promise<boolean>>(async () => false);
+  const refreshMailboxDataRef = useRef<(options?: { skipIfCurrent?: boolean }) => Promise<boolean>>(async () => false);
   const setMessagesRef = useRef<React.Dispatch<React.SetStateAction<Message[]>>>(() => {});
   const updateMessagesRef = useRef<(updater: (message: Message) => Message | null, options?: { source?: string }) => void>(() => {});
   const forwardMessageResultPruneUpdate = useCallback(
@@ -876,7 +888,7 @@ export default function MailClient({
     reportError,
     pushNotice,
     showNotification,
-    refreshMailboxData: () => refreshMailboxDataRef.current(),
+    refreshMailboxData: (options) => refreshMailboxDataRef.current(options),
     refreshFolders,
     refreshPendingCalendarReminders,
     setFolders,
@@ -1282,6 +1294,8 @@ export default function MailClient({
     queueFilteredSearchRefresh,
     markMessagesMutated,
     authoritativeRevision,
+    prefetchFirstPage,
+    dropFirstPagePrefetch,
   } = useMessageData({
     messagesKey,
     activeAccountId,
@@ -1310,6 +1324,18 @@ export default function MailClient({
   });
   refreshMailboxDataRef.current = refreshMailboxData;
   setMessagesRef.current = setMessages;
+
+  // Topics per thread, from the topics included in the list response. Derived during
+  // render so a list change commits once, not once more from an effect.
+  const messageTopicsById = useMemo(() => {
+    const next = new Map<string, Topic[]>();
+    for (const msg of messages) {
+      if (msg.threadId && msg.topics && msg.topics.length > 0 && !next.has(msg.threadId)) {
+        next.set(msg.threadId, msg.topics);
+      }
+    }
+    return next;
+  }, [messages]);
 
   const accountMessages = useMemo(() => {
     const { deduped, duplicates } = dedupeAccountMessages(messages, activeAccountId);
@@ -1675,7 +1701,9 @@ export default function MailClient({
     setManageOpen,
     setManageTab,
     setEditingAccount,
-    setDeletingFolderIds
+    setDeletingFolderIds,
+    prefetchFirstPage,
+    dropFirstPagePrefetch
   });
 
   const preferToDisplay = isDraftsFolder(activeFolderId) || isSentFolder(activeFolderId);
@@ -1944,16 +1972,6 @@ export default function MailClient({
     composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
   };
 
-  // Derive topics map from messages (topics are now included in the messages API response)
-  useEffect(() => {
-    const next = new Map<string, Topic[]>();
-    for (const msg of messages) {
-      if (msg.threadId && msg.topics && msg.topics.length > 0 && !next.has(msg.threadId)) {
-        next.set(msg.threadId, msg.topics);
-      }
-    }
-    setMessageTopicsById(next);
-  }, [messages]);
 
   const getAssignedThreadTopics = useCallback((message: Message) => {
     const threadTopics = message.threadId ? messageTopicsById.get(message.threadId) : undefined;
@@ -2209,8 +2227,9 @@ export default function MailClient({
 
   useEffect(() => {
     if (!activeAccountId || !showActiveTopicSuggestionGroup || !activeTopicSuggestionGroupKey) {
-      setActiveTopicSuggestions([]);
-      setActiveTopicSuggestionMessages([]);
+      // Already empty: keep the state, so a list change does not re-render.
+      setActiveTopicSuggestions(prev => (prev.length ? [] : prev));
+      setActiveTopicSuggestionMessages(prev => (prev.length ? [] : prev));
       setActiveTopicSuggestionsLoadedKey("");
       setActiveTopicSuggestionsLoading(false);
       return;
@@ -2254,8 +2273,9 @@ export default function MailClient({
 
   useEffect(() => {
     if (!activeAccountId || !showActiveTopicSuggestionGroup || !activeTopicSuggestionGroupKey) {
-      setActiveTopicSuggestions([]);
-      setActiveTopicSuggestionMessages([]);
+      // Already empty: keep the state, so a list change does not re-render.
+      setActiveTopicSuggestions(prev => (prev.length ? [] : prev));
+      setActiveTopicSuggestionMessages(prev => (prev.length ? [] : prev));
       setActiveTopicSuggestionsLoadedKey("");
       setActiveTopicSuggestionsLoading(false);
       return;
@@ -2782,23 +2802,27 @@ export default function MailClient({
   }, [activeMessage, closeReaderFocus, isMobile, openReaderFocus, readerLayout, navigateReader]);
   const applyThreadCollabUpdates = useCallback((accountId: string, updates: Map<string, CollabSummary>) => {
     if (!updates.size) return;
-    setThreadCollabCache(prev => new Map(prev).set(accountId, new Map([...(prev.get(accountId) ?? []), ...updates])));
-    const apply = (msg: Message) => {
-      const state = updates.get(msg.threadId);
-      return msg.accountId === accountId && state ? { ...msg, collab: state } : msg;
-    };
-    setMessages(prev => prev.map(apply));
-    setViewMessage(prev => prev ? apply(prev) : prev);
+    setThreadCollabCache(prev => applyThreadCollabCacheUpdates(prev, accountId, updates));
+    setMessages(prev => applyMessagesCollabUpdates(prev, accountId, updates));
+    setViewMessage(prev => prev ? applyMessageCollabUpdate(prev, accountId, updates) : prev);
     for (const [threadId] of updates) {
       const cached = threadContentByIdRef.current[threadId];
-      if (cached) upsertThreadCache(threadId, cached.map(apply));
+      if (!cached) continue;
+      const next = applyMessagesCollabUpdates(cached, accountId, updates);
+      if (next !== cached) upsertThreadCache(threadId, next);
     }
   }, [setMessages, setViewMessage, threadContentByIdRef, upsertThreadCache]);
   const handleThreadCollabUpdate = useCallback((state: ThreadCollabState) => {
     applyThreadCollabUpdates(state.accountId, new Map([[state.threadId, state]]));
   }, [applyThreadCollabUpdates]);
   const invalidateThreadCollab = useCallback((accountId: string) => {
-    setThreadCollabCache(prev => { const next = new Map(prev); next.delete(accountId); return next; });
+    // Nothing cached for the mailbox: keep the state, so a list change does not re-render.
+    setThreadCollabCache(prev => {
+      if (!prev.has(accountId)) return prev;
+      const next = new Map(prev);
+      next.delete(accountId);
+      return next;
+    });
   }, []);
   useEffect(() => { setThreadCollabCache(new Map()); }, [currentUser?.id]);
   useEffect(() => { invalidateThreadCollab(activeAccountId); }, [activeAccountId, authoritativeRevision, invalidateThreadCollab]);
@@ -4246,6 +4270,8 @@ export default function MailClient({
   }, [activeAccountId, currentAccount?.caldav?.url, currentAccount?.caldav?.syncIntervalMs, initialDataReady, apiFetch]);
 
   useEffect(() => {
+    // Already empty: keep the state, so a list change does not re-render.
+    const clearThreadRelatedMessages = () => setThreadRelatedMessages(prev => (prev.length ? [] : prev));
     const loadThreadRelated = async () => {
       const requestKey = currentKeyRef.current;
       const debugBase = {
@@ -4265,7 +4291,7 @@ export default function MailClient({
           ...debugBase,
           reason: "supports-threads"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       if (!includeThreadAcrossFoldersForList) {
@@ -4273,7 +4299,7 @@ export default function MailClient({
           ...debugBase,
           reason: "cross-folder-disabled"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       if (isDraftsFolder(activeFolderId)) {
@@ -4281,7 +4307,7 @@ export default function MailClient({
           ...debugBase,
           reason: "drafts-folder"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       if (searchScope !== "folder" || !activeFolderId) {
@@ -4289,7 +4315,7 @@ export default function MailClient({
           ...debugBase,
           reason: "not-folder-scope-or-missing-folder"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       if (!activeAccountId || threadRelatedCandidateIds.length === 0) {
@@ -4297,7 +4323,7 @@ export default function MailClient({
           ...debugBase,
           reason: "missing-account-or-empty-candidates"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       const threadIds = threadRelatedCandidateIds;
@@ -4306,7 +4332,7 @@ export default function MailClient({
           ...debugBase,
           reason: "empty-thread-ids-after-normalization"
         });
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
         return;
       }
       try {
@@ -4332,7 +4358,7 @@ export default function MailClient({
           if (currentKeyRef.current !== requestKey) {
             return;
           }
-          setThreadRelatedMessages([]);
+          clearThreadRelatedMessages();
           return;
         }
         const data = (await res.json()) as { items?: Message[] };
@@ -4357,7 +4383,7 @@ export default function MailClient({
         if (currentKeyRef.current !== requestKey) {
           return;
         }
-        setThreadRelatedMessages([]);
+        clearThreadRelatedMessages();
       }
     };
     loadThreadRelated();
@@ -5363,7 +5389,7 @@ export default function MailClient({
               }}
               listViewActions={{
                 onOpenReader: openReaderFocus,
-                onNavigationRowsChange: handleReaderRowsChange,
+                onNavigationRowsChange: readerRowsStore.publish,
                 setSortKey,
                 setSortDir,
                 setCollapsedGroups,
@@ -5399,7 +5425,7 @@ export default function MailClient({
               activeVirtualFolderName={activeVirtualFolder?.name}
               searchScope={searchScope}
               mutationInputs={{
-                navigationRows: readerRows,
+                getNavigationRows: readerRowsStore.getRows,
                 activeAccountId,
                 activeMessageId,
                 activeFolderId,
