@@ -7,7 +7,9 @@ describe("next.config headers", () => {
     const config = (await import("./next.config")).default;
     const headers = await config.headers!();
 
-    for (const source of ["/fonts/:path*", "/icons/:path*"]) {
+    // The icons rule names the static public files only; /icons/logo.svg
+    // and /icons/badged/:size are dynamic deployment-label routes.
+    for (const source of ["/fonts/:path*", "/icons/:file(icon-\\d+\\.png|base\\.svg)"]) {
       expect(headers).toContainEqual({
         source,
         headers: [{ key: "Cache-Control", value: PUBLIC_ASSET_CACHE_CONTROL }]
@@ -34,8 +36,9 @@ describe("next.config headers", () => {
     expect(headers.some((entry) => entry.source.includes("runtime-config"))).toBe(false);
     expect(headers.map((entry) => entry.source).sort()).toEqual([
       "/fonts/:path*",
-      "/icons/:path*",
+      "/icons/:file(icon-\\d+\\.png|base\\.svg)",
       "/reset-password"
     ]);
+    expect(headers.some((entry) => entry.source === "/icons/:path*")).toBe(false);
   });
 });
