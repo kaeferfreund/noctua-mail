@@ -1,0 +1,33 @@
+import { describe, expect, test } from "bun:test";
+import { buildOwnIdentitySets, matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
+import { buildSpamInputFromMessage } from "./input";
+
+const sets = buildOwnIdentitySets(["Office@Household.example.test", "owner@gmail.com", "not-an-address"]);
+function context(overrides: Partial<SpamAllowlistContext> = {}): SpamAllowlistContext {
+  return { ...sets, isCorrespondent: async () => false, latestDecision: async () => null, ...overrides };
+}
+const from = (address: string, authenticationResults: string[] = []) =>
+  ({ ...buildSpamInputFromMessage({ from: address, to: "office@household.example.test", subject: "S" }), authenticationResults });
+
+describe("spam allowlist", () => {
+  test("own addresses and own domains, but never a free-mail domain", async () => {
+    expect(sets.ownDomains).toEqual(new Set(["household.example.test"]));
+    expect(await matchSpamAllowlist(from("office@household.example.test"), context())).toBe("own-address");
+    expect(await matchSpamAllowlist(from("Kollegin <kollegin@household.example.test>"), context())).toBe("own-domain");
+    expect(await matchSpamAllowlist(from("owner@gmail.com"), context())).toBe("own-address");
+    expect(await matchSpamAllowlist(from("stranger@gmail.com"), context())).toBeNull();
+  });
+
+  test("a forged own-domain sender with failed DMARC is not allowlisted", async () => {
+    expect(await matchSpamAllowlist(from("office@household.example.test", ["mx; dmarc=fail (p=none)"]), context())).toBeNull();
+  });
+
+  test("correspondents and explicit decisions", async () => {
+    expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async (email) => email === "partner@example.test" })))
+      .toBe("correspondent");
+    expect(await matchSpamAllowlist(from("news@example.test"), context({ latestDecision: async () => "ham" }))).toBe("user-decision");
+    // A later "Als Spam" outranks having written to the sender.
+    expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async () => true, latestDecision: async () => "spam" })))
+      .toBeNull();
+  });
+});
