@@ -320,12 +320,15 @@ function pushNotification(payload) {
   if (!accountId || !from) return null;
   const count = Number.isInteger(payload.count) && payload.count > 1 ? payload.count : 1;
   const subject = nonEmptyString(payload.subject);
-  const accountName = nonEmptyString(payload.accountName) ?? "Noctua";
+  const accountName = nonEmptyString(payload.accountName);
+  // Sender first: the title names who wrote, the mailbox is context on the
+  // last body line. Collapsed pushes name the newest sender in the body.
+  const headline = count > 1 ? (subject ? `${from} — ${subject}` : from) : subject;
   return {
-    title: count > 1 ? `${accountName} · ${count} neue` : accountName,
+    title: count > 1 ? `${count} neue Nachrichten` : from,
     options: {
       ...common,
-      body: subject ? `${from} — ${subject}` : from,
+      body: [headline, accountName].filter(Boolean).join("\n"),
       tag: `mail:${accountId}`,
       renotify: true
     }

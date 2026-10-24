@@ -156,6 +156,23 @@ type PushPayload =
   INBOX messages across the mailboxes the device notifies about and the user
   can access.
 
+## Notification layout
+
+`public/sw.js` shows `new-mail` pushes sender first; the mailbox name is
+context on the last body line (left out when `accountName` is empty).
+
+| Case | Title | Body |
+| --- | --- | --- |
+| One mail | `from` | `subject` ⏎ `accountName` |
+| One mail, no subject | `from` | `accountName` |
+| `count` > 1 | `<count> neue Nachrichten` | `from — subject` ⏎ `accountName` |
+| `count` > 1, no subject | `<count> neue Nachrichten` | `from` ⏎ `accountName` |
+
+Example: title “Dr. Weber”, body “Terminbestätigung Montag” / “kontakt@monkeydent”.
+Notifications per mailbox share the tag `mail:<accountId>`, so a newer push
+replaces the older one and alerts again. The test push shows “Noctua:
+Benachrichtigungen aktiv”.
+
 ## iOS notes
 
 - Web Push on iPhone/iPad needs iOS/iPadOS 16.4 or later and works only for
