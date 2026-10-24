@@ -630,6 +630,12 @@
       "nextHint": "{unit, select, day {Next day} week {Next week} month {Next month} other {Next}}",
       "viewHint": "{view, select, dayGridMonth {Month view} timeGridWeek {Week view} timeGridDay {Day view} other {View}}",
       "viewChangeHint": "Change view"
+    },
+    "panel": {
+      "title": "Calendar",
+      "openWindow": "Open in window",
+      "openWindowLabel": "Open calendar in window",
+      "close": "Close calendar"
     }
   },
   "Search": {
