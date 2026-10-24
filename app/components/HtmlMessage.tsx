@@ -107,6 +107,45 @@ function extractPrefersColorScheme(css: string, theme: "dark" | "light") {
   return { stripped: output, injected };
 }
 
+const EXPLICIT_BACKGROUND_PATTERN = /\bbgcolor\s*=\s*["']?\s*([^"'\s>]*)|\bbackground(?:-color)?\s*:\s*([^;"'}]*)|\bbackground\s*=/gi;
+const NO_BACKGROUND_VALUE = /^(?:transparent|none|inherit|initial|unset|revert)?\s*(?:!important)?$/i;
+const DARK_NAMED_COLORS = new Set(["black", "navy", "darkblue", "midnightblue", "darkslategray", "darkslategrey", "maroon", "darkgreen", "indigo", "purple", "darkred"]);
+
+function isDarkColorValue(value: string) {
+  const color = value.trim().toLowerCase().split(/\s+/)[0] ?? "";
+  if (DARK_NAMED_COLORS.has(color)) return true;
+  let rgb: number[] | null = null;
+  const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (hex) {
+    const digits = hex[1].length === 3 ? hex[1].replace(/./g, "$&$&") : hex[1];
+    rgb = [0, 2, 4].map((offset) => parseInt(digits.slice(offset, offset + 2), 16));
+  } else {
+    const fn = value.trim().toLowerCase().match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+    if (fn) rgb = fn.slice(1, 4).map(Number);
+  }
+  if (!rgb) return false;
+  const [r, g, b] = rgb.map((channel) => channel / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.4;
+}
+
+// Whether the mail paints a background that is not recognisably dark: a
+// bgcolor/background attribute or a background(-color) declaration. Such mails
+// are designed for dark default text and turn light-on-light in dark mode.
+// Only tags and style blocks count, so prose like "Background: …" does not.
+function hasLightOwnBackground(html: string) {
+  const markup = [
+    ...Array.from(html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi), (match) => match[1]),
+    ...(html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "").match(/<[a-z][^>]*>/gi) ?? [])
+  ].join("\n");
+  for (const match of markup.matchAll(EXPLICIT_BACKGROUND_PATTERN)) {
+    const value = match[1] ?? match[2];
+    if (value === undefined) return true;
+    if (NO_BACKGROUND_VALUE.test(value.trim())) continue;
+    if (!isDarkColorValue(value)) return true;
+  }
+  return false;
+}
+
 function escapeAttribute(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -381,9 +420,14 @@ export function buildPreviewDocument({
   const quoteChipBackground = darkMode ? "#2b303b" : "#e8ebf0";
   const quoteChipHoverBackground = darkMode ? "#39404e" : "#dbe0e8";
   const quoteChipColor = darkMode ? "#aab4c4" : "#6b7480";
+  // The frame is its own document: the app's --mail-view-fg never reaches it,
+  // so a var() here always fell back to the light-theme text colour and left
+  // plain mails dark-on-dark. Dark uses the app's gray-12 (Radix dark), except
+  // for mails with their own light background, which keep the dark default.
+  const darkHostText = darkMode && !hasExplicitColor && !hasLightOwnBackground(cleanedHtml);
   const hostTextColor = hasExplicitColor
     ? ""
-    : "color: var(--mail-view-fg, var(--text, #1a1a1a));";
+    : `color: ${darkHostText ? "#eeeeee" : "#1a1a1a"};`;
   const bodyClassName = [NOCTUA_EMAIL_CONTENT_CLASS, "email-body", bodyAttrs.className]
     .filter(Boolean)
     .join(" ");

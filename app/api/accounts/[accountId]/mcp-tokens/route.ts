@@ -1,5 +1,5 @@
 import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
-import { MCP_PERMISSION_MODES } from "@/lib/mcpPermissions";
+import { MCP_PERMISSION_MODES, mcpTokenListItem } from "@/lib/mcpPermissions";
 import { NextResponse } from "next/server";
 import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
@@ -12,7 +12,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(context, async () => {
     const tokens = await listMcpTokens(context.accountId);
     const mailboxes = (await listAccessibleAccountsForUser(context.userId)).map(({ account, role }) => ({ id: account.id, name: account.name, email: account.email, accessRole: role }));
-    return NextResponse.json({ ok: true, mailboxes, tokens: context.role === "manager" ? tokens : tokens.filter(t => t.createdByUserId === context.userId) });
+    const accessible = new Set(mailboxes.map(mailbox => mailbox.id));
+    const visible = context.role === "manager" ? tokens : tokens.filter(t => t.createdByUserId === context.userId);
+    return NextResponse.json({ ok: true, mailboxes, tokens: visible.map(token => mcpTokenListItem(token, accessible)) });
   });
 }
 export async function POST(request: Request, { params }: AccountRouteParams) {

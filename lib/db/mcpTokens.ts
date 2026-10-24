@@ -1,6 +1,8 @@
 import type { McpTokenMetadata } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
+import { resolveAccountRoleRows } from "./accountAccess";
+import { ACCOUNT_ROLE_ORDER } from "../accountRole";
 import { mapMcpTokenRow, type StoredMcpTokenRow } from "./rowParsers";
 
 export type StoredMcpTokenRecord = McpTokenMetadata & {
@@ -21,12 +23,20 @@ function tokenMetadata(db: import("bun:sqlite").Database, row: StoredMcpTokenRow
 export function deleteMcpTokenAccountRows(db: import("bun:sqlite").Database, accountId: string, createdByUserId?: string) {
   const owner = createdByUserId == null ? "" : " AND createdByUserId=?";
   const args = createdByUserId == null ? [accountId] : [accountId, createdByUserId];
-  db.prepare(`DELETE FROM mcp_token_accounts WHERE accountId=?
-    AND tokenId IN (SELECT id FROM mcp_tokens WHERE accountId IS NOT NULL${owner})`).run(...args);
+  const ownedTokens = createdByUserId == null ? "" : " AND tokenId IN (SELECT id FROM mcp_tokens WHERE createdByUserId=?)";
+  db.prepare(`DELETE FROM mcp_token_accounts WHERE accountId=?${ownedTokens}`).run(...args);
   db.prepare(`DELETE FROM mcp_tokens WHERE accountId=?${owner} AND NOT EXISTS
     (SELECT 1 FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)`).run(...args);
-  db.prepare(`UPDATE mcp_tokens SET accountId=(SELECT MIN(a.accountId) FROM mcp_token_accounts a WHERE a.tokenId=mcp_tokens.id)
-    WHERE accountId=?${owner}`).run(...args);
+  const moved = db.prepare(`SELECT id, accountId, createdByUserId FROM mcp_tokens WHERE accountId=?${owner}`).all(...args) as
+    { id: string; accountId: string; createdByUserId: string }[];
+  for (const token of moved) {
+    // New primary: the remaining mailbox with the creator's highest live role; ties (and no role) by ID.
+    const remaining = mcpTokenAccountIds(db, token);
+    const roles = resolveAccountRoleRows(db, token.createdByUserId, remaining);
+    const rank = (id: string) => { const role = roles.get(id); return role ? ACCOUNT_ROLE_ORDER[role] : 0; };
+    const primary = remaining.reduce((best, id) => rank(id) > rank(best) ? id : best);
+    db.prepare("UPDATE mcp_tokens SET accountId=? WHERE id=?").run(primary, token.id);
+  }
 }
 export async function listMcpTokens(accountId: string) {
   const db = await getDb();

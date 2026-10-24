@@ -117,11 +117,14 @@ test("desktop status sections, density measurements and light/dark screenshots",
     writeFileSync(`${artifacts}/footer-gains.json`, JSON.stringify(footerGains, null, 2) + "\n");
   }
 });
-// Run once with NOCTUA_BUILD_HASH/NOCTUA_BUILD_TIME exported to the server and
-// once without; the label is server-rendered from the runtime env.
+// Run once on a build made with NOCTUA_BUILD_HASH/NOCTUA_BUILD_TIME and once
+// without. The server reads the identity from the build artifact
+// (public/build-version.json) and only falls back to its runtime env when the
+// artifact has no commit, so the expectation follows the same order.
 test("build label in the popover footer, the phone menu and the sidebar brand", async ({ page }) => {
   test.skip(baseline);
-  const hash = process.env.NOCTUA_BUILD_HASH?.trim() ?? "";
+  const artifact = JSON.parse(readFileSync("public/build-version.json", "utf8")) as { hash?: string };
+  const hash = artifact.hash?.trim() || (process.env.NOCTUA_BUILD_HASH?.trim() ?? "");
   const label = hash ? new RegExp(`^Build ${hash.slice(0, 7)}( · \\d{2}\\.\\d{2}\\.\\d{4}, \\d{2}:\\d{2})?$`) : null;
   for (const colorScheme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: 1440, height: 900 }); await page.emulateMedia({ colorScheme }); await page.goto("/");
@@ -285,7 +288,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     // Real pointer hit testing catches a painted-over dialog that fill() alone misses.
     await title.click();
     await title.fill(`${summary} created`);
-    await create.getByRole("button", { name: "Open time picker" }).first().click();
+    await create.getByRole("button", { name: "Zeitauswahl öffnen" }).first().click();
     const picker = page.getByRole("listbox");
     await expect(picker).toBeVisible();
     const pickerLayer = await picker.locator("xpath=ancestor::*[contains(@class, 'rt-PopperContent')]").evaluate(element => Number(getComputedStyle(element).zIndex));
@@ -313,9 +316,9 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
   });
 }
 
-// FullCalendar's href-less date labels report tabIndex 0; Radix then picked one
-// as the popover's last tabbable element and Tab left the popover. Walk the real
-// tab order with the keyboard: it must wrap inside the popover both ways.
+// FullCalendar 6's href-less date labels reported tabIndex 0; Radix then picked
+// one as the popover's last tabbable element and Tab left the popover. Walk the
+// real tab order with the keyboard: it must wrap inside the popover both ways.
 test("desktop calendar popover keeps Tab and Shift+Tab inside the popover", async ({ page }) => {
   test.skip(baseline);
   await page.setViewportSize({ width: 1280, height: 900 });

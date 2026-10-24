@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { Checkbox, Flex, Select, Text, TextField } from "@radix-ui/themes";
 import {
   RECURRENCE_OPTIONS,
@@ -10,6 +11,7 @@ import {
   toggleAllDayInputValue,
   type RecurrenceOption
 } from "@/lib/composeInvite";
+import type { UiLocale } from "@/lib/i18n/config";
 import TimePicker from "./TimePicker";
 
 type Props = {
@@ -55,6 +57,8 @@ export default function CalendarEventScheduleFields({
   onRecurrenceRuleChange,
   onLocationChange
 }: Props) {
+  const t = useTranslations("EventSchedule");
+  const locale = useLocale() as UiLocale;
   const start = splitDateAndTime(startValue, allDay);
   const end = splitDateAndTime(endValue, allDay);
 
@@ -115,7 +119,7 @@ export default function CalendarEventScheduleFields({
       <Flex gap="3" wrap="wrap" align="end">
         <Flex direction="column" gap="1">
           <Text size="1" color="gray">
-            Start
+            {t("start")}
           </Text>
           <Flex gap="1">
             <TextField.Root
@@ -128,13 +132,13 @@ export default function CalendarEventScheduleFields({
               value={start.time}
               onChange={handleStartTime}
               disabled={disabled || allDay || !start.date}
-              ariaLabel="Start time"
+              ariaLabel={t("startTime")}
             />
           </Flex>
         </Flex>
         <Flex direction="column" gap="1">
           <Text size="1" color="gray">
-            End
+            {t("end")}
           </Text>
           <Flex gap="1">
             <TextField.Root
@@ -148,7 +152,7 @@ export default function CalendarEventScheduleFields({
               onChange={handleEndTime}
               referenceMinutes={startMinutes}
               disabled={disabled || allDay || !end.date}
-              ariaLabel="End time"
+              ariaLabel={t("endTime")}
             />
           </Flex>
         </Flex>
@@ -166,13 +170,13 @@ export default function CalendarEventScheduleFields({
             }}
             disabled={disabled}
           />
-          All day
+          {t("allDay")}
         </Flex>
       </Text>
 
       <Flex direction="column" gap="1">
         <Text size="1" color="gray">
-          Repeat
+          {t("repeat")}
         </Text>
         <Select.Root
           value={currentRecurrenceOption as RecurrenceOption}
@@ -187,7 +191,7 @@ export default function CalendarEventScheduleFields({
           <Select.Content position="popper">
             {RECURRENCE_OPTIONS.map((option) => (
               <Select.Item key={option.value} value={option.value}>
-                {recurrenceOptionLabel(option.value, startDateForRecurrence)}
+                {recurrenceOptionLabel(option.value, startDateForRecurrence, locale)}
               </Select.Item>
             ))}
           </Select.Content>
@@ -196,10 +200,10 @@ export default function CalendarEventScheduleFields({
 
       <Flex direction="column" gap="1">
         <Text size="1" color="gray">
-          Location
+          {t("location")}
         </Text>
         <TextField.Root
-          placeholder="Location (optional)"
+          placeholder={t("locationPlaceholder")}
           value={location}
           onChange={(event) => onLocationChange(event.target.value)}
           disabled={disabled}

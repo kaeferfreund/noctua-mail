@@ -4,6 +4,7 @@ import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import McpTabContent from "./tabs/McpTabContent";
 import type { mintMcpToken } from "@/lib/mcpAuth";
+import { mcpTokenListItem } from "@/lib/mcpPermissions";
 
 afterEach(cleanup);
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -18,7 +19,7 @@ describe("QA-003 MCP token client contract", () => {
     const apiFetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === "POST") { writes.push(JSON.parse(String(init.body))); return response({ ok: true, ...minted }, 201); }
       reads++;
-      return response({ ok: true, tokens: writes.length ? [minted.tokenRecord] : [] });
+      return response({ ok: true, tokens: writes.length ? [mcpTokenListItem(minted.tokenRecord, new Set(["synthetic-mailbox"]))] : [] });
     };
     const props = { accountId: "synthetic-mailbox", isActive: true, isExistingAccount: true, apiFetch, onClose: () => {} };
     const page = render(<Theme><McpTabContent {...props} /></Theme>);
@@ -48,7 +49,7 @@ it("selects own/shared mailboxes and a mode, displays both on token rows", async
     { id: "synthetic-shared", name: "Synthetic shared", email: "shared@example.test" }];
   const apiFetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === "POST") { writes.push(JSON.parse(String(init.body))); return response({ ok: true, ...minted }, 201); }
-    return response({ ok: true, mailboxes, tokens: [{ ...minted.tokenRecord, accountIds: mailboxes.map(item => item.id), scopes: ["read"] }] });
+    return response({ ok: true, mailboxes, tokens: [mcpTokenListItem({ ...minted.tokenRecord, accountIds: mailboxes.map(item => item.id), scopes: ["read"] }, new Set(mailboxes.map(item => item.id)))] });
   };
   const page = render(<Theme><McpTabContent accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={apiFetch} onClose={() => {}} /></Theme>);
   const shared = await page.findByRole("checkbox", { name: "Synthetic shared (shared@example.test)" });
@@ -62,4 +63,32 @@ it("selects own/shared mailboxes and a mode, displays both on token rows", async
     accountIds: ["synthetic-mailbox", "synthetic-shared"], mode: "read" }]));
   expect(page.getByText("Mailboxes: Synthetic own (own@example.test), Synthetic shared (shared@example.test)")).toBeTruthy();
   expect(page.getAllByText("Read only").length).toBe(2);
+});
+
+it("shows only accessible mailbox names plus a count, warns before revoking other mailboxes, labels invalid scopes", async () => {
+  const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetic own", email: "own@example.test" },
+    { id: "synthetic-shared", name: "Synthetic shared", email: "shared@example.test" }];
+  const base = mcpTokenListItem(minted.tokenRecord, new Set());
+  const tokens = [{ ...base, id: "synthetic-multi", label: "Synthetic multi", accountIds: mailboxes.map(item => item.id), hiddenMailboxCount: 2, scopes: [] },
+    { ...base, id: "synthetic-single", label: "Synthetic single", accountIds: ["synthetic-mailbox"], hiddenMailboxCount: 0, scopes: ["read", "drafts"] }];
+  const deletes: string[] = [];
+  const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === "DELETE") { deletes.push(String(input)); return response({ ok: true }); }
+    return response({ ok: true, mailboxes, tokens });
+  };
+  const prompts: string[] = [];
+  const originalConfirm = window.confirm;
+  window.confirm = (message?: string) => { prompts.push(String(message)); return false; };
+  try {
+    const page = render(<Theme><McpTabContent accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={apiFetch} onClose={() => {}} /></Theme>);
+    expect(await page.findByText("Mailboxes: Synthetic own (own@example.test), Synthetic shared (shared@example.test), +2 more mailboxes")).toBeTruthy();
+    expect(page.getByText("Invalid (no access)")).toBeTruthy();
+    expect(page.getByText("Read and create drafts (no sending)", { selector: "span:not(label)" })).toBeTruthy();
+    const [multiDelete, singleDelete] = page.getAllByRole("button", { name: "Delete" });
+    fireEvent.click(multiDelete);
+    fireEvent.click(singleDelete);
+    expect(prompts).toEqual(["Delete this MCP token? It is revoked for every covered mailbox, including: Synthetic shared (shared@example.test), +2 more mailboxes",
+      "Delete this MCP token?"]);
+    expect(deletes).toEqual([]);
+  } finally { window.confirm = originalConfirm; }
 });

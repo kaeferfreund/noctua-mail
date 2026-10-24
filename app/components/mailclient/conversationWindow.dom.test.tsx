@@ -8,6 +8,7 @@ import type { Message } from "@/lib/data";
 import ThreadView from "./message/ThreadView";
 import { printWithLoadedBodies } from "./message/threadViewState";
 import { useThreadContent, type ThreadReadRequest } from "./useThreadContent";
+import { THREAD_CACHE_LIMIT } from "./constants";
 
 afterEach(cleanup);
 
@@ -341,7 +342,7 @@ describe("useThreadContent conversation reads", () => {
     });
     expect(loaded!.body).toBe("Stored body of window-m7");
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
-      `GET /api/accounts/${ACCOUNT}/messages/window-m7`
+      `GET /api/accounts/${ACCOUNT}/messages/window-m7?suggestions=0`
     ]);
     expect(result.current.messageBodyById[`${ACCOUNT}:window-m7`]?.body).toBe("Stored body of window-m7");
   });
@@ -368,6 +369,62 @@ describe("useThreadContent conversation reads", () => {
     expect(calls.map((call) => call.method)).toEqual(["GET", "POST", "GET"]);
     expect(calls[1].url).toContain("/resync");
     expect(loaded!.body).toBe("Stored body of window-m8");
+  });
+
+  test("a fast thread switch aborts card body reads of the conversation left; a manual read keeps running", async () => {
+    const gates = new Map<string, ReturnType<typeof deferred<Response>>>();
+    const { apiFetch, calls } = fakeApi((call) => {
+      const gate = deferred<Response>();
+      gates.set(call.url, gate);
+      return gate.promise;
+    });
+    const { result } = renderThreadContent(apiFetch);
+    const cardInA = header(1, { threadId: "thread-a" });
+    const replyInA = header(2, { threadId: "thread-a" });
+    const cardInB = header(3, { threadId: "thread-b" });
+    let cardResult: Promise<Message | null> = Promise.resolve(null);
+    let replyResult: Promise<Message | null> = Promise.resolve(null);
+    act(() => {
+      cardResult = result.current.ensureMessageContent(cardInA);
+      replyResult = result.current.ensureMessageContent(replyInA, { manual: true });
+      void result.current.ensureMessageContent(cardInB);
+    });
+    expect(result.current.messageContentLoading["window-m1"]).toBe(true);
+    // The reader moves on to thread B.
+    act(() => result.current.abortBodyReadsOutside("thread-b"));
+    expect(calls.map((call) => call.signal?.aborted)).toEqual([true, false, false]);
+    await act(async () => {
+      gates.forEach((gate, url) => gate.resolve(Response.json({ ok: true, message: detail(url.includes("m2") ? replyInA : cardInB) })));
+    });
+    expect(await cardResult).toBeNull();
+    expect((await replyResult)?.body).toBe("Stored body of window-m2");
+    // An aborted read is no error and no longer loading, so a revisit reads it again.
+    expect(result.current.messageContentLoading["window-m1"]).toBeUndefined();
+    expect(result.current.messageContentErrorById["window-m1"]).toBeUndefined();
+    expect(result.current.messageBodyById[`${ACCOUNT}:window-m1`]).toBeUndefined();
+    expect(result.current.messageBodyById[`${ACCOUNT}:window-m3`]?.body).toBe("Stored body of window-m3");
+    act(() => { void result.current.ensureMessageContent(cardInA); });
+    expect(calls).toHaveLength(4);
+  });
+
+  test("window state leaves with a thread evicted from the cache", async () => {
+    const { apiFetch } = fakeApi((call) =>
+      Response.json({
+        items: [header(1, { threadId: call.body.threadIds[0] })],
+        placeholders: [],
+        window: { total: 1, anchorId: "window-m1", hasOlder: false, olderCursor: null, hasNewer: false, newerCursor: null }
+      })
+    );
+    const { result } = renderThreadContent(apiFetch);
+    for (let index = 0; index <= THREAD_CACHE_LIMIT; index += 1) {
+      await act(async () => {
+        await result.current.loadThreadContent(threadRequest(`thread-${index}`, "window-m1"));
+      });
+    }
+    expect(result.current.threadContentById["thread-0"]).toBeUndefined();
+    expect(result.current.threadWindowById["thread-0"]).toBeUndefined();
+    expect(Object.keys(result.current.threadWindowById)).toHaveLength(THREAD_CACHE_LIMIT);
+    expect(result.current.threadWindowById[`thread-${THREAD_CACHE_LIMIT}`]?.total).toBe(1);
   });
 
   test("an empty stored message is not resynced", async () => {

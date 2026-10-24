@@ -223,6 +223,7 @@ import {
   getComposeThreadFocusMessageId,
   getDefaultExpandedMessageIds,
   getInlineComposePlacement,
+  getReaderExcludedFolderIds as getReaderExcludedFolderIdsFor,
   getRenderedThreadMessages,
   isThreadMessageCollapsed,
   printWithLoadedBodies
@@ -305,6 +306,7 @@ import {
   markReminderDeliveredOnClientById
 } from "./mailclient/utils/calendarReminders";
 import {
+  DEEP_LINK_LIST_PAGE_LIMIT,
   NOTICE_TIMEOUTS,
   THREAD_COLLAPSE_SETTLE_MS
 } from "./mailclient/constants";
@@ -1292,6 +1294,7 @@ export default function MailClient({
     setMessages,
     groupMeta,
     setGroupMeta,
+    messagesPage,
     setMessagesPage,
     hasMoreMessages,
     setHasMoreMessages,
@@ -1502,6 +1505,7 @@ export default function MailClient({
     updateMessageBody,
     loadThreadContent,
     abortThreadContent,
+    abortBodyReadsOutside,
     loadThreadPage
   } = useThreadContent({
     activeAccountId,
@@ -4438,13 +4442,15 @@ export default function MailClient({
     threadRelatedCandidatesKey
   ]);
 
-  // Trash/spam rows stay out of the conversation unless the reader is in that folder.
   const getReaderExcludedFolderIds = useCallback(
     (active: Message) =>
-      Array.from(excludedFolderIdsForThreads).filter(
-        (folderId) => folderId !== activeFolderId && folderId !== active.folderId
-      ),
-    [activeFolderId, excludedFolderIdsForThreads]
+      getReaderExcludedFolderIdsFor({
+        activeMessage: active,
+        activeFolderId,
+        accountFolderIds: accountFolders.map((folder) => folder.id),
+        threadExcludedFolderIds: excludedFolderIdsForThreads
+      }),
+    [accountFolders, activeFolderId, excludedFolderIdsForThreads]
   );
 
   // Reader content: a bounded header window around the selected message.
@@ -4465,10 +4471,13 @@ export default function MailClient({
         reason: "missing-active-message"
       });
       abortThreadContent();
+      abortBodyReadsOutside(null);
       return;
     }
     const threadId = active.threadId ?? active.messageId ?? active.id;
     if (!threadId) return;
+    // Bodies still loading for the conversation just left are not needed any more.
+    abortBodyReadsOutside(threadId);
     const cachedThread = threadContentByIdRef.current[threadId];
     if (cachedThread?.some((item) => item.id === active.id)) {
       logListDebug("info", "thread-related:content-effect:skip", {
@@ -4507,6 +4516,7 @@ export default function MailClient({
       threadDateSource
     });
   }, [
+    abortBodyReadsOutside,
     abortThreadContent,
     activeAccountId,
     activeFolderId,
@@ -4892,10 +4902,12 @@ export default function MailClient({
       selectionStore.setSelection(new Set([target.id]), target.id); setActiveMessageId(target.id);
       setPendingSelectionCollapseMessageId(target.id); setPendingSelectionScrollMessageId(target.id);
       deepLinkSelectionRef.current = null;
-    } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId) {
+    } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId &&
+      messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
+      // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
       setMessagesPage(page => page + 1);
     }
-  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
+  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
 
   useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
   const handleNoticeOpen = (notice: InAppNotice) => {

@@ -73,6 +73,27 @@ export function getThreadWindowPageControls(params: {
   };
 }
 
+/**
+ * Folders the reader's conversation window leaves out. Trash and spam rows stay out
+ * of a conversation unless the reader is in that folder. A message read in trash or
+ * spam shows only that folder's rows of its conversation, so its window is limited
+ * to that folder too; otherwise load controls would page through rows never shown.
+ */
+export function getReaderExcludedFolderIds(params: {
+  activeMessage: Pick<Message, "folderId">;
+  activeFolderId: string;
+  accountFolderIds: string[];
+  threadExcludedFolderIds: ReadonlySet<string>;
+}) {
+  const { activeMessage, activeFolderId, accountFolderIds, threadExcludedFolderIds } = params;
+  if (threadExcludedFolderIds.has(activeMessage.folderId)) {
+    return accountFolderIds.filter((folderId) => folderId !== activeMessage.folderId);
+  }
+  return Array.from(threadExcludedFolderIds).filter(
+    (folderId) => folderId !== activeFolderId && folderId !== activeMessage.folderId
+  );
+}
+
 export function getInlineComposePlacement(params: {
   activeThread: Message[];
   showComposeInline: boolean;

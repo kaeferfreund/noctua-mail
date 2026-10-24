@@ -66,8 +66,9 @@ test("reader focus: double-click, counter, next, back preserves mounted list and
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(value => { localStorage.setItem("noctua:theme", value); }, scheme);
     await page.reload();
-    await rows(page).first().click();
+    // The URL reopens the message (deep link) and the saved preference shows it in focus.
     await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+    await expect(page.locator('[id="list"]')).toBeHidden();
     await expect(page.locator("html")).toHaveClass(new RegExp(scheme));
     await expect(toolbar(page).getByRole("button", { name: "Next message", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -84,8 +85,10 @@ test("reader focus: Enter, toggles, j/k, sidebar reset, persistence, print and e
   await page.keyboard.press("Shift+Enter"); await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
   await page.keyboard.press("Shift+Enter"); await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
   expect(await page.evaluate(() => localStorage.getItem("noctua:readerLayout"))).toBe("focus");
-  await page.reload(); await rows(page).first().click();
+  // A reload reopens the message from the URL (deep link) in the saved focus layout.
+  await page.reload();
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "focus");
+  await expect(page.locator('[id="list"]')).toBeHidden();
   // Clicking even the current view returns to the list without forgetting the preference.
   await page.locator('[data-slot="sidebar"]').getByRole("button", { name: /Inbox/, exact: true }).first().click();
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");

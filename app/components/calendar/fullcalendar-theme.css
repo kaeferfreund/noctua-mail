@@ -1,10 +1,21 @@
-/* FullCalendar theme overrides for Noctua Mail */
+/* FullCalendar theme overrides for Noctua Mail.
+   Every neutral palette variable maps onto a Radix token that flips under
+   .dark. The classic palette's own dark block only applies with FullCalendar's
+   colorScheme option, which the app does not set, so an unmapped variable
+   would keep its light value in dark mode. */
 .fc {
   --fc-classic-foreground: var(--text);
+  --fc-classic-faint-foreground: var(--gray-a9);
+  --fc-classic-muted-foreground: var(--muted-foreground);
   --fc-classic-border: var(--border);
+  --fc-classic-strong-border: var(--gray-a8);
   --fc-classic-small-dot-width: 8px;
   --fc-classic-large-dot-width: 8px;
-  --fc-classic-faint: rgba(0, 0, 0, 0.04);
+  /* Translucent neutrals over the surface: hover (muted) and pressed or
+     selected (strong) stay distinguishable in light and dark. */
+  --fc-classic-faint: var(--gray-a2);
+  --fc-classic-muted: var(--gray-a3);
+  --fc-classic-strong: var(--gray-a5);
   --fc-classic-background-event-opacity: 0.3;
   --fc-classic-highlight: var(--accent-a3);
   --fc-classic-today: var(--accent-a2);
@@ -12,15 +23,13 @@
   --fc-classic-now: var(--red-9, #e5484d);
   --fc-classic-event: var(--accent-9);
   --fc-classic-event-contrast: #fff;
-  --fc-classic-strong: rgba(0, 0, 0, 0.25);
-  --fc-classic-muted: var(--gray-2);
-  --fc-classic-muted-foreground: var(--muted-foreground);
   --fc-classic-background: var(--surface);
   --fc-classic-button-foreground: var(--text);
   --fc-classic-button: var(--gray-3);
   --fc-classic-button-border: var(--border);
-  --fc-classic-button-strong: var(--gray-4);
-  --fc-classic-button-strong-border: var(--border);
+  --fc-classic-button-strong: var(--gray-5);
+  --fc-classic-button-strong-border: var(--gray-a8);
+  --fc-classic-button-outline: var(--ring);
   --fc-classic-primary: var(--accent-9);
   --fc-classic-primary-foreground: #fff;
 
@@ -210,6 +219,5 @@
 }
 
 .dark .fc {
-  --fc-classic-faint: rgba(255, 255, 255, 0.03);
   --fc-classic-today: rgba(184, 213, 255, 0.08);
 }

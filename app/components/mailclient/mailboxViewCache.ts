@@ -52,6 +52,10 @@ export class MailboxViewCache {
     touch(this.lists, url, { ...entry, rows }, LIST_ENTRY_LIMIT);
   }
 
+  dropList(url: string) {
+    this.lists.delete(url);
+  }
+
   readFolders(accountId: string): Folder[] | null {
     const entry = this.folders.get(accountId);
     if (!entry) return null;

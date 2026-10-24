@@ -5,6 +5,7 @@
 // sender-supplied data-remote-*, http-equiv/referrer meta, and inline/sheet CSS
 // with url(), image-set, escapes, @import and </style> breakouts. The generator
 // text is unchanged; only the PRNG state became local to one generator.
+import { stripConditionalComments } from "../../html/strip";
 
 /** Returns a function that yields the next document of the seeded stream. */
 export function createSanitizeFuzzDocuments(initialSeed: number): () => string {
@@ -54,4 +55,18 @@ export function createSanitizeFuzzDocuments(initialSeed: number): () => string {
   const doc = () => (rand() < 0.3 ? "<!doctype html><html><head>" + (rand() < 0.5 ? `<style>${sheet()}</style>` : "") + "</head><body>" : "") +
     Array.from({ length: 1 + Math.floor(rand() * 6) }, () => node(0)).join("");
   return doc;
+}
+
+/** Seeds and documents per seed of the differential fuzz in lib/html/sanitize.pair.test.ts. */
+export const SANITIZE_FUZZ_SEEDS = [7, 1009, 424242] as const;
+export const SANITIZE_FUZZ_CASES = 1000;
+
+/** The fuzz inputs of one seed: every generated document, raw and comment-stripped. */
+export function* sanitizeFuzzInputs(seed: number, cases: number = SANITIZE_FUZZ_CASES) {
+  const nextDocument = createSanitizeFuzzDocuments(seed);
+  for (let index = 0; index < cases; index += 1) {
+    const raw = nextDocument();
+    yield raw;
+    yield stripConditionalComments(raw);
+  }
 }

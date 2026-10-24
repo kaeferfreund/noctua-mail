@@ -4,6 +4,7 @@ import { createContext, useContext } from "react";
 import type React from "react";
 import type { Attachment, Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
+import type { SenderMessageAction } from "./senderErrors";
 import type {
   ComposeMode,
   ComposeResizeState,
@@ -33,6 +34,7 @@ export type ComposeContextValue = {
   identityDisabled?: boolean;
   sendDisabled?: boolean;
   senderMessage?: string | null;
+  senderAction?: SenderMessageAction;
   onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage: Message | null;

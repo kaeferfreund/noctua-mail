@@ -7,6 +7,7 @@ import { Button, Select, Text, TextField } from "@radix-ui/themes";
 import type { Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
 import InReplyToReferenceRow from "../InReplyToReferenceRow";
 import styles from "./Compose.module.css";
+import type { SenderMessageAction } from "./senderErrors";
 
 type RecipientFocus = "to" | "cc" | "bcc" | null;
 
@@ -24,9 +25,12 @@ type ComposeFieldsProps = {
   identityId?: string;
   identityDisabled?: boolean;
   senderMessage?: string | null;
+  senderAction?: SenderMessageAction;
   onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage?: Message | null;
+  /** The referenced message is forwarded, not answered. */
+  inReplyToIsForward?: boolean;
   onJumpToMessage?: (messageId: string) => void;
   setComposeSubject: React.Dispatch<React.SetStateAction<string>>;
   setComposeTo: React.Dispatch<React.SetStateAction<string>>;
@@ -203,8 +207,9 @@ export default function ComposeFields({
   composeShowBcc,
   activeAccountId,
   fromValue,
-  identities = [], identityId, identityDisabled = false, senderMessage, onSenderRetry, onIdentityChange,
+  identities = [], identityId, identityDisabled = false, senderMessage, senderAction = "sender", onSenderRetry, onIdentityChange,
   inReplyToMessage,
+  inReplyToIsForward = false,
   onJumpToMessage,
   setComposeSubject,
   setComposeTo,
@@ -297,7 +302,7 @@ export default function ComposeFields({
   const inReplyToRow = inReplyToMessage ? (
     <InReplyToReferenceRow
       variant="compose"
-      label={t("Reader.inReplyTo")}
+      label={t(inReplyToIsForward ? "Reader.forwardedMail" : "Reader.inReplyTo")}
       value={t("Compose.fields.inReplyTo", { subject: inReplyToMessage.subject || t("Reader.noSubject"), from: inReplyToMessage.from })}
       onClick={onJumpToMessage ? () => onJumpToMessage(inReplyToMessage.id) : undefined}
     />
@@ -334,7 +339,7 @@ export default function ComposeFields({
             </Select.Item>)}
           </Select.Content>
         </Select.Root>
-        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} {onSenderRetry ? <button type="button" onClick={onSenderRetry}>{senderMessages.retrySender}</button> : <a href={`#compose-${variant}-from`}>{senderMessages.reviewSender}</a>}</Text>}
+        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} {onSenderRetry ? <button type="button" onClick={onSenderRetry}>{senderMessages.retrySender}</button> : senderAction === "recipients" ? <a href={`#compose-${variant}-to`}>{senderMessages.reviewRecipients}</a> : senderAction === "sender" ? <a href={`#compose-${variant}-from`}>{senderMessages.reviewSender}</a> : null}</Text>}
       </div>
     </div>
   );

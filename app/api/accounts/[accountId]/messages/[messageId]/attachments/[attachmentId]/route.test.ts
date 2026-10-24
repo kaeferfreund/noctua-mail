@@ -106,8 +106,9 @@ describe("attachment byte cache", () => {
 
     const first = await attachmentRequest(cookie, accountId, message.id, attachmentId);
     expect(first.status).toBe(200);
+    // Revalidated on every use: no max-age window in which a logged-out or revoked browser reads the cached bytes.
+    expect(first.headers.get("cache-control")).toBe("private, no-cache");
     expect(first.headers.get("cache-control")).toBe(ATTACHMENT_CACHE_CONTROL);
-    expect(first.headers.get("cache-control")).not.toContain("immutable");
     const etag = first.headers.get("etag");
     expect(etag).toMatch(/^"[0-9a-f.]+-[0-9a-f]+"$/i);
     expect(Buffer.from(await first.arrayBuffer())).toEqual(bytes);

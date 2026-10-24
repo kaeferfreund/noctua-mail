@@ -8,12 +8,12 @@ import {
   buildAccountMcpTokenPath,
   buildAccountMcpTokensPath
 } from "@/lib/accountApiPaths";
-import type { AccountDateFormat, McpTokenMetadata } from "@/lib/data";
+import type { AccountDateFormat } from "@/lib/data";
 import { formatAccountIntl } from "@/lib/dateFormatting";
 import { formatDate } from "@/lib/i18n/format";
 import { timeZone, type UiLocale } from "@/lib/i18n/config";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
-import { MCP_PERMISSION_MODES, mcpPermissionMode, type McpPermissionMode } from "@/lib/mcpPermissions";
+import { MCP_PERMISSION_MODES, mcpPermissionMode, mcpTokenListItem, type McpPermissionMode, type McpTokenListItem } from "@/lib/mcpPermissions";
 import type { mintMcpToken } from "@/lib/mcpAuth";
 
 type Props = {
@@ -33,7 +33,7 @@ type CreateTokenResponse = Partial<Awaited<ReturnType<typeof mintMcpToken>>> & {
 
 type ListTokensResponse = {
   ok?: boolean;
-  tokens?: McpTokenMetadata[];
+  tokens?: McpTokenListItem[];
   mailboxes?: { id: string; name: string; email: string }[];
   message?: string;
 };
@@ -110,7 +110,7 @@ function McpTokenSettings({
   const t = useTranslations("Settings");
   const locale = useLocale();
   const request = apiFetch ?? fetch;
-  const [tokens, setTokens] = useState<McpTokenMetadata[]>([]);
+  const [tokens, setTokens] = useState<McpTokenListItem[]>([]);
   const [mailboxes, setMailboxes] = useState<NonNullable<ListTokensResponse["mailboxes"]>>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(accountId ? [accountId] : []);
   const [mode, setMode] = useState<McpPermissionMode>("drafts");
@@ -220,7 +220,7 @@ function McpTokenSettings({
         setError(data?.message ?? t("mcp.createFailed"));
         return;
       }
-      const tokenRecord = data.tokenRecord;
+      const tokenRecord = mcpTokenListItem(data.tokenRecord, new Set(selectedAccountIds));
       setTokens((current) => [tokenRecord, ...current.filter((item) => item.id !== tokenRecord.id)]);
       setCreatedSecret(data.token);
       await loadTokens();
@@ -234,9 +234,21 @@ function McpTokenSettings({
     }
   }, [accountId, customExpiresAt, expiryPreset, label, selectedAccountIds, mode, request, loadTokens, t]);
 
-  const handleDelete = useCallback(async (tokenId: string) => {
+  /** Names of accessible covered mailboxes plus a count for the rest; `exclude` drops the current tab's mailbox. */
+  const describeMailboxes = useCallback((token: McpTokenListItem, exclude?: string) => [
+    ...token.accountIds.filter(id => id !== exclude).map(id => {
+      const mailbox = mailboxes.find(item => item.id === id);
+      return mailbox ? `${mailbox.name} (${mailbox.email})` : id;
+    }),
+    ...(token.hiddenMailboxCount > 0 ? [t("mcp.tokenMailboxesHidden", { count: token.hiddenMailboxCount })] : [])
+  ].join(", "), [mailboxes, t]);
+
+  const handleDelete = useCallback(async (token: McpTokenListItem) => {
     if (!accountId) return;
-    const confirmed = window.confirm(t("mcp.deleteConfirm"));
+    const tokenId = token.id;
+    // Deleting revokes the token for every covered mailbox, not just this tab's.
+    const others = describeMailboxes(token, accountId);
+    const confirmed = window.confirm(others ? t("mcp.deleteConfirmShared", { mailboxes: others }) : t("mcp.deleteConfirm"));
     if (!confirmed) return;
     setDeletingId(tokenId);
     setError("");
@@ -254,7 +266,7 @@ function McpTokenSettings({
     } finally {
       setDeletingId("");
     }
-  }, [accountId, readError, request, t]);
+  }, [accountId, describeMailboxes, readError, request, t]);
 
   if (!isExistingAccount) {
     return null;
@@ -418,16 +430,13 @@ function McpTokenSettings({
                       color="red"
                       variant="soft"
                       disabled={deletingId === token.id}
-                      onClick={() => void handleDelete(token.id)}
+                      onClick={() => void handleDelete(token)}
                     >
                       {deletingId === token.id ? t("mcp.deleting") : t("common.delete")}
                     </Button>
                   </Flex>
                   <Text size="1">{t(`mcp.mode.${mcpPermissionMode(token.scopes)}`)}</Text>
-                  <Text size="1" style={{ overflowWrap: "anywhere" }}>{t("mcp.tokenMailboxes", { mailboxes: (token.accountIds ?? [token.accountId]).map(id => {
-                    const mailbox = mailboxes.find(item => item.id === id);
-                    return mailbox ? `${mailbox.name} (${mailbox.email})` : id;
-                  }).join(", ") })}</Text>
+                  <Text size="1" style={{ overflowWrap: "anywhere" }}>{t("mcp.tokenMailboxes", { mailboxes: describeMailboxes(token) })}</Text>
                   <Text size="1" color="gray">{t("mcp.created", { date: timestampLabel(token.createdAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.expires", { date: timestampLabel(token.expiresAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.lastUsed", { date: timestampLabel(token.lastUsedAt) })}</Text>

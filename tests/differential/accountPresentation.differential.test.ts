@@ -202,6 +202,7 @@ async function pair(run: (impl: "legacy" | "current") => Promise<unknown>, arm?:
 const revoke = (userId: string, accountId: string) => master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(userId, accountId);
 const setRole = (userId: string, accountId: string, role: string) => master.prepare("UPDATE user_accounts SET role=? WHERE userId=? AND accountId=?").run(role, userId, accountId);
 const req = (path: string, jar: { header(): string }) => new Request(`http://localhost:3000${path}`, { headers: { cookie: jar.header(), origin: "http://localhost:3000" } });
+const SESSION_SELECTION_UPDATE = /^\s*update "?auth_session"?\s/i;
 const clearSelection = (v: Viewer) => () => { master.prepare("UPDATE auth_session SET activeAccountId=NULL WHERE id=?").run(v.session.id); };
 const ACCOUNT_KEYS = ["1", "2", "12", "invalid-role", "disabled"];
 
@@ -309,8 +310,9 @@ describe("/api/auth/me", () => {
   test("mfa-restricted payload", async () => {
     await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", restrictedJar)));
   });
-  // Injection seam: the session selection UPDATE (Better Auth adapter, auth handle on the master file),
-  // the same boundary as app/api/auth/me/route.test.ts. Selection starts NULL, so both implementations write.
+  // Injection seam: the session selection UPDATE (legacy: Better Auth adapter on the auth handle; current: the
+  // compare-and-set on the master handle; both on the master file), the same boundary as
+  // app/api/auth/me/route.test.ts. Selection starts NULL, so both implementations write.
   for (const [name, mutate] of [
     ["selected mailbox revoked", (v: Viewer) => { const row = master.prepare("SELECT activeAccountId FROM auth_session WHERE id=?").get(v.session.id) as { activeAccountId: string | null }; if (row.activeAccountId) revoke(v.user.id, row.activeAccountId); }],
     ["manager downgraded", (v: Viewer) => setRole(v.user.id, ACCOUNTS[1], "viewer")],
@@ -318,14 +320,14 @@ describe("/api/auth/me", () => {
   ] as const) test(`${name} during selection persistence`, async () => {
     const v = viewers["12"];
     await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", v.jar)),
-      () => afterFirst(/^update "auth_session"/i, false, () => mutate(v)), clearSelection(v));
+      () => afterFirst(SESSION_SELECTION_UPDATE, false, () => mutate(v)), clearSelection(v));
   });
   // Owner decision 1, fifth case: a grant committed while /auth/me persists its selection is reflected
   // completely or not at all; the payload never lists a mailbox without a membership.
   test("mailbox granted during selection persistence", async () => {
     const v = viewers["2"];
     const bytes = await pair(impl => (impl === "legacy" ? legacy.legacyMeGET : meGET)(req("/api/auth/me", v.jar)),
-      () => afterFirst(/^update "auth_session"/i, false, () => {
+      () => afterFirst(SESSION_SELECTION_UPDATE, false, () => {
         master.prepare("INSERT INTO user_accounts(userId,accountId,role) VALUES(?,?,'editor')").run(v.user.id, ACCOUNTS[0]);
       }), clearSelection(v));
     const body = JSON.parse(JSON.parse(bytes).body) as { accountId: string; accounts: Array<{ id: string; accessRole: string }> };
