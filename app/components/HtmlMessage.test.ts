@@ -16,6 +16,29 @@ describe("HTML preview document text colour", () => {
     expect(bodyRule(build("<p>Plain</p>", undefined, false))).toContain("color: #1a1a1a;");
     expect(build("<p>Plain</p>", undefined, true)).not.toContain("var(--mail-view-fg");
   });
+  test("mails with their own light background keep dark text in dark mode", () => {
+    for (const html of [
+      '<table bgcolor="#ffffff"><tr><td>Text</td></tr></table>',
+      "<table bgcolor=white><tr><td>Text</td></tr></table>",
+      '<div style="background-color:#fff">Text</div>',
+      '<div style="background: #f4f4f4 url(x.png)">Text</div>',
+      "<style>.wrap{background-color:rgb(250, 250, 250)}</style><div class=\"wrap\">Text</div>",
+      '<td background="paper.png">Text</td>'
+    ]) {
+      expect(bodyRule(build(html, undefined, true))).toContain("color: #1a1a1a;");
+    }
+  });
+  test("transparent or dark own backgrounds still get the dark theme's text colour", () => {
+    for (const html of [
+      '<div style="background-color: transparent">Text</div>',
+      '<div style="background:none">Text</div>',
+      '<table bgcolor="#111111"><tr><td>Text</td></tr></table>',
+      '<div style="background-color: rgb(20, 20, 30)">Text</div>',
+      "<p>Background: we met at the background-color: #fff workshop.</p>"
+    ]) {
+      expect(bodyRule(build(html, undefined, true))).toContain("color: #eeeeee;");
+    }
+  });
   test("mails with their own colours keep them in both themes", () => {
     for (const dark of [true, false]) {
       expect(bodyRule(build('<p style="color:#123456">Own</p>', undefined, dark))).not.toContain("color:");
