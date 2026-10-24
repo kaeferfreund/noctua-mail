@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { signInQa } from "./qaRound2Session";
 
 // Opened HTML mail with blocked remote content and the collaboration bar on
-// phones (390 / 360 px, light and dark) plus one desktop reference:
+// phones (390 / 360 px) and desktop (1280 px), light and dark, plus the
+// 1440 px light reference:
 //   QA_SHELL_PORT=<port> QA_SHELL_SPEC=qa-mobile-reader.spec.ts \
 //     bun scripts/runQaShellBrowserTests.ts
 // Evidence defaults to the untracked <checkout>/.tmp/mobile-reader-evidence;
@@ -101,8 +102,10 @@ test("mobile reader: compact header rows leave room for the mail body", async ({
     await page.waitForTimeout(3000); await page.goto("/");
     return false;
   }, { timeout: 120000, intervals: [500] }).toBe(true);
-  for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }, { width: 1440, height: 900 }]) {
-    for (const scheme of viewport.width > 768 ? ["light"] as const : ["dark", "light"] as const) {
+  const runs = [{ width: 390, height: 844 }, { width: 360, height: 740 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }]
+    .map(viewport => ({ viewport, schemes: viewport.width === 1440 ? ["light"] as const : ["dark", "light"] as const }));
+  for (const { viewport, schemes } of runs) {
+    for (const scheme of schemes) {
       await page.setViewportSize(viewport);
       await page.evaluate(value => { localStorage.setItem("noctua:theme", value); }, scheme);
       await page.goto("/");
