@@ -91,6 +91,27 @@ describe("spam storage", () => {
     expect(candidates.map((entry) => [entry.senderEmail, entry.label]).sort()).toEqual([["a@shop.example", "ham"], ["b@shop.example", "spam"]]);
   });
 
+  test("pruning keeps the newest examples and every sender's latest \"Kein Spam\"", async () => {
+    const f = await createCollabFixture();
+    const base = { messageId: null, decidedByUserId: null, snippet: "Synthetisch" };
+    await f.api.saveSpamExample(f.accountId, { ...base, source: "not-spam", senderEmail: "kept@shop.example", senderDomain: "shop.example", subject: "Rechnung", label: "ham", createdAt: 1 });
+    await f.api.saveSpamExample(f.accountId, { ...base, source: "not-spam", senderEmail: "flipped@shop.example", senderDomain: "shop.example", subject: "Alt", label: "ham", createdAt: 2 });
+    await f.api.saveSpamExample(f.accountId, { ...base, source: "mark-spam", senderEmail: "flipped@shop.example", senderDomain: "shop.example", subject: "Neu", label: "spam", createdAt: 3 });
+    const insert = f.db.prepare(`INSERT INTO spam_examples (id, accountId, messageId, senderEmail, senderDomain, subject, snippet, label, source, decidedByUserId, createdAt)
+      VALUES (?, ?, NULL, ?, 'bulk.example', ?, 'Synthetisch', 'spam', 'mark-spam', NULL, ?)`);
+    f.db.transaction(() => {
+      for (let index = 0; index < 2000; index += 1) insert.run(crypto.randomUUID(), f.accountId, `s${index}@bulk.example`, `Werbung ${index}`, 10 + index);
+    })();
+    await f.api.saveSpamExample(f.accountId, { ...base, source: "mark-spam", senderEmail: "last@bulk.example", senderDomain: "bulk.example", subject: "Letzte", label: "spam", createdAt: 5_000 });
+    const count = (f.db.prepare("SELECT COUNT(*) AS n FROM spam_examples WHERE accountId = ?").get(f.accountId) as { n: number }).n;
+    expect(count).toBe(2001);
+    expect(await f.api.getLatestSpamDecision(f.accountId, "kept@shop.example")).toBe("ham");
+    // Older decisions of a sender whose latest one is "Als Spam" age out as before.
+    expect(await f.api.getLatestSpamDecision(f.accountId, "flipped@shop.example")).toBeNull();
+    expect(await f.api.getLatestSpamDecision(f.accountId, "s0@bulk.example")).toBeNull();
+    expect(await f.api.getLatestSpamDecision(f.accountId, "s1@bulk.example")).toBe("spam");
+  });
+
   test("correspondents match exact Sent recipients, never substrings", async () => {
     const f = await createCollabFixture();
     const sentFolderId = `${f.accountId}-sent`;

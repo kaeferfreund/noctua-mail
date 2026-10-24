@@ -47,7 +47,17 @@ export async function listUncheckedSpamMessageIds(accountId: string, folderId: s
 
 export type NewSpamExample = SpamExample & { messageId: string | null; source: string; decidedByUserId: string | null };
 
-/** The latest decision per sender and subject wins; old examples are pruned per account. */
+/**
+ * A sender's latest decision when it is "Kein Spam": it carries the sender's
+ * allowlist entry (getLatestSpamDecision), so the rolling cap never prunes it.
+ */
+const SENDER_HAM_SQL = `e.label = 'ham' AND e.senderEmail IS NOT NULL AND NOT EXISTS (SELECT 1 FROM spam_examples newer
+  WHERE newer.accountId = e.accountId AND newer.senderEmail = e.senderEmail AND newer.createdAt > e.createdAt)`;
+
+/**
+ * The latest decision per sender and subject wins; old examples are pruned per
+ * account to the newest EXAMPLES_PER_ACCOUNT, apart from senders' latest "Kein Spam".
+ */
 export async function saveSpamExample(accountId: string, example: NewSpamExample) {
   return withDbWriteRetry("saveSpamExample", async () => {
     const db = await getAccountDb(accountId);
@@ -60,7 +70,7 @@ export async function saveSpamExample(accountId: string, example: NewSpamExample
         .run(randomUUID(), accountId, example.messageId, example.senderEmail, example.senderDomain, example.subject,
           example.snippet, example.label, example.source, example.decidedByUserId, example.createdAt);
       db.prepare(`DELETE FROM spam_examples WHERE accountId = ? AND id IN (
-        SELECT id FROM spam_examples WHERE accountId = ? ORDER BY createdAt DESC LIMIT -1 OFFSET ?)`)
+        SELECT id FROM spam_examples e WHERE e.accountId = ? AND NOT (${SENDER_HAM_SQL}) ORDER BY e.createdAt DESC LIMIT -1 OFFSET ?)`)
         .run(accountId, accountId, EXAMPLES_PER_ACCOUNT);
     }).immediate();
   });
