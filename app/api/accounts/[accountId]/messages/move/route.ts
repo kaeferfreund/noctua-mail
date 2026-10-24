@@ -46,7 +46,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
-    const { clientId } = accountContext;
+    const { clientId, userId } = accountContext;
 
     const folderError = await validateAccountFolders(accountId, [destinationFolderId, sourceFolderId || null]);
     if (folderError) return folderError;
@@ -98,7 +98,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         staged.map((item) => ({
           ...item,
           accountId,
-          clientId
+          clientId,
+          userId
         }))
       );
     }

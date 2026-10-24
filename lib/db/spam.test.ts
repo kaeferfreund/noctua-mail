@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { trustedFacts, trustedProfile } from "../mail/spam/testProfiles";
 import { createCollabFixture } from "../testThreadCollabHarness";
 import { initAccountSchema } from "./schema";
 import { prepareAccountShardConnection, shardWriterGuardsInstalled } from "./shardFormat";
@@ -20,10 +21,10 @@ describe("spam shard migration", () => {
       legacy.exec(`INSERT INTO messages (id, accountId, folderId, threadId, subject, fromAddr, toAddr, preview, date, dateValue, body)
         VALUES ('legacy', 'synthetic', 'inbox', 'thread', 'Synthetic', 'a@example.test', 'b@example.test', '', '', 0, '')`);
       // Reproduce a shard written before this feature: no table, guards, index or columns.
-      for (const { name } of legacy.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='spam_examples'").all() as Array<{ name: string }>) {
+      for (const { name } of legacy.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name IN ('spam_examples', 'spam_sender_profiles')").all() as Array<{ name: string }>) {
         legacy.exec(`DROP TRIGGER "${name}"`);
       }
-      legacy.exec("DROP TABLE spam_examples; DROP INDEX idx_messages_account_spam");
+      legacy.exec("DROP TABLE spam_examples; DROP TABLE spam_sender_profiles; DROP INDEX idx_messages_account_spam");
       for (const column of spamColumns) legacy.exec(`ALTER TABLE messages DROP COLUMN ${column}`);
       expect(shardWriterGuardsInstalled(legacy)).toBe(true);
       legacy.close();
@@ -37,11 +38,14 @@ describe("spam shard migration", () => {
       expect(db.prepare("PRAGMA user_version").get()).toEqual({ user_version: 3 });
       expect(shardWriterGuardsInstalled(db)).toBe(true);
       expect(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='noctua_writer_v3_spam_examples_insert'").get()).toBeTruthy();
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='noctua_writer_v3_spam_sender_profiles_update'").get()).toBeTruthy();
       db.close();
 
       // A connection without the v3 writer function cannot write examples.
       const old = new Database(file);
       expect(() => old.prepare("INSERT INTO spam_examples (id, accountId, subject, snippet, label, source, createdAt) VALUES ('x','a','s','s','spam','t',0)"))
+        .toThrow("no such function: noctua_writer_v3");
+      expect(() => old.prepare("INSERT INTO spam_sender_profiles (accountId, senderKey, count, firstSeenAt, lastSeenAt, patterns, updatedAt) VALUES ('a','s',0,0,0,'{}',0)"))
         .toThrow("no such function: noctua_writer_v3");
       old.close();
     } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -108,5 +112,62 @@ describe("spam storage", () => {
     await saveSpamSettings(scope, { autoMove: true }, "admin");
     await saveSpamSettings(scope, { autoMove: false, threshold: 0.9 }, "admin");
     expect(await getSpamSettings(scope)).toEqual({ autoMove: false, threshold: 0.9 });
+  });
+});
+
+describe("sender profiles", () => {
+  const sender = "notify@service.example.test";
+
+  test("checked mails fold into the profile; \"Als Spam\" marks existing and unknown senders", async () => {
+    const f = await createCollabFixture();
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toBeNull();
+    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }));
+    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 2_000 }));
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 2, firstSeenAt: 1_000, lastSeenAt: 2_000, authAligned: 2, lastUserSpamAt: null });
+    await f.api.markSenderProfileUserSpam(f.accountId, sender, 5_000);
+    await f.api.markSenderProfileUserSpam(f.accountId, sender, 4_000);
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 2, lastUserSpamAt: 5_000 });
+    await f.api.markSenderProfileUserSpam(f.accountId, "new@example.test", 6_000);
+    expect(await f.api.getSenderProfile(f.accountId, "new@example.test")).toMatchObject({ count: 0, lastUserSpamAt: 6_000 });
+  });
+
+  test("the backfill replaces profiles and keeps stored \"Als Spam\" times", async () => {
+    const f = await createCollabFixture();
+    await f.api.markSenderProfileUserSpam(f.accountId, sender, 5_000);
+    await f.api.markSenderProfileUserSpam(f.accountId, "gone@example.test", 6_000);
+    await f.api.recordSenderProfileMail(f.accountId, { ...trustedFacts(), senderKey: "stale@example.test" });
+    expect(await f.api.replaceSenderProfiles(f.accountId, [trustedProfile(25, 60)])).toBe(1);
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 25, lastUserSpamAt: 5_000 });
+    expect(await f.api.getSenderProfile(f.accountId, "gone@example.test")).toMatchObject({ count: 0, lastUserSpamAt: 6_000 });
+    expect(await f.api.getSenderProfile(f.accountId, "stale@example.test")).toBeNull();
+  });
+
+  test("revocation resets only the sender's recent trusted skips; counters come from stored verdicts", async () => {
+    const f = await createCollabFixture();
+    const day = 24 * 60 * 60_000;
+    const now = 1767225600000 + 30 * day;
+    const from = `Service <${sender}>`;
+    const [skipped, modelChecked, old, other, canary, canaryMismatch] = await f.seed(
+      f.message("<a@example.test>", { from, dateValue: now - day }),
+      f.message("<b@example.test>", { from, dateValue: now - day }),
+      f.message("<c@example.test>", { from, dateValue: now - 10 * day }),
+      f.message("<d@example.test>", { from: "other@example.test", dateValue: now - day }),
+      f.message("<e@example.test>", { from, dateValue: now - 2 * day }),
+      f.message("<f@example.test>", { from, dateValue: now - 2 * day }));
+    const trusted = { verdict: "ham" as const, confidence: 1, reasons: ["trusted:profile (25 Mails seit 2026-03, DKIM service.example.test)"] };
+    for (const message of [skipped, old, other]) await f.api.saveSpamVerdict(f.accountId, message.id, trusted);
+    await f.api.saveSpamVerdict(f.accountId, modelChecked.id, { verdict: "ham", confidence: 0.9, reasons: ["Benachrichtigung"] });
+    await f.api.saveSpamVerdict(f.accountId, canary.id, { verdict: "ham", confidence: 0.9, reasons: ["trusted:canary (Stichprobe, 25 Mails seit 2026-03)"] });
+    await f.api.saveSpamVerdict(f.accountId, canaryMismatch.id, { verdict: "unsure", confidence: 0.7, reasons: ["trusted:canary (Stichprobe, 25 Mails seit 2026-03)", "Link"] });
+    expect(await f.api.countSpamTrustDecisions(f.accountId)).toEqual({ trustedSkips: 3, canaryChecks: 2, canaryMismatches: 1 });
+
+    expect(await f.api.resetTrustedSpamChecks(f.accountId, f.folderId, sender, now - 7 * day)).toEqual([skipped.id]);
+    expect((await f.api.getMessageById(f.accountId, skipped.id))?.spamVerdict).toBeUndefined();
+    expect((await f.api.getMessageById(f.accountId, modelChecked.id))?.spamVerdict).toBe("ham");
+    expect((await f.api.getMessageById(f.accountId, old.id))?.spamVerdict).toBe("ham");
+    expect(await f.api.countSpamTrustDecisions(f.accountId)).toEqual({ trustedSkips: 2, canaryChecks: 2, canaryMismatches: 1 });
+
+    const around = await f.api.listSenderMailsAround(f.accountId, f.folderId, sender, now - day, 60 * 60_000, skipped.id);
+    expect(around.map((row) => row.id)).toEqual([modelChecked.id]);
   });
 });
