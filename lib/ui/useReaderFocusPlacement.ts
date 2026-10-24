@@ -46,8 +46,16 @@ export function useReaderFocusPlacement(focused: boolean, readerId: string,
       });
     };
     document.addEventListener("focusout", onFocusOut);
+    // Chromium blurs a disabled control only at its next focus check; a busy phase
+    // shorter than that re-enables it first and focus stays put. Move it on the change.
+    const disabled = new MutationObserver(records => {
+      const control = document.activeElement;
+      if (control instanceof HTMLElement && control.matches(":disabled") && records.some(record => record.target === control)) focusReaderBack();
+    });
+    disabled.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["disabled"] });
     return () => {
       document.removeEventListener("focusout", onFocusOut);
+      disabled.disconnect();
       window.cancelAnimationFrame(frame);
     };
   }, [focused]);
