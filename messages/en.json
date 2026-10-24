@@ -377,7 +377,8 @@
       "quietHours": "Quiet hours",
       "quietFrom": "From",
       "quietTo": "To",
-      "quietHelp": "Time zone: {zone}"
+      "quietHelp": "Time zone: {zone}",
+      "quietSameTime": "The quiet hours must start and end at different times."
     },
     "signatures": {
       "listTitle": "Signature list",

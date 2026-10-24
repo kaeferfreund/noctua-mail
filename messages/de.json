@@ -377,7 +377,8 @@
       "quietHours": "Ruhezeit",
       "quietFrom": "Von",
       "quietTo": "Bis",
-      "quietHelp": "Zeitzone: {zone}"
+      "quietHelp": "Zeitzone: {zone}",
+      "quietSameTime": "Beginn und Ende der Ruhezeit müssen sich unterscheiden."
     },
     "signatures": {
       "listTitle": "Signaturen",
