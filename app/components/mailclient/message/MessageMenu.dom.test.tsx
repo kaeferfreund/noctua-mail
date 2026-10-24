@@ -1,6 +1,6 @@
 // Uses the shared resolver and actions through the real row menu.
 import { afterEach, describe, expect, it } from "bun:test";
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import type { ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
@@ -145,12 +145,15 @@ describe("row menu focus return", () => {
       const trigger = menu.view.getByRole("button", { name: "Message actions" });
       act(() => { trigger.focus(); });
       await menu.open();
+      // Radix returns focus from a 0 ms timer after the menu unmounts. No
+      // waitFor here: its polling starves happy-dom's timers for seconds.
       await act(async () => {
         fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
         await new Promise(resolve => setTimeout(resolve, 50));
       });
       expect(menu.view.queryByRole("menu")).toBeNull();
-      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+      expect(document.activeElement).toBe(trigger);
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 800)); });
       expect(menu.view.queryByRole("tooltip")).toBeNull();
     } finally {
