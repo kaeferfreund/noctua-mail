@@ -69,14 +69,27 @@ describe("spam storage", () => {
     // Re-syncing the same message keeps the verdict.
     await f.seed({ ...suspicious, subject: "Updated" });
     expect((await f.api.getMessageById(f.accountId, suspicious.id))?.spamVerdict).toBe("spam");
-    expect(await f.api.listUncheckedSpamMessageIds(f.accountId, f.folderId, 0, 10)).toEqual([]);
+    expect(await f.api.listUncheckedSpamMessages(f.accountId, f.folderId, 0, 10, 3)).toEqual([]);
   });
 
   test("unchecked messages are listed oldest first", async () => {
     const f = await createCollabFixture();
     const [newer, older] = await f.seed(f.message("<new@example.test>", { dateValue: 1767225600000 + 60_000 }),
       f.message("<old@example.test>", { dateValue: 1767225600000 }));
-    expect(await f.api.listUncheckedSpamMessageIds(f.accountId, f.folderId, 0, 10)).toEqual([older.id, newer.id]);
+    expect(await f.api.listUncheckedSpamMessages(f.accountId, f.folderId, 0, 10, 3)).toEqual([{ id: older.id, failedAttempts: 0 }, { id: newer.id, failedAttempts: 0 }]);
+  });
+
+  test("failed attempts persist on the unchecked row until the limit; a verdict replaces them", async () => {
+    const f = await createCollabFixture();
+    const [first, second] = await f.seed(f.message("<a@example.test>"), f.message("<b@example.test>"));
+    await f.api.recordSpamCheckFailure(f.accountId, first.id, 2);
+    await f.api.recordSpamCheckFailure(f.accountId, second.id, 3);
+    expect(await f.api.listUncheckedSpamMessages(f.accountId, f.folderId, 0, 10, 3)).toEqual([{ id: first.id, failedAttempts: 2 }]);
+    expect((await f.api.getMessageById(f.accountId, first.id))?.spamVerdict).toBeUndefined();
+    expect(await f.api.saveSpamVerdict(f.accountId, first.id, { verdict: "ham", confidence: 0.9, reasons: ["Rechnung"] }, { automatic: true })).toBe(true);
+    await f.api.recordSpamCheckFailure(f.accountId, first.id, 3);
+    expect(await f.api.getMessageById(f.accountId, first.id)).toMatchObject({ spamVerdict: "ham", spamReasons: ["Rechnung"] });
+    expect(await f.api.listUncheckedSpamMessages(f.accountId, f.folderId, 0, 10, 4)).toEqual([{ id: second.id, failedAttempts: 3 }]);
   });
 
   test("examples: latest decision per sender and subject wins; candidates by sender, domain and recency", async () => {

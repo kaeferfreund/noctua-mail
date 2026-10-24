@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
+import { APICallError } from "ai";
+import { isRetryableSpamError } from "./classifySpam";
+import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, spamErrorLogFields, SPAM_MAX_ATTEMPTS, type SpamCheckJob } from "./queue";
 
 const job = (messageId: string): SpamCheckJob => ({ accountId: "acc", messageId });
 
@@ -41,6 +43,48 @@ describe("spam queue", () => {
     expect(queue.has(job("a"))).toBe(false);
   });
 
+  test("errors a retry cannot fix are reported after the first attempt and stored as exhausted", async () => {
+    let attempts = 0;
+    const failures: unknown[] = [];
+    const counts: number[] = [];
+    const queue = createSpamQueue({
+      check: async () => {
+        attempts += 1;
+        throw new APICallError({ message: "invalid x-api-key", url: "https://api.example.test", requestBodyValues: {}, statusCode: 401 });
+      },
+      onFailure: (_job, error) => failures.push(error),
+      onAttemptFailed: (_job, failed) => { counts.push(failed); },
+      isRetryable: isRetryableSpamError,
+      sleep: async () => { throw new Error("must not wait"); }
+    });
+    queue.enqueue([job("a")]);
+    await queue.onIdle();
+    expect(attempts).toBe(1);
+    expect(failures).toHaveLength(1);
+    expect(counts).toEqual([SPAM_MAX_ATTEMPTS]);
+  });
+
+  test("failed attempts are reported after each one and earlier ones count against the limit", async () => {
+    const counts: Array<[string, number]> = [];
+    let attempts = 0;
+    const queue = createSpamQueue({
+      check: async () => { attempts += 1; throw new Error("overloaded"); },
+      onFailure: () => {},
+      onAttemptFailed: (entry, failed) => { counts.push([entry.messageId, failed]); },
+      sleep: async () => {}
+    });
+    queue.enqueue([job("fresh")]);
+    await queue.onIdle();
+    expect(counts).toEqual([["fresh", 1], ["fresh", 2], ["fresh", 3]]);
+    counts.length = 0;
+    attempts = 0;
+    // Two attempts failed before a restart: one attempt is left.
+    queue.enqueue([{ ...job("resumed"), failedAttempts: 2 }]);
+    await queue.onIdle();
+    expect(attempts).toBe(1);
+    expect(counts).toEqual([["resumed", 3]]);
+  });
+
   test("a check that recovers on retry is not reported", async () => {
     let attempts = 0;
     let failed = false;
@@ -61,11 +105,12 @@ describe("sweep selection", () => {
     let now = 0;
     const claims = createSpamClaims(24 * 60 * 60_000, 20_000, () => now);
     const ids = Array.from({ length: 120 }, (_, index) => `m${index}`);
-    const first = pickSweepJobs("acc", ids, { has: () => false }, claims, 50);
+    const candidates = ids.map((id) => ({ id }));
+    const first = pickSweepJobs("acc", candidates, { has: () => false }, claims, 50);
     expect(first.map((entry) => entry.messageId)).toEqual(ids.slice(0, 50));
     expect(ids.filter((id) => claims.isClaimed(job(id)))).toEqual(ids.slice(0, 50));
     // The next sweep (same ids, first 50 still unchecked) takes the next 50; queued ones are skipped.
-    const second = pickSweepJobs("acc", ids, { has: (entry) => entry.messageId === "m50" }, claims, 50);
+    const second = pickSweepJobs("acc", candidates, { has: (entry) => entry.messageId === "m50" }, claims, 50);
     expect(second.map((entry) => entry.messageId)).toEqual(ids.slice(51, 101));
     expect(claims.isClaimed(job("m50"))).toBe(false);
     // Claims expire after the TTL.
@@ -75,6 +120,17 @@ describe("sweep selection", () => {
 });
 
 describe("spam failure logger", () => {
+  test("error fields carry name, code and status, never the message", () => {
+    const leak = "Betreff: Geheime Rechnung an anna@example.test";
+    const validation = Object.assign(new Error(`Type validation failed: Value: {"reasons":["${leak}"]}`), { name: "AI_TypeValidationError" });
+    expect(spamErrorLogFields(validation)).toEqual({ error: "AI_TypeValidationError" });
+    const api = new APICallError({ message: leak, url: "https://api.example.test", requestBodyValues: { prompt: leak }, statusCode: 429 });
+    expect(spamErrorLogFields(api)).toEqual({ error: "AI_APICallError", status: 429 });
+    expect(spamErrorLogFields(Object.assign(new Error(leak), { code: "SQLITE_BUSY" }))).toEqual({ error: "Error", code: "SQLITE_BUSY" });
+    expect(spamErrorLogFields(leak)).toEqual({ error: "string" });
+    expect(JSON.stringify([validation, api].map(spamErrorLogFields))).not.toContain("Geheime");
+  });
+
   test("logs once per account per 10 minutes", () => {
     let now = 0;
     const lines: string[] = [];

@@ -23,6 +23,21 @@ export type SpamAllowlistContext = {
 
 export type AllowlistMatch = "own-address" | "own-domain" | "correspondent" | "user-decision";
 
+export type SpamUserDecision = { label: "spam" | "ham"; decidedByUserId: string | null };
+
+/**
+ * The sender's latest user decision as the allowlist sees it. "Als Spam"
+ * always counts. "Kein Spam" puts the sender on the allowlist only when its
+ * author may manage the mailbox (`mayAllow`, the manager role that also sets
+ * the mailbox's spam settings); a plain editor's mark, or one without a known
+ * author, stays an example for the model.
+ */
+export async function allowlistDecision(decision: SpamUserDecision | null, mayAllow: (userId: string) => Promise<boolean>) {
+  if (!decision) return null;
+  if (decision.label === "spam") return "spam";
+  return decision.decidedByUserId && await mayAllow(decision.decidedByUserId) ? "ham" : null;
+}
+
 export function buildOwnIdentitySets(addresses: Iterable<string>) {
   const ownAddresses = new Set<string>();
   const ownDomains = new Set<string>();

@@ -33,16 +33,33 @@ export async function saveSpamVerdict(accountId: string, messageId: string, verd
 }
 
 /**
- * Unchecked rows of a folder newer than `sinceDateValue`, oldest first. Every
- * checked row has `spamCheckedAt`, so after the first sweep this only returns
- * mail that arrived since (served by idx_messages_account_folder_date).
+ * An unchecked row keeps the failed attempts of earlier runs in spamReasons
+ * (`["failed:<n>"]`) until a verdict replaces it; hydration ignores reasons
+ * without a verdict.
  */
-export async function listUncheckedSpamMessageIds(accountId: string, folderId: string, sinceDateValue: number, limit: number) {
+const FAILED_ATTEMPTS_SQL = `CASE WHEN spamReasons LIKE '["failed:%' THEN CAST(substr(spamReasons, 10) AS INTEGER) ELSE 0 END`;
+
+/**
+ * Unchecked rows of a folder newer than `sinceDateValue`, oldest first, with
+ * fewer than `maxAttempts` failed attempts. Every checked row has
+ * `spamCheckedAt`, so after the first sweep this only returns mail that
+ * arrived since (served by idx_messages_account_folder_date).
+ */
+export async function listUncheckedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number, maxAttempts: number) {
   const db = await getAccountDb(accountId);
-  const rows = db.prepare(`SELECT id FROM messages
+  return db.prepare(`SELECT id, ${FAILED_ATTEMPTS_SQL} AS failedAttempts FROM messages
     WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND spamCheckedAt IS NULL AND COALESCE(deleted, 0) = 0
-    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as Array<{ id: string }>;
-  return rows.map((row) => row.id);
+      AND ${FAILED_ATTEMPTS_SQL} < ?
+    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, maxAttempts, limit) as Array<{ id: string; failedAttempts: number }>;
+}
+
+/** Stores the failed attempts of a row that is still unchecked (a verdict written meanwhile is kept). */
+export async function recordSpamCheckFailure(accountId: string, messageId: string, failedAttempts: number) {
+  return withDbWriteRetry("recordSpamCheckFailure", async () => {
+    const db = await getAccountDb(accountId);
+    db.prepare(`UPDATE messages SET spamReasons = ? WHERE accountId = ? AND id = ? AND spamCheckedAt IS NULL AND spamVerdict IS NULL`)
+      .run(JSON.stringify([`failed:${failedAttempts}`]), accountId, messageId);
+  });
 }
 
 export type NewSpamExample = SpamExample & { messageId: string | null; source: string; decidedByUserId: string | null };
@@ -101,10 +118,15 @@ export async function listSpamExampleCandidates(accountId: string, target: { sen
 }
 
 export async function getLatestSpamDecision(accountId: string, senderEmail: string): Promise<SpamLabel | null> {
+  return (await getLatestSpamDecisionRow(accountId, senderEmail))?.label ?? null;
+}
+
+/** The sender's latest decision and who made it (null for a move without a session). */
+export async function getLatestSpamDecisionRow(accountId: string, senderEmail: string): Promise<{ label: SpamLabel; decidedByUserId: string | null } | null> {
   const db = await getAccountDb(accountId);
-  const row = db.prepare(`SELECT label FROM spam_examples WHERE accountId = ? AND senderEmail = ? ORDER BY createdAt DESC LIMIT 1`)
-    .get(accountId, senderEmail) as { label?: string } | undefined;
-  return row?.label === "spam" || row?.label === "ham" ? row.label : null;
+  const row = db.prepare(`SELECT label, decidedByUserId FROM spam_examples WHERE accountId = ? AND senderEmail = ? ORDER BY createdAt DESC LIMIT 1`)
+    .get(accountId, senderEmail) as { label?: string; decidedByUserId?: string | null } | undefined;
+  return row?.label === "spam" || row?.label === "ham" ? { label: row.label, decidedByUserId: row.decidedByUserId ?? null } : null;
 }
 
 /** Whether the mailbox has written to `email` (exact To/Cc/Bcc entry of a Sent-folder message). */

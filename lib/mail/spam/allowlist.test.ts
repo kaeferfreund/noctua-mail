@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildOwnIdentitySets, matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
+import { allowlistDecision, buildOwnIdentitySets, matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
 import { buildSpamInputFromMessage } from "./input";
 
 const sets = buildOwnIdentitySets(["Office@Household.example.test", "owner@gmail.com", "not-an-address"]);
@@ -58,5 +58,15 @@ describe("spam allowlist", () => {
     expect(await matchSpamAllowlist(from("partner@example.test"), known)).toBe("correspondent");
     // Without any Authentication-Results there is nothing to judge.
     expect(await matchSpamAllowlist(from("partner@example.test", []), known)).toBe("correspondent");
+  });
+
+  test("\"Kein Spam\" allowlists only when its author may manage the mailbox; \"Als Spam\" always counts", async () => {
+    const managers = new Set(["manager"]);
+    const mayAllow = async (userId: string) => managers.has(userId);
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: "manager" }, mayAllow)).toBe("ham");
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: "editor" }, mayAllow)).toBeNull();
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: null }, mayAllow)).toBeNull();
+    expect(await allowlistDecision({ label: "spam", decidedByUserId: "editor" }, mayAllow)).toBe("spam");
+    expect(await allowlistDecision(null, mayAllow)).toBeNull();
   });
 });
