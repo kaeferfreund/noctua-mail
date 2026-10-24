@@ -101,3 +101,30 @@ test("real membership revoke retains multi-mailbox token and revokes single-mail
   expect(validateMcpTokenRow(principal.master, single.token)).toBeNull();
   expect((await listMcpTokenAccounts(multi.tokenRecord.id)).map(item => item.account.id)).toEqual([sharedId]);
 });
+
+test("membership revoke moves the primary to the remaining mailbox with the creator's highest role, then by ID", async () => {
+  const manager = await createAuthenticatedTestSession(accountId);
+  // otherId sorts before sharedId; with viewer on otherId the editor mailbox must win.
+  const { tokenRecord } = await mintMcpToken(session, accountId, "Synthetic role primary", 3600, { accountIds: [accountId, otherId, sharedId] });
+  principal.master.prepare("UPDATE user_accounts SET role='viewer' WHERE userId=? AND accountId=?").run(principal.user.id, otherId);
+  try {
+    await changeAccountMember(accountId, principal.user.id, manager.user.id, null);
+    expect(resolveMcpToolContextRow(principal.master, tokenRecord.id)).toMatchObject({ accountId: sharedId, role: "editor" });
+  } finally {
+    principal.master.prepare("UPDATE user_accounts SET role='manager' WHERE userId=? AND accountId=?").run(principal.user.id, otherId);
+    await principal.addMembership(principal.user.id, accountId, "manager");
+  }
+});
+
+test("removeUserAccountLink applies the same token cleanup as a membership revoke", async () => {
+  const db = await dbModulePromise;
+  const multi = await mint();
+  const single = await mintMcpToken(session, accountId, "Synthetic single link", 3600);
+  try {
+    expect(await db.removeUserAccountLink(principal.user.id, accountId)).toBe(true);
+    expect(validateMcpTokenRow(principal.master, single.token)).toBeNull();
+    expect(resolveMcpToolContextRow(principal.master, multi.tokenRecord.id).accountId).toBe(sharedId);
+  } finally { await principal.addMembership(principal.user.id, accountId, "manager"); }
+  expect(() => resolveMcpToolContextRow(principal.master, multi.tokenRecord.id, accountId)).toThrow("not covered");
+  expect(validateMcpTokenRow(principal.master, single.token)).toBeNull();
+});

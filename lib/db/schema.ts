@@ -162,7 +162,7 @@ function ensureMasterTeamColumns(db: any) {
       ["grantedByUserId", "TEXT"],
       ["grantedAt", "INTEGER"]
     ]);
-    // Reserved, not enforced yet (NULL = legacy behaviour).
+    // JSON array of MCP scopes, enforced on every tool call; NULL = legacy read+drafts, invalid = no permissions.
     ensureTableColumns(db, "mcp_tokens", [["scopes", "TEXT"]]);
   }).immediate();
 }

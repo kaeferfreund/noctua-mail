@@ -1,3 +1,5 @@
+import type { McpTokenMetadata } from "./data";
+
 /** Token permissions narrow live mailbox roles; they never grant a mailbox role. */
 export const MCP_SCOPES = ["read", "drafts", "manage", "send"] as const;
 export type McpScope = typeof MCP_SCOPES[number];
@@ -14,9 +16,17 @@ export function parseMcpScopes(value: string | null | undefined): McpScope[] {
     return Array.isArray(parsed) && parsed.every(scope => MCP_SCOPES.includes(scope)) ? [...new Set(parsed)] : [];
   } catch { return []; }
 }
-export function mcpPermissionMode(scopes?: readonly McpScope[]): McpPermissionMode {
+/** "invalid": stored scopes failed to parse, so the token denies every tool. */
+export function mcpPermissionMode(scopes?: readonly McpScope[]): McpPermissionMode | "invalid" {
   const effective = scopes ?? scopesForMcpMode("drafts");
+  if (!effective.length) return "invalid";
   return effective.includes("send") ? "full" : effective.includes("drafts") ? "drafts" : "read";
+}
+/** A token row as one mailbox tab shows it: covered mailboxes the viewer can access; the rest (primary included) only as a count. */
+export type McpTokenListItem = Omit<McpTokenMetadata, "accountId" | "accountIds"> & { accountIds: string[]; hiddenMailboxCount: number };
+export function mcpTokenListItem({ accountId, accountIds = [accountId], ...token }: McpTokenMetadata, accessible: ReadonlySet<string>): McpTokenListItem {
+  const visible = accountIds.filter(id => accessible.has(id));
+  return { ...token, accountIds: visible, hiddenMailboxCount: accountIds.length - visible.length };
 }
 export function assertMcpScope(scopes: readonly McpScope[] | undefined, scope: McpScope) {
   if (!(scopes ?? scopesForMcpMode("drafts")).includes(scope)) throw new Error(`Token has no ${scope} permission`);
