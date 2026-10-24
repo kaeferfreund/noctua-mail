@@ -47,6 +47,13 @@ for (const compact of [false, true]) {
     expect(element.classList.contains("fc-event-local")).toBe(true);
     expect(element.classList.contains("fc-event-partstat-declined")).toBe(true);
     expect(element.title).toContain(event.summary);
+    // Radix FocusScope takes anything reporting tabIndex >= 0 as a loop edge of
+    // the status popover / phone Sheet. Each such element must be one the
+    // browser really tabs to (FullCalendar 6's href-less date anchors were not).
+    const reportedTabbable = [...view.container.querySelectorAll<HTMLElement>("*")].filter(el => el.tabIndex >= 0);
+    expect(reportedTabbable.length).toBeGreaterThan(0);
+    expect(reportedTabbable.filter(el => !el.matches("button, input, select, textarea, a[href], [tabindex]"))
+      .map(el => el.outerHTML.slice(0, 80))).toEqual([]);
     expect(element.querySelector(".fc-event-title")?.textContent).toContain(event.summary);
     fireEvent.click(element);
     expect(onEventClick).toHaveBeenCalledWith(event, "event", event.startAtMs);
