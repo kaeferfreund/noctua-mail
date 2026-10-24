@@ -602,9 +602,15 @@
      for it push the actions onto their own row. Keep all header controls at
      their intrinsic widths instead of shrinking their boxes into overlap. */
   .header { gap: var(--space-2); }
-  .topRow { flex-wrap: wrap; gap: var(--space-2); margin-bottom: 0; }
-  .actions { flex: 0 0 auto; margin-left: auto; gap: var(--space-1); }
-  .messageActions { flex-shrink: 0; gap: var(--space-1); }
+  .topRow { flex-wrap: wrap; gap: 0 var(--space-2); margin-bottom: 0; }
+  .actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; margin-left: auto; gap: var(--space-1); }
+  /* Reply … Delete get 40 px touch targets (the other header controls are
+     already 44 px). Adjacent targets need no gap; the actions wrap instead of
+     overflowing the card when a narrow phone also shows the translate toggle.
+     Next to the badges they usually take a row of their own; their boxes
+     carry enough whitespace, so the wrapped rows get no extra gap. */
+  .messageActions { flex-shrink: 0; gap: 0; }
+  .messageActions > :global(.rt-IconButton) { width: 40px; height: 40px; min-width: 40px; margin: 0; box-sizing: border-box; }
   .badges > * { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
   /* The date stays on the sender row; it wraps below only when the sender
