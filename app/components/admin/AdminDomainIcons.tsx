@@ -25,7 +25,7 @@ function DomainIconPreview({ entry, alt }: { entry: DomainIconEntry; alt: string
   const src = `${iconUrl(entry.domain)}?v=${entry.version ?? "favicon"}`;
   const [failed, setFailed] = useState<string | null>(null);
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/40">
+    <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
       {failed === src ? null : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={alt} width={32} height={32} className="size-8 object-contain" onError={() => setFailed(src)} />
@@ -90,7 +90,7 @@ export default function AdminDomainIcons({ apiFetch = fetch }: { apiFetch?: Admi
         if (file && target.current) upload(target.current, file);
       }} />
     {entries && !entries.length && <p className="text-sm text-muted-foreground">{t("domainIcons.empty")}</p>}
-    {entries && entries.length > 0 && <ul className="max-w-2xl divide-y border-y">
+    {entries && entries.length > 0 && <ul className="m-0 max-w-2xl list-none divide-y divide-border border-y border-border p-0">
       {entries.map(entry => <li key={entry.domain} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2" data-domain={entry.domain}>
         <DomainIconPreview entry={entry} alt={t("domainIcons.iconAlt", { domain: entry.domain })} />
         <div className="min-w-0 flex-1">
