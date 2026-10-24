@@ -242,3 +242,28 @@ describe("Notifications settings tab", () => {
     expect(page.getByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }).getAttribute("aria-checked")).toBe("false");
   });
 });
+
+describe("Notifications settings tab: quiet hours", () => {
+  it("keeps quiet hours that start when they end in the form with a hint instead of saving them", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
+    const quietHours = { from: "22:00", to: "07:00", timeZone: "Europe/Berlin" };
+    const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA, { ...defaults, quietHours })] });
+    const page = mount(apiFetch);
+    const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
+    const puts = () => calls.filter(call => call.method === "PUT");
+
+    fireEvent.change(settings.getByLabelText("Bis"), { target: { value: "22:00" } });
+    const hint = await page.findByRole("alert");
+    expect(hint.textContent).toBe("Beginn und Ende der Ruhezeit müssen sich unterscheiden.");
+    expect((settings.getByLabelText("Bis") as HTMLInputElement).value).toBe("22:00");
+    expect(settings.getByLabelText("Von").getAttribute("aria-invalid")).toBe("true");
+    expect(settings.getByLabelText("Bis").getAttribute("aria-describedby")).toBe(hint.id);
+    expect(puts()).toEqual([]);
+
+    fireEvent.change(settings.getByLabelText("Von"), { target: { value: "21:00" } });
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect((puts()[0].body as { settings: PushDeviceSettings }).settings.quietHours).toEqual({ ...quietHours, from: "21:00", to: "22:00" });
+    expect(page.queryByText("Beginn und Ende der Ruhezeit müssen sich unterscheiden.")).toBeNull();
+    expect(settings.getByLabelText("Von").getAttribute("aria-invalid")).toBeNull();
+  });
+});
