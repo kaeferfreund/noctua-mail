@@ -32,6 +32,7 @@ import FromAddressHoverCard from "./FromAddressHoverCard";
 import type { MessageThreadListProps } from "./messageListViewTypes";
 import { useMessageListItems } from "./useMessageListItems";
 import { useThreadListAnimationState } from "./useThreadListAnimationState";
+import { useRowSwipeActions } from "./useRowSwipeActions";
 import {
   getDragThreadMessageIds,
   getThreadRowDisplayMeta,
@@ -151,6 +152,7 @@ export default function MessageThreadList({
   });
 
   useReaderNavigationRows(listItems, onNavigationRowsChange);
+  const getRowSwipe = useRowSwipeActions(actions, pendingMessageActions);
 
   return (
     <MessageListRenderer
@@ -193,6 +195,7 @@ export default function MessageThreadList({
         });
         return animateFromGroup || animateFromThread || animateFromNested;
       }}
+      getRowSwipe={getRowSwipe}
       renderRow={({ item, index }) => {
         const message = item.message;
         const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);

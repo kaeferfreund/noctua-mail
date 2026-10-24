@@ -1,7 +1,9 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import type React from "react";
 import type { ListItem, ListRowItem, MessageGroup } from "./listModel";
 import MessageGroupRow from "./MessageGroupRow";
+import SwipeableRow, { type RowSwipeActions } from "./SwipeableRow";
+import { createSwipeOpenStore } from "./swipeGesture";
 import VirtualizedList from "./VirtualizedList";
 
 const SUGGESTION_SECTION_ROWS_TOP_GAP = 0;
@@ -25,6 +27,8 @@ type MessageListRendererProps = {
   };
   isRowAnimated?: (args: { item: ListRowItem; index: number }) => boolean;
   renderRow: (args: { item: ListRowItem; index: number }) => React.ReactNode;
+  /** Phone swipe actions per row; rows without them do not swipe. */
+  getRowSwipe?: (item: ListRowItem) => RowSwipeActions | null;
 };
 
 function MessageListRenderer({
@@ -38,8 +42,34 @@ function MessageListRenderer({
   onGroupOpenChange,
   classNames,
   isRowAnimated,
-  renderRow
+  renderRow,
+  getRowSwipe
 }: MessageListRendererProps) {
+  // One open swipe row per list; scrolling the list closes it.
+  const [swipeStore] = useState(createSwipeOpenStore);
+  const swipeEnabled = Boolean(getRowSwipe);
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl || !swipeEnabled) return;
+    const closeSwipe = () => swipeStore.set(null);
+    scrollEl.addEventListener("scroll", closeSwipe, { passive: true });
+    return () => scrollEl.removeEventListener("scroll", closeSwipe);
+  }, [scrollRef, swipeEnabled, swipeStore]);
+
+  const renderListRow = useCallback(
+    (item: ListRowItem, index: number) => {
+      const row = renderRow({ item, index });
+      const swipe = getRowSwipe?.(item);
+      if (!swipe) return row;
+      return (
+        <SwipeableRow rowKey={item.key} store={swipeStore} {...swipe}>
+          {row}
+        </SwipeableRow>
+      );
+    },
+    [getRowSwipe, renderRow, swipeStore]
+  );
+
   const getItemHeight = useCallback(
     (item: ListItem) => {
       if (item.type === "group") return groupHeight;
@@ -116,7 +146,7 @@ function MessageListRenderer({
                           }`}
                           style={{ height: rowHeight }}
                         >
-                          {renderRow({ item: row, index: rowIndex })}
+                          {renderListRow(row, rowIndex)}
                         </div>
                       );
                     })}
@@ -139,7 +169,7 @@ function MessageListRenderer({
           }`}
           style={{ transform: `translateY(${top}px)`, height: rowHeight }}
         >
-          {renderRow({ item, index })}
+          {renderListRow(item, index)}
         </div>
       );
     },
@@ -150,7 +180,7 @@ function MessageListRenderer({
       groupHeight,
       isRowAnimated,
       onGroupOpenChange,
-      renderRow,
+      renderListRow,
       rowHeight
     ]
   );
