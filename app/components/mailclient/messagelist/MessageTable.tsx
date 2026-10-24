@@ -20,6 +20,7 @@ import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./me
 import { selectAllVisibleMessages } from "./listSelection";
 import { useSelectionSnapshot } from "./selectionStore";
 import MessageListRenderer from "./MessageListRenderer";
+import { useRowSwipeActions } from "./useRowSwipeActions";
 import type { MessageTableProps } from "./messageListViewTypes";
 import { useMessageListItems } from "./useMessageListItems";
 import {
@@ -173,6 +174,7 @@ export default function MessageTable({
   });
 
   useReaderNavigationRows(listItems, onNavigationRowsChange);
+  const getRowSwipe = useRowSwipeActions(actions, pendingMessageActions);
 
   return (
     <div className={styles.table}>
@@ -271,6 +273,7 @@ export default function MessageTable({
             groupKey: item.groupKey
           })
         }
+        getRowSwipe={getRowSwipe}
         renderRow={({ item, index }) => {
           const message = item.message;
           const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);

@@ -1,7 +1,7 @@
 import { messageDeepLink } from "@/lib/navigation/deepLinks";
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { Fragment, useState } from "react";
+import { Fragment, useContext, useState } from "react";
 import {
   Archive,
   ArrowRightLeft,
@@ -49,6 +49,7 @@ import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
+import { MessageMenuControlContext } from "./messageMenuControl";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -171,6 +172,7 @@ export default function MessageMenu({
 }: MessageMenuProps) {
   const t = useTranslations("Reader");
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
+  const control = useContext(MessageMenuControlContext);
   const [copyResult, setCopyResult] = useState<"copied" | "failed" | null>(null);
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const rowReadAction = origin === "thread" ? undefined : readAction;
@@ -245,7 +247,13 @@ export default function MessageMenu({
     : [];
 
   return (
-    <DropdownMenu.Root onOpenChange={onOpenChange}>
+    <DropdownMenu.Root
+      open={control?.open}
+      onOpenChange={(open) => {
+        control?.onOpenChange(open);
+        onOpenChange?.(open);
+      }}
+    >
       <DropdownMenu.Trigger asChild>
         <TooltipIconButton
           variant="ghost"

@@ -1,0 +1,113 @@
+/* Phone swipe actions on a message row (see SwipeableRow.tsx). */
+.root {
+  position: relative;
+  height: 100%;
+  /* Clip the sliding content sideways only: row dividers sit 1px above. */
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.content {
+  position: relative;
+  height: 100%;
+  background: var(--card);
+  transform: translateX(var(--swipe-offset, 0px));
+  transition: transform 0.2s ease;
+  /* The browser keeps vertical scrolling; horizontal moves reach the row. */
+  touch-action: pan-y;
+}
+
+.root[data-swipe-state="dragging"] .content {
+  transition: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.leading,
+.trailing {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.root[data-swipe-state="dragging"] .leading,
+.root[data-swipe-state="dragging"] .trailing {
+  transition: none;
+}
+
+.leading {
+  left: 0;
+  width: max(var(--swipe-offset, 0px), 0px);
+  background: var(--blue-9);
+}
+
+.trailing {
+  right: 0;
+  width: max(calc(-1 * var(--swipe-offset, 0px)), 0px);
+  background: var(--red-9);
+}
+
+.action {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+  border: 0;
+  color: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: flex-grow 0.15s ease, padding 0.15s ease;
+}
+
+.action:focus-visible {
+  outline: 2px solid white;
+  outline-offset: -4px;
+}
+
+.actionRead {
+  background: var(--blue-9);
+}
+
+.actionMore {
+  background: var(--gray-9);
+}
+
+.actionDelete {
+  background: var(--red-9);
+}
+
+/* Full swipe: the edge action takes the whole revealed area (iOS snap). */
+.actionRead[data-full] {
+  align-items: flex-end;
+  padding-right: 24px;
+}
+
+.actionDelete[data-full] {
+  align-items: flex-start;
+  padding-left: 24px;
+}
+
+.actionMore[data-collapsed] {
+  flex-grow: 0;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .leading,
+  .trailing,
+  .action {
+    transition: none;
+  }
+}

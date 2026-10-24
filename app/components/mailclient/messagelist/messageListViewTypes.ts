@@ -104,6 +104,8 @@ export type MessageListViewActions = {
     options?: { isFlaggedGroup?: boolean }
   ) => void;
   handleDeleteMessage: (message: Message) => void;
+  /** The row's read toggle; `seen` is the row's displayed state (a collapsed thread counts as one). */
+  toggleRowRead: (message: Message, seen: boolean) => void;
   toggleFlaggedFlag: (message: Message, collapsedThreadMessages?: Message[]) => void;
   toggleTodoFlag: (
     message: Message,
