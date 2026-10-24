@@ -1409,6 +1409,11 @@
       "todo": "Aufgabe",
       "done": "Erledigt",
       "new": "Neu",
+      "seen": "Gelesen",
+      "answered": "Beantwortet",
+      "flagged": "Markiert",
+      "deleted": "Gelöscht",
+      "draft": "Entwurf",
       "newsletter": "📰 Newsletter",
       "notification": "🔔 Benachrichtigung",
       "transactional": "🧾 Transaktions-E-Mails"

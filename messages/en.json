@@ -1409,6 +1409,11 @@
       "todo": "To-Do",
       "done": "Done",
       "new": "New",
+      "seen": "Seen",
+      "answered": "Answered",
+      "flagged": "Flagged",
+      "deleted": "Deleted",
+      "draft": "Draft",
       "newsletter": "📰 Newsletter",
       "notification": "🔔 Notification",
       "transactional": "🧾 Transactional"
