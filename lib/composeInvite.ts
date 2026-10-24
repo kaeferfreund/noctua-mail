@@ -1,3 +1,7 @@
+import type { UiLocale } from "@/lib/i18n/config";
+import { formatDate } from "@/lib/i18n/format";
+import { getTranslator } from "@/lib/i18n/translator";
+
 export type ComposeInviteDraft = {
   location?: string;
   start: string;
@@ -23,36 +27,31 @@ export type RecurrenceOption =
   | "monthly-by-day"
   | "yearly";
 
-// Static label / rrule defaults. "monthly-by-day" is dynamic — its label and
+// Static rrule defaults; labels come from the EventSchedule catalog
+// (recurrenceOptionLabel). "monthly-by-day" is dynamic — its label and
 // rrule depend on the event's start date and are computed by the helpers
 // below. The entry here only exists so the option appears in the dropdown.
-export const RECURRENCE_OPTIONS: { value: RecurrenceOption; label: string; rrule: string }[] = [
-  { value: "none", label: "Does not repeat", rrule: "" },
-  { value: "daily", label: "Daily", rrule: "FREQ=DAILY" },
-  { value: "weekly", label: "Weekly", rrule: "FREQ=WEEKLY" },
-  { value: "every-2-weeks", label: "Every two weeks", rrule: "FREQ=WEEKLY;INTERVAL=2" },
-  { value: "monthly", label: "Monthly", rrule: "FREQ=MONTHLY" },
-  { value: "monthly-by-day", label: "Monthly on weekday", rrule: "FREQ=MONTHLY" },
-  { value: "yearly", label: "Yearly", rrule: "FREQ=YEARLY" }
+export const RECURRENCE_OPTIONS: { value: RecurrenceOption; rrule: string }[] = [
+  { value: "none", rrule: "" },
+  { value: "daily", rrule: "FREQ=DAILY" },
+  { value: "weekly", rrule: "FREQ=WEEKLY" },
+  { value: "every-2-weeks", rrule: "FREQ=WEEKLY;INTERVAL=2" },
+  { value: "monthly", rrule: "FREQ=MONTHLY" },
+  { value: "monthly-by-day", rrule: "FREQ=MONTHLY" },
+  { value: "yearly", rrule: "FREQ=YEARLY" }
 ];
 
+const RECURRENCE_LABEL_KEYS = {
+  "none": "none",
+  "daily": "daily",
+  "weekly": "weekly",
+  "every-2-weeks": "everyTwoWeeks",
+  "monthly": "monthly",
+  "monthly-by-day": "monthlyByDay",
+  "yearly": "yearly"
+} as const satisfies Record<RecurrenceOption, string>;
+
 const WEEKDAY_RRULE_CODES = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
-const WEEKDAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday"
-] as const;
-const ORDINAL_LABELS: Record<number, string> = {
-  1: "first",
-  2: "second",
-  3: "third",
-  4: "fourth",
-  [-1]: "last"
-};
 
 // Map a date to its ordinal occurrence within the month for that weekday:
 //   1..4 → first/second/third/fourth, -1 → last.
@@ -82,12 +81,12 @@ export function parseLocalScheduleDate(value: string): Date | null {
   return date;
 }
 
-export function formatMonthlyByDayLabel(date: Date | null | undefined): string {
-  if (!date) return "Monthly on weekday";
-  const ordinal = ordinalForStartDate(date);
-  const ordinalLabel = ORDINAL_LABELS[ordinal] ?? "first";
-  const weekday = WEEKDAY_NAMES[date.getDay()];
-  return `Monthly on the ${ordinalLabel} ${weekday}`;
+export function formatMonthlyByDayLabel(date: Date | null | undefined, locale: UiLocale): string {
+  const t = getTranslator(locale);
+  if (!date) return t("EventSchedule.recurrence.monthlyByDay");
+  // 2023-01-01 is a Sunday; formatting in UTC keeps the local weekday index.
+  const weekday = formatDate(Date.UTC(2023, 0, 1 + date.getDay()), locale, { weekday: "long", day: undefined, month: undefined, year: undefined }, "UTC");
+  return t("EventSchedule.recurrence.monthlyByDayOn", { ordinal: String(ordinalForStartDate(date)), weekday });
 }
 
 export function buildMonthlyByDayRRule(date: Date | null | undefined): string {
@@ -99,10 +98,11 @@ export function buildMonthlyByDayRRule(date: Date | null | undefined): string {
 
 export function recurrenceOptionLabel(
   option: RecurrenceOption,
-  startDate?: Date | null
+  startDate: Date | null | undefined,
+  locale: UiLocale
 ): string {
-  if (option === "monthly-by-day") return formatMonthlyByDayLabel(startDate ?? null);
-  return RECURRENCE_OPTIONS.find((item) => item.value === option)?.label ?? "";
+  if (option === "monthly-by-day") return formatMonthlyByDayLabel(startDate ?? null, locale);
+  return getTranslator(locale)(`EventSchedule.recurrence.${RECURRENCE_LABEL_KEYS[option]}`);
 }
 
 function padDatePart(value: number) {

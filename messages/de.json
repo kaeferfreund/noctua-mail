@@ -1720,6 +1720,27 @@
     "filterCriteria": "Filter: {badges}",
     "queryCriteria": "„{query}“"
   },
+  "EventSchedule": {
+    "start": "Beginn",
+    "end": "Ende",
+    "startTime": "Uhrzeit Beginn",
+    "endTime": "Uhrzeit Ende",
+    "allDay": "Ganztägig",
+    "repeat": "Wiederholung",
+    "location": "Ort",
+    "locationPlaceholder": "Ort (optional)",
+    "openTimePicker": "Zeitauswahl öffnen",
+    "recurrence": {
+      "none": "Keine Wiederholung",
+      "daily": "Täglich",
+      "weekly": "Wöchentlich",
+      "everyTwoWeeks": "Alle zwei Wochen",
+      "monthly": "Monatlich",
+      "monthlyByDay": "Monatlich am selben Wochentag",
+      "monthlyByDayOn": "Monatlich am {ordinal, select, 1 {ersten} 2 {zweiten} 3 {dritten} 4 {vierten} other {letzten}} {weekday}",
+      "yearly": "Jährlich"
+    }
+  },
   "Folders": {
     "inbox": "Posteingang",
     "sent": "Gesendet",

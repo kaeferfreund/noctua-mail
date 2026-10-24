@@ -285,7 +285,7 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     // Real pointer hit testing catches a painted-over dialog that fill() alone misses.
     await title.click();
     await title.fill(`${summary} created`);
-    await create.getByRole("button", { name: "Open time picker" }).first().click();
+    await create.getByRole("button", { name: "Zeitauswahl öffnen" }).first().click();
     const picker = page.getByRole("listbox");
     await expect(picker).toBeVisible();
     const pickerLayer = await picker.locator("xpath=ancestor::*[contains(@class, 'rt-PopperContent')]").evaluate(element => Number(getComputedStyle(element).zIndex));
