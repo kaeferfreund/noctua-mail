@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { formatEnvelopeAddresses, resolveMessageSenderKey } from "@/lib/mail/imap/parser";
 import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
@@ -36,6 +37,8 @@ import {
 
 const DEFAULT_MAX_IDLE = 3;
 const DEFAULT_BACKGROUND_POLL_INTERVAL = 900_000; // 15 minutes
+// Bound orphaned streams even when the runtime reports neither abort nor cancel.
+const MAX_STREAM_LIFETIME_MS = 60 * 60 * 1000;
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
@@ -86,6 +89,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         let stopped = false;
         let pollTimer: ReturnType<typeof setInterval> | undefined;
         let keepaliveTimer: ReturnType<typeof setInterval> | undefined;
+        let lifetimeTimer: ReturnType<typeof setTimeout> | undefined;
         let polling = false;
         let pollClient: import("imapflow").ImapFlow | null = null;
         const { userId, sessionId, generation, authenticatedAt, expiresAt } = accountContext.session;
@@ -132,6 +136,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           if (stopped) return;
           stopped = true;
           streamTimers.clearInterval(pollTimer); streamTimers.clearInterval(keepaliveTimer);
+          streamTimers.clearTimeout(lifetimeTimer);
           request.signal.removeEventListener("abort", onAbort);
           unregister();
           try { controller.close(); } catch { /* Already closed. */ }
@@ -143,6 +148,17 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         cancelStream = onAbort;
         request.signal.addEventListener("abort", onAbort, { once: true });
         if (request.signal.aborted) { onAbort(); return; }
+        if (stopped) return;
+
+        const streamId = randomUUID().slice(0, 8);
+        lifetimeTimer = streamTimers.setTimeout(async () => {
+          try {
+            // Authorization is asynchronous: deliver before closing the stream.
+            await send("reconnect", { streamId });
+          } finally {
+            authStream.close();
+          }
+        }, MAX_STREAM_LIFETIME_MS);
 
         const closeSession = async (folderId: string) => {
           const sess = sessions.get(folderId);
