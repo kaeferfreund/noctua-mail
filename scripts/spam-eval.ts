@@ -3,6 +3,7 @@
  *
  *   bun scripts/spam-eval.ts --data /path/to/noctua-data [--sample eval-sample.json]
  *     [--rules static-rules.json] [--limit 200 [--stratified]] [--concurrency 4] [--threshold 0.85]
+ *     [--out eval-result.json]
  *
  * --limit N takes the first N items (the sample lists spam first); with
  * --stratified it takes N/2 spam and N/2 ham instead.
@@ -12,25 +13,29 @@
  * messages and a seeded random 1,000 INBOX messages are used. With
  * ANTHROPIC_API_KEY set the model is called (costs money); without it only the
  * allowlist and static rules run and the rest is reported as undecided. Output
- * names messages by subject and sender only.
+ * names messages by subject and sender only, plus the model's token usage, the
+ * prompt-cache hit rate and a cost estimate (prices: SPAM_MODEL_PRICES in config). --out writes every evaluated item
+ * with its decision as JSON (input for scripts/spam-apply.ts).
  */
 import { Database, constants } from "bun:sqlite";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { simpleParser } from "mailparser";
 import type { Folder } from "../lib/data";
 import { sentToAddressInDb } from "../lib/db/sentRecipients";
 import { buildOwnIdentitySets, type SpamAllowlistContext } from "../lib/mail/spam/allowlist";
 import { classifySpam, shouldMarkAsSpam } from "../lib/mail/spam/classifySpam";
-import { isValidThreshold, resolveSpamConfig } from "../lib/mail/spam/config";
+import { isValidThreshold, resolveSpamConfig, SPAM_MODEL_PRICES } from "../lib/mail/spam/config";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
 import { loadStaticRules, serverFlaggedSpam, staticRulesPath } from "../lib/mail/spam/staticRules";
+import type { SpamEvalRecord } from "../lib/mail/spam/apply";
 import type { SpamDecision, SpamInput } from "../lib/mail/spam/types";
+import { addSpamUsage, EMPTY_SPAM_USAGE, estimateSpamCostUsd, spamCacheHitRate } from "../lib/mail/spam/usage";
 import { findInboxFolder, findSentFolder, isSpamFolder } from "../lib/specialFolders";
 
 type Item = { accountId: string; id: string; label: "spam" | "ham"; serverSpamFlag?: boolean };
-type Outcome = { item: Item; subject: string; sender: string; decision: SpamDecision | null; marked: boolean; serverFlag: boolean; error?: string };
+type Outcome = { item: Item; subject: string; sender: string; fromEmail: string | null; mailboxPath: string | null; decision: SpamDecision | null; marked: boolean; serverFlag: boolean; error?: string };
 
 function arg(name: string) {
   const index = process.argv.indexOf(`--${name}`);
@@ -40,6 +45,8 @@ function arg(name: string) {
 const dataDir = path.resolve(arg("data") ?? process.env.NOCTUA_DATA_DIR ?? "");
 if (!arg("data") && !process.env.NOCTUA_DATA_DIR) throw new Error("Pass --data <data dir> (read-only)");
 const samplePath = arg("sample");
+const outPath = arg("out") ? path.resolve(arg("out")!) : undefined;
+if (outPath && !path.relative(dataDir, outPath).startsWith("..")) throw new Error("--out must not point into the data dir");
 const rulesPath = arg("rules") ?? staticRulesPath();
 const limit = Number(arg("limit") ?? 0);
 const stratified = process.argv.includes("--stratified");
@@ -113,6 +120,7 @@ const selected = limit <= 0 ? items
   : stratified ? [...byLabel("spam", Math.ceil(limit / 2)), ...byLabel("ham", Math.floor(limit / 2))]
   : items.slice(0, limit);
 const rules = await loadStaticRules(rulesPath);
+let usage = EMPTY_SPAM_USAGE;
 
 async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<string, unknown> } | null> {
   const { db } = shard(item.accountId);
@@ -128,7 +136,7 @@ async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<st
 async function evaluate(item: Item): Promise<Outcome | null> {
   const loaded = await loadInput(item);
   if (!loaded) return null;
-  const { input } = loaded;
+  const { input, row } = loaded;
   const { db, folders } = shard(item.accountId);
   const sent = findSentFolder(folders, item.accountId);
   const allowlist: SpamAllowlistContext = {
@@ -137,9 +145,13 @@ async function evaluate(item: Item): Promise<Outcome | null> {
     // The dev data has no recorded user decisions yet.
     latestDecision: async () => null
   };
-  const base = { item, subject: input.subject, sender: input.fromEmail ?? input.from, serverFlag: item.serverSpamFlag ?? serverFlaggedSpam(input) };
+  const base = {
+    item, subject: input.subject, sender: input.fromEmail ?? input.from, fromEmail: input.fromEmail ?? null,
+    mailboxPath: typeof row.mailboxPath === "string" ? row.mailboxPath : null, serverFlag: item.serverSpamFlag ?? serverFlaggedSpam(input)
+  };
   try {
-    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model, providerOptions: getSpamProviderOptions(config) });
+    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model,
+      providerOptions: getSpamProviderOptions(config), onUsage: (call) => { usage = addSpamUsage(usage, call); } });
     return { ...base, decision, marked: shouldMarkAsSpam(decision, threshold) };
   } catch (error) {
     return { ...base, decision: null, marked: false, error: String(error) };
@@ -190,3 +202,30 @@ console.log(`Spam passed by allowlist/allow rules: ${allowlistedSpam.length}`);
 allowlistedSpam.slice(0, 30).forEach((outcome) => console.log(`${line(outcome)} [${outcome.decision?.source}: ${outcome.decision?.reasons.join("; ")}]`));
 const errors = outcomes.filter((outcome) => outcome.error);
 if (errors.length) console.log(`Errors: ${errors.length} (first: ${errors[0].error})`);
+if (usage.calls) {
+  console.log(`Model usage: ${usage.calls} calls, input ${usage.inputTokens} tokens (uncached ${usage.noCacheTokens}, `
+    + `cache read ${usage.cacheReadTokens}, cache write ${usage.cacheWriteTokens}), output ${usage.outputTokens} tokens`);
+  console.log(`Cache hit rate: ${pct(spamCacheHitRate(usage))} of input tokens read from cache; ${usage.cacheHits} of ${usage.calls} calls read the cache`);
+  const price = SPAM_MODEL_PRICES[config.model];
+  console.log(price
+    ? `Estimated cost: $${estimateSpamCostUsd(usage, price).toFixed(4)} (${config.model} list prices, cache writes at the 1 h TTL)`
+    : `Estimated cost: no price for ${config.model} in SPAM_MODEL_PRICES`);
+}
+
+if (outPath) {
+  // Same mapping as the stored verdict: "spam" only when marked, a spam verdict below the threshold is "unsure".
+  const records: SpamEvalRecord[] = outcomes.map((outcome) => ({
+    accountId: outcome.item.accountId,
+    id: outcome.item.id,
+    label: outcome.item.label,
+    decision: outcome.marked ? "spam" : outcome.decision?.verdict === "ham" ? "ham" : "unsure",
+    source: outcome.error ? "error" : outcome.decision?.source ?? "undecided",
+    confidence: outcome.decision?.confidence ?? null,
+    subject: outcome.subject,
+    fromEmail: outcome.fromEmail,
+    mailboxPath: outcome.mailboxPath,
+    serverSpamFlag: outcome.serverFlag
+  }));
+  writeFileSync(outPath, `${JSON.stringify({ generatedAt: new Date().toISOString(), threshold, items: records }, null, 2)}\n`);
+  console.log(`Wrote ${records.length} items to ${outPath}`);
+}
