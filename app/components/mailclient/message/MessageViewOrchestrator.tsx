@@ -154,6 +154,11 @@ export type MessageViewOrchestratorHandle = {
 
 export type MessageViewOrchestratorHeaderInputs = {
   toolbar?: React.ReactNode;
+  // Places `toolbar` at the end of the subject row instead of in its own
+  // row above the thread header (desktop split layout: only Expand).
+  toolbarInSubjectRow?: boolean;
+  // One line under the subject row (the split layout's one-time tip).
+  notice?: React.ReactNode;
   mailboxLabel?: string;
   collab?: { controller: ThreadCollabController; role?: AccountRole };
   // Used to compute thread topics / fallback thread-subject source and
@@ -720,6 +725,7 @@ function MessageViewOrchestratorImpl(
   const threadViewModeToggle = showThreadViewModeToggle ? (
     <SegmentedControl.Root
       size="1"
+      className={paneStyles.viewModeToggle}
       value={threadViewMode}
       onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
       style={{ flexShrink: 0 }}
@@ -731,7 +737,7 @@ function MessageViewOrchestratorImpl(
 
   return (
     <MessageViewPane
-      toolbar={header.toolbar}
+      toolbar={header.toolbarInSubjectRow ? null : header.toolbar}
       backActions={isMobile && activeMessage ? threadViewModeToggle : null}
       header={activeMessage ? (() => {
               const rootSubject =
@@ -761,7 +767,9 @@ function MessageViewOrchestratorImpl(
                     <ThreadSubject key={rootSubject} subject={rootSubject} />
                     {header.mailboxLabel ? <Badge size="1" color="gray">{header.mailboxLabel}</Badge> : null}
                     {isMobile ? null : threadViewModeToggle}
+                    {header.toolbarInSubjectRow ? header.toolbar : null}
                   </Flex>
+                  {header.notice}
                   {threadTopics.length > 0 && (
                     <Flex gap="1" wrap="wrap" justify="end">
                       {threadTopics.map((topic) => (
