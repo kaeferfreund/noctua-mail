@@ -1436,8 +1436,8 @@ export function useSyncController({
       // A planned stream end can reconnect immediately without starting polling.
       source.addEventListener("reconnect", () => {
         if (disposed || streamSourceRef.current !== source) return;
-        if (document.visibilityState === "visible") startStream();
-        else stopStream();
+        // Hidden: the same path as `visibilitychange`, in case that event was missed.
+        handleVisibility();
       });
     };
 
