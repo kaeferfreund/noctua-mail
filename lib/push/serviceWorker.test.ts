@@ -129,6 +129,14 @@ describe("service worker push", () => {
     expect(worker.notifications[1].options.data).toEqual({ url: "/?m=x#top" });
   });
 
+  it("never turns a same-origin URL with a // path into a link to another host", async () => {
+    const worker = loadWorker();
+    for (const url of [`${origin}//evil.example.invalid/x`, `${origin}/\\evil.example.invalid/x`, "//evil.example.invalid/x", "/\\evil.example.invalid/x"]) {
+      await worker.push({ ...mail, url });
+    }
+    expect(worker.notifications.map((n) => n.options.data)).toEqual(Array(4).fill({ url: "/" }));
+  });
+
   it("badge pushes only update the app badge; zero clears it", async () => {
     const worker = loadWorker();
     await worker.push({ type: "badge", badge: 7, sentAt: 1 });
@@ -159,6 +167,19 @@ describe("service worker notification click", () => {
     const cold = loadWorker();
     await cold.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
     expect(cold.opened).toEqual([mail.url]);
+  });
+});
+
+describe("service worker notification click on a foreign target", () => {
+  it("opens only same-origin windows, whatever the notification data says", async () => {
+    for (const url of ["//evil.example.invalid/x", "https://evil.example.invalid/x", `${origin}//evil.example.invalid/x`]) {
+      const cold = loadWorker();
+      await cold.dispatch("notificationclick", { notification: { data: { url }, close() {} } });
+      expect(cold.opened).toEqual(["/"]);
+      const warm = loadWorker({ clients: [{ url: `${origin}/` }] });
+      await warm.dispatch("notificationclick", { notification: { data: { url }, close() {} } });
+      expect(warm.posted).toEqual([{ client: `${origin}/`, message: { type: "noctua:notification-open", url: "/" } }]);
+    }
   });
 });
 
