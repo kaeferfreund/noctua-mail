@@ -45,7 +45,9 @@
   text-overflow: ellipsis;
 }
 
+/* On phones a long address takes its own line under the name and truncates
+   there, never breaking mid-word; the trigger's title holds the full address. */
 @media (width < 768px) {
   .addressTrigger { flex-wrap: wrap; }
-  .addressEmail { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .addressEmail { max-width: 100%; }
 }

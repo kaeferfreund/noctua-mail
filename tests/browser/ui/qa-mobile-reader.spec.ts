@@ -19,8 +19,10 @@ const html = `<html><body><img src="https://images.example.test/logo.png" width=
 <h1>Swap-Punkte | KW 44</h1><p>Liebe Kundin, lieber Kunde,</p>
 ${Array.from({ length: 12 }, (_, n) => `<p>Synthetischer Absatz ${n + 1} für die mobile Leseansicht.</p>`).join("\n")}
 </body></html>`;
+// A sender address longer than a phone row: it must truncate, not break mid-word.
+const senderEmail = "kundenservice.benachrichtigungen@mail.example.test";
 const source = [
-  "From: Synthetic Broker <support@mail.example.test>",
+  `From: Synthetic Broker <${senderEmail}>`,
   "To: demo@monkeydent.test",
   "Message-ID: <qa-mobile-reader@example.test>",
   `Date: ${new Date(Date.now() + 3_600_000).toUTCString()}`,
@@ -51,12 +53,40 @@ async function measure(page: Page) {
       const element = [...document.querySelectorAll<HTMLElement>(selector)].find(item => item.getBoundingClientRect().height > 0);
       return element ? Math.round(element.getBoundingClientRect().top) : null;
     };
+    // The message card's own actions (Reply … Delete), next to its Delete button.
+    const actions = [...document.querySelectorAll<HTMLElement>('[data-message-action="delete"]')]
+      .find(item => item.getBoundingClientRect().height > 0)?.parentElement;
+    const address = [...document.querySelectorAll<HTMLElement>('button[title*="<"]')]
+      .find(item => item.getBoundingClientRect().height > 0);
+    const email = address?.lastElementChild as HTMLElement | undefined;
     return {
       bannerTop: top('[data-mail-print="body"] [role="status"]'),
       bodyTop: top('[data-mail-print="body"] iframe'),
-      horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+      horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
+      actionTargets: [...actions?.querySelectorAll("button") ?? []].map(button => {
+        const box = button.getBoundingClientRect();
+        return { name: button.getAttribute("aria-label"), width: Math.round(box.width), height: Math.round(box.height) };
+      }),
+      address: email ? {
+        title: address!.title,
+        lineHeight: parseFloat(getComputedStyle(email).lineHeight),
+        height: email.getBoundingClientRect().height,
+        truncated: email.scrollWidth > email.clientWidth,
+        insideCard: email.getBoundingClientRect().right <= innerWidth
+      } : null
     };
   });
+}
+
+/** Relative luminance of the HTML body's text inside the sandboxed mail frame. */
+async function bodyTextLuminance(page: Page) {
+  const frame = page.frames().find(item => item !== page.mainFrame() && item.url() === "about:srcdoc");
+  const color = await frame!.evaluate(() => getComputedStyle(document.querySelector("p")!).color);
+  const [r, g, b] = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map(value => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return { color, luminance: 0.2126 * r + 0.7152 * g + 0.0722 * b };
 }
 
 test("mobile reader: compact header rows leave room for the mail body", async ({ page }) => {
@@ -80,10 +110,24 @@ test("mobile reader: compact header rows leave room for the mail body", async ({
       await openMail(page);
       // Let the sandboxed HTML frame settle its measured height.
       await page.waitForTimeout(800);
-      const result = { ...viewport, scheme, ...await measure(page) };
+      const result = { ...viewport, scheme, ...await measure(page), bodyText: await bodyTextLuminance(page) };
       results.push(result);
       await page.screenshot({ path: path.join(evidence, `${prefix}-${viewport.width}-${scheme}.png`) });
       expect(result.horizontalOverflow).toBe(false);
+      // Plain HTML mails take the theme's text colour (light text on the dark card).
+      if (scheme === "dark") expect(result.bodyText.luminance).toBeGreaterThan(0.6);
+      else expect(result.bodyText.luminance).toBeLessThan(0.05);
+      if (viewport.width < 768) {
+        expect(result.actionTargets.map(target => target.name)).toEqual(["Antworten", "Allen antworten", "Weiterleiten", "Ähnliche suchen", "Löschen"]);
+        for (const target of result.actionTargets) {
+          expect(target.width, target.name!).toBeGreaterThanOrEqual(40);
+          expect(target.height, target.name!).toBeGreaterThanOrEqual(40);
+        }
+        // One truncated line inside the card; the trigger's title keeps the full address.
+        expect(result.address).toMatchObject({ truncated: true, insideCard: true });
+        expect(result.address!.height).toBeLessThanOrEqual(result.address!.lineHeight * 1.5);
+        expect(result.address!.title).toBe(`Synthetic Broker <${senderEmail}>`);
+      }
       if (process.env.MOBILE_READER_ASSERT_BODY === "1" && viewport.width === 390) {
         expect(result.bodyTop).not.toBeNull();
         expect(result.bodyTop!).toBeLessThan(viewport.height * 0.45);
