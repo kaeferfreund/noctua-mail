@@ -51,8 +51,17 @@ const appendShortTimeZone = (timestamp: string) => {
   return shortTimeZone ? `${timestamp} ${shortTimeZone}` : timestamp;
 };
 
-const buildHashValue = (env: EnvMap) => env.NOCTUA_BUILD_HASH ?? env.NEXT_PUBLIC_BUILD_HASH;
-const buildTimeValue = (env: EnvMap) => env.NOCTUA_BUILD_TIME ?? env.NEXT_PUBLIC_BUILD_TIME;
+// A blank variable (`NOCTUA_BUILD_HASH=` in an EnvironmentFile) counts as unset.
+const firstSet = (...values: (string | undefined)[]) => values.find(value => value?.trim());
+const buildHashValue = (env: EnvMap) => firstSet(env.NOCTUA_BUILD_HASH, env.NEXT_PUBLIC_BUILD_HASH);
+const buildTimeValue = (env: EnvMap) => firstSet(env.NOCTUA_BUILD_TIME, env.NEXT_PUBLIC_BUILD_TIME);
+
+/** True when the stamp's calendar fields exist (Date.parse rolls 2026-02-30 over to March). */
+const isCalendarDateTime = (value: string) => {
+  const [year, month, day, hour, minute, second = 0] = (value.match(/\d+/g) ?? []).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day && hour < 24 && minute < 60 && second < 60;
+};
 
 /** UTC ISO instant (`2026-10-23T13:16:05Z`), or null when the stamp is not a date-time. */
 const parseBuildTime = (value?: string) => {
@@ -60,7 +69,7 @@ const parseBuildTime = (value?: string) => {
   const candidate = UNZONED_TIMESTAMP_PATTERN.test(trimmed)
     ? `${trimmed.replace(" ", "T")}Z`
     : ZONED_TIMESTAMP_PATTERN.test(trimmed) ? trimmed : "";
-  const time = candidate ? Date.parse(candidate) : Number.NaN;
+  const time = candidate && isCalendarDateTime(candidate) ? Date.parse(candidate) : Number.NaN;
   return Number.isNaN(time) ? null : new Date(time).toISOString().replace(/\.000Z$/, "Z");
 };
 
@@ -81,6 +90,7 @@ export const getBuildInfo = (env: EnvMap = process.env): BuildIdentity | null =>
   };
 };
 
+/** Label the client compares with /api/version to detect a new deployment. */
 export const getBuildVersionLabel = (env: EnvMap = process.env) => {
   const hash = normalizeBuildHash(buildHashValue(env));
   const timestamp = appendShortTimeZone(normalizeBuildTimestamp(buildTimeValue(env)));
@@ -89,4 +99,46 @@ export const getBuildVersionLabel = (env: EnvMap = process.env) => {
     return `${hash} | ${timestamp}`;
   }
   return hash || timestamp;
+};
+
+/** Contents of public/build-version.json, written by build-scripts/generateBuildVersion.ts. */
+export type BuildVersionPayload = {
+  ok: true;
+  buildVersionLabel: string;
+  /** Full commit hash; absent in files from older builds and in the tracked placeholder. */
+  hash?: string;
+  builtAt?: string | null;
+};
+
+/** The build identity to record in the build artifact, from the build-time environment. */
+export const createBuildVersionPayload = (env: EnvMap = process.env): BuildVersionPayload => {
+  const info = getBuildInfo(env);
+  return { ok: true, buildVersionLabel: getBuildVersionLabel(env), ...(info ? { hash: info.hash, builtAt: info.builtAt } : {}) };
+};
+
+export type RunningBuild = {
+  /** Comparison key for the client's new-build check. */
+  label: string;
+  /** What BuildInfo displays; null without a known commit. */
+  info: BuildIdentity | null;
+};
+
+/**
+ * The build artifact is the source of the running build's identity: it is
+ * written next to the compiled app, so the label, the display and the
+ * /api/version answer always describe the code that is running, also in
+ * Docker images whose build arguments are not set at runtime. The runtime
+ * environment is used only when the artifact carries no identity (next dev,
+ * builds from before the artifact recorded the commit).
+ */
+export const resolveRunningBuild = (file: Partial<BuildVersionPayload> | null, env: EnvMap = process.env): RunningBuild => {
+  const hash = readBuildHash(typeof file?.hash === "string" ? file.hash : "");
+  if (hash) {
+    return {
+      label: typeof file?.buildVersionLabel === "string" && file.buildVersionLabel ? file.buildVersionLabel : normalizeBuildHash(hash),
+      info: { hash, shortHash: hash.slice(0, SHORT_COMMIT_LENGTH), builtAt: parseBuildTime(file?.builtAt ?? undefined) }
+    };
+  }
+  const fileLabel = typeof file?.buildVersionLabel === "string" ? file.buildVersionLabel.trim() : "";
+  return { label: fileLabel || getBuildVersionLabel(env), info: getBuildInfo(env) };
 };
