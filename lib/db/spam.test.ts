@@ -155,7 +155,8 @@ describe("sender profiles", () => {
       f.message("<e@example.test>", { from, dateValue: now - 2 * day }),
       f.message("<f@example.test>", { from, dateValue: now - 2 * day }));
     const trusted = { verdict: "ham" as const, confidence: 1, reasons: ["trusted:profile (25 Mails seit 2026-03, DKIM service.example.test)"] };
-    for (const message of [skipped, old, other]) await f.api.saveSpamVerdict(f.accountId, message.id, trusted);
+    for (const message of [skipped, other]) await f.api.saveSpamVerdict(f.accountId, message.id, trusted, { checkedAt: now - day });
+    await f.api.saveSpamVerdict(f.accountId, old.id, trusted, { checkedAt: now - 10 * day });
     await f.api.saveSpamVerdict(f.accountId, modelChecked.id, { verdict: "ham", confidence: 0.9, reasons: ["Benachrichtigung"] });
     await f.api.saveSpamVerdict(f.accountId, canary.id, { verdict: "ham", confidence: 0.9, reasons: ["trusted:canary (Stichprobe, 25 Mails seit 2026-03)"] });
     await f.api.saveSpamVerdict(f.accountId, canaryMismatch.id, { verdict: "unsure", confidence: 0.7, reasons: ["trusted:canary (Stichprobe, 25 Mails seit 2026-03)", "Link"] });
@@ -166,6 +167,17 @@ describe("sender profiles", () => {
     expect((await f.api.getMessageById(f.accountId, modelChecked.id))?.spamVerdict).toBe("ham");
     expect((await f.api.getMessageById(f.accountId, old.id))?.spamVerdict).toBe("ham");
     expect(await f.api.countSpamTrustDecisions(f.accountId)).toEqual({ trustedSkips: 2, canaryChecks: 2, canaryMismatches: 1 });
+
+    // Same sender in another spelling: legacy row without fromEmail, upper case, comment instead of brackets, IDN domain.
+    const idnSender = "info@xn--bcher-kva.example.test";
+    const [legacy, idn, backdated] = await f.seed(
+      f.message("<g@example.test>", { from: "NOTIFY@Service.Example.Test (Service)", dateValue: now - day }),
+      f.message("<h@example.test>", { from: "Bücher <Info@Bücher.example.test>", dateValue: now - day }),
+      f.message("<i@example.test>", { from, dateValue: now - 400 * day }));
+    f.db.prepare("UPDATE messages SET fromEmail = NULL WHERE id = ?").run(legacy.id);
+    for (const message of [legacy, idn, backdated]) await f.api.saveSpamVerdict(f.accountId, message.id, trusted, { checkedAt: now - day });
+    expect((await f.api.resetTrustedSpamChecks(f.accountId, f.folderId, sender, now - 7 * day)).sort()).toEqual([legacy.id, backdated.id].sort());
+    expect(await f.api.resetTrustedSpamChecks(f.accountId, f.folderId, idnSender, now - 7 * day)).toEqual([idn.id]);
 
     const around = await f.api.listSenderMailsAround(f.accountId, f.folderId, sender, now - day, 60 * 60_000, skipped.id);
     expect(around.map((row) => row.id)).toEqual([modelChecked.id]);
