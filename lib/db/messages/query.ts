@@ -1788,10 +1788,10 @@ async function getTotalCount(params: {
 
 /**
  * Group meta for the thread list's "date" grouping without a count query.
- * The client shows the loaded rows per date bucket, never these counts (the
- * SQL buckets in getThreadGroupCounts use host-local day boundaries, see
- * buildGroupedMessages). Every bucket is listed, so the client keeps the
- * collapse state of buckets that are not on the loaded pages.
+ * The client shows the loaded rows per date bucket, never SQL bucket counts
+ * (SQL day boundaries would be host-local, see buildGroupedMessages). Every
+ * bucket is listed, so the client keeps the collapse state of buckets that
+ * are not on the loaded pages.
  */
 function getLoadedDateGroups(items: Message[]): GroupMeta[] {
   const counts = new Map<string, number>();
@@ -1804,6 +1804,7 @@ function getLoadedDateGroups(items: Message[]): GroupMeta[] {
   );
 }
 
+/** Thread bucket counts for "week" / "year"; "date" uses getLoadedDateGroups. */
 async function getThreadGroupCounts(params: {
   db: any;
   accountId: string;
@@ -1819,34 +1820,6 @@ async function getThreadGroupCounts(params: {
       ON t.accountId = m.accountId
      AND t.threadId = m.threadId
   `;
-
-  if (groupBy === "date") {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const rows = db
-      .prepare(
-        `
-        SELECT
-          CASE
-            WHEN t.${threadDateColumn} >= ? THEN 'Today'
-            WHEN t.${threadDateColumn} >= ? THEN 'Yesterday'
-            WHEN t.${threadDateColumn} >= ? THEN 'This Week'
-            ELSE 'Older'
-          END as key,
-          COUNT(*) as count
-        ${joinFrom}
-        WHERE ${where}
-        GROUP BY key
-      `
-      )
-      .all(
-        todayStart,
-        todayStart - 24 * 60 * 60 * 1000,
-        todayStart - 7 * 24 * 60 * 60 * 1000,
-        ...args
-      ) as Array<{ key: string; count: number }>;
-    return groupsFromRows(sortGroupsForGroupBy(rows, groupBy), groupBy);
-  }
 
   if (groupBy === "week") {
     const rows = db
