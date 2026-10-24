@@ -2,6 +2,7 @@ import type { ImapFlow, ImapFlowOptions } from "imapflow";
 import tls from "tls";
 
 import type { Account } from "@/lib/data";
+import { isImapDeadlineCancelled } from "./imapCancellation";
 import { markImapConnectFailure } from "./imapError";
 import { getImapLogger, logImapOp } from "./imapLogger";
 
@@ -363,6 +364,13 @@ export async function connectImapClientWithRetry(params: {
       }
       if (closedByOwner) {
         // A cancellation, not a server failure: no retry and no breaker count.
+        // This includes the post-send deadline (`withImapDeadline`) closing a
+        // pending connect. Its budget is shared with the SMTP send, so a slow
+        // send can leave the connect a fraction of a second on a healthy server;
+        // a breaker opened by that would block every IMAP path of the account
+        // for the cooldown. A server that really hangs still trips the breaker
+        // through ImapFlow's own connection/greeting timeouts on the stream,
+        // watcher and sync paths.
         if (logger !== false) {
           logger.info?.({
             event: "imap.connect_cancelled",
@@ -370,6 +378,7 @@ export async function connectImapClientWithRetry(params: {
             clientId: logContext.clientId ?? null,
             mailbox: logContext.mailbox ?? null,
             host: account.imap.host,
+            cause: isImapDeadlineCancelled() ? "deadline" : "owner",
             attempt,
             error: (error as Error | undefined)?.message ?? String(error ?? "")
           });

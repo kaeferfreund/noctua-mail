@@ -6,6 +6,7 @@ import { ImapFlow } from "imapflow";
 import type { Account } from "@/lib/data";
 import { startImapServer } from "../../scripts/dev-fixture/imap-server";
 import { connectIdleImapClient } from "./imap/idle";
+import { bindImapCancellation, PostSendTimeoutError, withImapDeadline } from "./imapCancellation";
 import {
   bindImapClientError,
   buildImapFlowOptions,
@@ -43,6 +44,9 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
   let closingServer: Server;
   let closingPort = 0;
   let closingAccepts = 0;
+  let silentServer: Server;
+  let silentPort = 0;
+  const silentSockets = new Set<Socket>();
   const originalEnv = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
   const originalLog = console.log;
   const originalWarn = console.warn;
@@ -60,11 +64,22 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
     await once(closingServer, "listening");
     const address = closingServer.address();
     closingPort = typeof address === "object" && address ? address.port : 0;
+    // A hanging server: accepts TCP but never sends the greeting.
+    silentServer = createServer((socket) => {
+      silentSockets.add(socket);
+      socket.on("close", () => silentSockets.delete(socket));
+    });
+    silentServer.listen(0, "127.0.0.1");
+    await once(silentServer, "listening");
+    const silentAddress = silentServer.address();
+    silentPort = typeof silentAddress === "object" && silentAddress ? silentAddress.port : 0;
   });
 
   afterAll(async () => {
     await fixture.stop();
     await new Promise<void>((resolve) => closingServer.close(() => resolve()));
+    for (const socket of silentSockets) socket.destroy();
+    await new Promise<void>((resolve) => silentServer.close(() => resolve()));
   });
 
   beforeEach(() => {
@@ -121,7 +136,8 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
       line.includes("cancelled=Unexpected close"))).toBe(true);
     expect(warnings.some((line) => line.includes('"event":"imap.connect_retry"'))).toBe(false);
     expect(warnings.some((line) => line.includes('"event":"imap.connect_breaker_open"'))).toBe(false);
-    expect(infos.some((line) => line.includes('"event":"imap.connect_cancelled"'))).toBe(true);
+    expect(infos.some((line) => line.includes('"event":"imap.connect_cancelled"') &&
+      line.includes('"cause":"owner"'))).toBe(true);
     expect(getImapConnectBlockedUntil(account)).toBe(0);
 
     // The account stays connectable right away.
@@ -149,6 +165,34 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
     expect(created).toBe(1);
     expect(getImapConnectBlockedUntil(account)).toBe(0);
     expect(warnings).toEqual([]);
+  });
+
+  it("a post-send deadline ending a hanging connect is a cancellation, not a breaker failure", async () => {
+    const account = fixtureAccount("acc-deadline", silentPort);
+    let created = 0;
+    let settled!: Promise<unknown>;
+
+    await expect(withImapDeadline(Date.now() + 100, async () => {
+      settled = connectImapClientWithRetry({
+        account,
+        logContext: { accountId: account.id, mailbox: "INBOX" },
+        connectOp: "imap.connect",
+        createClient: () => {
+          created += 1;
+          const client = newClient(account);
+          bindImapCancellation(client);
+          return client;
+        }
+      });
+      return await settled;
+    })).rejects.toBeInstanceOf(PostSendTimeoutError);
+    await settled.catch(() => {});
+
+    expect(created).toBe(1);
+    expect(getImapConnectBlockedUntil(account)).toBe(0);
+    expect(warnings).toEqual([]);
+    const cancelled = infos.find((line) => line.includes('"event":"imap.connect_cancelled"'));
+    expect(cancelled).toContain('"cause":"deadline"');
   });
 
   it("still retries and opens the breaker when the server closes during connect", async () => {
