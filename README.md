@@ -11,6 +11,19 @@ A working WebCal integration is planned, I need it, and it will be the first thi
 
 ![noctua-mail.png](doc/noctua-mail.png)
 
+## CI
+
+[![CI](https://github.com/kaeferfreund/noctua-mail/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kaeferfreund/noctua-mail/actions/workflows/ci.yml)
+
+GitHub Actions runs typecheck, lint, unit and DOM tests, and a production build
+with synthetic build-only settings on pull requests and pushes to `main`,
+`team-inbox`, `integration/stage`, and `deploy/dev-stage`. Failed test logs are
+available as workflow artifacts. The inherited upstream deployment workflows
+are disabled for this fork; deployments follow the ops runbooks.
+
+Dependabot checks Bun dependencies and GitHub Actions weekly, targeting
+`integration/stage`; minor and patch updates are grouped, majors stay individual.
+
 ## ✨ Key Features
 
 ### 🧠 Adaptive Email Categorization
