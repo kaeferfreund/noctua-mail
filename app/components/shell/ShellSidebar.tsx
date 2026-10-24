@@ -4,8 +4,8 @@ import { formatNumber } from "@/lib/i18n/format";
 import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
-import { memo, useMemo, useRef, useState, type ReactNode } from "react";
-import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
+import { memo, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
@@ -39,6 +39,7 @@ import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
+import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -58,6 +59,8 @@ export type ShellSidebarProps = {
     accounts: ShellAccount[];
     summaries?: readonly UserMailboxSummary[];
     activeAccountId: string;
+    /** Signed-in user; keys the collapsed domain groups on this device. */
+    userId?: string | null;
     /** May return the switch promise; the clicked row shows a pending state until it settles. */
     onSwitch: (accountId: string) => void | Promise<unknown>;
     onAdd?: () => void;
@@ -85,6 +88,9 @@ const GROUPED_ROW_CLASS = "pl-8";
 /** Thin tree guide down the left of a domain group's rows, under the centre
  * of the heading's 16 px icon slot; drawn above the row fills. */
 const DOMAIN_GROUP_GUIDE_CLASS = "relative isolate before:pointer-events-none before:absolute before:inset-y-0 before:left-[15px] before:z-10 before:w-px before:bg-sidebar-border";
+/** The domain heading toggles its group: menu-row hover and focus ring, and
+ * the active fill while it hides the active mailbox. */
+const DOMAIN_HEADER_CLASS = "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2";
 
 type MailboxRowProps = {
   account: ShellAccount;
@@ -183,49 +189,94 @@ function DomainIcon({ domain, accounts }: { domain: string; accounts: readonly S
   );
 }
 
+/** Unread and assigned-to-me totals of a collapsed group, each shown only
+ * when it carries news (same rule as the mailbox badge). */
+function DomainCounts({ accounts, summaryById }: { accounts: readonly ShellAccount[]; summaryById: ReadonlyMap<string, UserMailboxSummary> }) {
+  const t = useTranslations("Shell");
+  let unread = 0;
+  let assignedToMe = 0;
+  for (const account of accounts) {
+    const summary = summaryById.get(account.id);
+    unread += summary?.unread ?? 0;
+    assignedToMe += summary?.assignedToMe ?? 0;
+  }
+  if (unread === 0 && assignedToMe === 0) return null;
+  return (
+    <span className="flex items-center gap-1.5 text-2xs tabular-nums" data-domain-counts="">
+      {unread > 0 ? <MailboxCount label={t("mailboxes.unread", {count: unread})} title={t("mailboxes.unreadTitle")}
+        icon={<Mail className="size-2.5" aria-hidden="true" />} value={unread} /> : null}
+      {assignedToMe > 0 ? <MailboxCount label={t("mailboxes.assigned", {count: assignedToMe})} title={t("mailboxes.assignedTitle")}
+        icon={<UserRound className="size-2.5" aria-hidden="true" />} value={assignedToMe} /> : null}
+    </span>
+  );
+}
+
 export function MailboxRows({
   accounts,
   activeAccountId,
   pendingAccountId = null,
   onSwitch,
-  summaries
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries"> & {
+  summaries,
+  userId
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
 }) {
   const t = useTranslations("Shell");
+  const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
+  const { collapsed, toggle } = useCollapsedDomains(userId);
   return (
     <div>
-      {groups.map((group) => (
-        <div key={group.domain ?? "all"} className={cn(grouped && "mt-3 first:mt-1")}>
-          {grouped ? (
-            <div className="flex items-center gap-2 px-2 pb-1 text-sm font-medium text-sidebar-foreground">
-              {/* The slot keeps the heading text in line with the rows'
-                  names while the icon loads, and when there is none. */}
-              <span className="flex size-4 shrink-0 items-center justify-center">
-                {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
-              </span>
-              <span className="truncate">{group.domain ?? t("mailboxes.other")}</span>
-            </div>
-          ) : null}
-          <SidebarMenu className={cn(grouped && DOMAIN_GROUP_GUIDE_CLASS)} data-domain-group={grouped ? "" : undefined}>
-            {group.accounts.map((account) => (
-              <MailboxRow
-                key={account.id}
-                account={account}
-                summary={summaryById.get(account.id)}
-                isActive={account.id === activeAccountId}
-                isPending={account.id === pendingAccountId}
-                grouped={grouped}
-                onSwitch={onSwitch}
-              />
-            ))}
-          </SidebarMenu>
-        </div>
-      ))}
+      {groups.map((group, index) => {
+        // Expanded by default; a collapsed group shows its totals on the
+        // heading and is tinted while it hides the active mailbox.
+        const domainKey = group.domain ?? "";
+        const isCollapsed = grouped && collapsed.has(domainKey);
+        const hidesActive = isCollapsed && group.accounts.some(account => account.id === activeAccountId);
+        const groupListId = `${listId}-${index}`;
+        return (
+          <div key={group.domain ?? "all"} className={cn(grouped && "mt-3 first:mt-1")}>
+            {grouped ? (
+              <button
+                type="button"
+                data-slot="domain-group-toggle"
+                className={cn(DOMAIN_HEADER_CLASS, ACTIVE_ROW_CLASS, !isCollapsed && "mb-1")}
+                aria-expanded={!isCollapsed}
+                aria-controls={groupListId}
+                data-active={hidesActive ? "true" : undefined}
+                onClick={() => toggle(domainKey)}
+              >
+                {/* The slot keeps the heading text in line with the rows'
+                    names while the icon loads, and when there is none. */}
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+                </span>
+                <span className="min-w-0 truncate">{group.domain ?? t("mailboxes.other")}</span>
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  {isCollapsed ? <DomainCounts accounts={group.accounts} summaryById={summaryById} /> : null}
+                  {isCollapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
+                </span>
+              </button>
+            ) : null}
+            <SidebarMenu id={grouped ? groupListId : undefined} hidden={isCollapsed} className={cn(grouped && DOMAIN_GROUP_GUIDE_CLASS, isCollapsed && "hidden")} data-domain-group={grouped ? "" : undefined}>
+              {isCollapsed ? null : group.accounts.map((account) => (
+                <MailboxRow
+                  key={account.id}
+                  account={account}
+                  summary={summaryById.get(account.id)}
+                  isActive={account.id === activeAccountId}
+                  isPending={account.id === pendingAccountId}
+                  grouped={grouped}
+                  onSwitch={onSwitch}
+                />
+              ))}
+            </SidebarMenu>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -352,6 +403,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     accounts={mine}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
+                    userId={mailboxes.userId}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />
@@ -368,6 +420,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     accounts={shared}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
+                    userId={mailboxes.userId}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />
