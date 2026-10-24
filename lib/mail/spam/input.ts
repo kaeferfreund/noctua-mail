@@ -1,7 +1,7 @@
 import { convert as htmlToTextConvert } from "html-to-text";
 import { isQuoteBoundaryText } from "@/lib/html/quoteBoundary";
 import { normalizeIdentityEmail, parseAddressEmails } from "@/lib/ownAddresses";
-import { extractDisplayName } from "@/lib/senderIdentity";
+import { extractDisplayName, getRootDomain } from "@/lib/senderIdentity";
 import type { SpamInput } from "./types";
 
 export const SPAM_TEXT_LIMIT = 4096;
@@ -37,6 +37,36 @@ export function extractLinkDomains(text: string, html?: string | null) {
   return [...domains].slice(0, MAX_LINK_DOMAINS);
 }
 
+const ANCHOR_OPEN = /<a\b[^>]*>/gi;
+const ANCHOR_HREF = /\bhref\s*=\s*["']?\s*(https?:\/\/[^\s"'<>]+)/i;
+const SHOWN_URL_PATTERN = /^(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:[/?#]\S*)?$/i;
+const ANCHOR_TEXT_LIMIT = 300;
+
+/**
+ * Link targets whose visible text is itself a URL or domain of another root
+ * domain ("www.bank.example" pointing to elsewhere.example). Newsletters do
+ * this with tracking links too, so the profile decides whether it is unusual.
+ */
+export function extractMaskedLinkDomains(html: string | null | undefined) {
+  if (!html) return [];
+  const masked = new Set<string>();
+  for (const match of html.matchAll(ANCHOR_OPEN)) {
+    const href = match[0].match(ANCHOR_HREF)?.[1];
+    if (!href) continue;
+    const start = match.index + match[0].length;
+    const close = html.slice(start, start + ANCHOR_TEXT_LIMIT).search(/<\/a\s*>/i);
+    if (close < 0) continue;
+    const shown = html.slice(start, start + close).replace(/<[^>]*>/g, "").replace(/&nbsp;/gi, " ").trim().match(SHOWN_URL_PATTERN)?.[1];
+    if (!shown) continue;
+    try {
+      const target = new URL(href).hostname.toLowerCase().replace(/^www\./, "");
+      if (target && getRootDomain(target) !== getRootDomain(shown.toLowerCase())) masked.add(target);
+    } catch { /* not a URL */ }
+    if (masked.size >= MAX_LINK_DOMAINS) break;
+  }
+  return [...masked];
+}
+
 function capText(text: string) {
   return stripQuotedText(text).replace(/[ \t]+/g, " ").slice(0, SPAM_TEXT_LIMIT);
 }
@@ -52,6 +82,8 @@ export type ParsedSpamSource = {
   from?: ParsedAddress;
   replyTo?: ParsedAddress;
   to?: ParsedAddress | ParsedAddress[];
+  cc?: ParsedAddress | ParsedAddress[];
+  messageId?: string;
   subject?: string;
   date?: Date;
   text?: string;
@@ -62,12 +94,12 @@ export type ParsedSpamSource = {
 
 const unfold = (value: string) => value.replace(/\r?\n[ \t]+/g, " ").trim().slice(0, HEADER_VALUE_LIMIT);
 
-function addressText(value: ParsedSpamSource["to"]) {
+function addressText(value: ParsedSpamSource["to"] | ParsedSpamSource["cc"]) {
   if (!value) return "";
   return (Array.isArray(value) ? value : [value]).map((entry) => entry.text ?? "").filter(Boolean).join(", ");
 }
 
-type HeaderLine = { key: string; value: string };
+export type HeaderLine = { key: string; value: string };
 
 /**
  * Only the receiving server's verdicts count: the top-most Authentication-Results
@@ -87,13 +119,34 @@ function topSpamHeaders(lines: HeaderLine[]) {
     .slice(0, MAX_SPAM_HEADERS).map((line) => `${line.key}: ${line.value}`);
 }
 
+/** Unfolded header lines of a raw header block (the part of a source before the first empty line). */
+export function parseHeaderBlock(block: string): HeaderLine[] {
+  const lines: HeaderLine[] = [];
+  for (const raw of block.replace(/\r?\n[ \t]+/g, " ").split(/\r?\n/)) {
+    const colon = raw.indexOf(":");
+    if (colon > 0) lines.push({ key: raw.slice(0, colon).trim().toLowerCase(), value: unfold(raw.slice(colon + 1)) });
+  }
+  return lines;
+}
+
+/** The header-derived fields of SpamInput. */
+function headerFields(lines: HeaderLine[]) {
+  const header = (key: string) => lines.find((line) => line.key === key)?.value ?? null;
+  return {
+    listId: header("list-id"),
+    listUnsubscribe: header("list-unsubscribe"),
+    autoSubmitted: header("auto-submitted"),
+    authenticationResults: topAuthenticationResults(lines),
+    spamHeaders: topSpamHeaders(lines)
+  };
+}
+
 /** Builds the classifier input from a parsed RFC 822 source. */
 export function buildSpamInput(parsed: ParsedSpamSource): SpamInput {
   const lines = (parsed.headerLines ?? []).map((header) => ({
     key: header.key.toLowerCase(),
     value: unfold(header.line.slice(header.line.indexOf(":") + 1))
   }));
-  const header = (key: string) => lines.find((line) => line.key === key)?.value ?? null;
   const from = parsed.from?.text ?? "";
   const plain = parsed.text?.trim()
     ? parsed.text
@@ -103,38 +156,47 @@ export function buildSpamInput(parsed: ParsedSpamSource): SpamInput {
     ...firstMailbox(from),
     replyTo: parsed.replyTo?.text || null,
     to: addressText(parsed.to),
+    cc: addressText(parsed.cc),
+    messageId: parsed.messageId ?? null,
     subject: parsed.subject ?? "",
     date: parsed.date ? parsed.date.toISOString() : null,
-    listId: header("list-id"),
-    listUnsubscribe: header("list-unsubscribe"),
-    authenticationResults: topAuthenticationResults(lines),
-    spamHeaders: topSpamHeaders(lines),
+    ...headerFields(lines),
     linkDomains: extractLinkDomains(plain, typeof parsed.html === "string" ? parsed.html : null),
+    maskedLinkDomains: extractMaskedLinkDomains(typeof parsed.html === "string" ? parsed.html : null),
     attachments: (parsed.attachments ?? []).slice(0, MAX_ATTACHMENTS)
       .map((attachment) => `${attachment.filename || "(ohne Namen)"} (${attachment.contentType})`),
     text: capText(plain)
   };
 }
 
-/** Fallback when no stored source exists: the columns the message row keeps. */
+/**
+ * Fallback when no stored source exists: the columns the message row keeps.
+ * `headers` (the source's raw header block) adds the receiving server's
+ * verdicts without parsing the whole source (sender profile backfill).
+ */
 export function buildSpamInputFromMessage(message: {
-  from: string; to: string; subject: string; date?: string | null; replyTo?: string | null;
-  listId?: string | null; listUnsubscribe?: string | null; body?: string | null;
-  attachments?: Array<{ filename: string; contentType: string }>;
+  from: string; to: string; cc?: string | null; subject: string; date?: string | null; replyTo?: string | null;
+  messageId?: string | null; listId?: string | null; listUnsubscribe?: string | null; body?: string | null; htmlBody?: string | null;
+  attachments?: Array<{ filename: string; contentType: string }>; headers?: string | null;
 }): SpamInput {
   const text = message.body ?? "";
+  const headers = message.headers ? headerFields(parseHeaderBlock(message.headers)) : null;
   return {
     from: message.from,
     ...firstMailbox(message.from),
     replyTo: message.replyTo ?? null,
     to: message.to,
+    cc: message.cc ?? "",
+    messageId: message.messageId ?? null,
     subject: message.subject,
     date: message.date ?? null,
-    listId: message.listId ?? null,
-    listUnsubscribe: message.listUnsubscribe ?? null,
-    authenticationResults: [],
-    spamHeaders: [],
-    linkDomains: extractLinkDomains(text),
+    listId: message.listId ?? headers?.listId ?? null,
+    listUnsubscribe: message.listUnsubscribe ?? headers?.listUnsubscribe ?? null,
+    autoSubmitted: headers?.autoSubmitted ?? null,
+    authenticationResults: headers?.authenticationResults ?? [],
+    spamHeaders: headers?.spamHeaders ?? [],
+    linkDomains: extractLinkDomains(text, message.htmlBody),
+    maskedLinkDomains: extractMaskedLinkDomains(message.htmlBody),
     attachments: (message.attachments ?? []).slice(0, MAX_ATTACHMENTS)
       .map((attachment) => `${attachment.filename} (${attachment.contentType})`),
     text: capText(text)

@@ -116,17 +116,18 @@ test("production shard-opening inventory routes every writable shard connection 
     .filter(file => /\.tsx?$/.test(file) && !/\.test\.|\/test[^/]*|\/testFixtures\//.test(file));
   const openers = files.filter(file => /new\s+(?:Database|DatabaseCtor)\s*\(|Database\.open\(/.test(source(file))).sort();
   expect(openers).toEqual([
-    "lib/db/connection.ts", "lib/membershipCleanup.ts", "scripts/checkShardMessageCollisions.ts",
-    "scripts/dev-fixture/store.ts", "scripts/spam-apply.ts", "scripts/spam-eval.ts", "scripts/verifyAdmissionCleanup.ts"
+    "lib/db/connection.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts", "scripts/checkShardMessageCollisions.ts",
+    "scripts/dev-fixture/store.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
   expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/membershipCleanup.ts"]);
   expect(source("lib/db/connection.ts")).toContain("configureAccountDb(accountDb)");
   expect(source("lib/membershipCleanup.ts")).toContain("configureAccountDb(db, 0)");
   expect(source("scripts/checkShardMessageCollisions.ts")).toContain("{ readonly: true }");
-  // The spam eval reads live data dirs: read-only and immutable (no -wal/-shm access).
-  expect(source("scripts/spam-eval.ts")).toContain("?immutable=1`, flags)");
-  expect(source("scripts/spam-eval.ts")).toContain("SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI");
+  // The spam eval and the profile backfill dry run read data dirs read-only and immutable (no -wal/-shm access).
+  expect(source("lib/mail/spam/evalData.ts")).toContain("?immutable=1`, flags)");
+  expect(source("lib/mail/spam/evalData.ts")).toContain("SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI");
+  expect(source("lib/mail/spam/evalData.ts").match(/new Database\(/g)).toHaveLength(1);
   // The spam apply script inspects shards read-only; its writes go through the common DB API.
   expect(source("scripts/spam-apply.ts").match(/new Database\(/g)).toHaveLength(2);
   expect(source("scripts/spam-apply.ts").match(/new Database\([^\n]*, \{ readonly: true \}\);/g)).toHaveLength(2);
@@ -169,17 +170,18 @@ test("all 112 legacy-binary DML sites fail on v3 with FK enforcement disabled", 
   } finally { old.close(); }
 });
 
-test("84 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation", async () => {
+test("87 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation", async () => {
   const { db } = await createSharedShardFixture();
   const old: any = new Database(db.prepare("PRAGMA database_list").get().file);
   try {
     old.function("noctua_writer_v2", () => 2);
     const triggers = db.prepare("SELECT name,tbl_name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v3_%'").all() as { name: string; tbl_name: string }[];
-    expect(triggers).toHaveLength(84);
+    expect(triggers).toHaveLength(87);
     const tables = [...new Set(triggers.map(row => row.tbl_name))];
-    // 27 audited tables plus spam_examples (doc/SPAM-DETECTION.md).
-    expect(tables).toHaveLength(28);
+    // 27 audited tables plus spam_examples and spam_sender_profiles (doc/SPAM-DETECTION.md).
+    expect(tables).toHaveLength(29);
     expect(tables).toContain("spam_examples");
+    expect(tables).toContain("spam_sender_profiles");
     for (const table of tables) {
       for (const sql of [`INSERT INTO "${table}" DEFAULT VALUES`, `UPDATE "${table}" SET accountId=accountId WHERE 0`, `DELETE FROM "${table}" WHERE 0`]) {
         expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v3");

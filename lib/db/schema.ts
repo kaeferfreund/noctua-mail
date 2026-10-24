@@ -1506,9 +1506,10 @@ const SPAM_MESSAGE_COLUMNS: Array<[string, string]> = [
 const spamSchemaByDb = new WeakSet<object>();
 /**
  * Additive spam-detection schema (doc/SPAM-DETECTION.md): nullable verdict
- * columns on messages plus the account-scoped `spam_examples` table. On a v3
- * shard the new table gets its writer guards in the same immediate
- * transaction, so the shard never looks incomplete to another connection.
+ * columns on messages plus the account-scoped `spam_examples` and
+ * `spam_sender_profiles` tables. On a v3 shard new tables get their writer
+ * guards in the same immediate transaction, so the shard never looks
+ * incomplete to another connection.
  */
 export function ensureSpamRuntimeSchema(db: any, inTransaction = false) {
   if (spamSchemaByDb.has(db)) return;
@@ -1516,6 +1517,7 @@ export function ensureSpamRuntimeSchema(db: any, inTransaction = false) {
   const installed = () => {
     const columns = getDbTableColumns(db, "messages");
     return SPAM_MESSAGE_COLUMNS.every(([name]) => columns.has(name)) && getDbTableColumns(db, "spam_examples").size > 0
+      && getDbTableColumns(db, "spam_sender_profiles").size > 0
       && !!db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_messages_account_spam'`).get();
   };
   if (!installed()) {
@@ -1539,6 +1541,18 @@ export function ensureSpamRuntimeSchema(db: any, inTransaction = false) {
         CREATE INDEX IF NOT EXISTS idx_spam_examples_sender ON spam_examples(accountId, senderEmail, createdAt DESC);
         CREATE INDEX IF NOT EXISTS idx_spam_examples_domain ON spam_examples(accountId, senderDomain, createdAt DESC);
         CREATE INDEX IF NOT EXISTS idx_spam_examples_created ON spam_examples(accountId, createdAt DESC);
+        -- Learned sender profiles (lib/mail/spam/senderProfile.ts); patterns is JSON.
+        CREATE TABLE IF NOT EXISTS spam_sender_profiles (
+          accountId TEXT NOT NULL,
+          senderKey TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          firstSeenAt INTEGER NOT NULL,
+          lastSeenAt INTEGER NOT NULL,
+          lastUserSpamAt INTEGER,
+          patterns TEXT NOT NULL,
+          updatedAt INTEGER NOT NULL,
+          PRIMARY KEY (accountId, senderKey)
+        );
         -- Partial: only checked rows, so it stays tiny and builds instantly on large shards.
         CREATE INDEX IF NOT EXISTS idx_messages_account_spam ON messages(accountId, spamVerdict)
           WHERE spamVerdict IS NOT NULL;
