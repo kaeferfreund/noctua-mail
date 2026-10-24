@@ -74,24 +74,27 @@ export function getThreadWindowPageControls(params: {
 }
 
 /**
- * Folders the reader's conversation window leaves out. Trash and spam rows stay out
- * of a conversation unless the reader is in that folder. A message read in trash or
- * spam shows only that folder's rows of its conversation, so its window is limited
- * to that folder too; otherwise load controls would page through rows never shown.
+ * Folders the reader's conversation window covers. Trash and spam rows stay out of a
+ * conversation unless the reader is in that folder. A message read in trash or spam
+ * shows only that folder's rows of its conversation, so its window is limited to that
+ * folder too, including against folders the account no longer lists; otherwise load
+ * controls would page through rows never shown.
  */
-export function getReaderExcludedFolderIds(params: {
+export function getReaderFolderScope(params: {
   activeMessage: Pick<Message, "folderId">;
   activeFolderId: string;
-  accountFolderIds: string[];
   threadExcludedFolderIds: ReadonlySet<string>;
-}) {
-  const { activeMessage, activeFolderId, accountFolderIds, threadExcludedFolderIds } = params;
+}): { folderId: string | null; excludeFolderIds: string[] } {
+  const { activeMessage, activeFolderId, threadExcludedFolderIds } = params;
   if (threadExcludedFolderIds.has(activeMessage.folderId)) {
-    return accountFolderIds.filter((folderId) => folderId !== activeMessage.folderId);
+    return { folderId: activeMessage.folderId, excludeFolderIds: [] };
   }
-  return Array.from(threadExcludedFolderIds).filter(
-    (folderId) => folderId !== activeFolderId && folderId !== activeMessage.folderId
-  );
+  return {
+    folderId: null,
+    excludeFolderIds: Array.from(threadExcludedFolderIds).filter(
+      (folderId) => folderId !== activeFolderId && folderId !== activeMessage.folderId
+    )
+  };
 }
 
 export function getInlineComposePlacement(params: {
