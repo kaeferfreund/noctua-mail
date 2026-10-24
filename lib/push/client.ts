@@ -64,20 +64,50 @@ export async function currentPushSubscription(): Promise<PushSubscription | null
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
 
-async function postSubscription(apiFetch: AdminFetch, subscription: PushSubscription, settings?: PushDeviceSettings) {
+/** Same value as the server's `pushEndpointHash` (lib/push/subscriptions.ts): SHA-256 hex, first 16 characters. */
+export async function pushEndpointHashOf(endpoint: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint)));
+  return Array.from(digest.subarray(0, 8), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** The entry of `devices` that is this browser's subscription; null when the server does not know it. */
+export async function findPushDevice(devices: PushDevice[], subscription: PushSubscription | null): Promise<PushDevice | null> {
+  if (!subscription) return null;
+  const hash = await pushEndpointHashOf(subscription.endpoint);
+  return devices.find((device) => device.endpointHash === hash) ?? null;
+}
+
+/** Settings of this browser's push device, null without one (e.g. for the app badge). */
+export async function loadCurrentPushDeviceSettings(apiFetch: AdminFetch = fetch): Promise<PushDeviceSettings | null> {
+  const subscription = await currentPushSubscription();
+  if (!subscription) return null;
+  return (await findPushDevice(await listPushDevices(apiFetch), subscription))?.settings ?? null;
+}
+
+/** Window event after this browser's push device was added, changed or removed. */
+export const PUSH_DEVICE_CHANGED_EVENT = "noctua:push-device-changed";
+
+export function announcePushDeviceChange() {
+  window.dispatchEvent(new Event(PUSH_DEVICE_CHANGED_EVENT));
+}
+
+async function postSubscription(apiFetch: AdminFetch, subscription: PushSubscription, settings?: PushDeviceSettings, previousEndpoint?: string) {
   return adminRequest<{ id: string; settings: PushDeviceSettings }>(apiFetch, SUBSCRIPTIONS_URL, jsonMutation("POST", {
-    subscription: subscription.toJSON(), ...(settings ? { settings } : {}), userAgent: navigator.userAgent
+    subscription: subscription.toJSON(), ...(settings ? { settings } : {}), userAgent: navigator.userAgent,
+    ...(previousEndpoint && previousEndpoint !== subscription.endpoint ? { previousEndpoint } : {})
   }));
 }
 
 /**
- * Re-POSTs an existing browser subscription (refreshes keys/lastSeenAt on the
- * server, keeps its settings) and returns the server id of this device.
+ * Re-registers this browser's subscription (refreshes keys/lastSeenAt on the
+ * server, keeps its settings) and returns the server id of this device. Only
+ * for a device the server still lists in `devices`: one removed elsewhere, or
+ * registered by another user of this browser, stays off until switched on.
  */
-export async function syncPushSubscription(apiFetch: AdminFetch = fetch): Promise<{ id: string; settings: PushDeviceSettings } | null> {
+export async function syncPushSubscription(devices: PushDevice[], publicKey: string, apiFetch: AdminFetch = fetch): Promise<{ id: string; settings: PushDeviceSettings } | null> {
   if (pushAvailability() !== "available" || Notification.permission !== "granted") return null;
-  const subscription = await currentPushSubscription();
-  return subscription ? postSubscription(apiFetch, subscription) : null;
+  if (!(await findPushDevice(devices, await currentPushSubscription()))) return null;
+  return registerPushSubscription(publicKey, undefined, apiFetch);
 }
 
 export function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
@@ -107,19 +137,27 @@ export async function ensurePushSubscription(settings?: PushDeviceSettings, apiF
   }
   const publicKey = await fetchVapidPublicKey(apiFetch);
   if (!publicKey) return { status: "not-configured" };
+  const device = await registerPushSubscription(publicKey, settings, apiFetch);
+  return { status: "subscribed", id: device.id, settings: device.settings };
+}
+
+/** Subscribes with the server's key (reusing a current subscription) and registers the device. */
+async function registerPushSubscription(publicKey: string, settings: PushDeviceSettings | undefined, apiFetch: AdminFetch) {
   const applicationServerKey = base64UrlToBytes(publicKey);
   // MailClient registers /sw.js on start; registering again is a no-op then.
   if (!(await navigator.serviceWorker.getRegistration())) await navigator.serviceWorker.register("/sw.js");
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
+  let previousEndpoint: string | undefined;
   if (subscription && !sameKey(subscription.options.applicationServerKey, applicationServerKey)) {
     // The server's VAPID key changed; the old subscription can no longer receive pushes.
+    // The server moves its settings to the new one and drops its row.
+    previousEndpoint = subscription.endpoint;
     await subscription.unsubscribe();
     subscription = null;
   }
   subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
-  const device = await postSubscription(apiFetch, subscription, settings);
-  return { status: "subscribed", id: device.id, settings: device.settings };
+  return postSubscription(apiFetch, subscription, settings, previousEndpoint);
 }
 
 /** Removes this browser's subscription from the server and the browser. */

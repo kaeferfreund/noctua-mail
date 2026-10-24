@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge, Button, Callout, Card, Checkbox, Flex, Switch, Text } from "@radix-ui/themes";
 import { Info } from "lucide-react";
@@ -12,7 +12,7 @@ import { formatDate, formatTime } from "@/lib/i18n/format";
 import type { UiLocale } from "@/lib/i18n/config";
 import type { PushDeviceSettings } from "@/lib/push/types";
 import {
-  describeUserAgent, disablePushSubscription, ensurePushSubscription, fetchVapidPublicKey, listPushDevices,
+  announcePushDeviceChange, describeUserAgent, disablePushSubscription, ensurePushSubscription, fetchVapidPublicKey, listPushDevices,
   pushAvailability, removePushDevice, sendTestPush, syncPushSubscription, updatePushDevice,
   type PushAvailability, type PushDevice
 } from "@/lib/push/client";
@@ -48,8 +48,9 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
       if (!active) return;
       setConfigured(Boolean(publicKey));
       if (!publicKey) return;
-      const current = await syncPushSubscription(apiFetch).catch(() => null);
       const list = await listPushDevices(apiFetch);
+      // Only a device the server still knows is re-registered; otherwise it shows as off.
+      const current = await syncPushSubscription(list, publicKey, apiFetch).catch(() => null);
       if (!active) return;
       setDevices(list);
       if (current) { setCurrentId(current.id); setExpanded(current.id); }
@@ -62,7 +63,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
     try {
       const result = await ensurePushSubscription(undefined, apiFetch);
       if (result.status === "subscribed") {
-        setCurrentId(result.id); setExpanded(result.id); await reload();
+        setCurrentId(result.id); setExpanded(result.id); announcePushDeviceChange(); await reload();
       } else if (result.status === "not-configured") setConfigured(false);
       else if (result.status === "dismissed") setNotice({ kind: "alert", text: t("dismissed") });
       else setAvailability(result.status);
@@ -75,7 +76,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
     setBusy(true); setNotice(null);
     try {
       await disablePushSubscription(apiFetch);
-      setCurrentId(null); await reload();
+      setCurrentId(null); announcePushDeviceChange(); await reload();
     } catch {
       setNotice({ kind: "alert", text: t("failed") });
     } finally { setBusy(false); }
@@ -90,6 +91,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
       const stored = await updatePushDevice(apiFetch, device.id, settings);
       if (writes.current.get(device.id) !== sequence) return;
       setDevices(list => list.map(item => item.id === device.id ? { ...item, settings: stored } : item));
+      if (device.id === currentId) announcePushDeviceChange();
       setNotice({ kind: "status", text: t("saved") });
     } catch {
       if (writes.current.get(device.id) !== sequence) return;
@@ -111,7 +113,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
   const remove = async (device: PushDevice) => {
     setBusy(true); setNotice(null);
     try {
-      if (device.id === currentId) { await disablePushSubscription(apiFetch); setCurrentId(null); }
+      if (device.id === currentId) { await disablePushSubscription(apiFetch); setCurrentId(null); announcePushDeviceChange(); }
       else await removePushDevice(apiFetch, device.id);
       await reload();
     } catch {
@@ -209,7 +211,17 @@ function DeviceSettingsForm({ label, settings, mailboxes, onChange }: {
   const all = settings.accountIds === "all";
   const selected = all ? mailboxes.map(mailbox => mailbox.id) : settings.accountIds as string[];
   const quiet = settings.quietHours;
-  const setQuiet = (patch: Partial<{ from: string; to: string }>) => quiet && onChange({ ...settings, quietHours: { ...quiet, ...patch } });
+  // The server rejects quiet hours that start when they end: such an edit stays in the form with a hint.
+  const [clash, setClash] = useState<{ from: string; to: string } | null>(null);
+  const clashId = useId();
+  const shown = quiet && (clash ?? quiet);
+  const setQuiet = (patch: Partial<{ from: string; to: string }>) => {
+    if (!quiet || !shown) return;
+    const next = { from: shown.from, to: shown.to, ...patch };
+    if (next.from === next.to) { setClash(next); return; }
+    setClash(null);
+    onChange({ ...settings, quietHours: { ...quiet, ...next } });
+  };
   return (
     <Flex direction="column" gap="3" role="group" aria-label={label}>
       <Flex direction="column" gap="2" role="group" aria-label={t("mailboxes")}>
@@ -235,17 +247,21 @@ function DeviceSettingsForm({ label, settings, mailboxes, onChange }: {
         <Flex gap="2" align="center"><Switch checked={settings.badge} onCheckedChange={badge => onChange({ ...settings, badge })} />{t("badge")}</Flex>
       </Text>
       <Text as="label" size="2">
-        <Flex gap="2" align="center"><Switch checked={quiet !== null} onCheckedChange={checked => onChange({
-          ...settings, quietHours: checked ? { ...DEFAULT_QUIET_HOURS, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null
-        })} />{t("quietHours")}</Flex>
+        <Flex gap="2" align="center"><Switch checked={quiet !== null} onCheckedChange={checked => {
+          setClash(null);
+          onChange({ ...settings, quietHours: checked ? { ...DEFAULT_QUIET_HOURS, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null });
+        }} />{t("quietHours")}</Flex>
       </Text>
-      {quiet && <Flex direction="column" gap="1" pl="5">
+      {quiet && shown && <Flex direction="column" gap="1" pl="5">
         <Flex gap="3" align="center" wrap="wrap">
           <label className="flex items-center gap-2 text-sm">{t("quietFrom")}
-            <input type="time" className={nativeControlBaseClass} value={quiet.from} required onChange={event => event.target.value && setQuiet({ from: event.target.value })} /></label>
+            <input type="time" className={nativeControlBaseClass} value={shown.from} required aria-invalid={clash ? true : undefined} aria-describedby={clash ? clashId : undefined}
+              onChange={event => event.target.value && setQuiet({ from: event.target.value })} /></label>
           <label className="flex items-center gap-2 text-sm">{t("quietTo")}
-            <input type="time" className={nativeControlBaseClass} value={quiet.to} required onChange={event => event.target.value && setQuiet({ to: event.target.value })} /></label>
+            <input type="time" className={nativeControlBaseClass} value={shown.to} required aria-invalid={clash ? true : undefined} aria-describedby={clash ? clashId : undefined}
+              onChange={event => event.target.value && setQuiet({ to: event.target.value })} /></label>
         </Flex>
+        {clash && <Text id={clashId} size="1" color="red" role="alert">{t("quietSameTime")}</Text>}
         <Text size="1" color="gray">{t("quietHelp", { zone: quiet.timeZone })}</Text>
       </Flex>}
     </Flex>
