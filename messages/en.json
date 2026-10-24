@@ -1507,6 +1507,7 @@
     "sender": {
       "chooseSender": "Choose a sender",
       "reviewSender": "Review sender",
+      "reviewRecipients": "Review recipients",
       "unavailableDraft": "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
       "chooseEnabledSender": "Choose an enabled From address before sending.",
       "confirmKeepEditedSignature": "Keep the edited signature and add the new signature? Your edited text will be preserved.",
