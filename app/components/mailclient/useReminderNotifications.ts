@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { Account, CalendarEvent } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
 import { buildAccountCalendarEventsPath } from "@/lib/accountApiPaths";
+import { NOTIFICATION_BADGE_ICON, NOTIFICATION_ICON } from "@/lib/appBranding";
 import { CALENDAR_EVENTS_UPDATED_EVENT } from "@/app/components/calendar/calendarEventsClient";
 import type { ExceptionEntry } from "./types";
 import { DEFAULT_UPCOMING_WINDOW_MS } from "./status/upcomingEntries";
@@ -162,8 +163,8 @@ export function useReminderNotifications({
       const notificationOptions = {
         body,
         tag,
-        icon: "/icons/icon-192.png",
-        badge: "/favicon.png",
+        icon: NOTIFICATION_ICON,
+        badge: NOTIFICATION_BADGE_ICON,
         data: {
           url: targetUrl,
           messageId: opts?.messageId ?? null,

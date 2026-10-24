@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-BASE_TITLE="Noctua Mail"
+BASE_TITLE="Mail"
 ENV_LABEL="${APP_ENV_LABEL:-}"
 
 if [[ -n "$ENV_LABEL" ]]; then
@@ -17,7 +17,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const PLACEHOLDER = "__NOCTUA_APP_TITLE__";
-const replacement = process.env.APP_TITLE || "Noctua Mail";
+const replacement = process.env.APP_TITLE || "Mail";
 const roots = ["/app/.next"];
 const allowedExtensions = new Set([".html", ".rsc", ".webmanifest", ".body"]);
 let updatedFiles = 0;

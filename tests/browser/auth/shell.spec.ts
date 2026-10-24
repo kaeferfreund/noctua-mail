@@ -7,7 +7,7 @@ import { test, expect, api, signIn, register, recoveryLink } from "./fixtures";
 // Recordings remain disabled for every credential, QR, code and reset screen.
 test(SCENARIOS.shellLogin, async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Sign in to Noctua" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Mail" })).toBeVisible();
   await expect(page.getByLabel("Email", { exact: true })).toHaveAttribute("autocomplete", "username webauthn");
   await expect(page.getByRole("button", { name: "Sign in with a passkey" })).toBeVisible();
   await expect(page.getByText("Use my personal mailbox password")).toHaveCount(0);
@@ -129,7 +129,7 @@ test(SCENARIOS.activatedSignup, async ({ page, seed }) => {
   await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(`otpauth://totp/Synthetic?secret=${secret}`));
   await page.getByRole("button", { name: "Verify authenticator", exact: true }).click();
   await page.getByRole("button", { name: "I saved my backup codes", exact: true }).click();
-  await page.getByRole("button", { name: "Continue to Noctua", exact: true }).click();
+  await page.getByRole("button", { name: "Continue to Mail", exact: true }).click();
   await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
 });
 test(SCENARIOS.activatedManagement, async ({ page, seed, authenticator }) => {
@@ -192,7 +192,7 @@ test(SCENARIOS.shellBackup, async ({ page, seed }) => {
   const logout = page.waitForRequest(request => new URL(request.url()).pathname === "/api/auth/logout");
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   expect((await logout).postData()).toBeNull();
-  await expect(page.getByRole("heading", { name: "Sign in to Noctua" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Mail" })).toBeVisible();
   expect((await api(page, "/api/auth/me")).status).toBe(401);
 });
 
@@ -216,7 +216,7 @@ test(SCENARIOS.shellReplacement, async ({ page, seed }) => {
   await page.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(uri));
   await page.getByRole("button", { name: "Verify authenticator", exact: true }).click();
   await page.getByRole("button", { name: "I saved my backup codes", exact: true }).click();
-  await page.getByRole("button", { name: "Continue to Noctua", exact: true }).click();
+  await page.getByRole("button", { name: "Continue to Mail", exact: true }).click();
   await expect(page.getByRole("heading", { name: "No mailbox yet" })).toBeVisible();
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await passwordLogin(page, seed.email, seed.password);

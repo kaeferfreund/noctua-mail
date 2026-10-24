@@ -1,6 +1,6 @@
 // Generates the branding proposals: icon SVGs, PNG renders and the standalone
 // preview page. Run from the repository root: `bun briefs/branding/build.ts`
-// (needs rsvg-convert, the same tool build-scripts/generate_push_icons.sh uses).
+// (needs rsvg-convert, the same tool build-scripts/generate_icons.sh uses).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

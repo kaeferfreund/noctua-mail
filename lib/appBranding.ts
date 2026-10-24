@@ -1,4 +1,21 @@
-const BASE_APP_TITLE = "Noctua Mail";
+/** Product name shown to users; code identifiers and env vars keep "Noctua". */
+export const BASE_APP_TITLE = "Mail";
+
+/**
+ * Bumped whenever public/icons/base.svg changes (build-scripts/generate_icons.sh).
+ * Icon files keep their names and are cached for a day, so every reference
+ * carries this version to make browsers and notifications fetch the new art.
+ * public/sw.js cannot import this module and repeats the value.
+ */
+export const APP_ICON_VERSION = "2";
+
+export function versionedIconUrl(path: string) {
+  return `${path}?v=${APP_ICON_VERSION}`;
+}
+
+export const NOTIFICATION_ICON = versionedIconUrl("/icons/icon-192.png");
+/** White silhouette: Android draws notification badges from the alpha channel. */
+export const NOTIFICATION_BADGE_ICON = versionedIconUrl("/icons/icon-96-mono.png");
 
 type RuntimeConfig = { appEnvironmentLabel?: string };
 
@@ -93,10 +110,12 @@ export function formatMailboxPageTitle(input: {
   accountEmail?: string | null;
   unreadCount?: number | null;
 }) {
-  const folderName = input.folderName?.trim() || "Mail";
+  // Without a folder (sign-in, loading) the app name alone names the window;
+  // a "Mail" placeholder would repeat the product name.
+  const folderName = input.folderName?.trim() ?? "";
   const unread =
     typeof input.unreadCount === "number" && input.unreadCount > 0
       ? `(${input.unreadCount}) `
       : "";
-  return buildPageTitle(`${unread}${folderName}`, input.accountEmail);
+  return buildPageTitle(folderName && `${unread}${folderName}`, input.accountEmail);
 }
