@@ -358,6 +358,7 @@
       "noDevices": "No devices registered yet.",
       "currentDevice": "This device",
       "unknownDevice": "Unknown device",
+      "unknownSender": "Unknown",
       "lastSeen": "Last active: {date}",
       "showSettings": "Settings",
       "hideSettings": "Hide settings",

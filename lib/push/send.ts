@@ -1,6 +1,8 @@
 import { createHash } from "crypto";
 import { readAccountAccess, resolveAccountRole } from "@/lib/accountAccess";
-import { getAccountById, getFolders, getMailboxSummaries } from "@/lib/db";
+import { getAccountById, getFolders, getMailboxSummaries, getUserById } from "@/lib/db";
+import { defaultLocale } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 import { isSpamDetectionOn } from "@/lib/mail/spam/config";
 import { loadMailboxSpamSettings, loadSpamConfig } from "@/lib/mail/spam/settings";
 import { emptyDeepLink, serializeDeepLink } from "@/lib/navigation/deepLinks";
@@ -86,8 +88,12 @@ function truncate(value: string) {
   return text.length > MAX_TEXT_LENGTH ? `${text.slice(0, MAX_TEXT_LENGTH - 1)}…` : text;
 }
 
-function senderLabel(message: Pick<InboxMessage, "fromAddr" | "fromEmail">) {
-  return truncate(extractDisplayName(message.fromAddr) || message.fromEmail || message.fromAddr);
+/** Display name, address or raw header; mail without any From gets the catalog's "unknown" in the user's language. */
+async function senderLabel(message: Pick<InboxMessage, "fromAddr" | "fromEmail">, userId: string) {
+  const label = truncate(extractDisplayName(message.fromAddr) || message.fromEmail || message.fromAddr || "");
+  if (label) return label;
+  const locale = (await getUserById(userId))?.uiLocale ?? defaultLocale;
+  return getTranslator(locale)("Settings.notifications.unknownSender");
 }
 
 /** Push services replace an undelivered message with the same topic (RFC 8030 §5.4): one pending push per mailbox. */
@@ -294,7 +300,7 @@ export function createPushNotifier(options: PushNotifierOptions = {}): PushNotif
       count: live.length,
       messageId: newest.id,
       threadId: newest.threadId ?? null,
-      from: senderLabel(newest),
+      from: await senderLabel(newest, subscription.userId),
       subject: subscription.settings.includeSubject ? truncate(newest.subject) : null,
       url: serializeDeepLink({ ...emptyDeepLink(), accountId, folderId: inboxId, messageId: newest.id }),
       ...(subscription.settings.badge ? { badge: await unreadBadge(subscription.userId, subscription.settings) } : {}),
