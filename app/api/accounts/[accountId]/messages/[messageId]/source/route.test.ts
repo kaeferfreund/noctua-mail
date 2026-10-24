@@ -118,8 +118,9 @@ describe("handleGetMessageSourceRequest", () => {
 
     const first = await sourceRequest();
     expect(first.status).toBe(200);
+    // Revalidated on every use: no max-age window in which a logged-out or revoked browser reads the cached source.
+    expect(first.headers.get("cache-control")).toBe("private, no-cache");
     expect(first.headers.get("cache-control")).toBe(MESSAGE_SOURCE_CACHE_CONTROL);
-    expect(first.headers.get("cache-control")).not.toContain("immutable");
     const etag = first.headers.get("etag");
     expect(etag).toMatch(/^"[0-9a-f.]+-[0-9a-f]+"$/i);
     const firstBody = (await first.json()) as { ok?: boolean; source?: string };

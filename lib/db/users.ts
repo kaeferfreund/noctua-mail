@@ -136,22 +136,6 @@ export async function getUserAccounts(): Promise<UserAccountLink[]> {
   return rows.map(mapUserAccountLinkRow);
 }
 
-export async function listAccessibleAccountIdsForUser(userId: string) {
-  const db = await getDb();
-  const rows = db
-    .prepare(
-      `SELECT DISTINCT a.id as id
-       FROM accounts a
-       LEFT JOIN user_accounts ua ON ua.accountId = a.id
-       WHERE ua.userId = ? OR a.ownerUserId = ?
-       ORDER BY a.id ASC`
-    )
-    .all(userId, userId) as Array<{ id?: string | null }>;
-  return rows
-    .map((row) => String(row.id ?? "").trim())
-    .filter(Boolean);
-}
-
 /**
  * Synchronous core of `addUserAccountLink` for callers that compose one
  * transaction on the master connection (signup). Returns true when a new
