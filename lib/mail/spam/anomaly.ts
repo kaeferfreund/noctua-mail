@@ -84,7 +84,7 @@ export function linkAnomalies(profile: SenderProfile, mail: SenderMailFacts): An
     if (isIpHost(host)) anomalies.push(`IP-Link ${host}`);
     else if (profile.linkDomains[key]) continue;
     else if (isRiskyLinkHost(host)) anomalies.push(`neue Link-Domain ${host} (Kürzer/Freigabe)`);
-    else if (!profile.linkDomainsOverflow) anomalies.push(`neue Link-Domain ${key}`);
+    else anomalies.push(`neue Link-Domain ${key}`);
   }
   if (mail.maskedLinkDomains.length && share(profile.maskedLinkCount, profile.count) < RARE_SHARE) {
     anomalies.push(`Linktext zeigt eine andere Domain als das Ziel (${mail.maskedLinkDomains[0]})`);
