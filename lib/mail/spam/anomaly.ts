@@ -20,7 +20,7 @@ import type { SpamInput } from "./types";
  * Absender; Abweichung: …" instead of skipping it.
  */
 export type AnomalyResult = { anomalies: string[] };
-/** Another mail of the same sender to the same mailbox (burst rule). */
+/** Another mail of the same sender to the same mailbox (burst rule); `date` is its arrival, never its Date header. */
 export type RecentSenderMail = { date: number; circle: string };
 
 const share = (part: number, total: number) => (total > 0 ? part / total : 0);
@@ -84,7 +84,7 @@ export function linkAnomalies(profile: SenderProfile, mail: SenderMailFacts): An
     if (isIpHost(host)) anomalies.push(`IP-Link ${host}`);
     else if (profile.linkDomains[key]) continue;
     else if (isRiskyLinkHost(host)) anomalies.push(`neue Link-Domain ${host} (Kürzer/Freigabe)`);
-    else if (!profile.linkDomainsOverflow) anomalies.push(`neue Link-Domain ${key}`);
+    else anomalies.push(`neue Link-Domain ${key}`);
   }
   if (mail.maskedLinkDomains.length && share(profile.maskedLinkCount, profile.count) < RARE_SHARE) {
     anomalies.push(`Linktext zeigt eine andere Domain als das Ziel (${mail.maskedLinkDomains[0]})`);
@@ -157,7 +157,7 @@ export type SpamTrustContext = {
   ownAddresses: ReadonlySet<string>;
   /** The household-merged profile of a sender key as of `now` (the eval: only mails that arrived before). */
   loadProfile: (senderKey: string, now: number) => Promise<SenderProfile | null>;
-  /** Other mails of the sender to this mailbox around `date` (burst rule). */
+  /** Other mails of the sender to this mailbox around `date` (burst rule), each with its arrival. */
   loadRecent?: (senderKey: string, date: number) => Promise<RecentSenderMail[]>;
   /** Stable message key for the canary sample. */
   canaryKey: string;

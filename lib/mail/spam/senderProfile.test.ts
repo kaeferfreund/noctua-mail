@@ -136,6 +136,9 @@ describe("sender profile", () => {
       lastUserSpamAt: null, patterns: serializeProfilePatterns(profile) };
     expect(senderProfileFromRow(row)).toEqual(profile);
     expect(senderProfileFromRow({ ...row, patterns: "not json" }).count).toBe(21);
+    // A stored overflow flag of the earlier unbounded-then-off link rule is dropped.
+    const legacy = JSON.stringify({ ...JSON.parse(row.patterns), linkDomainsOverflow: true, linkDomainsSeenAt: undefined });
+    expect(senderProfileFromRow({ ...row, patterns: legacy })).toEqual({ ...profile, linkDomainsSeenAt: {} });
   });
 
   test("the canary sample is deterministic and about 2 %", () => {

@@ -1,8 +1,14 @@
 import { randomUUID } from "crypto";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import type { SpamDecision, SpamExample, SpamLabel } from "../mail/spam/types";
+import type { AccountProfileBuild } from "../mail/spam/profileBuild";
 import {
+  addProfileJunk,
+  emptySenderProfile,
   foldSenderMail,
+  hasProfileMail,
+  PROFILE_MAIL_IDS,
+  profileMailKey,
   senderProfileFromRow,
   serializeProfilePatterns,
   type SenderMailFacts,
@@ -10,7 +16,6 @@ import {
   type SenderProfileRow
 } from "../mail/spam/senderProfile";
 import { getAccountDb, getDb } from "./connection";
-import { messageAuthorEmailSql } from "./ownAddressSql";
 import { sentToAddressInDb } from "./sentRecipients";
 
 const EXAMPLES_PER_ACCOUNT = 2000;
@@ -104,10 +109,7 @@ export async function hasSentToAddress(accountId: string, sentFolderId: string, 
 const profileColumns = "senderKey, count, firstSeenAt, lastSeenAt, lastUserSpamAt, patterns";
 
 export async function getSenderProfile(accountId: string, senderKey: string): Promise<SenderProfile | null> {
-  const db = await getAccountDb(accountId);
-  const row = db.prepare(`SELECT ${profileColumns} FROM spam_sender_profiles WHERE accountId = ? AND senderKey = ?`)
-    .get(accountId, senderKey) as SenderProfileRow | null;
-  return row ? senderProfileFromRow(row) : null;
+  return readSenderProfile(await getAccountDb(accountId), accountId, senderKey);
 }
 
 function writeSenderProfile(db: any, accountId: string, profile: SenderProfile, now: number) {
@@ -119,60 +121,138 @@ function writeSenderProfile(db: any, accountId: string, profile: SenderProfile, 
       serializeProfilePatterns(profile), now);
 }
 
-/** Adds one checked mail to the sender's profile (read-modify-write in one immediate transaction). */
-export async function recordSenderProfileMail(accountId: string, facts: SenderMailFacts) {
+function readSenderProfile(db: any, accountId: string, senderKey: string) {
+  const row = db.prepare(`SELECT ${profileColumns} FROM spam_sender_profiles WHERE accountId = ? AND senderKey = ?`)
+    .get(accountId, senderKey) as SenderProfileRow | null;
+  return row ? senderProfileFromRow(row) : null;
+}
+
+/**
+ * Adds one checked mail to the sender's profile, once per message: a mail
+ * checked again after a revocation or folded by a backfill catch-up is not
+ * counted twice (read-modify-write in one immediate transaction).
+ */
+export async function recordSenderProfileMail(accountId: string, facts: SenderMailFacts, messageId: string) {
   return withDbWriteRetry("recordSenderProfileMail", async () => {
     const db = await getAccountDb(accountId);
-    db.transaction(() => {
-      const row = db.prepare(`SELECT ${profileColumns} FROM spam_sender_profiles WHERE accountId = ? AND senderKey = ?`)
-        .get(accountId, facts.senderKey) as SenderProfileRow | null;
-      writeSenderProfile(db, accountId, foldSenderMail(row ? senderProfileFromRow(row) : null, facts), Date.now());
-    }).immediate();
+    return db.transaction(() => {
+      const profile = readSenderProfile(db, accountId, facts.senderKey);
+      if (profile && hasProfileMail(profile, messageId)) return false;
+      writeSenderProfile(db, accountId, foldSenderMail(profile, { ...facts, id: messageId }), Date.now());
+      return true;
+    }).immediate() as boolean;
   });
 }
 
 /**
- * Backfill: replaces every profile of the account. A user's "Als Spam" time
- * already stored survives when the rebuilt profile has none.
+ * A mail of a known sender went to Junk without a user decision (auto-move):
+ * it counts into the junk share once. Unknown senders get no profile for it.
  */
-export async function replaceSenderProfiles(accountId: string, profiles: Iterable<SenderProfile>) {
-  return withDbWriteRetry("replaceSenderProfiles", async () => {
+export async function recordSenderProfileJunk(accountId: string, senderKey: string, messageId: string) {
+  return withDbWriteRetry("recordSenderProfileJunk", async () => {
     const db = await getAccountDb(accountId);
-    let written = 0;
-    db.transaction(() => {
-      const kept = new Map((db.prepare(`SELECT senderKey, lastUserSpamAt FROM spam_sender_profiles WHERE accountId = ? AND lastUserSpamAt IS NOT NULL`)
-        .all(accountId) as Array<{ senderKey: string; lastUserSpamAt: number }>).map((row) => [row.senderKey, row.lastUserSpamAt]));
-      db.prepare(`DELETE FROM spam_sender_profiles WHERE accountId = ?`).run(accountId);
-      const now = Date.now();
-      for (const profile of profiles) {
-        const userSpamAt = Math.max(profile.lastUserSpamAt ?? 0, kept.get(profile.senderKey) ?? 0) || null;
-        kept.delete(profile.senderKey);
-        writeSenderProfile(db, accountId, { ...profile, lastUserSpamAt: userSpamAt }, now);
-        written += 1;
-      }
-      for (const [senderKey, lastUserSpamAt] of kept) {
-        db.prepare(`INSERT INTO spam_sender_profiles (accountId, senderKey, count, firstSeenAt, lastSeenAt, lastUserSpamAt, patterns, updatedAt)
-          VALUES (?, ?, 0, ?, ?, ?, '{}', ?)`).run(accountId, senderKey, lastUserSpamAt, lastUserSpamAt, lastUserSpamAt, now);
-      }
-    }).immediate();
-    return written;
+    return db.transaction(() => {
+      const profile = readSenderProfile(db, accountId, senderKey);
+      if (!profile || !addProfileJunk(profile, messageId)) return false;
+      writeSenderProfile(db, accountId, profile, Date.now());
+      return true;
+    }).immediate() as boolean;
   });
 }
 
-/** Backfill: `build` reads the account's rows over the app connection; the result replaces the stored profiles. */
-export async function backfillSenderProfiles(accountId: string, build: (db: any) => Promise<Iterable<SenderProfile>>) {
-  const profiles = await build(await getAccountDb(accountId));
-  return replaceSenderProfiles(accountId, profiles);
+type StoredJunkKeys = Map<string, Set<string>>;
+
+function readStoredJunkKeys(db: any, accountId: string): StoredJunkKeys {
+  const rows = db.prepare(`SELECT ${profileColumns} FROM spam_sender_profiles WHERE accountId = ?`).all(accountId) as SenderProfileRow[];
+  return new Map(rows.map((row) => [row.senderKey, new Set(senderProfileFromRow(row).junkMailIds)]));
 }
 
-/** "Als Spam": the sender loses trust in every mailbox (household merge takes the latest time). */
-export async function markSenderProfileUserSpam(accountId: string, senderKey: string, at: number) {
+/**
+ * Writes a backfill: every profile of the account is replaced. A user's "Als
+ * Spam" time already stored survives when the rebuilt profile has none. With
+ * `junk`, mails counted as junk live while the backfill was building (stored
+ * now, not before the build, and not in a Junk folder the build read) are
+ * kept on top of the rebuilt junk count.
+ */
+function writeBackfill(db: any, accountId: string, profiles: Iterable<SenderProfile>,
+  junk?: { before: StoredJunkKeys; builtIds: ReadonlyMap<string, readonly string[]> }) {
+  const stored = new Map((db.prepare(`SELECT ${profileColumns} FROM spam_sender_profiles WHERE accountId = ?`).all(accountId) as SenderProfileRow[])
+    .map((row) => [row.senderKey, senderProfileFromRow(row)]));
+  const liveJunk = (senderKey: string) => {
+    if (!junk) return [];
+    const before = junk.before.get(senderKey);
+    const built = new Set((junk.builtIds.get(senderKey) ?? []).map(profileMailKey));
+    return (stored.get(senderKey)?.junkMailIds ?? []).filter((key) => !before?.has(key) && !built.has(key));
+  };
+  db.prepare(`DELETE FROM spam_sender_profiles WHERE accountId = ?`).run(accountId);
+  const now = Date.now();
+  let written = 0;
+  for (const profile of profiles) {
+    const extra = liveJunk(profile.senderKey);
+    const userSpamAt = Math.max(profile.lastUserSpamAt ?? 0, stored.get(profile.senderKey)?.lastUserSpamAt ?? 0) || null;
+    stored.delete(profile.senderKey);
+    writeSenderProfile(db, accountId, { ...profile, lastUserSpamAt: userSpamAt, junkCount: profile.junkCount + extra.length,
+      junkMailIds: [...profile.junkMailIds, ...extra].slice(-PROFILE_MAIL_IDS) }, now);
+    written += 1;
+  }
+  for (const previous of stored.values()) {
+    if (previous.lastUserSpamAt === null) continue;
+    const kept = emptySenderProfile(previous.senderKey, previous.lastUserSpamAt);
+    writeSenderProfile(db, accountId, { ...kept, lastUserSpamAt: previous.lastUserSpamAt, junkCount: previous.junkCount, junkMailIds: previous.junkMailIds }, now);
+  }
+  return written;
+}
+
+/** Backfill: replaces every profile of the account (see writeBackfill). */
+export async function replaceSenderProfiles(accountId: string, profiles: Iterable<SenderProfile>) {
+  return withDbWriteRetry("replaceSenderProfiles", async () => {
+    const db = await getAccountDb(accountId);
+    return db.transaction(() => writeBackfill(db, accountId, profiles)).immediate() as number;
+  });
+}
+
+/** Catch-up passes before the backfill writes even though mail is still arriving. */
+const BACKFILL_CATCH_UP_ROUNDS = 5;
+
+/**
+ * Backfill over the app connection: `build` reads the account's rows (with
+ * `previous` only the rows stored since). Mail that arrives while it builds
+ * is read in a catch-up pass before the write, so nothing learned live in the
+ * meantime is lost; the write itself merges live junk counts and "Als Spam"
+ * times (writeBackfill). Mails folded here and checked later are not counted
+ * again (recordSenderProfileMail).
+ */
+export async function backfillSenderProfiles(accountId: string,
+  build: (db: any, previous: AccountProfileBuild | null) => Promise<AccountProfileBuild>) {
+  const db = await getAccountDb(accountId);
+  const before = readStoredJunkKeys(db, accountId);
+  let built = await build(db, null);
+  for (let round = 1; ; round += 1) {
+    const current = built;
+    const written = await withDbWriteRetry("backfillSenderProfiles", async () => db.transaction(() => {
+      const last = (db.prepare("SELECT COALESCE(MAX(rowid), 0) AS last FROM messages").get() as { last: number }).last;
+      if (last !== current.lastRowid && round < BACKFILL_CATCH_UP_ROUNDS) return null;
+      return writeBackfill(db, accountId, current.profiles.values(), { before, builtIds: current.junkIds });
+    }).immediate() as number | null);
+    if (written !== null) return { written, build: current };
+    built = await build(db, current);
+  }
+}
+
+/**
+ * "Als Spam": the sender loses trust in every mailbox (household merge takes
+ * the latest time). With `messageId` the mail also counts into the junk share
+ * once.
+ */
+export async function markSenderProfileUserSpam(accountId: string, senderKey: string, at: number, messageId?: string) {
   return withDbWriteRetry("markSenderProfileUserSpam", async () => {
     const db = await getAccountDb(accountId);
-    db.prepare(`INSERT INTO spam_sender_profiles (accountId, senderKey, count, firstSeenAt, lastSeenAt, lastUserSpamAt, patterns, updatedAt)
-      VALUES (?, ?, 0, ?, ?, ?, '{}', ?)
-      ON CONFLICT(accountId, senderKey) DO UPDATE SET lastUserSpamAt = MAX(COALESCE(lastUserSpamAt, 0), excluded.lastUserSpamAt), updatedAt = excluded.updatedAt`)
-      .run(accountId, senderKey, at, at, at, Date.now());
+    db.transaction(() => {
+      const profile = readSenderProfile(db, accountId, senderKey) ?? emptySenderProfile(senderKey, at);
+      profile.lastUserSpamAt = Math.max(profile.lastUserSpamAt ?? 0, at);
+      if (messageId !== undefined) addProfileJunk(profile, messageId);
+      writeSenderProfile(db, accountId, profile, Date.now());
+    }).immediate();
   });
 }
 
@@ -181,26 +261,45 @@ const TRUSTED_SKIP_SQL = `spamReasons LIKE '["trusted:profile%'`;
 const TRUST_CANARY_SQL = `spamReasons LIKE '["trusted:canary%'`;
 
 /**
- * Revocation: the sender's INBOX rows since `since` that were skipped as
- * trusted become unchecked again; returns their ids for re-queueing.
+ * A row whose author is `senderKey` (spamSenderKey: IDNA and case normalised,
+ * without display name), also for legacy rows that only carry fromAddr.
+ */
+const SENDER_ROW_SQL = `instr(lower(COALESCE(NULLIF(fromEmail, ''), fromAddr)), ?) > 0
+  AND mailbox_address_in(COALESCE(NULLIF(fromEmail, ''), fromAddr), ?) = 1`;
+// The ASCII local part is a cheap prefilter, so the exact check runs only on candidate rows.
+const senderRowParams = (senderKey: string) => [senderKey.slice(0, senderKey.lastIndexOf("@") + 1), JSON.stringify([senderKey])];
+
+/**
+ * Revocation: the sender's INBOX rows skipped as trusted since `since` (check
+ * time, not the sender's Date header) become unchecked again; returns their
+ * ids for re-queueing.
  */
 export async function resetTrustedSpamChecks(accountId: string, folderId: string, senderKey: string, since: number) {
   return withDbWriteRetry("resetTrustedSpamChecks", async () => {
     const db = await getAccountDb(accountId);
     const rows = db.prepare(`UPDATE messages SET spamVerdict = NULL, spamConfidence = NULL, spamReasons = NULL, spamCheckedAt = NULL
-      WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND ${TRUSTED_SKIP_SQL} AND ${messageAuthorEmailSql()} = ?
-      RETURNING id`).all(accountId, folderId, since, senderKey) as Array<{ id: string }>;
+      WHERE accountId = ? AND folderId = ? AND spamCheckedAt >= ? AND ${TRUSTED_SKIP_SQL} AND ${SENDER_ROW_SQL}
+      RETURNING id`).all(accountId, folderId, since, ...senderRowParams(senderKey)) as Array<{ id: string }>;
     return rows.map((row) => row.id);
   });
 }
 
-/** Other mails of a sender in a folder within `windowMs` of `date` (burst rule): date and To/Cc. */
-export async function listSenderMailsAround(accountId: string, folderId: string, senderKey: string, date: number, windowMs: number, excludeId: string) {
+export type SenderMailNear = {
+  id: string; dateValue: number; toAddr: string | null; ccAddr: string | null; hasSource: number | null; spamCheckedAt: number | null;
+};
+
+/**
+ * Other mails of a sender in a folder for the burst rule: the `limit` rows
+ * stored closest to `messageId` (rowid follows ingestion; the sender's Date
+ * header can be anything). The caller derives each one's arrival.
+ */
+export async function listSenderMailsNear(accountId: string, folderId: string, senderKey: string, messageId: string, limit: number) {
   const db = await getAccountDb(accountId);
-  return db.prepare(`SELECT id, dateValue, toAddr, ccAddr FROM messages
-    WHERE accountId = ? AND folderId = ? AND dateValue BETWEEN ? AND ? AND id != ? AND COALESCE(deleted, 0) = 0
-      AND ${messageAuthorEmailSql()} = ? LIMIT 50`)
-    .all(accountId, folderId, date - windowMs, date + windowMs, excludeId, senderKey) as Array<{ id: string; dateValue: number; toAddr: string | null; ccAddr: string | null }>;
+  const anchor = db.prepare(`SELECT rowid AS position FROM messages WHERE accountId = ? AND id = ?`).get(accountId, messageId) as { position: number } | null;
+  return db.prepare(`SELECT id, dateValue, toAddr, ccAddr, hasSource, spamCheckedAt FROM messages
+    WHERE accountId = ? AND folderId = ? AND id != ? AND COALESCE(deleted, 0) = 0 AND ${SENDER_ROW_SQL}
+    ORDER BY abs(rowid - ?) LIMIT ?`)
+    .all(accountId, folderId, messageId, ...senderRowParams(senderKey), anchor?.position ?? Number.MAX_SAFE_INTEGER, limit) as SenderMailNear[];
 }
 
 export type SpamTrustCounters = { trustedSkips: number; canaryChecks: number; canaryMismatches: number };
