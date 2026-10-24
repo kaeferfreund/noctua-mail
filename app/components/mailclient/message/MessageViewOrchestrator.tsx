@@ -17,13 +17,15 @@ import {
   useRef,
   useState
 } from "react";
-import { Badge, Flex, SegmentedControl } from "@radix-ui/themes";
+import { Badge, Flex, SegmentedControl, Tooltip } from "@radix-ui/themes";
+import { Rows3, StretchHorizontal } from "lucide-react";
 import type { Message, Topic } from "@/lib/data";
 
 import MessageViewPane from "./MessageViewPane";
 import ThreadSubject from "./ThreadSubject";
 import paneStyles from "./MessageViewPane.module.css";
 import ThreadView from "./ThreadView";
+import { getRenderedThreadMessages } from "./threadViewState";
 import type { ThreadWindowState } from "../useThreadContent";
 import type { ThreadViewCardProps } from "./ThreadView";
 import ThreadTopicSuggestionsRow from "./ThreadTopicSuggestionsRow";
@@ -704,17 +706,28 @@ function MessageViewOrchestratorImpl(
     messageTabs, collapsedMessages, messageTranslations,
     showTranslation, hideTranslation, changeTranslationLang]);
 
-  const threadViewModeToggle = (
+  // Compact and Full differ only in how collapsed cards render. A single
+  // rendered message opens expanded, so the toggle shows for threads only.
+  const showThreadViewModeToggle = getRenderedThreadMessages({
+    activeMessage, activeThread, supportsThreads, threadContentById,
+    threadContentLoading, showComposeInline, composeDraftId
+  }).length > 1;
+  const threadViewModeItem = (value: "compact" | "full", icon: React.ReactNode) => (
+    <Tooltip content={t(value)}>
+      <SegmentedControl.Item value={value} aria-label={t(value)}>{icon}</SegmentedControl.Item>
+    </Tooltip>
+  );
+  const threadViewModeToggle = showThreadViewModeToggle ? (
     <SegmentedControl.Root
       size="1"
       value={threadViewMode}
       onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
       style={{ flexShrink: 0 }}
     >
-      <SegmentedControl.Item value="compact">{t("compact")}</SegmentedControl.Item>
-      <SegmentedControl.Item value="full">{t("full")}</SegmentedControl.Item>
+      {threadViewModeItem("compact", <Rows3 size={14} aria-hidden="true" />)}
+      {threadViewModeItem("full", <StretchHorizontal size={14} aria-hidden="true" />)}
     </SegmentedControl.Root>
-  );
+  ) : null;
 
   return (
     <MessageViewPane

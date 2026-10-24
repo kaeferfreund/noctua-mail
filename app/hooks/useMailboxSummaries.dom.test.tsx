@@ -110,7 +110,7 @@ test("sidebar shows inactive and personal badges and view counts; burst SSE appl
   const h = harness(); await h.read();
   expect(h.sourceRequests).toHaveLength(1); expect(h.snapshots).toHaveLength(0);
   expect(h.view.getByLabelText("Unread count unavailable")).toBeTruthy();
-  expect(h.view.container.querySelector('[data-watcher-state="idling"]')).toBeTruthy();
+  expect(h.view.container.querySelector('[data-watcher-state="idling"]')).toBeNull();
   expect(h.view.getAllByRole("button")[0].getAttribute("title")).toContain("Watcher: Listening for new mail");
   expect(h.view.getByLabelText("2 unread")).toBeTruthy();
   expect(h.view.getByLabelText("3 threads")).toBeTruthy();
@@ -342,4 +342,53 @@ for (const heartbeat of [false, true]) test(`summary 401 ${heartbeat ? "with ini
     await act(async () => h.sources[7].close());
     expect(retries.map(retry => retry.delay)).toEqual([1000]);
   });
+});
+
+function renderMailboxRows(rows: UserMailboxSummary[]) {
+  return render(<Theme><TooltipProvider><SidebarProvider>
+    <MailboxRows accounts={rows.map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={rows[0].accountId} onSwitch={() => {}} />
+  </SidebarProvider></TooltipProvider></Theme>);
+}
+
+const badgeOf = (view: ReturnType<typeof renderMailboxRows>, index: number) =>
+  view.container.querySelectorAll('[data-sidebar="menu-badge"]')[index] as HTMLElement;
+
+test("mailbox badge with 0 unread and 0 assigned shows nothing; counts stay in hover and for screen readers", () => {
+  const view = renderMailboxRows([{ ...mailbox, unread: 0, assignedToMe: 0, unassignedOpen: 917, watcher: { state: "idling" } }]);
+  const badge = badgeOf(view, 0);
+  expect(badge.querySelectorAll("svg")).toHaveLength(0);
+  expect([...badge.children].every(child => child.classList.contains("sr-only"))).toBe(true);
+  expect(badge.querySelector("[data-watcher-state]")).toBeNull();
+  expect(view.getByLabelText("0 unread")).toBeTruthy();
+  expect(view.getByLabelText("0 assigned to me")).toBeTruthy();
+  expect(view.getByLabelText("917 unassigned open")).toBeTruthy();
+  const title = view.getByRole("button").getAttribute("title")!;
+  expect(title).toContain("0 unread · 0 assigned to me · 917 unassigned open");
+  expect(title).toContain("Watcher: Listening for new mail");
+  expect(view.getByRole("button").className.split(" ").filter(token => token.startsWith("pr-"))).toEqual([]);
+});
+
+test("mailbox badge with unread 2 and assigned 1 shows two numbers and no unassigned count", () => {
+  const view = renderMailboxRows([{ ...mailbox, unread: 2, assignedToMe: 1, unassignedOpen: 9113, watcher: { state: "idling" } }]);
+  const badge = badgeOf(view, 0);
+  const visible = [...badge.children].filter(child => !child.classList.contains("sr-only"));
+  expect(visible.map(child => child.getAttribute("aria-label"))).toEqual(["2 unread", "1 assigned to me"]);
+  expect(visible.map(child => child.textContent)).toEqual(["2", "1"]);
+  expect(badge.querySelectorAll("svg")).toHaveLength(2);
+  expect(visible.some(child => child.textContent?.includes("9113"))).toBe(false);
+  expect(view.getByLabelText("9113 unassigned open").classList.contains("sr-only")).toBe(true);
+  expect(view.getByRole("button").getAttribute("title")).toContain("9113 unassigned open");
+});
+
+test("mailbox badge shows the watcher dot only when the watcher is not healthy; unavailable unread stays hidden", () => {
+  const view = renderMailboxRows([
+    { ...mailbox, accountId: "synthetic-backoff", unread: null, assignedToMe: 0, watcher: { state: "backoff" } },
+    { ...mailbox, accountId: "synthetic-idle", unread: 5, assignedToMe: 0, watcher: { state: "idling" } }
+  ]);
+  const backoff = badgeOf(view, 0);
+  expect(backoff.querySelector('[data-watcher-state="backoff"]')?.getAttribute("title")).toBe("Watcher: Waiting to retry");
+  expect(backoff.querySelectorAll("svg")).toHaveLength(0);
+  expect(view.getByLabelText("Unread count unavailable").classList.contains("sr-only")).toBe(true);
+  expect(badgeOf(view, 1).querySelector("[data-watcher-state]")).toBeNull();
+  expect(badgeOf(view, 1).querySelectorAll("svg")).toHaveLength(1);
 });
