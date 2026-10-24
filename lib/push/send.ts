@@ -61,6 +61,9 @@ export type PushNotifier = {
   idle(): Promise<void>;
 };
 
+/** createPushNotifier's notifier plus the number of open collapse windows (tests). */
+export type PushNotifierWithWindows = PushNotifier & { openWindows(): number };
+
 type InboxMessage = {
   id: string;
   folderId: string;
@@ -131,7 +134,7 @@ function createLimiter(concurrency: number) {
   };
 }
 
-export function createPushNotifier(options: PushNotifierOptions = {}): PushNotifier {
+export function createPushNotifier(options: PushNotifierOptions = {}): PushNotifierWithWindows {
   const getTransport = options.transport ?? defaultTransport;
   const now = options.now ?? Date.now;
   const collapseMs = options.collapseMs ?? PUSH_COLLAPSE_MS;
@@ -241,6 +244,10 @@ export function createPushNotifier(options: PushNotifierOptions = {}): PushNotif
   }
 
   async function dispatch(accountId: string, messageIds: string[]) {
+    // A window past its collapse time without pending mail behaves like a missing one: drop it,
+    // so the map does not keep every (device, mailbox) ever notified, removed devices included.
+    const at = now();
+    for (const [key, window] of windows) if (!window.timer && window.lastSentAt + collapseMs <= at) windows.delete(key);
     for (const subscription of await listAllPushSubscriptions()) {
       if (!pushSettingsIncludeAccount(subscription.settings, accountId)) continue;
       const key = `${subscription.id}\u0000${accountId}`;
@@ -335,6 +342,9 @@ export function createPushNotifier(options: PushNotifierOptions = {}): PushNotif
         limit(() => send(transport, device, payload, { ttlSeconds: TEST_TTL_SECONDS, urgency: "high" }))));
       const sent = results.filter(Boolean).length;
       return { sent, failed: results.length - sent };
+    },
+    openWindows() {
+      return windows.size;
     },
     idle() {
       return outstanding === 0 ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve));
