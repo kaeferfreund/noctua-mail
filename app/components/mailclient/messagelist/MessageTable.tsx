@@ -15,7 +15,7 @@ import type { Message } from "@/lib/data";
 import SenderIcon from "../SenderIcon";
 import TopicBadge from "../TopicBadge";
 import badgeStyles from "../message/MessageBadge.module.css";
-import { getMessageListDateDisplay } from "./messageDateDisplay";
+import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./messageDateDisplay";
 import { selectAllVisibleMessages } from "./listSelection";
 import { useSelectionSnapshot } from "./selectionStore";
 import MessageListRenderer from "./MessageListRenderer";
@@ -48,6 +48,7 @@ export default function MessageTable({
 }: MessageTableProps) {
   const locale = useLocale();
   const t = useTranslations("List");
+  const relativeDayLabels = useMessageListRelativeDayLabels();
   const {
     groupedMessages,
     visibleMessages,
@@ -278,7 +279,7 @@ export default function MessageTable({
           const dateDisplay = getMessageListDateDisplay(
             item.displayDateValue,
             item.displayDate,
-            dateFormat, locale
+            dateFormat, locale, relativeDayLabels
           );
           const {
             isThreadSelectionRoot,
