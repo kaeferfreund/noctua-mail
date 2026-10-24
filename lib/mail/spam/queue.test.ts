@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createSpamFailureLogger, createSpamQueue, type SpamCheckJob } from "./queue";
+import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
 
 const job = (messageId: string): SpamCheckJob => ({ accountId: "acc", messageId });
 
@@ -53,6 +53,24 @@ describe("spam queue", () => {
     await queue.onIdle();
     expect(attempts).toBe(2);
     expect(failed).toBe(false);
+  });
+});
+
+describe("sweep selection", () => {
+  test("claims only the jobs it queues: 120 unchecked → 50 now, the other 70 stay unclaimed", () => {
+    let now = 0;
+    const claims = createSpamClaims(24 * 60 * 60_000, 20_000, () => now);
+    const ids = Array.from({ length: 120 }, (_, index) => `m${index}`);
+    const first = pickSweepJobs("acc", ids, { has: () => false }, claims, 50);
+    expect(first.map((entry) => entry.messageId)).toEqual(ids.slice(0, 50));
+    expect(ids.filter((id) => claims.isClaimed(job(id)))).toEqual(ids.slice(0, 50));
+    // The next sweep (same ids, first 50 still unchecked) takes the next 50; queued ones are skipped.
+    const second = pickSweepJobs("acc", ids, { has: (entry) => entry.messageId === "m50" }, claims, 50);
+    expect(second.map((entry) => entry.messageId)).toEqual(ids.slice(51, 101));
+    expect(claims.isClaimed(job("m50"))).toBe(false);
+    // Claims expire after the TTL.
+    now = 24 * 60 * 60_000;
+    expect(claims.isClaimed(job("m0"))).toBe(false);
   });
 });
 

@@ -68,6 +68,13 @@ describe("spam storage", () => {
     expect(await f.api.listUncheckedSpamMessageIds(f.accountId, f.folderId, 0, 10)).toEqual([]);
   });
 
+  test("unchecked messages are listed oldest first", async () => {
+    const f = await createCollabFixture();
+    const [newer, older] = await f.seed(f.message("<new@example.test>", { dateValue: 1767225600000 + 60_000 }),
+      f.message("<old@example.test>", { dateValue: 1767225600000 }));
+    expect(await f.api.listUncheckedSpamMessageIds(f.accountId, f.folderId, 0, 10)).toEqual([older.id, newer.id]);
+  });
+
   test("examples: latest decision per sender and subject wins; candidates by sender, domain and recency", async () => {
     const f = await createCollabFixture();
     const base = { messageId: null, source: "mark-spam", decidedByUserId: null, snippet: "Synthetisch" };

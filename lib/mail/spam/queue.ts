@@ -80,6 +80,40 @@ export function createSpamQueue(options: SpamQueueOptions) {
   };
 }
 
+/**
+ * Remembers claimed messages per process so later sweeps do not retry a
+ * dropped or undecided one within `ttlMs`.
+ */
+export function createSpamClaims(ttlMs: number, maxEntries: number, now: () => number = Date.now) {
+  const until = new Map<string, number>();
+  return {
+    isClaimed(job: SpamCheckJob) {
+      const expiry = until.get(jobKey(job));
+      return expiry !== undefined && expiry > now();
+    },
+    claim(job: SpamCheckJob) {
+      const time = now();
+      if (until.size >= maxEntries) {
+        for (const [entry, expiry] of until) if (expiry <= time || until.size >= maxEntries) until.delete(entry);
+      }
+      until.set(jobKey(job), time + ttlMs);
+    }
+  };
+}
+
+/**
+ * Picks at most `limit` ids (in the given order) that are neither queued nor
+ * claimed, and claims only those: ids beyond the limit stay unclaimed for the
+ * next sweep.
+ */
+export function pickSweepJobs(accountId: string, ids: string[], queue: { has: (job: SpamCheckJob) => boolean },
+  claims: ReturnType<typeof createSpamClaims>, limit: number) {
+  const jobs = ids.map((messageId) => ({ accountId, messageId }))
+    .filter((job) => !queue.has(job) && !claims.isClaimed(job)).slice(0, limit);
+  jobs.forEach((job) => claims.claim(job));
+  return jobs;
+}
+
 export const SPAM_LOG_WINDOW_MS = 10 * 60_000;
 
 /** Logs a failure at most once per account per window (default 10 minutes). */

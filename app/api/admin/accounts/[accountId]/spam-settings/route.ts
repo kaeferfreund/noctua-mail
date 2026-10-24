@@ -7,7 +7,7 @@ import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { loadMailboxSpamSettings, loadSpamConfig, saveMailboxSpamSettings } from "@/lib/mail/spam/settings";
 
-/** Per-mailbox spam settings (auto-move to Junk, threshold override). Admin only. */
+/** Per-mailbox spam settings (on/off, auto-move to Junk, threshold override). Admin only. */
 async function resolveAccount(params: AccountRouteParams["params"]) {
   const accountId = await getAccountIdFromParams(params);
   return accountId && await getAccountById(accountId) ? accountId : null;

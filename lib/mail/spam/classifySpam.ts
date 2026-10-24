@@ -24,13 +24,24 @@ Regeln:
 - confidence ist deine Sicherheit für das gewählte Urteil (0 bis 1).
 - reasons: höchstens 5 kurze Stichpunkte auf Deutsch, je höchstens 12 Wörter, ohne Namen, Adressen oder Zitate aus dem Text.`;
 
+/** Model call limit; a timeout is a failed attempt and goes through the queue's retries. */
+export const SPAM_MODEL_TIMEOUT_MS = 30_000;
+
+/**
+ * Mail-derived text must not close or open the <email>/<beispiele> blocks:
+ * angle brackets in data become ‹ ›, so the tags occur only where we put them.
+ */
+function data(value: string) {
+  return value.replace(/</g, "‹").replace(/>/g, "›");
+}
+
 function line(label: string, value: string | null | undefined) {
-  return value ? `${label}: ${value}\n` : "";
+  return value ? `${label}: ${data(value)}\n` : "";
 }
 
 function formatExample(example: SpamExample, index: number) {
   const label = example.label === "spam" ? "Spam" : "Kein Spam";
-  return `${index + 1}. [${label}] Von: ${example.senderEmail ?? "unbekannt"} | Betreff: ${example.subject} | Text: ${example.snippet}`;
+  return `${index + 1}. [${label}] Von: ${data(example.senderEmail ?? "unbekannt")} | Betreff: ${data(example.subject)} | Text: ${data(example.snippet)}`;
 }
 
 export function buildSpamPrompt(input: SpamInput, examples: SpamExample[], hints: string[]) {
@@ -38,14 +49,14 @@ export function buildSpamPrompt(input: SpamInput, examples: SpamExample[], hints
   parts.push(examples.length
     ? `<beispiele>\nFrühere Entscheidungen der Nutzer dieses Postfachs (ähnlichste zuerst):\n${examples.map(formatExample).join("\n")}\n</beispiele>`
     : "<beispiele>\nNoch keine früheren Entscheidungen.\n</beispiele>");
-  if (hints.length) parts.push(`Hinweise aus Regeln:\n${hints.map((hint) => `- ${hint}`).join("\n")}`);
+  if (hints.length) parts.push(`Hinweise aus Regeln:\n${hints.map((hint) => `- ${data(hint)}`).join("\n")}`);
   parts.push(`<email>\n${line("From", input.from)}${line("Reply-To", input.replyTo)}${line("To", input.to)}${line("Date", input.date)}`
     + `${line("Subject", input.subject || "(kein Betreff)")}${line("List-Id", input.listId)}${line("List-Unsubscribe", input.listUnsubscribe)}`
     + input.authenticationResults.map((value) => line("Authentication-Results", value)).join("")
-    + input.spamHeaders.map((value) => `${value}\n`).join("")
+    + input.spamHeaders.map((value) => `${data(value)}\n`).join("")
     + line("Link-Domains", input.linkDomains.join(", "))
     + line("Anhänge", input.attachments.join(", "))
-    + `Text:\n${input.text || "(leer)"}\n</email>`);
+    + `Text:\n${data(input.text) || "(leer)"}\n</email>`);
   return parts.join("\n\n");
 }
 
@@ -61,24 +72,44 @@ export type ClassifySpamParams = {
   model: LanguageModel | null;
   providerOptions?: SpamModelProviderOptions;
   abortSignal?: AbortSignal;
+  /** Defaults to SPAM_MODEL_TIMEOUT_MS. */
+  timeoutMs?: number;
 };
+
+/** Rejects once `signal` aborts, even if the provider ignores the signal. */
+function abortable<T>(promise: Promise<T>, signal: AbortSignal) {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason ?? new Error("Spam model call aborted"));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
 
 /**
  * Allowlist → static rules → model. Returns null when the model is needed but
  * not available (static-only mode): the message then stays unchecked.
- * Model errors (network, 429, invalid output) are thrown to the caller.
+ * Model errors (network, 429, timeout, invalid output) are thrown to the caller.
+ * A user's latest "Als Spam" for the sender outranks static allow rules: the
+ * model then decides, with that decision among the examples.
  */
 export async function classifySpam(params: ClassifySpamParams): Promise<SpamDecision | null> {
   const { input } = params;
   const allowed = params.allowlist ? await matchSpamAllowlist(input, params.allowlist) : null;
   if (allowed) return { verdict: "ham", confidence: 1, reasons: [ALLOWLIST_REASONS[allowed]], source: "allowlist" };
+  const email = input.fromEmail?.trim().toLowerCase();
+  const userSaidSpam = Boolean(email && params.allowlist && await params.allowlist.latestDecision(email) === "spam");
   const rules = applyStaticRules(params.staticRules, input);
-  if (rules.decision === "allow") return { verdict: "ham", confidence: 1, reasons: ["Absender laut Regel bekannt"], source: "static-allow" };
+  if (rules.decision === "allow" && !userSaidSpam) {
+    return { verdict: "ham", confidence: 1, reasons: ["Absender laut Regel bekannt"], source: "static-allow" };
+  }
   if (rules.decision === "deny") {
     return { verdict: "spam", confidence: 1, reasons: ["Absender oder Muster laut Regel eindeutig Spam"], source: "static-deny" };
   }
   if (!params.model) return null;
-  const { output } = await generateText({
+  const timeout = AbortSignal.timeout(params.timeoutMs ?? SPAM_MODEL_TIMEOUT_MS);
+  const abortSignal = params.abortSignal ? AbortSignal.any([params.abortSignal, timeout]) : timeout;
+  const { output } = await abortable(generateText({
     model: params.model,
     system: SPAM_SYSTEM_PROMPT,
     prompt: buildSpamPrompt(input, await params.getExamples(), rules.hints),
@@ -87,8 +118,8 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
     maxOutputTokens: 2048,
     // The queue owns retries (at most two); the SDK must not add its own.
     maxRetries: 0,
-    abortSignal: params.abortSignal
-  });
+    abortSignal
+  }), abortSignal);
   return { ...output, reasons: output.reasons.map((reason) => reason.trim()).filter(Boolean), source: "model" };
 }
 

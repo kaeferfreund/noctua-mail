@@ -427,6 +427,7 @@
       "heading": "Spam-Erkennung für dieses Postfach",
       "help": "Neue Nachrichten im Posteingang werden einmal geprüft. Verdächtige Nachrichten bekommen eine Markierung; das Verschieben nach Spam ist optional.",
       "globalOff": "Die Spam-Erkennung ist in der Verwaltung ausgeschaltet.",
+      "enabled": "Spam-Erkennung für dieses Postfach eingeschaltet",
       "autoMove": "Verdächtige Nachrichten automatisch in den Spam-Ordner verschieben",
       "threshold": "Eigene Schwelle (leer = {threshold, number} aus der Verwaltung)",
       "thresholdHelp": "Zwischen 0,5 und 1. Höher bedeutet weniger Markierungen.",

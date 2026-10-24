@@ -23,7 +23,7 @@ export async function saveSpamVerdict(accountId: string, messageId: string, verd
 }
 
 /**
- * Unchecked rows of a folder newer than `sinceDateValue`, newest first. Every
+ * Unchecked rows of a folder newer than `sinceDateValue`, oldest first. Every
  * checked row has `spamCheckedAt`, so after the first sweep this only returns
  * mail that arrived since (served by idx_messages_account_folder_date).
  */
@@ -31,7 +31,7 @@ export async function listUncheckedSpamMessageIds(accountId: string, folderId: s
   const db = await getAccountDb(accountId);
   const rows = db.prepare(`SELECT id FROM messages
     WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND spamCheckedAt IS NULL AND COALESCE(deleted, 0) = 0
-    ORDER BY dateValue DESC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as Array<{ id: string }>;
+    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as Array<{ id: string }>;
   return rows.map((row) => row.id);
 }
 
