@@ -113,7 +113,7 @@ function threadListProps(onSelect = noop): MessageThreadListProps {
       handleMessageDragStart: noop, handleMessageDragEnd: noop, handleRowClick: noop,
       handleSelectMessage: onSelect, selectRangeTo: noop, toggleMessageSelection: noop,
       selectCollapsedThread: noop, handleDeleteMessage: noop, toggleFlaggedFlag: noop,
-      toggleTodoFlag: noop, handleAddSuggestedThread: noop
+      toggleTodoFlag: noop, toggleRowRead: noop, handleAddSuggestedThread: noop
     },
     helpers: {
       buildThreadTree, flattenThread, getThreadLatestDate, getGroupLabel: (group) => group.key,
@@ -123,6 +123,14 @@ function threadListProps(onSelect = noop): MessageThreadListProps {
   };
 }
 
+// The virtual list positions each row in an item with a fixed height; on
+// phones the swipe wrapper sits between that item and the row.
+const virtualItemHeight = (row: Element) => {
+  let item = row.parentElement;
+  while (item && !item.style.transform) item = item.parentElement;
+  return item?.style.height;
+};
+
 describe("mobile message rows", () => {
   it("switches desktop narrow thread rows and virtual spacing together", () => {
     window.innerWidth = 1280;
@@ -130,20 +138,21 @@ describe("mobile message rows", () => {
     const page = render(<Theme><MessageThreadList {...props} /></Theme>);
     const row = () => page.container.querySelector<HTMLElement>('[data-message-list-row]')!;
     expect(row().dataset.messageNarrow).toBe("true");
-    expect(row().parentElement!.parentElement!.style.height).toBe("72px");
+    expect(virtualItemHeight(row())).toBe("72px");
     page.rerender(<Theme><MessageThreadList {...props} state={{ ...props.state, listIsNarrow: false }} /></Theme>);
     expect(row().dataset.messageNarrow).toBe("false");
-    expect(row().parentElement!.parentElement!.style.height).toBe("40px");
+    expect(virtualItemHeight(row())).toBe("40px");
   });
   it("allocates 72px for Compact on mobile and 60px on desktop", () => {
     const props = threadListProps();
     const page = render(<Theme><MessageCardList {...props} state={{ ...props.state, isCompactView: true }} /></Theme>);
-    const rows = [...page.container.querySelectorAll('[data-compact="true"]')];
-    expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["72px", "72px"]);
+    // Rows remount when the swipe wrapper comes or goes at the breakpoint.
+    const rows = () => [...page.container.querySelectorAll('[data-compact="true"]')];
+    expect(rows()).toHaveLength(2);
+    expect(rows().map((row) => virtualItemHeight(row))).toEqual(["72px", "72px"]);
     act(() => window.dispatchEvent(new Event("resize")));
     act(() => { window.innerWidth = 1280; window.dispatchEvent(new Event("resize")); });
-    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["60px", "60px"]);
+    expect(rows().map((row) => virtualItemHeight(row))).toEqual(["60px", "60px"]);
   });
   it("keeps Table selection independent from unread and row activation on mobile", () => {
     const props = threadListProps();
@@ -187,16 +196,16 @@ describe("mobile message rows", () => {
   it("allocates nonoverlapping 72px virtual rows and restores desktop density at the breakpoint", () => {
     const props = threadListProps();
     const page = render(<Theme><MessageThreadList {...props} /></Theme>);
-    const rows = [...page.container.querySelectorAll('[data-message-list-row]')];
-    expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["72px", "72px"]);
-    expect(rows[0].querySelector('[data-message-subject]')!.textContent).toBe("Synthetic subject");
-    expect(rows[0].querySelector('[data-message-cell="actions"] button[aria-label="Message actions"]')).toBeTruthy();
+    const rows = () => [...page.container.querySelectorAll('[data-message-list-row]')];
+    expect(rows()).toHaveLength(2);
+    expect(rows().map((row) => virtualItemHeight(row))).toEqual(["72px", "72px"]);
+    expect(rows()[0].querySelector('[data-message-subject]')!.textContent).toBe("Synthetic subject");
+    expect(rows()[0].querySelector('[data-message-cell="actions"] button[aria-label="Message actions"]')).toBeTruthy();
     props.state.listIsNarrow = false;
     page.rerender(<Theme><MessageThreadList {...props} /></Theme>);
     act(() => window.dispatchEvent(new Event("resize")));
     act(() => { window.innerWidth = 1280; window.dispatchEvent(new Event("resize")); });
-    expect(rows.map((row) => row.parentElement!.parentElement!.style.height)).toEqual(["40px", "40px"]);
+    expect(rows().map((row) => virtualItemHeight(row))).toEqual(["40px", "40px"]);
   });
   it("opens Message actions with Enter inside a real thread row without selecting it", async () => {
     let selected = 0;

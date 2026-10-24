@@ -14,6 +14,7 @@ import MessageListRenderer from "./MessageListRenderer";
 import type { MessageCardListProps } from "./messageListViewTypes";
 import { useMessageListItems } from "./useMessageListItems";
 import { useThreadListAnimationState } from "./useThreadListAnimationState";
+import { useRowSwipeActions } from "./useRowSwipeActions";
 import {
   getDragThreadMessageIds,
   getThreadRowDisplayMeta,
@@ -135,6 +136,7 @@ export default function MessageCardList({
   });
 
   useReaderNavigationRows(listItems, onNavigationRowsChange);
+  const getRowSwipe = useRowSwipeActions(actions, pendingMessageActions);
 
   return (
     <MessageListRenderer
@@ -180,6 +182,7 @@ export default function MessageCardList({
           });
         return animateFromGroup || animateFromThread || animateFromNested;
       }}
+      getRowSwipe={getRowSwipe}
       renderRow={({ item, index }) => {
         const message = item.message;
         const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);

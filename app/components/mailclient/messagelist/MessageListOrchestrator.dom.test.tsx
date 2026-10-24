@@ -26,7 +26,7 @@ function props(scope: "folder" | "all", searchActive: boolean): MessageListOrche
       setSortKey: noop, setSortDir: noop, setCollapsedGroups: noop, setCollapsedThreads: noop,
       setLastSelectedIdRef: noop, handleMessageDragStart: noop, handleMessageDragEnd: noop,
       handleRowClick: noop, handleSelectMessage: noop, selectRangeTo: noop, toggleMessageSelection: noop,
-      selectCollapsedThread: noop, handleAddSuggestedThread: noop
+      selectCollapsedThread: noop, toggleRowRead: noop, handleAddSuggestedThread: noop
     },
     listViewHelpers: {
       buildThreadTree: () => [], flattenThread: () => [], getThreadLatestDate: () => 0,
