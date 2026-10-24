@@ -43,7 +43,10 @@ export function checkLegacySourceOwnership(
   source: string
 ): { senderKey: string; sourceSha256: string } | { skip: LegacySourceSkipReason } {
   if (Buffer.byteLength(source) !== row.sizeBytes) return { skip: "size" };
-  const headers = parseHeaderMap(Buffer.from(source));
+  // parseHeaderMap stops at the first empty line: split only the header block
+  // (up to the newline before that line) instead of a possibly large body.
+  const headerEnd = source.search(/\n\r?\n/);
+  const headers = parseHeaderMap(Buffer.from(headerEnd < 0 ? source : source.slice(0, headerEnd + 1)));
   const messageId = normalizeEnvelopeHeaderId(getHeaderValue(headers, "message-id"));
   if (!messageId || messageId !== row.messageId) return { skip: "message-id" };
   // The same derivation as ingestion without an envelope and as the lazy backfill above.
