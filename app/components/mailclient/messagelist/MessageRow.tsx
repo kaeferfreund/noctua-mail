@@ -12,7 +12,7 @@ import SenderIcon from "../SenderIcon";
 import { hasAiModifiedFlag, hasTodoFlag, hasDoneFlag } from "../utils/messageHelpers";
 import badgeStyles from "../message/MessageBadge.module.css";
 import commonStyles from "./MessageListCommon.module.css";
-import { getMessageListDateDisplay } from "./messageDateDisplay";
+import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./messageDateDisplay";
 import styles from "./MessageRow.module.css";
 import CategoryBadge from "../CategoryBadge";
 import TopicBadge from "../TopicBadge";
@@ -177,6 +177,7 @@ function MessageRow({
 }: MessageRowProps) {
   const locale = useLocale();
   const t = useTranslations("List");
+  const relativeDayLabels = useMessageListRelativeDayLabels();
   const [optimisticSelected, setOptimisticSelected] = useState<boolean | null>(null);
   const [optimisticActive, setOptimisticActive] = useState(false);
   const clearTimerRef = useRef<number | null>(null);
@@ -242,7 +243,7 @@ function MessageRow({
   const dateDisplay = getMessageListDateDisplay(
     displayDateValue ?? message.dateValue,
     displayDate ?? message.date,
-    dateFormat, locale
+    dateFormat, locale, relativeDayLabels
   );
   const size = showSize ? describeMessageSize(message.sizeBytes, locale) : null;
   const firstTopicColor = topicColorRows ? (messageTopics?.[0]?.color ?? null) : null;
