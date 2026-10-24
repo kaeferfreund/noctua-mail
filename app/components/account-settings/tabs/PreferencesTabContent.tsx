@@ -85,7 +85,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       {loading && <p role="status">{t("preferences.loading")}</p>}
       {Boolean(error) && <p role="alert" className="text-destructive">{errorText}</p>}
       {saved && <p role="status">{t("preferences.saved")}</p>}
-      <fieldset disabled={loading || busy} className="grid min-w-0 gap-4 sm:grid-cols-2">
+      <fieldset disabled={loading || busy} className="m-0 grid min-w-0 gap-4 border-0 p-0 sm:grid-cols-2">
         {fields.map(field => {
           const changes = patch[field.group] as Record<string, unknown> | null | undefined;
           const stored = prefs[field.group] as Record<string, unknown> | undefined;
