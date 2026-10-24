@@ -11,7 +11,8 @@ declare module "bun:sqlite" {
   };
 
   export class Database {
-    constructor(path: string, options?: { create?: boolean; readwrite?: boolean; readonly?: boolean });
+    /** A number is a set of SQLITE_OPEN_* flags (e.g. READONLY | URI for `file:…?immutable=1`). */
+    constructor(path: string, options?: number | { create?: boolean; readwrite?: boolean; readonly?: boolean });
     exec(sql: string): void;
     close(): void;
     prepare(sql: string): {
