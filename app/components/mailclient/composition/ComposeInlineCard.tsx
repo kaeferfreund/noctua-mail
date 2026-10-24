@@ -33,7 +33,7 @@ export default function ComposeInlineCard() {
     composeDragActive,
     detachedWindow,
     fromValue,
-    identities, identityId, identityDisabled, sendDisabled, senderMessage, onSenderRetry, onIdentityChange,
+    identities, identityId, identityDisabled, sendDisabled, senderMessage, senderAction, onSenderRetry, onIdentityChange,
     inReplyToMessage,
     popOutCompose,
     openComposeInNewWindow,
@@ -122,7 +122,7 @@ export default function ComposeInlineCard() {
               composeShowBcc={composeShowBcc}
               activeAccountId={activeAccountId}
               fromValue={fromValue}
-              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} onSenderRetry={onSenderRetry} onIdentityChange={onIdentityChange}
+              identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} senderAction={senderAction} onSenderRetry={onSenderRetry} onIdentityChange={onIdentityChange}
               inReplyToMessage={inReplyToMessage}
               onJumpToMessage={jumpToMessage}
               setComposeSubject={setComposeSubject}

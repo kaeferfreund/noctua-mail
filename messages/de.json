@@ -1507,6 +1507,7 @@
     "sender": {
       "chooseSender": "Absender auswählen",
       "reviewSender": "Absender prüfen",
+      "reviewRecipients": "Empfänger prüfen",
       "unavailableDraft": "Die Absenderadresse dieses Entwurfs ist nicht verfügbar. Wähle einen aktiven Absender und speichere den Entwurf.",
       "chooseEnabledSender": "Wähle vor dem Senden eine aktive Absenderadresse.",
       "confirmKeepEditedSignature": "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten.",

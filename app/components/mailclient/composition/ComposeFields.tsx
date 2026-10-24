@@ -7,6 +7,7 @@ import { Button, Select, Text, TextField } from "@radix-ui/themes";
 import type { Message, RecipientSuggestion, SenderIdentity } from "@/lib/data";
 import InReplyToReferenceRow from "../InReplyToReferenceRow";
 import styles from "./Compose.module.css";
+import type { SenderMessageAction } from "./senderErrors";
 
 type RecipientFocus = "to" | "cc" | "bcc" | null;
 
@@ -24,6 +25,7 @@ type ComposeFieldsProps = {
   identityId?: string;
   identityDisabled?: boolean;
   senderMessage?: string | null;
+  senderAction?: SenderMessageAction;
   onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage?: Message | null;
@@ -203,7 +205,7 @@ export default function ComposeFields({
   composeShowBcc,
   activeAccountId,
   fromValue,
-  identities = [], identityId, identityDisabled = false, senderMessage, onSenderRetry, onIdentityChange,
+  identities = [], identityId, identityDisabled = false, senderMessage, senderAction = "sender", onSenderRetry, onIdentityChange,
   inReplyToMessage,
   onJumpToMessage,
   setComposeSubject,
@@ -334,7 +336,7 @@ export default function ComposeFields({
             </Select.Item>)}
           </Select.Content>
         </Select.Root>
-        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} {onSenderRetry ? <button type="button" onClick={onSenderRetry}>{senderMessages.retrySender}</button> : <a href={`#compose-${variant}-from`}>{senderMessages.reviewSender}</a>}</Text>}
+        {senderMessage && <Text as="p" size="1" id={`compose-${variant}-sender-message`} role="alert">{senderMessage} {onSenderRetry ? <button type="button" onClick={onSenderRetry}>{senderMessages.retrySender}</button> : senderAction === "recipients" ? <a href={`#compose-${variant}-to`}>{senderMessages.reviewRecipients}</a> : senderAction === "sender" ? <a href={`#compose-${variant}-from`}>{senderMessages.reviewSender}</a> : null}</Text>}
       </div>
     </div>
   );

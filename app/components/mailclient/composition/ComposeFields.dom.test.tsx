@@ -43,6 +43,15 @@ describe("compose From control", () => {
     expect(view.getByRole("alert").textContent).toContain("Choose an enabled sender");
     expect(view.getByRole("link", { name: "Review sender" }).getAttribute("href")).toBe("#compose-inline-from");
   });
+  test("SMTP rejections point to the field that can fix them (QA-211)", () => {
+    const recipient = fields("inline", { senderMessage: "A recipient was rejected.", senderAction: "recipients" });
+    expect(recipient.view.getByRole("link", { name: "Review recipients" }).getAttribute("href")).toBe("#compose-inline-to");
+    expect(recipient.view.queryByRole("link", { name: "Review sender" })).toBeNull();
+    cleanup();
+    const temporary = fields("modal", { senderMessage: "The provider is temporarily unavailable.", senderAction: null });
+    expect(temporary.view.getByRole("alert").textContent).toContain("temporarily unavailable");
+    expect(temporary.view.queryByRole("link")).toBeNull();
+  });
   test("viewer From selection and send are disabled", () => {
     const { view } = fields("modal", { identityDisabled: true });
     expect((view.getByLabelText("From:") as HTMLButtonElement).disabled).toBe(true);
