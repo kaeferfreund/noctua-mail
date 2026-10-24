@@ -225,6 +225,18 @@ describe("push sending rules", () => {
 });
 
 describe("test push", () => {
+  test("never contacts a stored endpoint the allowlist rejects and removes that device (review-r1 P1)", async () => {
+    const t = await setup();
+    silenceWarnings();
+    // Stored directly, as a row from before the allowlist fix would be.
+    const legacy = await upsertPushSubscription({
+      userId: t.user.id, endpoint: "https://127.0.0.1;.fcm.googleapis.com/x", p256dh: "synthetic-key", auth: "synthetic-auth", userAgent: null
+    });
+    expect(await t.notifier.sendTest(t.user.id)).toEqual({ sent: 1, failed: 1 });
+    expect(t.fake.sent.map((item) => item.endpoint)).toEqual([t.device.endpoint]);
+    expect(await getPushSubscription(legacy.id)).toBeNull();
+  });
+
   test("goes to one own device or all own devices, never to someone else's", async () => {
     const t = await setup();
     const second = await upsertPushSubscription({
