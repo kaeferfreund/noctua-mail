@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { MockLanguageModelV4 } from "ai/test";
-import { buildSpamPrompt, classifySpam, shouldMarkAsSpam, spamVerdictSchema } from "./classifySpam";
+import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, shouldMarkAsSpam, spamVerdictSchema } from "./classifySpam";
 import { createSpamQueue } from "./queue";
-import { EMPTY_STATIC_RULES, parseStaticRules } from "./staticRules";
+import { EMPTY_STATIC_RULES, loadStaticRules, parseStaticRules } from "./staticRules";
 import { mockSpamModel } from "./testModel";
 import type { SpamExample, SpamInput } from "./types";
+import type { SpamTokenUsage } from "./usage";
 
 const input: SpamInput = {
   from: "Prize Desk <winner@lottery.example.test>", fromEmail: "winner@lottery.example.test", fromName: "Prize Desk",
@@ -136,5 +141,117 @@ describe("prompt", () => {
     expect(prompt.indexOf("Regel: Mails von bank.example")).toBeLessThan(prompt.indexOf("</beispiele>"));
     expect(prompt).toContain("From: Evil ‹evil@example.test›");
     expect(prompt).toContain("‹/email›");
+  });
+});
+
+describe("prompt caching", () => {
+  const rulesJson = {
+    allow: [{ type: "address", value: "partner@example.test" }],
+    deny: [
+      { type: "domain", value: "spam.example.test", safe: true, spamHits: 9, hamHits: 0 },
+      { type: "subjectPattern", value: "(?<![\\p{L}\\p{N}_])gratis[^\\p{L}\\p{N}]+kapsel(?![\\p{L}\\p{N}_])", safe: true, spamHits: 4, hamHits: 0 },
+      { type: "header", value: "x-spam-status: \\bRCVD_ILLEGAL_IP\\b", safe: true, spamHits: 4, hamHits: 0 },
+      { type: "address", value: "maybe@unsafe.example.test", safe: false, spamHits: 2, hamHits: 0 }
+    ],
+    hints: [
+      { type: "subjectPattern", value: "(?<![\\p{L}\\p{N}_])gewinn(?![\\p{L}\\p{N}_])", spamHits: 5, hamHits: 1 },
+      { type: "domain", value: "builtin:tld-shop", spamHits: 35, hamHits: 1919, note: "From TLD .shop" }
+    ]
+  };
+  const rules = parseStaticRules(rulesJson);
+  const otherMail: SpamInput = { ...input, from: "Shop <news@shop.example.test>", fromEmail: "news@shop.example.test", fromName: "Shop",
+    subject: "Ihre Bestellung 4711", text: "Vielen Dank für Ihre Bestellung Nummer 4711.", linkDomains: ["shop.example.test"] };
+  const verdict = answer({ verdict: "unsure", confidence: 0.5, reasons: ["Unklar"] });
+
+  test("the system block is byte-identical for two different mails and carries the 1 h cache breakpoint", async () => {
+    const model = mockSpamModel(verdict);
+    for (const mail of [input, otherMail]) {
+      await classifySpam({ input: mail, staticRules: rules, getExamples: async () => [example("spam", mail.subject)], model });
+    }
+    const [first, second] = model.doGenerateCalls.map((call) => call.prompt);
+    expect(first[0].role).toBe("system");
+    expect(JSON.stringify(first[0])).toBe(JSON.stringify(second[0]));
+    expect(first[0].providerOptions).toEqual({ anthropic: { cacheControl: { type: "ephemeral", ttl: "1h" } } });
+    // Exactly one system block; everything after it is the per-mail user message.
+    expect(first.filter((message) => message.role === "system")).toHaveLength(1);
+    expect(JSON.stringify(first.slice(1))).not.toBe(JSON.stringify(second.slice(1)));
+  });
+
+  test("the Anthropic request puts cache_control on the system block and keeps it identical", async () => {
+    const bodies: Array<Record<string, any>> = [];
+    const fetch = async (_url: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({
+        id: `msg_${bodies.length}`, type: "message", role: "assistant", model: "claude-haiku-5-5",
+        content: [{ type: "text", text: verdict }], stop_reason: "end_turn", stop_sequence: null,
+        usage: { input_tokens: 300, output_tokens: 40, cache_creation_input_tokens: bodies.length === 1 ? 900 : 0, cache_read_input_tokens: bodies.length === 1 ? 0 : 900 }
+      }), { headers: { "content-type": "application/json" } });
+    };
+    const model = createAnthropic({ apiKey: "test-key", baseURL: "https://anthropic.example.test/v1", fetch: fetch as typeof globalThis.fetch })("claude-haiku-5-5");
+    const usages: SpamTokenUsage[] = [];
+    for (const mail of [input, otherMail]) {
+      await classifySpam({ input: mail, staticRules: rules, getExamples: async () => [], model, onUsage: (usage) => usages.push(usage) });
+    }
+    expect(bodies).toHaveLength(2);
+    expect(JSON.stringify(bodies[0].system)).toBe(JSON.stringify(bodies[1].system));
+    expect(bodies[0].system).toHaveLength(1);
+    expect(bodies[0].system[0].cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
+    expect(JSON.stringify(bodies[0].system)).not.toContain("Klicken Sie hier");
+    expect(JSON.stringify(bodies[0].messages)).toContain("Klicken Sie hier");
+    expect(usages[0]).toMatchObject({ calls: 1, cacheHits: 0, inputTokens: 1200, noCacheTokens: 300, cacheWriteTokens: 900, cacheReadTokens: 0, outputTokens: 40 });
+    expect(usages[1]).toMatchObject({ calls: 1, cacheHits: 1, inputTokens: 1200, cacheWriteTokens: 0, cacheReadTokens: 900 });
+  });
+
+  test("nothing from the mail, its examples or its hints lands in the cached prefix", async () => {
+    const model = mockSpamModel(verdict);
+    const marker = "Zz9Marker";
+    const mail: SpamInput = { ...input, from: `${marker} <${marker.toLowerCase()}@spam.example.test>`, fromEmail: `${marker.toLowerCase()}@spam.example.test`,
+      subject: `${marker} Betreff`, text: `${marker} Text`, replyTo: `${marker}@example.test`, linkDomains: [`${marker}.example.test`],
+      attachments: [`${marker}.pdf (application/pdf)`], spamHeaders: [`x-spam-status: ${marker}`], authenticationResults: [`mx; spf=${marker}`] };
+    await classifySpam({ input: mail, staticRules: parseStaticRules({ hints: [{ type: "domain", value: "example.test", note: "Qq7HintNote" }] }),
+      getExamples: async () => [{ ...example("ham", `${marker} Beispiel`), snippet: marker }], model });
+    const [system, ...rest] = model.doGenerateCalls[0].prompt;
+    expect(JSON.stringify(system).toLowerCase()).not.toContain(marker.toLowerCase());
+    expect(JSON.stringify(system)).not.toContain("Qq7HintNote");
+    expect(JSON.stringify(rest)).toContain(`${marker} Text`);
+    expect(JSON.stringify(rest)).toContain("Qq7HintNote");
+  });
+
+  test("the rule catalogue lists safe deny rules sorted, without counts, and never allow rules", () => {
+    const prompt = buildSpamSystemPrompt(rules);
+    expect(prompt.length).toBeLessThan(10_000);
+    expect(prompt).toContain("Absender-Domains: spam.example.test");
+    expect(prompt).toContain("Betreff-Wörter (… = weitere Zeichen dazwischen): gratis … kapsel");
+    expect(prompt).toContain("Kopfzeilen: x-spam-status: \\bRCVD_ILLEGAL_IP\\b");
+    expect(prompt).toContain("From TLD .shop");
+    expect(prompt).not.toContain("partner@example.test");
+    expect(prompt).not.toContain("maybe@unsafe.example.test");
+    expect(prompt).not.toMatch(/\d+× Spam/);
+    expect(prompt.indexOf("<regelkatalog>")).toBeGreaterThan(prompt.indexOf("Regeln:"));
+    // Same rules in another order and with other counts give the same text.
+    const reordered = parseStaticRules({ ...rulesJson, deny: [...rulesJson.deny].reverse().map((rule) => ({ ...rule, hamHits: 1 })) });
+    expect(buildSpamSystemPrompt(reordered)).toBe(prompt);
+  });
+
+  test("the catalogue is built once per rules version and follows a changed rules file", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "noctua-spam-catalogue-"));
+    try {
+      const file = path.join(dir, "rules.json");
+      writeFileSync(file, JSON.stringify(rulesJson));
+      const loaded = await loadStaticRules(file);
+      const prompt = buildSpamSystemPrompt(loaded);
+      expect(await loadStaticRules(file)).toBe(loaded);
+      // Memoised per rules object: a later mutation of the same object is not picked up.
+      loaded.deny.push({ type: "domain", value: "mutated.example.test", safe: true });
+      expect(buildSpamSystemPrompt(loaded)).toBe(prompt);
+      writeFileSync(file, JSON.stringify({ ...rulesJson, deny: [...rulesJson.deny, { type: "domain", value: "new.example.test", safe: true, spamHits: 3 }] }));
+      utimesSync(file, new Date(), new Date(Date.now() + 5_000));
+      const reloaded = await loadStaticRules(file);
+      expect(reloaded).not.toBe(loaded);
+      expect(buildSpamSystemPrompt(reloaded)).toContain("new.example.test");
+      expect(buildSpamSystemPrompt(reloaded)).not.toContain("mutated.example.test");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
