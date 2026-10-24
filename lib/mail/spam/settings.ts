@@ -1,4 +1,4 @@
-import { getSpamSettings, saveSpamSettings } from "@/lib/db";
+import { countSpamTrustDecisions, getAccounts, getSpamSettings, saveSpamSettings } from "@/lib/db";
 import {
   parseSpamAdminSettings,
   parseSpamMailboxSettings,
@@ -50,4 +50,14 @@ export function describeSpamConfig(config: SpamConfig) {
     threshold: config.threshold,
     modelUnavailable: spamModelUnavailableReason(config)
   };
+}
+
+/** Read-only trusted-sender counters per mailbox for the admin view (derived from stored verdicts). */
+export async function loadSpamTrustCounters() {
+  const accounts = await getAccounts();
+  return Promise.all(accounts.map(async (account) => ({
+    accountId: account.id,
+    email: account.email,
+    ...await countSpamTrustDecisions(account.id).catch(() => ({ trustedSkips: 0, canaryChecks: 0, canaryMismatches: 0 }))
+  })));
 }

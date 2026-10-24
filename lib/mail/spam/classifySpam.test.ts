@@ -7,7 +7,9 @@ import { MockLanguageModelV4 } from "ai/test";
 import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, shouldMarkAsSpam, spamVerdictSchema } from "./classifySpam";
 import { createSpamQueue } from "./queue";
 import { EMPTY_STATIC_RULES, loadStaticRules, parseStaticRules } from "./staticRules";
+import { isTrustCanary } from "./senderProfile";
 import { mockSpamModel } from "./testModel";
+import { DAY, ownAddresses, START, trustedInput, trustedProfile } from "./testProfiles";
 import type { SpamExample, SpamInput } from "./types";
 import type { SpamTokenUsage } from "./usage";
 
@@ -31,6 +33,12 @@ describe("spam verdict schema", () => {
 });
 
 describe("threshold logic", () => {
+  test("a decision's own minimum threshold raises the mailbox threshold, never lowers it", () => {
+    expect(shouldMarkAsSpam({ verdict: "spam", confidence: 0.87, minThreshold: 0.9 }, 0.85)).toBe(false);
+    expect(shouldMarkAsSpam({ verdict: "spam", confidence: 0.92, minThreshold: 0.9 }, 0.85)).toBe(true);
+    expect(shouldMarkAsSpam({ verdict: "spam", confidence: 0.92, minThreshold: 0.9 }, 0.95)).toBe(false);
+  });
+
   test("marks only spam verdicts at or above the threshold", () => {
     expect(shouldMarkAsSpam({ verdict: "spam", confidence: 0.85 }, 0.85)).toBe(true);
     expect(shouldMarkAsSpam({ verdict: "spam", confidence: 0.84 }, 0.85)).toBe(false);
@@ -253,5 +261,58 @@ describe("prompt caching", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("trusted senders", () => {
+  const ids = Array.from({ length: 2000 }, (_, index) => `msg-${index}`);
+  const canaryId = ids.find((id) => isTrustCanary(id))!;
+  const plainId = ids.find((id) => !isTrustCanary(id))!;
+  const trust = (canaryKey: string, profile = trustedProfile(25, 60)) =>
+    ({ ownAddresses, loadProfile: async () => profile, canaryKey, now: START + 61 * DAY });
+  const noDecision = { ownAddresses: new Set<string>(), ownDomains: new Set<string>(), isCorrespondent: async () => false, latestDecision: async () => null };
+
+  test("a trusted sender without anomaly is ham without a model call", async () => {
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 1, reasons: [] }));
+    expect(await classifySpam({ input: trustedInput, allowlist: noDecision, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model, trust: trust(plainId) }))
+      .toEqual({ verdict: "ham", confidence: 1, reasons: ["trusted:profile (25 Mails seit 2026-03, DKIM service.example.test)"], source: "trusted:profile", trust: { kind: "skip" } });
+    expect(model.doGenerateCalls).toHaveLength(0);
+    // Without a model the skip still decides.
+    expect(await classifySpam({ input: trustedInput, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model: null, trust: trust(canaryId) }))
+      .toMatchObject({ source: "trusted:profile" });
+  });
+
+  test("the canary sample goes to the model without a trust hint and reports a mismatch", async () => {
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.88, reasons: ["Phishing"] }));
+    const decision = await classifySpam({ input: trustedInput, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model, trust: trust(canaryId) });
+    expect(decision).toMatchObject({ verdict: "spam", source: "model", minThreshold: 0.9, trust: { kind: "canary", mismatch: true },
+      reasons: ["trusted:canary (Stichprobe, 25 Mails seit 2026-03, DKIM service.example.test)", "Phishing"] });
+    expect(shouldMarkAsSpam(decision, 0.85)).toBe(false);
+    const userPrompt = JSON.stringify(model.doGenerateCalls[0].prompt.filter((message) => message.role === "user"));
+    expect(userPrompt).not.toContain("Vertrauter Absender");
+    const agree = mockSpamModel(answer({ verdict: "ham", confidence: 0.9, reasons: [] }));
+    expect(await classifySpam({ input: trustedInput, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model: agree, trust: trust(canaryId) }))
+      .toMatchObject({ verdict: "ham", trust: { kind: "canary", mismatch: false } });
+  });
+
+  test("a trusted sender with anomalies goes to the model with the deviations and threshold 0.9", async () => {
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.89, reasons: ["Kaperung"] }));
+    const hijacked = { ...trustedInput, linkDomains: ["bit.ly"] };
+    const decision = await classifySpam({ input: hijacked, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model, trust: trust(plainId) });
+    expect(decision).toMatchObject({ source: "model", minThreshold: 0.9, trust: { kind: "anomaly", anomalies: ["neue Link-Domain bit.ly (Kürzer/Freigabe)"] } });
+    expect(shouldMarkAsSpam(decision, 0.85)).toBe(false);
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Vertrauter Absender (25 Mails seit 2026-03, DKIM service.example.test); Abweichung: neue Link-Domain bit.ly");
+  });
+
+  test("allowlist, static deny and a user's \"Als Spam\" keep precedence over trust", async () => {
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.95, reasons: ["Vom Nutzer als Spam markiert"] }));
+    const deny = parseStaticRules({ deny: [{ type: "domain", value: "service.example.test", safe: true }] });
+    expect(await classifySpam({ input: trustedInput, staticRules: deny, getExamples: async () => [], model, trust: trust(plainId) }))
+      .toMatchObject({ source: "static-deny" });
+    expect(await classifySpam({ input: trustedInput, allowlist: { ...noDecision, isCorrespondent: async () => true }, staticRules: EMPTY_STATIC_RULES,
+      getExamples: async () => [], model, trust: trust(plainId) })).toMatchObject({ source: "allowlist" });
+    expect(await classifySpam({ input: trustedInput, allowlist: { ...noDecision, latestDecision: async () => "spam" as const }, staticRules: EMPTY_STATIC_RULES,
+      getExamples: async () => [], model, trust: trust(plainId) })).toMatchObject({ source: "model", verdict: "spam" });
+    expect(model.doGenerateCalls).toHaveLength(1);
   });
 });
