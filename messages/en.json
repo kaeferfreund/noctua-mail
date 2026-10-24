@@ -694,6 +694,9 @@
       "openWindow": "Open in window",
       "openWindowLabel": "Open calendar in window",
       "close": "Close calendar"
+    },
+    "grid": {
+      "timed": "Timed"
     }
   },
   "Search": {

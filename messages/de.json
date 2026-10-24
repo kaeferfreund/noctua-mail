@@ -694,6 +694,9 @@
       "openWindow": "In neuem Fenster öffnen",
       "openWindowLabel": "Kalender in neuem Fenster öffnen",
       "close": "Kalender schließen"
+    },
+    "grid": {
+      "timed": "Mit Uhrzeit"
     }
   },
   "Search": {
