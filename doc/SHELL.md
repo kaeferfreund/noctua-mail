@@ -178,7 +178,11 @@ Every phone status Sheet (Hintergrundaufgaben, Posteingangsprüfung, Demnächst,
 Fehler, Kalender) starts with the same visible title row, `StatusSheetTitle`:
 title, count where the section has one, then the Sheet's 44px icon close; the
 section description and content follow. Clear-all for Fehler is a labelled
-button in the content, not a second icon next to the close. Reminder leads use
+button in the content, not a second icon next to the close. Headings form one
+outline: the desktop popover has an h2 title and an h3 per section, each phone
+Sheet an h2 title; the calendar's month title (FullCalendar `headingLevel`) is
+one level below its container, h4 under "Demnächst" and h3 in the phone Sheet.
+Reminder leads use
 the largest whole unit (`reminderLeadUnit`: zu Beginn, Minuten, Stunden, Tage)
 through one ICU select/plural message.
 
