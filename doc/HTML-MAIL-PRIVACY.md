@@ -38,8 +38,14 @@ filename alone is insufficient: unmarked legacy caches may have been
 overwritten by another copy with the same Message-ID. They stay unkeyed until
 authoritative resync/re-ingestion refreshes the source and ownership digest.
 Resync/re-ingestion also writes the key from the parsed envelope/header.
-A new-message-only sync does not refresh existing rows. No bulk backfill CLI is
-included: lazy backfill avoids scanning every retained source at startup.
+A new-message-only sync does not refresh existing rows. Lazy backfill avoids
+scanning every retained source at startup. For rows ingested before the key was
+stored, the operator tool `scripts/backfill-sender-keys.ts` (dry run by
+default, `--write` to stamp) fills `senderKey` and `sourceSha256` from the
+exact-id source only when that file matches the row's recorded byte size,
+Message-ID and From mailbox (`checkLegacySourceOwnership`); a copy with the
+same Message-ID that overwrote the file under the legacy writer fails these
+checks and the row stays unknown.
 Rows without an owned source stay unknown until resynced; the reader explains
 why their Always load button is disabled. SMTPUTF8 local parts remain UTF-8, while IDN
 domains are canonicalized to punycode for permission keys.
