@@ -5,6 +5,7 @@ import type { MessageResolution } from "@/lib/navigation/resolveMessage";
 import type { Message } from "@/lib/data";
 import { authorizeDeepLink, deepLinkHistoryMode, emptyDeepLink, parseDeepLink, serializeDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import { afterMobileOverlayNavigation, isMobileOverlayPop } from "@/app/hooks/useMobileOverlayHistory";
+import { readerShortcut } from "@/lib/ui/readerFocus";
 
 type Options = {
   ready: boolean;
@@ -23,7 +24,9 @@ type Options = {
 };
 /** `history` is Back/Forward; `link` is an in-app navigation to an explicit target. */
 export type DeepLinkTransaction = { phase: "start" | "settled"; origin: "initial" | "history" | "link"; messageId: string };
-type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; origin: DeepLinkTransaction["origin"]; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean; controller: AbortController; done: () => void };
+type Pending = { target: DeepLinkState; phase: "requested" | "switching" | "account" | "place" | "message" | "settle"; origin: DeepLinkTransaction["origin"]; expected?: DeepLinkState; forbidden?: boolean; historyMode: "push" | "replace"; keepMessage?: boolean;
+  /** Keep the status panel, calendar sidebar and composer as they are when the place is applied. */
+  keepShell?: boolean; controller: AbortController; done: () => void };
 
 let entrySequence = 0;
 /** Identifies one history entry, so two visits of the same place keep their own state. */
@@ -39,12 +42,12 @@ export function useDeepLinks(options: Options) {
   const initialized = useRef(false);
   const [, refresh] = useState(0);
   const update = useCallback(() => refresh(value => value + 1), []);
-  const request = useCallback((target: DeepLinkState, origin: Pending["origin"] = "link", historyMode: "push" | "replace" = "replace") => {
+  const request = useCallback((target: DeepLinkState, origin: Pending["origin"] = "link", historyMode: "push" | "replace" = "replace", keepShell = false) => {
     pending.current?.controller.abort();
     pending.current?.done();
     let done = () => {};
     const settled = new Promise<void>(resolve => { done = resolve; });
-    pending.current = { target, origin, historyMode, phase: "requested", controller: new AbortController(), done };
+    pending.current = { target, origin, historyMode, keepShell, phase: "requested", controller: new AbortController(), done };
     latest.current.onTransaction?.({ phase: "start", origin, messageId: target.messageId });
     update();
     return settled;
@@ -66,10 +69,11 @@ export function useDeepLinks(options: Options) {
     const onPop = (event: PopStateEvent) => {
       if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search), "history");
     };
+    // Only keys that move the selection (reader next/previous) mark the next change;
+    // arrow keys scroll and must not leave the flag set for a later click-free change.
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target;
-      const editing = target instanceof Element && target.closest("input, textarea, [contenteditable=true]");
-      if (!editing && ["j", "k", "ArrowDown", "ArrowUp"].includes(event.key)) keyboard.current = true;
+      const shortcut = readerShortcut(event);
+      if (shortcut === "next" || shortcut === "previous") keyboard.current = true;
     };
     const onPointer = () => { keyboard.current = false; };
     window.addEventListener("popstate", onPop);
@@ -88,9 +92,19 @@ export function useDeepLinks(options: Options) {
     if (!options.ready || !initialized.current) return;
     const work = pending.current;
     if (!work) return;
-    if (work.phase !== "requested" && work.target.accountId && !options.accountIds.includes(work.target.accountId)) {
+    const revoked = (accountId: string) => Boolean(accountId) && !options.accountIds.includes(accountId);
+    if (revoked(work.target.accountId) && (work.phase !== "requested" || revoked(options.state.accountId))) {
       // An authorization refresh can revoke a destination while its detail is loading.
       options.notice("forbidden");
+      if (revoked(options.state.accountId)) {
+        // The mailbox on screen is gone as well, so there is no granted fallback here:
+        // finish the transaction and let the bootstrap resolve the server's selection.
+        work.controller.abort();
+        pending.current = null;
+        work.done();
+        latest.current.onForbidden?.();
+        return;
+      }
       request({ ...emptyDeepLink(), accountId: options.state.accountId });
       return;
     }
@@ -112,6 +126,10 @@ export function useDeepLinks(options: Options) {
       if (options.state.accountId !== work.target.accountId) {
         // Controller failed/rebootstrap selected a fallback. Never keep retrying a denied link.
         work.target = { ...emptyDeepLink(), accountId: options.state.accountId };
+      }
+      if (work.keepShell) {
+        // Read now, after the click that started the link has closed its own popover or sheet.
+        work.target = { ...work.target, panel: options.state.panel, calendar: options.state.calendar, compose: options.state.compose };
       }
       work.phase = "place";
       work.expected = options.applyPlace(work.target);
@@ -181,9 +199,11 @@ export function useDeepLinks(options: Options) {
       afterMobileOverlayNavigation(() => { write(target, "push"); void request(target).then(resolve); });
     });
   }, [request, write]);
+  // Reminders, calendar entries and notices open a message without closing the
+  // status panel, the calendar sidebar or the composer.
   const navigateMessage = useCallback((messageId: string, accountId?: string) => {
     const target = { ...emptyDeepLink(), accountId: accountId || latest.current.state.accountId, messageId };
-    afterMobileOverlayNavigation(() => request(target, "link", "push"));
+    afterMobileOverlayNavigation(() => request(target, "link", "push", true));
   }, [request]);
   return { navigateAccount, navigateMessage };
 }
