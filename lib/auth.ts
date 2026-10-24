@@ -3,7 +3,7 @@ import { mailboxErrorResponse } from "./mailboxFailure";
 import type { AccountRole } from "./data";
 import type { Database } from "bun:sqlite";
 import { NextResponse } from "next/server";
-import { getAuth, setActiveAccountId } from "./betterAuth";
+import { compareAndSetActiveAccountId, getAuth } from "./betterAuth";
 import { getDb } from "./db/connection";
 import { getUserById } from "./serverDb";
 import { readAccountSelectionCandidates } from "./db/accounts";
@@ -125,22 +125,27 @@ function isSessionLive(db: Database, session: ActiveUserSession) {
  * Persist a deterministic default, then recheck membership on a fresh access read. Retry a revoked choice once.
  * The read after the write proves the selected mailbox still exists and is still a candidate, and supplies the
  * mailbox list, so grants, revocations and role changes committed during persistence are reflected.
+ * Every write is a compare-and-set on the selection this request last saw: a switch-account committed after
+ * getSession is adopted (it passed its own membership check, and is rechecked here), never written over.
  */
 export async function ensureActiveAccountId(session: ActiveUserSession): Promise<MailboxSelection> {
   const { readAccountAccess } = await import("./accountAccess");
   const db = await getDb();
   const readAccess = () => readAccountAccess(db, session.userId, { identities: true });
-  // Stored selection and activity as of this request's getSession, advanced by every write below.
+  // Stored selection and activity as of this request's getSession, advanced by every write attempt below.
   let stored = { accountId: session.activeAccountId, updatedAt: session.sessionUpdatedAt };
-  /** Writes only on a change or stale activity. Liveness is read on every attempt, written or not. */
+  /**
+   * Writes only on a change or stale activity. Returns the selection now stored (this request's or a concurrent
+   * switch's) and the liveness, which is read on every attempt, written or not.
+   */
   const persist = async (accountId: string | null) => {
     const age = Date.now() - stored.updatedAt;
     if (accountId !== stored.accountId || !(age >= 0 && age < SESSION_ACTIVITY_WRITE_INTERVAL_MS)) {
-      const updated = await setActiveAccountId(await getAuth(), session.sessionToken, accountId);
-      if (!updated) return false;
-      stored = { accountId, updatedAt: new Date(updated.updatedAt).getTime() };
+      const result = await compareAndSetActiveAccountId(db, session.sessionToken, stored.accountId, accountId);
+      if (!result) return { live: false, accountId: null };
+      stored = { accountId: result.accountId, updatedAt: result.updatedAt };
     }
-    return isSessionLive(db, session);
+    return { live: isSessionLive(db, session), accountId: stored.accountId };
   };
   for (let attempt = 0; attempt < 2; attempt++) {
     const candidates = readAccountSelectionCandidates(db, session.userId).sort(compareDisplayOrder);
@@ -150,11 +155,11 @@ export async function ensureActiveAccountId(session: ActiveUserSession): Promise
       return { mailboxState: "none", accountId: null, access: readAccess() };
     }
     const selected = candidates.find(a => a.id === session.activeAccountId) ?? candidates[0];
-    const live = await persist(selected.id);
+    const { live, accountId } = await persist(selected.id);
     const access = readAccess();
-    if (live && access.candidateIds.includes(selected.id)) {
-      session.activeAccountId = selected.id;
-      return { mailboxState: "selected", accountId: selected.id, access };
+    if (live && accountId && access.candidateIds.includes(accountId)) {
+      session.activeAccountId = accountId;
+      return { mailboxState: "selected", accountId, access };
     }
     session.activeAccountId = null;
   }

@@ -16,6 +16,7 @@ import { revokeAuthStreams } from "./authStreams";
 import { handOverResetLink } from "./authRecoveryContext";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { recordAdminAuditRow } from "./db/adminAudit";
+import type { Database } from "bun:sqlite";
 
 export const AUTH_BASE_PATH = "/api/ba";
 export const AUTH_COOKIE_PREFIX = "noctua";
@@ -224,6 +225,25 @@ export async function setActiveAccountId(auth: NoctuaAuth, sessionToken: string,
   const context = await auth.$context;
   return withDbWriteRetry("setActiveAccountId", () =>
     context.internalAdapter.updateSession(sessionToken, { activeAccountId: accountId }));
+}
+
+type StoredSelection = { activeAccountId: string | null; updatedAt: string };
+
+/**
+ * Compare-and-set selection write for implicit writers (/auth/me): changes the row only while the stored
+ * selection is still `expected`, so a switch committed after the caller's session read is never overwritten.
+ * Raw SQL on the master connection because the adapter's `where` cannot express `IS NULL`; Noctua registers no
+ * session update hooks and no secondary storage. Returns the stored selection after the attempt (`written`: by
+ * this call) or null when the session row is gone.
+ */
+export async function compareAndSetActiveAccountId(db: Pick<Database, "query">, sessionToken: string,
+  expected: string | null, accountId: string | null) {
+  return withDbWriteRetry("compareAndSetActiveAccountId", () => {
+    const written = db.query(`UPDATE auth_session SET activeAccountId=?, updatedAt=? WHERE token=? AND activeAccountId IS ?
+      RETURNING activeAccountId, updatedAt`).get(accountId, new Date().toISOString(), sessionToken, expected) as StoredSelection | null;
+    const row = written ?? db.query(`SELECT activeAccountId, updatedAt FROM auth_session WHERE token=?`).get(sessionToken) as StoredSelection | null;
+    return row && { written: !!written, accountId: row.activeAccountId ?? null, updatedAt: new Date(row.updatedAt).getTime() };
+  });
 }
 
 /** Fail startup instead of deriving security settings from request headers. */
