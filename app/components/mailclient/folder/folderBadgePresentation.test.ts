@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   getFolderBadgeKind,
   getFolderBadgeLabel,
+  getDraftsFolderCount,
   getFolderCountTitle,
   getFolderTreeCount
 } from "./folderBadgePresentation";
@@ -36,5 +37,13 @@ describe("folder badge presentation", () => {
     expect(getFolderTreeCount({ specialUse: "\\Drafts", count: 12, unreadCount: 3 })).toEqual({ kind: "drafts", count: 12 });
     expect(getFolderTreeCount({ specialUse: "\\Inbox", count: 12, unreadCount: 3 })).toEqual({ kind: "unread", count: 3 });
     expect(getFolderTreeCount({ specialUse: "", count: 4 })).toEqual({ kind: "unread", count: 0 });
+  });
+
+  it("uses one drafts count for the tree and the pinned entry, 0 while the count is unknown", () => {
+    const unknown = { specialUse: "\\Drafts", count: null as unknown as number, unreadCount: 0 };
+    expect(getDraftsFolderCount(unknown)).toBe(0);
+    expect(getFolderTreeCount(unknown)).toEqual({ kind: "drafts", count: getDraftsFolderCount(unknown) });
+    expect(getDraftsFolderCount({ count: -2 })).toBe(0);
+    expect(getDraftsFolderCount({ count: 7 })).toBe(7);
   });
 });

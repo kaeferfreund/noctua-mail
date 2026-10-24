@@ -85,6 +85,7 @@ import {
   reconcileSavedDraftMessages
 } from "./mailclient/composition/draftListState";
 import { useMessageDragDrop } from "./mailclient/useMessageDragDrop";
+import { getDraftsFolderCount } from "./mailclient/folder/folderBadgePresentation";
 import {
   renderQuickActions as renderQuickActionsHelper,
   renderMessageMenu as renderMessageMenuHelper,
@@ -1380,16 +1381,6 @@ export default function MailClient({
   const threadRelatedCandidatesKey = threadRelatedCandidateIds.join("|");
 
   // Memos that depend on messages (from useMessageData)
-  const messageCountByFolder = useMemo(() => {
-    const map = new Map<string, number>();
-    messages
-      .filter((m) => m.accountId === activeAccountId)
-      .forEach((msg) => {
-        const current = map.get(msg.folderId) ?? 0;
-        map.set(msg.folderId, current + 1);
-      });
-    return map;
-  }, [messages, activeAccountId]);
   const messageByMessageId = useMemo(() => {
     const map = new Map<string, Message>();
     messages.forEach((message) => {
@@ -1721,9 +1712,7 @@ export default function MailClient({
       ) ?? null,
     [folders, activeAccountId]
   );
-  const draftsCount = draftsFolder
-    ? draftsFolder.count ?? messageCountByFolder.get(draftsFolder.id) ?? 0
-    : 0;
+  const draftsCount = draftsFolder ? getDraftsFolderCount(draftsFolder) : 0;
   const listLoading = loadingMessages || refreshingMessages;
   const listBootstrapping =
     authState === "loading" ||
