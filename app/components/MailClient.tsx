@@ -185,6 +185,7 @@ import {
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
+import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
 import {
   formatMailboxPageTitle,
   formatMessageHtmlPageTitle,
@@ -2868,11 +2869,13 @@ export default function MailClient({
   });
   const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
   // The summary feed is the user-wide unread source; it is empty while it
-  // (re)connects, so only a sign-out clears the app icon badge.
+  // (re)connects, so only a sign-out clears the app icon badge. A device with
+  // push settings counts the same mailboxes as its pushes, or shows no badge.
+  const pushDeviceSettings = useCurrentPushDeviceSettings(authState === "ok");
   useEffect(() => {
     if (authState === "unauth") setAppBadge(0);
-    else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries));
-  }, [authState, mailboxSummaries]);
+    else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries, pushDeviceSettings));
+  }, [authState, mailboxSummaries, pushDeviceSettings]);
   const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;

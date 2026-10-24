@@ -12,7 +12,7 @@ import { formatDate, formatTime } from "@/lib/i18n/format";
 import type { UiLocale } from "@/lib/i18n/config";
 import type { PushDeviceSettings } from "@/lib/push/types";
 import {
-  describeUserAgent, disablePushSubscription, ensurePushSubscription, fetchVapidPublicKey, listPushDevices,
+  announcePushDeviceChange, describeUserAgent, disablePushSubscription, ensurePushSubscription, fetchVapidPublicKey, listPushDevices,
   pushAvailability, removePushDevice, sendTestPush, syncPushSubscription, updatePushDevice,
   type PushAvailability, type PushDevice
 } from "@/lib/push/client";
@@ -48,8 +48,9 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
       if (!active) return;
       setConfigured(Boolean(publicKey));
       if (!publicKey) return;
-      const current = await syncPushSubscription(apiFetch).catch(() => null);
       const list = await listPushDevices(apiFetch);
+      // Only a device the server still knows is re-registered; otherwise it shows as off.
+      const current = await syncPushSubscription(list, publicKey, apiFetch).catch(() => null);
       if (!active) return;
       setDevices(list);
       if (current) { setCurrentId(current.id); setExpanded(current.id); }
@@ -62,7 +63,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
     try {
       const result = await ensurePushSubscription(undefined, apiFetch);
       if (result.status === "subscribed") {
-        setCurrentId(result.id); setExpanded(result.id); await reload();
+        setCurrentId(result.id); setExpanded(result.id); announcePushDeviceChange(); await reload();
       } else if (result.status === "not-configured") setConfigured(false);
       else if (result.status === "dismissed") setNotice({ kind: "alert", text: t("dismissed") });
       else setAvailability(result.status);
@@ -75,7 +76,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
     setBusy(true); setNotice(null);
     try {
       await disablePushSubscription(apiFetch);
-      setCurrentId(null); await reload();
+      setCurrentId(null); announcePushDeviceChange(); await reload();
     } catch {
       setNotice({ kind: "alert", text: t("failed") });
     } finally { setBusy(false); }
@@ -90,6 +91,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
       const stored = await updatePushDevice(apiFetch, device.id, settings);
       if (writes.current.get(device.id) !== sequence) return;
       setDevices(list => list.map(item => item.id === device.id ? { ...item, settings: stored } : item));
+      if (device.id === currentId) announcePushDeviceChange();
       setNotice({ kind: "status", text: t("saved") });
     } catch {
       if (writes.current.get(device.id) !== sequence) return;
@@ -111,7 +113,7 @@ export default function NotificationsTabContent({ mailboxes, apiFetch = fetch }:
   const remove = async (device: PushDevice) => {
     setBusy(true); setNotice(null);
     try {
-      if (device.id === currentId) { await disablePushSubscription(apiFetch); setCurrentId(null); }
+      if (device.id === currentId) { await disablePushSubscription(apiFetch); setCurrentId(null); announcePushDeviceChange(); }
       else await removePushDevice(apiFetch, device.id);
       await reload();
     } catch {
