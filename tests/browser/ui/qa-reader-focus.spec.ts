@@ -32,7 +32,7 @@ async function screenshot(page: Page, name: string) {
 test("reader focus: double-click, counter, next, back preserves mounted list and selection; desktop light/dark", async ({ page }) => {
   await start(page);
   await rows(page).first().click();
-  await expect(toolbar(page).getByText("Tip: Double-click opens the message in a larger view")).toBeVisible();
+  await expect(page.locator("[data-reader-hint]").getByText("Tip: Double-click opens the message in a larger view")).toBeVisible();
   const firstId = await rows(page).first().getAttribute("data-message-id");
   await rows(page).first().dblclick();
   console.log("reader-focus: double-click completed");
@@ -51,7 +51,7 @@ test("reader focus: double-click, counter, next, back preserves mounted list and
   await toolbar(page).getByRole("button", { name: "Back to messages", exact: true }).click();
   await expect(panes(page)).toHaveAttribute("data-reader-layout", "split");
   await expect(page.locator(`[data-message-id="${secondId}"][data-selected="true"]`)).toBeVisible();
-  await expect(toolbar(page).getByText(/^Tip:/)).toHaveCount(0);
+  await expect(page.locator("[data-reader-hint]")).toHaveCount(0);
   // Assert the same list DOM and a scrolled position survive expansion/back.
   const list = page.locator('[id="list"] aside');
   await list.evaluate(el => { el.setAttribute("data-reader-kept", "yes"); el.scrollTop = 180; });

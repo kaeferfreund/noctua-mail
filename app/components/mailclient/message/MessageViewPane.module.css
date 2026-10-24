@@ -69,6 +69,8 @@
 .subjectGroup { display: flex; flex: 1; min-width: 0; align-items: flex-start; }
 .subjectText { flex: 1; min-width: 0; font-weight: 600; font-size: 16px; line-height: 1.4; word-break: break-word; overflow-wrap: anywhere; color: var(--gray-12); }
 .subjectToggle { display: none; }
+/* Radix wraps item content in inline spans, so icons sit on the text baseline; center them. */
+.viewModeToggle :global(.rt-SegmentedControlItemLabel) > span { display: flex; align-items: center; justify-content: center; }
 @media (width < 768px) {
   /* Back and the compact/full toggle share one row to leave room for the mail. */
   .mobileHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 8px; border-bottom: 1px solid var(--border); }
