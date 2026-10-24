@@ -8,7 +8,7 @@ import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import type { Folder } from "@/lib/data";
 import type { SyncTriggerOptions } from "../types";
-import { getFolderCountTitle } from "./folderBadgePresentation";
+import { getFolderCountTitle, getFolderTreeCount } from "./folderBadgePresentation";
 import styles from "./FolderTree.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
@@ -108,6 +108,7 @@ function FolderTreeNodeView({
   const folderTitle = isEngaged
     ? getFolderCountTitle(folderPathLabel(folder), folder.count ?? 0, folder.unreadCount ?? 0, locale)
     : undefined;
+  const treeCount = getFolderTreeCount(folder);
   const isDeleting = deletingFolderIds.has(folder.id);
   const isSyncingFolder = syncingFolders.has(folder.id);
   const isActive = searchScope === "folder" && folder.id === activeFolderId;
@@ -195,20 +196,20 @@ function FolderTreeNodeView({
         <span className={styles.treeIcon} aria-hidden>
           {specialIcon ?? <FolderIcon size={14} />}
         </span>
-        <span className={`${styles.treeName} ${folder.unreadCount ? styles.treeNameUnread : ""}`}>
+        <span className={`${styles.treeName} ${treeCount.kind === "unread" && treeCount.count ? styles.treeNameUnread : ""}`}>
           <span className={styles.treeNameText}>{getFolderDisplayName(folder, locale)}</span>
           {isSyncingFolder && <span className={styles.treeSyncSpinner} aria-hidden="true" />}
         </span>
-        {folder.unreadCount ? (
+        {treeCount.count ? (
           <Badge
             size="1"
             variant="soft"
             color={badgeColors.unread}
             className={styles.treeUnreadBadge}
-            aria-label={t("unreadCount", { count: folder.unreadCount ?? 0 })}
+            aria-label={t(treeCount.kind === "unread" ? "unreadCount" : "draftCount", { count: treeCount.count })}
             title={folderTitle}
           >
-            {folder.unreadCount}
+            {treeCount.count}
           </Badge>
         ) : null}
         <span className={styles.treeActions}>

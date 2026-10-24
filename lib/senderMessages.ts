@@ -4,6 +4,7 @@
 export const senderMessages = {
   "chooseSender": "Compose.sender.chooseSender",
   "reviewSender": "Compose.sender.reviewSender",
+  "reviewRecipients": "Compose.sender.reviewRecipients",
   "unavailableDraft": "Compose.sender.unavailableDraft",
   "chooseEnabledSender": "Compose.sender.chooseEnabledSender",
   "confirmKeepEditedSignature": "Compose.sender.confirmKeepEditedSignature",

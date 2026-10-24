@@ -1150,6 +1150,7 @@
     "loadFailed": "Nachrichten konnten nicht geladen werden. {error}",
     "emptyNamedFolder": "Keine Nachrichten in „{folder}“.",
     "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "draftCount": "{count, plural, one {# Entwurf} other {# Entwürfe}}",
     "searching": "Suche",
     "folderCount": "{count, plural, one {# insgesamt} other {# insgesamt}}",
     "folderCountTitle": "{path} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
@@ -1507,6 +1508,7 @@
     "sender": {
       "chooseSender": "Absender auswählen",
       "reviewSender": "Absender prüfen",
+      "reviewRecipients": "Empfänger prüfen",
       "unavailableDraft": "Die Absenderadresse dieses Entwurfs ist nicht verfügbar. Wähle einen aktiven Absender und speichere den Entwurf.",
       "chooseEnabledSender": "Wähle vor dem Senden eine aktive Absenderadresse.",
       "confirmKeepEditedSignature": "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten.",
@@ -1717,6 +1719,27 @@
     "fieldsScope": "in den Feldern {fields}",
     "filterCriteria": "Filter: {badges}",
     "queryCriteria": "„{query}“"
+  },
+  "EventSchedule": {
+    "start": "Beginn",
+    "end": "Ende",
+    "startTime": "Uhrzeit Beginn",
+    "endTime": "Uhrzeit Ende",
+    "allDay": "Ganztägig",
+    "repeat": "Wiederholung",
+    "location": "Ort",
+    "locationPlaceholder": "Ort (optional)",
+    "openTimePicker": "Zeitauswahl öffnen",
+    "recurrence": {
+      "none": "Keine Wiederholung",
+      "daily": "Täglich",
+      "weekly": "Wöchentlich",
+      "everyTwoWeeks": "Alle zwei Wochen",
+      "monthly": "Monatlich",
+      "monthlyByDay": "Monatlich am selben Wochentag",
+      "monthlyByDayOn": "Monatlich am {ordinal, select, 1 {ersten} 2 {zweiten} 3 {dritten} 4 {vierten} other {letzten}} {weekday}",
+      "yearly": "Jährlich"
+    }
   },
   "Folders": {
     "inbox": "Posteingang",

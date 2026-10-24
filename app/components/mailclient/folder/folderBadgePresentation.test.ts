@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   getFolderBadgeKind,
   getFolderBadgeLabel,
-  getFolderCountTitle
+  getFolderCountTitle,
+  getFolderTreeCount
 } from "./folderBadgePresentation";
 
 describe("folder badge presentation", () => {
@@ -29,5 +30,11 @@ describe("folder badge presentation", () => {
 
   it("clamps negative counts to zero", () => {
     expect(getFolderCountTitle("Drafts", -3, -1, "en")).toBe("Drafts (0 Messages, 0 Unread)");
+  });
+
+  it("counts drafts by total and every other folder by unread (QA-213)", () => {
+    expect(getFolderTreeCount({ specialUse: "\\Drafts", count: 12, unreadCount: 3 })).toEqual({ kind: "drafts", count: 12 });
+    expect(getFolderTreeCount({ specialUse: "\\Inbox", count: 12, unreadCount: 3 })).toEqual({ kind: "unread", count: 3 });
+    expect(getFolderTreeCount({ specialUse: "", count: 4 })).toEqual({ kind: "unread", count: 0 });
   });
 });

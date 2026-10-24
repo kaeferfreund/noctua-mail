@@ -213,6 +213,8 @@ describe("FTS-driven search candidates differential", () => {
     { name: "grouped by sender", params: { query: "needle", groupBy: "sender" } },
     { name: "grouped by domain", params: { query: "needle", groupBy: "domain" } },
     { name: "grouped by folder", params: { query: "needle", groupBy: "folder" } },
+    // One inbox + one archive hit: tied group counts must not depend on the plan.
+    { name: "grouped by folder, tied counts", params: { query: "mixed", groupBy: "folder" } },
     { name: "grouped by week", params: { query: "needle", groupBy: "week" } },
     { name: "grouped by year", params: { query: "needle", groupBy: "year" } },
     { name: "grouped none", params: { query: "needle", groupBy: "none" } },
@@ -233,6 +235,15 @@ describe("FTS-driven search candidates differential", () => {
       }
     });
   }
+
+  test("tied group counts are ordered by key in both modes", async () => {
+    for (const list of [listMessages, listThreads]) {
+      const result = await runBoth(() =>
+        list({ accountId: fixture.a.accountId, page: 1, pageSize: 10, query: "mixed", groupBy: "folder" } as Parameters<typeof listThreads>[0] & Parameters<typeof listMessages>[0])
+      );
+      expect((result.groups ?? []).map((group) => [group.key, group.count])).toEqual([["archive", 1], ["inbox", 1]]);
+    }
+  });
 
   // FTS5 parses upper-case AND/OR/NOT barewords as operators; as search
   // tokens they must be plain (prefix) terms in both modes, never a MATCH

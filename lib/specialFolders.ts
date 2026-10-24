@@ -205,13 +205,16 @@ function findFolderRecord(folderId: string | null | undefined, folders: Folder[]
 }
 
 /** Strict: matches only folders whose `specialUse` is the IMAP `\Drafts` token. */
+export function isDraftsFolderRecord(folder: Pick<Folder, "specialUse"> | null | undefined): boolean {
+  return (folder?.specialUse ?? "").toLowerCase() === "\\drafts";
+}
+
+/** Strict: matches only folders whose `specialUse` is the IMAP `\Drafts` token. */
 export function isDraftsFolder(
   folderId: string | null | undefined,
   folders: Folder[]
 ): boolean {
-  const folder = findFolderRecord(folderId, folders);
-  if (!folder) return false;
-  return (folder.specialUse ?? "").toLowerCase() === "\\drafts";
+  return isDraftsFolderRecord(findFolderRecord(folderId, folders));
 }
 
 /** Strict: matches only folders whose `specialUse` is the IMAP `\Trash` token. */
