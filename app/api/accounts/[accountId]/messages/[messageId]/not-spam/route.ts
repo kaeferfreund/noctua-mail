@@ -16,6 +16,7 @@ import {
 } from "@/app/api/_helpers/message/routeHelpers";
 import { clearImapNonJunkFlags } from "@/app/api/_helpers/message/flagMutationHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { recordSpamDecision, markMessageNotSuspicious } from "@/lib/mail/spam/examples";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -29,7 +30,7 @@ export async function POST(request: Request, { params }: Params) {
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
-    const { accountId: resolvedAccountId, account, clientId, message } = context;
+    const { accountId: resolvedAccountId, account, clientId, message, userId } = context;
 
     const { folder: inboxFolder, mailbox: inboxMailbox } = await resolveSpecialFolderAndMailbox(
       resolvedAccountId,
@@ -66,6 +67,8 @@ export async function POST(request: Request, { params }: Params) {
     if (flagsChanged) {
       await updateMessageFlags(resolvedAccountId, relocated?.nextId ?? message.id, nextFlags);
     }
+    await recordSpamDecision({ accountId: resolvedAccountId, message, label: "ham", source: "not-spam", userId });
+    await markMessageNotSuspicious(resolvedAccountId, relocated?.nextId ?? message.id);
 
     return NextResponse.json({
       ok: true,

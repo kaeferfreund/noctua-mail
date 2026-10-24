@@ -59,6 +59,10 @@ export const ACCOUNT_KEY_TABLE_SQL = {
       deliveredTo TEXT,
       originalTo TEXT,
       senderIdentityId TEXT,
+      spamVerdict TEXT,
+      spamConfidence REAL,
+      spamReasons TEXT,
+      spamCheckedAt INTEGER,
       PRIMARY KEY (accountId, id)
     );`,
   attachments: `CREATE TABLE IF NOT EXISTS attachments (

@@ -66,7 +66,8 @@ import {
   parseReferences,
   parseReminderDateListJson,
   parseStringArray,
-  safeParseJson
+  safeParseJson,
+  hydrateSpamVerdict
 } from "./_shared";
 
 export type GroupMeta = { key: string; label: string; count: number };
@@ -1309,6 +1310,11 @@ function applyBadgeFilters(where: string, args: any[], badges?: string[] | null,
     where += " AND m.category = ?";
     args.push("transactional");
   }
+  // Spam detector mark ("Verdächtig"), served by idx_messages_account_spam.
+  if (normalized.includes("suspicious")) {
+    where += " AND m.spamVerdict = ?";
+    args.push("spam");
+  }
   return where;
 }
 
@@ -2047,6 +2053,9 @@ export async function listRelatedMessages(params: {
         m.category,
         m.categoryScore,
         m.categorySignals,
+        m.spamVerdict,
+        m.spamConfidence,
+        m.spamReasons,
         ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
         EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
           as hasInlineAttachments
@@ -2218,6 +2227,7 @@ export async function listRelatedMessages(params: {
       category: row.category ?? undefined,
       categoryScore: typeof row.categoryScore === "number" ? row.categoryScore : undefined,
       categorySignals: parseStringArray(row.categorySignals),
+      ...hydrateSpamVerdict(row),
       calendarEventUids: calendarInviteData?.calendarEventUids ?? [],
       calendarInviteStates: calendarInviteData?.calendarInviteStates ?? [],
       listUnsubscribe: row.listUnsubscribe ?? undefined,
@@ -2480,6 +2490,9 @@ export async function listMessages(params: {
         m.category,
         m.categoryScore,
         m.categorySignals,
+        m.spamVerdict,
+        m.spamConfidence,
+        m.spamReasons,
         ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
         EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
           as hasInlineAttachments
@@ -2562,6 +2575,7 @@ export async function listMessages(params: {
       category: row.category ?? undefined,
       categoryScore: typeof row.categoryScore === "number" ? row.categoryScore : undefined,
       categorySignals: parseStringArray(row.categorySignals),
+      ...hydrateSpamVerdict(row),
       calendarEventUids: calendarInviteData?.calendarEventUids ?? [],
       calendarInviteStates: calendarInviteData?.calendarInviteStates ?? [],
       listUnsubscribe: row.listUnsubscribe ?? undefined,
@@ -3009,6 +3023,9 @@ export async function listThreads(params: {
               m.category,
               m.categoryScore,
               m.categorySignals,
+              m.spamVerdict,
+              m.spamConfidence,
+              m.spamReasons,
               ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
               EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
                 as hasInlineAttachments
@@ -3094,6 +3111,7 @@ export async function listThreads(params: {
       category: row.category ?? undefined,
       categoryScore: typeof row.categoryScore === "number" ? row.categoryScore : undefined,
       categorySignals: parseStringArray(row.categorySignals),
+      ...hydrateSpamVerdict(row),
       calendarEventUids: calendarInviteData?.calendarEventUids ?? [],
       calendarInviteStates: calendarInviteData?.calendarInviteStates ?? [],
       listUnsubscribe: row.listUnsubscribe ?? undefined,
@@ -3163,7 +3181,7 @@ const THREAD_MESSAGE_HEADER_COLUMNS = [
   "ccAddr", "bccAddr", "preview", "date", "dateValue", "priority", "hasSource", "unread",
   "flags", "seen", "answered", "flagged", "deleted", "draft", "recent", "category",
   "categoryScore", "categorySignals", "listId", "sizeBytes", "listUnsubscribe", "deliveredTo",
-  "originalTo", "senderIdentityId"
+  "originalTo", "senderIdentityId", "spamVerdict", "spamConfidence", "spamReasons"
 ] as const;
 
 export function threadMessageSelectColumns(projection: ThreadMessageProjection, alias = "m") {
@@ -3383,6 +3401,7 @@ export async function hydrateThreadMessageRows(
       category: row.category ?? undefined,
       categoryScore: typeof row.categoryScore === "number" ? row.categoryScore : undefined,
       categorySignals: parseStringArray(row.categorySignals),
+      ...hydrateSpamVerdict(row),
       calendarEventUids: calendarInviteData?.calendarEventUids ?? [],
       calendarInviteStates: calendarInviteData?.calendarInviteStates ?? [],
       listUnsubscribe: row.listUnsubscribe ?? undefined,

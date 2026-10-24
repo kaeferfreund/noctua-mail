@@ -14,6 +14,7 @@ import SenderIcon from "../SenderIcon";
 import { CALENDAR_INVITE_FLAG, hasMessageFlag } from "@/lib/messageFlags";
 import badgeStyles from "../message/MessageBadge.module.css";
 import CategoryBadge from "../CategoryBadge";
+import SpamBadge from "../SpamBadge";
 import FlagBadge from "../message/FlagBadge";
 import MessageBadge from "../message/MessageBadge";
 import TopicBadge from "../TopicBadge";
@@ -374,7 +375,7 @@ export default function MessageThreadList({
                 </FromAddressHoverCard>
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (

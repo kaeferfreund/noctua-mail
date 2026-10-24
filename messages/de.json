@@ -122,7 +122,8 @@
       "translation": "Übersetzung",
       "recipient-aliases": "Empfänger-Aliasse",
       "mcp": "MCP",
-      "members": "Mitglieder"
+      "members": "Mitglieder",
+      "spam": "Spam-Erkennung"
     },
     "accountTitle": "Postfacheinstellungen",
     "close": "Schließen",
@@ -421,6 +422,19 @@
         "uncategorized": "Ohne Kategorie",
         "none": "Keine"
       }
+    },
+    "spam": {
+      "heading": "Spam-Erkennung für dieses Postfach",
+      "help": "Neue Nachrichten im Posteingang werden einmal geprüft. Verdächtige Nachrichten bekommen eine Markierung; das Verschieben nach Spam ist optional.",
+      "globalOff": "Die Spam-Erkennung ist in der Verwaltung ausgeschaltet.",
+      "enabled": "Spam-Erkennung für dieses Postfach eingeschaltet",
+      "autoMove": "Verdächtige Nachrichten automatisch in den Spam-Ordner verschieben",
+      "threshold": "Eigene Schwelle (leer = {threshold, number} aus der Verwaltung)",
+      "thresholdHelp": "Zwischen 0,5 und 1. Höher bedeutet weniger Markierungen.",
+      "save": "Speichern",
+      "saved": "Gespeichert.",
+      "loading": "Lädt …",
+      "failed": "Die Einstellungen konnten nicht geladen oder gespeichert werden."
     }
   },
   "Pwa": {
@@ -919,7 +933,8 @@
       "users": "Benutzer",
       "mailboxes": "Postfächer",
       "invites": "Einladungen",
-      "audit": "Protokoll"
+      "audit": "Protokoll",
+      "spam": "Spam-Erkennung"
     },
     "loading": "Wird geladen …",
     "cancel": "Abbrechen",
@@ -1051,6 +1066,22 @@
       "loggedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an.",
       "request": "Die Anfrage ist fehlgeschlagen. Versuche es erneut.",
       "rateLimited": "Zu viele Versuche. Versuche es später erneut."
+    },
+    "spam": {
+      "heading": "Spam-Erkennung",
+      "help": "Ein Sprachmodell prüft jede neue Nachricht im Posteingang einmal und lernt aus den Entscheidungen „Als Spam“ und „Kein Spam“. Pro Postfach lässt sich das Verschieben in den Spam-Ordner einschalten.",
+      "enabled": "Spam-Erkennung eingeschaltet",
+      "provider": "Anbieter: {provider}",
+      "model": "Modell",
+      "threshold": "Schwelle (0,5–1)",
+      "thresholdHelp": "Markiert wird nur bei „Spam“ mit mindestens dieser Sicherheit.",
+      "unavailable": "Modell nicht nutzbar ({reason}). Bis dahin greifen nur Allowlist und feste Regeln.",
+      "save": "Speichern",
+      "saved": "Gespeichert.",
+      "unavailableReasons": {
+        "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
+        "unsupported-provider": "Anbieter wird nicht unterstützt"
+      }
     }
   },
   "List": {
@@ -1193,7 +1224,6 @@
     "copyLink": "Link kopieren",
     "linkCopied": "Link kopiert",
     "linkCopyFailed": "Link konnte nicht kopiert werden",
-
     "focus": {
       "expand": "Vergrößern",
       "showList": "Liste anzeigen",
@@ -1455,6 +1485,13 @@
       "newsletter": "Newsletter",
       "notification": "Benachrichtigung",
       "transactional": "Transaktions-E-Mails"
+    },
+    "spam": {
+      "badge": "Verdächtig",
+      "title": "Von der Spam-Erkennung als verdächtig markiert",
+      "titleWithReasons": "Verdächtig: {reasons}",
+      "notSuspicious": "Kein Spam",
+      "notSuspiciousTitle": "Markierung entfernen und als „Kein Spam“ merken"
     }
   },
   "Notifications": {
@@ -1529,7 +1566,9 @@
     "flagFailed": "Nachrichtenmarkierung konnte nicht aktualisiert werden.",
     "keywordFailed": "Nachrichtenschlagwort konnte nicht aktualisiert werden.",
     "categoryFailed": "Kategorie konnte nicht aktualisiert werden.",
-    "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden."
+    "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden.",
+    "markedNotSuspicious": "Markierung „Verdächtig“ entfernt.",
+    "notSuspiciousFailed": "Die Markierung „Verdächtig“ konnte nicht entfernt werden."
   },
   "Compose": {
     "sender": {
@@ -1745,7 +1784,12 @@
     "allFieldsScope": "in allen Feldern",
     "fieldsScope": "in den Feldern {fields}",
     "filterCriteria": "Filter: {badges}",
-    "queryCriteria": "„{query}“"
+    "queryCriteria": "„{query}“",
+    "suspicious": {
+      "name": "Verdächtig",
+      "description": "Hier findest du Nachrichten, die die Spam-Erkennung als verdächtig markiert hat.",
+      "badgeLabel": "Verdächtig"
+    }
   },
   "EventSchedule": {
     "start": "Beginn",

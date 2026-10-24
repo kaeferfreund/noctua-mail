@@ -533,7 +533,7 @@ describe("saved shell hydration", () => {
   });
 });
 
-for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views and descriptions in ${locale}, selecting stable IDs`, async () => {
+for (const locale of ["de", "en"] as const) it(`renders all eight sidebar views and descriptions in ${locale}, selecting stable IDs`, async () => {
   const t = getTranslator(locale);
   const selected: string[] = [];
   const rows = VIRTUAL_FOLDERS.map(folder => ({
@@ -545,8 +545,8 @@ for (const locale of ["de", "en"] as const) it(`renders all seven sidebar views 
   const page = renderSidebar([], () => {}, () => {}, {}, { inbox, collab: rows.slice(0, 3), virtual: rows.slice(3) }, locale);
   const buttons = [...page.container.querySelectorAll<HTMLButtonElement>("[data-view-id]")];
   expect(buttons.map(button => button.textContent)).toEqual(locale === "de"
-    ? ["Posteingang", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen"]
-    : ["Inbox", "Assigned to me", "Unassigned", "Open", "Focused", "Action Queue", "Invite Deck"]);
+    ? ["Posteingang", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen", "Verdächtig"]
+    : ["Inbox", "Assigned to me", "Unassigned", "Open", "Focused", "Action Queue", "Invite Deck", "Suspicious"]);
   expect(page.getByText(locale === "de" ? "Ansichten" : "Views")).toBeTruthy();
   expect(page.getByPlaceholderText(locale === "de" ? "Ordner suchen" : "Search folders")).toBeTruthy();
   expect(page.getByText(locale === "de" ? "0 insgesamt" : "0 total")).toBeTruthy();
