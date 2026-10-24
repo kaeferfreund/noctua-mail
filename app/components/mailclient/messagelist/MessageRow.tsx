@@ -269,6 +269,8 @@ function MessageRow({
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (isDisabled) return;
     if (event.button !== 0) return;
+    // A touch may become a scroll or a swipe; its tap still selects via click.
+    if (event.pointerType === "touch") return;
     const target = event.target as HTMLElement | null;
     const isRowControl = Boolean(target?.closest('[data-no-row-select="true"]'));
     const isCheckbox = Boolean(target?.closest('[role="checkbox"]'));

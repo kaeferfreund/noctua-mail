@@ -32,7 +32,7 @@ export function reviewListProps(): Omit<MessageListViewProps, "view"> {
       setLastSelectedIdRef: noop, handleMessageDragStart: noop, handleMessageDragEnd: noop,
       handleRowClick: noop, handleSelectMessage: noop, selectRangeTo: noop, toggleMessageSelection: noop,
       selectCollapsedThread: noop, handleDeleteMessage: noop, toggleFlaggedFlag: noop, toggleTodoFlag: noop,
-      handleAddSuggestedThread: noop
+      toggleRowRead: noop, handleAddSuggestedThread: noop
     },
     helpers: {
       buildThreadTree: () => [], flattenThread: () => [], getThreadLatestDate: () => 0,
