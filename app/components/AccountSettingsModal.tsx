@@ -24,6 +24,7 @@ import RecipientAliasesTabContent from "@/app/components/account-settings/tabs/R
 import McpTabContent from "@/app/components/account-settings/tabs/McpTabContent";
 import TranslationTabContent from "@/app/components/account-settings/tabs/TranslationTabContent";
 import SpamTabContent from "@/app/components/account-settings/tabs/SpamTabContent";
+import NotificationsTabContent from "@/app/components/account-settings/tabs/NotificationsTabContent";
 import { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 export type ManageTab =
@@ -31,6 +32,7 @@ export type ManageTab =
   | "identities"
   | "signatures"
   | "preferences"
+  | "notifications"
   | "categorization"
   | "calendar"
   | "topics"
@@ -53,6 +55,8 @@ function deriveSmtpSecurity(smtp: Account["smtp"]): "tls" | "starttls" | "none" 
 
 type Props = {
   editingAccount: Account;
+  /** All mailboxes of the signed-in user (push notification mailbox selection). */
+  accounts?: Account[];
   isOpen: boolean;
   manageTab: ManageTab;
   isExistingAccount: boolean;
@@ -78,6 +82,7 @@ type Props = {
 
 export default function AccountSettingsModal({
   editingAccount: initialAccount,
+  accounts,
   isOpen,
   manageTab,
   isExistingAccount,
@@ -145,6 +150,7 @@ export default function AccountSettingsModal({
       { value: "identities", label: senderMessages.identitiesTitle, disabled: !isExistingAccount },
       { value: "signatures", label: t("tabs.signatures"), disabled: !isExistingAccount },
       { value: "preferences", label: t("tabs.preferences"), disabled: !isExistingAccount },
+      { value: "notifications", label: t("tabs.notifications"), disabled: !isExistingAccount },
       { value: "categorization", label: t("tabs.categorization"), disabled: !isExistingAccount },
       { value: "topics", label: t("tabs.topics"), disabled: !isExistingAccount },
       { value: "calendar", label: t("tabs.calendar"), disabled: !isExistingAccount },
@@ -272,6 +278,10 @@ export default function AccountSettingsModal({
             <Tabs.Content value="preferences" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <PreferencesTabContent key={localAccount.id} editingAccount={localAccount} onClose={onClose} apiFetch={apiFetch} senderPreferences />
             </Tabs.Content>
+
+            {isExistingAccount && <Tabs.Content value="notifications" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+              <NotificationsTabContent mailboxes={accounts ?? [initialAccount]} apiFetch={apiFetch} />
+            </Tabs.Content>}
 
             {settingsTabVisible("categorization", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="categorization" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <CategorizationTabContent

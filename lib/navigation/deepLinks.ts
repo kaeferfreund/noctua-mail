@@ -1,5 +1,5 @@
 /** Public, version-independent URL state for the single-page mail shell. */
-export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
+export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
 export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam"] as const;
 export const GROUPS = ["none", "date", "week", "sender", "domain", "year", "folder", "event"] as const;
 export const PANELS = ["process", "exception", "reminder", "calendar", "mail-check"] as const;
