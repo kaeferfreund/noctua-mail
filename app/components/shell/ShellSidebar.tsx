@@ -271,7 +271,9 @@ export function MailboxRows({
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
                   {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
                 </span>
-                <span className="min-w-0 truncate">{group.domain ?? t("mailboxes.other")}</span>
+                {/* A long domain ellipsizes before the counters, which never
+                    shrink; the full name stays available as a tooltip. */}
+                <span className="min-w-0 truncate" title={group.domain ?? t("mailboxes.other")} data-domain-name="">{group.domain ?? t("mailboxes.other")}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
                   {isCollapsed ? <DomainCounts accounts={group.accounts} summaryById={summaryById} /> : null}
                   {isCollapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}

@@ -266,6 +266,12 @@ describe("collapsible domain groups", () => {
     expect(within(counts as HTMLElement).getByLabelText("7 unread").textContent).toBe("7");
     expect(within(counts as HTMLElement).getByLabelText("3 assigned to me").textContent).toBe("3");
     expect(counts.querySelectorAll("svg")).toHaveLength(2);
+    // The name ellipsizes before the counters; its full text is the title.
+    const name = brandHeader.querySelector<HTMLElement>("[data-domain-name]")!;
+    expect(name.className).toContain("truncate");
+    expect(name.className).toContain("min-w-0");
+    expect(name.title).toBe("brand.example.test");
+    expect(counts.parentElement!.className).toContain("shrink-0");
     // All totals zero: no counters at all.
     expect(plainHeader.querySelector("[data-domain-counts]")).toBeNull();
     expect(plainHeader.textContent).toBe("plain.example.test");
