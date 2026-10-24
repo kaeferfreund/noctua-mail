@@ -380,7 +380,6 @@ export function useAccountController({
       }
     },
     [
-      activeAccountId,
       apiFetch,
       loadInitialData,
       persistSelection,

@@ -105,6 +105,9 @@ export function useDeepLinks(options: Options) {
         latest.current.onForbidden?.();
         return;
       }
+      // The URL transaction falls back to the granted mailbox on screen; the state
+      // machine advances one phase per render, as for the initial URL above.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       request({ ...emptyDeepLink(), accountId: options.state.accountId });
       return;
     }
