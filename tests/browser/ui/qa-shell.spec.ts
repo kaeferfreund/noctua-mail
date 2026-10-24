@@ -43,7 +43,8 @@ test("QA-003/009: create a 180-day token, reveal it once, refresh metadata, dism
   await page.getByRole("button", { name: "Create token", exact: true }).click();
   const response = await created, data = await response.json();
   expect(response.status()).toBe(201);
-  expect(response.request().postDataJSON()).toEqual({ label: "Synthetic QA token", ttlSeconds: 15552000 });
+  // Default scope: the open mailbox only, drafts mode (McpTabContent).
+  expect(response.request().postDataJSON()).toEqual({ label: "Synthetic QA token", ttlSeconds: 15552000, accountIds: ["qa-shared"], mode: "drafts" });
   expect((data.tokenRecord.expiresAt - data.tokenRecord.createdAt) / 1000).toBe(15552000);
   await expect(page.getByText(data.token, { exact: true })).toBeVisible();
   await expect(page.getByText("Synthetic QA token", { exact: true })).toBeVisible();
@@ -107,7 +108,8 @@ test("QA-005: 360px and 390px reader retains 40% of the viewport with long subje
     const collapsed = await measure();
     expect(collapsed.message).toBeGreaterThanOrEqual(viewport.height * 0.4);
     const text = header.getByTitle(subject, { exact: true });
-    await expect(text).toHaveCSS("-webkit-line-clamp", "3");
+    // The compact phone reader clamps the subject to two lines (83b4d77).
+    await expect(text).toHaveCSS("-webkit-line-clamp", "2");
     await page.getByRole("button", { name: "Expand subject", exact: true }).click();
     await expect(text).toHaveText(subject);
     const expanded = await measure(); expect(expanded.message).toBeGreaterThanOrEqual(viewport.height * 0.4);
@@ -145,7 +147,7 @@ const viewDescriptions = JSON.parse(readFileSync("messages/en.json", "utf8")).Vi
 // cannot replace the routed counts while the rows are measured.
 async function routeViewCounts(page: Page) {
   const collab = { assignedToMe: 3, unassignedOpen: 9111, open: 12345 };
-  const virtual: Record<string, number> = { focused: 7, todo: 48, calendar: 5, "calendar,unread": 2 };
+  const virtual: Record<string, number> = { focused: 7, todo: 48, calendar: 5, "calendar,unread": 2, "suspicious,unread": 4 };
   await page.addInitScript(() => {
     const fetch = window.fetch.bind(window);
     Object.assign(window, { fetch: (input: RequestInfo | URL, init?: RequestInit) =>
@@ -176,8 +178,8 @@ test("QA-014: sidebar view rows keep the count inside the row highlight and desc
     // On a fresh fixture the inbox row (and its unread count) appears once the folder list has
     // synced; a load that rendered before that point is reloaded.
     await expect(async () => {
-      if (await countedViewRows(page) < 7) await page.reload();
-      await expect.poll(() => countedViewRows(page), { timeout: 10000 }).toBe(7);
+      if (await countedViewRows(page) < 8) await page.reload();
+      await expect.poll(() => countedViewRows(page), { timeout: 10000 }).toBe(8);
     }).toPass({ timeout: 90000 });
     const active = page.locator('[data-view-id^="folder:"][data-active="true"]');
     await expect(active.locator("..").locator('[data-sidebar="menu-badge"]')).toBeVisible();
@@ -190,7 +192,7 @@ test("QA-014: sidebar view rows keep the count inside the row highlight and desc
     }));
     const withBadge = rows.filter(row => row.badge);
     expect(rows.map(row => row.id.startsWith("folder:") ? "inbox" : row.id)).toEqual(["inbox", "virtual:assigned-to-me", "virtual:unassigned",
-      "virtual:open", "virtual:focused", "virtual:action-queue", "virtual:invite-deck"]);
+      "virtual:open", "virtual:focused", "virtual:action-queue", "virtual:invite-deck", "virtual:suspicious"]);
     expect(withBadge).toHaveLength(rows.length);
     expect(rows.find(row => row.active)!.id).toMatch(/^folder:/);
     for (const { row, label, badge } of withBadge) {
@@ -222,7 +224,8 @@ test("QA-014: sidebar view rows keep the count inside the row highlight and desc
       expect(tip.top).toBeGreaterThanOrEqual(0); expect(tip.bottom).toBeLessThanOrEqual(viewport.height);
       expect(tip.right).toBeLessThanOrEqual(viewport.width);
     }
-    // Keyboard focus shows the full ring inside the scrolling sidebar content.
+    // Keyboard focus shows the full ring inside the scrolling sidebar content: flush rows draw
+    // an inset ring (982b179c4), so the row box itself must stay within the clip.
     await page.mouse.move(viewport.width - 4, viewport.height - 4);
     await page.keyboard.press("Shift");
     await hovered.focus();
@@ -230,9 +233,9 @@ test("QA-014: sidebar view rows keep the count inside the row highlight and desc
     await expect(page.getByRole("tooltip")).toHaveText(`${views.unassigned.name}: ${views.unassigned.description}`);
     const ring = await hovered.evaluate(el => {
       const clip = el.closest('[data-sidebar="content"]')!.getBoundingClientRect(), r = el.getBoundingClientRect();
-      return { focusVisible: el.matches(":focus-visible"), shadow: getComputedStyle(el).boxShadow, inside: r.left - 2 >= clip.left && r.right + 2 <= clip.right };
+      return { focusVisible: el.matches(":focus-visible"), shadow: getComputedStyle(el).boxShadow, inside: r.left >= clip.left && r.right <= clip.right };
     });
-    expect(ring.focusVisible).toBe(true); expect(ring.shadow).toContain("0px 0px 0px 2px"); expect(ring.inside).toBe(true);
+    expect(ring.focusVisible).toBe(true); expect(ring.shadow).toContain("0px 0px 0px 2px inset"); expect(ring.inside).toBe(true);
     if (viewport.width === 1440) await page.screenshot({ path: `.tmp/qa-shell-views-${colorScheme}-1440.png` });
     console.log("QA-014", JSON.stringify({ colorScheme, width: viewport.width, activeBackground, hoverBackground, rows: withBadge.length,
       badges: await page.locator('[data-view-id] ~ [data-sidebar="menu-badge"]').allTextContents() }));
