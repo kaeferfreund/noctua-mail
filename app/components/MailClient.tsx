@@ -223,6 +223,7 @@ import {
   getComposeThreadFocusMessageId,
   getDefaultExpandedMessageIds,
   getInlineComposePlacement,
+  getReaderExcludedFolderIds as getReaderExcludedFolderIdsFor,
   getRenderedThreadMessages,
   isThreadMessageCollapsed,
   printWithLoadedBodies
@@ -4441,13 +4442,15 @@ export default function MailClient({
     threadRelatedCandidatesKey
   ]);
 
-  // Trash/spam rows stay out of the conversation unless the reader is in that folder.
   const getReaderExcludedFolderIds = useCallback(
     (active: Message) =>
-      Array.from(excludedFolderIdsForThreads).filter(
-        (folderId) => folderId !== activeFolderId && folderId !== active.folderId
-      ),
-    [activeFolderId, excludedFolderIdsForThreads]
+      getReaderExcludedFolderIdsFor({
+        activeMessage: active,
+        activeFolderId,
+        accountFolderIds: accountFolders.map((folder) => folder.id),
+        threadExcludedFolderIds: excludedFolderIdsForThreads
+      }),
+    [accountFolders, activeFolderId, excludedFolderIdsForThreads]
   );
 
   // Reader content: a bounded header window around the selected message.
