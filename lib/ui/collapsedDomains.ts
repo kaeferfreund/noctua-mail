@@ -8,7 +8,23 @@ export function collapsedDomainsKey(userId: string | null | undefined): string {
   return `noctua:sidebarDomainsCollapsed:${userId || "anonymous"}`;
 }
 
-/** The stored JSON array of domains; anything else counts as nothing collapsed. */
+/** The sidebar sections that group mailboxes by domain. */
+export type MailboxSection = "mine" | "shared";
+const SECTIONS: readonly MailboxSection[] = ["mine", "shared"];
+
+/** Stored entry for one group: the section is part of it, so the same domain
+ * in "Eigene" and "Geteilte" collapses independently. */
+export function collapsedDomainEntry(section: MailboxSection, domain: string): string {
+  return `${section}:${domain}`;
+}
+
+/** Entries stored before the section was part of the key are a bare domain
+ * (domains contain no colon); they count for both sections. */
+function isLegacyEntry(entry: string): boolean {
+  return !SECTIONS.some(section => entry.startsWith(`${section}:`));
+}
+
+/** The stored JSON array of entries; anything else counts as nothing collapsed. */
 export function parseCollapsedDomains(raw: string | null): ReadonlySet<string> {
   if (!raw) return new Set();
   try {
@@ -19,10 +35,28 @@ export function parseCollapsedDomains(raw: string | null): ReadonlySet<string> {
   }
 }
 
-/** The stored value after toggling one domain (sorted, so equal sets serialise equally). */
-export function toggleCollapsedDomain(collapsed: ReadonlySet<string>, domain: string): string {
-  const next = new Set(collapsed);
-  if (!next.delete(domain)) next.add(domain);
+/** The collapsed domains of one section. */
+export function collapsedDomainsInSection(entries: ReadonlySet<string>, section: MailboxSection): ReadonlySet<string> {
+  const prefix = `${section}:`;
+  const domains = new Set<string>();
+  for (const entry of entries) {
+    if (entry.startsWith(prefix)) domains.add(entry.slice(prefix.length));
+    else if (isLegacyEntry(entry)) domains.add(entry);
+  }
+  return domains;
+}
+
+/** The stored value after toggling one section's domain (sorted, so equal sets
+ * serialise equally). Legacy entries are rewritten per section first, so the
+ * other section keeps its state. */
+export function toggleCollapsedDomain(entries: ReadonlySet<string>, section: MailboxSection, domain: string): string {
+  const next = new Set<string>();
+  for (const entry of entries) {
+    if (isLegacyEntry(entry)) SECTIONS.forEach(item => next.add(collapsedDomainEntry(item, entry)));
+    else next.add(entry);
+  }
+  const entry = collapsedDomainEntry(section, domain);
+  if (!next.delete(entry)) next.add(entry);
   return JSON.stringify([...next].sort());
 }
 
@@ -38,15 +72,15 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Collapsed domain groups of the signed-in user; all expanded on the server
- * and until hydration. */
-export function useCollapsedDomains(userId: string | null | undefined) {
+/** Collapsed domain groups of the signed-in user in one sidebar section; all
+ * expanded on the server and until hydration. */
+export function useCollapsedDomains(userId: string | null | undefined, section: MailboxSection) {
   const key = collapsedDomainsKey(userId);
   const raw = useSyncExternalStore(subscribe, () => readReaderStorage(key), () => null);
-  const collapsed = useMemo(() => parseCollapsedDomains(raw), [raw]);
+  const collapsed = useMemo(() => collapsedDomainsInSection(parseCollapsedDomains(raw), section), [raw, section]);
   const toggle = useCallback((domain: string) => {
-    writeReaderStorage(key, toggleCollapsedDomain(parseCollapsedDomains(readReaderStorage(key)), domain));
+    writeReaderStorage(key, toggleCollapsedDomain(parseCollapsedDomains(readReaderStorage(key)), section, domain));
     listeners.forEach(listener => listener());
-  }, [key]);
+  }, [key, section]);
   return { collapsed, toggle };
 }

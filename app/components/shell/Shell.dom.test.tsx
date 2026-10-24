@@ -244,7 +244,7 @@ describe("collapsible domain groups", () => {
   it("restores the collapsed groups per user after a remount", () => {
     const first = renderGroups("user-1");
     fireEvent.click(headerOf(first, "brand.example.test"));
-    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["mine:brand.example.test"]');
     first.unmount();
     const again = renderGroups("user-1");
     expect(headerOf(again, "brand.example.test").getAttribute("aria-expanded")).toBe("false");
@@ -281,6 +281,39 @@ describe("collapsible domain groups", () => {
     fireEvent.click(brandHeader);
     expect(brandHeader.hasAttribute("data-active")).toBe(false);
     expect(view.getByRole("button", { name: /Brand b/ }).getAttribute("aria-current")).toBe("true");
+  });
+
+  describe("the same domain in Eigene and Geteilte", () => {
+    const sharedBrand = ["h", "i", "j", "k"].map(id => account(id, `Shared ${id}`, "brand.example.test", true));
+    const sharedPlain = ["l", "m", "n"].map(id => account(id, `Shared ${id}`, "plain.example.test", true));
+    const renderBoth = () => renderSidebar([...brand, ...plain, ...sharedBrand, ...sharedPlain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, plain[0].id, { userId: "user-1", summaries });
+    const brandHeaders = (view: ReturnType<typeof renderSidebar>) =>
+      view.getAllByText("brand.example.test", { selector: "span" }).map(span => span.closest("button")!);
+
+    it("collapses each section's group on its own", () => {
+      const view = renderBoth();
+      const [mineHeader, sharedHeader] = brandHeaders(view);
+      fireEvent.click(sharedHeader);
+      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
+      expect(mineHeader.getAttribute("aria-expanded")).toBe("true");
+      expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["shared:brand.example.test"]');
+      fireEvent.click(mineHeader);
+      fireEvent.click(sharedHeader);
+      expect(mineHeader.getAttribute("aria-expanded")).toBe("false");
+      expect(sharedHeader.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    it("reads a stored key without section as collapsed in both, then splits it", () => {
+      window.localStorage.setItem("noctua:sidebarDomainsCollapsed:user-1", '["brand.example.test"]');
+      const view = renderBoth();
+      const [mineHeader, sharedHeader] = brandHeaders(view);
+      expect(mineHeader.getAttribute("aria-expanded")).toBe("false");
+      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
+      fireEvent.click(mineHeader);
+      expect(mineHeader.getAttribute("aria-expanded")).toBe("true");
+      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
+      expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["shared:brand.example.test"]');
+    });
   });
 
   it("keeps ungrouped sections without a toggle", () => {
