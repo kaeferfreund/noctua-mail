@@ -13,6 +13,7 @@ import { personalEmailSchema } from "./userProvisioning";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { cleanupUserAccountAccess } from "./membershipCleanup";
 import { revokeAuthStreams } from "./authStreams";
+import { deletePushSubscriptionRowsForUser } from "./push/subscriptions";
 
 type Cleanup=typeof cleanupUserAccountAccess;
 function parseName(value:unknown) {
@@ -139,6 +140,7 @@ async function cleanDeletedUser(db:Database,op:LifecycleOperation,cleanup:Cleanu
     }
     if (!payload.reassignOwnerTo && db.prepare(`SELECT 1 FROM accounts WHERE ownerUserId=?`).get(op.targetUserId)) throw new AuthPolicyError("owner_reassignment_required",409);
     detachUserDomainRows(db,op.targetUserId,payload.reassignOwnerTo);
+    deletePushSubscriptionRowsForUser(db,op.targetUserId);
     db.prepare(`UPDATE admin_lifecycle_operations SET state='cleanup_pending',updatedAt=? WHERE id=?`).run(Date.now(),op.id);
   }).immediate());
   revokeAuthStreams({userId:op.targetUserId});
