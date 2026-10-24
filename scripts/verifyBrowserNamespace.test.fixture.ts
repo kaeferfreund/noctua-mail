@@ -36,7 +36,7 @@ const protocol = await import("@/lib/mail/imapClientOptions");
 mock.module("@/lib/mail/imapStreamRuntime", () => ({
   ...protocol,
   loadImapFlow: async () => class { constructor() { return transport; } },
-  streamTimers: { setInterval, clearInterval }
+  streamTimers: { setInterval, clearInterval, setTimeout, clearTimeout }
 }));
 const { connectIdleImapClient } = await import("@/lib/mail/imap/idle");
 mock.module("@/lib/mail/imap/idle", () => ({ connectIdleImapClient, runImapIdleLoop: async () => {} }));

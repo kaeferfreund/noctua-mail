@@ -1379,6 +1379,12 @@ export function useSyncController({
           }, 15000);
         }
       });
+      // A planned stream end can reconnect immediately without starting polling.
+      source.addEventListener("reconnect", () => {
+        if (disposed || streamSourceRef.current !== source) return;
+        if (document.visibilityState === "visible") startStream();
+        else stopStream();
+      });
     };
 
     // Suppress unused variable warning for streamMaxIdle
