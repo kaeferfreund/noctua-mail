@@ -47,7 +47,7 @@ test("both explicitly imported catalogs have identical semantic keys and transla
 test("sender inventory covers both catalogs, named values and literal signature tokens", async () => {
   const { senderMessages } = await import("@/lib/senderMessages");
   const inventory = await import("@/doc/SENDER-IDENTITIES-UI-STRINGS.json");
-  expect(inventory.semanticIds).toHaveLength(71);
+  expect(inventory.semanticIds).toHaveLength(72);
   expect(inventory.catalogMapping).toEqual(senderMessages);
   for (const locale of ["de", "en"] as const) {
     const t = getTranslator(locale);
