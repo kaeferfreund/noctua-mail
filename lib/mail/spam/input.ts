@@ -92,7 +92,7 @@ export type ParsedSpamSource = {
   attachments?: ReadonlyArray<{ filename?: string; contentType: string }>;
 };
 
-const unfold = (value: string) => value.replace(/\r?\n[ \t]+/g, " ").trim().slice(0, HEADER_VALUE_LIMIT);
+const unfold = (value: string) => value.replace(/\r?\n[ \t]+/g, " ").trim();
 
 function addressText(value: ParsedSpamSource["to"] | ParsedSpamSource["cc"]) {
   if (!value) return "";
@@ -124,20 +124,35 @@ export function parseHeaderBlock(block: string): HeaderLine[] {
   const lines: HeaderLine[] = [];
   for (const raw of block.replace(/\r?\n[ \t]+/g, " ").split(/\r?\n/)) {
     const colon = raw.indexOf(":");
-    if (colon > 0) lines.push({ key: raw.slice(0, colon).trim().toLowerCase(), value: unfold(raw.slice(colon + 1)) });
+    if (colon > 0) lines.push({ key: raw.slice(0, colon).trim().toLowerCase(), value: raw.slice(colon + 1).trim() });
   }
   return lines;
 }
 
-/** The header-derived fields of SpamInput. */
+/**
+ * Arrival time: the date of the top-most Received header (after its last ";"),
+ * stamped by the receiving server. The sender's Date header never counts; the
+ * sender can only add Received headers below the server's own.
+ */
+export function topReceivedAt(lines: HeaderLine[]) {
+  const value = lines.find((line) => line.key === "received")?.value;
+  if (!value) return null;
+  const stamp = value.slice(value.lastIndexOf(";") + 1).replace(/\([^()]*\)/g, " ").replace(/\s+/g, " ").trim();
+  const time = Date.parse(stamp);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
+/** The header-derived fields of SpamInput; `lines` hold the full unfolded values. */
 function headerFields(lines: HeaderLine[]) {
-  const header = (key: string) => lines.find((line) => line.key === key)?.value ?? null;
+  const capped = lines.map((line) => ({ key: line.key, value: line.value.slice(0, HEADER_VALUE_LIMIT) }));
+  const header = (key: string) => capped.find((line) => line.key === key)?.value ?? null;
   return {
     listId: header("list-id"),
     listUnsubscribe: header("list-unsubscribe"),
     autoSubmitted: header("auto-submitted"),
-    authenticationResults: topAuthenticationResults(lines),
-    spamHeaders: topSpamHeaders(lines)
+    authenticationResults: topAuthenticationResults(capped),
+    spamHeaders: topSpamHeaders(capped),
+    receivedAt: topReceivedAt(lines)
   };
 }
 
@@ -195,6 +210,7 @@ export function buildSpamInputFromMessage(message: {
     autoSubmitted: headers?.autoSubmitted ?? null,
     authenticationResults: headers?.authenticationResults ?? [],
     spamHeaders: headers?.spamHeaders ?? [],
+    receivedAt: headers?.receivedAt ?? null,
     linkDomains: extractLinkDomains(text, message.htmlBody),
     maskedLinkDomains: extractMaskedLinkDomains(message.htmlBody),
     attachments: (message.attachments ?? []).slice(0, MAX_ATTACHMENTS)

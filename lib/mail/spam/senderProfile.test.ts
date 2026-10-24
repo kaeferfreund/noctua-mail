@@ -12,9 +12,11 @@ import {
   senderMailFacts,
   senderProfileFromRow,
   serializeProfilePatterns,
+  spamArrivalTime,
   subjectPrefix,
   TRUST_DECAY_MS
 } from "./senderProfile";
+import type { SpamInput } from "./types";
 
 const DAY = 24 * 60 * 60_000;
 const own = new Set(["anna@example.test"]);
@@ -34,6 +36,48 @@ describe("senderMailFacts", () => {
     expect(senderMailFacts(other, { ownAddresses: own })?.auth).toBe("unaligned");
     expect(senderMailFacts({ ...trustedInput, authenticationResults: [] }, { ownAddresses: own })?.auth).toBe("unknown");
     expect(senderMailFacts({ ...trustedInput, fromEmail: null }, { ownAddresses: own })).toBeNull();
+  });
+
+  test("only DKIM header.d/header.i and SPF smtp.mailfrom align; selectors, HELO, comments and other tokens never do", () => {
+    const from = (fromEmail: string, results: string): SpamInput =>
+      ({ ...trustedInput, from: fromEmail, fromEmail, authenticationResults: [`mx.example.test; ${results}`] });
+    const auth = (fromEmail: string, results: string) => senderMailFacts(from(fromEmail, results), { ownAddresses: own });
+    expect(auth("chef@victim.test", "dkim=pass header.d=attacker.test header.s=victim.test")).toMatchObject({ auth: "unaligned", dkimDomains: [] });
+    expect(auth("chef@victim.test", "spf=pass smtp.mailfrom=bounce@attacker.test smtp.helo=victim.test")?.auth).toBe("unaligned");
+    expect(auth("chef@victim.test", "spf=pass smtp.helo=victim.test")?.auth).toBe("unaligned");
+    expect(auth("chef@victim.test", "spf=pass (victim.test) smtp.mailfrom=a@attacker.test x.y=victim.test")?.auth).toBe("unaligned");
+    expect(auth("chef@victim.test", "dkim=pass header.d=attacker.test policy.d=victim.test header.b=victim.test")?.auth).toBe("unaligned");
+    expect(auth("chef@victim.test", "dkim=pass header.d=victimtest.test")?.auth).toBe("unaligned");
+    expect(auth("x@bank.co.uk", "dkim=pass header.d=attacker.co.uk")?.auth).toBe("unaligned");
+    expect(auth("x@bank.co.uk", "dkim=pass header.d=co.uk")?.auth).toBe("unaligned");
+    expect(auth("x@co.uk", "dkim=pass header.d=co.uk")?.auth).toBe("unaligned");
+    expect(auth("x@bank.co.uk", "dkim=pass header.d=mail.bank.co.uk")).toMatchObject({ auth: "aligned", dkimDomains: ["mail.bank.co.uk"] });
+    expect(auth("chef@news.victim.test", "dkim=pass header.i=@victim.test")).toMatchObject({ auth: "aligned", dkimDomains: ["victim.test"] });
+    expect(auth("chef@victim.test", "spf=pass (sender IP is 192.0.2.1) smtp.mailfrom=bounce@em.victim.test smtp.helo=out.attacker.test"))
+      .toMatchObject({ auth: "aligned", dkimDomains: [], spf: "pass" });
+    expect(auth("chef@victim.test", "dkim=fail header.d=victim.test")?.auth).toBe("unaligned");
+  });
+
+  test("the arrival is the Received stamp or the caller's time, never the sender's Date header", () => {
+    const received = Date.UTC(2026, 5, 1, 12);
+    expect(senderMailFacts({ ...trustedInput, date: "2020-01-01T00:00:00.000Z", receivedAt: new Date(received).toISOString() }, { ownAddresses: own })?.date)
+      .toBe(received);
+    expect(senderMailFacts({ ...trustedInput, date: "2020-01-01T00:00:00.000Z", receivedAt: null }, { ownAddresses: own, arrivedAt: received })?.date)
+      .toBe(received);
+    const before = Date.now();
+    expect(spamArrivalTime({ receivedAt: "2999-01-01T00:00:00.000Z" })).toBeGreaterThanOrEqual(before);
+    expect(spamArrivalTime({ receivedAt: "2999-01-01T00:00:00.000Z" })).toBeLessThanOrEqual(Date.now());
+  });
+
+  test("20 mails on one day with a backdated Date header earn no trust", () => {
+    let profile = null;
+    for (let index = 0; index < 20; index += 1) {
+      const date = new Date(START - (index === 0 ? 31 : 0) * DAY + index * 60_000).toISOString();
+      const receivedAt = new Date(START + index * 60_000).toISOString();
+      profile = foldSenderMail(profile, senderMailFacts({ ...trustedInput, date, receivedAt }, { ownAddresses: own })!);
+    }
+    expect(profile).toMatchObject({ count: 20, firstSeenAt: START, lastSeenAt: START + 19 * 60_000 });
+    expect(evaluateSenderTrust(profile, START + DAY)).toMatchObject({ trusted: false, reason: "zu kurze Historie" });
   });
 
   test("language, subject prefix and masked links of the own domain", () => {

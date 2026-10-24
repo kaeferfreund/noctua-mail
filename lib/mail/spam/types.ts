@@ -20,6 +20,8 @@ export type SpamInput = {
   authenticationResults: string[];
   /** Unfolded `X-Spam-*` headers as "Name: value". */
   spamHeaders: string[];
+  /** Arrival stamp of the receiving server (top-most Received header, ISO); never the sender's Date header. */
+  receivedAt?: string | null;
   linkDomains: string[];
   /** Link targets whose visible text names another domain (extractMaskedLinkDomains). */
   maskedLinkDomains?: string[];

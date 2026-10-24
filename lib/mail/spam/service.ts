@@ -176,13 +176,14 @@ async function checkMessage(job: SpamCheckJob) {
   // "spam" is stored only when the mark applies; a spam verdict below the threshold is kept as "unsure".
   const verdict: SpamVerdict = marked ? "spam" : decision.verdict === "spam" ? "unsure" : decision.verdict;
   const saved = await saveSpamVerdict(job.accountId, message.id, { verdict, confidence: decision.confidence, reasons: decision.reasons }, { automatic: true });
-  // Each message is saved once (spamCheckedAt), so it enters the profile once; marked spam never teaches the pattern.
-  if (saved && verdict !== "spam") await learnSenderProfile(job.accountId, input, message, identity.ownAddresses);
+  // Each message is saved once (spamCheckedAt), so it enters the profile once; only ham teaches the pattern (not spam, not unsure).
+  if (saved && verdict === "ham") await learnSenderProfile(job.accountId, input, identity.ownAddresses);
   if (saved && marked && mailbox.autoMove) await autoMoveToJunk(job.accountId, message);
 }
 
-async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, message: Message, ownAddresses: ReadonlySet<string>) {
-  const facts = senderMailFacts(input, { ownAddresses, date: message.dateValue });
+async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, ownAddresses: ReadonlySet<string>) {
+  // Without a Received stamp the check time is the arrival: dateValue is the sender's Date header.
+  const facts = senderMailFacts(input, { ownAddresses, arrivedAt: Date.now() });
   if (!facts) return;
   try {
     await recordSenderProfileMail(accountId, facts);

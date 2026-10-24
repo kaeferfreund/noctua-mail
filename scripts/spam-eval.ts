@@ -22,8 +22,9 @@
  * before the model, as the server does. With a file argument the profiles are
  * read from that file when it exists, otherwise built and written there (the
  * output of scripts/spam-profiles-backfill.ts --dry-run --out works as well).
- * Trust is judged as of each mail's own date (180-day decay), as the server
- * would have at its arrival; the profiles themselves cover the whole history.
+ * Trust is judged as of each mail's arrival (Received stamp, else dateValue;
+ * 180-day decay) with the household history of the mails that arrived before
+ * it, as the server would have seen it then.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -37,6 +38,7 @@ import { openSpamDataDir } from "../lib/mail/spam/evalData";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
 import { loadHouseholdProfiles, type HouseholdProfiles } from "../lib/mail/spam/profileFile";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
+import { spamArrivalTime } from "../lib/mail/spam/senderProfile";
 import { loadStaticRules, serverFlaggedSpam, staticRulesPath } from "../lib/mail/spam/staticRules";
 import type { SpamEvalRecord } from "../lib/mail/spam/apply";
 import type { SpamDecision, SpamInput } from "../lib/mail/spam/types";
@@ -141,7 +143,7 @@ async function evaluate(item: Item): Promise<Outcome | null> {
   if (!loaded) return null;
   const { input, row } = loaded;
   const { db, folders } = shard(item.accountId);
-  const trust: SpamTrustContext | null = household ? household.context(item.accountId, item.id, Number(row.dateValue) || Date.now()) : null;
+  const trust: SpamTrustContext | null = household ? household.context(item.accountId, item.id, spamArrivalTime(input, Number(row.dateValue) || Date.now())) : null;
   const sent = findSentFolder(folders, item.accountId);
   const allowlist: SpamAllowlistContext = {
     ...own,

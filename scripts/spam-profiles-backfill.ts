@@ -1,60 +1,76 @@
 /**
  * One-time sender profile backfill for trusted senders (doc/SPAM-DETECTION.md).
  *
- *   bun scripts/spam-profiles-backfill.ts --data /path/to/noctua-data --dry-run [--out profiles.json]
- *   bun scripts/spam-profiles-backfill.ts [--data /path/to/noctua-data] [--account <accountId>]
+ *   bun scripts/spam-profiles-backfill.ts --data /path/to/noctua-data [--account <accountId>] [--out profiles.json]
+ *   bun scripts/spam-profiles-backfill.ts --data /path/to/noctua-data --write [--account <accountId>]
  *
  * Builds every account's profiles from its stored rows in one pass per shard
- * (only the first 64 KB of each source: header block and attachment names).
- * --dry-run opens the data dir read-only (immutable=1) and prints counts and
- * timings; --out writes the profiles as JSON for `spam-eval --trust-profiles <file>`
- * (it names senders: keep it outside the data dir and the repository).
- * The real run reads over the app's DB layer and replaces each account's
+ * (only the first 64 KB of each source: header block and attachment names) and
+ * imports the stored "Als Spam" decisions. The default is a dry run: the data
+ * dir is opened read-only (immutable=1) and the plan is printed; --out writes
+ * the sender histories as JSON for `spam-eval --trust-profiles <file>` (it
+ * names senders: keep it outside the data dir and the repository).
+ * --write reads over the app's DB layer and replaces each account's
  * `spam_sender_profiles` rows in one transaction (stored "Als Spam" times
- * survive). Run it from the app directory after the deploy of this build.
+ * survive). It needs an explicit --data (the NOCTUA_DATA_DIR Bun loads from
+ * .env.local is never used) and refuses shards without the spam schema instead
+ * of migrating them outside the deploy runbook.
  */
-import path from "node:path";
 import { openSpamDataDir } from "../lib/mail/spam/evalData";
-import { buildProfileFile, householdProfiles, writeProfileFile } from "../lib/mail/spam/profileFile";
+import { PROFILE_BACKFILL_USAGE, parseProfileBackfillArgs } from "../lib/mail/spam/profileBackfillArgs";
+import { accountSenders, buildProfileFile, householdProfiles, writeProfileFile } from "../lib/mail/spam/profileFile";
 
-function arg(name: string) {
-  const index = process.argv.indexOf(`--${name}`);
-  return index > 0 ? process.argv[index + 1] : undefined;
+const args = parseProfileBackfillArgs(process.argv.slice(2));
+if (args.kind === "help") {
+  console.log(PROFILE_BACKFILL_USAGE);
+  process.exit(0);
 }
-
-const dryRun = process.argv.includes("--dry-run");
-if (arg("data")) process.env.NOCTUA_DATA_DIR = path.resolve(arg("data")!);
-const dataDir = process.env.NOCTUA_DATA_DIR?.trim();
-if (!dataDir) throw new Error("Pass --data <data dir> or set NOCTUA_DATA_DIR");
-const outPath = arg("out") ? path.resolve(arg("out")!) : undefined;
-if (outPath && !dryRun) throw new Error("--out is only available with --dry-run");
-if (outPath && !path.relative(dataDir, outPath).startsWith("..")) throw new Error("--out must not point into the data dir");
-const accountFilter = arg("account") ?? null;
+if (args.kind === "error") {
+  console.error(`${args.message}\n\n${PROFILE_BACKFILL_USAGE}`);
+  process.exit(1);
+}
+const { dataDir, write, out, account: accountFilter } = args;
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 const started = performance.now();
 
-if (dryRun) {
+if (!write) {
   const data = openSpamDataDir(dataDir);
   try {
+    console.log(`Dry run (read-only): ${dataDir}, ${data.accounts.length} accounts`);
     const file = await buildProfileFile(data, (accountId, account, ms) => {
       if (accountFilter && accountId !== accountFilter) return;
-      console.log(`${accountId}: ${account.rows} rows (${account.withSource} source heads), ${account.profiles.length} senders, ${seconds(ms)}`);
+      console.log(`${accountId}: ${account.rows} rows (${account.withSource} source heads) → would write ${accountSenders(account).size} profiles `
+        + `(${Object.keys(account.userSpam).length} with "Als Spam"), ${seconds(ms)}`);
     });
     const household = householdProfiles(file, data.own.ownAddresses, "built");
-    console.log(`Household: ${household.senders} senders, ${household.trusted} trusted, ${household.rows} rows, ${seconds(performance.now() - started)} (read-only)`);
-    if (outPath) {
-      writeProfileFile(outPath, file);
-      console.log(`Wrote ${outPath}`);
+    console.log(`Household: ${household.senders} senders, ${household.trusted} trusted now, ${household.rows} rows, ${seconds(performance.now() - started)}`);
+    if (out) {
+      writeProfileFile(out, file);
+      console.log(`Wrote ${out}`);
     }
+    console.log("Nothing written to the data dir. Add --write to replace the stored profiles.");
   } finally { data.close(); }
 } else {
+  // Read-only inspection first: the shards must already carry the spam schema.
+  const inspect = openSpamDataDir(dataDir);
+  const targets = inspect.accounts.filter((candidate) => !accountFilter || candidate.id === accountFilter);
+  const missingSchema = targets.filter((candidate) => !inspect.shard(candidate.id).db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'spam_sender_profiles'").get()).map((candidate) => candidate.id);
+  inspect.close();
+  console.log(`Writing sender profiles into ${dataDir}: ${targets.length} accounts${accountFilter ? ` (only ${accountFilter})` : ""}`);
+  if (!targets.length) throw new Error(accountFilter ? `Account ${accountFilter} not found in ${dataDir}` : `No accounts in ${dataDir}`);
+  if (missingSchema.length) {
+    throw new Error(`Shards without the spam schema (start the deployed app first, deploy runbook): ${missingSchema.join(", ")}`);
+  }
+  // The app's DB layer reads NOCTUA_DATA_DIR; the explicit --data wins over .env.local.
+  process.env.NOCTUA_DATA_DIR = dataDir;
   const { backfillSenderProfiles, getAccounts, getFolders } = await import("../lib/db");
   const { buildOwnIdentitySets } = await import("../lib/mail/spam/allowlist");
   const { buildAccountSenderProfiles } = await import("../lib/mail/spam/profileBuild");
   const { getSourcesDir } = await import("../lib/runtimePaths");
   const accounts = await getAccounts();
   const own = buildOwnIdentitySets(accounts.flatMap((account) => [account.email, ...(account.ownAddresses ?? [])]));
-  for (const account of accounts.filter((candidate) => !accountFilter || candidate.id === accountFilter)) {
+  for (const account of accounts.filter((candidate) => targets.some((target) => target.id === candidate.id))) {
     const accountStarted = performance.now();
     const folders = await getFolders(account.id);
     let rows = 0;
