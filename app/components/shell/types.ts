@@ -80,6 +80,13 @@ export function mailboxInitials(account: Pick<Account, "name" | "email">): strin
   return localPart.slice(0, 2).toUpperCase() || "?";
 }
 
+/** The mailbox's custom avatar when it is an image URL; other stored values
+ * (e.g. the literal initials "NW") count as no avatar. */
+export function mailboxAvatarUrl(account: Pick<Account, "avatar">): string | null {
+  const avatar = account.avatar?.trim() ?? "";
+  return /^(https?:\/\/|\/|data:image\/)/i.test(avatar) ? avatar : null;
+}
+
 export function mailboxLabel(account: Pick<Account, "name" | "email">): string {
   return account.name.trim() || account.email;
 }

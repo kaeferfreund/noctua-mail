@@ -13,7 +13,7 @@ import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
 import { Button } from "@/app/components/ui/button";
 import ShellUserMenu, { type ShellUserMenuProps } from "./ShellUserMenu";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/app/components/ui/avatar";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
 import {
   Sidebar,
@@ -37,7 +37,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
-import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 
 export type ShellSidebarProps = {
@@ -115,12 +115,8 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
   const showUnread = summary !== undefined && summary.unread !== null && summary.unread > 0;
   const showAssigned = summary !== undefined && summary.assignedToMe > 0;
   const showWatcher = summary !== undefined && summary.watcher.state !== "idling";
-  // A custom avatar wins; otherwise the mailbox's own address goes through the
-  // message list's sender-icon route (domain favicon, Gravatar), and the
-  // initials stay while it loads or when no logo exists.
-  const avatarSrc = account.avatar || ((account.settings?.appearance?.senderIcons ?? true)
-    ? buildSenderIconSrc(account.id, { from: account.name, fromEmail: account.email, fallback: "none" })
-    : undefined);
+  // Only a custom avatar image; the domain icon sits on the group header.
+  const avatarSrc = mailboxAvatarUrl(account);
   const watcherLabel = summary ? t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)}) : "";
   return (
     <SidebarMenuItem>
@@ -136,10 +132,11 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
         aria-busy={isPending ? "true" : undefined}
         className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
       >
-        <Avatar size="sm">
-          {avatarSrc ? <AvatarImage src={avatarSrc} alt="" /> : null}
-          <AvatarFallback>{mailboxInitials(account)}</AvatarFallback>
-        </Avatar>
+        {avatarSrc ? (
+          <Avatar size="sm" className="empty:hidden">
+            <AvatarImage src={avatarSrc} alt="" />
+          </Avatar>
+        ) : null}
         <span>{mailboxLabel(account)}</span>
       </SidebarMenuButton>
       {summary && (
@@ -164,6 +161,19 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
   );
 });
 
+/** One favicon per domain group header, through the sender-icon route of
+ * the group's first mailbox with sender icons on; nothing while it loads or
+ * when the domain has no logo (`fallback=none` answers 404). */
+function DomainIcon({ domain, accounts }: { domain: string; accounts: readonly ShellAccount[] }) {
+  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true);
+  if (!source) return null;
+  return (
+    <Avatar className="size-4 rounded-sm after:hidden empty:hidden">
+      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none" })} alt="" className="rounded-sm" />
+    </Avatar>
+  );
+}
+
 export function MailboxRows({
   accounts,
   activeAccountId,
@@ -182,7 +192,10 @@ export function MailboxRows({
       {groups.map((group) => (
         <div key={group.domain ?? "all"}>
           {group.domain || accounts.length > 6 ? (
-            <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{group.domain ?? t("mailboxes.other")}</div>
+            <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-xs text-muted-foreground">
+              {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+              <span className="truncate">{group.domain ?? t("mailboxes.other")}</span>
+            </div>
           ) : null}
           <SidebarMenu>
             {group.accounts.map((account) => (
