@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { simpleParser } from "mailparser";
-import { buildSpamInput, buildSpamInputFromMessage, extractMaskedLinkDomains, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
+import {
+  buildSpamInput, buildSpamInputFromMessage, configuredAuthservIds, extractMaskedLinkDomains, parseHeaderBlock, receivingAuthenticationResults, SPAM_TEXT_LIMIT,
+  stripQuotedText
+} from "./input";
 
 const source = [
   "Authentication-Results: mx.example.test; spf=pass smtp.mailfrom=example.test;",
@@ -78,6 +81,38 @@ describe("buildSpamInput", () => {
     ].join("\r\n");
     const input = buildSpamInput(await simpleParser(forged));
     expect(input.authenticationResults).toEqual(["mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none"]);
+  });
+
+  test("authserv-id pinning: without our server's block a sender-inserted block of another id never counts", async () => {
+    const mail = (...authResults: string[]) => [
+      "Received: from sender.example.net (sender.example.net [192.0.2.10]) by mx1.mail.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+      ...authResults.map((value) => `Authentication-Results: ${value}`),
+      "From: Victim <ceo@victim.example.test>",
+      "To: anna@example.test",
+      "Subject: Dringend",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Bitte sofort ueberweisen."
+    ].join("\r\n");
+    const forged = "mx.google.example; dkim=pass header.d=victim.example.test; spf=pass smtp.mailfrom=victim.example.test";
+    expect(buildSpamInput(await simpleParser(mail(forged))).authenticationResults).toEqual([]);
+    // Our server's block (same organisation as the Received "by" host) counts; the forged one under it does not.
+    const ours = "mx2.mail.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none";
+    expect(buildSpamInput(await simpleParser(mail(forged, ours))).authenticationResults).toEqual([ours]);
+    const headers = mail(forged, ours).split("\r\n\r\n")[0];
+    expect(buildSpamInputFromMessage({ from: "ceo@victim.example.test", to: "anna@example.test", subject: "S", headers }).authenticationResults).toEqual([ours]);
+  });
+
+  test("authserv-id pinning: a configured list wins over the Received host; no Received line keeps the top-most block", () => {
+    const lines = parseHeaderBlock([
+      "Received: from relay.example.net by relay.example.net; Sat, 24 Oct 2026 10:00:00 +0000",
+      "Authentication-Results: relay.example.net; dkim=pass header.d=victim.example.test",
+      "Authentication-Results: auth.provider.example; dkim=none"
+    ].join("\r\n"));
+    expect(receivingAuthenticationResults(lines, [])).toEqual(["relay.example.net; dkim=pass header.d=victim.example.test"]);
+    expect(receivingAuthenticationResults(lines, ["auth.provider.example"])).toEqual(["auth.provider.example; dkim=none"]);
+    expect(configuredAuthservIds({ NOCTUA_SPAM_AUTHSERV_ID: " Auth.Provider.example , mx.example.test" })).toEqual(["auth.provider.example", "mx.example.test"]);
+    expect(receivingAuthenticationResults(lines.slice(1), [])).toEqual(["relay.example.net; dkim=pass header.d=victim.example.test"]);
   });
 
   test("the row fallback takes the server verdicts from a raw header block", () => {
