@@ -381,9 +381,12 @@ export function buildPreviewDocument({
   const quoteChipBackground = darkMode ? "#2b303b" : "#e8ebf0";
   const quoteChipHoverBackground = darkMode ? "#39404e" : "#dbe0e8";
   const quoteChipColor = darkMode ? "#aab4c4" : "#6b7480";
+  // The frame is its own document: the app's --mail-view-fg never reaches it,
+  // so a var() here always fell back to the light-theme text colour and left
+  // plain mails dark-on-dark. Dark uses the app's gray-12 (Radix dark).
   const hostTextColor = hasExplicitColor
     ? ""
-    : "color: var(--mail-view-fg, var(--text, #1a1a1a));";
+    : `color: ${darkMode ? "#eeeeee" : "#1a1a1a"};`;
   const bodyClassName = [NOCTUA_EMAIL_CONTENT_CLASS, "email-body", bodyAttrs.className]
     .filter(Boolean)
     .join(" ");
