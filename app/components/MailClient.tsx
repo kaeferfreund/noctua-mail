@@ -4847,7 +4847,9 @@ export default function MailClient({
 
   const [openBottomStatusPanel, setOpenBottomStatusPanel] = useState<BottomStatusPanel>(null);
 
-  const deepLinkSelectionRef = useRef<Message | null>(null);
+  // The linked message the list still has to highlight. `revision` is the list read current when the
+  // link last asked for a page (null: none asked yet); the next page is asked for once that read is replaced.
+  const deepLinkSelectionRef = useRef<{ message: Message; revision: number | null } | null>(null);
   const deepLinkState: DeepLinkState = {
     accountId: activeAccountId, folderId: activeFolderId,
     messageId: viewMessage?.accountId === activeAccountId ? viewMessage.id : "",
@@ -4900,24 +4902,32 @@ export default function MailClient({
       setViewMessage(message); selectReaderLayout(message.id);
       setActiveMessageId(message.id); selectionStore.setSelection(new Set([message.id]), message.id);
       setPendingSelectionCollapseMessageId(message.id); setPendingSelectionScrollMessageId(message.id);
-      deepLinkSelectionRef.current = message;
+      deepLinkSelectionRef.current = { message, revision: null };
     },
     notice: kind => pushNotice({ type: "info", title: tn(`deepLink.${kind}`) }),
     onTransaction: scrollAnchors.onTransaction
   });
   useEffect(() => {
-    const target = deepLinkSelectionRef.current;
-    if (!target || viewMessage?.id !== target.id || target.accountId !== activeAccountId) return;
+    const pending = deepLinkSelectionRef.current;
+    if (!pending) return;
+    const target = pending.message;
+    if (viewMessage?.id !== target.id || target.accountId !== activeAccountId) return;
     if (filteredMessages.some(message => message.id === target.id)) {
       selectionStore.setSelection(new Set([target.id]), target.id); setActiveMessageId(target.id);
       setPendingSelectionCollapseMessageId(target.id); setPendingSelectionScrollMessageId(target.id);
       deepLinkSelectionRef.current = null;
     } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId &&
-      messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
-      // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
-      setMessagesPage(page => page + 1);
+      pending.revision !== authoritativeRevision) {
+      if (messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
+        // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
+        pending.revision = authoritativeRevision;
+        setMessagesPage(page => page + 1);
+      } else if (pending.revision !== null) {
+        // The last page the link may read came without the target: pages the user loads later must not jump to it.
+        deepLinkSelectionRef.current = null;
+      }
     }
-  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
+  }, [activeAccountId, activeVirtualFolderId, authoritativeRevision, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
 
   useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
   const handleNoticeOpen = (notice: InAppNotice) => {
