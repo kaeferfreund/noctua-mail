@@ -5,7 +5,7 @@ import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
 import { memo, useMemo, useRef, useState, type ReactNode } from "react";
-import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, UsersRound } from "lucide-react";
+import { FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
@@ -86,9 +86,35 @@ type MailboxRowProps = {
   onSwitch: (accountId: string) => void;
 };
 
+/** Right padding that keeps the label clear of the badge: the badge shows
+ * at most two counts plus the watcher dot, each only when it carries news. */
+function mailboxBadgePadding(counts: number, showWatcher: boolean): string | undefined {
+  if (counts === 0) return showWatcher ? "pr-8" : undefined;
+  if (counts === 1) return showWatcher ? "pr-16" : "pr-14";
+  return showWatcher ? "pr-28" : "pr-24";
+}
+
+/** One badge count: icon and number when it carries news, otherwise a
+ * screen-reader-only label so the row still announces every count. */
+function MailboxCount({ label, title, icon, value }: { label: string; title?: string; icon?: ReactNode; value?: number }) {
+  if (icon === undefined || value === undefined) return <span className="sr-only" aria-label={label}>{label}</span>;
+  return (
+    <span className="flex items-center gap-0.5" aria-label={label} title={title}>
+      {icon}{value}
+    </span>
+  );
+}
+
 /** One mailbox row; memoized so a switch re-renders only the rows whose state changed. */
 const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPending, onSwitch }: MailboxRowProps) {
   const t = useTranslations("Shell");
+  // The badge shows only news (unread, assigned to me) and an unhealthy
+  // watcher; zero counts, the unassigned count and the unread-unavailable case
+  // stay in the hover and as screen-reader-only labels.
+  const showUnread = summary !== undefined && summary.unread !== null && summary.unread > 0;
+  const showAssigned = summary !== undefined && summary.assignedToMe > 0;
+  const showWatcher = summary !== undefined && summary.watcher.state !== "idling";
+  const watcherLabel = summary ? t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)}) : "";
   return (
     <SidebarMenuItem>
       {/* aria-current follows the committed mailbox only; a click shows
@@ -101,7 +127,7 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
           : account.email}
         aria-current={isActive ? "true" : undefined}
         aria-busy={isPending ? "true" : undefined}
-        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, summary && "pr-32")}
+        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
       >
         <Avatar size="sm">
           {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
@@ -110,19 +136,21 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
         <span>{mailboxLabel(account)}</span>
       </SidebarMenuButton>
       {summary && (
-        <SidebarMenuBadge className="right-1 w-auto gap-1.5 text-2xs">
-          <span className="flex items-center gap-0.5" aria-label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})} title={t("mailboxes.unreadTitle")}>
-            <Mail className="size-2.5" aria-hidden="true" />{summary.unread ?? "—"}
-          </span>
-          <span className="flex items-center gap-0.5" aria-label={t("mailboxes.assigned", {count: summary.assignedToMe})} title={t("mailboxes.assignedTitle")}>
-            <UserRound className="size-2.5" aria-hidden="true" />{summary.assignedToMe}
-          </span>
-          <span className="flex items-center gap-0.5" aria-label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} title={t("mailboxes.unassignedTitle")}>
-            <UsersRound className="size-2.5" aria-hidden="true" />{summary.unassignedOpen}
-          </span>
-          <span role="img" data-watcher-state={summary.watcher.state} aria-label={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})} title={t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)})}
-            className={cn("size-1.5 rounded-full", summary.watcher.state === "idling" ? "bg-emerald-500" :
-              summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
+        <SidebarMenuBadge className="right-1 w-auto min-w-0 gap-1.5 px-0.5 text-2xs">
+          <MailboxCount
+            label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})}
+            {...(showUnread && { title: t("mailboxes.unreadTitle"), icon: <Mail className="size-2.5" aria-hidden="true" />, value: summary.unread! })}
+          />
+          <MailboxCount
+            label={t("mailboxes.assigned", {count: summary.assignedToMe})}
+            {...(showAssigned && { title: t("mailboxes.assignedTitle"), icon: <UserRound className="size-2.5" aria-hidden="true" />, value: summary.assignedToMe })}
+          />
+          <MailboxCount label={t("mailboxes.unassigned", {count: summary.unassignedOpen})} />
+          {showWatcher ? (
+            <span role="img" data-watcher-state={summary.watcher.state} aria-label={watcherLabel} title={watcherLabel}
+              className={cn("size-1.5 rounded-full",
+                summary.watcher.state === "auth_failed" || summary.watcher.state === "backoff" ? "bg-amber-500" : "bg-muted-foreground/50")} />
+          ) : null}
         </SidebarMenuBadge>
       )}
     </SidebarMenuItem>

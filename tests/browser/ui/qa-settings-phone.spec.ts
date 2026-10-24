@@ -103,8 +103,7 @@ test("QA-215: the reader labels IMAP system flags in German", async ({ page }) =
   await page.goto("/");
   // A seed message that is already \\Seen (its row has no "Ungelesen" prefix).
   await page.getByRole("button", { name: /^Jona Testperson Vorsorge nach den Ferien/ }).first().click();
-  // The flag badges sit in the full message header.
-  await page.getByRole("radio", { name: "Vollständig", exact: true }).click();
+  // The flag badges sit in the header of the expanded message card.
   const badge = page.getByText("Gelesen", { exact: true }).first();
   await expect(badge).toBeVisible();
   await expect(page.getByText("Seen", { exact: true })).toHaveCount(0);
