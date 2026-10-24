@@ -539,8 +539,16 @@ function shouldSearchAttachmentFilenames(fields?: string[] | null) {
   return selected.includes("attachments");
 }
 
+// Control characters separate tokens. A NUL would end the FTS5 MATCH string ("unterminated string") and
+// truncate the LIKE patterns, which SQLite reads up to the first NUL (a widened match).
+function replaceSearchControlCharacters(value: string) {
+  return value.replace(/\p{Cc}/gu, " ");
+}
+
 function normalizeSearchTermList(values?: string[] | null) {
-  return Array.from(new Set((values ?? []).map((value) => value.trim()).filter(Boolean)));
+  return Array.from(
+    new Set((values ?? []).map((value) => replaceSearchControlCharacters(value).trim()).filter(Boolean))
+  );
 }
 
 // An array is one `me` token: OR within that identity set, AND between tokens.
@@ -617,9 +625,7 @@ function parseSearchInput(
   fields?: string[] | null,
   accountEmail?: OwnAddressInput
 ) {
-  // Control characters separate tokens. A NUL would end the FTS5 MATCH string ("unterminated string") and
-  // truncate the LIKE patterns, which SQLite reads up to the first NUL.
-  const input = (raw ?? "").replace(/\p{Cc}/gu, " ");
+  const input = replaceSearchControlCharacters(raw ?? "");
 
   // Extract "from:" terms and handle "from:me"
   const fromTerms: AddressSearchTerm[] = [];

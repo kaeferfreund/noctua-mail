@@ -933,6 +933,14 @@ class StatelessJsonResponseTransport implements Transport {
     if (parseErrors.length > 0 && parsedMessages.length === 0) {
       return { ok: false as const, responses: parseErrors };
     }
+    // Responses are matched to their requests by String(id): a repeated id (also 1 and "1") would never resolve.
+    const requestIds = parsedMessages.filter(isJSONRPCRequest).map((message) => String(message.id));
+    if (new Set(requestIds).size !== requestIds.length) {
+      return {
+        ok: false as const,
+        responses: [makeJsonRpcError(null, ErrorCode.InvalidRequest, "Invalid request: duplicate id in batch")]
+      };
+    }
 
     const responsePromises = parsedMessages
       .filter(isJSONRPCRequest)
