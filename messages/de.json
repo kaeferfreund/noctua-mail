@@ -694,6 +694,55 @@
       "openWindow": "In neuem Fenster öffnen",
       "openWindowLabel": "Kalender in neuem Fenster öffnen",
       "close": "Kalender schließen"
+    },
+    "grid": {
+      "timed": "Mit Uhrzeit"
+    },
+    "eventDialog": {
+      "newTitle": "Neuer Termin",
+      "editTitle": "Termin bearbeiten",
+      "titlePlaceholder": "Titel des Termins",
+      "titleRequired": "Bitte gib einen Titel ein.",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Beschreibung (optional)",
+      "saveFailed": "Der Termin konnte nicht gespeichert werden.",
+      "deleteFailed": "Der Termin konnte nicht gelöscht werden.",
+      "delete": "Löschen",
+      "cancel": "Abbrechen",
+      "saving": "Wird gespeichert …",
+      "save": "Speichern",
+      "create": "Erstellen"
+    },
+    "reminderDialog": {
+      "scheduleTitle": "Erinnerung planen",
+      "modifyTitle": "Erinnerung ändern",
+      "untitled": "Kalendertermin",
+      "current": "Aktuell: {unit, select, start {zu Beginn} day {{count, plural, one {# Tag} other {# Tage}} vorher} hour {{count, plural, one {# Stunde} other {# Stunden}} vorher} other {{count, plural, one {# Minute} other {# Minuten}} vorher}}",
+      "notifyMe": "Erinnere mich",
+      "lead": "{unit, select, start {Zu Beginn} day {{count, plural, one {# Tag} other {# Tage}} vorher} hour {{count, plural, one {# Stunde} other {# Stunden}} vorher} other {{count, plural, one {# Minute} other {# Minuten}} vorher}}",
+      "cancel": "Abbrechen",
+      "saving": "Wird gespeichert …",
+      "schedule": "Erinnerung planen",
+      "update": "Erinnerung aktualisieren"
+    },
+    "responseDialog": {
+      "title": "Auf Einladung antworten",
+      "untitled": "Termin ohne Titel",
+      "organizer": "Organisator: {organizer}",
+      "yourResponse": "Deine Antwort",
+      "accept": "Zusagen",
+      "tentative": "Mit Vorbehalt",
+      "decline": "Absagen",
+      "applyTo": "Gilt für",
+      "wholeSeries": "Ganze Serie",
+      "notifyOrganizer": "Organisator benachrichtigen",
+      "sendReply": "Antwort per E-Mail senden",
+      "replyNotRequested": "Der Organisator hat keine Antwort angefordert. Du kannst trotzdem eine senden.",
+      "sendReplyLabel": "Antwort an den Organisator senden",
+      "cancel": "Abbrechen",
+      "saving": "Wird gespeichert …",
+      "submitAndSend": "{status, select, ACCEPTED {Zusagen und Antwort senden} DECLINED {Absagen und Antwort senden} TENTATIVE {Mit Vorbehalt zusagen und Antwort senden} other {Antwort senden}}",
+      "submitWithoutSending": "{status, select, ACCEPTED {Zusagen, ohne Antwort zu senden} DECLINED {Absagen, ohne Antwort zu senden} TENTATIVE {Mit Vorbehalt zusagen, ohne Antwort zu senden} other {Speichern, ohne Antwort zu senden}}"
     }
   },
   "Search": {

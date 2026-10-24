@@ -279,8 +279,8 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     await page.screenshot({ animations: "disabled", path: `${artifacts}/calendar-${width}.png` });
     const add = surface.locator(".fc-addEvent-button");
     await add.click();
-    const create = page.getByRole("dialog", { name: "New Event", exact: true });
-    const title = create.getByPlaceholder("Event title", { exact: true });
+    const create = page.getByRole("dialog", { name: "Neuer Termin", exact: true });
+    const title = create.getByPlaceholder("Titel des Termins", { exact: true });
     await expect(title).toBeFocused();
     const surfaceLayer = await surface.evaluate(element => Number(getComputedStyle(element).zIndex));
     const dialogLayer = await create.locator("xpath=ancestor::*[contains(@class, 'rt-BaseDialogOverlay')]").evaluate(element => Number(getComputedStyle(element).zIndex));
@@ -295,16 +295,16 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
     expect(pickerLayer).toBeGreaterThan(dialogLayer);
     await page.keyboard.press("Escape");
     await page.screenshot({ animations: "disabled", path: `${artifacts}/calendar-create-${width}.png` });
-    await create.getByRole("button", { name: "Create", exact: true }).click();
+    await create.getByRole("button", { name: "Erstellen", exact: true }).click();
     await expect(create).toHaveCount(0);
     await expect(add).toBeFocused();
     await surface.locator(".fc-event-title").filter({ hasText: summary, hasNotText: "created" }).first().click();
     const editButton = surface.getByRole("button", { name: "Edit", exact: true });
     await editButton.click();
-    const edit = page.getByRole("dialog", { name: "Edit Event", exact: true });
-    await edit.getByPlaceholder("Event title", { exact: true }).click();
-    await edit.getByPlaceholder("Event title", { exact: true }).fill(`${summary} edited`);
-    await edit.getByRole("button", { name: "Save", exact: true }).click();
+    const edit = page.getByRole("dialog", { name: "Termin bearbeiten", exact: true });
+    await edit.getByPlaceholder("Titel des Termins", { exact: true }).click();
+    await edit.getByPlaceholder("Titel des Termins", { exact: true }).fill(`${summary} edited`);
+    await edit.getByRole("button", { name: "Speichern", exact: true }).click();
     await expect(edit).toHaveCount(0);
     await expect(editButton).toBeFocused();
     await expect(surface.getByRole("heading", { name: `${summary} edited`, exact: true })).toBeVisible();
@@ -425,8 +425,8 @@ for (const [width, height] of [[320, 568], [320, 500], [360, 640], [390, 844]]) 
     }
     const add = await reachable(sheet.locator(".fc-addEvent-button"));
     await page.mouse.click(add.x, add.y);
-    const create = page.getByRole("dialog", { name: "New Event", exact: true });
-    const title = create.getByPlaceholder("Event title", { exact: true });
+    const create = page.getByRole("dialog", { name: "Neuer Termin", exact: true });
+    const title = create.getByPlaceholder("Titel des Termins", { exact: true });
     await expect(title).toBeFocused();
     const titleBox = (await title.boundingBox())!;
     expect(await title.evaluate((element, { x, y }) => element.contains(document.elementFromPoint(x, y)),

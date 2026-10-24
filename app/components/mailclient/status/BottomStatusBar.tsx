@@ -12,7 +12,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/ui/pop
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/app/components/ui/dropdown-menu";
 import { Sheet, SheetContent } from "@/app/components/ui/sheet";
 import { StatusSheetTitle } from "@/app/components/shell/StatusPanelFrame";
-import calendarFrame from "@/app/components/calendar/CalendarPopover.module.css";
 import styles from "./BottomStatusBar.module.css";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
 import type { Account, AccountDateFormat, CalendarEvent, Folder } from "@/lib/data";
@@ -107,7 +106,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
       {openPanel === "calendar" ? t("reminder.title") : t("calendar")}
     </Button>
     </div>
-    {openPanel === "calendar" ? <div data-calendar-frame={isMobile ? "phone" : "popover"} className={isMobile ? mobileStyles.calendarBody : calendarFrame.body}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
+    {openPanel === "calendar" ? <div data-calendar-frame={isMobile ? "phone" : "popover"} className={isMobile ? mobileStyles.calendarBody : styles.calendarBody}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
       headingLevel={isMobile ? 3 : 4}
       onOpenMessage={props.onOpenCalendarMessage ? id => { props.onOpenCalendarMessage?.(id); close(); } : undefined}
       onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /></div> : null}

@@ -10,8 +10,8 @@
   min-height: 0;
 }
 
-/* FullCalendar's 100% height needs a bounded flex frame, just like the
-   floating calendar. Its shared body supplies flex: 1 and min-height: 0. */
+/* FullCalendar's 100% height needs a bounded flex frame; .calendarBody
+   supplies flex: 1 and min-height: 0. */
 .calendarOpen {
   height: min(660px, calc(100dvh - 24rem));
 }
@@ -21,4 +21,19 @@
     flex: 1;
     height: 100%;
   }
+}
+
+/* Desktop popover frame around the calendar; the phone Sheet uses
+   MobileFrames .calendarBody. */
+.calendarBody {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px 0;
+}
+
+.calendarBody * {
+  user-select: text;
 }

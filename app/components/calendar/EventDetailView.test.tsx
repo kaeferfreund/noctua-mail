@@ -1,8 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import type { ReactElement } from "react";
 import type { CalendarEvent } from "@/lib/data";
+import { I18nTestProvider } from "@/lib/i18n/testRender";
 import EventDetailView from "./EventDetailView";
+
+// The response and reminder dialogs read their copy from the catalog.
+const renderToStaticMarkup = (element: ReactElement) => renderMarkup(createElement(I18nTestProvider, null, element));
 
 function buildEventSnapshot(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
