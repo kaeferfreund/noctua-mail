@@ -8,6 +8,7 @@ import {
   recordDraftTombstone
 } from "@/lib/db";
 import { deleteImapMessage } from "@/lib/mail/imap";
+import { DraftSendError, releaseScheduleForDraftChange } from "@/lib/drafts";
 import { deleteMessageFiles } from "@/lib/storage";
 import {
   getAccountIdFromParams,
@@ -37,6 +38,13 @@ export async function POST(request: Request, { params }: Params) {
     const message = await getMessageById(accountId, draftId);
     if (!message) {
       return NextResponse.json({ ok: false, message: "Draft not found" }, { status: 404 });
+    }
+    // Discarding (also the cleanup after a compose send) closes the draft's schedule first.
+    try {
+      await releaseScheduleForDraftChange(accountId, message.id, "discarded");
+    } catch (error) {
+      if (error instanceof DraftSendError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
+      throw error;
     }
     // Tombstone first so the draft can't be resurrected by a sync even if the
     // IMAP delete below fails or races an in-flight APPEND (the original

@@ -864,6 +864,27 @@ export function initMasterSchema(db: any) {
       failures INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(userId);
+
+    -- Scheduled sends of saved drafts (doc/SCHEDULED-SEND.md). sendAt/nextAttemptAt are UTC epoch ms;
+    -- leaseOwner is the claiming process (pid:uuid) while status='sending'; lastError is a reason code.
+    CREATE TABLE IF NOT EXISTS scheduled_sends (
+      id TEXT PRIMARY KEY,
+      accountId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      draftId TEXT NOT NULL,
+      sendAt INTEGER NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('queued','sending','sent','failed','cancelled')),
+      attempts INTEGER NOT NULL DEFAULT 0,
+      nextAttemptAt INTEGER NOT NULL,
+      lastError TEXT,
+      leaseOwner TEXT,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scheduled_sends_due ON scheduled_sends(status, nextAttemptAt);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_sends_draft ON scheduled_sends(accountId, draftId);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_sends_active_draft
+      ON scheduled_sends(accountId, draftId) WHERE status IN ('queued','sending');
   `);
 
   db.prepare(

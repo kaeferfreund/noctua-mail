@@ -47,6 +47,7 @@ import {
   buildDraftSendEnvelopeRecipients,
   draftHasSendableRecipients
 } from "@/lib/draftSendEnvelope";
+import { releaseDraftSchedules, ScheduledSendBusyError, type ScheduledSendReason } from "./db/scheduledSends";
 
 export type DraftAttachmentInput = {
   filename: string;
@@ -121,6 +122,19 @@ export class DraftSendError extends Error {
 }
 
 export type SendDraftResult = SentCopyResult & { identityId: string };
+
+/** Closes the open schedule of a draft before a manual change; 409 while it is being sent. */
+export async function releaseScheduleForDraftChange(
+  accountId: string, draftId: string, reason: ScheduledSendReason,
+  ErrorType: typeof DraftSaveError | typeof DraftSendError = DraftSendError
+) {
+  try {
+    await releaseDraftSchedules(accountId, draftId, reason);
+  } catch (error) {
+    if (error instanceof ScheduledSendBusyError) throw new ErrorType(409, "This draft is being sent by its schedule right now.");
+    throw error;
+  }
+}
 
 function getReplyRecipient(ownAddresses: readonly string[], message: Message) {
   const sentByCurrentUser = isOwnAddress(message.from, ownAddresses);
@@ -428,6 +442,8 @@ export async function saveDraftForAccount(params: {
   const authorization = await beforeWrite?.();
   const assertCurrent = authorization ? await prepareOutboundAssertion(authorization) : () => {};
   assertCurrent();
+  // Editing a planned draft cancels its schedule; a schedule that is sending right now wins.
+  if (existingDraft) await releaseScheduleForDraftChange(accountId, existingDraft.id, "edited", DraftSaveError);
   const uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
   if (!uid) {
     throw new DraftSaveError(502, "Failed to save draft to IMAP server");
@@ -477,41 +493,10 @@ export async function saveDraftForAccount(params: {
 }
 
 /**
- * Send a previously-saved draft without re-opening it in compose.
- *
- * The draft is relayed from its stored raw MIME source, which helps
- * preserve the drafted MIME structure and headers — attachments,
- * `Content-ID`s, the compose-invite header, and the original
- * `Message-ID` — as stored with the draft. The cached source in this
- * path is a UTF-8 string, so this preserves headers and structure
- * without promising byte-for-byte preservation; the `latin1` round-trip
- * inside `stripBccHeader` only matters when a caller hands us a
- * `Buffer` containing binary bytes, which isn't the case here. The
- * SMTP envelope is built from the draft's parsed `to`/`cc`/`bcc` —
- * we don't re-parse the raw blob for recipients.
- *
- * Two header-level edits happen before relay:
- *   1. `stripBccHeader` — the local draft is saved with
- *      `keepBcc: true`, but the wire copy must not carry `Bcc:` or
- *      blind-carbon addresses would leak to every To/Cc recipient.
- *   2. `injectUndisclosedRecipientsToHeader` — for BCC-only drafts
- *      (no To, no Cc), insert `To: undisclosed-recipients:;` so the
- *      wire copy has a recipient header. Mirrors the `outboundTo`
- *      fallback in `/api/accounts/[accountId]/smtp/send`.
- *
- * On success the draft is removed from both the IMAP Drafts mailbox
- * and the local message store, and a copy is appended to the Sent
- * folder. The result distinguishes delivery from Sent-copy failure.
+ * The send preconditions of a stored draft, shared by `sendDraftForAccount` and the
+ * scheduled-send preflight so a planned send is rejected for the same reasons as a send.
  */
-export async function sendDraftForAccount(params: {
-  account: Account;
-  accountId: string;
-  clientId: string;
-  draftId: string;
-  actor: CollabActor;
-  authorization?: OutboundAuthorization;
-}): Promise<SendDraftResult> {
-  const { account, accountId, clientId, draftId } = params;
+export async function loadSendableDraft(accountId: string, draftId: string) {
   const draft = await getMessageById(accountId, draftId);
   if (!draft) {
     throw new DraftSendError(404, "Draft not found");
@@ -554,6 +539,49 @@ export async function sendDraftForAccount(params: {
     );
   }
 
+  const messageId = draft.messageId?.trim() || rawSource.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim();
+  if (!messageId) throw new DraftSendError(409, "Draft has no Message-ID. Open it in compose and save it again.");
+  const identity = await validateDraftIdentity(rawSource, draft, await listSenderIdentities(accountId));
+  return { draft, rawSource, messageId, identity };
+}
+
+/**
+ * Send a previously-saved draft without re-opening it in compose.
+ *
+ * The draft is relayed from its stored raw MIME source, which helps
+ * preserve the drafted MIME structure and headers — attachments,
+ * `Content-ID`s, the compose-invite header, and the original
+ * `Message-ID` — as stored with the draft. The cached source in this
+ * path is a UTF-8 string, so this preserves headers and structure
+ * without promising byte-for-byte preservation; the `latin1` round-trip
+ * inside `stripBccHeader` only matters when a caller hands us a
+ * `Buffer` containing binary bytes, which isn't the case here. The
+ * SMTP envelope is built from the draft's parsed `to`/`cc`/`bcc` —
+ * we don't re-parse the raw blob for recipients.
+ *
+ * Two header-level edits happen before relay:
+ *   1. `stripBccHeader` — the local draft is saved with
+ *      `keepBcc: true`, but the wire copy must not carry `Bcc:` or
+ *      blind-carbon addresses would leak to every To/Cc recipient.
+ *   2. `injectUndisclosedRecipientsToHeader` — for BCC-only drafts
+ *      (no To, no Cc), insert `To: undisclosed-recipients:;` so the
+ *      wire copy has a recipient header. Mirrors the `outboundTo`
+ *      fallback in `/api/accounts/[accountId]/smtp/send`.
+ *
+ * On success the draft is removed from both the IMAP Drafts mailbox
+ * and the local message store, and a copy is appended to the Sent
+ * folder. The result distinguishes delivery from Sent-copy failure.
+ */
+export async function sendDraftForAccount(params: {
+  account: Account;
+  accountId: string;
+  clientId: string;
+  draftId: string;
+  actor: CollabActor;
+  authorization?: OutboundAuthorization;
+}): Promise<SendDraftResult> {
+  const { account, accountId, clientId, draftId } = params;
+  const { draft, rawSource, messageId, identity } = await loadSendableDraft(accountId, draftId);
   // Prepare the wire copy:
   //   - `stripBccHeader` removes the `Bcc:` header that's in the cached
   //     draft (saved with `keepBcc: true`). Relaying that unchanged would
@@ -567,9 +595,6 @@ export async function sendDraftForAccount(params: {
   // The envelope recipients we build from the draft's parsed fields
   // still include Bcc addresses, so they receive the message — they
   // just don't appear in the message's own headers.
-  const messageId = draft.messageId?.trim() || rawSource.match(/^Message-ID:\s*(.+)$/im)?.[1]?.trim();
-  if (!messageId) throw new DraftSendError(409, "Draft has no Message-ID. Open it in compose and save it again.");
-  const identity = await validateDraftIdentity(rawSource, draft, await listSenderIdentities(accountId));
   const sentSource = injectUndisclosedRecipientsToHeader(stripIdentityHeader(rawSource));
   const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);

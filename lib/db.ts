@@ -463,3 +463,12 @@ export {
   saveSpamSettings,
   saveSpamVerdict
 } from "./db/spam";
+export {
+  cancelScheduledSend,
+  claimDueScheduledSends,
+  createScheduledSend,
+  getScheduledSend,
+  listScheduledSends,
+  ScheduledSendBusyError
+} from "./db/scheduledSends";
+export type { ScheduledSend, ScheduledSendReason, ScheduledSendStatus } from "./db/scheduledSends";

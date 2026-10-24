@@ -5,7 +5,7 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { DraftSendError, sendDraftForAccount } from "@/lib/drafts";
+import { DraftSendError, releaseScheduleForDraftChange, sendDraftForAccount } from "@/lib/drafts";
 import {
   getAccountIdFromParams,
   type AccountRouteParams
@@ -45,6 +45,8 @@ export async function POST(request: Request, { params }: Params) {
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
 
     try {
+      // "Jetzt senden" on a planned draft: the manual send replaces the schedule (409 while it is sending).
+      await releaseScheduleForDraftChange(resolvedAccountId, draftId, "sent_now");
       const result = await sendDraftForAccount({
         account,
         authorization: { request },
