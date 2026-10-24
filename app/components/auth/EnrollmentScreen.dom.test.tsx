@@ -32,7 +32,7 @@ describe("EnrollmentScreen", () => {
     expect(view.queryByLabelText("Setup secret")).toBeNull();
     fireEvent.click(view.getByText("I saved my backup codes"));
     expect(view.queryByText("synthetic-code-a")).toBeNull();
-    fireEvent.click(view.getByText("Continue to Noctua"));
+    fireEvent.click(view.getByText("Continue to Mail"));
     await waitFor(() => expect(done).toBe(1));
     expect(calls.filter(call => call.path.endsWith("/reauth"))).toHaveLength(2);
     const verification = calls.find(call => call.path.endsWith("verify-totp"))!;

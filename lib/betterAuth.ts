@@ -15,6 +15,7 @@ import { currentAuthProof } from "./authPolicyContext";
 import { revokeAuthStreams } from "./authStreams";
 import { handOverResetLink } from "./authRecoveryContext";
 import { withDbWriteRetry } from "./dbWriteRetry";
+import { BASE_APP_TITLE } from "./appBranding";
 import { recordAdminAuditRow } from "./db/adminAudit";
 import type { Database } from "bun:sqlite";
 
@@ -77,7 +78,8 @@ const adminWithoutImpersonation = defaultAc.newRole({
  */
 export function noctuaAuthOptions(config: NoctuaAuthConfig) {
   const twoFactorPlugin = twoFactor({
-    issuer: "Noctua",
+    // Label of the entry in authenticator apps; existing entries keep theirs.
+    issuer: BASE_APP_TITLE,
     // Passwordless migration requires the Noctua proof wrappers (Slice 4).
     // This library option alone never establishes session MFA assurance.
     allowPasswordless: true,
@@ -88,7 +90,7 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
     throw new Error("Pinned Better Auth twoFactor bridge changed; IMAP login disabled pending review");
   }
   return {
-    appName: "Noctua",
+    appName: BASE_APP_TITLE,
     baseURL: config.baseURL,
     basePath: AUTH_BASE_PATH,
     trustedOrigins: config.trustedOrigins ?? [config.baseURL],
@@ -163,7 +165,7 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
       } }),
       passkey({
         rpID: config.passkeyRpID ?? new URL(config.baseURL).hostname,
-        rpName: "Noctua",
+        rpName: BASE_APP_TITLE,
         origin: config.baseURL,
         authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
         registration: {
