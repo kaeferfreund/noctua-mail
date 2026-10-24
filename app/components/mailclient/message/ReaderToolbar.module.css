@@ -3,7 +3,7 @@
 .actions, .navigation { display: flex; align-items: center; gap: 12px; }
 .navigation { margin-left: auto; }
 .counter { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.expand { width: auto; padding: 0 6px; gap: 6px; margin-left: auto; white-space: nowrap; }
+.expand { margin-left: auto; }
 .root[data-focus="true"] .expand { margin-left: 0; }
 .hint { display: flex; align-items: center; gap: 8px; color: var(--gray-11); font-size: 11px; min-width: 0; }
 .hint > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
