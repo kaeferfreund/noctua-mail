@@ -184,6 +184,7 @@ import {
 } from "@/lib/accountApiPaths";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
+import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
 import {
   formatMailboxPageTitle,
   formatMessageHtmlPageTitle,
@@ -2866,6 +2867,12 @@ export default function MailClient({
     }
   });
   const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
+  // The summary feed is the user-wide unread source; it is empty while it
+  // (re)connects, so only a sign-out clears the app icon badge.
+  useEffect(() => {
+    if (authState === "unauth") setAppBadge(0);
+    else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries));
+  }, [authState, mailboxSummaries]);
   const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;
@@ -5698,6 +5705,7 @@ export default function MailClient({
       {manageOpen && editingAccount && (
         <UrlHistoryContext.Provider value={true}><AccountSettingsModal
           editingAccount={editingAccount}
+          accounts={accounts}
           isOpen={manageOpen}
           manageTab={manageTab}
           isExistingAccount={isExistingAccount}
