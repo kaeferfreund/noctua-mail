@@ -1,5 +1,5 @@
 import { ACCOUNT_KEY_TABLE_SQL, ensureAccountKeySchema } from "./accountKeys";
-import { assertCompleteShardFormat, assertSupportedShardFormat, prepareAccountShardConnection } from "./shardFormat";
+import { assertCompleteShardFormat, assertSupportedShardFormat, installShardWriterGuards, prepareAccountShardConnection, SHARD_FORMAT_VERSION } from "./shardFormat";
 import { ownAddressList, type OwnAddressInput } from "../ownAddresses";
 import { seedSenderIdentityRow } from "./senderIdentities";
 import { randomUUID } from "crypto";
@@ -840,6 +840,14 @@ export function initMasterSchema(db: any) {
       payload TEXT,
       createdAt INTEGER NOT NULL
     );
+
+    -- Spam detection settings (doc/SPAM-DETECTION.md): scope 'global' or an account id.
+    CREATE TABLE IF NOT EXISTS spam_settings (
+      scope TEXT PRIMARY KEY,
+      settings TEXT NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      updatedByUserId TEXT
+    );
   `);
 
   db.prepare(
@@ -1003,6 +1011,7 @@ export function initAccountSchema(db: any) {
     }).immediate();
     threadCollabSchemaByDb.add(db);
     senderIdentityMessageSchemaByDb.add(db);
+    spamSchemaByDb.add(db);
     if (result.droppedFtsOrphans) console.warn(`[shard-format-v3] dropped ${result.droppedFtsOrphans} orphan FTS rows`);
     return result;
   } finally {
@@ -1330,6 +1339,7 @@ function initAccountSchemaBody(db: any, inTransaction: boolean) {
   `);
 
   ensureSenderIdentityMessageRuntimeSchema(db, inTransaction);
+  ensureSpamRuntimeSchema(db, inTransaction);
 
   // Lightweight schema migration for existing account DBs.
   const messageColumns = new Set(
@@ -1488,4 +1498,56 @@ export function ensureSenderIdentityMessageRuntimeSchema(db: any, inTransaction 
     else db.transaction(install).immediate();
   }
   if (!inTransaction) senderIdentityMessageSchemaByDb.add(db);
+}
+
+const SPAM_MESSAGE_COLUMNS: Array<[string, string]> = [
+  ["spamVerdict", "TEXT"], ["spamConfidence", "REAL"], ["spamReasons", "TEXT"], ["spamCheckedAt", "INTEGER"]
+];
+const spamSchemaByDb = new WeakSet<object>();
+/**
+ * Additive spam-detection schema (doc/SPAM-DETECTION.md): nullable verdict
+ * columns on messages plus the account-scoped `spam_examples` table. On a v3
+ * shard the new table gets its writer guards in the same immediate
+ * transaction, so the shard never looks incomplete to another connection.
+ */
+export function ensureSpamRuntimeSchema(db: any, inTransaction = false) {
+  if (spamSchemaByDb.has(db)) return;
+  // Cold readers of migrated shards must never acquire a writer lock.
+  const installed = () => {
+    const columns = getDbTableColumns(db, "messages");
+    return SPAM_MESSAGE_COLUMNS.every(([name]) => columns.has(name)) && getDbTableColumns(db, "spam_examples").size > 0
+      && !!db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_messages_account_spam'`).get();
+  };
+  if (!installed()) {
+    const install = () => {
+      if (installed()) return;
+      ensureTableColumns(db, "messages", SPAM_MESSAGE_COLUMNS);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS spam_examples (
+          id TEXT PRIMARY KEY,
+          accountId TEXT NOT NULL,
+          messageId TEXT,
+          senderEmail TEXT,
+          senderDomain TEXT,
+          subject TEXT NOT NULL,
+          snippet TEXT NOT NULL,
+          label TEXT NOT NULL,
+          source TEXT NOT NULL,
+          decidedByUserId TEXT,
+          createdAt INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_spam_examples_sender ON spam_examples(accountId, senderEmail, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_spam_examples_domain ON spam_examples(accountId, senderDomain, createdAt DESC);
+        CREATE INDEX IF NOT EXISTS idx_spam_examples_created ON spam_examples(accountId, createdAt DESC);
+        -- Partial: only checked rows, so it stays tiny and builds instantly on large shards.
+        CREATE INDEX IF NOT EXISTS idx_messages_account_spam ON messages(accountId, spamVerdict)
+          WHERE spamVerdict IS NOT NULL;
+      `);
+      // Older shards get their guards from the v3 migration that follows.
+      if (assertSupportedShardFormat(db) === SHARD_FORMAT_VERSION) installShardWriterGuards(db);
+    };
+    if (inTransaction) install();
+    else db.transaction(install).immediate();
+  }
+  if (!inTransaction) spamSchemaByDb.add(db);
 }

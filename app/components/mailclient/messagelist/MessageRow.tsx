@@ -15,6 +15,7 @@ import commonStyles from "./MessageListCommon.module.css";
 import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./messageDateDisplay";
 import styles from "./MessageRow.module.css";
 import CategoryBadge from "../CategoryBadge";
+import SpamBadge from "../SpamBadge";
 import TopicBadge from "../TopicBadge";
 import FlagBadge from "../message/FlagBadge";
 import MessageBadge from "../message/MessageBadge";
@@ -527,6 +528,7 @@ function MessageRow({
               : message.category && (
                   <CategoryBadge category={message.category as any} showText={false} />
                 )}
+            <SpamBadge message={message} />
             {messageTopics && messageTopics.map((topic) => (
               <TopicBadge key={topic.id} topic={topic} showText size="1" preferShortName />
             ))}
