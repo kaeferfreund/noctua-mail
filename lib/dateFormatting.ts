@@ -1,4 +1,4 @@
-import { formatDate as formatUiDate } from "./i18n/format";
+import { displayDayNumber, formatDate as formatUiDate, formatTime as formatUiTime } from "./i18n/format";
 import { formattingLocales, timeZone, type UiLocale } from "./i18n/config";
 import type { AccountDateFormat } from "./data";
 
@@ -62,6 +62,12 @@ const FORMAT_LOCALE_BY_PRESET: Record<Exclude<AccountDateFormat, "locale" | "ymd
 type DateDisplay = {
   text: string;
   tooltip: string;
+};
+
+/** Translated day words that replace the date part for today and yesterday. */
+export type RelativeDayLabels = {
+  today: string;
+  yesterday: string;
 };
 
 const formatterCache = new Map<string, Intl.DateTimeFormat | null>();
@@ -157,22 +163,33 @@ export function formatAccountDateValue(
   return formatDate(parsedDate, format, includeSeconds);
 }
 
+/**
+ * List/reader date label. With `relativeDays`, a timestamp on today's or
+ * yesterday's calendar day in the display zone shows the day word plus the
+ * time ("Heute, 14:32"); the tooltip always keeps the full date.
+ */
 export function getMessageDateDisplay(
   dateValue: number,
   fallbackDate: string,
   preferredFormat?: AccountDateFormat,
-  locale?: UiLocale
+  locale?: UiLocale,
+  relativeDays?: { labels: RelativeDayLabels; nowMs?: number }
 ): DateDisplay {
   if (locale && Number.isFinite(dateValue)) {
     const date = new Date(dateValue);
     if (Number.isNaN(date.getTime())) return { text: fallbackDate, tooltip: fallbackDate };
-    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone, hourCycle: "h23" };
-    const render = (seconds: boolean) => {
-      const opts = { ...options, ...(seconds ? { second: "2-digit" as const } : {}) };
-      if (!preferredFormat || preferredFormat === "locale") return formatUiDate(date, locale, opts);
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", timeZone, hourCycle: "h23" };
+    const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit", ...timeOptions };
+    const render = (opts: Intl.DateTimeFormatOptions, timeOnly = false) => {
+      if (!preferredFormat || preferredFormat === "locale") {
+        return timeOnly ? formatUiTime(date, locale, opts) : formatUiDate(date, locale, opts);
+      }
       return formatAccountIntl(date, preferredFormat, { ...opts, ...(preferredFormat === "mdy" ? { hour12: true } : {}) }, locale);
     };
-    return { text: render(false), tooltip: render(true) };
+    const tooltip = render({ ...options, second: "2-digit" });
+    const dayWord = relativeDays ? relativeDayLabel(dateValue, relativeDays.labels, relativeDays.nowMs) : null;
+    if (dayWord) return { text: `${dayWord}, ${render(timeOptions, true)}`, tooltip };
+    return { text: render(options), tooltip };
   }
   const text = formatAccountDateValue(dateValue, preferredFormat, false);
   const tooltip = formatAccountDateValue(dateValue, preferredFormat, true);
@@ -183,6 +200,14 @@ export function getMessageDateDisplay(
     text,
     tooltip
   };
+}
+
+function relativeDayLabel(dateValue: number, labels: RelativeDayLabels, nowMs = Date.now()): string | null {
+  if (!Number.isFinite(nowMs)) return null;
+  const dayOffset = displayDayNumber(nowMs) - displayDayNumber(dateValue);
+  if (dayOffset === 0) return labels.today;
+  if (dayOffset === 1) return labels.yesterday;
+  return null;
 }
 
 export function formatMessageDate(

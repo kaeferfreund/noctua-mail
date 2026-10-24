@@ -23,7 +23,7 @@ import {
   hasTodoFlag,
   hasDoneFlag
 } from "../utils/messageHelpers";
-import { getMessageListDateDisplay } from "./messageDateDisplay";
+import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./messageDateDisplay";
 import { useSelectionSnapshot } from "./selectionStore";
 import ThreadMarkers from "./ThreadMarkers";
 import MessageListRenderer from "./MessageListRenderer";
@@ -55,6 +55,7 @@ export default function MessageThreadList({
 }: MessageThreadListProps) {
   const locale = useLocale();
   const t = useTranslations("List");
+  const relativeDayLabels = useMessageListRelativeDayLabels();
   const {
     groupedMessages,
     collapsedGroups,
@@ -200,7 +201,7 @@ export default function MessageThreadList({
         const dateDisplay = getMessageListDateDisplay(
           item.displayDateValue,
           item.displayDate,
-          dateFormat, locale
+          dateFormat, locale, relativeDayLabels
         );
         const isDragging = draggingMessageIds.has(message.id);
         const isActive = message.id === activeMessageId;
