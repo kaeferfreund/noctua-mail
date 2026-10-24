@@ -44,7 +44,7 @@ export default function ReaderToolbar(props: Props) {
         </div>
       </> : null}
       <TooltipIconButton size="2" variant="ghost" color="gray" className={styles.expand} aria-label={t(focus ? "focus.showList" : "focus.expand")} tooltip={`${t(focus ? "focus.showList" : "focus.expand")} (Shift+Enter)`} aria-keyshortcuts="Shift+Enter" onClick={props.toggleLayout}>
-        {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}<span>{t(focus ? "focus.showList" : "focus.expand")}</span>
+        {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
       </TooltipIconButton>
     </div>
     {!focus && props.showHint ? <div className={styles.hint}>
