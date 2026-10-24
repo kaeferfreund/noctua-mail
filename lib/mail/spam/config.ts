@@ -8,6 +8,15 @@ export const DEFAULT_SPAM_PROVIDER = "anthropic";
 export const DEFAULT_SPAM_MODEL = "claude-haiku-5-5";
 export const DEFAULT_SPAM_THRESHOLD = 0.85;
 
+/**
+ * List prices in USD per million tokens, for cost estimates only (scripts/spam-eval.ts).
+ * `cacheWrite` is the 1-hour TTL price, the TTL the classifier's cached prefix uses.
+ */
+export type SpamModelPrice = { input: number; output: number; cacheRead: number; cacheWrite: number };
+export const SPAM_MODEL_PRICES: Record<string, SpamModelPrice> = {
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.2 }
+};
+
 export type SpamAdminSettings = { enabled?: boolean; model?: string; threshold?: number };
 export type SpamMailboxSettings = { enabled?: boolean; autoMove?: boolean; threshold?: number };
 

@@ -36,6 +36,9 @@ const RULE_TYPES = new Set<StaticRuleType>(["address", "domain", "name", "subjec
 const BUILTIN = "builtin:";
 const MAX_HINTS = 8;
 
+/** A `builtin:*` feature instead of a literal rule value. */
+export const isBuiltinRule = (rule: StaticRule) => rule.value.startsWith(BUILTIN);
+
 export function staticRulesPath(env: Record<string, string | undefined> = process.env) {
   return env.NOCTUA_SPAM_RULES_FILE?.trim() || path.join(getDataDir(), "spam-static-rules.json");
 }
@@ -146,7 +149,7 @@ function knownNameFromUnknownAddress(rules: StaticRules, input: SpamInput) {
 }
 
 function matches(rule: StaticRule, input: SpamInput, rules: StaticRules): boolean {
-  if (rule.value.startsWith(BUILTIN)) return matchesBuiltin(rule, input, rules);
+  if (isBuiltinRule(rule)) return matchesBuiltin(rule, input, rules);
   const value = lower(rule.value);
   switch (rule.type) {
     case "address":
@@ -182,7 +185,7 @@ function describe(rule: StaticRule) {
   const counted = rule.spamHits !== undefined || rule.hamHits !== undefined;
   // Rules seen at least as often in good mail as in spam are weak signals.
   const label = counted && ham >= spam ? "Schwacher Hinweis" : "Hinweis";
-  const what = rule.value.startsWith(BUILTIN) ? rule.note ?? rule.value : `${rule.type} „${rule.value}“${rule.note ? ` (${rule.note})` : ""}`;
+  const what = isBuiltinRule(rule) ? rule.note ?? rule.value : `${rule.type} „${rule.value}“${rule.note ? ` (${rule.note})` : ""}`;
   return `${label}: ${what}${counted ? ` – bisher ${spam}× Spam, ${ham}× kein Spam` : ""}`;
 }
 
