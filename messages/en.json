@@ -358,6 +358,7 @@
       "noDevices": "No devices registered yet.",
       "currentDevice": "This device",
       "unknownDevice": "Unknown device",
+      "unknownSender": "Unknown",
       "lastSeen": "Last active: {date}",
       "showSettings": "Settings",
       "hideSettings": "Hide settings",
@@ -376,7 +377,8 @@
       "quietHours": "Quiet hours",
       "quietFrom": "From",
       "quietTo": "To",
-      "quietHelp": "Time zone: {zone}"
+      "quietHelp": "Time zone: {zone}",
+      "quietSameTime": "The quiet hours must start and end at different times."
     },
     "signatures": {
       "listTitle": "Signature list",
@@ -694,6 +696,55 @@
       "openWindow": "Open in window",
       "openWindowLabel": "Open calendar in window",
       "close": "Close calendar"
+    },
+    "grid": {
+      "timed": "Timed"
+    },
+    "eventDialog": {
+      "newTitle": "New Event",
+      "editTitle": "Edit Event",
+      "titlePlaceholder": "Event title",
+      "titleRequired": "Title is required.",
+      "description": "Description",
+      "descriptionPlaceholder": "Description (optional)",
+      "saveFailed": "Failed to save event.",
+      "deleteFailed": "Failed to delete event.",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save",
+      "create": "Create"
+    },
+    "reminderDialog": {
+      "scheduleTitle": "Schedule Reminder",
+      "modifyTitle": "Modify Reminder",
+      "untitled": "Calendar event",
+      "current": "Current: {unit, select, start {at start} day {{count, plural, one {# day} other {# days}} before} hour {{count, plural, one {# hour} other {# hours}} before} other {{count, plural, one {# minute} other {# minutes}} before}}",
+      "notifyMe": "Notify me",
+      "lead": "{unit, select, start {At start} day {{count, plural, one {# day} other {# days}} before} hour {{count, plural, one {# hour} other {# hours}} before} other {{count, plural, one {# minute} other {# minutes}} before}}",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "schedule": "Schedule reminder",
+      "update": "Update reminder"
+    },
+    "responseDialog": {
+      "title": "Respond to invitation",
+      "untitled": "Untitled Event",
+      "organizer": "Organizer: {organizer}",
+      "yourResponse": "Your response",
+      "accept": "Accept",
+      "tentative": "Tentative",
+      "decline": "Decline",
+      "applyTo": "Apply to",
+      "wholeSeries": "Whole series",
+      "notifyOrganizer": "Notify organizer",
+      "sendReply": "Send reply email",
+      "replyNotRequested": "The organizer did not request a reply. You can still send one.",
+      "sendReplyLabel": "Send reply to organizer",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "submitAndSend": "{status, select, ACCEPTED {Accept and send response} DECLINED {Decline and send response} TENTATIVE {Mark tentative and send response} other {Respond and send response}}",
+      "submitWithoutSending": "{status, select, ACCEPTED {Accept and save without sending response} DECLINED {Decline and save without sending response} TENTATIVE {Mark tentative and save without sending response} other {Respond and save without sending response}}"
     }
   },
   "Search": {

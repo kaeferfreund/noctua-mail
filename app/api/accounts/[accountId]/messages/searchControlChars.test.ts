@@ -5,7 +5,7 @@ import { dbModulePromise } from "@/lib/testDbHarness";
 
 // Security recheck N2: a NUL byte (or another control character) in the search query reached the FTS5 MATCH
 // string and failed with "unterminated string" (unhandled 500). Control characters separate search tokens.
-const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
+const { listMessages, listThreads, saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
 const { GET: threads } = await import("@/app/api/accounts/[accountId]/threads/route");
 const { GET: messages } = await import("@/app/api/accounts/[accountId]/messages/route");
 
@@ -45,5 +45,21 @@ describe("search query with control characters", () => {
       expect((await list(route, name, "alpha\u0000needle")).ids).toEqual([`${accountId}-message-0`]);
       expect((await list(route, name, "beta\u0000needle")).ids).toEqual([]);
     });
+  }
+
+  // The address lists (`from`/`recipients`/`participants`, from the MCP search tool) go straight into LIKE: a NUL
+  // ends the pattern early, so "\u0000nomatch" read as "%" and matched every message.
+  for (const [name, run] of [
+    ["messages", (filters: Record<string, string[]>) => listMessages({ accountId, folderId: folder.id, page: 1, pageSize: 50, ...filters })],
+    ["threads", (filters: Record<string, string[]>) => listThreads({ accountId, folderId: folder.id, page: 1, pageSize: 50, ...filters })]
+  ] as const) {
+    for (const key of ["from", "recipients", "participants"]) {
+      test(`${name}: control characters in ${key} act as spaces`, async () => {
+        const ids = async (values: string[]) => (await run({ [key]: values })).items.map(item => item.id).sort();
+        expect(await ids(["\u0000nomatch"])).toEqual([]);
+        expect(await ids(["example\u0001\u007f"])).toEqual(await ids(["example"]));
+        expect((await ids(["example"])).length).toBe(2);
+      });
+    }
   }
 });

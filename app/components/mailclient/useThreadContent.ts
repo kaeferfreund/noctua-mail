@@ -54,13 +54,15 @@ export type ThreadReadRequest = {
   windowed: boolean;
   messageIds: string[];
   excludeFolderIds: string[];
+  /** Only rows of this folder in a windowed read (a conversation read in trash or spam). */
+  folderId?: string | null;
   groupBy: string;
   threadDateSource: string;
 };
 
 export type ThreadPageRequest = Pick<
   ThreadReadRequest,
-  "threadId" | "excludeFolderIds" | "groupBy" | "threadDateSource"
+  "threadId" | "excludeFolderIds" | "folderId" | "groupBy" | "threadDateSource"
 > & { direction: "older" | "newer" };
 
 const bodyCacheKey = (message: Pick<Message, "accountId" | "id">) =>
@@ -646,7 +648,9 @@ export function useThreadContent({
               threadDateSource: request.threadDateSource,
               projection: "headers",
               excludeFolderIds: request.excludeFolderIds,
-              ...(request.windowed ? { window: { anchorMessageId: request.anchorMessageId } } : {})
+              ...(request.windowed
+                ? { window: { anchorMessageId: request.anchorMessageId, ...(request.folderId ? { folderId: request.folderId } : {}) } }
+                : {})
             }),
             signal: controller.signal
           });
@@ -733,7 +737,7 @@ export function useThreadContent({
             threadDateSource: request.threadDateSource,
             projection: "headers",
             excludeFolderIds: request.excludeFolderIds,
-            window: { cursor }
+            window: { cursor, ...(request.folderId ? { folderId: request.folderId } : {}) }
           }),
           signal: controller.signal
         });

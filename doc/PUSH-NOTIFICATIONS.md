@@ -41,7 +41,7 @@ JSON, at most 16 KB.
 | `PUT /api/push/subscriptions/:id` | `{ settings }` | `{ ok, settings }` |
 | `DELETE /api/push/subscriptions/:id` | – | `{ ok }` |
 | `DELETE /api/push/subscriptions` | `{ endpoint }` | `{ ok }`, the caller's own endpoint (after `unsubscribe()`) |
-| `POST /api/push/test` | `{ id? }` | `{ ok, sent, failed }`: a `test` push to that device or to all own devices |
+| `POST /api/push/test` | `{ id? }` | `{ ok, sent, failed }`: a `test` push to that device or to all own devices; one call per user every 10 s, else 429 with `Retry-After` |
 
 Errors: 400 invalid body, 401 not signed in, 403 foreign origin, 404 unknown
 id or not one's own, 413 body too large, 503 push off.
@@ -49,24 +49,31 @@ id or not one's own, 413 body too large, 503 push off.
 Rules of `POST /api/push/subscriptions`:
 
 - The endpoint must be `https:` on a browser push service:
-  `*.googleapis.com` (Chrome, Edge, Android), `*.push.services.mozilla.com`
-  (Firefox), `*.push.apple.com` (Safari, iOS), `*.notify.windows.com`
-  (legacy Edge). Anything else is rejected, because the server sends requests
-  to that URL (SSRF guard). `keys.p256dh` must be a 65-byte P-256 point and
-  `keys.auth` 16 bytes, both base64url.
+  `fcm.googleapis.com` (Chrome, Edge, Android),
+  `updates.push.services.mozilla.com` (Firefox), `web.push.apple.com`
+  (Safari, iOS), `*.notify.windows.com` (legacy Edge). Anything else is
+  rejected, because the server sends requests to that URL (SSRF guard).
+  Stored devices on other hosts are removed at their next delivery.
+  `keys.p256dh` must be a 65-byte P-256 point and `keys.auth` 16 bytes, both
+  base64url.
 - A re-POST by the same user refreshes keys, `userAgent` and `lastSeenAt`,
   resets the failure count and keeps the stored settings unless new ones are
   given. `userAgent` defaults to the request's User-Agent (max 512 chars).
 - The endpoint belongs to the browser. When a different user signs in on that
   browser and subscribes, the previous row is replaced by a new one (new id,
   default or given settings).
-- `previousEndpoint` (sent by the service worker after `pushsubscriptionchange`)
+- `previousEndpoint` (sent by the service worker after `pushsubscriptionchange`,
+  and by the settings panel when it re-subscribes after a VAPID key change)
   names the endpoint the browser replaced. If the caller owns a row with that
   endpoint, the row is deleted in the same transaction and its settings carry
   over to the new endpoint unless `settings` is given (explicit settings win).
   A previous endpoint that is unknown or belongs to another user is ignored;
   the response is the same either way.
 - A user keeps at most 20 devices; a new one evicts the least recently seen.
+- Opening the settings panel re-registers this browser only when the server
+  still lists its endpoint (matched by `endpointHash`). A device removed from
+  another device, or registered by another user of the same browser, shows as
+  off until it is switched on again.
 
 ## Settings (per device)
 
@@ -79,7 +86,8 @@ Rules of `POST /api/push/subscriptions`:
 
 Default `{ accountIds: "all", includeSubject: true, quietHours: null, badge: true }`.
 The server validates strictly: all four keys, nothing else; at most 200
-account ids; `HH:MM` 00:00–23:59 with `from ≠ to`; an IANA time zone. Account
+account ids; `HH:MM` 00:00–23:59 with `from ≠ to` (the settings panel keeps
+an equal pair in the form with a hint); an IANA time zone. Account
 ids are not checked against access when saving; at send time only mailboxes
 the user can access right now are honoured, so `"all"` follows membership
 changes. Quiet hours: `from` inclusive, `to` exclusive, a window with
@@ -131,7 +139,9 @@ Storage: master table `push_subscriptions` (`id`, `userId`, unique
 The server never sends `type: "badge"` pushes: browsers require a visible
 notification for every push (`userVisibleOnly`), and Safari/iOS revoke
 subscriptions that receive pushes without one. Badges travel in `new-mail`
-pushes and are updated by the open app.
+pushes and are updated by the open app, which counts like the server: with a
+registered device only the mailboxes it notifies about, and no badge when the
+device has `badge: false`; without one, all mailboxes.
 
 ## Payload
 
@@ -147,7 +157,10 @@ type PushPayload =
   | { type: "badge"; badge: number; sentAt: number };
 ```
 
-- `from` is the sender's display name, else the address.
+- `from` is the sender's display name, else the address; mail without any
+  sender gets `Settings.notifications.unknownSender` in the user's language
+  ("Unbekannt"). The service worker also shows "Unbekannt" for an empty `from`,
+  so every push still shows a notification.
 - `subject` is `null` when the device has `includeSubject: false`.
 - `url` is the app-relative deep link of the newest message
   (`serializeDeepLink`, doc/DEEP-LINKS.md), e.g. `/?a=…&f=INBOX&m=…`; the
@@ -218,4 +231,6 @@ funktionieren unverändert weiter.
   server row and the browser subscription. A device of a user without any
   access receives nothing.
 - The high-water marks and collapse windows live in process memory; a restart
-  only means the first sync per mailbox sets a new baseline.
+  only means the first sync per mailbox sets a new baseline. Expired windows
+  are dropped at the next dispatch.
+- Deleting a user deletes their devices.

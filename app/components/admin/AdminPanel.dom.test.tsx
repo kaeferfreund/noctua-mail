@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import AdminPanel from "./AdminPanel";
+import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
 import { clientFixture, proof } from "@/app/components/auth/authTestHelpers";
 import type { AdminUser } from "./types";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
@@ -159,6 +160,19 @@ describe("AdminPanel", () => {
     fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
     await waitFor(() => expect(used).toBe("synthetic-final-admin-grant"));
     expect(proofCalls[0].body).toEqual({ purpose: "admin.recovery", currentPassword: "synthetic-password", proofMode: "passkey" });
+  });
+  it("styles every admin select with the shared settings control classes", async () => {
+    const { page } = harness();
+    await page.findByText("user@example.test");
+    expect(page.getByLabelText("Role for user@example.test").className).toBe(nativeControlBaseClass);
+    fireEvent.click(within(page.getByText("user@example.test").closest("tr")!).getByRole("button", { name: "Delete user" }));
+    expect((await page.findByRole("dialog", { name: "Delete user" })).querySelector("select")!.className).toBe(nativeControlClass);
+    fireEvent.click(page.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(page.getByRole("button", { name: "Remove passkey" }));
+    expect((await page.findByRole("dialog", { name: "Remove passkey" })).querySelector("select")!.className).toBe(nativeControlClass);
+    fireEvent.click(page.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(page.getByRole("button", { name: "Invites" }));
+    expect((await page.findByLabelText("Invite role")).className).toBe(nativeControlClass);
   });
   it("does not fetch or render for a non-admin", () => {
     let fetched = false;

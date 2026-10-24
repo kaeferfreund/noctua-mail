@@ -97,7 +97,10 @@ moved messages open their current folder with a notice. A forbidden account from
 the URL is discarded before a detail request and falls back to the session's
 currently authorized selection, or the normal mailbox gate when none exists. If
 that selection is revoked as well, the link finishes with one notice and the
-bootstrap resolves the server's selection.
+bootstrap resolves the server's selection. Links and sidebar clicks wait for the
+startup restore; when the selected mailbox's folders fail to load at startup, the
+error is shown and they apply without those folders (the startup sync still waits
+for them).
 
 `useMobileNavigation` still derives phone visibility and supplies header Back;
 with URL management enabled it neither pushes nor consumes a second history
@@ -111,9 +114,9 @@ this does not rely on `history.length`. Forward re-resolves the message.
 
 The reader opens from its detail response without waiting for inbox pagination.
 Existing selection/collapse/scroll-by-message-ID behavior targets the linked row;
-up to four additional list pages (`DEEP_LINK_LIST_PAGE_LIMIT`) may load afterwards
+the list reads up to `DEEP_LINK_LIST_PAGE_LIMIT` (4) pages, one after the other,
 to select that row; an older target further down stays open in the reader without
-a highlighted row. Links from reminders, calendar entries and notices keep the
+a highlighted row, and pages the user loads later do not jump back to it. Links from reminders, calendar entries and notices keep the
 status panel, calendar sidebar and composer as they are when the link applies. Exact history-specific
 list and reader pixel/semantic anchors, cancellation of delayed scroll restoration
 on user gestures, calendar date/view/event state, sort/threading preferences,

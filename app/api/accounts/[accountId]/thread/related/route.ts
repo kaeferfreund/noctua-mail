@@ -32,6 +32,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       before?: number;
       after?: number;
       pageSize?: number;
+      /** Only rows of this folder. */
+      folderId?: string;
     };
   };
   const accountId = await getAccountIdFromParams(params);
@@ -91,6 +93,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
           after: windowRequest.after,
           pageSize: windowRequest.pageSize,
           excludeFolderIds,
+          folderId: typeof windowRequest.folderId === "string" ? windowRequest.folderId.trim() || null : null,
           groupBy,
           threadDateSource
         });

@@ -99,6 +99,16 @@ describe("service worker push", () => {
     ]);
   });
 
+  it("names an empty sender as unknown instead of dropping the notification", async () => {
+    const worker = loadWorker();
+    await worker.push({ ...mail, from: "" });
+    await worker.push({ ...mail, from: "  ", count: 2 });
+    expect(worker.notifications.map((n) => [n.title, n.options.body])).toEqual([
+      ["Unbekannt", "Rechnung März\nTeam Postfach"],
+      ["2 neue Nachrichten", "Unbekannt — Rechnung März\nTeam Postfach"]
+    ]);
+  });
+
   it("collapses counts into the title and names the newest sender in the body", async () => {
     const worker = loadWorker();
     await worker.push({ ...mail, count: 3 });
@@ -119,6 +129,14 @@ describe("service worker push", () => {
     expect(worker.notifications[1].options.data).toEqual({ url: "/?m=x#top" });
   });
 
+  it("never turns a same-origin URL with a // path into a link to another host", async () => {
+    const worker = loadWorker();
+    for (const url of [`${origin}//evil.example.invalid/x`, `${origin}/\\evil.example.invalid/x`, "//evil.example.invalid/x", "/\\evil.example.invalid/x"]) {
+      await worker.push({ ...mail, url });
+    }
+    expect(worker.notifications.map((n) => n.options.data)).toEqual(Array(4).fill({ url: "/" }));
+  });
+
   it("badge pushes only update the app badge; zero clears it", async () => {
     const worker = loadWorker();
     await worker.push({ type: "badge", badge: 7, sentAt: 1 });
@@ -133,7 +151,7 @@ describe("service worker push", () => {
   it("drops malformed payloads without a notification or an exception", async () => {
     const worker = loadWorker();
     const malformed = [undefined, "{not json", "null", "[1]", "42", { type: "unknown" }, { ...mail, accountId: "" },
-      { ...mail, from: 5 }, { type: "badge", badge: "3" }, { type: "badge", badge: -1 }, { type: "badge", badge: Number.NaN }];
+      { ...mail, from: 5 }, { ...mail, from: undefined }, { type: "badge", badge: "3" }, { type: "badge", badge: -1 }, { type: "badge", badge: Number.NaN }];
     for (const payload of malformed) await worker.push(payload);
     expect(worker.notifications).toEqual([]);
     expect(worker.badges).toEqual([]);
@@ -149,6 +167,19 @@ describe("service worker notification click", () => {
     const cold = loadWorker();
     await cold.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
     expect(cold.opened).toEqual([mail.url]);
+  });
+});
+
+describe("service worker notification click on a foreign target", () => {
+  it("opens only same-origin windows, whatever the notification data says", async () => {
+    for (const url of ["//evil.example.invalid/x", "https://evil.example.invalid/x", `${origin}//evil.example.invalid/x`]) {
+      const cold = loadWorker();
+      await cold.dispatch("notificationclick", { notification: { data: { url }, close() {} } });
+      expect(cold.opened).toEqual(["/"]);
+      const warm = loadWorker({ clients: [{ url: `${origin}/` }] });
+      await warm.dispatch("notificationclick", { notification: { data: { url }, close() {} } });
+      expect(warm.posted).toEqual([{ client: `${origin}/`, message: { type: "noctua:notification-open", url: "/" } }]);
+    }
   });
 });
 

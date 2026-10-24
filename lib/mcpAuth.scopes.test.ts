@@ -81,6 +81,18 @@ test("legacy NULL scopes and empty mapping mean primary-only read/drafts without
 });
 
 
+test("removeUserAccountLink keeps an owner's tokens: ownership still grants the mailbox", async () => {
+  const db = await dbModulePromise;
+  const ownedId = `${accountId}-owned`;
+  await db.upsertAccount({ ...identityTestAccount(ownedId), ownerUserId: principal.user.id });
+  await principal.addMembership(principal.user.id, ownedId, "editor");
+  const owned = await mintMcpToken(session, ownedId, "Synthetic owned", 3600);
+  expect(await db.removeUserAccountLink(principal.user.id, ownedId)).toBe(true);
+  expect(validateMcpTokenRow(principal.master, owned.token)?.accountId).toBe(ownedId);
+  expect(resolveMcpToolContextRow(principal.master, owned.tokenRecord.id, ownedId).role).toBe("manager");
+  expect((await listMcpTokenAccounts(owned.tokenRecord.id)).map(item => item.account.id)).toEqual([ownedId]);
+});
+
 test("real membership revoke retains multi-mailbox token and revokes single-mailbox token", async () => {
   const manager = await createAuthenticatedTestSession(accountId);
   const multi = await mint();
