@@ -1,33 +1,28 @@
 /* FullCalendar theme overrides for Noctua Mail */
 .fc {
-  --fc-border-color: var(--border);
-  --fc-daygrid-event-dot-width: 8px;
-  --fc-list-event-dot-width: 8px;
-  --fc-list-event-hover-bg-color: var(--gray-a3);
-  --fc-non-business-color: rgba(0, 0, 0, 0.04);
-  --fc-bg-event-opacity: 0.3;
-  --fc-highlight-color: var(--accent-a3);
-  --fc-today-bg-color: var(--accent-a2);
+  --fc-classic-foreground: var(--text);
+  --fc-classic-border: var(--border);
+  --fc-classic-small-dot-width: 8px;
+  --fc-classic-large-dot-width: 8px;
+  --fc-classic-faint: rgba(0, 0, 0, 0.04);
+  --fc-classic-background-event-opacity: 0.3;
+  --fc-classic-highlight: var(--accent-a3);
+  --fc-classic-today: var(--accent-a2);
   /* Red rather than the accent so "now" never reads as just another event. */
-  --fc-now-indicator-color: var(--red-9, #e5484d);
-  --fc-event-bg-color: var(--accent-9);
-  --fc-event-border-color: var(--accent-9);
-  --fc-event-text-color: #fff;
-  --fc-event-selected-overlay-color: rgba(0, 0, 0, 0.25);
-  --fc-more-link-bg-color: var(--gray-3);
-  --fc-more-link-text-color: var(--muted-foreground);
-  --fc-neutral-bg-color: var(--gray-2);
-  --fc-neutral-text-color: var(--muted-foreground);
-  --fc-page-bg-color: var(--surface);
-  --fc-button-text-color: var(--text);
-  --fc-button-bg-color: var(--gray-3);
-  --fc-button-border-color: var(--border);
-  --fc-button-hover-bg-color: var(--gray-4);
-  --fc-button-hover-border-color: var(--border);
-  --fc-button-active-bg-color: var(--accent-9);
-  --fc-button-active-border-color: var(--accent-9);
-  --fc-button-active-text-color: #fff;
-  --fc-small-font-size: 0.75em;
+  --fc-classic-now: var(--red-9, #e5484d);
+  --fc-classic-event: var(--accent-9);
+  --fc-classic-event-contrast: #fff;
+  --fc-classic-strong: rgba(0, 0, 0, 0.25);
+  --fc-classic-muted: var(--gray-2);
+  --fc-classic-muted-foreground: var(--muted-foreground);
+  --fc-classic-background: var(--surface);
+  --fc-classic-button-foreground: var(--text);
+  --fc-classic-button: var(--gray-3);
+  --fc-classic-button-border: var(--border);
+  --fc-classic-button-strong: var(--gray-4);
+  --fc-classic-button-strong-border: var(--border);
+  --fc-classic-primary: var(--accent-9);
+  --fc-classic-primary-foreground: #fff;
 
   font-family: inherit;
   font-size: 13px;
@@ -49,10 +44,7 @@
   color: var(--text);
 }
 
-/* FullCalendar renders each toolbar chunk as a plain block <div>. The center
-   chunk holds prev, the <h2> title, and next; because the title is a block
-   element it would push the arrows onto their own lines. Lay the chunk out as
-   a centered inline row so the nav reads "< June 2026 >". */
+/* Keep prev, title and next on a single centered row. */
 .fc .fc-toolbar-chunk {
   display: flex;
   align-items: center;
@@ -67,6 +59,12 @@
 .fc .fc-button:focus {
   box-shadow: none;
   outline: 2px solid var(--accent-a6);
+}
+
+/* v7 disables pointer hit testing on disabled buttons. Keep the toolbar's
+   geometry stable for hit testing; the native disabled attribute blocks clicks. */
+.fc .fc-button:disabled {
+  pointer-events: auto;
 }
 
 /* The "＋ Event" create action reads as the primary toolbar button. */
@@ -89,20 +87,8 @@
   color: #fff;
 }
 
-.fc th {
-  border-color: var(--border);
-}
-
-.fc td {
-  border-color: var(--border);
-}
-
-.fc .fc-scrollgrid {
-  border-color: var(--border);
-}
-
 .fc .fc-daygrid-day.fc-day-today {
-  background-color: var(--fc-today-bg-color);
+  background-color: var(--fc-classic-today);
 }
 
 .fc .fc-event {
@@ -111,46 +97,39 @@
 }
 
 .fc .fc-event.fc-event-caldav {
-  --fc-event-bg-color: var(--green-9);
-  --fc-event-border-color: var(--green-9);
+  --fc-classic-event: var(--green-9);
 }
 
 .fc .fc-event.fc-event-email {
-  --fc-event-bg-color: var(--accent-9);
-  --fc-event-border-color: var(--accent-9);
+  --fc-classic-event: var(--accent-9);
 }
 
 .fc .fc-event.fc-event-local {
-  --fc-event-bg-color: var(--blue-9, #0072d6);
-  --fc-event-border-color: var(--blue-9, #0072d6);
+  --fc-classic-event: var(--blue-9, #0072d6);
 }
 
 .fc .fc-event.fc-event-sent-invite {
-  --fc-event-bg-color: var(--indigo-9, #4f46e5);
-  --fc-event-border-color: var(--indigo-9, #4f46e5);
+  --fc-classic-event: var(--indigo-9, #4f46e5);
 }
 
 .fc .fc-event.fc-event-reminder {
-  --fc-event-bg-color: var(--gray-8, #6b7280);
-  --fc-event-border-color: var(--gray-9, #4b5563);
-  --fc-event-text-color: #fff;
+  --fc-classic-event: var(--gray-8, #6b7280);
+  border-color: var(--gray-9, #4b5563);
+  --fc-classic-event-contrast: #fff;
 }
 
 /* Participation status styles (override source type colors) */
 .fc .fc-event.fc-event-partstat-accepted {
-  --fc-event-bg-color: var(--blue-9, #0072d6);
-  --fc-event-border-color: var(--blue-9, #0072d6);
+  --fc-classic-event: var(--blue-9, #0072d6);
 }
 
 .fc .fc-event.fc-event-partstat-tentative,
 .fc .fc-event.fc-event-partstat-needsaction {
-  --fc-event-bg-color: var(--amber-9, #f59e0b);
-  --fc-event-border-color: var(--amber-9, #f59e0b);
+  --fc-classic-event: var(--amber-9, #f59e0b);
 }
 
 .fc .fc-event.fc-event-partstat-declined {
-  --fc-event-bg-color: var(--red-5, #fca5a5);
-  --fc-event-border-color: var(--red-5, #fca5a5);
+  --fc-classic-event: var(--red-5, #fca5a5);
   opacity: 0.75;
 }
 
@@ -169,8 +148,8 @@
    transparent, so a line crossing them strikes through their titles — which
    already means "declined" here — and repainting them opaque would have to
    guess at whatever the calendar happens to be sitting on. */
-.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-daygrid-day-bg::after,
-.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-daygrid-day-bg::before {
+.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today::after,
+.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today::before {
   content: "";
   pointer-events: none;
   position: absolute;
@@ -180,34 +159,31 @@
 
 /* Arrow head at the day's left edge, as in the timegrid views. Chip titles
    start well right of this, so it never lands on text. */
-.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-daygrid-day-bg::before {
+.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today::before {
   border: 4px solid transparent;
-  border-left: 5px solid var(--fc-now-indicator-color);
+  border-left: 5px solid var(--fc-classic-now);
   left: 0;
   margin-top: -3px;
 }
 
-.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-daygrid-day-bg::after {
-  border-top: 2px solid var(--fc-now-indicator-color);
+.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today::after {
+  border-top: 2px solid var(--fc-classic-now);
   right: 0;
   width: 16px;
 }
 
 /* Reserve the strip the mark's right-hand end runs in. */
-.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-daygrid-event-harness {
+.fc-now-scope .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today .fc-event {
   margin-right: 20px;
 }
 
 .fc .fc-timegrid-event-short .fc-event-main {
   padding: 0 2px;
-}
-
-.fc .fc-timegrid-event-short .fc-event-main-frame {
   align-items: center;
   gap: 0.2rem;
 }
 
-.fc .fc-timegrid-event-short .fc-event-title-container {
+.fc .fc-timegrid-event-short .fc-event-title {
   align-items: center;
   display: flex;
   min-width: 0;
@@ -234,6 +210,6 @@
 }
 
 .dark .fc {
-  --fc-non-business-color: rgba(255, 255, 255, 0.03);
-  --fc-today-bg-color: rgba(184, 213, 255, 0.08);
+  --fc-classic-faint: rgba(255, 255, 255, 0.03);
+  --fc-classic-today: rgba(184, 213, 255, 0.08);
 }
