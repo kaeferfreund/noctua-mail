@@ -12,7 +12,7 @@ const response = (data: unknown, status = 200) => new Response(JSON.stringify(da
 describe("spam settings", () => {
   it("admin: shows the effective config and saves enabled, model and threshold", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
-    let effective = { enabled: false, provider: "anthropic", model: "claude-haiku-5-5", threshold: 0.85, modelUnavailable: "ANTHROPIC_API_KEY is not set" };
+    let effective = { enabled: false, provider: "anthropic", model: "claude-haiku-5-5", threshold: 0.85, modelUnavailable: "missing-key" as const };
     const apiFetch: AdminFetch = async (input, init) => {
       calls.push({ url: String(input), init });
       if (init?.method === "PUT") effective = { ...effective, ...JSON.parse(String(init.body)), model: "claude-haiku-5-5" };
@@ -20,7 +20,7 @@ describe("spam settings", () => {
     };
     const page = render(<Theme><AdminSpamSettings apiFetch={apiFetch} /></Theme>);
     expect(await page.findByText("Provider: anthropic")).toBeTruthy();
-    expect(page.getByText(/ANTHROPIC_API_KEY is not set/)).toBeTruthy();
+    expect(page.getByText(/no API key \(ANTHROPIC_API_KEY\)/)).toBeTruthy();
     fireEvent.click(page.getByLabelText("Spam detection enabled"));
     fireEvent.change(page.getByLabelText(/Threshold/), { target: { value: "0,9" } });
     fireEvent.click(page.getByRole("button", { name: "Save" }));

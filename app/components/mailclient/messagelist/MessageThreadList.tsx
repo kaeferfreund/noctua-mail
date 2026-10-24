@@ -375,7 +375,7 @@ export default function MessageThreadList({
                 </FromAddressHoverCard>
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (
@@ -414,7 +414,6 @@ export default function MessageThreadList({
                     : message.category && (
                         <CategoryBadge category={message.category as any} showText={false} />
                       )}
-                  <SpamBadge message={message} />
                   {(threadBadgeUnion.threadHasFlagged || message.flagged) && (
                     <FlagBadge
                       onClick={() =>
