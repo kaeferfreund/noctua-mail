@@ -3,7 +3,8 @@ import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
-import { trustedFacts, trustedProfile } from "../mail/spam/testProfiles";
+import { buildAccountSenderProfiles } from "../mail/spam/profileBuild";
+import { ownAddresses, trustedFacts, trustedProfile } from "../mail/spam/testProfiles";
 import { createCollabFixture } from "../testThreadCollabHarness";
 import { initAccountSchema } from "./schema";
 import { prepareAccountShardConnection, shardWriterGuardsInstalled } from "./shardFormat";
@@ -121,8 +122,8 @@ describe("sender profiles", () => {
   test("checked mails fold into the profile; \"Als Spam\" marks existing and unknown senders", async () => {
     const f = await createCollabFixture();
     expect(await f.api.getSenderProfile(f.accountId, sender)).toBeNull();
-    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }));
-    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 2_000 }));
+    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }), "m1");
+    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 2_000 }), "m2");
     expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 2, firstSeenAt: 1_000, lastSeenAt: 2_000, authAligned: 2, lastUserSpamAt: null });
     await f.api.markSenderProfileUserSpam(f.accountId, sender, 5_000);
     await f.api.markSenderProfileUserSpam(f.accountId, sender, 4_000);
@@ -131,11 +132,58 @@ describe("sender profiles", () => {
     expect(await f.api.getSenderProfile(f.accountId, "new@example.test")).toMatchObject({ count: 0, lastUserSpamAt: 6_000 });
   });
 
+  test("a mail counts into the profile once, also when it is checked again after a revocation", async () => {
+    const f = await createCollabFixture();
+    expect(await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }), "m1")).toBe(true);
+    expect(await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 2_000 }), "m2")).toBe(true);
+    expect(await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }), "m1")).toBe(false);
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 2, lastSeenAt: 2_000 });
+  });
+
+  test("junk counts live: \"Als Spam\" and auto-move count each mail once; auto-move creates no profile", async () => {
+    const f = await createCollabFixture();
+    expect(await f.api.recordSenderProfileJunk(f.accountId, sender, "j1")).toBe(false);
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toBeNull();
+    await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: 1_000 }), "m1");
+    expect(await f.api.recordSenderProfileJunk(f.accountId, sender, "j1")).toBe(true);
+    expect(await f.api.recordSenderProfileJunk(f.accountId, sender, "j1")).toBe(false);
+    await f.api.markSenderProfileUserSpam(f.accountId, sender, 5_000, "j2");
+    await f.api.markSenderProfileUserSpam(f.accountId, sender, 6_000, "j2");
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 1, junkCount: 2, lastUserSpamAt: 6_000 });
+    await f.api.markSenderProfileUserSpam(f.accountId, "new@example.test", 7_000, "j3");
+    expect(await f.api.getSenderProfile(f.accountId, "new@example.test")).toMatchObject({ count: 0, junkCount: 1, lastUserSpamAt: 7_000 });
+  });
+
+  test("the backfill catches up with mail stored while it builds and keeps junk counted live meanwhile", async () => {
+    const f = await createCollabFixture();
+    const from = `Service <${sender}>`;
+    const day = 24 * 60 * 60_000;
+    await f.seed(...[1, 2, 3].map((index) => f.message(`<b${index}@example.test>`, { from, dateValue: Date.UTC(2026, 5, index) })));
+    const folders = await f.api.getFolders(f.accountId);
+    const late = f.message("<late@example.test>", { from, dateValue: Date.UTC(2026, 5, 4) });
+    let builds = 0;
+    const { written, build } = await f.api.backfillSenderProfiles(f.accountId, async (db, previous) => {
+      builds += 1;
+      const built = await buildAccountSenderProfiles({ accountId: f.accountId, db, folders, ownAddresses, previous: previous ?? undefined });
+      if (!previous) {
+        // Meanwhile a mail arrives and is learned live, and another one is auto-moved to Junk.
+        await f.seed(late);
+        await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: Date.UTC(2026, 5, 4) }), late.id);
+        await f.api.recordSenderProfileJunk(f.accountId, sender, "junk-live");
+      }
+      return built;
+    });
+    expect({ builds, written, rows: build.rows }).toEqual({ builds: 2, written: 1, rows: 4 });
+    expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 4, junkCount: 1, lastSeenAt: Date.UTC(2026, 5, 4) });
+    // The caught-up mail is not counted again when its check arrives later.
+    expect(await f.api.recordSenderProfileMail(f.accountId, trustedFacts({ date: Date.UTC(2026, 5, 4) + day }), late.id)).toBe(false);
+  });
+
   test("the backfill replaces profiles and keeps stored \"Als Spam\" times", async () => {
     const f = await createCollabFixture();
     await f.api.markSenderProfileUserSpam(f.accountId, sender, 5_000);
     await f.api.markSenderProfileUserSpam(f.accountId, "gone@example.test", 6_000);
-    await f.api.recordSenderProfileMail(f.accountId, { ...trustedFacts(), senderKey: "stale@example.test" });
+    await f.api.recordSenderProfileMail(f.accountId, { ...trustedFacts(), senderKey: "stale@example.test" }, "m1");
     expect(await f.api.replaceSenderProfiles(f.accountId, [trustedProfile(25, 60)])).toBe(1);
     expect(await f.api.getSenderProfile(f.accountId, sender)).toMatchObject({ count: 25, lastUserSpamAt: 5_000 });
     expect(await f.api.getSenderProfile(f.accountId, "gone@example.test")).toMatchObject({ count: 0, lastUserSpamAt: 6_000 });

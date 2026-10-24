@@ -456,6 +456,7 @@ export {
   listSpamExampleCandidates,
   listUncheckedSpamMessageIds,
   markSenderProfileUserSpam,
+  recordSenderProfileJunk,
   recordSenderProfileMail,
   replaceSenderProfiles,
   resetTrustedSpamChecks,
