@@ -117,7 +117,7 @@ async function checkMessage(job: SpamCheckJob) {
   const decision = await classifySpam({
     input,
     allowlist,
-    staticRules: loadStaticRules(),
+    staticRules: await loadStaticRules(),
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
     model: getSpamLanguageModel(config),
     providerOptions: getSpamProviderOptions(config)
