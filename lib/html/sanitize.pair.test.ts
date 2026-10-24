@@ -1,15 +1,25 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test, type Mock } from "bun:test";
 import { createHash } from "node:crypto";
 import { sanitizeHtmlForDisplay, sanitizeHtmlForDisplayPair } from "./sanitize";
-import { stripConditionalComments } from "./strip";
 import { sanitizeHtmlForDisplay as referenceSanitize } from "@/lib/testFixtures/htmlSanitize/sanitizeReference0ac6cfa";
 import { sanitizeDifferentialInputs } from "@/lib/testFixtures/htmlSanitize/sanitizeDifferentialInputs";
-import { createSanitizeFuzzDocuments } from "@/lib/testFixtures/htmlSanitize/sanitizeFuzz";
+import { SANITIZE_FUZZ_CASES, SANITIZE_FUZZ_SEEDS, sanitizeFuzzInputs } from "@/lib/testFixtures/htmlSanitize/sanitizeFuzz";
 import golden from "@/lib/testFixtures/htmlSanitize/sanitizeGolden0ac6cfa.json";
 
 // Differential proof for the single-normalization pair: the shipped sanitizer
 // must stay byte-identical to the sanitizer at 0ac6cfa, in both remote-content
 // modes, including the "remote content blocked" banner decision.
+//
+// The golden hashes and FUZZ_STREAM_HASHES pin the output of the frozen reference
+// on the installed sanitize-html, postcss and parse5. A dependency upgrade that
+// changes sanitizer output fails the pins even when shipped and reference code
+// still agree. To re-anchor after such an upgrade:
+//   1. Run this file. The fuzz tests must report no mismatches (an empty list);
+//      only the pinned hashes may differ. Any mismatch is a real divergence.
+//   2. Review the output change (it comes from the dependency, not from Noctua).
+//   3. Run `bun lib/testFixtures/htmlSanitize/genGolden.ts`: it rewrites
+//      sanitizeGolden0ac6cfa.json and prints new FUZZ_STREAM_HASHES to paste below.
+//   4. Commit both with the dependency bump and name the upgrade in the message.
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -52,15 +62,16 @@ describe("sanitize differential against 0ac6cfa: golden inputs", () => {
   });
 });
 
-// Hashes of the reference output stream recorded by the spike in a 0ac6cfa
-// checkout: sha256 over `block \0 allow \0` for the raw and comment-stripped
-// form of every generated document.
-const FUZZ_SEEDS = [
-  { seed: 7, streamHash: "e36817dbc919ac9428eaaf47c4c5487939821ba8cba8aeaa7ceb341316ae5a53" },
-  { seed: 1009, streamHash: "a565dc19b1c032c49805cb55d0eb68d663acd38b026b758798754bf30ef7dd1d" },
-  { seed: 424242, streamHash: "5b0885ec15dd98b4a5da4072609a481911803f3447cae162e155d78491a27932" }
-];
-const FUZZ_CASES = 3000;
+// Hashes of the reference output stream: sha256 over `block \0 allow \0` for the
+// raw and comment-stripped form of every generated document. The first 1,000
+// documents per seed of the 3,000-document stream the spike recorded in a 0ac6cfa
+// checkout (whose full-stream hashes the frozen reference reproduced when the
+// stream was shortened).
+const FUZZ_STREAM_HASHES: Record<(typeof SANITIZE_FUZZ_SEEDS)[number], string> = {
+  7: "8e45d71eeee4e647801ea2368b308957b5802669092eb1550ec96207489cba8d",
+  1009: "c2fe5f19d6aafb6e851119679fd69522544ad6b598df73e6339684fb73ea43a0",
+  424242: "ad06fb831231875a046391c57584ba31a92394473a40dfa70c8696db8a72be9a"
+};
 
 describe("sanitize differential against 0ac6cfa: seeded fuzz", () => {
   // parse-srcset (inside sanitize-html) logs every invalid descriptor it sees,
@@ -73,30 +84,26 @@ describe("sanitize differential against 0ac6cfa: seeded fuzz", () => {
     log.mockRestore();
   });
 
-  for (const { seed, streamHash } of FUZZ_SEEDS) {
-    test(`seed ${seed}: ${FUZZ_CASES} documents, raw and comment-stripped, byte for byte`, () => {
-      const nextDocument = createSanitizeFuzzDocuments(seed);
+  for (const seed of SANITIZE_FUZZ_SEEDS) {
+    test(`seed ${seed}: ${SANITIZE_FUZZ_CASES} documents, raw and comment-stripped, byte for byte`, () => {
       const referenceStream = createHash("sha256");
       const mismatches: { input: string; field: string }[] = [];
       let compared = 0;
-      for (let index = 0; index < FUZZ_CASES; index += 1) {
-        const raw = nextDocument();
-        for (const input of [raw, stripConditionalComments(raw)]) {
-          const block = referenceSanitize(input);
-          const allow = referenceSanitize(input, "allow");
-          referenceStream.update(block).update("\0").update(allow).update("\0");
-          const pair = sanitizeHtmlForDisplayPair(input);
-          if (pair.block !== block) mismatches.push({ input, field: "pair.block" });
-          if (pair.allow !== allow) mismatches.push({ input, field: "pair.allow" });
-          if ((pair.block !== pair.allow) !== (block !== allow)) mismatches.push({ input, field: "banner" });
-          if (sanitizeHtmlForDisplay(input) !== block) mismatches.push({ input, field: "single.block" });
-          if (sanitizeHtmlForDisplay(input, "allow") !== allow) mismatches.push({ input, field: "single.allow" });
-          compared += 1;
-        }
+      for (const input of sanitizeFuzzInputs(seed)) {
+        const block = referenceSanitize(input);
+        const allow = referenceSanitize(input, "allow");
+        referenceStream.update(block).update("\0").update(allow).update("\0");
+        const pair = sanitizeHtmlForDisplayPair(input);
+        if (pair.block !== block) mismatches.push({ input, field: "pair.block" });
+        if (pair.allow !== allow) mismatches.push({ input, field: "pair.allow" });
+        if ((pair.block !== pair.allow) !== (block !== allow)) mismatches.push({ input, field: "banner" });
+        if (sanitizeHtmlForDisplay(input) !== block) mismatches.push({ input, field: "single.block" });
+        if (sanitizeHtmlForDisplay(input, "allow") !== allow) mismatches.push({ input, field: "single.allow" });
+        compared += 1;
       }
       expect(mismatches.slice(0, 5)).toEqual([]);
-      expect(compared).toBe(2 * FUZZ_CASES);
-      expect(referenceStream.digest("hex")).toBe(streamHash);
+      expect(compared).toBe(2 * SANITIZE_FUZZ_CASES);
+      expect(referenceStream.digest("hex")).toBe(FUZZ_STREAM_HASHES[seed]);
     }, 120_000);
   }
 });
