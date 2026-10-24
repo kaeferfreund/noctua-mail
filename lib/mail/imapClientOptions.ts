@@ -335,7 +335,9 @@ export async function connectImapClientWithRetry(params: {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const client = createClient();
     try {
-      await logImapOp(connectOp, { host: account.imap.host, ...logContext }, () => client.connect());
+      await logImapOp(connectOp, { host: account.imap.host, ...logContext }, () => client.connect(), {
+        cancelled: () => client.closedByClient === true
+      });
       if (attempt > 1 && logger !== false) {
         logger.info?.({
           event: "imap.connect_recovered",
