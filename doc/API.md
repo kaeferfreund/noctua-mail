@@ -152,7 +152,8 @@ that mailbox; editors see their own. `POST` accepts `{label, ttlSeconds?, accoun
 Scopes only narrow mailbox roles. Sender identity writes still require manager;
 personal sender preference writes require `manage` plus viewer membership.
 The central `tools/call` gate denies unclassified tools and returns an MCP tool error
-`Token has no <scope> permission` for calls outside the mode. There is **no MCP send tool**.
+`Token has no <scope> permission` for calls outside the mode. `tools/list` advertises only
+the tools the token's live stored scopes allow (invalid scopes: none). There is **no MCP send tool**.
 `authorizeOutbound({tokenId}, ...)` requires `send` by default and rechecks it at the
 final effect; draft saves explicitly require `drafts`, identity/preferences writes `manage`.
 The HTTP web send authorization is unchanged.

@@ -7,7 +7,8 @@ import { getUserAccountPrefs, mergeUserAccountPrefs, listSenderIdentities, Inval
 import { getUserMailboxSummary } from "@/lib/mailboxSummary";
 import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
-import { assertMcpToolPermission, listMcpTokenAccounts, resolveMcpToolContext } from "@/lib/mcpAuth";
+import { assertMcpToolPermission, listMcpTokenAccounts, mcpTokenScopes, resolveMcpToolContext } from "@/lib/mcpAuth";
+import { mcpToolScope, type McpScope } from "@/lib/mcpPermissions";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getThreadCollabState, listThreadComments, listThreadActivity,
   updateThreadCollabState, addThreadComment } from "@/lib/threadCollab";
@@ -871,17 +872,32 @@ class StatelessJsonResponseTransport implements Transport {
   private readonly responses: JSONRPCMessage[] = [];
   private readonly extra: MessageExtraInfo;
   private responseResolvers = new Map<string, () => void>();
+  private readonly toolListIds = new Set<string>();
 
-  constructor(extra: MessageExtraInfo, private readonly authorizeTool: (name: string) => Promise<void>) {
+  constructor(extra: MessageExtraInfo, private readonly authorizeTool: (name: string) => Promise<void>,
+    private readonly toolScopes: () => Promise<readonly McpScope[]>) {
     this.extra = extra;
+  }
+
+  /** tools/list advertises only tools the token's stored scopes allow; an unclassified tool fails the listing. */
+  private async filterToolList(message: JSONRPCMessage): Promise<JSONRPCMessage> {
+    if (!isJSONRPCResponse(message) || !Array.isArray(message.result.tools)) return message;
+    try {
+      const scopes = await this.toolScopes();
+      const tools = (message.result.tools as { name: string }[]).filter(tool => scopes.includes(mcpToolScope(tool.name)));
+      return { ...message, result: { ...message.result, tools } };
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "MCP authorization failed";
+      return { jsonrpc: "2.0", id: message.id, error: { code: ErrorCode.InternalError, message: text } };
+    }
   }
 
   async start() {}
 
   async send(message: JSONRPCMessage) {
     if (isJSONRPCResponse(message) || isJSONRPCError(message)) {
-      this.responses.push(message);
       const key = String(message.id);
+      this.responses.push(this.toolListIds.has(key) ? await this.filterToolList(message) : message);
       this.responseResolvers.get(key)?.();
       this.responseResolvers.delete(key);
     }
@@ -936,6 +952,7 @@ class StatelessJsonResponseTransport implements Transport {
           continue;
         }
       }
+      if (isJSONRPCRequest(message) && message.method === "tools/list") this.toolListIds.add(String(message.id));
       this.onmessage?.(message, this.extra);
     }
 
@@ -1349,7 +1366,7 @@ export async function executeMcpHttpRequest(params: {
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,
     requestInfo: params.requestInfo
-  }, name => assertMcpToolPermission(context.tokenRecord.id, name));
+  }, name => assertMcpToolPermission(context.tokenRecord.id, name), () => mcpTokenScopes(context.tokenRecord.id));
   await server.connect(transport);
 
   try {

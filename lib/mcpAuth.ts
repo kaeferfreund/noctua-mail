@@ -78,6 +78,12 @@ export async function assertMcpToolPermission(tokenId: string, toolName: string)
   const context = liveToken(await getDb(), "t.id", tokenId, (_db, live) => assertMcpScope(live.tokenRecord.scopes, scope));
   if (!context) throw new Error("Unauthorized MCP token");
 }
+/** Live stored scopes for the tools/list filter (same token policy as the tools/call gate). */
+export async function mcpTokenScopes(tokenId: string): Promise<readonly McpScope[]> {
+  const context = liveToken(await getDb(), "t.id", tokenId);
+  if (!context) throw new Error("Unauthorized MCP token");
+  return context.tokenRecord.scopes ?? scopesForMcpMode("drafts");
+}
 /** Enumerate only covered mailboxes with live membership, independent of primary membership. */
 export async function listMcpTokenAccounts(tokenId: string): Promise<AccountAccessEntry[]> {
   const db = await getDb();
