@@ -5,7 +5,7 @@ export const PROFILE_BACKFILL_USAGE = `Usage: bun scripts/spam-profiles-backfill
        bun scripts/spam-profiles-backfill.ts --data <data dir> --write [--account <accountId>]
 
 Builds the trusted-sender profiles from the stored rows of every account.
-Default is a dry run: the data dir is opened read-only (immutable=1) and the
+Default is a dry run: the data dir is opened read-only (mode=ro) and the
 plan is printed; --out writes the sender histories for spam-eval --trust-profiles
 (outside the data dir). --write replaces the stored profiles; it needs an
 explicit --data (NOCTUA_DATA_DIR from the environment is never used) and shards
