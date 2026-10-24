@@ -620,6 +620,27 @@
       }
     }
   },
+  "Calendar": {
+    "toolbar": {
+      "addEvent": "＋ Event",
+      "addEventHint": "New event",
+      "today": "Today",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "todayHint": "{unit, select, day {Today} week {This week} month {This month} other {Today}}",
+      "prevHint": "{unit, select, day {Previous day} week {Previous week} month {Previous month} other {Previous}}",
+      "nextHint": "{unit, select, day {Next day} week {Next week} month {Next month} other {Next}}",
+      "viewHint": "{view, select, dayGridMonth {Month view} timeGridWeek {Week view} timeGridDay {Day view} other {View}}",
+      "viewChangeHint": "Change view"
+    },
+    "panel": {
+      "title": "Calendar",
+      "openWindow": "Open in window",
+      "openWindowLabel": "Open calendar in window",
+      "close": "Close calendar"
+    }
+  },
   "Search": {
     "scope": {
       "everywhere": "Everywhere",
