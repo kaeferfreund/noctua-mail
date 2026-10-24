@@ -445,3 +445,13 @@ export type { MailboxSummary, WatcherState } from "./db/mailboxSummary";
 
 export { InvalidAccountPreferencesError } from "./db/userAccountPrefs";
 export { listSenderIdentities, getAccountOwnAddresses } from "./db/senderIdentities";
+export {
+  getLatestSpamDecision,
+  getSpamSettings,
+  hasSentToAddress,
+  listSpamExampleCandidates,
+  listUncheckedSpamMessageIds,
+  saveSpamExample,
+  saveSpamSettings,
+  saveSpamVerdict
+} from "./db/spam";
