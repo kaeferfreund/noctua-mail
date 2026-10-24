@@ -28,8 +28,10 @@ function labelControls(children: ReactNode, labelId: string, hintId?: string): R
   return cloneElement(children, { children: labelled });
 }
 
+/** Native control styling without a width, for controls sized by their content (table cells). 44px tall on phones. */
+export const nativeControlBaseClass = "min-w-0 rounded-md border bg-background p-2 max-md:min-h-11";
 /** Native select/input/textarea styling shared by the settings forms; fills and never widens its column. */
-export const nativeControlClass = "w-full min-w-0 rounded-md border bg-background p-2";
+export const nativeControlClass = `w-full ${nativeControlBaseClass}`;
 
 type FieldProps = {
   label: string;
