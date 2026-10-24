@@ -1,6 +1,6 @@
 // Uses the shared resolver and actions through the real row menu.
 import { afterEach, describe, expect, it } from "bun:test";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import type { ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
@@ -130,5 +130,31 @@ describe("row read/unread menu", () => {
     await menu.choose("Mark as To-Do");
     expect(menu.todos).toEqual(["root"]);
     expect(menu.resolutions()).toBe(0);
+  });
+});
+
+describe("row menu focus return", () => {
+  it("returns keyboard focus to ⋮ after the menu closes without reopening its tooltip", async () => {
+    // Escape is a keyboard interaction, so browsers mark the returned focus :focus-visible.
+    const originalMatches = Element.prototype.matches;
+    Element.prototype.matches = function (this: Element, selector: string) {
+      return selector === ":focus-visible" ? this === document.activeElement : originalMatches.call(this, selector);
+    };
+    try {
+      const menu = setup();
+      const trigger = menu.view.getByRole("button", { name: "Message actions" });
+      act(() => { trigger.focus(); });
+      await menu.open();
+      await act(async () => {
+        fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+      expect(menu.view.queryByRole("menu")).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 800)); });
+      expect(menu.view.queryByRole("tooltip")).toBeNull();
+    } finally {
+      Element.prototype.matches = originalMatches;
+    }
   });
 });

@@ -47,7 +47,7 @@ import type { RowReadAction } from "../messagelist/selectionActions";
 import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
-import TooltipIconButton from "@/app/components/TooltipIconButton";
+import TooltipIconButton, { useQuietMenuFocusReturn } from "@/app/components/TooltipIconButton";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
 
@@ -173,6 +173,7 @@ export default function MessageMenu({
   const t = useTranslations("Reader");
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
+  const quietFocusReturn = useQuietMenuFocusReturn();
   const [copyResult, setCopyResult] = useState<"copied" | "failed" | null>(null);
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const rowReadAction = origin === "thread" ? undefined : readAction;
@@ -264,6 +265,7 @@ export default function MessageMenu({
           className={isMobile ? mobileStyles.messageMore : undefined}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => event.stopPropagation()}
+          onFocus={quietFocusReturn.onTriggerFocus}
         >
           <MoreVertical size={14} />
         </TooltipIconButton>
@@ -271,6 +273,7 @@ export default function MessageMenu({
       <Theme asChild><DropdownMenu.Content
         align="end"
         sideOffset={6}
+        onCloseAutoFocus={quietFocusReturn.onCloseAutoFocus}
         className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
       >
         {[
