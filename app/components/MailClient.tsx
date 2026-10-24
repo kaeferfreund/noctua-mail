@@ -226,7 +226,7 @@ import {
   getComposeThreadFocusMessageId,
   getDefaultExpandedMessageIds,
   getInlineComposePlacement,
-  getReaderExcludedFolderIds as getReaderExcludedFolderIdsFor,
+  getReaderFolderScope as getReaderFolderScopeFor,
   getRenderedThreadMessages,
   isThreadMessageCollapsed,
   printWithLoadedBodies
@@ -4452,15 +4452,14 @@ export default function MailClient({
     threadRelatedCandidatesKey
   ]);
 
-  const getReaderExcludedFolderIds = useCallback(
+  const getReaderFolderScope = useCallback(
     (active: Message) =>
-      getReaderExcludedFolderIdsFor({
+      getReaderFolderScopeFor({
         activeMessage: active,
         activeFolderId,
-        accountFolderIds: accountFolders.map((folder) => folder.id),
         threadExcludedFolderIds: excludedFolderIdsForThreads
       }),
-    [accountFolders, activeFolderId, excludedFolderIdsForThreads]
+    [activeFolderId, excludedFolderIdsForThreads]
   );
 
   // Reader content: a bounded header window around the selected message.
@@ -4499,7 +4498,7 @@ export default function MailClient({
       });
       return;
     }
-    const excludeFolderIds = getReaderExcludedFolderIds(active);
+    const { folderId, excludeFolderIds } = getReaderFolderScope(active);
     const key = [
       activeAccountId,
       threadId,
@@ -4508,6 +4507,7 @@ export default function MailClient({
       groupBy,
       threadDateSource,
       supportsThreads ? "window" : "single",
+      folderId ?? "",
       excludeFolderIds.join(",")
     ].join("|");
     logListDebug("info", "thread-related:content-effect:request", {
@@ -4522,6 +4522,7 @@ export default function MailClient({
       windowed: supportsThreads,
       messageIds: [active.id],
       excludeFolderIds,
+      folderId,
       groupBy,
       threadDateSource
     });
@@ -4531,7 +4532,7 @@ export default function MailClient({
     activeAccountId,
     activeFolderId,
     activeMessageThreadKey,
-    getReaderExcludedFolderIds,
+    getReaderFolderScope,
     groupBy,
     loadThreadContent,
     threadDateSource,
@@ -4551,12 +4552,12 @@ export default function MailClient({
       void loadThreadPage({
         threadId: active.threadId ?? active.messageId ?? active.id,
         direction,
-        excludeFolderIds: getReaderExcludedFolderIds(active),
+        ...getReaderFolderScope(active),
         groupBy,
         threadDateSource
       });
     },
-    [getReaderExcludedFolderIds, groupBy, loadThreadPage, threadDateSource]
+    [getReaderFolderScope, groupBy, loadThreadPage, threadDateSource]
   );
   const printReader = useCallback(() => {
     void printWithLoadedBodies({

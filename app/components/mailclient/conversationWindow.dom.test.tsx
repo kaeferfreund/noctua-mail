@@ -332,6 +332,30 @@ describe("useThreadContent conversation reads", () => {
     expect(windowState?.placeholders).toEqual([]);
   });
 
+  test("a conversation read in trash asks for trash rows only, also when paging", async () => {
+    const trash = `${ACCOUNT}:Trash`;
+    const { apiFetch, calls } = fakeApi((call) =>
+      Response.json({
+        items: [header(3, { folderId: trash })],
+        placeholders: [],
+        window: { total: 2, anchorId: "window-m3", hasOlder: !call.body.window?.cursor, olderCursor: "cursor-older", hasNewer: false, newerCursor: null }
+      })
+    );
+    const { result } = renderThreadContent(apiFetch);
+    await act(async () => {
+      await result.current.loadThreadContent({ ...threadRequest("window-thread", "window-m3"), folderId: trash });
+    });
+    await act(async () => {
+      await result.current.loadThreadPage({
+        threadId: "window-thread", direction: "older", excludeFolderIds: [], folderId: trash, groupBy: "date", threadDateSource: "received"
+      });
+    });
+    expect(calls.map((call) => call.body.window)).toEqual([
+      { anchorMessageId: "window-m3", folderId: trash },
+      { cursor: "cursor-older", folderId: trash }
+    ]);
+  });
+
   test("reply on a not-yet-loaded body reads the local detail without a resync", async () => {
     const target = header(7);
     const { apiFetch, calls } = fakeApi(() => Response.json({ ok: true, message: detail(target) }));

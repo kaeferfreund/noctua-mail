@@ -71,3 +71,12 @@ describe("conversation window topic suggestions", () => {
     expect(body.body).toBe("Synthetic body");
   });
 });
+
+describe("conversation window folder limit", () => {
+  test("window.folderId limits the window to that folder", async () => {
+    const inFolder = await windowRead({ anchorMessageId: "target-4", folderId: folder.id });
+    expect(inFolder.items.map(item => item.id)).toEqual(["target-1", "target-2", "target-3", "target-4"]);
+    const elsewhere = await windowRead({ anchorMessageId: "target-4", folderId: `${accountId}:Trash` });
+    expect(elsewhere.items).toEqual([]);
+  });
+});

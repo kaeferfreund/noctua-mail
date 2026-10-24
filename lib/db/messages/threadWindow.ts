@@ -105,6 +105,8 @@ export async function listThreadMessageWindow(params: {
   after?: number;
   pageSize?: number;
   excludeFolderIds?: string[];
+  /** Only rows of this folder (a conversation read in trash or spam shows only those). */
+  folderId?: string | null;
   groupBy?: string;
   threadDateSource?: ThreadDateSource;
 }): Promise<ThreadWindowResult> {
@@ -123,6 +125,10 @@ export async function listThreadMessageWindow(params: {
     baseArgs,
     (params.excludeFolderIds ?? []).slice(0, MAX_EXCLUDED_FOLDERS)
   );
+  if (params.folderId) {
+    baseWhere += " AND m.folderId = ?";
+    baseArgs.push(params.folderId);
+  }
 
   type KeyRow = { id: string; dateValue: number };
   const selectKeys = (condition: string, args: unknown[], order: "ASC" | "DESC", limit: number) =>
