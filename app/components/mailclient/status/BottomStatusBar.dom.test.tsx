@@ -14,7 +14,8 @@ const originalWidth = window.innerWidth;
 const dom = window as unknown as { happyDOM: { setURL: (url: string) => void } };
 const originalUrl = window.location.href;
 beforeEach(() => { window.innerWidth = 1280; dom.happyDOM.setURL("http://localhost/"); });
-afterEach(() => { cleanup(); window.innerWidth = originalWidth; dom.happyDOM.setURL(originalUrl); });
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); window.innerWidth = originalWidth; dom.happyDOM.setURL(originalUrl); });
 const job: SyncJobProgress = {
   jobId: "private-job", accountId: "acc-private", folderId: "acc-private:INBOX", mailboxPath: "acc-private:INBOX",
   mode: "full", phase: "fetching", processed: 25, estimatedTotal: 100, percent: 25, updatedAt: 1,

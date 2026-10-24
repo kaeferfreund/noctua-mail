@@ -56,7 +56,8 @@ beforeEach(() => {
       events: [], reminders: [], members: [], prefs: {}, decisions: [], threads: [], conflicts: [] });
   }) as typeof fetch;
 });
-afterEach(() => { clearInterval(tick); cleanup(); globalThis.fetch = originals.fetch; globalThis.EventSource = originals.eventSource; });
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { clearInterval(tick); cleanup(); localStorage.clear(); sessionStorage.clear(); globalThis.fetch = originals.fetch; globalThis.EventSource = originals.eventSource; });
 
 async function mount() {
   const { default: MailClient } = await import("@/app/components/MailClient");
