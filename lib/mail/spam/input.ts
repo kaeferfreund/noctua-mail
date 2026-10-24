@@ -108,7 +108,8 @@ export function configuredAuthservIds(env: Record<string, string | undefined> = 
   return (env[SPAM_AUTHSERV_ID_ENV] ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
 }
 
-const authservId = (value: string) => value.split(";")[0].replace(/\([^()]*\)/g, " ").trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+const authservId = (value: string) =>
+  value.split(";")[0].replace(/\([^()]*\)/g, " ").trim().split(/\s+/)[0]?.toLowerCase().replace(/\.$/, "") ?? "";
 
 /** The host after "by" in a Received value: the server that stamped it. */
 function receivedByHost(value: string) {
@@ -120,9 +121,10 @@ function receivedByHost(value: string) {
  * allowlist and the trusted-sender profiles: only blocks above the second
  * Received line whose authserv-id belongs to the receiving server count; of
  * those, the top-most id's block. The receiving server is the configured
- * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the organisational domain
- * of the host that stamped the top-most Received line, which no sender can
- * write. A block the sender inserted under another id (no A-R of our server)
+ * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host that stamped
+ * the top-most Received line, which no sender can write: an id matches when it
+ * is that host, its first label (MailProvider writes `by mx1.mail.example.com` and
+ * `Authentication-Results: mx1;`) or in its registrable domain. A block the sender inserted under another id (no A-R of our server)
  * is ignored. A mail without any Received line never passed an MX (local
  * append); there the top-most block counts as before.
  */
@@ -135,8 +137,10 @@ export function receivingAuthenticationResults(lines: HeaderLine[], configured: 
   const limit = receivedIndexes.length >= 2 ? receivedIndexes[1] : lines.length;
   const byHost = receivedIndexes.length ? receivedByHost(lines[receivedIndexes[0]].value) : null;
   const receiver = byHost ? getRootDomain(byHost) ?? byHost : null;
+  const isReceiver = (id: string) => byHost !== null
+    && (id === byHost || id === byHost.split(".")[0] || (getRootDomain(id) ?? id) === receiver);
   const pinned = (id: string) => (configured.length ? configured.includes(id)
-    : receiver === null ? receivedIndexes.length === 0 : (getRootDomain(id) ?? id) === receiver);
+    : byHost === null ? receivedIndexes.length === 0 : isReceiver(id));
   const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit && pinned(authservId(line.value)));
   const first = results[0] ? authservId(results[0].value) : "";
   return results.filter((line) => authservId(line.value) === first).map((line) => line.value);
