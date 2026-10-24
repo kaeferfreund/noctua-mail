@@ -10,9 +10,10 @@ import {
 import type { PushDeviceSettings } from "@/lib/push/types";
 import { invalidPushBody, pushNotConfigured, pushRoute, readPushBody, unknownPushDevice } from "../_shared";
 
-const BODY_KEYS = new Set(["subscription", "settings", "userAgent"]);
+const BODY_KEYS = new Set(["subscription", "settings", "userAgent", "previousEndpoint"]);
 const SUBSCRIPTION_KEYS = new Set(["endpoint", "keys", "expirationTime"]);
 const USER_AGENT_MAX = 512;
+const ENDPOINT_MAX = 2048;
 
 function base64UrlBytes(value: unknown) {
   return typeof value === "string" && /^[A-Za-z0-9_-]+={0,2}$/.test(value) ? Buffer.from(value, "base64url").length : -1;
@@ -48,8 +49,10 @@ export async function POST(request: Request) {
       settings = parsed;
     }
     if (!subscription || (body.userAgent !== undefined && typeof body.userAgent !== "string")) return invalidPushBody();
+    const previousEndpoint = body.previousEndpoint;
+    if (previousEndpoint !== undefined && (typeof previousEndpoint !== "string" || !previousEndpoint || previousEndpoint.length > ENDPOINT_MAX)) return invalidPushBody();
     const userAgent = ((body.userAgent as string | undefined) ?? request.headers.get("user-agent") ?? "").slice(0, USER_AGENT_MAX) || null;
-    const stored = await upsertPushSubscription({ userId: session.userId, ...subscription, userAgent, settings });
+    const stored = await upsertPushSubscription({ userId: session.userId, ...subscription, userAgent, settings, previousEndpoint });
     return okResponse({ id: stored.id, settings: stored.settings });
   });
 }
