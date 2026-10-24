@@ -35,6 +35,7 @@ import FolderSidebarPane, {
 } from "@/app/components/mailclient/folder/FolderSidebarPane";
 import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSidebarSection";
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
+import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
@@ -114,6 +115,12 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
   const showUnread = summary !== undefined && summary.unread !== null && summary.unread > 0;
   const showAssigned = summary !== undefined && summary.assignedToMe > 0;
   const showWatcher = summary !== undefined && summary.watcher.state !== "idling";
+  // A custom avatar wins; otherwise the mailbox's own address goes through the
+  // message list's sender-icon route (domain favicon, Gravatar), and the
+  // initials stay while it loads or when no logo exists.
+  const avatarSrc = account.avatar || ((account.settings?.appearance?.senderIcons ?? true)
+    ? buildSenderIconSrc(account.id, { from: account.name, fromEmail: account.email, fallback: "none" })
+    : undefined);
   const watcherLabel = summary ? t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)}) : "";
   return (
     <SidebarMenuItem>
@@ -130,7 +137,7 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
         className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
       >
         <Avatar size="sm">
-          {account.avatar ? <AvatarImage src={account.avatar} alt="" /> : null}
+          {avatarSrc ? <AvatarImage src={avatarSrc} alt="" /> : null}
           <AvatarFallback>{mailboxInitials(account)}</AvatarFallback>
         </Avatar>
         <span>{mailboxLabel(account)}</span>

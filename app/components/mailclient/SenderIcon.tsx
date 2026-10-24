@@ -15,6 +15,21 @@ type SenderIconProps = {
   unread?: boolean;
 };
 
+/** URL of the account's sender-icon route. With `fallback: "none"` the route
+ * answers 404 instead of its initials SVG when no logo is found, so callers
+ * can keep their own initials. */
+export function buildSenderIconSrc(
+  accountId: string,
+  sender: { from?: string | null; fromEmail?: string | null; fallback?: "none" }
+) {
+  const search = new URLSearchParams({
+    from: sender.from ?? ""
+  });
+  if (sender.fromEmail) search.set("fromEmail", sender.fromEmail);
+  if (sender.fallback) search.set("fallback", sender.fallback);
+  return buildAccountSenderIconPath(accountId, search);
+}
+
 export default function SenderIcon({
   accountId,
   from,
@@ -30,13 +45,10 @@ export default function SenderIcon({
     () => getSenderIdentity({ from, fromEmail }),
     [from, fromEmail]
   );
-  const src = useMemo(() => {
-    const search = new URLSearchParams({
-      from: from ?? ""
-    });
-    if (fromEmail) search.set("fromEmail", fromEmail);
-    return buildAccountSenderIconPath(accountId, search);
-  }, [accountId, from, fromEmail]);
+  const src = useMemo(
+    () => buildSenderIconSrc(accountId, { from, fromEmail }),
+    [accountId, from, fromEmail]
+  );
 
   if (!enabled || !accountId) return null;
 

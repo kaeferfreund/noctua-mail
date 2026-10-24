@@ -33,15 +33,19 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       fromEmail,
       enabled: account.settings?.appearance?.senderIcons ?? true
     });
+    const headers = {
+      "Cache-Control": "private, max-age=21600",
+      Vary: "Cookie",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'"
+    };
+    // `fallback=none`: the caller draws its own initials when no logo exists.
+    if (result.provider === null && url.searchParams.get("fallback") === "none") {
+      return new Response(null, { status: 404, headers });
+    }
 
     return new Response(new Uint8Array(result.body), {
-      headers: {
-        "Content-Type": result.contentType,
-        "Cache-Control": "private, max-age=21600",
-        Vary: "Cookie",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'"
-      }
+      headers: { "Content-Type": result.contentType, ...headers }
     });
   });
 }
