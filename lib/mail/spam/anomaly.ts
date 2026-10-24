@@ -155,13 +155,13 @@ export function detectSenderAnomalies(profile: SenderProfile, mail: SenderMailFa
 /** What the classifier needs to apply trust (classifySpam). Loaders run only when the sender could be trusted. */
 export type SpamTrustContext = {
   ownAddresses: ReadonlySet<string>;
-  /** The household-merged profile of a sender key as of `now`. */
+  /** The household-merged profile of a sender key as of `now` (the eval: only mails that arrived before). */
   loadProfile: (senderKey: string, now: number) => Promise<SenderProfile | null>;
   /** Other mails of the sender to this mailbox around `date` (burst rule). */
   loadRecent?: (senderKey: string, date: number) => Promise<RecentSenderMail[]>;
   /** Stable message key for the canary sample. */
   canaryKey: string;
-  /** Reference time for decay; the server uses the arrival (now), the eval the mail's own date. */
+  /** Reference time for decay; the server uses the check time (now), the eval the mail's arrival (spamArrivalTime). */
   now?: number;
 };
 
@@ -172,7 +172,7 @@ export type SenderTrustAssessment =
 /** Null when the sender is not trusted: the normal pipeline decides. */
 export async function assessSenderTrust(input: SpamInput, context: SpamTrustContext): Promise<SenderTrustAssessment | null> {
   const now = context.now ?? Date.now();
-  const facts = senderMailFacts(input, { ownAddresses: context.ownAddresses, date: now });
+  const facts = senderMailFacts(input, { ownAddresses: context.ownAddresses, arrivedAt: now });
   if (!facts) return null;
   const profile = await context.loadProfile(facts.senderKey, now);
   if (!profile || !evaluateSenderTrust(profile, now).trusted) return null;

@@ -1,4 +1,5 @@
 import { normalizeIdentityEmail, parseAddressEmails } from "@/lib/ownAddresses";
+import { isPublicSuffix } from "@/lib/publicSuffixes";
 import { getRootDomain } from "@/lib/senderIdentity";
 import { serverFlaggedSpam } from "./staticRules";
 import type { SpamInput } from "./types";
@@ -33,6 +34,7 @@ export type LexiconCategory = "credentials" | "payment" | "urgency" | "bankChang
 export type SenderMailFacts = {
   senderKey: string;
   fromDomain: string;
+  /** Arrival time (spamArrivalTime), not the sender's Date header. */
   date: number;
   /** aligned: SPF or DKIM pass for the From domain; unknown: no Authentication-Results at all. */
   auth: "aligned" | "unaligned" | "unknown";
@@ -110,23 +112,57 @@ export function linkDomainKey(host: string) {
   return isIpHost(value) ? value : getRootDomain(value) ?? value;
 }
 
-type AuthEntry = { method: string; result: string; domains: string[]; dkimDomain: string | null };
+type AuthEntry = { method: string; result: string; domain: string | null };
 
-/** Method results of the receiving server's Authentication-Results (input.ts keeps only its block). */
+/**
+ * Method results of the receiving server's Authentication-Results (input.ts
+ * keeps only its block). Only the identity a method authenticates counts:
+ * DKIM `header.d` (else the domain of `header.i`), SPF `smtp.mailfrom`. Selectors,
+ * `smtp.helo` and comments name nothing the sender proved to own.
+ */
 export function parseAuthenticationResults(values: string[]): AuthEntry[] {
-  return values.flatMap((value) => value.split(";").slice(1).flatMap((segment) => {
-    const match = segment.match(/^\s*([a-z0-9-]+)\s*=\s*([a-z]+)/i);
-    if (!match) return [];
-    const props = [...segment.matchAll(/\b([a-z]+\.[a-z]+)=([^\s;()]+)/gi)]
-      .map((prop) => [prop[1].toLowerCase(), prop[2].toLowerCase().replace(/^["']|["']$/g, "")] as const);
-    const domains = props.map(([, identity]) => domainOf(identity)).filter(Boolean);
-    const dkimDomain = props.find(([key]) => key === "header.d")?.[1]
-      ?? (props.find(([key]) => key === "header.i")?.[1] ? domainOf(props.find(([key]) => key === "header.i")![1]) : null);
-    return [{ method: match[1].toLowerCase(), result: match[2].toLowerCase(), domains, dkimDomain }];
-  }));
+  return values.flatMap((value) => {
+    let text = value;
+    for (let previous = ""; previous !== text;) {
+      previous = text;
+      text = text.replace(/\([^()]*\)/g, " ");
+    }
+    return text.split(";").slice(1).flatMap((segment) => {
+      const match = segment.match(/^\s*([a-z0-9-]+)\s*=\s*([a-z]+)/i);
+      if (!match) return [];
+      const method = match[1].toLowerCase();
+      const props = new Map<string, string>();
+      for (const prop of segment.matchAll(/(?:^|\s)([a-z]+\.[a-z-]+)\s*=\s*("[^"]*"|[^\s;]+)/gi)) {
+        const key = prop[1].toLowerCase();
+        if (!props.has(key)) props.set(key, prop[2].toLowerCase().replace(/^"|"$/g, ""));
+      }
+      const identity = method === "dkim" ? props.get("header.d") ?? props.get("header.i")
+        : method === "spf" ? props.get("smtp.mailfrom") : undefined;
+      return [{ method, result: match[2].toLowerCase(), domain: identity ? domainOf(identity).replace(/\.$/, "") || null : null }];
+    });
+  });
 }
 
-const aligned = (domain: string, fromDomain: string) => !!domain && getRootDomain(domain) === getRootDomain(fromDomain);
+/**
+ * Relaxed DMARC-style alignment: `domain` is the organisational domain of the
+ * From domain (public-suffix aware, getRootDomain) or one of its subdomains.
+ */
+export function isAlignedDomain(domain: string | null | undefined, fromDomain: string) {
+  const org = getRootDomain(fromDomain);
+  if (!domain || !org || isPublicSuffix(org)) return false;
+  const value = domain.toLowerCase();
+  return value === org || value.endsWith(`.${org}`);
+}
+
+/**
+ * Arrival time of a mail: the receiving server's Received stamp, else
+ * `fallback` (the caller's own clock or stored arrival); never the sender's
+ * Date header and never in the future.
+ */
+export function spamArrivalTime(input: Pick<SpamInput, "receivedAt">, fallback = Date.now()) {
+  const received = input.receivedAt ? Date.parse(input.receivedAt) : NaN;
+  return Math.min(Number.isFinite(received) ? received : fallback, Date.now());
+}
 
 const STOP_WORDS: Record<SpamLanguage, Set<string>> = {
   de: new Set("der die das und ist nicht ein eine einen zu mit für auf sie wir ihr ihre ihren den dem des von bitte sehr wie auch noch bei über sind wird werden haben hat ich sich oder".split(" ")),
@@ -195,34 +231,35 @@ const emailsOf = (value: string | null | undefined) => parseAddressEmails(value 
 /** To + Cc outside the household and the sender's own domain, sorted: who else a mail went to (burst rule). */
 export function recipientCircle(recipients: string[], senderKey: string, ownAddresses: ReadonlySet<string>) {
   const fromDomain = domainOf(senderKey);
-  return [...new Set(recipients.filter((email) => !ownAddresses.has(email) && !aligned(domainOf(email), fromDomain)))].sort().join(",");
+  return [...new Set(recipients.filter((email) => !ownAddresses.has(email) && !isAlignedDomain(domainOf(email), fromDomain)))].sort().join(",");
 }
 
 export function recipientCircleOf(to: string | null | undefined, cc: string | null | undefined, senderKey: string, ownAddresses: ReadonlySet<string>) {
   return recipientCircle([...emailsOf(to), ...emailsOf(cc)], senderKey, ownAddresses);
 }
 
-/** Extracts the facts of one mail. Null without a usable From address. */
-export function senderMailFacts(input: SpamInput, options: { ownAddresses: ReadonlySet<string>; date?: number }): SenderMailFacts | null {
+/**
+ * Extracts the facts of one mail. Null without a usable From address.
+ * `arrivedAt`: arrival time when the mail has no Received stamp (spamArrivalTime).
+ */
+export function senderMailFacts(input: SpamInput, options: { ownAddresses: ReadonlySet<string>; arrivedAt?: number }): SenderMailFacts | null {
   const senderKey = spamSenderKey(input.fromEmail);
   if (!senderKey) return null;
   const fromDomain = domainOf(senderKey);
   const auth = parseAuthenticationResults(input.authenticationResults);
   const passed = auth.filter((entry) => entry.result === "pass" && (entry.method === "spf" || entry.method === "dkim")
-    && entry.domains.some((domain) => aligned(domain, fromDomain)));
+    && isAlignedDomain(entry.domain, fromDomain));
   const spf = auth.find((entry) => entry.method === "spf")?.result;
   const recipients = [...emailsOf(input.to), ...emailsOf(input.cc)];
   const replyTo = emailsOf(input.replyTo)[0] ?? null;
-  const parsedDate = input.date ? Date.parse(input.date) : NaN;
   const messageIdDomain = input.messageId?.match(/@([^@>\s]+)>?\s*$/)?.[1];
   const score = serverSpamScore(input.spamHeaders);
   return {
     senderKey,
     fromDomain,
-    date: Number.isFinite(parsedDate) ? parsedDate : options.date ?? Date.now(),
+    date: spamArrivalTime(input, options.arrivedAt),
     auth: input.authenticationResults.length === 0 ? "unknown" : passed.length ? "aligned" : "unaligned",
-    dkimDomains: [...new Set(passed.filter((entry) => entry.method === "dkim" && entry.dkimDomain && aligned(entry.dkimDomain, fromDomain))
-      .map((entry) => entry.dkimDomain!))],
+    dkimDomains: [...new Set(passed.filter((entry) => entry.method === "dkim").map((entry) => entry.domain!))],
     spf: spf === undefined ? null : spf === "pass" || spf === "fail" || spf === "softfail" ? spf : "other",
     recipients: recipients.length,
     direct: recipients.some((email) => options.ownAddresses.has(email)),
@@ -230,7 +267,7 @@ export function senderMailFacts(input: SpamInput, options: { ownAddresses: Reado
     replyToDomain: replyTo && replyTo !== senderKey ? domainOf(replyTo) : null,
     linkHosts: input.linkDomains.map(lower).filter(Boolean),
     // A link into the sender's own domain is not deceptive, whatever its text says.
-    maskedLinkDomains: (input.maskedLinkDomains ?? []).filter((host) => !aligned(host, fromDomain)),
+    maskedLinkDomains: (input.maskedLinkDomains ?? []).filter((host) => !isAlignedDomain(host, fromDomain)),
     attachmentTypes: [...new Set(input.attachments.map(attachmentType))],
     language: guessLanguage(input.text),
     subjectPrefix: subjectPrefix(input.subject),

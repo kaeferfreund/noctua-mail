@@ -72,6 +72,22 @@ describe("buildSpamInput", () => {
     expect(input).toMatchObject({ cc: "bob@example.test", messageId: "<1@shop.example.test>", listId: "<news.shop.example.test>", autoSubmitted: "auto-generated" });
   });
 
+  test("arrival: the top-most Received stamp, also beyond the header value cap; the Date header and lower Received never count", async () => {
+    const padding = "x".repeat(700);
+    const received = [
+      `Received: from relay.example.test (relay.example.test [192.0.2.1]) (${padding})`,
+      "  by mx.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 16:59:17 +0200 (CEST)",
+      "Received: from forged.example.invalid by forged.example.invalid; Mon, 01 Jan 2024 00:00:00 +0000"
+    ].join("\r\n");
+    const withReceived = `${received}\r\n${source}`;
+    expect(buildSpamInput(await simpleParser(withReceived)).receivedAt).toBe("2026-10-24T14:59:17.000Z");
+    const headers = withReceived.slice(0, withReceived.indexOf("\r\n\r\n"));
+    expect(buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", subject: "S", headers }).receivedAt)
+      .toBe("2026-10-24T14:59:17.000Z");
+    expect(buildSpamInput(await simpleParser(source)).receivedAt).toBeNull();
+    expect(buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", date: "2026-10-23" }).receivedAt).toBeNull();
+  });
+
   test("masked links: link text naming another domain than the target", () => {
     const html = `<a href="https://login.example.invalid/x">www.bank.example.test</a> <a href="https://bank.example.test/y"><b>bank.example.test</b></a>
       <a href="https://track.example.test/c">Hier klicken</a>`;

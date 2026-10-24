@@ -11,7 +11,7 @@ export const trustedInput: SpamInput = {
   replyTo: null, to: "anna@example.test", cc: "", messageId: "<abc@mail.service.example.test>", subject: "[Service] Build passed",
   date: new Date(START + 60 * DAY).toISOString(), listId: "<builds.service.example.test>", listUnsubscribe: null, autoSubmitted: null,
   authenticationResults: ["mx.example.test; spf=pass smtp.mailfrom=bounce.service.example.test; dkim=pass header.d=service.example.test"],
-  spamHeaders: ["x-spam-status: No, score=0.1"], linkDomains: ["app.service.example.test"], maskedLinkDomains: [], attachments: [],
+  spamHeaders: ["x-spam-status: No, score=0.1"], receivedAt: new Date(START + 60 * DAY).toISOString(), linkDomains: ["app.service.example.test"], maskedLinkDomains: [], attachments: [],
   text: "Hello, the build of your project is green. You can see the details on the page. Thank you for using the service."
 };
 

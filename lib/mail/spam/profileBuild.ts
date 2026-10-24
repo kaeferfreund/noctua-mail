@@ -5,14 +5,17 @@ import { parseAddressEmails } from "@/lib/ownAddresses";
 import { findInboxFolder, isDraftsFolder, isSentFolder, isSpamFolder, isTrashFolder } from "@/lib/specialFolders";
 import type { RecentSenderMail } from "./anomaly";
 import { buildSpamInputFromMessage } from "./input";
-import { foldSenderMail, senderMailFacts, spamSenderKey, type SenderMailFacts, type SenderProfile } from "./senderProfile";
+import { emptySenderProfile, foldSenderMail, senderMailFacts, spamSenderKey, type SenderMailFacts, type SenderProfile } from "./senderProfile";
 
 /**
  * Builds the sender profiles of one account shard from its stored rows in one
  * pass (backfill and `spam-eval --trust-profiles`): no full MIME parse, only
  * the first SOURCE_HEAD_BYTES of each source for the header block and the
  * attachment names. Rows of Sent, Drafts and Trash do not count; rows in a
- * Junk folder only raise the profile's junk count.
+ * Junk folder only raise the profile's junk count. Stored "Als Spam" decisions
+ * (spam_examples) become the profile's lastUserSpamAt. A mail's time is its
+ * arrival (the Received stamp of the source head); only rows without one fall
+ * back to dateValue (rows without a stored source: no authentication either).
  */
 export const SOURCE_HEAD_BYTES = 64 * 1024;
 const HTML_LIMIT = 200_000;
@@ -86,8 +89,17 @@ type ProfileRow = {
   body: string | null; htmlBody: string | null; hasSource: number | null;
 };
 
+/** One counted mail of a sender: its facts and the row id. */
+export type SenderMailRecord = SenderMailFacts & { id: string };
+
 export type AccountProfileBuild = {
   profiles: Map<string, SenderProfile>;
+  /** The counted mails per sender by arrival (the eval folds only the mails before the judged one). */
+  mails: Map<string, SenderMailRecord[]>;
+  /** Mails per sender in Junk folders. */
+  junkMails: Map<string, number>;
+  /** Latest stored "Als Spam" decision per sender. */
+  userSpam: Map<string, number>;
   /** INBOX mails per sender (burst rule in the eval). */
   inboxMails: Map<string, Array<RecentSenderMail & { id: string }>>;
   rows: number;
@@ -116,7 +128,7 @@ export async function buildAccountSenderProfiles(params: {
     : [];
   const heads = params.sourcesDir ? await readSourceHeads(params.sourcesDir, accountId, ids) : new Map<string, SourceHead>();
 
-  const facts = new Map<string, SenderMailFacts[]>();
+  const mails = new Map<string, SenderMailRecord[]>();
   const junkMails = new Map<string, number>();
   const inboxMails: AccountProfileBuild["inboxMails"] = new Map();
   let rows = 0;
@@ -135,27 +147,47 @@ export async function buildAccountSenderProfiles(params: {
       messageId: row.messageId, listId: row.listId, listUnsubscribe: row.listUnsubscribe, body: row.body, htmlBody: row.htmlBody,
       attachments: head?.attachments, headers: head?.headers
     });
-    const mail = senderMailFacts(input, { ownAddresses: params.ownAddresses, date: row.dateValue });
-    if (!mail) continue;
-    const list = facts.get(mail.senderKey);
-    if (list) list.push(mail); else facts.set(mail.senderKey, [mail]);
+    const facts = senderMailFacts(input, { ownAddresses: params.ownAddresses, arrivedAt: row.dateValue });
+    if (!facts) continue;
+    const mail = { ...facts, id: row.id };
+    const list = mails.get(mail.senderKey);
+    if (list) list.push(mail); else mails.set(mail.senderKey, [mail]);
     if (row.folderId === inboxId) {
       const entry = { id: row.id, date: row.dateValue, circle: mail.circle };
-      const mails = inboxMails.get(mail.senderKey);
-      if (mails) mails.push(entry); else inboxMails.set(mail.senderKey, [entry]);
+      const inbox = inboxMails.get(mail.senderKey);
+      if (inbox) inbox.push(entry); else inboxMails.set(mail.senderKey, [entry]);
     }
   }
 
+  for (const list of mails.values()) list.sort((a, b) => a.date - b.date);
+  const userSpam = storedUserSpam(db, accountId);
   const profiles = new Map<string, SenderProfile>();
-  for (const [senderKey, list] of facts) {
-    list.sort((a, b) => a.date - b.date);
-    let profile: SenderProfile | null = null;
-    for (const mail of list) profile = foldSenderMail(profile, mail);
-    if (profile) profiles.set(senderKey, profile);
+  for (const senderKey of new Set([...mails.keys(), ...userSpam.keys()])) {
+    profiles.set(senderKey, foldSenderMails(senderKey, mails.get(senderKey) ?? [], junkMails.get(senderKey) ?? 0, userSpam.get(senderKey) ?? null));
   }
-  for (const [senderKey, count] of junkMails) {
-    const profile = profiles.get(senderKey);
-    if (profile) profile.junkCount += count;
+  return { profiles, mails, junkMails, userSpam, inboxMails, rows, withSource: heads.size };
+}
+
+/** The profile of `list` (sorted by arrival) with the sender's junk count and "Als Spam" time. */
+export function foldSenderMails(senderKey: string, list: readonly SenderMailFacts[], junkCount: number, lastUserSpamAt: number | null,
+  start: SenderProfile | null = null): SenderProfile {
+  let profile = start;
+  for (const mail of list) profile = foldSenderMail(profile, mail);
+  const result = profile ?? emptySenderProfile(senderKey, lastUserSpamAt ?? Date.now());
+  result.junkCount = junkCount;
+  result.lastUserSpamAt = Math.max(result.lastUserSpamAt ?? 0, lastUserSpamAt ?? 0) || null;
+  return result;
+}
+
+/** Latest "Als Spam" per sender key from the shard's stored user decisions (none on shards without the table). */
+function storedUserSpam(db: ShardDb, accountId: string) {
+  const latest = new Map<string, number>();
+  if (!db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'spam_examples'`).all().length) return latest;
+  const rows = db.prepare(`SELECT senderEmail, MAX(createdAt) AS at FROM spam_examples
+    WHERE accountId = ? AND label = 'spam' AND senderEmail IS NOT NULL GROUP BY senderEmail`).all(accountId) as Array<{ senderEmail: string; at: number }>;
+  for (const row of rows) {
+    const key = spamSenderKey(row.senderEmail);
+    if (key) latest.set(key, Math.max(latest.get(key) ?? 0, row.at));
   }
-  return { profiles, inboxMails, rows, withSource: heads.size };
+  return latest;
 }

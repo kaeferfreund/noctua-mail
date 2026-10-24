@@ -115,14 +115,29 @@ authentication and holds only while a mail matches the sender's pattern.
 **Profile** (`senderProfile.ts`, shard table `spam_sender_profiles`, one row
 per account and sender address): number of mails, first/last mail, last "Als
 Spam", mails in Junk folders, how many passed SPF or DKIM aligned with the From
-domain (relaxed: same root domain; no Authentication-Results counts as not
-aligned), DKIM domains, a histogram of To+Cc counts, how often the mailbox was
+domain, DKIM domains, a histogram of To+Cc counts, how often the mailbox was
 addressed directly, Reply-To domains, link root domains (at most 150, then
 "overflow"), masked links, attachment types, German/English by stop words,
 subject prefixes (`[tag]`, text before `:` or the first word, digits as `#`),
 lexicon categories, List-Id/List-Unsubscribe/Auto-Submitted and Message-ID
 domains. Rows of Sent, Drafts and Trash never count; Junk rows only count as
 junk. A mail after more than 180 days of silence starts the history over.
+
+**Alignment**: only the identity a method authenticated counts — DKIM
+`header.d` (else the domain of `header.i`), SPF `smtp.mailfrom`. Selectors
+(`header.s`), `smtp.helo`, comments and any other `x.y=` token never align. A
+domain is aligned when it is the organisational domain of the From domain or a
+subdomain of it; `getRootDomain` knows multi-label public suffixes
+(`lib/publicSuffixes.ts`: co.uk, com.au …), so `attacker.co.uk` is not aligned
+with `bank.co.uk`. No Authentication-Results counts as not aligned.
+
+**Time**: first and last mail are arrival times — the date of the top-most
+`Received` header, which the receiving server stamps (the sender can only add
+headers below it). The sender's `Date` header (also what `dateValue` stores)
+never counts. Without a Received stamp the server takes the check time; the
+backfill and the eval take `dateValue`, which only affects rows without a stored
+source (they have no authentication results either, so they cannot make a
+sender trusted). Arrival times in the future are capped at now.
 
 **Household view**: the profiles of the same address in all mailboxes are
 merged (counts and patterns add up, earliest first mail, latest "Als Spam";
@@ -157,8 +172,8 @@ message id) still go to the model, without any trust hint; their reasons start
 with `trusted:canary (…)`. When the model does not say ham the server logs
 `[spam] canary mismatch` (account, message id, verdict, confidence; no content).
 
-**Learning and revocation**: each saved non-spam check adds the mail to the
-mailbox's profile (once per message, as `spamCheckedAt` is set once). "Als
+**Learning and revocation**: each saved check with the result ham adds the mail
+to the mailbox's profile (spam and unsure results never do) (once per message, as `spamCheckedAt` is set once). "Als
 Spam" by a user (`POST …/messages/:id/spam`) sets the profile's `lastUserSpamAt`
 (a household-wide revocation through the merge) and resets the sender's INBOX
 rows of the last 7 days in every mailbox that were skipped as trusted; they are
@@ -172,11 +187,23 @@ Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
 **Backfill**: existing rows enter the profiles once with
 `scripts/spam-profiles-backfill.ts` (one pass per shard, only the first 64 KB of
 each source for the header block and attachment names; about 40 s for 87,000
-rows on the dev data). `--data <dir> --dry-run [--out profiles.json]` is
-read-only (`immutable=1`); the real run reads over the app's DB layer and
-replaces each account's profiles in one transaction, keeping stored "Als Spam"
-times. Run it once after the deploy of this build. Without the backfill only
-mail checked from then on builds profiles, and nobody is trusted for weeks.
+rows on the dev data). Stored "Als Spam" decisions (`spam_examples`, label
+spam) become `lastUserSpamAt`, so they revoke trust household-wide like new ones.
+`--data <dir> [--out profiles.json]` is the default dry run: read-only
+(`immutable=1`), it prints the plan per account. `--data <dir> --write` replaces
+each account's profiles over the app's DB layer in one transaction, keeping
+stored "Als Spam" times. The data dir always comes from `--data` (never from
+`NOCTUA_DATA_DIR`/.env.local), `--help` prints the usage, unknown options are
+errors, and shards without the spam schema are refused (the deployed app
+creates it under the runbook). Run it once with `--write` after the deploy of
+this build. Without the backfill only mail checked from then on builds
+profiles, and nobody is trusted for weeks.
+
+**Eval** (`spam-eval --trust-profiles [file]`): the file holds every counted
+mail's facts per sender (version 2; older files are rejected). A mail is judged
+as of its arrival with the household profile of the mails that arrived before
+it — never with itself or later mail — so the "first seen" rules fire as they
+would have on arrival.
 
 ## Learning from decisions
 
