@@ -3,7 +3,7 @@ import type { Message } from "@/lib/data";
 import {
   getComposeThreadFocusMessageId,
   getInlineComposePlacement,
-  getReaderExcludedFolderIds,
+  getReaderFolderScope,
   getRenderedThreadMessages,
   getVisibleThreadMessages
 } from "./threadViewState";
@@ -202,19 +202,19 @@ describe("getComposeThreadFocusMessageId", () => {
   });
 });
 
-describe("getReaderExcludedFolderIds", () => {
-  const accountFolderIds = ["acc:INBOX", "acc:Archive", "acc:Trash", "acc:Spam"];
+describe("getReaderFolderScope", () => {
   const threadExcludedFolderIds = new Set(["acc:Trash", "acc:Spam"]);
 
   it("leaves trash and spam out of a conversation read elsewhere", () => {
-    expect(getReaderExcludedFolderIds({
-      activeMessage: { folderId: "acc:INBOX" }, activeFolderId: "acc:INBOX", accountFolderIds, threadExcludedFolderIds
-    })).toEqual(["acc:Trash", "acc:Spam"]);
+    expect(getReaderFolderScope({
+      activeMessage: { folderId: "acc:INBOX" }, activeFolderId: "acc:INBOX", threadExcludedFolderIds
+    })).toEqual({ folderId: null, excludeFolderIds: ["acc:Trash", "acc:Spam"] });
   });
 
   it("limits a conversation read in trash to trash, as the reader shows it", () => {
-    expect(getReaderExcludedFolderIds({
-      activeMessage: { folderId: "acc:Trash" }, activeFolderId: "acc:Trash", accountFolderIds, threadExcludedFolderIds
-    })).toEqual(["acc:INBOX", "acc:Archive", "acc:Spam"]);
+    // Rows in folders the account does not list (any more) are left out as well.
+    expect(getReaderFolderScope({
+      activeMessage: { folderId: "acc:Trash" }, activeFolderId: "acc:Trash", threadExcludedFolderIds
+    })).toEqual({ folderId: "acc:Trash", excludeFolderIds: [] });
   });
 });

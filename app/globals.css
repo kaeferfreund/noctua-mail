@@ -249,7 +249,7 @@
 /* z-index ladder for fixed and portalled layers, lowest first. Modules and
    the shadcn primitives read these tokens (z-(--layer-*) in Tailwind)
    instead of repeating the numbers:
-     --layer-floating        floating calendar and composite status popover
+     --layer-floating        composite status popover (incl. its calendar)
      --layer-dialog          base shadcn dialog/sheet content, compose modal
      --layer-dialog-overlay  Radix Themes dialog overlay (.rt-BaseDialogOverlay)
      9996–9997               nested Settings/Admin dialogs and confirmations,

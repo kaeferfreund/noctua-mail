@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Dialog, Flex, Text, TextArea, TextField } from "@radix-ui/themes";
 import { Trash2 } from "lucide-react";
 import {
@@ -45,6 +46,7 @@ export default function EventDialog({
   onSaved,
   onDeleted
 }: Props) {
+  const t = useTranslations("Calendar.eventDialog");
   const isEditing = Boolean(event?.id);
   const titleRef = useRef<HTMLInputElement>(null);
   const focusRestore = useDialogFocusRestore();
@@ -85,7 +87,7 @@ export default function EventDialog({
 
   const handleSave = async () => {
     if (!summary.trim()) {
-      setError("Title is required.");
+      setError(t("titleRequired"));
       return;
     }
     const startMs = startValue ? inviteInputToMs(startValue, allDay) : Date.now();
@@ -122,13 +124,13 @@ export default function EventDialog({
       });
       const data = (await res.json()) as { ok: boolean; event?: CalendarEvent; message?: string };
       if (!res.ok || !data.ok) {
-        setError(data.message ?? "Failed to save event.");
+        setError(data.message ?? t("saveFailed"));
         return;
       }
       if (data.event) onSaved?.(data.event);
       onClose();
     } catch {
-      setError("Failed to save event.");
+      setError(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -145,13 +147,13 @@ export default function EventDialog({
         body: JSON.stringify({ eventId: event.id })
       });
       if (!res.ok) {
-        setError("Failed to delete event.");
+        setError(t("deleteFailed"));
         return;
       }
       onDeleted?.(event.id);
       onClose();
     } catch {
-      setError("Failed to delete event.");
+      setError(t("deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -168,13 +170,13 @@ export default function EventDialog({
         onCloseAutoFocus={focusRestore.onCloseAutoFocus}>
         <Flex direction="column" gap="3">
           <DialogTitleBar
-            title={isEditing ? "Edit Event" : "New Event"}
+            title={isEditing ? t("editTitle") : t("newTitle")}
             onClose={onClose}
           />
 
           <Flex direction="column" gap="2">
             <TextField.Root
-              placeholder="Event title"
+              placeholder={t("titlePlaceholder")}
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               ref={titleRef}
@@ -213,9 +215,9 @@ export default function EventDialog({
           />
 
           <Flex direction="column" gap="1">
-            <Text size="1" color="gray">Description</Text>
+            <Text size="1" color="gray">{t("description")}</Text>
             <TextArea
-              placeholder="Description (optional)"
+              placeholder={t("descriptionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -237,17 +239,17 @@ export default function EventDialog({
                 disabled={deleting || saving}
               >
                 <Trash2 size={14} />
-                Delete
+                {t("delete")}
               </Button>
             ) : (
               <span />
             )}
             <Flex gap="2">
               <Button size="2" variant="soft" color="gray" onClick={onClose} disabled={saving || deleting}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button size="2" onClick={handleSave} disabled={saving || deleting || !summary.trim()}>
-                {saving ? "Saving…" : isEditing ? "Save" : "Create"}
+                {saving ? t("saving") : isEditing ? t("save") : t("create")}
               </Button>
             </Flex>
           </Flex>

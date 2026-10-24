@@ -363,3 +363,12 @@ test("provenance adoption revokes historical targeted invites and preserves deli
     expect(db.prepare(`SELECT revokedAt FROM invite_codes WHERE code='synthetic-new-operator'`).get().revokedAt).toBeNull();
   }finally{db.close();}
 });
+
+test("user deletion drops the deleted user's push devices and keeps everyone else's",async()=>{
+  const f=await setup(),actor=await enrolled(f),target=await enrolled(f,"user");
+  const device=f.master.prepare(`INSERT INTO push_subscriptions(id,userId,endpoint,p256dh,auth,settings) VALUES(?,?,?,'synthetic-key','synthetic-auth','{}')`);
+  device.run("synthetic-target-device",target.user.id,"https://fcm.googleapis.com/fcm/send/synthetic-target");
+  device.run("synthetic-actor-device",actor.user.id,"https://fcm.googleapis.com/fcm/send/synthetic-actor");
+  await removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{});
+  expect(f.master.prepare(`SELECT id FROM push_subscriptions ORDER BY id`).all()).toEqual([{id:"synthetic-actor-device"}]);
+});

@@ -345,6 +345,19 @@ describe("trusted senders", () => {
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Vertrauter Absender (25 Mails seit 2026-03, DKIM service.example.test); Abweichung: neue Link-Domain bit.ly");
   });
 
+  test("a static rule hint vetoes the skip; a weak hint does not", async () => {
+    const hint = (spamHits: number, hamHits: number) => parseStaticRules({ hints: [{ type: "domain", value: "service.example.test", spamHits, hamHits }] });
+    const model = mockSpamModel(answer({ verdict: "ham", confidence: 0.9, reasons: ["Benachrichtigung"] }));
+    const decision = await classifySpam({ input: trustedInput, staticRules: hint(4, 0), getExamples: async () => [], model, trust: trust(plainId) });
+    expect(decision).toMatchObject({ source: "model", minThreshold: 0.9, trust: { kind: "anomaly", anomalies: ["passt zu einer Spam-Regel (siehe Hinweise)"] } });
+    const prompt = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(prompt).toContain("Hinweis: domain „service.example.test“ – bisher 4× Spam, 0× kein Spam");
+    expect(prompt).toContain("Abweichung: passt zu einer Spam-Regel");
+    expect(await classifySpam({ input: trustedInput, staticRules: hint(1, 3), getExamples: async () => [], model, trust: trust(plainId) }))
+      .toMatchObject({ source: "trusted:profile", trust: { kind: "skip" } });
+    expect(model.doGenerateCalls).toHaveLength(1);
+  });
+
   test("allowlist, static deny and a user's \"Als Spam\" keep precedence over trust", async () => {
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.95, reasons: ["Vom Nutzer als Spam markiert"] }));
     const deny = parseStaticRules({ deny: [{ type: "domain", value: "service.example.test", safe: true }] });

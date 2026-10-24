@@ -65,6 +65,16 @@ it("selects own/shared mailboxes and a mode, displays both on token rows", async
   expect(page.getAllByText("Read only").length).toBe(2);
 });
 
+it("names the full endpoint URL and marks mailbox names as user text inside their labels", async () => {
+  const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetic own", email: "own@example.test" }];
+  const page = render(<Theme><McpTabContent accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={async () => response({ ok: true, mailboxes, tokens: [] })} onClose={() => {}} /></Theme>);
+  const label = (await page.findByRole("checkbox", { name: "Synthetic own (own@example.test)" })).closest("label")!;
+  expect(label.querySelector("[data-user-text]")?.textContent).toBe("Synthetic own (own@example.test)");
+  expect(label.style.overflowWrap).toBe("");
+  const url = `${window.location.origin}/api/mcp`;
+  expect(page.getByText(url).getAttribute("title")).toBe(url);
+});
+
 it("shows only accessible mailbox names plus a count, warns before revoking other mailboxes, labels invalid scopes", async () => {
   const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetic own", email: "own@example.test" },
     { id: "synthetic-shared", name: "Synthetic shared", email: "shared@example.test" }];

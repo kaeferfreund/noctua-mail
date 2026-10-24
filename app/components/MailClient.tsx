@@ -185,6 +185,7 @@ import {
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
+import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
 import {
   formatMailboxPageTitle,
   formatMessageHtmlPageTitle,
@@ -226,7 +227,7 @@ import {
   getComposeThreadFocusMessageId,
   getDefaultExpandedMessageIds,
   getInlineComposePlacement,
-  getReaderExcludedFolderIds as getReaderExcludedFolderIdsFor,
+  getReaderFolderScope as getReaderFolderScopeFor,
   getRenderedThreadMessages,
   isThreadMessageCollapsed,
   printWithLoadedBodies
@@ -1658,7 +1659,7 @@ export default function MailClient({
 
   // useAccountController: manages account/folder CRUD and initial data load
   const {
-    mailboxState, security: authSecurity, bootstrapError, logout,
+    mailboxState, security: authSecurity, bootstrapError, foldersUnavailableAccountId, logout,
     loadInitialData,
     switchAccount,
     saveAccount,
@@ -2868,11 +2869,13 @@ export default function MailClient({
   });
   const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
   // The summary feed is the user-wide unread source; it is empty while it
-  // (re)connects, so only a sign-out clears the app icon badge.
+  // (re)connects, so only a sign-out clears the app icon badge. A device with
+  // push settings counts the same mailboxes as its pushes, or shows no badge.
+  const pushDeviceSettings = useCurrentPushDeviceSettings(authState === "ok");
   useEffect(() => {
     if (authState === "unauth") setAppBadge(0);
-    else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries));
-  }, [authState, mailboxSummaries]);
+    else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries, pushDeviceSettings));
+  }, [authState, mailboxSummaries, pushDeviceSettings]);
   const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   activeMessageRef.current = activeMessage ?? null;
@@ -4452,15 +4455,14 @@ export default function MailClient({
     threadRelatedCandidatesKey
   ]);
 
-  const getReaderExcludedFolderIds = useCallback(
+  const getReaderFolderScope = useCallback(
     (active: Message) =>
-      getReaderExcludedFolderIdsFor({
+      getReaderFolderScopeFor({
         activeMessage: active,
         activeFolderId,
-        accountFolderIds: accountFolders.map((folder) => folder.id),
         threadExcludedFolderIds: excludedFolderIdsForThreads
       }),
-    [accountFolders, activeFolderId, excludedFolderIdsForThreads]
+    [activeFolderId, excludedFolderIdsForThreads]
   );
 
   // Reader content: a bounded header window around the selected message.
@@ -4499,7 +4501,7 @@ export default function MailClient({
       });
       return;
     }
-    const excludeFolderIds = getReaderExcludedFolderIds(active);
+    const { folderId, excludeFolderIds } = getReaderFolderScope(active);
     const key = [
       activeAccountId,
       threadId,
@@ -4508,6 +4510,7 @@ export default function MailClient({
       groupBy,
       threadDateSource,
       supportsThreads ? "window" : "single",
+      folderId ?? "",
       excludeFolderIds.join(",")
     ].join("|");
     logListDebug("info", "thread-related:content-effect:request", {
@@ -4522,6 +4525,7 @@ export default function MailClient({
       windowed: supportsThreads,
       messageIds: [active.id],
       excludeFolderIds,
+      folderId,
       groupBy,
       threadDateSource
     });
@@ -4531,7 +4535,7 @@ export default function MailClient({
     activeAccountId,
     activeFolderId,
     activeMessageThreadKey,
-    getReaderExcludedFolderIds,
+    getReaderFolderScope,
     groupBy,
     loadThreadContent,
     threadDateSource,
@@ -4551,12 +4555,12 @@ export default function MailClient({
       void loadThreadPage({
         threadId: active.threadId ?? active.messageId ?? active.id,
         direction,
-        excludeFolderIds: getReaderExcludedFolderIds(active),
+        ...getReaderFolderScope(active),
         groupBy,
         threadDateSource
       });
     },
-    [getReaderExcludedFolderIds, groupBy, loadThreadPage, threadDateSource]
+    [getReaderFolderScope, groupBy, loadThreadPage, threadDateSource]
   );
   const printReader = useCallback(() => {
     void printWithLoadedBodies({
@@ -4847,7 +4851,9 @@ export default function MailClient({
 
   const [openBottomStatusPanel, setOpenBottomStatusPanel] = useState<BottomStatusPanel>(null);
 
-  const deepLinkSelectionRef = useRef<Message | null>(null);
+  // The linked message the list still has to highlight. `revision` is the list read current when the
+  // link last asked for a page (null: none asked yet); the next page is asked for once that read is replaced.
+  const deepLinkSelectionRef = useRef<{ message: Message; revision: number | null } | null>(null);
   const deepLinkState: DeepLinkState = {
     accountId: activeAccountId, folderId: activeFolderId,
     messageId: viewMessage?.accountId === activeAccountId ? viewMessage.id : "",
@@ -4859,7 +4865,8 @@ export default function MailClient({
     calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
   };
   const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
-    ready: authState === "ok" && initialDataReady && initialFoldersLoadedAccountId === activeAccountId,
+    ready: authState === "ok" && initialDataReady &&
+      (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
     state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
     applyPlace: requested => {
       const targetView = requested.query.trim() || requested.badges.length ? null : requested.view;
@@ -4900,24 +4907,32 @@ export default function MailClient({
       setViewMessage(message); selectReaderLayout(message.id);
       setActiveMessageId(message.id); selectionStore.setSelection(new Set([message.id]), message.id);
       setPendingSelectionCollapseMessageId(message.id); setPendingSelectionScrollMessageId(message.id);
-      deepLinkSelectionRef.current = message;
+      deepLinkSelectionRef.current = { message, revision: null };
     },
     notice: kind => pushNotice({ type: "info", title: tn(`deepLink.${kind}`) }),
     onTransaction: scrollAnchors.onTransaction
   });
   useEffect(() => {
-    const target = deepLinkSelectionRef.current;
-    if (!target || viewMessage?.id !== target.id || target.accountId !== activeAccountId) return;
+    const pending = deepLinkSelectionRef.current;
+    if (!pending) return;
+    const target = pending.message;
+    if (viewMessage?.id !== target.id || target.accountId !== activeAccountId) return;
     if (filteredMessages.some(message => message.id === target.id)) {
       selectionStore.setSelection(new Set([target.id]), target.id); setActiveMessageId(target.id);
       setPendingSelectionCollapseMessageId(target.id); setPendingSelectionScrollMessageId(target.id);
       deepLinkSelectionRef.current = null;
     } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId &&
-      messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
-      // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
-      setMessagesPage(page => page + 1);
+      pending.revision !== authoritativeRevision) {
+      if (messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
+        // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
+        pending.revision = authoritativeRevision;
+        setMessagesPage(page => page + 1);
+      } else if (pending.revision !== null) {
+        // The last page the link may read came without the target: pages the user loads later must not jump to it.
+        deepLinkSelectionRef.current = null;
+      }
     }
-  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
+  }, [activeAccountId, activeVirtualFolderId, authoritativeRevision, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
 
   useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
   const handleNoticeOpen = (notice: InAppNotice) => {
