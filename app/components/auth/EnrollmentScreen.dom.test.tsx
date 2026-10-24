@@ -1,9 +1,12 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import EnrollmentScreen from "./EnrollmentScreen";
 import { clientFixture, proof, setup } from "./authTestHelpers";
 
+// The "stores nothing" assertion below is about this screen, not about what other
+// test files left in the shared happy-dom storage (file order differs on CI runners).
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 afterEach(cleanup);
 function start(view: ReturnType<typeof render>) {
   fireEvent.change(view.getByLabelText("Current password"), { target: { value: "synthetic-password" } });
