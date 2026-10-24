@@ -47,7 +47,9 @@ export function getImapLogger() {
 export async function logImapOp<T>(
   op: string,
   details: Record<string, unknown>,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  // True when the owner closed the client itself (teardown, abort): not a server failure.
+  options: { cancelled?: () => boolean } = {}
 ) {
   const logger = getImapLogger();
   if (logger === false) {
@@ -78,9 +80,12 @@ export async function logImapOp<T>(
   } catch (error) {
     const ms = Date.now() - start;
     const suffix = meta ? ` ${meta}` : "";
-    logger.warn?.(
-      `[imap] ${op}${suffix} ${ms}ms error=${(error as Error)?.message ?? String(error)}`
-    );
+    const message = (error as Error)?.message ?? String(error);
+    if (options.cancelled?.()) {
+      logger.info?.(`[imap] ${op}${suffix} ${ms}ms cancelled=${message}`);
+    } else {
+      logger.warn?.(`[imap] ${op}${suffix} ${ms}ms error=${message}`);
+    }
     throw error;
   }
 }

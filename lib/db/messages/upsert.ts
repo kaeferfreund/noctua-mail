@@ -155,6 +155,17 @@ export async function upsertMessages(
        FROM messages
        WHERE accountId = ? AND id = ?`
     );
+    // A reply synced before its ancestors falls back to a thread named after the
+    // nearest missing ancestor's Message-ID (lib/threading.ts). When that ancestor
+    // arrives, its own thread absorbs the stranded rows: one indexed lookup per reply.
+    const findStrandedThreadRows = db.prepare(
+      `SELECT id, threadId, messageId, dateValue FROM messages WHERE accountId = ? AND threadId = ?`
+    );
+    const relinkStrandedRow = db.prepare(
+      `UPDATE messages SET threadId = ?,
+         parentId = CASE WHEN parentId IS NULL AND inReplyTo = ? THEN ? ELSE parentId END
+       WHERE accountId = ? AND id = ?`
+    );
     const findFolderMessageDuplicates = db.prepare(
       `SELECT id, threadId, messageId, dateValue, folderId, mailboxPath, imapUid, flags, sizeBytes, deliveredTo, originalTo, senderIdentityId
        FROM messages
@@ -652,6 +663,13 @@ export async function upsertMessages(
           message.senderIdentityId ?? existingRow?.senderIdentityId ?? null
           // End sender identity metadata.
         );
+        if (message.messageId && message.threadId && message.threadId !== message.messageId) {
+          for (const row of findStrandedThreadRows.all(accountId, message.messageId) as ReplacedRow[]) {
+            if (row.id === rowId) continue;
+            relinkStrandedRow.run(message.threadId, message.messageId, rowId, accountId, row.id);
+            remaps.push({ ...row, oldThreadId: row.threadId, newThreadId: message.threadId });
+          }
+        }
         ftsWriter.insert(accountId, rowId, ftsRowid, [
           message.subject,
           message.from,

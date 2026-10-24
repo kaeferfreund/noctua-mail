@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import { render } from "@/lib/i18n/testRender";
 import ShellPanes from "@/app/components/shell/ShellPanes";
-import ReaderToolbar from "@/app/components/mailclient/message/ReaderToolbar";
+import ReaderToolbar, { ReaderFocusHint } from "@/app/components/mailclient/message/ReaderToolbar";
 import MessageListView from "@/app/components/mailclient/messagelist/MessageListView";
 import { reviewListProps } from "@/tests/helpers/i18nSlice2b";
 import { handleMessageRowKeyDown } from "@/app/components/mailclient/messagelist/listInteractions";
@@ -29,11 +29,12 @@ function FocusHarness({ mobile = false }: { mobile?: boolean }) {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [changeLayout, mobile, readerLayout]);
-  const toolbar = <ReaderToolbar layout={readerLayout} showHint={hintMessageId === "synthetic"} dismissHint={dismissHint}
+  const toolbar = <><ReaderToolbar layout={readerLayout}
     toggleLayout={() => changeLayout(readerLayout === "split" ? "focus" : "split")} back={() => changeLayout("split")}
     archive={() => {}} spam={() => {}} inSpam={false} remove={() => {}} move={() => {}} topics={() => {}} done={() => {}}
     isDone={false} busy={false} renderMenu={() => null} openWindow={() => {}} position={1} total={2} hasMore={false}
-    previous={() => {}} next={() => {}} canPrevious={false} canNext navigating={false} />;
+    previous={() => {}} next={() => {}} canPrevious={false} canNext navigating={false} />
+    {readerLayout === "split" && hintMessageId === "synthetic" && <ReaderFocusHint dismiss={dismissHint} />}</>;
   return <Theme><button onClick={onNavigate}>Synthetic folder</button><ShellPanes readerLayout={readerLayout}
     list={<div ref={scroll} data-testid="scroll"><div role="button" tabIndex={0} data-testid="row" data-selected={selected}
       onClick={() => { setSelected(true); onSelect("synthetic"); }}

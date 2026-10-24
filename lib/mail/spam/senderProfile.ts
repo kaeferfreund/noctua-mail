@@ -25,6 +25,10 @@ export const TRUSTED_SPAM_THRESHOLD = 0.9;
 
 const RECIPIENT_BUCKETS = 51;
 const CAPS = { dkimDomains: 10, replyToDomains: 20, linkDomains: 150, attachmentTypes: 20, subjectPrefixes: 40, lexicon: 8, messageIdDomains: 10 };
+/** Of the kept link domains, this many are the most frequent; the rest of the cap holds the most recently seen. */
+const LINK_DOMAINS_FREQUENT = 100;
+/** Message keys a profile remembers (newest last), so a mail is counted once even when it is checked again. */
+export const PROFILE_MAIL_IDS = 256;
 
 type Counts = Record<string, number>;
 export type SpamLanguage = "de" | "en";
@@ -69,6 +73,10 @@ export type SenderProfile = {
   lastSeenAt: number;
   lastUserSpamAt: number | null;
   junkCount: number;
+  /** Keys (profileMailKey) of the latest mails counted into `count`, newest last; at most PROFILE_MAIL_IDS. */
+  mailIds: string[];
+  /** Keys of the latest mails counted into `junkCount`, newest last; at most PROFILE_MAIL_IDS. */
+  junkMailIds: string[];
   authAligned: number;
   authUnknown: number;
   dkimDomains: Counts;
@@ -78,9 +86,10 @@ export type SenderProfile = {
   replyToCount: number;
   replyToDomains: Counts;
   linkMailCount: number;
+  /** Bounded (capLinkDomains): the most frequent link root domains plus the most recently seen ones. */
   linkDomains: Counts;
-  /** More distinct link domains than the cap: "never seen" is no longer reliable. */
-  linkDomainsOverflow: boolean;
+  /** Last arrival per kept link domain. */
+  linkDomainsSeenAt: Counts;
   maskedLinkCount: number;
   attachmentCount: number;
   attachmentTypes: Counts;
@@ -282,39 +291,91 @@ export function senderMailFacts(input: SpamInput, options: { ownAddresses: Reado
 
 export function emptySenderProfile(senderKey: string, date: number): SenderProfile {
   return {
-    senderKey, count: 0, firstSeenAt: date, lastSeenAt: date, lastUserSpamAt: null, junkCount: 0,
+    senderKey, count: 0, firstSeenAt: date, lastSeenAt: date, lastUserSpamAt: null, junkCount: 0, mailIds: [], junkMailIds: [],
     authAligned: 0, authUnknown: 0, dkimDomains: {}, recipients: Array(RECIPIENT_BUCKETS).fill(0), directCount: 0,
-    replyToCount: 0, replyToDomains: {}, linkMailCount: 0, linkDomains: {}, linkDomainsOverflow: false, maskedLinkCount: 0,
+    replyToCount: 0, replyToDomains: {}, linkMailCount: 0, linkDomains: {}, linkDomainsSeenAt: {}, maskedLinkCount: 0,
     attachmentCount: 0, attachmentTypes: {}, languages: { de: 0, en: 0 }, subjectPrefixes: {}, lexicon: {}, serviceCount: 0, messageIdDomains: {}
   };
 }
 
-/** Keeps the `cap` most frequent keys; returns whether any were dropped. */
+/** Keeps the `cap` most frequent keys. */
 function capCounts(counts: Counts, cap: number) {
   const keys = Object.keys(counts);
-  if (keys.length <= cap) return false;
+  if (keys.length <= cap) return;
   keys.sort((a, b) => counts[b] - counts[a] || (a < b ? -1 : 1));
   for (const key of keys.slice(cap)) delete counts[key];
-  return true;
 }
 
 function bump(counts: Counts, keys: Iterable<string | null>, cap: number) {
   for (const key of new Set(keys)) if (key) counts[key] = (counts[key] ?? 0) + 1;
-  return capCounts(counts, cap);
+  capCounts(counts, cap);
 }
 
 /**
- * Adds one mail to a profile (in place). After TRUST_DECAY_MS without mail the
- * history starts over: a long silent sender is new again. A user's "Als Spam"
- * survives the restart.
+ * Link domains stay a bounded but live set, so "new link domain" keeps working
+ * for senders with many domains: the LINK_DOMAINS_FREQUENT most frequent
+ * domains and, for the rest of the cap, the most recently seen. A flood of
+ * one-off domains only displaces other rare domains, never the usual ones,
+ * and a domain that recurs climbs into the frequent part.
  */
-export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailFacts): SenderProfile {
+function capLinkDomains(profile: Pick<SenderProfile, "linkDomains" | "linkDomainsSeenAt">) {
+  const { linkDomains: counts, linkDomainsSeenAt: seenAt } = profile;
+  const keys = Object.keys(counts);
+  if (keys.length <= CAPS.linkDomains) return;
+  const recency = (a: string, b: string) => (seenAt[b] ?? 0) - (seenAt[a] ?? 0) || (a < b ? -1 : 1);
+  const frequent = new Set([...keys].sort((a, b) => counts[b] - counts[a] || recency(a, b)).slice(0, LINK_DOMAINS_FREQUENT));
+  const rest = keys.filter((key) => !frequent.has(key)).sort(recency);
+  for (const key of rest.slice(CAPS.linkDomains - LINK_DOMAINS_FREQUENT)) {
+    delete counts[key];
+    delete seenAt[key];
+  }
+}
+
+/** FNV-1a (32 bit) of a string. */
+function fnv1a(key: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/** Short key of a message row id for the profile's id lists. */
+export const profileMailKey = (messageId: string) => fnv1a(messageId).toString(36);
+
+function rememberMailKey(keys: string[], messageId: string) {
+  keys.push(profileMailKey(messageId));
+  if (keys.length > PROFILE_MAIL_IDS) keys.splice(0, keys.length - PROFILE_MAIL_IDS);
+}
+
+/** Whether the mail is already counted into the profile (a re-check after a revocation, a backfill catch-up). */
+export const hasProfileMail = (profile: SenderProfile, messageId: string) => profile.mailIds.includes(profileMailKey(messageId));
+
+/** Counts one mail of the sender as junk once (Junk folder, "Als Spam", auto-move); false when already counted. */
+export function addProfileJunk(profile: SenderProfile, messageId: string) {
+  if (profile.junkMailIds.includes(profileMailKey(messageId))) return false;
+  profile.junkCount += 1;
+  rememberMailKey(profile.junkMailIds, messageId);
+  return true;
+}
+
+/**
+ * Adds one mail to a profile (in place); with `id` the profile remembers it
+ * (hasProfileMail). After TRUST_DECAY_MS without mail the history starts over:
+ * a long silent sender is new again. A user's "Als Spam" and the junk count
+ * survive the restart.
+ */
+export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailFacts & { id?: string }): SenderProfile {
   let target = profile;
   if (!target || (target.count > 0 && facts.date - target.lastSeenAt > TRUST_DECAY_MS)) {
     const fresh = emptySenderProfile(facts.senderKey, facts.date);
     fresh.lastUserSpamAt = target?.lastUserSpamAt ?? null;
+    fresh.junkCount = target?.junkCount ?? 0;
+    fresh.junkMailIds = target?.junkMailIds ?? [];
     target = fresh;
   }
+  if (facts.id !== undefined) rememberMailKey(target.mailIds, facts.id);
   target.count += 1;
   if (facts.date < target.firstSeenAt || target.count === 1) target.firstSeenAt = facts.date;
   if (facts.date > target.lastSeenAt || target.count === 1) target.lastSeenAt = facts.date;
@@ -329,7 +390,11 @@ export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailF
   }
   if (facts.linkHosts.length) {
     target.linkMailCount += 1;
-    if (bump(target.linkDomains, facts.linkHosts.map(linkDomainKey), CAPS.linkDomains)) target.linkDomainsOverflow = true;
+    for (const key of new Set(facts.linkHosts.map(linkDomainKey))) {
+      target.linkDomains[key] = (target.linkDomains[key] ?? 0) + 1;
+      target.linkDomainsSeenAt[key] = Math.max(target.linkDomainsSeenAt[key] ?? 0, facts.date);
+    }
+    capLinkDomains(target);
   }
   if (facts.maskedLinkDomains.length) target.maskedLinkCount += 1;
   if (facts.attachmentTypes.length) {
@@ -346,7 +411,7 @@ export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailF
 
 function addCounts(target: Counts, source: Counts, cap: number) {
   for (const [key, value] of Object.entries(source)) target[key] = (target[key] ?? 0) + value;
-  return capCounts(target, cap);
+  capCounts(target, cap);
 }
 
 /**
@@ -374,7 +439,11 @@ export function mergeSenderProfiles(profiles: SenderProfile[], now = Date.now())
     merged.languages.en += profile.languages.en;
     addCounts(merged.dkimDomains, profile.dkimDomains, CAPS.dkimDomains);
     addCounts(merged.replyToDomains, profile.replyToDomains, CAPS.replyToDomains);
-    if (addCounts(merged.linkDomains, profile.linkDomains, CAPS.linkDomains) || profile.linkDomainsOverflow) merged.linkDomainsOverflow = true;
+    for (const [key, value] of Object.entries(profile.linkDomains)) {
+      merged.linkDomains[key] = (merged.linkDomains[key] ?? 0) + value;
+      merged.linkDomainsSeenAt[key] = Math.max(merged.linkDomainsSeenAt[key] ?? 0, profile.linkDomainsSeenAt[key] ?? 0);
+    }
+    capLinkDomains(merged);
     addCounts(merged.attachmentTypes, profile.attachmentTypes, CAPS.attachmentTypes);
     addCounts(merged.subjectPrefixes, profile.subjectPrefixes, CAPS.subjectPrefixes);
     addCounts(merged.lexicon, profile.lexicon, CAPS.lexicon);
@@ -388,6 +457,7 @@ export type SenderTrust = { trusted: true } | { trusted: false; reason: string }
 /** Concept §3.2: history, authentication and no "Als Spam" — the per-mail anomalies are checked separately. */
 export function evaluateSenderTrust(profile: SenderProfile | null, now = Date.now()): SenderTrust {
   if (!profile || profile.count === 0) return { trusted: false, reason: "unbekannter Absender" };
+  // Final on purpose: a later "Kein Spam" never resets lastUserSpamAt (doc/SPAM-DETECTION.md, Trusted senders).
   if (profile.lastUserSpamAt !== null) return { trusted: false, reason: "vom Nutzer als Spam markiert" };
   if (now - profile.lastSeenAt > TRUST_DECAY_MS) return { trusted: false, reason: "lange keine Mail" };
   if (profile.count < TRUST_MIN_MAILS) return { trusted: false, reason: "zu wenige Mails" };
@@ -419,12 +489,7 @@ export function recipientP95(profile: SenderProfile) {
 
 /** Deterministic canary sample (FNV-1a of the message id). */
 export function isTrustCanary(key: string, percent = TRUST_CANARY_PERCENT) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0) % 10_000 < percent * 100;
+  return fnv1a(key) % 10_000 < percent * 100;
 }
 
 const PROFILE_COLUMNS = new Set(["senderKey", "count", "firstSeenAt", "lastSeenAt", "lastUserSpamAt"]);
@@ -440,7 +505,9 @@ export function senderProfileFromRow(row: SenderProfileRow): SenderProfile {
   let patterns: Partial<SenderProfile> = {};
   try { patterns = JSON.parse(row.patterns || "{}") as Partial<SenderProfile>; } catch { patterns = {}; }
   const base = emptySenderProfile(row.senderKey, row.firstSeenAt);
-  const profile: SenderProfile = { ...base, ...patterns, senderKey: row.senderKey, count: row.count, firstSeenAt: row.firstSeenAt,
+  // Profiles stored before the bounded link-domain set carried an overflow flag that switched the rule off.
+  const { linkDomainsOverflow: _legacyOverflow, ...current } = patterns as Partial<SenderProfile> & { linkDomainsOverflow?: boolean };
+  const profile: SenderProfile = { ...base, ...current, senderKey: row.senderKey, count: row.count, firstSeenAt: row.firstSeenAt,
     lastSeenAt: row.lastSeenAt, lastUserSpamAt: row.lastUserSpamAt ?? null };
   if (!Array.isArray(profile.recipients) || profile.recipients.length !== RECIPIENT_BUCKETS) profile.recipients = base.recipients;
   return profile;
