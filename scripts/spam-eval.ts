@@ -3,7 +3,7 @@
  *
  *   bun scripts/spam-eval.ts --data /path/to/noctua-data [--sample eval-sample.json]
  *     [--rules static-rules.json] [--limit 200 [--stratified]] [--concurrency 4] [--threshold 0.85]
- *     [--out eval-result.json]
+ *     [--out eval-result.json] [--trust-profiles [profiles.json]]
  *
  * --limit N takes the first N items (the sample lists spam first); with
  * --stratified it takes N/2 spam and N/2 ham instead.
@@ -16,18 +16,29 @@
  * names messages by subject and sender only, plus the model's token usage, the
  * prompt-cache hit rate and a cost estimate (prices: SPAM_MODEL_PRICES in config). --out writes every evaluated item
  * with its decision as JSON (input for scripts/spam-apply.ts).
+ *
+ * --trust-profiles builds the household sender profiles from the data dir (one
+ * read-only pass per shard) and applies trusted senders with the anomaly gate
+ * before the model, as the server does. With a file argument the profiles are
+ * read from that file when it exists, otherwise built and written there (the
+ * output of scripts/spam-profiles-backfill.ts --dry-run --out works as well).
+ * Trust is judged as of each mail's arrival (Received stamp, else dateValue;
+ * 180-day decay) with the household history of the mails that arrived before
+ * it, as the server would have seen it then.
  */
-import { Database, constants } from "bun:sqlite";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { simpleParser } from "mailparser";
-import type { Folder } from "../lib/data";
 import { sentToAddressInDb } from "../lib/db/sentRecipients";
-import { buildOwnIdentitySets, type SpamAllowlistContext } from "../lib/mail/spam/allowlist";
+import type { SpamAllowlistContext } from "../lib/mail/spam/allowlist";
+import type { SpamTrustContext } from "../lib/mail/spam/anomaly";
 import { classifySpam, shouldMarkAsSpam } from "../lib/mail/spam/classifySpam";
 import { isValidThreshold, resolveSpamConfig, SPAM_MODEL_PRICES } from "../lib/mail/spam/config";
+import { openSpamDataDir } from "../lib/mail/spam/evalData";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
+import { loadHouseholdProfiles, type HouseholdProfiles } from "../lib/mail/spam/profileFile";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
+import { spamArrivalTime } from "../lib/mail/spam/senderProfile";
 import { loadStaticRules, serverFlaggedSpam, staticRulesPath } from "../lib/mail/spam/staticRules";
 import type { SpamEvalRecord } from "../lib/mail/spam/apply";
 import type { SpamDecision, SpamInput } from "../lib/mail/spam/types";
@@ -40,6 +51,11 @@ type Outcome = { item: Item; subject: string; sender: string; fromEmail: string 
 function arg(name: string) {
   const index = process.argv.indexOf(`--${name}`);
   return index > 0 ? process.argv[index + 1] : undefined;
+}
+/** Value of an option whose argument is optional (`--trust-profiles [file]`). */
+function optionalArg(name: string) {
+  const value = arg(name);
+  return value && !value.startsWith("--") ? value : undefined;
 }
 
 const dataDir = path.resolve(arg("data") ?? process.env.NOCTUA_DATA_DIR ?? "");
@@ -54,32 +70,14 @@ const concurrency = Math.max(1, Number(arg("concurrency") ?? 4));
 const config = resolveSpamConfig(null);
 const threshold = isValidThreshold(Number(arg("threshold"))) ? Number(arg("threshold")) : config.threshold;
 const model = getSpamLanguageModel(config);
+const trustProfiles = process.argv.includes("--trust-profiles");
+const trustFile = optionalArg("trust-profiles");
+if (trustFile && !path.relative(dataDir, path.resolve(trustFile)).startsWith("..")) throw new Error("--trust-profiles <file> must not point into the data dir");
 
-// immutable=1: never take locks or touch the -wal/-shm files of a live data dir.
-function openReadOnly(file: string) {
-  const flags = (constants as Record<string, number>).SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI;
-  return new Database(`file:${encodeURI(file)}?immutable=1`, flags);
-}
-
-const main = openReadOnly(path.join(dataDir, "db", "main.db"));
-const accounts = main.prepare("SELECT id, email, dbPath FROM accounts").all() as Array<{ id: string; email: string; dbPath: string | null }>;
-const identities = main.prepare("SELECT email FROM sender_identities").all() as Array<{ email: string }>;
-main.close();
-const own = buildOwnIdentitySets([...accounts.map((account) => account.email), ...identities.map((identity) => identity.email)]);
-
-const shards = new Map<string, { db: Database; folders: Folder[] }>();
-function shard(accountId: string) {
-  let entry = shards.get(accountId);
-  if (!entry) {
-    const account = accounts.find((candidate) => candidate.id === accountId);
-    const file = account?.dbPath && existsSync(account.dbPath) ? account.dbPath : path.join(dataDir, "db", "accounts", `${accountId}.db`);
-    const db = openReadOnly(file);
-    const folders = db.prepare("SELECT * FROM folders WHERE accountId = ?").all(accountId) as Folder[];
-    entry = { db, folders };
-    shards.set(accountId, entry);
-  }
-  return entry;
-}
+// immutable=1 (evalData.ts): never take locks or touch the -wal/-shm files of a live data dir.
+const data = openSpamDataDir(dataDir);
+const { accounts, own } = data;
+const shard = (accountId: string) => data.shard(accountId);
 
 /** Deterministic PRNG for the fallback sample (mulberry32). */
 function random(seed: number) {
@@ -121,6 +119,13 @@ const selected = limit <= 0 ? items
   : items.slice(0, limit);
 const rules = await loadStaticRules(rulesPath);
 let usage = EMPTY_SPAM_USAGE;
+let household: HouseholdProfiles | null = null;
+if (trustProfiles) {
+  const started = performance.now();
+  household = await loadHouseholdProfiles(data, trustFile ? path.resolve(trustFile) : null);
+  console.log(`Trust profiles: ${household.senders} senders (${household.trusted} trusted) from ${household.rows} rows, `
+    + `${household.source === "file" ? `read from ${trustFile}` : "built from the data dir"} in ${((performance.now() - started) / 1000).toFixed(1)} s`);
+}
 
 async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<string, unknown> } | null> {
   const { db } = shard(item.accountId);
@@ -138,6 +143,7 @@ async function evaluate(item: Item): Promise<Outcome | null> {
   if (!loaded) return null;
   const { input, row } = loaded;
   const { db, folders } = shard(item.accountId);
+  const trust: SpamTrustContext | null = household ? household.context(item.accountId, item.id, spamArrivalTime(input, Number(row.dateValue) || Date.now())) : null;
   const sent = findSentFolder(folders, item.accountId);
   const allowlist: SpamAllowlistContext = {
     ...own,
@@ -150,7 +156,7 @@ async function evaluate(item: Item): Promise<Outcome | null> {
     mailboxPath: typeof row.mailboxPath === "string" ? row.mailboxPath : null, serverFlag: item.serverSpamFlag ?? serverFlaggedSpam(input)
   };
   try {
-    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model,
+    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model, trust,
       providerOptions: getSpamProviderOptions(config), onUsage: (call) => { usage = addSpamUsage(usage, call); } });
     return { ...base, decision, marked: shouldMarkAsSpam(decision, threshold) };
   } catch (error) {
@@ -166,7 +172,7 @@ await Promise.all(Array.from({ length: concurrency }, async () => {
     if (outcome) outcomes.push(outcome);
   }
 }));
-for (const { db } of shards.values()) db.close();
+data.close();
 
 const of = (label: "spam" | "ham") => outcomes.filter((outcome) => outcome.item.label === label);
 const spam = of("spam");
@@ -200,6 +206,26 @@ flaggedHamMarked.forEach((outcome) => console.log(line(outcome)));
 const allowlistedSpam = spam.filter((outcome) => outcome.decision?.source === "allowlist" || outcome.decision?.source === "static-allow");
 console.log(`Spam passed by allowlist/allow rules: ${allowlistedSpam.length}`);
 allowlistedSpam.slice(0, 30).forEach((outcome) => console.log(`${line(outcome)} [${outcome.decision?.source}: ${outcome.decision?.reasons.join("; ")}]`));
+if (household) {
+  const trusted = (kind: string) => outcomes.filter((outcome) => outcome.decision?.trust?.kind === kind);
+  const canaries = trusted("canary");
+  const mismatches = canaries.filter((outcome) => outcome.decision?.trust?.kind === "canary" && outcome.decision.trust.mismatch);
+  const anomalous = trusted("anomaly");
+  console.log(`Trusted senders: ${trusted("skip").length} skipped as trusted:profile (no model call), ${canaries.length} canary checks, `
+    + `${mismatches.length} canary mismatches, ${anomalous.length} trusted with anomalies (model, threshold 0.9)`);
+  mismatches.forEach((outcome) => console.log(`${line(outcome)} [canary: ${outcome.decision?.verdict} ${outcome.decision?.confidence}]`));
+  const reasons: Record<string, number> = {};
+  for (const outcome of anomalous) {
+    for (const anomaly of outcome.decision?.trust?.kind === "anomaly" ? outcome.decision.trust.anomalies : []) {
+      const key = anomaly.replace(/\d+(?:\.\d+)?/g, "n").replace(/(Domain|Link|Anhang) \S+/g, "$1 …").replace(/\([^)]*\)$/, "").trim();
+      reasons[key] = (reasons[key] ?? 0) + 1;
+    }
+  }
+  console.log(`Anomalies by rule: ${JSON.stringify(Object.fromEntries(Object.entries(reasons).sort((a, b) => b[1] - a[1])))}`);
+  const markedTrusted = anomalous.filter((outcome) => outcome.marked);
+  console.log(`Trusted with anomalies marked as spam: ${markedTrusted.length}`);
+  markedTrusted.forEach((outcome) => console.log(`${line(outcome)} [${outcome.decision?.trust?.kind === "anomaly" ? outcome.decision.trust.anomalies.join("; ") : ""}]`));
+}
 const errors = outcomes.filter((outcome) => outcome.error);
 if (errors.length) console.log(`Errors: ${errors.length} (first: ${errors[0].error})`);
 if (usage.calls) {

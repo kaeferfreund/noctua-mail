@@ -98,4 +98,12 @@ describe("senderIdentity", () => {
     expect(getRootDomain("mail.apple.com")).toBe("apple.com");
     expect(getRootDomain("localhost")).toBe("localhost");
   });
+
+  it("keeps the registrable label under multi-label public suffixes", () => {
+    expect(getRootDomain("mail.bank.co.uk")).toBe("bank.co.uk");
+    expect(getRootDomain("bank.co.uk")).toBe("bank.co.uk");
+    expect(getRootDomain("co.uk")).toBe("co.uk");
+    expect(getRootDomain("news.shop.com.au")).toBe("shop.com.au");
+    expect(getRootDomain("a.b.example.de")).toBe("example.de");
+  });
 });

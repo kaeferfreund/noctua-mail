@@ -1,6 +1,8 @@
 import { generateText, Output, type LanguageModel, type SystemModelMessage } from "ai";
 import { z } from "zod";
 import { matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
+import { assessSenderTrust, type SpamTrustContext } from "./anomaly";
+import { isTrustCanary, TRUSTED_SPAM_THRESHOLD } from "./senderProfile";
 import { applyStaticRules, isBuiltinRule, type StaticRule, type StaticRuleType, type StaticRules } from "./staticRules";
 import { SPAM_SYSTEM_CACHE_OPTIONS, type SpamModelProviderOptions } from "./provider";
 import type { SpamDecision, SpamExample, SpamInput } from "./types";
@@ -48,7 +50,8 @@ function formatExample(example: SpamExample, index: number) {
 const HINT_LEGEND = `Hinweise aus Regeln in der Anfrage bedeuten:
 - „Starker Hinweis“: der Mailserver (SpamAssassin) hat die Nachricht selbst als Spam gekennzeichnet.
 - „Hinweis“: eine aus früheren Spam-Mails abgeleitete Regel passt; „bisher n× Spam, m× kein Spam“ sagt, wie oft sie bei Spam und bei echter Mail zutraf.
-- „Schwacher Hinweis“: die Regel traf bei echter Mail mindestens so oft zu wie bei Spam; allein kein Grund für "spam".`;
+- „Schwacher Hinweis“: die Regel traf bei echter Mail mindestens so oft zu wie bei Spam; allein kein Grund für "spam".
+- „Vertrauter Absender; Abweichung“: der Absender schreibt diesem Haushalt seit Langem mit gültiger Signatur, diese Mail weicht aber vom gewohnten Muster ab. Prüfe, ob das Absenderkonto übernommen wurde; eine harmlose Abweichung allein ist kein Grund für "spam".`;
 
 const CATALOGUE_GROUPS: Array<[StaticRuleType, string]> = [
   ["address", "Absender"],
@@ -142,8 +145,9 @@ export function buildSpamPrompt(input: SpamInput, examples: SpamExample[], hints
   return parts.join("\n\n");
 }
 
-export function shouldMarkAsSpam(decision: Pick<SpamDecision, "verdict" | "confidence"> | null, threshold: number) {
-  return decision?.verdict === "spam" && decision.confidence >= threshold;
+/** A decision's own stricter threshold (trusted senders) raises the mailbox threshold, never lowers it. */
+export function shouldMarkAsSpam(decision: Pick<SpamDecision, "verdict" | "confidence" | "minThreshold"> | null, threshold: number) {
+  return decision?.verdict === "spam" && decision.confidence >= Math.max(threshold, decision.minThreshold ?? 0);
 }
 
 export type ClassifySpamParams = {
@@ -158,6 +162,8 @@ export type ClassifySpamParams = {
   timeoutMs?: number;
   /** Token usage of the model call, when one was made. */
   onUsage?: (usage: SpamTokenUsage) => void;
+  /** Learned sender profiles (trusted senders); without it every undecided mail goes to the model. */
+  trust?: SpamTrustContext | null;
 };
 
 /** Rejects once `signal` aborts, even if the provider ignores the signal. */
@@ -171,11 +177,17 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal) {
 }
 
 /**
- * Allowlist → static rules → model. Returns null when the model is needed but
- * not available (static-only mode): the message then stays unchecked.
- * Model errors (network, 429, timeout, invalid output) are thrown to the caller.
- * A user's latest "Als Spam" for the sender outranks static allow rules: the
- * model then decides, with that decision among the examples.
+ * Allowlist → static rules → trusted sender profile → model. Returns null when
+ * the model is needed but not available (static-only mode): the message then
+ * stays unchecked. Model errors (network, 429, timeout, invalid output) are
+ * thrown to the caller. A user's latest "Als Spam" for the sender outranks
+ * static allow rules and trust: the model then decides, with that decision
+ * among the examples.
+ *
+ * A trusted sender without anomalies is ham without a model call, except for
+ * the canary sample, which the model checks without any trust hint. A trusted
+ * sender with anomalies goes to the model with the deviations as a hint and
+ * the stricter TRUSTED_SPAM_THRESHOLD.
  */
 export async function classifySpam(params: ClassifySpamParams): Promise<SpamDecision | null> {
   const { input } = params;
@@ -190,13 +202,22 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
   if (rules.decision === "deny") {
     return { verdict: "spam", confidence: 1, reasons: ["Absender oder Muster laut Regel eindeutig Spam"], source: "static-deny" };
   }
+  const trust = params.trust && !userSaidSpam ? await assessSenderTrust(input, params.trust) : null;
+  const skip: SpamDecision | null = trust?.kind === "skip"
+    ? { verdict: "ham", confidence: 1, reasons: [`trusted:profile (${trust.summary})`], source: "trusted:profile", trust: { kind: "skip" } }
+    : null;
+  const canary = Boolean(skip && params.trust && isTrustCanary(params.trust.canaryKey));
+  if (skip && (!canary || !params.model)) return skip;
   if (!params.model) return null;
+  const hints = trust?.kind === "anomaly"
+    ? [...rules.hints, `Vertrauter Absender (${trust.summary}); Abweichung: ${trust.anomalies.join(", ")}`]
+    : rules.hints;
   const timeout = AbortSignal.timeout(params.timeoutMs ?? SPAM_MODEL_TIMEOUT_MS);
   const abortSignal = params.abortSignal ? AbortSignal.any([params.abortSignal, timeout]) : timeout;
   const { output, usage } = await abortable(generateText({
     model: params.model,
     system: spamSystemMessage(params.staticRules),
-    prompt: buildSpamPrompt(input, await params.getExamples(), rules.hints),
+    prompt: buildSpamPrompt(input, await params.getExamples(), hints),
     output: Output.object({ schema: spamVerdictSchema }),
     providerOptions: params.providerOptions,
     maxOutputTokens: 2048,
@@ -205,7 +226,13 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
     abortSignal
   }), abortSignal);
   params.onUsage?.(spamUsageFromSdk(usage));
-  return { ...output, reasons: output.reasons.map((reason) => reason.trim()).filter(Boolean), source: "model" };
+  const decision: SpamDecision = { ...output, reasons: output.reasons.map((reason) => reason.trim()).filter(Boolean), source: "model" };
+  if (skip && trust) {
+    return { ...decision, reasons: [`trusted:canary (Stichprobe, ${trust.summary})`, ...decision.reasons],
+      minThreshold: TRUSTED_SPAM_THRESHOLD, trust: { kind: "canary", mismatch: decision.verdict !== "ham" } };
+  }
+  if (trust?.kind === "anomaly") return { ...decision, minThreshold: TRUSTED_SPAM_THRESHOLD, trust: { kind: "anomaly", anomalies: trust.anomalies } };
+  return decision;
 }
 
 const ALLOWLIST_REASONS = {

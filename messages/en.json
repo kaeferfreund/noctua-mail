@@ -1075,6 +1075,7 @@
       "model": "Model",
       "threshold": "Threshold (0.5–1)",
       "thresholdHelp": "A message is marked only for \"spam\" with at least this confidence.",
+      "trustCounters": "Trusted senders: {skips, number} skipped without the model, {canaries, number} samples, {mismatches, number} of them disagreeing",
       "unavailable": "Model not usable ({reason}). Until then only the allowlist and fixed rules apply.",
       "save": "Save",
       "saved": "Saved.",
