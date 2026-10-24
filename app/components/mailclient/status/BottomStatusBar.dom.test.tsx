@@ -38,6 +38,11 @@ function Harness({ initial = null, overrides = {} }: {
   return <I18nTestProvider locale="de"><Theme><BottomStatusBar {...props()} {...overrides} openPanel={openPanel} setOpenPanel={setOpenPanel} /></Theme></I18nTestProvider>;
 }
 
+function LocaleHarness({ locale }: { locale: "de" | "en" }) {
+  const [openPanel, setOpenPanel] = useState<BottomStatusPanel>(window.innerWidth < 768 ? null : "reminder");
+  return <I18nTestProvider locale={locale}><Theme><BottomStatusBar {...props()} activeAccountId="synthetic-account" openPanel={openPanel} setOpenPanel={setOpenPanel} /></Theme></I18nTestProvider>;
+}
+
 describe("compact header status", () => {
   for (const [name, overrides, state, count] of [
     ["idle", {}, "idle", 0],
@@ -81,6 +86,32 @@ describe("compact header status", () => {
     const section = panel === "calendar" || panel === "reminders" ? "reminder" : panel === "exceptions" ? "exception" : panel;
     expect(popover.querySelector(`[data-status-section="${section}"] button`)?.getAttribute("aria-expanded")).toBe("true");
     if (panel === "calendar") expect(within(popover).getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
+  });
+  // The calendar opens from a named trigger in both frames; the phone Sheet
+  // then carries the noun title, the desktop section the way back.
+  for (const [locale, trigger, sheetTitle, back] of [
+    ["de", "Kalender öffnen", "Kalender", "Demnächst"],
+    ["en", "Open calendar", "Calendar", "Upcoming"]
+  ] as const) it(`names the calendar trigger in ${locale}`, async () => {
+    const network = spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+      async () => Response.json({ items: [], conflicts: [] }), { preconnect: globalThis.fetch.preconnect }));
+    try {
+      const harness = () => <LocaleHarness locale={locale} />;
+      const desktop = render(harness());
+      const popover = await desktop.findByRole("dialog");
+      fireEvent.click(within(popover).getByRole("button", { name: trigger }));
+      await waitFor(() => expect(popover.querySelector('[data-calendar-frame="popover"]')).toBeTruthy());
+      // The same toggle now leads back to the list (beside the section heading button).
+      expect(within(popover).queryByRole("button", { name: trigger })).toBeNull();
+      expect(within(popover).getAllByRole("button", { name: back })).toHaveLength(2);
+      cleanup();
+      window.innerWidth = 390;
+      const phone = render(harness());
+      fireEvent.keyDown(phone.getByRole("button", { name: locale === "de" ? "Aktivität und Kalender" : "Activity and calendar" }), { key: "Enter" });
+      fireEvent.click(await phone.findByRole("menuitem", { name: trigger }));
+      const sheet = await phone.findByRole("dialog", { name: sheetTitle });
+      expect(sheet.querySelector('[data-calendar-frame="phone"]')).toBeTruthy();
+    } finally { network.mockRestore(); }
   });
   it("resolves private identifiers to names and invokes retry; Details are readable", async () => {
     let retried: SyncJobProgress | undefined;
