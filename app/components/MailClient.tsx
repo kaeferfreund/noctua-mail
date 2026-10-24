@@ -169,7 +169,6 @@ import {
   buildAccountComposeRecipientsPath,
   buildAccountDraftSendPath,
   buildAccountDraftDiscardPath,
-  buildAccountFoldersPath,
   buildAccountMessageTopicsPath,
   buildAccountAttachmentPath,
   buildAccountMessageTopicSuggestionsPath,
@@ -405,6 +404,7 @@ type ActiveTopicSuggestionsResponse = {
 
 import { useLocale, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
+import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 
 const skipReaderRowsSubscription = () => () => {};
@@ -569,28 +569,7 @@ export default function MailClient({
     apiFetch
   });
 
-  const activeAccountIdRef = useRef(activeAccountId);
-  activeAccountIdRef.current = activeAccountId;
-  const refreshFolders = useCallback(async (accountIdOverride?: string): Promise<Folder[] | null> => {
-    const targetAccountId = accountIdOverride?.trim() || activeAccountId;
-    if (!targetAccountId) {
-      setFolders([]);
-      return [];
-    }
-    try {
-      const foldersRes = await apiFetch(buildAccountFoldersPath(targetAccountId));
-      if (foldersRes.ok) {
-        const nextFolders = (await foldersRes.json()) as Folder[];
-        if (activeAccountIdRef.current === targetAccountId) setFolders(nextFolders);
-        return nextFolders;
-      } else {
-        reportError(await readErrorMessage(foldersRes));
-      }
-    } catch {
-      reportError(tn("refreshFoldersFailed"));
-    }
-    return null;
-  }, [activeAccountId, apiFetch, reportError, readErrorMessage, setFolders, tn]);
+  const refreshFolders = useFolderRefresh({ activeAccountId, apiFetch, reportError, readErrorMessage, setFolders });
 
   const [groupBy, setGroupBy] = useState<
     "none" | "date" | "week" | "sender" | "domain" | "year" | "folder" | "event"

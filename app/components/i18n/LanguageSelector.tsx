@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { isUiLocale, localeCookie, localeCookieMaxAge, type UiLocalePreference } from "@/lib/i18n/config";
 import { useLocalePreferences } from "./I18nProvider";
+import { nativeControlBaseClass } from "@/app/components/account-settings/Field";
 
 export default function LanguageSelector({ authenticated = false }: { authenticated?: boolean }) {
   const t = useTranslations("Settings.language");
@@ -50,7 +51,7 @@ export default function LanguageSelector({ authenticated = false }: { authentica
   if (!authenticated && initial.uiLocale !== null) return null;
   return <div className="grid gap-1 text-sm">
     <label htmlFor={id}>{t("label")}</label>
-    <select id={id} className="rounded-md border bg-background p-2" value={preference ?? "automatic"} disabled={loading || saving || pending} onChange={event => void change(isUiLocale(event.target.value) ? event.target.value : null)}>
+    <select id={id} className={nativeControlBaseClass} value={preference ?? "automatic"} disabled={loading || saving || pending} onChange={event => void change(isUiLocale(event.target.value) ? event.target.value : null)}>
       <option value="de">{t("german")}</option>
       <option value="en">{t("english")}</option>
       <option value="automatic">{t("automatic")}</option>

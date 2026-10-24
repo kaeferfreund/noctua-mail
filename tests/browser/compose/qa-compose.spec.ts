@@ -198,9 +198,9 @@ test('sender identities: personal From, signature replacement, saved draft reope
   await page.getByLabel('Personal signature',{exact:true}).selectOption('custom');
   await page.getByLabel('Personal signature text',{exact:true}).fill('Regards,\n{{user.name}}\n{{identity.email}}');
   const prefSaved=page.waitForResponse(response=>response.url().endsWith('/prefs')&&response.request().method()==='PUT');
-  await page.getByRole('button',{name:'Save sender preferences',exact:true}).click();
+  await page.getByRole('button',{name:'Save preferences',exact:true}).click();
   expect((await prefSaved).status()).toBe(200);
-  await expect(page.getByText('Sender preferences saved.',{exact:true})).toBeVisible();
+  await expect(page.getByText('Preferences saved.',{exact:true})).toBeVisible();
   await page.keyboard.press('Escape');
   await openCompose(page);
   const from=page.getByLabel('From:',{exact:true});
