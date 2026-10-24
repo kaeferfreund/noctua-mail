@@ -20,6 +20,8 @@ const {getDb,getAccountDb,closeAllDbConnections}=await import("../lib/db/connect
 const {encodeSecret,decodeSecret}=await import("../lib/secret");
 const {totpFromUri}=await import("../tests/helpers/totp");
 let server:ChildProcess|undefined, serverLog="";
+// Report what is actually installed; these packages do not export ./package.json, so read it from node_modules.
+const installedVersion=(name:string)=>String(JSON.parse(readFileSync(path.join(root,"node_modules",name,"package.json"),"utf8")).version);
 const sensitive:string[]=[];
 class Jar {
   cookies=new Map<string,string>();
@@ -172,5 +174,5 @@ try {
   for(const secret of sensitive) if(secret)assert.ok(!serverLog.includes(secret),"server logs exposed synthetic capability");
   assert.ok(!serverLog.includes("Admin invite code:"));
   console.log("PASS startup/request logs contain no known synthetic password, hash, TOTP seed, backup code, session/challenge cookie, MCP token or recovery capability");
-  console.log("SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun "+process.versions.bun+", port "+port+", synthetic isolated storage only");
+  console.log("SMOKE PASS: compiled Next "+installedVersion("next")+", Better Auth "+installedVersion("better-auth")+"/passkey "+installedVersion("@better-auth/passkey")+", Bun "+process.versions.bun+", port "+port+", synthetic isolated storage only");
 } finally { await stop();closeAllDbConnections();rmSync(scratch,{recursive:true,force:true}); }

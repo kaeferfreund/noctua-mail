@@ -702,26 +702,28 @@ bun --env-file=.env.local scripts/recoverTeamAuth.ts --application-stopped --con
 
 ## Production and restore smoke
 
-`bun scripts/smokeTeamAuth.ts` uses only port 3785 and fresh worktree-local `.tmp` storage,
+`bun scripts/smokeTeamAuth.ts` uses only port 3799 (`AUTH_SMOKE_PORT`) and fresh worktree-local `.tmp` storage,
 canonical origin/proxy headers with real Secure cookies, the compiled production mount and
-production limits. `bun run test:auth-browser` starts compiled Next on port 3784 (`AUTH_BROWSER_PORT`, default 3784), seeds offline,
+production limits. `bun run test:auth-browser` starts compiled Next on port 3799 (`AUTH_BROWSER_PORT`, default 3799), seeds offline,
 and exercises all real wrappers/mounts. It contains no custom HTTP auth interception or disabled
-runtime limits. ARM requires `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64`; reuse the
-fresh build with `AUTH_BROWSER_USE_BUILD=1`. Both runners stop only their own child processes.
+runtime limits. Install the browser once per Playwright version with `bunx playwright install chromium`;
+reuse the fresh build with `AUTH_BROWSER_USE_BUILD=1`. Both runners stop only their own child processes.
 The auth/master/shard/key restore probe is synthetic Stage 1 evidence; application-wide restore
 and household go-live stay Stage 4 (TEAM-INBOX.md §11).
 
 ### Browser acceptance
 
-Pinned Playwright 1.58.2 uses synthetic isolated identities and real Chromium/CDP CTAP2 ceremonies.
+Pinned Playwright 1.64.1 uses synthetic isolated identities and real Chromium/CDP CTAP2 ceremonies.
 The suite exercises actual compiled login/enrollment/reset/security screens and retains real
 registration/assertion/replay, server UV=false rejection, RP/origin mismatch, grant/challenge binding,
 rotated sessions, reset/revoke invalidation and finalizer quarantine fault cases. A minimal intercepted
 fixture page remains only for WebAuthn controls; no signature/callback is mocked. The compiled mount
 and production policy limits are active. Offline helper scripts never expose an HTTP test route.
 HAR, screenshots, video and traces are disabled to avoid recording capabilities. Both runners fail
-on occupied ports and stop only their own processes. ARM install/runtime uses the Ubuntu 24.04
-platform override. Virtual-authenticator results do not replace canonical physical phone/PWA tests.
+on occupied ports and stop only their own processes. Playwright 1.64.1 supports Ubuntu 26.04 on ARM
+directly: plain `bunx playwright install chromium` installs Chrome for Testing (chromium v1248), and the
+`PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64` workaround in the 1.58.2 evidence below is no
+longer needed. Virtual-authenticator results do not replace canonical physical phone/PWA tests.
 
 ## Route inventory
 

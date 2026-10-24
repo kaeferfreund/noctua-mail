@@ -10,8 +10,15 @@ import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles
 // import.meta.dirname, which is the same directory.
 const projectDir = path.resolve(import.meta.dirname);
 
+// Reset links carry a one-time capability in their path or query. Keep every
+// spelling a client may send out of the request log, not only the issued
+// /reset-password?token= and /api/ba/reset-password/<token> forms: any letter
+// case, any percent-encoded character, wherever "reset-password" appears.
+const RESET_PASSWORD_ANY_SPELLING = new RegExp([..."reset-password"]
+  .map((char) => `(?:${char}|%${char.charCodeAt(0).toString(16)})`).join(""), "i");
+
 const nextConfig: NextConfig = {
-  logging: { incomingRequests: { ignore: [/\/api\/ba\/reset-password\//, /\/reset-password(?:\?|$)/] } },
+  logging: { incomingRequests: { ignore: [RESET_PASSWORD_ANY_SPELLING] } },
   async headers() {
     return [{ source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
