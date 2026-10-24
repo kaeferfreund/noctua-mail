@@ -164,15 +164,19 @@ describe("planned SSE reconnect", () => {
     expect(streamParams(sources[1]).get("activeFolderId")).toBe("synthetic-a:Archive");
   });
 
-  test("reconnect while hidden closes the source and waits for visibility before reopening", async () => {
+  test("reconnect while hidden closes the source, polls in the background and reopens on visibility", async () => {
     const h = mount(undefined, undefined, "ok");
-    await act(async () => {});
+    await act(async () => { sources[0].dispatchEvent(new Event("open")); });
+    expect(h.result.current.streamMode).toBe("stream");
+    // `visibilitychange` was missed: the page is hidden but still in stream mode.
     visibility("hidden");
-    act(() => { sources[0].dispatchEvent(new Event("reconnect")); });
+    await act(async () => { sources[0].dispatchEvent(new Event("reconnect")); });
     expect(sources).toHaveLength(1);
     expect(sources[0].closes).toBe(1);
-    expect(intervalSpy).not.toHaveBeenCalled();
-    expect(h.requests.some(path => path.includes("/imap/poll"))).toBe(false);
+    expect(h.result.current.streamMode).toBe("polling");
+    expect(h.result.current.mailCheckMode).toBe("polling");
+    expect(intervalSpy.mock.calls.filter(([, ms]) => ms === 300000)).toHaveLength(1);
+    expect(h.requests.filter(path => path.includes("/imap/poll"))).toHaveLength(1);
     visibility("visible");
     act(() => { document.dispatchEvent(new Event("visibilitychange")); });
     expect(sources).toHaveLength(2);
