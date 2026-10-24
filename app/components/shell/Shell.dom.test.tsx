@@ -131,7 +131,14 @@ describe("shell sidebar", () => {
       expect(row.closest("[data-sidebar=menu]")?.hasAttribute("data-domain-group")).toBe(true);
       expect(row.className).toContain("pl-8");
     }
-    expect(view.getByText("a.example.test").parentElement!.className).toContain("font-medium");
+    const heading = view.getByText("a.example.test").parentElement!;
+    expect(heading.className).toContain("font-medium");
+    // Flat nesting: heading and its rows are siblings in the section, with
+    // no group wrapper adding padding; heading and rows share one height.
+    expect(heading.nextElementSibling?.hasAttribute("data-domain-group")).toBe(true);
+    expect(heading.parentElement!.getAttribute("data-sidebar")).toBe("group-content");
+    expect(heading.parentElement!.parentElement!.className).toContain("md:px-0");
+    for (const element of [heading, ...rows]) expect(element.className).toContain("h-8");
     view.unmount();
     const short = renderSidebar(accounts.slice(0, 6), () => {});
     expect(short.queryByText("a.example.test")).toBeNull();
