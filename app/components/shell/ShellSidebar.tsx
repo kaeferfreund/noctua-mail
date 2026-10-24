@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/i18n/format";
 import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
-import { memo, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
@@ -81,16 +81,26 @@ const ACTIVE_ROW_CLASS = "data-[active=true]:bg-[var(--iris-3)] data-[active=tru
 /** A clicked mailbox row before the switch commits: the accent fill at once
  * (also under the pointer), pulsing while the mailbox loads. */
 const PENDING_ROW_CLASS = "aria-busy:bg-[var(--iris-3)] aria-busy:text-[var(--iris-11)] aria-busy:animate-pulse aria-busy:cursor-progress";
+/** On desktop the inset sidebar frame already pads the panel, so mailbox and
+ * view rows span their section and the row's own padding is the only one
+ * before its content. The phone sheet has no frame; the section keeps its
+ * padding there. */
+const FLUSH_SECTION_CLASS = "md:px-0";
+/** Rows that reach the edges of the scrolling sidebar content draw their
+ * focus ring inside, where the scroll container cannot clip it. */
+const FLUSH_ROW_RING_CLASS = "ring-inset";
+/** Mailbox rows and domain headings share one height: 32 px, 40 px on phones. */
+const MAILBOX_ROW_HEIGHT_CLASS = "h-8 max-md:h-10";
 /** Rows under a domain heading: the name (or custom avatar) starts where the
- * heading's text does (icon slot + gap), while the row's hover and active
- * fill still spans the indent. */
+ * heading's text does (row padding + icon slot + gap), while the row's hover
+ * and active fill still spans the indent. */
 const GROUPED_ROW_CLASS = "pl-8";
 /** Thin tree guide down the left of a domain group's rows, under the centre
  * of the heading's 16 px icon slot; drawn above the row fills. */
 const DOMAIN_GROUP_GUIDE_CLASS = "relative isolate before:pointer-events-none before:absolute before:inset-y-0 before:left-[15px] before:z-10 before:w-px before:bg-sidebar-border";
 /** The domain heading toggles its group: menu-row hover and focus ring, and
  * the active fill while it hides the active mailbox. */
-const DOMAIN_HEADER_CLASS = "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2";
+const DOMAIN_HEADER_CLASS = "flex w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2";
 
 type MailboxRowProps = {
   account: ShellAccount;
@@ -145,7 +155,7 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
           : account.email}
         aria-current={isActive ? "true" : undefined}
         aria-busy={isPending ? "true" : undefined}
-        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, grouped && GROUPED_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
+        className={cn(MAILBOX_ROW_HEIGHT_CLASS, FLUSH_ROW_RING_CLASS, ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, grouped && GROUPED_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
       >
         {avatarSrc ? (
           <Avatar size="sm" className="empty:hidden">
@@ -155,7 +165,7 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
         <span>{mailboxLabel(account)}</span>
       </SidebarMenuButton>
       {summary && (
-        <SidebarMenuBadge className="right-1 w-auto min-w-0 gap-1.5 px-0.5 text-2xs">
+        <SidebarMenuBadge className="right-1 w-auto min-w-0 gap-1.5 px-0.5 text-2xs max-md:peer-data-[size=default]/menu-button:top-2.5">
           <MailboxCount
             label={summary.unread === null ? t("mailboxes.unreadUnavailable") : t("mailboxes.unread", {count: summary.unread})}
             {...(showUnread && { title: t("mailboxes.unreadTitle"), icon: <Mail className="size-2.5" aria-hidden="true" />, value: summary.unread! })}
@@ -228,8 +238,11 @@ export function MailboxRows({
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
   const { collapsed, toggle } = useCollapsedDomains(userId);
+  // Headings and row lists are siblings: no wrapper per group adds padding
+  // or margins of its own; a heading after the first opens with the gap
+  // between groups.
   return (
-    <div>
+    <>
       {groups.map((group, index) => {
         // Expanded by default; a collapsed group shows its totals on the
         // heading and is tinted while it hides the active mailbox.
@@ -238,12 +251,12 @@ export function MailboxRows({
         const hidesActive = isCollapsed && group.accounts.some(account => account.id === activeAccountId);
         const groupListId = `${listId}-${index}`;
         return (
-          <div key={group.domain ?? "all"} className={cn(grouped && "mt-3 first:mt-1")}>
+          <Fragment key={group.domain ?? "all"}>
             {grouped ? (
               <button
                 type="button"
                 data-slot="domain-group-toggle"
-                className={cn(DOMAIN_HEADER_CLASS, ACTIVE_ROW_CLASS, !isCollapsed && "mb-1")}
+                className={cn(DOMAIN_HEADER_CLASS, MAILBOX_ROW_HEIGHT_CLASS, FLUSH_ROW_RING_CLASS, ACTIVE_ROW_CLASS, index > 0 && "mt-2")}
                 aria-expanded={!isCollapsed}
                 aria-controls={groupListId}
                 data-active={hidesActive ? "true" : undefined}
@@ -251,7 +264,7 @@ export function MailboxRows({
               >
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
-                <span className="flex size-4 shrink-0 items-center justify-center">
+                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
                   {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
                 </span>
                 <span className="min-w-0 truncate">{group.domain ?? t("mailboxes.other")}</span>
@@ -274,10 +287,10 @@ export function MailboxRows({
                 />
               ))}
             </SidebarMenu>
-          </div>
+          </Fragment>
         );
       })}
-    </div>
+    </>
   );
 }
 
@@ -296,7 +309,7 @@ export function ViewRow({ view }: { view: ShellView }) {
           preflight `[hidden]` rule the content's `hidden` attribute would not
           hide it. `hidden: false` drops the icon-rail default attribute. */}
       <SidebarMenuButton
-        className={cn(styles.viewButton, ACTIVE_ROW_CLASS)}
+        className={cn(styles.viewButton, FLUSH_ROW_RING_CLASS, ACTIVE_ROW_CLASS)}
         data-view-id={view.id}
         isActive={view.active}
         onClick={view.onSelect}
@@ -392,7 +405,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                 </SidebarMenuItem></SidebarMenu>
               ) : null}
             </SidebarGroup>
-            <SidebarGroup>
+            <SidebarGroup className={FLUSH_SECTION_CLASS}>
               <SidebarGroupLabel>{t("mailboxes.mine")}</SidebarGroupLabel>
               {mailboxes.onAdd && <SidebarGroupAction title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
                 <Plus />
@@ -413,7 +426,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               </SidebarGroupContent>
             </SidebarGroup>
             {shared.length > 0 ? (
-              <SidebarGroup>
+              <SidebarGroup className={FLUSH_SECTION_CLASS}>
                 <SidebarGroupLabel>{t("mailboxes.shared")}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <MailboxRows
@@ -428,7 +441,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               </SidebarGroup>
             ) : null}
             {viewRows.length > 0 ? (
-              <SidebarGroup>
+              <SidebarGroup className={FLUSH_SECTION_CLASS}>
                 <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   {/* The row descriptions are plain text: closing them as soon as
