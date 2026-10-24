@@ -12,7 +12,8 @@
  * names senders: keep it outside the data dir and the repository).
  * --write reads over the app's DB layer and replaces each account's
  * `spam_sender_profiles` rows in one transaction (stored "Als Spam" times
- * survive). It needs an explicit --data (the NOCTUA_DATA_DIR Bun loads from
+ * and junk counts recorded live meanwhile survive; mail stored while it
+ * builds is read in a catch-up pass first). It needs an explicit --data (the NOCTUA_DATA_DIR Bun loads from
  * .env.local is never used) and refuses shards without the spam schema instead
  * of migrating them outside the deploy runbook.
  */
@@ -37,14 +38,14 @@ const started = performance.now();
 if (!write) {
   const data = openSpamDataDir(dataDir);
   try {
-    console.log(`Dry run (read-only): ${dataDir}, ${data.accounts.length} accounts`);
+    console.log(`Dry run (read-only): ${dataDir}, ${data.accounts.length} accounts${accountFilter ? ` (only ${accountFilter})` : ""}`);
     const file = await buildProfileFile(data, (accountId, account, ms) => {
-      if (accountFilter && accountId !== accountFilter) return;
       console.log(`${accountId}: ${account.rows} rows (${account.withSource} source heads) → would write ${accountSenders(account).size} profiles `
         + `(${Object.keys(account.userSpam).length} with "Als Spam"), ${seconds(ms)}`);
-    });
+    }, accountFilter);
     const household = householdProfiles(file, data.own.ownAddresses, "built");
-    console.log(`Household: ${household.senders} senders, ${household.trusted} trusted now, ${household.rows} rows, ${seconds(performance.now() - started)}`);
+    console.log(`${accountFilter ? "This account" : "Household"}: ${household.senders} senders, ${household.trusted} trusted now, ${household.rows} rows, `
+      + seconds(performance.now() - started));
     if (out) {
       writeProfileFile(out, file);
       console.log(`Wrote ${out}`);
@@ -75,13 +76,9 @@ if (!write) {
   for (const account of accounts.filter((candidate) => targets.some((target) => target.id === candidate.id))) {
     const accountStarted = performance.now();
     const folders = await getFolders(account.id);
-    let rows = 0;
-    const written = await backfillSenderProfiles(account.id, async (db) => {
-      const built = await buildAccountSenderProfiles({ accountId: account.id, db, folders, ownAddresses: own.ownAddresses, sourcesDir: getSourcesDir() });
-      rows = built.rows;
-      return built.profiles.values();
-    });
-    console.log(`${account.id}: ${rows} rows, ${written} profiles written, ${seconds(performance.now() - accountStarted)}`);
+    const { written, build } = await backfillSenderProfiles(account.id, (db, previous) =>
+      buildAccountSenderProfiles({ accountId: account.id, db, folders, ownAddresses: own.ownAddresses, sourcesDir: getSourcesDir(), previous: previous ?? undefined }));
+    console.log(`${account.id}: ${build.rows} rows, ${written} profiles written, ${seconds(performance.now() - accountStarted)}`);
   }
   console.log(`Done in ${seconds(performance.now() - started)}`);
 }
