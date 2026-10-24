@@ -12,8 +12,9 @@ import MessageMenu from "./MessageMenu";
 afterEach(cleanup);
 const noop = () => {};
 
-function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true }: {
+function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true, inTrash = false }: {
   collapsed?: boolean;
+  inTrash?: boolean;
   allRead?: boolean;
   origin?: "list" | "table" | "thread";
   single?: boolean;
@@ -53,6 +54,8 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     : undefined;
   const flags: Array<[string, string, boolean]> = [];
   const todos: string[] = [];
+  const deletes: Array<[string, boolean | undefined]> = [];
+  const archives: string[] = [];
   const props: ComponentProps<typeof MessageMenu> = {
     message: root, origin, isDraft: false, readAction, pendingMessageActions: new Set(),
     openCompose: noop,
@@ -61,13 +64,16 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
       if (flag === "seen") message.seen = value;
     },
     toggleTodoFlag: message => { todos.push(message.id); }, clearTodoFlag: noop,
-    handleMarkSpam: noop, handleMarkNotSpam: noop, handleArchiveMessage: noop,
-    handleSetCategory: noop, handleDeleteMessage: noop, handleUnsubscribe: noop,
+    handleMarkSpam: noop, handleMarkNotSpam: noop,
+    handleArchiveMessage: message => { archives.push(message.id); },
+    handleSetCategory: noop,
+    handleDeleteMessage: (message, options) => { deletes.push([message.id, options?.allowThreadDeletion]); },
+    handleUnsubscribe: noop,
     handleDownloadEml: noop, handleResyncMessage: noop, handleOpenInNewWindow: noop,
     handleOpenHtmlInNewWindow: noop, onShowRelated: noop, onShowThread: noop,
     allTopics: [], onFetchSuggestions: async () => [], onAssignTopics: noop,
     onToggleTopic: noop, onGetRecentFolders: () => [], onMoveToFolder: noop,
-    onMoveTo: noop, isTrashFolder: () => false, isSpamFolder: () => false
+    onMoveTo: noop, isTrashFolder: () => inTrash, isSpamFolder: () => false
   };
   const view = render(<Theme><TooltipProvider><MessageMenu {...props} /></TooltipProvider></Theme>);
   const open = async () => {
@@ -83,7 +89,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
       await new Promise(resolve => setTimeout(resolve, 0));
     });
   };
-  return { view, open, choose, messages, calls, flags, todos, resolutions: () => resolutions };
+  return { view, open, choose, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions };
 }
 
 describe("row read/unread menu", () => {
@@ -130,5 +136,50 @@ describe("row read/unread menu", () => {
     await menu.choose("Mark as To-Do");
     expect(menu.todos).toEqual(["root"]);
     expect(menu.resolutions()).toBe(0);
+  });
+});
+
+describe("row menu delete", () => {
+  const itemsWithSeparators = (menu: ReturnType<typeof setup>) =>
+    Array.from(menu.view.getByRole("menu").querySelectorAll('[role="menuitem"], [role="separator"]'))
+      .map(node => node.getAttribute("role") === "separator" ? "---" : node.textContent);
+
+  for (const origin of ["list", "table", "thread"] as const) {
+    it(`${origin}: offers Delete as its own group right after the compose actions`, async () => {
+      const menu = setup({ origin });
+      await menu.open();
+      expect(itemsWithSeparators(menu).slice(0, 7)).toEqual([
+        "Reply", "Reply all", "Forward", "Edit as New", "---", "Delete", "---"
+      ]);
+      await menu.choose("Delete");
+      expect(menu.deletes).toEqual([["root", origin !== "thread"]]);
+    });
+  }
+  it("is reachable with arrow keys and triggers on Enter like Archive", async () => {
+    const menu = setup({ origin: "table" });
+    await menu.open();
+    const items = menu.view.getAllByRole("menuitem");
+    const deleteIndex = items.findIndex(item => item.textContent === "Delete");
+    expect(deleteIndex).toBe(4);
+    await act(async () => { items[0].focus(); });
+    for (let step = 0; step < deleteIndex; step++) {
+      await act(async () => {
+        fireEvent.keyDown(document.activeElement as Element, { key: "ArrowDown" });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      });
+    }
+    expect(document.activeElement?.textContent).toBe("Delete");
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement as Element, { key: "Enter" });
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(menu.deletes).toEqual([["root", true]]);
+    expect(menu.archives).toEqual([]);
+  });
+  it("labels the entry as permanent delete in the Trash folder", async () => {
+    const menu = setup({ inTrash: true });
+    await menu.open();
+    await menu.choose("Delete permanently");
+    expect(menu.deletes).toEqual([["root", true]]);
   });
 });
