@@ -27,6 +27,8 @@ const RECIPIENT_BUCKETS = 51;
 const CAPS = { dkimDomains: 10, replyToDomains: 20, linkDomains: 150, attachmentTypes: 20, subjectPrefixes: 40, lexicon: 8, messageIdDomains: 10 };
 /** Of the kept link domains, this many are the most frequent; the rest of the cap holds the most recently seen. */
 const LINK_DOMAINS_FREQUENT = 100;
+/** Message keys a profile remembers (newest last), so a mail is counted once even when it is checked again. */
+export const PROFILE_MAIL_IDS = 256;
 
 type Counts = Record<string, number>;
 export type SpamLanguage = "de" | "en";
@@ -71,6 +73,10 @@ export type SenderProfile = {
   lastSeenAt: number;
   lastUserSpamAt: number | null;
   junkCount: number;
+  /** Keys (profileMailKey) of the latest mails counted into `count`, newest last; at most PROFILE_MAIL_IDS. */
+  mailIds: string[];
+  /** Keys of the latest mails counted into `junkCount`, newest last; at most PROFILE_MAIL_IDS. */
+  junkMailIds: string[];
   authAligned: number;
   authUnknown: number;
   dkimDomains: Counts;
@@ -285,7 +291,7 @@ export function senderMailFacts(input: SpamInput, options: { ownAddresses: Reado
 
 export function emptySenderProfile(senderKey: string, date: number): SenderProfile {
   return {
-    senderKey, count: 0, firstSeenAt: date, lastSeenAt: date, lastUserSpamAt: null, junkCount: 0,
+    senderKey, count: 0, firstSeenAt: date, lastSeenAt: date, lastUserSpamAt: null, junkCount: 0, mailIds: [], junkMailIds: [],
     authAligned: 0, authUnknown: 0, dkimDomains: {}, recipients: Array(RECIPIENT_BUCKETS).fill(0), directCount: 0,
     replyToCount: 0, replyToDomains: {}, linkMailCount: 0, linkDomains: {}, linkDomainsSeenAt: {}, maskedLinkCount: 0,
     attachmentCount: 0, attachmentTypes: {}, languages: { de: 0, en: 0 }, subjectPrefixes: {}, lexicon: {}, serviceCount: 0, messageIdDomains: {}
@@ -325,18 +331,51 @@ function capLinkDomains(profile: Pick<SenderProfile, "linkDomains" | "linkDomain
   }
 }
 
+/** FNV-1a (32 bit) of a string. */
+function fnv1a(key: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/** Short key of a message row id for the profile's id lists. */
+export const profileMailKey = (messageId: string) => fnv1a(messageId).toString(36);
+
+function rememberMailKey(keys: string[], messageId: string) {
+  keys.push(profileMailKey(messageId));
+  if (keys.length > PROFILE_MAIL_IDS) keys.splice(0, keys.length - PROFILE_MAIL_IDS);
+}
+
+/** Whether the mail is already counted into the profile (a re-check after a revocation, a backfill catch-up). */
+export const hasProfileMail = (profile: SenderProfile, messageId: string) => profile.mailIds.includes(profileMailKey(messageId));
+
+/** Counts one mail of the sender as junk once (Junk folder, "Als Spam", auto-move); false when already counted. */
+export function addProfileJunk(profile: SenderProfile, messageId: string) {
+  if (profile.junkMailIds.includes(profileMailKey(messageId))) return false;
+  profile.junkCount += 1;
+  rememberMailKey(profile.junkMailIds, messageId);
+  return true;
+}
+
 /**
- * Adds one mail to a profile (in place). After TRUST_DECAY_MS without mail the
- * history starts over: a long silent sender is new again. A user's "Als Spam"
- * survives the restart.
+ * Adds one mail to a profile (in place); with `id` the profile remembers it
+ * (hasProfileMail). After TRUST_DECAY_MS without mail the history starts over:
+ * a long silent sender is new again. A user's "Als Spam" and the junk count
+ * survive the restart.
  */
-export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailFacts): SenderProfile {
+export function foldSenderMail(profile: SenderProfile | null, facts: SenderMailFacts & { id?: string }): SenderProfile {
   let target = profile;
   if (!target || (target.count > 0 && facts.date - target.lastSeenAt > TRUST_DECAY_MS)) {
     const fresh = emptySenderProfile(facts.senderKey, facts.date);
     fresh.lastUserSpamAt = target?.lastUserSpamAt ?? null;
+    fresh.junkCount = target?.junkCount ?? 0;
+    fresh.junkMailIds = target?.junkMailIds ?? [];
     target = fresh;
   }
+  if (facts.id !== undefined) rememberMailKey(target.mailIds, facts.id);
   target.count += 1;
   if (facts.date < target.firstSeenAt || target.count === 1) target.firstSeenAt = facts.date;
   if (facts.date > target.lastSeenAt || target.count === 1) target.lastSeenAt = facts.date;
@@ -449,12 +488,7 @@ export function recipientP95(profile: SenderProfile) {
 
 /** Deterministic canary sample (FNV-1a of the message id). */
 export function isTrustCanary(key: string, percent = TRUST_CANARY_PERCENT) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0) % 10_000 < percent * 100;
+  return fnv1a(key) % 10_000 < percent * 100;
 }
 
 const PROFILE_COLUMNS = new Set(["senderKey", "count", "firstSeenAt", "lastSeenAt", "lastUserSpamAt"]);

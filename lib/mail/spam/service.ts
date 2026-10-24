@@ -10,6 +10,7 @@ import {
   listSenderMailsNear,
   listUncheckedSpamMessageIds,
   markSenderProfileUserSpam,
+  recordSenderProfileJunk,
   recordSenderProfileMail,
   resetTrustedSpamChecks,
   saveSpamVerdict
@@ -180,7 +181,7 @@ async function checkMessage(job: SpamCheckJob) {
   const verdict: SpamVerdict = marked ? "spam" : decision.verdict === "spam" ? "unsure" : decision.verdict;
   const saved = await saveSpamVerdict(job.accountId, message.id, { verdict, confidence: decision.confidence, reasons: decision.reasons }, { automatic: true });
   // Each message is saved once (spamCheckedAt), so it enters the profile once; only ham teaches the pattern (not spam, not unsure).
-  if (saved && verdict === "ham") await learnSenderProfile(job.accountId, input, identity.ownAddresses);
+  if (saved && verdict === "ham") await learnSenderProfile(job.accountId, message.id, input, identity.ownAddresses);
   if (saved && marked && mailbox.autoMove) await autoMoveToJunk(job.accountId, message);
 }
 
@@ -191,12 +192,12 @@ async function loadRecentSenderMails(accountId: string, message: Message, sender
   return rows.map((row) => ({ date: storedMailArrival(row, heads.get(row.id)), circle: recipientCircleOf(row.toAddr, row.ccAddr, senderKey, ownAddresses) }));
 }
 
-async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, ownAddresses: ReadonlySet<string>) {
+async function learnSenderProfile(accountId: string, messageId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, ownAddresses: ReadonlySet<string>) {
   // Without a Received stamp the check time is the arrival: dateValue is the sender's Date header.
   const facts = senderMailFacts(input, { ownAddresses, arrivedAt: Date.now() });
   if (!facts) return;
   try {
-    await recordSenderProfileMail(accountId, facts);
+    await recordSenderProfileMail(accountId, facts, messageId);
   } catch (error) {
     state.logFailure(accountId, "sender profile update failed", { error: String(error) });
   }
@@ -204,15 +205,16 @@ async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<t
 
 /**
  * "Als Spam" by a user (concept §4): the sender is never trusted again in any
- * mailbox, and its INBOX mail of the last 7 days that was skipped as trusted
- * is checked again. Never throws: the user's action must not fail.
+ * mailbox, the marked mail counts into the sender's junk share, and its INBOX
+ * mail of the last 7 days that was skipped as trusted is checked again. Never
+ * throws: the user's action must not fail.
  */
-export async function revokeSenderTrust(accountId: string, from: string) {
+export async function revokeSenderTrust(accountId: string, from: string, messageId?: string) {
   const senderKey = spamSenderKey(parseAddressEmails(from)[0]);
   if (!senderKey) return;
   try {
     const now = Date.now();
-    await markSenderProfileUserSpam(accountId, senderKey, now);
+    await markSenderProfileUserSpam(accountId, senderKey, now, messageId);
     for (const id of (await household()).accountIds) {
       const inbox = findInboxFolder(await getFolders(id), id);
       if (!inbox) continue;
@@ -233,5 +235,11 @@ async function autoMoveToJunk(accountId: string, message: Message) {
   } catch (error) {
     // The mark stays; the move is not retried (the user can still use "Als Spam").
     state.logFailure(accountId, "auto-move to Junk failed", { error: String(error) });
+    return;
+  }
+  const senderKey = spamSenderKey(parseAddressEmails(message.from)[0]);
+  if (senderKey) {
+    await recordSenderProfileJunk(accountId, senderKey, message.id)
+      .catch((error) => state.logFailure(accountId, "sender junk count failed", { error: String(error) }));
   }
 }
