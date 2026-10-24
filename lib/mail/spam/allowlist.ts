@@ -1,4 +1,5 @@
 import { isFreeMailDomain } from "@/lib/senderIdentity";
+import { parseAuthenticationResults } from "./senderProfile";
 import type { SpamInput } from "./types";
 
 /**
@@ -38,18 +39,16 @@ const inDomain = (candidate: string, domain: string) => candidate === domain || 
 
 /**
  * Whether the receiving server's Authentication-Results show `spf=pass` or
- * `dkim=pass` with an identity (smtp.mailfrom, header.d, header.i …) in `domain`.
+ * `dkim=pass` for an identity in `domain`. Only the identity the method
+ * authenticates counts, as for trusted senders (parseAuthenticationResults):
+ * DKIM `header.d` (else `header.i`), SPF `smtp.mailfrom`. `smtp.helo`,
+ * selectors, other properties and comments are chosen by the sender.
  */
 export function senderAuthPassed(input: Pick<SpamInput, "authenticationResults">, domain: string) {
   const wanted = domain.trim().toLowerCase();
   if (!wanted) return false;
-  return input.authenticationResults.some((value) => value.split(";").slice(1).some((segment) => {
-    if (!/^\s*(spf|dkim)\s*=\s*pass\b/i.test(segment)) return false;
-    return [...segment.matchAll(/\b[a-z]+\.[a-z]+=([^\s;()]+)/gi)].some((match) => {
-      const identity = match[1].toLowerCase().replace(/^["']|["']$/g, "");
-      return inDomain(identity.slice(identity.lastIndexOf("@") + 1), wanted);
-    });
-  }));
+  return parseAuthenticationResults(input.authenticationResults).some((entry) =>
+    entry.result === "pass" && (entry.method === "spf" || entry.method === "dkim") && !!entry.domain && inDomain(entry.domain, wanted));
 }
 
 export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlistContext): Promise<AllowlistMatch | null> {

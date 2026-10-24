@@ -27,6 +27,18 @@ describe("spam allowlist", () => {
       .toBe("own-address");
   });
 
+  test("only the authenticated identity counts: HELO, selectors, other properties and comments never do", async () => {
+    const own = (result: string) => matchSpamAllowlist(from("office@household.example.test", [`mxe.example.test; ${result}`]), context());
+    expect(await own("spf=pass smtp.mailfrom=bounce@attacker.example smtp.helo=household.example.test")).toBeNull();
+    expect(await own("spf=pass smtp.helo=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example header.s=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example policy.d=household.example.test")).toBeNull();
+    expect(await own("spf=pass (household.example.test) smtp.mailfrom=x@attacker.example x.y=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example (header.d=household.example.test)")).toBeNull();
+    expect(await own("spf=pass smtp.mailfrom=bounce@mail.household.example.test smtp.helo=out.attacker.example")).toBe("own-address");
+    expect(await own("dkim=pass header.i=@household.example.test")).toBe("own-address");
+  });
+
   test("correspondents and explicit decisions", async () => {
     expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async (email) => email === "partner@example.test" })))
       .toBe("correspondent");
