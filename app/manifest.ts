@@ -4,6 +4,9 @@ import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // Explicit identity (equal to the start_url-derived one) so installed
+    // apps and their push subscriptions survive later start_url changes.
+    id: "/",
     name: DEFAULT_APP_TITLE,
     short_name: DEFAULT_APP_TITLE,
     description: "Modern webmail client prototype",

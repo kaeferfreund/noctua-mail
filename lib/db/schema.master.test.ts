@@ -261,3 +261,21 @@ test("MCP mapping migration is additive/idempotent and token deletion cleans map
   db.exec("DELETE FROM mcp_tokens WHERE id='legacy'");
   expect(db.prepare("SELECT * FROM mcp_token_accounts").all()).toEqual([]);
 });
+
+test("push_subscriptions migration is additive on a legacy master and idempotent", () => {
+  const db = openMemoryDb();
+  createLegacyMasterTables(db);
+  insertLegacyUser(db, "legacy-user", "person@example.test", 1);
+  runMigrationQuietly(db);
+  runMigrationQuietly(db);
+  expect(columnNames(db, "push_subscriptions")).toEqual([
+    "id", "userId", "endpoint", "p256dh", "auth", "userAgent", "settings", "createdAt", "lastSeenAt", "lastSentAt", "failures"
+  ]);
+  expect(db.prepare("SELECT COUNT(*) AS count FROM users").get()).toEqual({ count: 1 });
+  expect((db.prepare("PRAGMA index_list(push_subscriptions)").all() as Array<{ name: string }>).map((row) => row.name))
+    .toContain("idx_push_subscriptions_user");
+  db.exec("INSERT INTO push_subscriptions (id,userId,endpoint,p256dh,auth,settings) VALUES ('a','legacy-user','https://push.example.test/1','k','s','{}')");
+  expect(db.prepare("SELECT failures FROM push_subscriptions WHERE id='a'").get()).toEqual({ failures: 0 });
+  expect(() => db.exec("INSERT INTO push_subscriptions (id,userId,endpoint,p256dh,auth,settings) VALUES ('b','legacy-user','https://push.example.test/1','k','s','{}')"))
+    .toThrow("UNIQUE constraint");
+});
