@@ -139,6 +139,19 @@ describe("spam storage", () => {
     expect(await f.api.hasSentToAddress(f.accountId, f.folderId, "partner@example.test")).toBe(false);
   });
 
+  test("a short address is found behind many substring candidates", async () => {
+    const f = await createCollabFixture();
+    const sentFolderId = `${f.accountId}-sent`;
+    await f.api.saveFoldersForAccount(f.accountId, [
+      { id: f.folderId, accountId: f.accountId, name: "INBOX", count: 0, unreadCount: 0, specialUse: "\\Inbox" },
+      { id: sentFolderId, accountId: f.accountId, name: "Sent", count: 0, unreadCount: 0, specialUse: "\\Sent" }
+    ]);
+    const decoys = Array.from({ length: 40 }, (_, index) => f.message(`<decoy${index}@example.test>`, { folderId: sentFolderId, to: `user${index}a@example.test` }));
+    await f.api.upsertMessages(f.accountId, sentFolderId, [...decoys, f.message("<exact@example.test>", { folderId: sentFolderId, to: "A@example.test" })]);
+    expect(await f.api.hasSentToAddress(f.accountId, sentFolderId, "a@example.test")).toBe(true);
+    expect(await f.api.hasSentToAddress(f.accountId, sentFolderId, "b@example.test")).toBe(false);
+  });
+
   test("settings round-trip in the master database", async () => {
     const { getSpamSettings, saveSpamSettings } = await (await import("../testDbHarness")).dbModulePromise;
     const scope = `spam-${crypto.randomUUID()}`;
