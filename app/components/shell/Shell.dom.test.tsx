@@ -109,7 +109,7 @@ describe("shell sidebar", () => {
       (id) => { switched.push(id); }, () => { syncs++; });
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[aria-current], button[title$='@example.test']")]
       .filter((row) => row.getAttribute("aria-label") !== "User menu");
-    expect(rows.map((row) => row.textContent)).toEqual(["ALAlpha", "ZUZulu", "TETeam"]);
+    expect(rows.map((row) => row.textContent)).toEqual(["Alpha", "Zulu", "Team"]);
     fireEvent.click(view.getByRole("button", { name: /Alpha/ }));
     expect(switched).toEqual(["a"]);
     fireEvent.click(view.getByRole("button", { name: "Check all folders for new mail" }));
@@ -212,46 +212,59 @@ function stubAvatarImages() {
   };
 }
 
-describe("mailbox avatars", () => {
-  const avatarOf = (view: ReturnType<typeof renderSidebar>, name: string) =>
-    view.getByRole("button", { name: new RegExp(name) }).querySelector<HTMLElement>("[data-slot=avatar]")!;
+describe("mailbox avatars and domain icons", () => {
+  const rowOf = (view: ReturnType<typeof renderSidebar>, name: string) =>
+    view.getByRole("button", { name: new RegExp(name) });
+  const headerOf = (view: ReturnType<typeof renderSidebar>, domain: string) =>
+    view.getByText(domain, { selector: "span" }).parentElement!;
+  const domainIconSrc = (row: ShellAccount, domain: string) =>
+    `/api/accounts/${row.id}/sender-icon?${new URLSearchParams({ from: domain, fromEmail: row.email, fallback: "none" })}`;
 
-  it("loads the mailbox's own address through the sender-icon route and keeps the initials until or unless it loads", async () => {
+  it("shows a row avatar only for a custom image URL, never initials", async () => {
     const images = stubAvatarImages();
     try {
-      const quiet = { ...account("c", "Charlie"), settings: { appearance: { senderIcons: false } } } as ShellAccount;
-      const view = renderSidebar([account("a", "Alpha", "brand.example.test"), account("b", "Bravo"), quiet], () => {});
-      const iconSrc = (row: ShellAccount) => `/api/accounts/${row.id}/sender-icon?${new URLSearchParams({ from: row.name, fromEmail: row.email, fallback: "none" })}`;
-      const alphaSrc = iconSrc(account("a", "Alpha", "brand.example.test"));
-      const bravoSrc = iconSrc(account("b", "Bravo"));
-      expect(images.probes.map(probe => probe.src).sort()).toEqual([alphaSrc, bravoSrc]);
-      // While loading: initials only.
-      expect(avatarOf(view, "Alpha").textContent).toBe("AL");
-      expect(avatarOf(view, "Alpha").querySelector("img")).toBeNull();
-
-      await images.settle(alphaSrc, true);
-      await images.settle(bravoSrc, false);
-      await waitFor(() => expect(avatarOf(view, "Alpha").querySelector("img")?.getAttribute("src")).toBe(alphaSrc));
-      expect(avatarOf(view, "Alpha").textContent).toBe("");
-      // No logo (the route answers 404): the initials stay, with the fallback colouring.
-      expect(avatarOf(view, "Bravo").querySelector("img")).toBeNull();
-      expect(avatarOf(view, "Bravo").querySelector("[data-slot=avatar-fallback]")?.textContent).toBe("BR");
-      expect(avatarOf(view, "Bravo").querySelector("[data-slot=avatar-fallback]")?.className).toContain("bg-muted");
-      // Sender icons switched off for the mailbox: no request, initials.
-      expect(avatarOf(view, "Charlie").textContent).toBe("CH");
+      const custom = { ...account("a", "Alpha"), avatar: "https://avatars.example.test/alpha.png" };
+      const literal = { ...account("b", "Bravo"), avatar: "NW" };
+      const view = renderSidebar([custom, literal, account("c", "Charlie")], () => {});
+      // Up to six mailboxes: no domain headers, so the custom avatar is the only image request.
+      expect(images.probes.map(probe => probe.src)).toEqual([custom.avatar]);
+      await images.settle(custom.avatar, true);
+      await waitFor(() => expect(rowOf(view, "Alpha").querySelector("[data-slot=avatar] img")?.getAttribute("src")).toBe(custom.avatar));
+      // The literal "NW" and an empty value mean no avatar: the name starts the row.
+      for (const name of ["Bravo", "Charlie"]) {
+        expect(rowOf(view, name).querySelector("[data-slot=avatar]")).toBeNull();
+        expect(rowOf(view, name).firstElementChild?.textContent).toBe(name);
+      }
+      expect(view.queryByText("NW")).toBeNull();
+      expect(view.queryByText("BR")).toBeNull();
     } finally {
       images.restore();
     }
   });
 
-  it("keeps a custom avatar URL instead of the sender icon", async () => {
+  it("requests one icon per domain header and keeps a plain header without one", async () => {
     const images = stubAvatarImages();
     try {
-      const custom = { ...account("a", "Alpha"), avatar: "https://avatars.example.test/alpha.png" };
-      const view = renderSidebar([custom], () => {});
-      expect(images.probes.map(probe => probe.src)).toEqual([custom.avatar]);
-      await images.settle(custom.avatar, true);
-      await waitFor(() => expect(avatarOf(view, "Alpha").querySelector("img")?.getAttribute("src")).toBe(custom.avatar));
+      const brand = ["a", "b", "c", "d"].map(id => account(id, `Brand ${id}`, "brand.example.test"));
+      const plain = ["e", "f"].map(id => account(id, `Plain ${id}`, "plain.example.test"));
+      const quiet = { ...account("g", "Quiet"), settings: { appearance: { senderIcons: false } } } as ShellAccount;
+      const view = renderSidebar([...brand, ...plain, quiet], () => {});
+      const brandSrc = domainIconSrc(brand[0], "brand.example.test");
+      const plainSrc = domainIconSrc(plain[0], "plain.example.test");
+      // One request per domain; a domain whose mailboxes have sender icons off makes none.
+      expect(images.probes.map(probe => probe.src).sort()).toEqual([brandSrc, plainSrc].sort());
+      for (const row of [...brand, ...plain, quiet]) {
+        expect(rowOf(view, row.name).querySelector("[data-slot=avatar]")).toBeNull();
+      }
+
+      await images.settle(brandSrc, true);
+      await images.settle(plainSrc, false);
+      await waitFor(() => expect(headerOf(view, "brand.example.test").querySelector("img")?.getAttribute("src")).toBe(brandSrc));
+      // No logo (the route answers 404): the header keeps only its text.
+      expect(headerOf(view, "plain.example.test").querySelector("img")).toBeNull();
+      expect(headerOf(view, "plain.example.test").querySelector("[data-slot=avatar]")?.childElementCount).toBe(0);
+      expect(headerOf(view, "plain.example.test").textContent).toBe("plain.example.test");
+      expect(headerOf(view, "example.test").querySelector("[data-slot=avatar]")).toBeNull();
     } finally {
       images.restore();
     }

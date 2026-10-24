@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { groupMailboxes, mailboxInitials, mailboxLabel, partitionMailboxes } from "./types";
+import { groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, partitionMailboxes } from "./types";
 
 function account(overrides: Partial<Account> & { id: string }): Account {
   return {
@@ -54,6 +54,16 @@ describe("mailboxLabel", () => {
   test("prefers the trimmed name and falls back to the e-mail", () => {
     expect(mailboxLabel({ name: " Team ", email: "team@example.com" })).toBe("Team");
     expect(mailboxLabel({ name: "", email: "team@example.com" })).toBe("team@example.com");
+  });
+});
+
+describe("mailboxAvatarUrl", () => {
+  test("accepts image URLs and treats other stored values as no avatar", () => {
+    expect(mailboxAvatarUrl({ avatar: "https://avatars.example.test/a.png" })).toBe("https://avatars.example.test/a.png");
+    expect(mailboxAvatarUrl({ avatar: "/avatars/a.png" })).toBe("/avatars/a.png");
+    expect(mailboxAvatarUrl({ avatar: "data:image/png;base64,AAAA" })).toBe("data:image/png;base64,AAAA");
+    expect(mailboxAvatarUrl({ avatar: "NW" })).toBeNull();
+    expect(mailboxAvatarUrl({ avatar: "" })).toBeNull();
   });
 });
 
