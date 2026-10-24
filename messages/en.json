@@ -427,6 +427,7 @@
       "heading": "Spam detection for this mailbox",
       "help": "New inbox messages are checked once. Suspicious messages are marked; moving them to Junk is optional.",
       "globalOff": "Spam detection is switched off in the administration.",
+      "enabled": "Spam detection enabled for this mailbox",
       "autoMove": "Move suspicious messages to the Junk folder automatically",
       "threshold": "Own threshold (empty = {threshold, number} from the administration)",
       "thresholdHelp": "Between 0.5 and 1. Higher means fewer marks.",

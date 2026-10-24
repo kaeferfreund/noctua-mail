@@ -15,11 +15,11 @@ import { findInboxFolder, findSentFolder } from "@/lib/specialFolders";
 import { moveMessageToJunk } from "@/app/api/_helpers/message/junkMove";
 import { buildOwnIdentitySets, type SpamAllowlistContext } from "./allowlist";
 import { classifySpam, shouldMarkAsSpam } from "./classifySpam";
-import { resolveMailboxThreshold } from "./config";
+import { isSpamDetectionOn, resolveMailboxThreshold } from "./config";
 import { findSpamExamples } from "./examples";
 import { buildSpamInput, buildSpamInputFromMessage } from "./input";
 import { getSpamLanguageModel, getSpamProviderOptions, spamModelUnavailableReason } from "./provider";
-import { createSpamFailureLogger, createSpamQueue, type SpamCheckJob } from "./queue";
+import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
 import { loadStaticRules } from "./staticRules";
 import type { SpamVerdict } from "./types";
@@ -39,7 +39,7 @@ const IDENTITY_TTL_MS = 10 * 60_000;
 type SpamServiceState = {
   queue: ReturnType<typeof createSpamQueue>;
   logFailure: ReturnType<typeof createSpamFailureLogger>;
-  processed: Map<string, number>;
+  claims: ReturnType<typeof createSpamClaims>;
   identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets> };
 };
 
@@ -48,7 +48,7 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
   const logFailure = createSpamFailureLogger();
   return {
     logFailure,
-    processed: new Map(),
+    claims: createSpamClaims(PROCESSED_TTL_MS, PROCESSED_LIMIT),
     queue: createSpamQueue({
       check: (job) => checkMessage(job),
       onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", { error: String(error) })
@@ -56,31 +56,17 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
   };
 })();
 
-/** Remembers queued messages so later sweeps do not retry a dropped or undecided one. */
-function claim(job: SpamCheckJob) {
-  const key = `${job.accountId}\u0000${job.messageId}`;
-  const now = Date.now();
-  const expiry = state.processed.get(key);
-  if (expiry !== undefined && expiry > now) return false;
-  if (state.processed.size >= PROCESSED_LIMIT) {
-    for (const [entry, until] of state.processed) if (until <= now || state.processed.size >= PROCESSED_LIMIT) state.processed.delete(entry);
-  }
-  state.processed.set(key, now + PROCESSED_TTL_MS);
-  return true;
-}
-
 export function scheduleSpamSweep(accountId: string) {
   void sweep(accountId).catch((error) => state.logFailure(accountId, "sweep failed", { error: String(error) }));
 }
 
 async function sweep(accountId: string) {
-  if (!(await loadSpamConfig()).enabled) return;
+  if (!isSpamDetectionOn(await loadSpamConfig(), await loadMailboxSpamSettings(accountId))) return;
   const inbox = findInboxFolder(await getFolders(accountId), accountId);
   if (!inbox) return;
+  // Oldest first, so a backlog is worked off before it leaves the window.
   const ids = await listUncheckedSpamMessageIds(accountId, inbox.id, Date.now() - SWEEP_WINDOW_MS, SWEEP_LIMIT * 4);
-  const jobs = ids.map((messageId) => ({ accountId, messageId }))
-    .filter((job) => !state.queue.has(job) && claim(job)).slice(0, SWEEP_LIMIT);
-  state.queue.enqueue(jobs);
+  state.queue.enqueue(pickSweepJobs(accountId, ids, state.queue, state.claims, SWEEP_LIMIT));
 }
 
 async function householdIdentity() {
@@ -101,7 +87,8 @@ async function loadSpamInput(accountId: string, message: Message) {
 
 async function checkMessage(job: SpamCheckJob) {
   const config = await loadSpamConfig();
-  if (!config.enabled) return;
+  const mailbox = await loadMailboxSpamSettings(job.accountId);
+  if (!isSpamDetectionOn(config, mailbox)) return;
   const message = await getMessageById(job.accountId, job.messageId);
   if (!message) return;
   const folders = await getFolders(job.accountId);
@@ -126,7 +113,6 @@ async function checkMessage(job: SpamCheckJob) {
     state.logFailure(job.accountId, "model unavailable; messages stay unchecked", { reason: spamModelUnavailableReason(config) });
     return;
   }
-  const mailbox = await loadMailboxSpamSettings(job.accountId);
   const marked = shouldMarkAsSpam(decision, resolveMailboxThreshold(config, mailbox));
   // "spam" is stored only when the mark applies; a spam verdict below the threshold is kept as "unsure".
   const verdict: SpamVerdict = marked ? "spam" : decision.verdict === "spam" ? "unsure" : decision.verdict;

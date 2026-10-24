@@ -40,12 +40,30 @@ describe("spam settings", () => {
     expect(await page.findByText("Spam detection is switched off in the administration.")).toBeTruthy();
     const threshold = page.getByLabelText(/Own threshold/) as HTMLInputElement;
     expect(threshold.value).toBe("0.95");
-    fireEvent.click(page.getByRole("switch"));
+    fireEvent.click(page.getByLabelText("Move suspicious messages to the Junk folder automatically"));
     fireEvent.change(threshold, { target: { value: "" } });
     fireEvent.click(page.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(page.getByText("Saved.")).toBeTruthy());
     const put = calls.find(call => call.init?.method === "PUT")!;
     expect(put.url).toBe("/api/admin/accounts/synthetic%20mailbox/spam-settings");
-    expect(JSON.parse(String(put.init?.body))).toEqual({ autoMove: true, threshold: null });
+    expect(JSON.parse(String(put.init?.body))).toEqual({ enabled: true, autoMove: true, threshold: null });
+  });
+
+  it("mailbox: the own switch defaults to on and saves off", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const apiFetch: AdminFetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return response({ ok: true, settings: init?.method === "PUT" ? JSON.parse(String(init.body)) : {}, globalThreshold: 0.85, enabled: true });
+    };
+    const page = render(<Theme><SpamTabContent accountId="synthetic" apiFetch={apiFetch} /></Theme>);
+    const enabled = await page.findByLabelText("Spam detection enabled for this mailbox");
+    expect(enabled.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(enabled);
+    expect(enabled.getAttribute("aria-checked")).toBe("false");
+    expect(page.getByLabelText("Move suspicious messages to the Junk folder automatically").hasAttribute("disabled")).toBe(true);
+    fireEvent.click(page.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(page.getByText("Saved.")).toBeTruthy());
+    const put = calls.find(call => call.init?.method === "PUT")!;
+    expect(JSON.parse(String(put.init?.body))).toEqual({ enabled: false, autoMove: false, threshold: null });
   });
 });

@@ -7,13 +7,14 @@ import { Info } from "lucide-react";
 import Field from "@/app/components/account-settings/Field";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 
-type MailboxSpamSettings = { settings: { autoMove?: boolean; threshold?: number }; globalThreshold: number; enabled: boolean };
+type MailboxSpamSettings = { settings: { enabled?: boolean; autoMove?: boolean; threshold?: number }; globalThreshold: number; enabled: boolean };
 
-/** Per-mailbox spam settings (admin only): auto-move to Junk and an optional own threshold. */
+/** Per-mailbox spam settings (admin only): own on/off switch, auto-move to Junk and an optional own threshold. */
 export default function SpamTabContent({ accountId, apiFetch = fetch }: { accountId: string; apiFetch?: AdminFetch }) {
   const t = useTranslations("Settings.spam");
   const url = `/api/admin/accounts/${encodeURIComponent(accountId)}/spam-settings`;
   const [data, setData] = useState<MailboxSpamSettings | null>(null);
+  const [enabled, setEnabled] = useState(true);
   const [autoMove, setAutoMove] = useState(false);
   const [threshold, setThreshold] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -23,6 +24,7 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
     adminRequest<MailboxSpamSettings>(apiFetch, url).then((result) => {
       if (!active) return;
       setData(result);
+      setEnabled(result.settings.enabled ?? true);
       setAutoMove(result.settings.autoMove ?? false);
       setThreshold(result.settings.threshold === undefined ? "" : String(result.settings.threshold));
     }).catch(() => { if (active) setStatus("failed"); });
@@ -33,7 +35,7 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
     setStatus("saving");
     const value = threshold.trim().replace(",", ".");
     try {
-      const result = await adminRequest<MailboxSpamSettings>(apiFetch, url, jsonMutation("PUT", { autoMove, threshold: value ? Number(value) : null }));
+      const result = await adminRequest<MailboxSpamSettings>(apiFetch, url, jsonMutation("PUT", { enabled, autoMove, threshold: value ? Number(value) : null }));
       setData(result);
       setStatus("saved");
     } catch {
@@ -47,7 +49,8 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
       <Text size="3" weight="medium">{t("heading")}</Text>
       <Text size="2" color="gray">{t("help")}</Text>
       {!data.enabled && <Callout.Root color="amber" size="1"><Callout.Icon><Info size={14} /></Callout.Icon><Callout.Text>{t("globalOff")}</Callout.Text></Callout.Root>}
-      <Text as="label" size="2"><Flex gap="2" align="center"><Switch checked={autoMove} onCheckedChange={setAutoMove} />{t("autoMove")}</Flex></Text>
+      <Text as="label" size="2"><Flex gap="2" align="center"><Switch checked={enabled} onCheckedChange={setEnabled} />{t("enabled")}</Flex></Text>
+      <Text as="label" size="2"><Flex gap="2" align="center"><Switch checked={autoMove} disabled={!enabled} onCheckedChange={setAutoMove} />{t("autoMove")}</Flex></Text>
       <Field label={t("threshold", { threshold: data.globalThreshold })} hint={t("thresholdHelp")}>
         <TextField.Root inputMode="decimal" value={threshold} placeholder={String(data.globalThreshold)} onChange={(event) => setThreshold(event.target.value)} />
       </Field>

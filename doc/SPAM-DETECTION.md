@@ -15,9 +15,12 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
 
 1. **Trigger.** Every successful sync job (any mode, including the IMAP IDLE
    watcher's repair sync) calls `scheduleSpamSweep(accountId)` in the server
-   process (`lib/syncJobs.ts`). The sweep lists up to 50 INBOX rows of the last
-   3 days with `spamCheckedAt IS NULL` and queues each once per process (24 h
-   memory, so a failed or undecided message is not retried by the next sweep).
+   process (`lib/syncJobs.ts`). The sweep takes the 50 oldest INBOX rows of the
+   last 3 days with `spamCheckedAt IS NULL` that are not already queued or
+   claimed, and claims only those once per process (24 h memory, so a failed or
+   undecided message is not retried by the next sweep; the rest of a backlog is
+   picked up by the next sweeps). Mailboxes with their own switch off are
+   skipped before any data is read.
    Sync never waits: the queue runs in the background with concurrency 2.
 2. **Skip.** Only messages still in the INBOX are checked; anything moved to
    Junk, Trash, Sent or Drafts meanwhile is skipped.
@@ -33,6 +36,8 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
    own-domain senders exist in the corpus —, addresses the mailbox has written
    to (exact To/Cc/Bcc of its Sent folder), and senders whose latest decision is
    "Kein Spam" (a later "Als Spam" lifts the correspondent entry).
+   A sender whose latest decision is "Als Spam" also skips the static allow
+   rules below; the model decides with that decision among the examples.
 5. **Static rules** (`staticRules.ts`, file below): allow `address`/`domain`
    rules short-circuit to ham (`requireAuth` rules only after SPF/DKIM pass);
    deny rules short-circuit to spam only with `safe: true`; all other matches,
@@ -42,9 +47,12 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
 6. **Model** (`classifySpam.ts`): `generateText` with `Output.object` (the AI
    SDK 7 replacement of `generateObject`) and a Zod schema
    `{ verdict: "spam" | "ham" | "unsure", confidence: 0–1, reasons: string[] (≤ 5, German) }`,
-   Anthropic `effort: "low"`, no SDK retries. The prompt contains the 16 nearest
-   user decisions (same sender address > same root domain > subject similarity >
-   most recent, at least three of each label when available).
+   Anthropic `effort: "low"`, no SDK retries, 30 s timeout per call (a timeout
+   is a failed attempt). Angle brackets in mail-derived text and examples are
+   replaced by ‹ ›, so data cannot close the `<email>`/`<beispiele>` blocks.
+   The prompt contains the 16 nearest user decisions (same sender address >
+   same root domain > subject similarity > most recent, at least three of each
+   label when available).
 7. **Store.** `spamVerdict = "spam"` only when the model said spam with
    `confidence ≥ threshold` (default 0.85; per mailbox override); a spam verdict
    below the threshold is stored as `"unsure"`. Automatic results never
@@ -52,8 +60,8 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
 8. **Auto-move** (optional per mailbox): marked messages are moved with the same
    code path as "Als Spam" (`app/api/_helpers/message/junkMove.ts`).
 
-Failures (no key, 429, network, invalid model output) are retried at most twice
-(after 5 s and 30 s), then dropped; the message stays unmarked. Each account
+Failures (no key, 429, network, timeout, invalid model output) are retried at
+most twice (after 5 s and 30 s), then dropped; the message stays unmarked. Each account
 logs such failures at most once per 10 minutes. Without `ANTHROPIC_API_KEY` only
 the allowlist and static rules decide; everything else stays unchecked.
 
@@ -103,7 +111,7 @@ afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
 | `NOCTUA_SPAM_THRESHOLD` | env, admin setting overrides | `0.85` (0.5–1) |
 | `NOCTUA_SPAM_ENABLED` | env, admin setting overrides | off |
 | `NOCTUA_SPAM_RULES_FILE` | env | `<data dir>/spam-static-rules.json` |
-| auto-move, own threshold | per mailbox (admin) | off / global |
+| on/off, auto-move, own threshold | per mailbox (admin) | on / off / global |
 
 Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`).
 Per mailbox: Postfach-Einstellungen → Spam-Erkennung, visible to admins only
@@ -130,8 +138,10 @@ bun scripts/spam-eval.ts --data /path/to/noctua-data \
 
 With `ANTHROPIC_API_KEY` set it calls the model for every undecided message
 (~1,300 calls for the full sample; `--limit N` and `--concurrency N` help);
-without it only the allowlist and static rules run. The output lists precision,
-recall, decision sources, false positives and spam passed by the allowlist by
-subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
+without it only the allowlist and static rules run. `--limit N` alone takes the
+first N sample items, and the sample lists spam first, so a small limit
+evaluates no ham. For a test run use `--limit 100 --stratified` (N/2 spam and
+N/2 ham). The output lists precision, recall, decision sources, false positives
+and spam passed by the allowlist by subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
 is reported separately from plain false positives. The static rules were derived
 from the same corpus, so their precision there is optimistic.

@@ -1,15 +1,15 @@
 /**
  * Spam detection configuration (doc/SPAM-DETECTION.md). Environment values are
  * defaults; the admin setting (master table `spam_settings`, scope "global")
- * overrides enabled/model/threshold. Per-mailbox settings add auto-move and an
- * optional threshold override.
+ * overrides enabled/model/threshold. Per-mailbox settings add an own on/off
+ * switch (default on), auto-move and an optional threshold override.
  */
 export const DEFAULT_SPAM_PROVIDER = "anthropic";
 export const DEFAULT_SPAM_MODEL = "claude-haiku-5-5";
 export const DEFAULT_SPAM_THRESHOLD = 0.85;
 
 export type SpamAdminSettings = { enabled?: boolean; model?: string; threshold?: number };
-export type SpamMailboxSettings = { autoMove?: boolean; threshold?: number };
+export type SpamMailboxSettings = { enabled?: boolean; autoMove?: boolean; threshold?: number };
 
 export type SpamConfig = {
   enabled: boolean;
@@ -41,6 +41,11 @@ export function resolveSpamConfig(admin: SpamAdminSettings | null, env: SpamEnv 
   };
 }
 
+/** The global switch must be on; a mailbox is on unless switched off explicitly. */
+export function isSpamDetectionOn(config: Pick<SpamConfig, "enabled">, mailbox: SpamMailboxSettings | null) {
+  return config.enabled && mailbox?.enabled !== false;
+}
+
 export function resolveMailboxThreshold(config: SpamConfig, mailbox: SpamMailboxSettings | null) {
   return mailbox?.threshold ?? config.threshold;
 }
@@ -70,9 +75,13 @@ export function parseSpamAdminSettings(input: unknown): SpamAdminSettings {
 
 export function parseSpamMailboxSettings(input: unknown): SpamMailboxSettings {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new SpamSettingsError("Invalid settings");
-  const { autoMove, threshold, ...rest } = input as Record<string, unknown>;
+  const { enabled, autoMove, threshold, ...rest } = input as Record<string, unknown>;
   if (Object.keys(rest).length) throw new SpamSettingsError("Unknown setting");
   const next: SpamMailboxSettings = {};
+  if (enabled !== undefined) {
+    if (typeof enabled !== "boolean") throw new SpamSettingsError("Invalid enabled flag");
+    next.enabled = enabled;
+  }
   if (autoMove !== undefined) {
     if (typeof autoMove !== "boolean") throw new SpamSettingsError("Invalid autoMove flag");
     next.autoMove = autoMove;

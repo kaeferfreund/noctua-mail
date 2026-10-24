@@ -2,7 +2,10 @@
  * Spam classifier evaluation on a data dir, strictly read-only (doc/SPAM-DETECTION.md).
  *
  *   bun scripts/spam-eval.ts --data /path/to/noctua-data [--sample eval-sample.json]
- *     [--rules static-rules.json] [--limit 200] [--concurrency 4] [--threshold 0.85]
+ *     [--rules static-rules.json] [--limit 200 [--stratified]] [--concurrency 4] [--threshold 0.85]
+ *
+ * --limit N takes the first N items (the sample lists spam first); with
+ * --stratified it takes N/2 spam and N/2 ham instead.
  *
  * Labels: messages in Junk/Spam folders are spam, INBOX messages are ham. With
  * --sample the labeled items come from that file; without it all Junk/Spam
@@ -39,6 +42,7 @@ if (!arg("data") && !process.env.NOCTUA_DATA_DIR) throw new Error("Pass --data <
 const samplePath = arg("sample");
 const rulesPath = arg("rules") ?? staticRulesPath();
 const limit = Number(arg("limit") ?? 0);
+const stratified = process.argv.includes("--stratified");
 const concurrency = Math.max(1, Number(arg("concurrency") ?? 4));
 const config = resolveSpamConfig(null);
 const threshold = isValidThreshold(Number(arg("threshold"))) ? Number(arg("threshold")) : config.threshold;
@@ -104,7 +108,10 @@ function sampleFromDb(): Item[] {
 const items: Item[] = samplePath && existsSync(samplePath)
   ? (JSON.parse(readFileSync(samplePath, "utf8")) as { items: Item[] }).items
   : sampleFromDb();
-const selected = limit > 0 ? items.slice(0, limit) : items;
+const byLabel = (label: Item["label"], count: number) => items.filter((item) => item.label === label).slice(0, count);
+const selected = limit <= 0 ? items
+  : stratified ? [...byLabel("spam", Math.ceil(limit / 2)), ...byLabel("ham", Math.floor(limit / 2))]
+  : items.slice(0, limit);
 const rules = await loadStaticRules(rulesPath);
 
 async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<string, unknown> } | null> {
