@@ -3,14 +3,14 @@ import type { SpamInput } from "./types";
 
 /**
  * Hard allowlist: these senders are never classified as spam.
- * - addresses of every enrolled mailbox and sender identity,
- * - the household's own domains (domains of enrolled mailboxes, free-mail
- *   providers excluded),
+ * - addresses of every enrolled mailbox and sender identity, and the
+ *   household's own domains (domains of enrolled mailboxes, free-mail
+ *   providers excluded) — but only when SPF or DKIM passed for the sender's
+ *   domain: a forged own-domain From is a known spam pattern and goes to the
+ *   model instead (briefs/spam/static-rules-report.md §4),
  * - addresses the mailbox has written to (To/Cc of its Sent folder),
  * - senders whose latest user decision is "Kein Spam" (a later "Als Spam"
  *   decision also lifts the correspondent entry).
- * Own addresses and domains do not count when DMARC failed: a forged
- * own-domain From is a common phishing pattern and goes to the model instead.
  */
 export type SpamAllowlistContext = {
   ownAddresses: ReadonlySet<string>;
@@ -34,18 +34,31 @@ export function buildOwnIdentitySets(addresses: Iterable<string>) {
   return { ownAddresses, ownDomains };
 }
 
-export function dmarcFailed(input: Pick<SpamInput, "authenticationResults">) {
-  return input.authenticationResults.some((line) => /\bdmarc\s*=\s*fail\b/i.test(line));
+const inDomain = (candidate: string, domain: string) => candidate === domain || candidate.endsWith(`.${domain}`);
+
+/**
+ * Whether the receiving server's Authentication-Results show `spf=pass` or
+ * `dkim=pass` with an identity (smtp.mailfrom, header.d, header.i …) in `domain`.
+ */
+export function senderAuthPassed(input: Pick<SpamInput, "authenticationResults">, domain: string) {
+  const wanted = domain.trim().toLowerCase();
+  if (!wanted) return false;
+  return input.authenticationResults.some((value) => value.split(";").slice(1).some((segment) => {
+    if (!/^\s*(spf|dkim)\s*=\s*pass\b/i.test(segment)) return false;
+    return [...segment.matchAll(/\b[a-z]+\.[a-z]+=([^\s;()]+)/gi)].some((match) => {
+      const identity = match[1].toLowerCase().replace(/^["']|["']$/g, "");
+      return inDomain(identity.slice(identity.lastIndexOf("@") + 1), wanted);
+    });
+  }));
 }
 
 export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlistContext): Promise<AllowlistMatch | null> {
   const email = input.fromEmail?.trim().toLowerCase();
   if (!email) return null;
   const domain = email.slice(email.lastIndexOf("@") + 1);
-  if (!dmarcFailed(input)) {
-    if (context.ownAddresses.has(email)) return "own-address";
-    if (context.ownDomains.has(domain)) return "own-domain";
-  }
+  if (context.ownAddresses.has(email) && senderAuthPassed(input, domain)) return "own-address";
+  const ownDomain = [...context.ownDomains].find((own) => inDomain(domain, own));
+  if (ownDomain && senderAuthPassed(input, ownDomain)) return "own-domain";
   const decision = await context.latestDecision(email);
   if (decision === "ham") return "user-decision";
   // An explicit "Als Spam" outranks having written to the sender once.

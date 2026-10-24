@@ -6,7 +6,8 @@ const sets = buildOwnIdentitySets(["Office@Household.example.test", "owner@gmail
 function context(overrides: Partial<SpamAllowlistContext> = {}): SpamAllowlistContext {
   return { ...sets, isCorrespondent: async () => false, latestDecision: async () => null, ...overrides };
 }
-const from = (address: string, authenticationResults: string[] = []) =>
+const pass = (domain: string) => [`mxe.example.test; spf=pass smtp.mailfrom=bounce@${domain}; dkim=pass header.d=${domain}`];
+const from = (address: string, authenticationResults: string[] = pass(address.replace(/^.*@|>$/g, ""))) =>
   ({ ...buildSpamInputFromMessage({ from: address, to: "office@household.example.test", subject: "S" }), authenticationResults });
 
 describe("spam allowlist", () => {
@@ -18,8 +19,12 @@ describe("spam allowlist", () => {
     expect(await matchSpamAllowlist(from("stranger@gmail.com"), context())).toBeNull();
   });
 
-  test("a forged own-domain sender with failed DMARC is not allowlisted", async () => {
-    expect(await matchSpamAllowlist(from("office@household.example.test", ["mx; dmarc=fail (p=none)"]), context())).toBeNull();
+  test("own addresses and domains need SPF or DKIM pass for the sender's domain", async () => {
+    expect(await matchSpamAllowlist(from("office@household.example.test", ["mxe.example.test; spf=none smtp.mailfrom=x@forged.example"]), context())).toBeNull();
+    expect(await matchSpamAllowlist(from("office@household.example.test", pass("forged.example")), context())).toBeNull();
+    expect(await matchSpamAllowlist(from("office@household.example.test", []), context())).toBeNull();
+    expect(await matchSpamAllowlist(from("office@household.example.test", ["mxe.example.test; spf=fail smtp.mailfrom=office@household.example.test; dkim=pass header.d=household.example.test"]), context()))
+      .toBe("own-address");
   });
 
   test("correspondents and explicit decisions", async () => {

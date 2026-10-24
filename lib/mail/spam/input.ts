@@ -67,6 +67,26 @@ function addressText(value: ParsedSpamSource["to"]) {
   return (Array.isArray(value) ? value : [value]).map((entry) => entry.text ?? "").filter(Boolean).join(", ");
 }
 
+type HeaderLine = { key: string; value: string };
+
+/**
+ * Only the receiving server's verdicts count: the top-most Authentication-Results
+ * block (all headers with the first one's authserv-id) and the first occurrence of
+ * each X-Spam-* header. Copies further down come from earlier hops or the sender.
+ */
+function topAuthenticationResults(lines: HeaderLine[]) {
+  const results = lines.filter((line) => line.key === "authentication-results");
+  const servId = (value: string) => value.split(";")[0].trim().toLowerCase();
+  const first = results[0] ? servId(results[0].value) : "";
+  return results.filter((line) => servId(line.value) === first).map((line) => line.value);
+}
+
+function topSpamHeaders(lines: HeaderLine[]) {
+  const seen = new Set<string>();
+  return lines.filter((line) => line.key.startsWith("x-spam") && !seen.has(line.key) && seen.add(line.key))
+    .slice(0, MAX_SPAM_HEADERS).map((line) => `${line.key}: ${line.value}`);
+}
+
 /** Builds the classifier input from a parsed RFC 822 source. */
 export function buildSpamInput(parsed: ParsedSpamSource): SpamInput {
   const lines = (parsed.headerLines ?? []).map((header) => ({
@@ -87,9 +107,8 @@ export function buildSpamInput(parsed: ParsedSpamSource): SpamInput {
     date: parsed.date ? parsed.date.toISOString() : null,
     listId: header("list-id"),
     listUnsubscribe: header("list-unsubscribe"),
-    authenticationResults: lines.filter((line) => line.key === "authentication-results").map((line) => line.value),
-    spamHeaders: lines.filter((line) => line.key.startsWith("x-spam")).slice(0, MAX_SPAM_HEADERS)
-      .map((line) => `${line.key}: ${line.value}`),
+    authenticationResults: topAuthenticationResults(lines),
+    spamHeaders: topSpamHeaders(lines),
     linkDomains: extractLinkDomains(plain, typeof parsed.html === "string" ? parsed.html : null),
     attachments: (parsed.attachments ?? []).slice(0, MAX_ATTACHMENTS)
       .map((attachment) => `${attachment.filename || "(ohne Namen)"} (${attachment.contentType})`),
