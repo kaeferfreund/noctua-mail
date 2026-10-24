@@ -54,6 +54,14 @@ describe("static rules", () => {
     expect(applyStaticRules(rules, input("kontakt@household.example.test", "Hi", { authenticationResults: passed("forged.example") })).decision).toBeNull();
   });
 
+  test("rules without requireAuth do not allow a forged From when the server reports authentication", () => {
+    const forged = { authenticationResults: ["mxe.example.test; spf=pass smtp.mailfrom=x@attacker.example; dkim=pass header.d=attacker.example"] };
+    expect(applyStaticRules(rules, input("partner@example.test", "Hi", forged)).decision).toBeNull();
+    expect(applyStaticRules(rules, input("a@shop.co.example", "Hi", forged)).decision).toBeNull();
+    expect(applyStaticRules(rules, input("partner@example.test", "Hi", { authenticationResults: passed("example.test") })).decision).toBe("allow");
+    expect(applyStaticRules(rules, input("a@mail.shop.co.example", "Hi", { authenticationResults: passed("shop.co.example") })).decision).toBe("allow");
+  });
+
   test("name entries never allow; an unknown address with a known name is a weak hint", () => {
     expect(applyStaticRules(rules, input("Erika Muster <erika@example.test>")).decision).toBeNull();
     expect(applyStaticRules(rules, input("Erika Muster <erika@example.test>")).hints).toEqual([]);

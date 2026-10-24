@@ -1,14 +1,15 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getDataDir } from "@/lib/runtimePaths";
-import { senderAuthPassed } from "./allowlist";
+import { senderAuthAllowsEntry, senderAuthPassed } from "./allowlist";
 import type { SpamInput } from "./types";
 
 /**
  * Static rules derived from the existing mail (briefs/spam/static-rules.json,
  * copied to the data dir on deploy; semantics in static-rules-report.md §4).
  * - allow `address`/`domain` short-circuit to ham; with `requireAuth` only when
- *   SPF or DKIM passed for the sender's domain, otherwise they do nothing,
+ *   SPF or DKIM passed for the sender's domain, without it unless the server's
+ *   Authentication-Results show no pass for it (forged From); otherwise they do nothing,
  * - allow `name` entries never allow; they feed the weak "known display name
  *   from an unknown address" hint,
  * - deny rules short-circuit to spam only when `safe: true`,
@@ -175,8 +176,10 @@ function matches(rule: StaticRule, input: SpamInput, rules: StaticRules): boolea
 
 function allows(rule: StaticRule, input: SpamInput, rules: StaticRules) {
   if (rule.type === "name" || !matches(rule, input, rules)) return false;
-  // Authenticated for the trusted domain itself (a subdomain sender signed by it counts).
-  return !rule.requireAuth || senderAuthPassed(input, rule.type === "domain" ? lower(rule.value) : senderDomain(input));
+  // Authenticated for the trusted domain itself (a subdomain sender signed by it counts);
+  // rules without requireAuth still yield to a forged From (senderAuthAllowsEntry).
+  const domain = rule.type === "domain" ? lower(rule.value) : senderDomain(input);
+  return rule.requireAuth ? senderAuthPassed(input, domain) : senderAuthAllowsEntry(input, domain);
 }
 
 function describe(rule: StaticRule) {

@@ -19,6 +19,8 @@ const input: SpamInput = {
   listId: null, listUnsubscribe: null, authenticationResults: ["mx.example.test; spf=fail"], spamHeaders: ["x-spam-status: Yes, score=7.1"],
   linkDomains: ["claim.example.test"], attachments: [], text: "Klicken Sie hier, um Ihren Gewinn abzuholen."
 };
+/** The same mail with SPF passing for the sender's domain: unauthenticated allow entries apply only then. */
+const authed: SpamInput = { ...input, authenticationResults: ["mx.example.test; spf=pass smtp.mailfrom=bounce@lottery.example.test"] };
 const example = (label: "spam" | "ham", subject: string): SpamExample =>
   ({ senderEmail: "x@example.test", senderDomain: "example.test", subject, snippet: "Synthetischer Text", label, createdAt: 1 });
 const answer = (value: object) => JSON.stringify(value);
@@ -67,7 +69,7 @@ describe("classifySpam", () => {
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 1, reasons: [] }));
     const allowlist = { ownAddresses: new Set<string>(), ownDomains: new Set<string>(),
       isCorrespondent: async (email: string) => email === "winner@lottery.example.test", latestDecision: async () => null };
-    expect(await classifySpam({ input, allowlist, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model }))
+    expect(await classifySpam({ input: authed, allowlist, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model }))
       .toMatchObject({ verdict: "ham", source: "allowlist" });
     const deny = parseStaticRules({ deny: [{ type: "domain", value: "lottery.example.test", safe: true }] });
     expect(await classifySpam({ input, staticRules: deny, getExamples: async () => [], model }))
@@ -82,16 +84,16 @@ describe("classifySpam", () => {
     const sameSender: SpamExample = { ...example("spam", "Sie haben gewonnen"), senderEmail: "winner@lottery.example.test" };
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.95, reasons: ["Vom Nutzer als Spam markiert"] }));
 
-    expect(await classifySpam({ input, allowlist: context(null), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context(null), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "ham", source: "static-allow" });
     expect(model.doGenerateCalls).toHaveLength(0);
 
-    expect(await classifySpam({ input, allowlist: context("spam"), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context("spam"), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "spam", confidence: 0.95, source: "model" });
     expect(model.doGenerateCalls).toHaveLength(1);
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("[Spam] Von: winner@lottery.example.test | Betreff: Sie haben gewonnen");
 
-    expect(await classifySpam({ input, allowlist: context("ham"), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context("ham"), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "ham", source: "allowlist" });
     expect(model.doGenerateCalls).toHaveLength(1);
   });

@@ -11,7 +11,8 @@ import type { SpamInput } from "./types";
  *   model instead (briefs/spam/static-rules-report.md §4),
  * - addresses the mailbox has written to (To/Cc of its Sent folder),
  * - senders whose latest user decision is "Kein Spam" (a later "Als Spam"
- *   decision also lifts the correspondent entry).
+ *   decision also lifts the correspondent entry);
+ *   these two only with authentication for the sender (senderAuthAllowsEntry).
  */
 export type SpamAllowlistContext = {
   ownAddresses: ReadonlySet<string>;
@@ -51,6 +52,17 @@ export function senderAuthPassed(input: Pick<SpamInput, "authenticationResults">
     entry.result === "pass" && (entry.method === "spf" || entry.method === "dkim") && !!entry.domain && inDomain(entry.domain, wanted));
 }
 
+/**
+ * Allow entries that do not prove the sender (correspondents, "Kein Spam"
+ * senders, static allow rules without `requireAuth`) apply only when SPF or
+ * DKIM passed for `domain`, or when the receiving server wrote no
+ * Authentication-Results at all (nothing to judge). A forged From of a known
+ * sender therefore goes to the model.
+ */
+export function senderAuthAllowsEntry(input: Pick<SpamInput, "authenticationResults">, domain: string) {
+  return input.authenticationResults.length === 0 || senderAuthPassed(input, domain);
+}
+
 export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlistContext): Promise<AllowlistMatch | null> {
   const email = input.fromEmail?.trim().toLowerCase();
   if (!email) return null;
@@ -58,6 +70,7 @@ export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlis
   if (context.ownAddresses.has(email) && senderAuthPassed(input, domain)) return "own-address";
   const ownDomain = [...context.ownDomains].find((own) => inDomain(domain, own));
   if (ownDomain && senderAuthPassed(input, ownDomain)) return "own-domain";
+  if (!senderAuthAllowsEntry(input, domain)) return null;
   const decision = await context.latestDecision(email);
   if (decision === "ham") return "user-decision";
   // An explicit "Als Spam" outranks having written to the sender once.
