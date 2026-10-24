@@ -179,7 +179,9 @@ as `hash`/`builtAt` in `public/build-version.json`, and the page and
 `/api/version` read it once per process (`getRunningBuild`). A Docker image
 therefore shows its build without runtime variables, and a runtime environment
 that describes another build cannot pair a new label with old code. Runtime
-variables are read only when the artifact has no commit (`next dev`).
+variables are read only when the artifact has no commit and always under
+`next dev` (`NODE_ENV=development`), so a file left by a local `bun run build`
+never labels the live dev server.
 
 Every phone status Sheet (Hintergrundaufgaben, Posteingangsprüfung, Demnächst,
 Fehler, Kalender) starts with the same visible title row, `StatusSheetTitle`:
