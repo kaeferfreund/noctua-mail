@@ -14,6 +14,9 @@ import type { SpamInput } from "./types";
  *   from an unknown address" hint,
  * - deny rules short-circuit to spam only when `safe: true`,
  * - everything else (hints, `builtin:*` features) goes to the model as a hint.
+ * `header` rules ("Name: regex") see only these headers: Authentication-Results
+ * (the receiving server's block), the first X-Spam-* of each name, List-Id,
+ * List-Unsubscribe, Reply-To and Message-ID; rules on other names never match.
  * Unknown fields and unknown `builtin:*` values are ignored; a missing or
  * unreadable file means "no static rules".
  */
@@ -123,6 +126,7 @@ function headerValues(input: SpamInput, name: string): string[] {
   if (key === "list-id") return input.listId ? [input.listId] : [];
   if (key === "list-unsubscribe") return input.listUnsubscribe ? [input.listUnsubscribe] : [];
   if (key === "reply-to") return input.replyTo ? [input.replyTo] : [];
+  if (key === "message-id") return input.messageId ? [input.messageId] : [];
   return input.spamHeaders
     .filter((line) => lower(line.slice(0, line.indexOf(":"))) === key)
     .map((line) => line.slice(line.indexOf(":") + 1).trim());
