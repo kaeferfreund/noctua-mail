@@ -115,6 +115,10 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
     })).rejects.toThrow("Unexpected close");
 
     expect(created).toHaveLength(1);
+    // Teardown is not a server failure: no warn line at all, the connect op logs at info.
+    expect(warnings).toEqual([]);
+    expect(infos.some((line) => line.includes("[imap] imap.connect mailbox=INBOX") &&
+      line.includes("cancelled=Unexpected close"))).toBe(true);
     expect(warnings.some((line) => line.includes('"event":"imap.connect_retry"'))).toBe(false);
     expect(warnings.some((line) => line.includes('"event":"imap.connect_breaker_open"'))).toBe(false);
     expect(infos.some((line) => line.includes('"event":"imap.connect_cancelled"'))).toBe(true);
@@ -144,7 +148,7 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
 
     expect(created).toBe(1);
     expect(getImapConnectBlockedUntil(account)).toBe(0);
-    expect(warnings.some((line) => line.includes('"event":"imap.connect_breaker_open"'))).toBe(false);
+    expect(warnings).toEqual([]);
   });
 
   it("still retries and opens the breaker when the server closes during connect", async () => {
@@ -163,6 +167,7 @@ describe("connectImapClientWithRetry against a synthetic IMAP server", () => {
     expect(created).toBe(3);
     expect(closingAccepts).toBe(3);
     expect(warnings.filter((line) => line.includes('"event":"imap.connect_retry"'))).toHaveLength(2);
+    expect(warnings.filter((line) => line.startsWith("[imap] connect mailbox=INBOX") && line.includes("error=Unexpected close"))).toHaveLength(3);
     expect(warnings.some((line) => line.includes('"event":"imap.connect_breaker_open"'))).toBe(true);
     expect(infos.some((line) => line.includes('"event":"imap.connect_cancelled"'))).toBe(false);
     expect(getImapConnectBlockedUntil(account)).toBeGreaterThan(Date.now());
