@@ -153,13 +153,19 @@ function memoizedPrivateCss(): CssFilter {
   };
 }
 
-function sanitizeNormalized(
-  normalized: string,
-  mode: RemoteContentMode,
-  css: CssFilter,
-  onRemoteRewrite?: () => void
-) {
-  const block = mode === "block";
+/**
+ * The display mode reaches sanitizeNormalized only as this gate: every
+ * remote-content rewrite is handed to it, and only the block policy applies
+ * it. Mode-dependent behavior therefore cannot bypass the gate, which is what
+ * lets sanitizeHtmlForDisplayPair count rewrites and skip the allow pass when
+ * there were none.
+ */
+type RemoteRewriteGate = (rewrite: () => void) => void;
+const applyRemoteRewrite: RemoteRewriteGate = (rewrite) => rewrite();
+const keepRemoteSource: RemoteRewriteGate = () => {};
+const remoteRewriteGate = (mode: RemoteContentMode) => mode === "block" ? applyRemoteRewrite : keepRemoteSource;
+
+function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, css: CssFilter) {
   const sanitized = sanitizeHtml(normalized, {
     ...SANITIZE_HTML_OPTIONS,
     transformTags: {
@@ -173,22 +179,18 @@ function sanitizeNormalized(
         }
         if (attribs.style) attribs.style = css(attribs.style, true);
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
-        // The only mode-dependent code. sanitizeHtmlForDisplayPair skips the
-        // allow pass when neither rewrite below ran, so any future
-        // mode-specific behavior must also call onRemoteRewrite.
-        if (block && (tagName === "img" || tagName === "source")) {
-          if (attribs.src && !isLocalMailResource(attribs.src)) {
-            onRemoteRewrite?.();
+        // The only mode-dependent code, and it runs only through the gate.
+        if (tagName === "img" || tagName === "source") {
+          if (attribs.src && !isLocalMailResource(attribs.src)) blockRemote(() => {
             attribs["data-remote-src"] = attribs.src;
             attribs.src = BLANK_IMAGE;
-          }
+          });
           // A srcset may mix remote and inline candidates (and data URLs contain
           // commas). Retain only wholly local sets; src remains the fallback.
-          if (attribs.srcset && !localSrcset(attribs.srcset)) {
-            onRemoteRewrite?.();
+          if (attribs.srcset && !localSrcset(attribs.srcset)) blockRemote(() => {
             attribs["data-remote-srcset"] = attribs.srcset;
             delete attribs.srcset;
-          }
+          });
         }
         return { tagName, attribs };
       }
@@ -202,7 +204,7 @@ function sanitizeNormalized(
 
 export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = "block") {
   if (!input) return input;
-  return sanitizeNormalized(normalizeHtmlStructure(input), mode, memoizedPrivateCss());
+  return sanitizeNormalized(normalizeHtmlStructure(input), remoteRewriteGate(mode), memoizedPrivateCss());
 }
 
 export type SanitizedHtmlPair = { block: string; allow: string };
@@ -220,9 +222,10 @@ export function sanitizeHtmlForDisplayPair(input: string): SanitizedHtmlPair {
   const normalized = normalizeHtmlStructure(input);
   const css = memoizedPrivateCss();
   let remoteRewrites = 0;
-  const block = sanitizeNormalized(normalized, "block", css, () => {
+  const block = sanitizeNormalized(normalized, (rewrite) => {
     remoteRewrites += 1;
-  });
-  const allow = remoteRewrites ? sanitizeNormalized(normalized, "allow", css) : block;
+    applyRemoteRewrite(rewrite);
+  }, css);
+  const allow = remoteRewrites ? sanitizeNormalized(normalized, keepRemoteSource, css) : block;
   return { block, allow };
 }
