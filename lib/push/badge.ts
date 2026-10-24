@@ -1,3 +1,6 @@
+import { pushSettingsIncludeAccount } from "./settings";
+import type { PushDeviceSettings } from "./types";
+
 // App icon badge (Badging API). Supported by installed PWAs on iOS 16.4+,
 // Chromium desktop and some Android launchers; a no-op everywhere else.
 
@@ -19,7 +22,17 @@ export function setAppBadge(count: number, nav: BadgeNavigator | null = currentN
   done.catch(() => {});
 }
 
-/** Unread inbox total across mailboxes; mailboxes not synced yet count as 0. */
-export function unreadBadgeCount(mailboxes: ReadonlyArray<{ unread: number | null }>): number {
-  return mailboxes.reduce((total, mailbox) => total + (mailbox.unread ?? 0), 0);
+/**
+ * Unread inbox total; mailboxes not synced yet count as 0. With this device's
+ * push settings it matches the server's push badge: only the selected
+ * mailboxes, and no badge at all when the device turned it off.
+ */
+export function unreadBadgeCount(
+  mailboxes: ReadonlyArray<{ accountId: string; unread: number | null }>,
+  settings: PushDeviceSettings | null = null
+): number {
+  if (settings && !settings.badge) return 0;
+  return mailboxes
+    .filter((mailbox) => !settings || pushSettingsIncludeAccount(settings, mailbox.accountId))
+    .reduce((total, mailbox) => total + (mailbox.unread ?? 0), 0);
 }
