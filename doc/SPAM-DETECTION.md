@@ -65,6 +65,36 @@ most twice (after 5 s and 30 s), then dropped; the message stays unmarked. Each 
 logs such failures at most once per 10 minutes. Without `ANTHROPIC_API_KEY` only
 the allowlist and static rules decide; everything else stays unchecked.
 
+## Caching
+
+Every model call starts with the same system block, marked as an Anthropic
+prompt-cache breakpoint (`cacheControl` `ephemeral`, TTL 1 h, set in
+`provider.ts`): the instructions plus a rule catalogue from the static rules file
+(the hint labels, the `builtin:*` features and the safe deny rules — strongest
+first up to 4,000 characters, then grouped and sorted; no hit counts, no dates,
+never allow rules). With the current rules file the block is about 3,000
+characters (≈ 1,000 tokens; Haiku 5.5 caches from 512 tokens). It is built from
+the rules only, once per rules file version (mtime/size), so it is byte-identical
+across mails. Everything per mail comes after the breakpoint in the user message:
+examples, rule hints, the mail last. The examples get no second breakpoint: their
+order depends on the subject of each mail.
+
+The 1 h TTL fits the traffic (a few dozen mails a day in bursts); a 5 min entry
+would expire between most calls. A cache write costs 2× input, a read 0.1×, so
+the prefix pays off from the third call within an hour. A changed rules file
+starts a new entry.
+
+Reading the hit rate: each model call logs `[spam] model call` at debug level
+with `inputTokens` (total), `cacheReadTokens`, `cacheWriteTokens` and
+`outputTokens` from the AI SDK's `usage` (no content). After a sweep's jobs are
+done, `[spam] sweep done` sums them per account and adds `cacheHitRate` (cache
+read ÷ all input tokens). `scripts/spam-eval.ts` prints the totals, the hit
+rate, how many calls read the cache and a cost estimate from `SPAM_MODEL_PRICES`
+in `config.ts`. Mostly `cacheWriteTokens` and no reads means the prefix changes
+between calls; zero for both means it is below the model's minimum. The first
+calls of an eval run with `--concurrency` > 1 all write, because none of them can
+read an entry that is not written yet.
+
 ## Learning from decisions
 
 - "Als Spam" (`POST …/messages/:id/spam`, editor+) stores a spam example.
