@@ -1150,6 +1150,7 @@
     "loadFailed": "Failed to load messages. {error}",
     "emptyNamedFolder": "No messages in {folder}.",
     "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "draftCount": "{count, plural, one {# draft} other {# drafts}}",
     "searching": "Searching",
     "folderCount": "{count, plural, one {# total} other {# total}}",
     "folderCountTitle": "{path} ({total, plural, one {# Messages} other {# Messages}}, {unread, plural, one {# Unread} other {# Unread}})",

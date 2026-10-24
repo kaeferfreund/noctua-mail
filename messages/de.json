@@ -1150,6 +1150,7 @@
     "loadFailed": "Nachrichten konnten nicht geladen werden. {error}",
     "emptyNamedFolder": "Keine Nachrichten in „{folder}“.",
     "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "draftCount": "{count, plural, one {# Entwurf} other {# Entwürfe}}",
     "searching": "Suche",
     "folderCount": "{count, plural, one {# insgesamt} other {# insgesamt}}",
     "folderCountTitle": "{path} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
