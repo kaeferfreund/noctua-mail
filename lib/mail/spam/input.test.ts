@@ -80,6 +80,18 @@ describe("buildSpamInput", () => {
     expect(input.authenticationResults).toEqual(["mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none"]);
   });
 
+  test("a long X-Spam-Status keeps the tests at the end of its list; other headers stay capped", async () => {
+    const tests = Array.from({ length: 60 }, (_, index) => `SYNTHETIC_TEST_${index}`).concat("RCVD_ILLEGAL_IP").join(",");
+    const status = `Yes, score=9.9 required=5.0 tests=${tests} autolearn=no version=3.4.6`;
+    expect(status.length).toBeGreaterThan(1000);
+    const raw = [`X-Spam-Status: ${status}`, `X-Spam-Report: ${"x".repeat(1000)}`, "From: a@example.test", "To: b@example.test", "Subject: S", "", "Text"].join("\r\n");
+    const input = buildSpamInput(await simpleParser(raw));
+    expect(input.spamHeaders[0]).toBe(`x-spam-status: ${status}`);
+    expect(input.spamHeaders[1].length).toBe("x-spam-report: ".length + 600);
+    expect(buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", headers: raw.slice(0, raw.indexOf("\r\n\r\n")) }).spamHeaders[0])
+      .toContain("RCVD_ILLEGAL_IP");
+  });
+
   test("the row fallback takes the server verdicts from a raw header block", () => {
     const headers = source.slice(0, source.indexOf("\r\n\r\n")) + "\r\nAuto-Submitted: auto-generated";
     const input = buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", cc: "bob@example.test", subject: "S",
