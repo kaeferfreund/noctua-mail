@@ -1,4 +1,5 @@
 import { isFreeMailDomain } from "@/lib/senderIdentity";
+import { parseAuthenticationResults } from "./senderProfile";
 import type { SpamInput } from "./types";
 
 /**
@@ -10,7 +11,8 @@ import type { SpamInput } from "./types";
  *   model instead (briefs/spam/static-rules-report.md §4),
  * - addresses the mailbox has written to (To/Cc of its Sent folder),
  * - senders whose latest user decision is "Kein Spam" (a later "Als Spam"
- *   decision also lifts the correspondent entry).
+ *   decision also lifts the correspondent entry);
+ *   these two only with authentication for the sender (senderAuthAllowsEntry).
  */
 export type SpamAllowlistContext = {
   ownAddresses: ReadonlySet<string>;
@@ -20,6 +22,21 @@ export type SpamAllowlistContext = {
 };
 
 export type AllowlistMatch = "own-address" | "own-domain" | "correspondent" | "user-decision";
+
+export type SpamUserDecision = { label: "spam" | "ham"; decidedByUserId: string | null };
+
+/**
+ * The sender's latest user decision as the allowlist sees it. "Als Spam"
+ * always counts. "Kein Spam" puts the sender on the allowlist only when its
+ * author may manage the mailbox (`mayAllow`, the manager role that also sets
+ * the mailbox's spam settings); a plain editor's mark, or one without a known
+ * author, stays an example for the model.
+ */
+export async function allowlistDecision(decision: SpamUserDecision | null, mayAllow: (userId: string) => Promise<boolean>) {
+  if (!decision) return null;
+  if (decision.label === "spam") return "spam";
+  return decision.decidedByUserId && await mayAllow(decision.decidedByUserId) ? "ham" : null;
+}
 
 export function buildOwnIdentitySets(addresses: Iterable<string>) {
   const ownAddresses = new Set<string>();
@@ -38,18 +55,27 @@ const inDomain = (candidate: string, domain: string) => candidate === domain || 
 
 /**
  * Whether the receiving server's Authentication-Results show `spf=pass` or
- * `dkim=pass` with an identity (smtp.mailfrom, header.d, header.i …) in `domain`.
+ * `dkim=pass` for an identity in `domain`. Only the identity the method
+ * authenticates counts, as for trusted senders (parseAuthenticationResults):
+ * DKIM `header.d` (else `header.i`), SPF `smtp.mailfrom`. `smtp.helo`,
+ * selectors, other properties and comments are chosen by the sender.
  */
 export function senderAuthPassed(input: Pick<SpamInput, "authenticationResults">, domain: string) {
   const wanted = domain.trim().toLowerCase();
   if (!wanted) return false;
-  return input.authenticationResults.some((value) => value.split(";").slice(1).some((segment) => {
-    if (!/^\s*(spf|dkim)\s*=\s*pass\b/i.test(segment)) return false;
-    return [...segment.matchAll(/\b[a-z]+\.[a-z]+=([^\s;()]+)/gi)].some((match) => {
-      const identity = match[1].toLowerCase().replace(/^["']|["']$/g, "");
-      return inDomain(identity.slice(identity.lastIndexOf("@") + 1), wanted);
-    });
-  }));
+  return parseAuthenticationResults(input.authenticationResults).some((entry) =>
+    entry.result === "pass" && (entry.method === "spf" || entry.method === "dkim") && !!entry.domain && inDomain(entry.domain, wanted));
+}
+
+/**
+ * Allow entries that do not prove the sender (correspondents, "Kein Spam"
+ * senders, static allow rules without `requireAuth`) apply only when SPF or
+ * DKIM passed for `domain`, or when the receiving server wrote no
+ * Authentication-Results at all (nothing to judge). A forged From of a known
+ * sender therefore goes to the model.
+ */
+export function senderAuthAllowsEntry(input: Pick<SpamInput, "authenticationResults">, domain: string) {
+  return input.authenticationResults.length === 0 || senderAuthPassed(input, domain);
 }
 
 export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlistContext): Promise<AllowlistMatch | null> {
@@ -59,6 +85,7 @@ export async function matchSpamAllowlist(input: SpamInput, context: SpamAllowlis
   if (context.ownAddresses.has(email) && senderAuthPassed(input, domain)) return "own-address";
   const ownDomain = [...context.ownDomains].find((own) => inDomain(domain, own));
   if (ownDomain && senderAuthPassed(input, ownDomain)) return "own-domain";
+  if (!senderAuthAllowsEntry(input, domain)) return null;
   const decision = await context.latestDecision(email);
   if (decision === "ham") return "user-decision";
   // An explicit "Als Spam" outranks having written to the sender once.

@@ -53,6 +53,29 @@ describe("spam settings", () => {
     expect(JSON.parse(String(put.init?.body))).toEqual({ enabled: true, autoMove: true, threshold: null });
   });
 
+  it("mailbox: a non-numeric or out-of-range threshold shows the field error and saves nothing", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const apiFetch: AdminFetch = async (input, init) => {
+      calls.push({ url: String(input), init });
+      return response({ ok: true, settings: init?.method === "PUT" ? JSON.parse(String(init.body)) : { threshold: 0.95 }, globalThreshold: 0.85, enabled: true });
+    };
+    const page = render(<Theme><SpamTabContent accountId="synthetic" apiFetch={apiFetch} /></Theme>);
+    const threshold = await page.findByLabelText(/Own threshold/) as HTMLInputElement;
+    for (const value of ["abc", "0,3", "1.5"]) {
+      fireEvent.change(threshold, { target: { value } });
+      fireEvent.click(page.getByRole("button", { name: "Save" }));
+      expect((await page.findByRole("alert")).textContent).toBe("Enter a number between 0.5 and 1, or leave the field empty.");
+      expect(threshold.getAttribute("aria-invalid")).toBe("true");
+      expect(threshold.getAttribute("aria-describedby")).toContain(page.getByRole("alert").id);
+    }
+    expect(calls.filter(call => call.init?.method === "PUT")).toEqual([]);
+    fireEvent.change(threshold, { target: { value: "0,8" } });
+    expect(page.queryByRole("alert")).toBeNull();
+    fireEvent.click(page.getByRole("button", { name: "Save" }));
+    await page.findByText("Saved.");
+    expect(JSON.parse(String(calls.find(call => call.init?.method === "PUT")!.init?.body))).toEqual({ enabled: true, autoMove: false, threshold: 0.8 });
+  });
+
   it("mailbox: the own switch defaults to on and saves off", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const apiFetch: AdminFetch = async (input, init) => {

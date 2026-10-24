@@ -124,8 +124,8 @@ test("production shard-opening inventory routes every writable shard connection 
   expect(source("lib/db/connection.ts")).toContain("configureAccountDb(accountDb)");
   expect(source("lib/membershipCleanup.ts")).toContain("configureAccountDb(db, 0)");
   expect(source("scripts/checkShardMessageCollisions.ts")).toContain("{ readonly: true }");
-  // The spam eval and the profile backfill dry run read data dirs read-only and immutable (no -wal/-shm access).
-  expect(source("lib/mail/spam/evalData.ts")).toContain("?immutable=1`, flags)");
+  // The spam eval and the profile backfill dry run read data dirs read-only (mode=ro: WAL-aware, never writes or checkpoints).
+  expect(source("lib/mail/spam/evalData.ts")).toContain("?mode=ro`, flags)");
   expect(source("lib/mail/spam/evalData.ts")).toContain("SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI");
   expect(source("lib/mail/spam/evalData.ts").match(/new Database\(/g)).toHaveLength(1);
   // The spam apply script inspects shards read-only; its writes go through the common DB API.
