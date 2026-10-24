@@ -4,7 +4,7 @@ import { getSharedTestAuthHarness } from "@/lib/testAuthHarness";
 import { createCollabFixture } from "@/lib/testThreadCollabHarness";
 import { createPushNotifier, type PushNotifierOptions } from "./send";
 import type { PushDelivery, PushTransport } from "./server";
-import { getPushSubscription, PUSH_MAX_FAILURES, upsertPushSubscription } from "./subscriptions";
+import { deletePushSubscription, getPushSubscription, PUSH_MAX_FAILURES, upsertPushSubscription } from "./subscriptions";
 import { DEFAULT_PUSH_DEVICE_SETTINGS, type PushDeviceSettings, type PushPayload } from "./types";
 import { getDb } from "../db/connection";
 
@@ -115,6 +115,27 @@ describe("push sending rules", () => {
     await t.arrive({ dateValue: fixed });
     await t.sync();
     expect(t.mine()).toEqual([]);
+  });
+
+  test("drops collapse windows once they have expired, also those of removed devices", async () => {
+    const t = await setup();
+    // A second device keeps push active after the first one is removed.
+    await upsertPushSubscription({
+      userId: t.user.id, endpoint: `https://fcm.googleapis.com/fcm/send/${crypto.randomUUID()}`, p256dh: "synthetic-key", auth: "synthetic-auth",
+      userAgent: null, settings: { ...DEFAULT_PUSH_DEVICE_SETTINGS, accountIds: ["some-other-mailbox"] }
+    });
+    await t.arrive();
+    await t.sync();
+    expect(t.mine()).toHaveLength(1);
+    // Devices of other tests in the shared database open windows for this mailbox too.
+    const open = t.notifier.openWindows();
+    expect(open).toBeGreaterThanOrEqual(1);
+    await deletePushSubscription(t.device.id);
+    await Bun.sleep(80);
+    await t.arrive();
+    await t.sync();
+    expect(t.mine()).toHaveLength(1);
+    expect(t.notifier.openWindows()).toBe(open - 1);
   });
 
   test("skips spam, read, deleted and old mail", async () => {
