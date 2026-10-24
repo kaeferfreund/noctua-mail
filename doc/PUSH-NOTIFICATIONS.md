@@ -37,7 +37,7 @@ JSON, at most 16 KB.
 |---|---|---|
 | `GET /api/push/vapid-public-key` | – | `{ ok, publicKey }` (base64url) · 404 when push is off |
 | `GET /api/push/subscriptions` | – | `{ ok, subscriptions: [{ id, endpointHash, userAgent, settings, createdAt, lastSeenAt }] }`, own devices only, never the endpoint |
-| `POST /api/push/subscriptions` | `{ subscription: PushSubscriptionJSON, settings?, userAgent? }` | `{ ok, id, settings }`; upsert by endpoint |
+| `POST /api/push/subscriptions` | `{ subscription: PushSubscriptionJSON, settings?, userAgent?, previousEndpoint? }` | `{ ok, id, settings }`; upsert by endpoint |
 | `PUT /api/push/subscriptions/:id` | `{ settings }` | `{ ok, settings }` |
 | `DELETE /api/push/subscriptions/:id` | – | `{ ok }` |
 | `DELETE /api/push/subscriptions` | `{ endpoint }` | `{ ok }`, the caller's own endpoint (after `unsubscribe()`) |
@@ -60,6 +60,12 @@ Rules of `POST /api/push/subscriptions`:
 - The endpoint belongs to the browser. When a different user signs in on that
   browser and subscribes, the previous row is replaced by a new one (new id,
   default or given settings).
+- `previousEndpoint` (sent by the service worker after `pushsubscriptionchange`)
+  names the endpoint the browser replaced. If the caller owns a row with that
+  endpoint, the row is deleted in the same transaction and its settings carry
+  over to the new endpoint unless `settings` is given (explicit settings win).
+  A previous endpoint that is unknown or belongs to another user is ignored;
+  the response is the same either way.
 - A user keeps at most 20 devices; a new one evicts the least recently seen.
 
 ## Settings (per device)

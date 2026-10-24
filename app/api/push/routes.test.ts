@@ -113,11 +113,54 @@ describe("push API", () => {
       { subscription: { ...valid, keys: { p256dh: "short", auth: valid.keys.auth } } },
       { subscription: { ...valid, keys: { p256dh: valid.keys.p256dh, auth: Buffer.alloc(8).toString("base64url") } } },
       { subscription: valid, settings: { accountIds: "all" } },
-      { subscription: valid, userAgent: 5 }
+      { subscription: valid, userAgent: 5 },
+      { subscription: valid, previousEndpoint: 5 }, { subscription: valid, previousEndpoint: "" },
+      { subscription: valid, previousEndpoint: `https://fcm.googleapis.com/${"x".repeat(2048)}` }
     ]) expect((await subscribe(request("/subscriptions", "POST", user.cookie, body))).status).toBe(400);
     expect((await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: valid }, { origin: "https://foreign.example.test" }))).status).toBe(403);
     expect((await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: valid }, { "content-type": "text/plain" }))).status).toBe(400);
     expect((await (await listSubscriptions(request("/subscriptions", "GET", user.cookie))).json()).subscriptions).toEqual([]);
+  });
+
+  test("a rotated subscription (previousEndpoint) keeps the device settings and replaces the old row", async () => {
+    const user = await signedIn();
+    const settings = { accountIds: ["acc-synthetic"], includeSubject: false, badge: false, quietHours: { from: "22:00", to: "07:00", timeZone: "Europe/Berlin" } };
+    const old = subscription();
+    const { id: oldId } = await (await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: old, settings }))).json();
+    const rotated = subscription();
+    const response = await (await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: rotated, previousEndpoint: old.endpoint }))).json();
+    expect(response).toEqual({ ok: true, id: expect.any(String), settings });
+    expect(response.id).not.toBe(oldId);
+    const rows = user.master.prepare("SELECT endpoint, settings FROM push_subscriptions WHERE userId = ?").all(user.user.id) as { endpoint: string; settings: string }[];
+    expect(rows.map((row) => [row.endpoint, JSON.parse(row.settings)])).toEqual([[rotated.endpoint, settings]]);
+
+    // Explicit settings win over the previous device's; the old row still goes.
+    const next = subscription();
+    const explicit = { ...DEFAULT_PUSH_DEVICE_SETTINGS, badge: false };
+    expect(await (await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: next, previousEndpoint: rotated.endpoint, settings: explicit }))).json())
+      .toEqual({ ok: true, id: expect.any(String), settings: explicit });
+    expect(user.master.prepare("SELECT endpoint FROM push_subscriptions WHERE userId = ?").all(user.user.id)).toEqual([{ endpoint: next.endpoint }]);
+  });
+
+  test("a previousEndpoint of another user is ignored: no settings leak, no deletion", async () => {
+    const owner = await signedIn();
+    const other = await signedIn();
+    const ownerDevice = subscription();
+    const ownerSettings = { ...DEFAULT_PUSH_DEVICE_SETTINGS, includeSubject: false, accountIds: ["acc-synthetic-owner"] };
+    const { id: ownerId } = await (await subscribe(request("/subscriptions", "POST", owner.cookie, { subscription: ownerDevice, settings: ownerSettings }))).json();
+
+    const otherDevice = subscription();
+    const response = await subscribe(request("/subscriptions", "POST", other.cookie, { subscription: otherDevice, previousEndpoint: ownerDevice.endpoint }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, id: expect.any(String), settings: DEFAULT_PUSH_DEVICE_SETTINGS });
+    expect(rowsOf(owner)).toEqual([{ id: ownerId, endpoint: ownerDevice.endpoint, settings: JSON.stringify(ownerSettings) }]);
+    // An unknown previous endpoint behaves the same.
+    expect((await subscribe(request("/subscriptions", "POST", other.cookie, { subscription: subscription(), previousEndpoint: "https://fcm.googleapis.com/fcm/send/unknown" }))).status).toBe(200);
+    expect(rowsOf(owner)).toHaveLength(1);
+
+    function rowsOf(session: Awaited<ReturnType<typeof signedIn>>) {
+      return session.master.prepare("SELECT id, endpoint, settings FROM push_subscriptions WHERE userId = ?").all(session.user.id);
+    }
   });
 
   test("settings and removal are own-only", async () => {

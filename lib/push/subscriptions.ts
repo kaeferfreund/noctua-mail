@@ -59,6 +59,8 @@ export type PushSubscriptionInput = {
   auth: string;
   userAgent: string | null;
   settings?: PushDeviceSettings;
+  /** Endpoint this one replaces after the browser rotated the subscription. */
+  previousEndpoint?: string;
 };
 
 /**
@@ -67,15 +69,23 @@ export type PushSubscriptionInput = {
  * browser's own capability: when another user signs in on that browser and
  * subscribes, the old row is replaced by a new one (new id, default settings).
  * A user keeps at most PUSH_MAX_DEVICES_PER_USER devices.
+ * With `previousEndpoint` (browser rotation) the caller's own row for that
+ * endpoint is removed and, unless new settings are given, its settings carry
+ * over. A previous endpoint of another user is ignored.
  */
 export async function upsertPushSubscription(input: PushSubscriptionInput): Promise<StoredPushSubscription> {
   return withDbWriteRetry("upsertPushSubscription", async () => {
     const db = await getDb();
     const now = Date.now();
     return db.transaction(() => {
+      const previous = input.previousEndpoint && input.previousEndpoint !== input.endpoint
+        ? db.prepare(`SELECT * FROM push_subscriptions WHERE endpoint = ? AND userId = ?`).get(input.previousEndpoint, input.userId) as PushSubscriptionRow | undefined
+        : undefined;
+      if (previous) db.prepare(`DELETE FROM push_subscriptions WHERE id = ?`).run(previous.id);
+      const carried = input.settings ?? (previous ? parseStoredSettings(previous.settings) : undefined);
       const existing = db.prepare(`SELECT * FROM push_subscriptions WHERE endpoint = ?`).get(input.endpoint) as PushSubscriptionRow | undefined;
       if (existing && existing.userId === input.userId) {
-        const settings = input.settings ?? parseStoredSettings(existing.settings);
+        const settings = carried ?? parseStoredSettings(existing.settings);
         db.prepare(`UPDATE push_subscriptions SET p256dh = ?, auth = ?, userAgent = COALESCE(?, userAgent), settings = ?,
             lastSeenAt = ?, failures = 0 WHERE id = ?`)
           .run(input.p256dh, input.auth, input.userAgent, JSON.stringify(settings), now, existing.id);
@@ -84,7 +94,7 @@ export async function upsertPushSubscription(input: PushSubscriptionInput): Prom
         db.prepare(`INSERT INTO push_subscriptions (id, userId, endpoint, p256dh, auth, userAgent, settings, createdAt, lastSeenAt, failures)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`)
           .run(randomUUID(), input.userId, input.endpoint, input.p256dh, input.auth, input.userAgent,
-            JSON.stringify(input.settings ?? DEFAULT_PUSH_DEVICE_SETTINGS), now, now);
+            JSON.stringify(carried ?? DEFAULT_PUSH_DEVICE_SETTINGS), now, now);
         db.prepare(`DELETE FROM push_subscriptions WHERE userId = ? AND id NOT IN (
             SELECT id FROM push_subscriptions WHERE userId = ? ORDER BY lastSeenAt DESC, createdAt DESC LIMIT ?)`)
           .run(input.userId, input.userId, PUSH_MAX_DEVICES_PER_USER);

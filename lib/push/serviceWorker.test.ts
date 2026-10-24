@@ -141,23 +141,27 @@ describe("service worker notification click", () => {
 describe("service worker pushsubscriptionchange", () => {
   const oldSubscription = { endpoint: "https://push.example.test/old", options: { applicationServerKey: new Uint8Array([1, 2, 3]).buffer } };
 
-  it("re-subscribes with the previous key, registers the new endpoint and drops the old one", async () => {
+  it("re-subscribes with the previous key and registers the new endpoint as the successor of the old one", async () => {
     const worker = loadWorker();
     await worker.dispatch("pushsubscriptionchange", { oldSubscription });
     expect(worker.subscribed).toEqual([{ userVisibleOnly: true, applicationServerKey: oldSubscription.options.applicationServerKey }]);
     expect(worker.fetches).toEqual([
       { url: "/api/push/subscriptions", method: "POST", body: {
-        subscription: { endpoint: "https://push.example.test/new", keys: { p256dh: "p", auth: "a" } }, userAgent: "SyntheticAgent/1.0" } },
-      { url: "/api/push/subscriptions", method: "DELETE", body: { endpoint: "https://push.example.test/old" } }
+        subscription: { endpoint: "https://push.example.test/new", keys: { p256dh: "p", auth: "a" } }, userAgent: "SyntheticAgent/1.0",
+        previousEndpoint: "https://push.example.test/old" } }
     ]);
   });
 
-  it("uses a browser-provided subscription or the server key, and keeps the old row when registration fails", async () => {
+  it("uses a browser-provided subscription or the server key, and sends no previousEndpoint without a different old one", async () => {
     const provided = loadWorker();
     const newSubscription = { endpoint: "https://push.example.test/given", toJSON: () => ({ endpoint: "https://push.example.test/given" }) };
     await provided.dispatch("pushsubscriptionchange", { oldSubscription, newSubscription });
     expect(provided.subscribed).toEqual([]);
-    expect(provided.fetches.map(call => call.method)).toEqual(["POST", "DELETE"]);
+    expect(provided.fetches.map(call => [call.method, (call.body as { previousEndpoint?: string }).previousEndpoint])).toEqual([["POST", "https://push.example.test/old"]]);
+
+    const unchanged = loadWorker();
+    await unchanged.dispatch("pushsubscriptionchange", { oldSubscription: { endpoint: "https://push.example.test/given" }, newSubscription });
+    expect(unchanged.fetches.map(call => call.body)).toEqual([{ subscription: { endpoint: "https://push.example.test/given" }, userAgent: "SyntheticAgent/1.0" }]);
 
     const fallback = loadWorker({ fetchResponses: {
       "GET /api/push/vapid-public-key": Response.json({ ok: true, publicKey: "BSyntheticKey" }),
