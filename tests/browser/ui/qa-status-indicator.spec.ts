@@ -313,9 +313,9 @@ for (const [width, height] of [[1280, 900], [1024, 900], [390, 844]]) {
   });
 }
 
-// FullCalendar's href-less date labels report tabIndex 0; Radix then picked one
-// as the popover's last tabbable element and Tab left the popover. Walk the real
-// tab order with the keyboard: it must wrap inside the popover both ways.
+// FullCalendar 6's href-less date labels reported tabIndex 0; Radix then picked
+// one as the popover's last tabbable element and Tab left the popover. Walk the
+// real tab order with the keyboard: it must wrap inside the popover both ways.
 test("desktop calendar popover keeps Tab and Shift+Tab inside the popover", async ({ page }) => {
   test.skip(baseline);
   await page.setViewportSize({ width: 1280, height: 900 });

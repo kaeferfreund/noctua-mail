@@ -182,13 +182,14 @@ button in the content, not a second icon next to the close. Reminder leads use
 the largest whole unit (`reminderLeadUnit`: zu Beginn, Minuten, Stunden, Tage)
 through one ICU select/plural message.
 
-FullCalendar renders day numbers and column headers as `<a>` without `href`.
-Browsers skip them, but `tabIndex` still reports 0, so Radix FocusScope took
-one as the popover's last tabbable element and Tab left the calendar popover
-instead of wrapping. `CalendarView` sets `tabIndex = -1` on those labels when
-their cells mount (`calendarFocus.ts`), so the desktop popover loops focus in
-calendar mode exactly as in section mode, and Shift+Tab from the first control
-reaches the last event.
+Radix FocusScope treats every element whose `tabIndex` is 0 or more as a loop
+edge. FullCalendar 6 rendered day numbers and column headers as `<a>` without
+`href`: browsers skip them, but `tabIndex` reported 0, so Tab left the calendar
+popover instead of wrapping. FullCalendar 7 renders those labels as plain,
+`aria-hidden` elements, so the desktop popover loops focus in calendar mode
+exactly as in section mode, and Shift+Tab from the first control reaches the
+last event. `CalendarView.dom.test.tsx` fails if the calendar ever again exposes
+an element that reports a tab index without being keyboard-focusable.
 
 Desktop density (768px and wider) is scoped to `ShellPanes.module.css`:
 `--shell-gutter: 0px`, `--pane-padding-x/y: 12px`, and
