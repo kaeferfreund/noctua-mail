@@ -1,6 +1,6 @@
 import { getFolderDisplayName, folderNameMatches } from "@/lib/i18n/folderNames";
 import { useLocale, useTranslations } from "next-intl";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type React from "react";
 import { Folder as FolderIcon, MoreVertical } from "lucide-react";
 import { Badge, DropdownMenu, IconButton } from "@radix-ui/themes";
@@ -85,15 +85,23 @@ function FolderTreeNodeView({
     syncAccount,
     folderSpecialIcon
   } = actions;
-  const { hasFolderMatch, folderPathLabel } = helpers;
+  const { hasFolderMatch } = helpers;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // The Radix menu + tooltip and the count title cost real work per folder and
-  // are rarely used, so they are built on the first sign of interest in this
-  // row (pointer over it, focus in it) and kept from then on. The active and
-  // syncing rows show their action button without hover, so they mount it
-  // right away and keyboard users always reach the real menu trigger.
+  // The Radix menu + tooltip cost real work per folder and are rarely used, so
+  // they are built on the first sign of interest in this row (pointer over it,
+  // focus in it) and kept from then on. The active and syncing rows show their
+  // action button without hover, so they mount it right away and keyboard users
+  // always reach the real menu trigger.
   const [isEngaged, setIsEngaged] = useState(false);
   const engage = () => setIsEngaged(true);
+  // The count title is the row's accessible description, so it exists before
+  // any pointer or focus (screen-reader browse mode reaches the row without
+  // either). Memoized: the node re-renders on tree state changes that leave it.
+  const folderPath = helpers.folderPathLabel(folder);
+  const folderTitle = useMemo(
+    () => getFolderCountTitle(folderPath, folder.count ?? 0, folder.unreadCount ?? 0, locale),
+    [folderPath, folder.count, folder.unreadCount, locale]
+  );
 
   const isCollapsed = collapsedFolders[folder.id] ?? false;
   const hasChildren = (folderTree.get(folder.id) ?? []).length > 0;
@@ -105,14 +113,17 @@ function FolderTreeNodeView({
     ? folderNameMatches(folder, folderQueryText, locale)
     : true;
   const childNodes = folderTree.get(folder.id) ?? [];
-  const folderTitle = isEngaged
-    ? getFolderCountTitle(folderPathLabel(folder), folder.count ?? 0, folder.unreadCount ?? 0, locale)
-    : undefined;
   const treeCount = getFolderTreeCount(folder);
   const isDeleting = deletingFolderIds.has(folder.id);
   const isSyncingFolder = syncingFolders.has(folder.id);
   const isActive = searchScope === "folder" && folder.id === activeFolderId;
   const mountMenu = isEngaged || isActive || isSyncingFolder;
+  const selectFolder = () => {
+    if (isDeleting) return;
+    clearSearch();
+    setSearchScope("folder");
+    setActiveFolderId(folder.id);
+  };
 
   return (
     <div
@@ -133,19 +144,19 @@ function FolderTreeNodeView({
         tabIndex={0}
         onPointerEnter={engage}
         onFocus={engage}
-        onClick={() => {
-          if (isDeleting) return;
-          clearSearch();
-          setSearchScope("folder");
-          setActiveFolderId(folder.id);
+        // React events from the portalled folder menu bubble here through the
+        // component tree: a click selects only from inside the row's own DOM,
+        // and Enter/Space only when the row itself has focus (not its action
+        // button or a menu item).
+        onClick={(event) => {
+          if (!event.currentTarget.contains(event.target as Node)) return;
+          selectFolder();
         }}
         onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            if (isDeleting) return;
-            clearSearch();
-            setSearchScope("folder");
-            setActiveFolderId(folder.id);
+            selectFolder();
           }
         }}
         onDragOver={(event) => {
