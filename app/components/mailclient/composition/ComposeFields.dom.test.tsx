@@ -52,6 +52,16 @@ describe("compose From control", () => {
     expect(temporary.view.getByRole("alert").textContent).toContain("temporarily unavailable");
     expect(temporary.view.queryByRole("link")).toBeNull();
   });
+  test("the referenced message is labelled per mode: forwarded vs replied to", () => {
+    const source = { id: "m1", subject: "Synthetic quarterly report", from: "sender@example.test" } as React.ComponentProps<typeof ComposeFields>["inReplyToMessage"];
+    const forward = fields("modal", { inReplyToMessage: source, inReplyToIsForward: true });
+    expect(forward.view.getByText("Forwarded mail:")).toBeTruthy();
+    expect(forward.view.queryByText("In Reply To:")).toBeNull();
+    cleanup();
+    const reply = fields("inline", { inReplyToMessage: source });
+    expect(reply.view.getByText("In Reply To:")).toBeTruthy();
+    expect(reply.view.queryByText("Forwarded mail:")).toBeNull();
+  });
   test("viewer From selection and send are disabled", () => {
     const { view } = fields("modal", { identityDisabled: true });
     expect((view.getByLabelText("From:") as HTMLButtonElement).disabled).toBe(true);
