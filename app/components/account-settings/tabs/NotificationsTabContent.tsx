@@ -156,7 +156,7 @@ function ThisDevice({ availability, subscribed, busy, onEnable, onDisable }: {
       <Flex direction="column" gap="1">
         <Text size="2" weight="medium">{t("installTitle")}</Text>
         <Text size="2">{t("installHelp")}</Text>
-        <ol className="m-0 list-decimal pl-5 text-sm">
+        <ol className="m-0 list-decimal pl-5 text-sm hyphens-auto [overflow-wrap:break-word]">
           <li>{t("installStep1")}</li>
           <li>{t("installStep2")}</li>
           <li>{t("installStep3", { app: DEFAULT_APP_TITLE })}</li>
