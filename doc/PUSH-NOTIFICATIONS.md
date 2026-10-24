@@ -168,8 +168,12 @@ type PushPayload =
 - Notification texts (sender, subject) pass through the browser vendor's push
   service encrypted end-to-end; the service sees only size and timing. With
   `includeSubject: false` the subject is not part of the payload at all.
-- Signing out does not remove the device on the server; the client removes
-  its subscription (`DELETE /api/push/subscriptions`) when the user turns
-  notifications off. A device of a user without any access receives nothing.
+- Signing out removes the device on the server: before `POST /api/auth/logout`
+  the client sends `DELETE /api/push/subscriptions` for its current endpoint
+  (best effort, errors are ignored). The browser subscription itself stays, so
+  a shared device shows nothing for the signed-out user until a signed-in user
+  registers it again in the notification settings. Turning notifications off removes both the
+  server row and the browser subscription. A device of a user without any
+  access receives nothing.
 - The high-water marks and collapse windows live in process memory; a restart
   only means the first sync per mailbox sets a new baseline.
