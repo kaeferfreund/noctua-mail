@@ -4,6 +4,7 @@ import {
   formatMonthlyByDayLabel,
   getEndValueAfterStartChange,
   parseLocalScheduleDate,
+  RECURRENCE_OPTIONS,
   recurrenceOptionLabel,
   recurrenceOptionToRRule,
   rruleToOption,
@@ -159,18 +160,18 @@ describe("monthly-by-day recurrence", () => {
 
   it("formats the human label from the start date", () => {
     const startDate = parseLocalScheduleDate("2026-03-17T09:00");
-    expect(formatMonthlyByDayLabel(startDate)).toBe("Monthly on the third Tuesday");
+    expect(formatMonthlyByDayLabel(startDate, "en")).toBe("Monthly on the third Tuesday");
   });
 
   it("maps the 5th occurrence to 'last' so the rule fires every month", () => {
     // 2026-03-30 is a Monday — the 5th and last Monday of March 2026.
     const startDate = parseLocalScheduleDate("2026-03-30");
     expect(buildMonthlyByDayRRule(startDate)).toBe("FREQ=MONTHLY;BYDAY=-1MO");
-    expect(formatMonthlyByDayLabel(startDate)).toBe("Monthly on the last Monday");
+    expect(formatMonthlyByDayLabel(startDate, "en")).toBe("Monthly on the last Monday");
   });
 
   it("falls back to a generic label and plain monthly rule when no date is given", () => {
-    expect(formatMonthlyByDayLabel(null)).toBe("Monthly on weekday");
+    expect(formatMonthlyByDayLabel(null, "en")).toBe("Monthly on weekday");
     expect(buildMonthlyByDayRRule(null)).toBe("FREQ=MONTHLY");
   });
 
@@ -192,10 +193,19 @@ describe("monthly-by-day recurrence", () => {
 
   it("uses dynamic label via recurrenceOptionLabel", () => {
     const startDate = parseLocalScheduleDate("2026-03-17");
-    expect(recurrenceOptionLabel("monthly-by-day", startDate)).toBe(
+    expect(recurrenceOptionLabel("monthly-by-day", startDate, "en")).toBe(
       "Monthly on the third Tuesday"
     );
-    expect(recurrenceOptionLabel("weekly", startDate)).toBe("Weekly");
+    expect(recurrenceOptionLabel("weekly", startDate, "en")).toBe("Weekly");
+  });
+
+  it("localizes recurrence labels in German", () => {
+    expect(formatMonthlyByDayLabel(parseLocalScheduleDate("2026-03-17"), "de")).toBe("Monatlich am dritten Dienstag");
+    expect(formatMonthlyByDayLabel(parseLocalScheduleDate("2026-03-30"), "de")).toBe("Monatlich am letzten Montag");
+    expect(formatMonthlyByDayLabel(null, "de")).toBe("Monatlich am selben Wochentag");
+    expect(RECURRENCE_OPTIONS.map((option) => recurrenceOptionLabel(option.value, null, "de"))).toEqual([
+      "Keine Wiederholung", "Täglich", "Wöchentlich", "Alle zwei Wochen", "Monatlich", "Monatlich am selben Wochentag", "Jährlich"
+    ]);
   });
 
   it("uses 'last' when the start date is the 4th and last occurrence of its weekday", () => {
@@ -204,7 +214,7 @@ describe("monthly-by-day recurrence", () => {
     // to Apr 23; "last" stays on the latest Thursday each month.
     const startDate = parseLocalScheduleDate("2026-02-26");
     expect(buildMonthlyByDayRRule(startDate)).toBe("FREQ=MONTHLY;BYDAY=-1TH");
-    expect(formatMonthlyByDayLabel(startDate)).toBe("Monthly on the last Thursday");
+    expect(formatMonthlyByDayLabel(startDate, "en")).toBe("Monthly on the last Thursday");
   });
 
   it("keeps 'fourth' when a 5th occurrence exists in the same month", () => {
@@ -212,6 +222,6 @@ describe("monthly-by-day recurrence", () => {
     // NOT the last — there is a 31. So we emit "fourth", not "last".
     const startDate = parseLocalScheduleDate("2026-03-24");
     expect(buildMonthlyByDayRRule(startDate)).toBe("FREQ=MONTHLY;BYDAY=4TU");
-    expect(formatMonthlyByDayLabel(startDate)).toBe("Monthly on the fourth Tuesday");
+    expect(formatMonthlyByDayLabel(startDate, "en")).toBe("Monthly on the fourth Tuesday");
   });
 });

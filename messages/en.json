@@ -1150,6 +1150,7 @@
     "loadFailed": "Failed to load messages. {error}",
     "emptyNamedFolder": "No messages in {folder}.",
     "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "draftCount": "{count, plural, one {# draft} other {# drafts}}",
     "searching": "Searching",
     "folderCount": "{count, plural, one {# total} other {# total}}",
     "folderCountTitle": "{path} ({total, plural, one {# Messages} other {# Messages}}, {unread, plural, one {# Unread} other {# Unread}})",
@@ -1507,6 +1508,7 @@
     "sender": {
       "chooseSender": "Choose a sender",
       "reviewSender": "Review sender",
+      "reviewRecipients": "Review recipients",
       "unavailableDraft": "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
       "chooseEnabledSender": "Choose an enabled From address before sending.",
       "confirmKeepEditedSignature": "Keep the edited signature and add the new signature? Your edited text will be preserved.",
@@ -1717,6 +1719,27 @@
     "fieldsScope": "in fields {fields}",
     "filterCriteria": "filter {badges}",
     "queryCriteria": "\"{query}\""
+  },
+  "EventSchedule": {
+    "start": "Start",
+    "end": "End",
+    "startTime": "Start time",
+    "endTime": "End time",
+    "allDay": "All day",
+    "repeat": "Repeat",
+    "location": "Location",
+    "locationPlaceholder": "Location (optional)",
+    "openTimePicker": "Open time picker",
+    "recurrence": {
+      "none": "Does not repeat",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "everyTwoWeeks": "Every two weeks",
+      "monthly": "Monthly",
+      "monthlyByDay": "Monthly on weekday",
+      "monthlyByDayOn": "Monthly on the {ordinal, select, 1 {first} 2 {second} 3 {third} 4 {fourth} other {last}} {weekday}",
+      "yearly": "Yearly"
+    }
   },
   "Folders": {
     "inbox": "Inbox",

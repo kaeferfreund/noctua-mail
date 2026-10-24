@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Clock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Popover, TextField } from "@radix-ui/themes";
 import styles from "./TimePicker.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
@@ -95,6 +96,7 @@ export default function TimePicker({
   disabled = false,
   ariaLabel
 }: Props) {
+  const t = useTranslations("EventSchedule");
   const [draft, setDraft] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [open, setOpen] = useState(false);
@@ -201,7 +203,7 @@ export default function TimePicker({
                 variant="ghost"
                 color="gray"
                 disabled={disabled}
-                tooltip="Open time picker"
+                tooltip={t("openTimePicker")}
                 className={styles.triggerButton}
               >
                 <Clock size={14} />

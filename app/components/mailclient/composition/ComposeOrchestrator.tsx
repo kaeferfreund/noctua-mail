@@ -6,7 +6,7 @@ import { senderMessages, isSenderMessageId } from "@/lib/senderMessages";
 
 import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
 import { resolveSignatureTemplate } from "@/lib/signatureTemplates";
-import { readSenderError } from "./senderErrors";
+import { readSenderError, senderMessageAction } from "./senderErrors";
 import { getSendWarnings, type SendOutcome } from "./sendOutcome";
 import {
   forwardRef,
@@ -1545,6 +1545,7 @@ function ComposeOrchestratorImpl(
     sendDisabled: senderLoading || !senderCanCompose || !sender?.identities.some(item => item.id === composeIdentityId && item.enabled),
     onSenderRetry: senderError && !senderLoading ? retrySender ?? undefined : undefined,
     senderMessage: senderError ? renderMessage(senderError) : draftSaveError ? renderMessage(draftSaveError) : (!senderLoading && !sender?.identities.some(item => item.id === composeIdentityId && item.enabled) ? senderCopy.unavailableDraft : compose.composeSenderWarnings.map(renderMessage).join(" ")),
+    senderAction: senderMessageAction(senderError ?? draftSaveError),
     onIdentityChange: (id) => {
       const identity = sender?.identities.find(item => item.id === id && item.enabled);
       if (!identity || sendingMail || !senderCanCompose) return;
