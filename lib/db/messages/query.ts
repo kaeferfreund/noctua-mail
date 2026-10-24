@@ -616,7 +616,9 @@ function parseSearchInput(
   fields?: string[] | null,
   accountEmail?: OwnAddressInput
 ) {
-  const input = raw ?? "";
+  // Control characters separate tokens. A NUL would end the FTS5 MATCH string ("unterminated string") and
+  // truncate the LIKE patterns, which SQLite reads up to the first NUL.
+  const input = (raw ?? "").replace(/\p{Cc}/gu, " ");
 
   // Extract "from:" terms and handle "from:me"
   const fromTerms: AddressSearchTerm[] = [];
