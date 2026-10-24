@@ -74,9 +74,10 @@ describe("/auth/me session activity write", () => {
     ["session deleted", (f: Awaited<ReturnType<typeof fixture>>) => f.master.prepare("DELETE FROM auth_session WHERE id=?").run(f.session.id)],
     ["security generation bumped", (f: Awaited<ReturnType<typeof fixture>>) => f.master.prepare("UPDATE auth_security_state SET generation=generation+1 WHERE userId=?").run(f.user.id)],
     ["session expired", (f: Awaited<ReturnType<typeof fixture>>) => f.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now() - 1000).toISOString(), f.session.id)]
-  ] as const) test(`revocation after the guard, on the skipped-write path: ${name} -> no selection`, async () => {
+  ] as const) for (const stale of [false, true]) test(`revocation after the guard, on the ${stale ? "stale-activity write" : "skipped-write"} path: ${name} -> no selection`, async () => {
     const f = await fixture();
     await f.me();
+    if (stale) await f.setUpdatedAt(SESSION_ACTIVITY_WRITE_INTERVAL_MS + 1000);
     const session = await guard(f);
     expect(session.activeAccountId).toBe(f.accountId);
     await withDbWriteRetry("test.revoke", () => revoke(f));
@@ -114,5 +115,54 @@ describe("/auth/me session activity write", () => {
     expect(selection.access.candidateIds).toEqual([other]);
     expect(session.activeAccountId).toBe(other);
     expect(f.row()!.activeAccountId).toBe(other);
+  });
+
+  // A switch-account that commits after this request's getSession read must survive the request's selection
+  // write (backlog: /auth/me write-back of an old selection, cross-tab lost switch with stale activity).
+  const switchTo = async (f: Awaited<ReturnType<typeof fixture>>, accountId: string) => {
+    const { setActiveAccountId } = await import("@/lib/betterAuth");
+    expect(await setActiveAccountId(f.auth, f.session.token, accountId)).toBeTruthy();
+  };
+  test("a stale-activity write does not overwrite a switch committed after the session read", async () => {
+    const f = await fixture();
+    const other = await f.addMailbox("Zulu Activity");
+    expect((await f.me()).body.accountId).toBe(f.accountId);
+    await f.setUpdatedAt(SESSION_ACTIVITY_WRITE_INTERVAL_MS + 1000);
+    const session = await guard(f);
+    expect(session.activeAccountId).toBe(f.accountId);
+    await switchTo(f, other);
+    const selection = await ensureActiveAccountId(session);
+    expect({ mailboxState: selection.mailboxState, accountId: selection.accountId }).toEqual({ mailboxState: "selected", accountId: other });
+    expect(selection.access.candidateIds.sort()).toEqual([f.accountId, other].sort());
+    expect(session.activeAccountId).toBe(other);
+    expect(f.row()!.activeAccountId).toBe(other);
+    expect((await f.me()).body.accountId).toBe(other);
+  });
+
+  test("a default chosen for an empty selection does not overwrite a switch committed after the session read", async () => {
+    const f = await fixture();
+    const other = await f.addMailbox("Zulu Activity");
+    await f.me();
+    await withDbWriteRetry("test.clear", () => f.master.prepare("UPDATE auth_session SET activeAccountId=NULL WHERE id=?").run(f.session.id));
+    const session = await guard(f);
+    expect(session.activeAccountId).toBeNull();
+    await switchTo(f, other);
+    const selection = await ensureActiveAccountId(session);
+    expect(selection.accountId).toBe(other);
+    expect(f.row()!.activeAccountId).toBe(other);
+  });
+
+  test("an adopted switch is rechecked: revoked after it committed -> the default is written", async () => {
+    const f = await fixture();
+    const other = await f.addMailbox("Zulu Activity");
+    await f.me();
+    await f.setUpdatedAt(SESSION_ACTIVITY_WRITE_INTERVAL_MS + 1000);
+    const session = await guard(f);
+    await switchTo(f, other);
+    await withDbWriteRetry("test.revoke", () => f.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.user.id, other));
+    const selection = await ensureActiveAccountId(session);
+    expect({ mailboxState: selection.mailboxState, accountId: selection.accountId }).toEqual({ mailboxState: "selected", accountId: f.accountId });
+    expect(selection.access.candidateIds).toEqual([f.accountId]);
+    expect(f.row()!.activeAccountId).toBe(f.accountId);
   });
 });
