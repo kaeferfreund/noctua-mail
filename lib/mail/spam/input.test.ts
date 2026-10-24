@@ -103,6 +103,30 @@ describe("buildSpamInput", () => {
     expect(buildSpamInputFromMessage({ from: "ceo@victim.example.test", to: "anna@example.test", subject: "S", headers }).authenticationResults).toEqual([ours]);
   });
 
+  test("authserv-id pinning: Netcup's bare host label (by mxf9a0.netcup.net, Authentication-Results: mxf9a0;) is the receiving server", async () => {
+    const ours = "mxf9a0; dkim=pass header.d=shop.example.test; spf=pass smtp.mailfrom=shop.example.test";
+    const netcup = [
+      "Received: from mail.shop.example.test (mail.shop.example.test [192.0.2.20]) by mxf9a0.netcup.net (Postfix) with ESMTPS id 4X1; Sat, 24 Oct 2026 10:00:00 +0000",
+      `Authentication-Results: ${ours}`,
+      "Authentication-Results: mx.forwarder.example.net; dkim=pass header.d=victim.example.test",
+      "From: Shop <news@shop.example.test>",
+      "To: anna@example.test",
+      "Subject: Bestellung",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Ihre Bestellung ist unterwegs."
+    ].join("\r\n");
+    expect(buildSpamInput(await simpleParser(netcup)).authenticationResults).toEqual([ours]);
+    const lines = parseHeaderBlock(netcup.split("\r\n\r\n")[0]);
+    for (const id of ["MXF9A0.", "mxf9a0.netcup.net", "mx2.netcup.net"]) {
+      const block = `Authentication-Results: ${id}; spf=pass smtp.mailfrom=shop.example.test`;
+      expect(receivingAuthenticationResults(parseHeaderBlock(`${netcup.split("\r\n")[0]}\r\n${block}`), [])).toHaveLength(1);
+    }
+    // Another bare label or a foreign host never counts.
+    expect(receivingAuthenticationResults(parseHeaderBlock(`${netcup.split("\r\n")[0]}\r\nAuthentication-Results: mxf9a1; spf=pass`), [])).toEqual([]);
+    expect(receivingAuthenticationResults(lines.filter((line) => !line.value.startsWith("mxf9a0;")), [])).toEqual([]);
+  });
+
   test("authserv-id pinning: a configured list wins over the Received host; no Received line keeps the top-most block", () => {
     const lines = parseHeaderBlock([
       "Received: from relay.example.net by relay.example.net; Sat, 24 Oct 2026 10:00:00 +0000",
