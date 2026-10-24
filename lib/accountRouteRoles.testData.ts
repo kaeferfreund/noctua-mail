@@ -279,6 +279,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
   },
   {
     "method": "POST",
+    "path": "messages/[messageId]/not-suspicious",
+    "minRole": "manager"
+  },
+  {
+    "method": "POST",
     "path": "messages/[messageId]/resync",
     "minRole": "viewer"
   },
