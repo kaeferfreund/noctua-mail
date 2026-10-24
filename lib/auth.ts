@@ -121,6 +121,11 @@ function isSessionLive(db: Database, session: ActiveUserSession) {
       AND julianday(s.expiresAt)>julianday('now')`).get(session.sessionId, session.sessionToken, session.userId, session.generation);
 }
 
+/** Clears the selection only while it is still `accountId` (compare-and-set): a switch committed since then stays. */
+export async function clearActiveAccountIdIfStill(session: ActiveUserSession, accountId: string) {
+  return compareAndSetActiveAccountId(await getDb(), session.sessionToken, accountId, null);
+}
+
 /**
  * Persist a deterministic default, then recheck membership on a fresh access read. Retry a revoked choice once.
  * The read after the write proves the selected mailbox still exists and is still a candidate, and supplies the
