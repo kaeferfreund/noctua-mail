@@ -29,6 +29,8 @@ type ComposeFieldsProps = {
   onSenderRetry?: () => void;
   onIdentityChange?: (id: string) => void;
   inReplyToMessage?: Message | null;
+  /** The referenced message is forwarded, not answered. */
+  inReplyToIsForward?: boolean;
   onJumpToMessage?: (messageId: string) => void;
   setComposeSubject: React.Dispatch<React.SetStateAction<string>>;
   setComposeTo: React.Dispatch<React.SetStateAction<string>>;
@@ -207,6 +209,7 @@ export default function ComposeFields({
   fromValue,
   identities = [], identityId, identityDisabled = false, senderMessage, senderAction = "sender", onSenderRetry, onIdentityChange,
   inReplyToMessage,
+  inReplyToIsForward = false,
   onJumpToMessage,
   setComposeSubject,
   setComposeTo,
@@ -299,7 +302,7 @@ export default function ComposeFields({
   const inReplyToRow = inReplyToMessage ? (
     <InReplyToReferenceRow
       variant="compose"
-      label={t("Reader.inReplyTo")}
+      label={t(inReplyToIsForward ? "Reader.forwardedMail" : "Reader.inReplyTo")}
       value={t("Compose.fields.inReplyTo", { subject: inReplyToMessage.subject || t("Reader.noSubject"), from: inReplyToMessage.from })}
       onClick={onJumpToMessage ? () => onJumpToMessage(inReplyToMessage.id) : undefined}
     />

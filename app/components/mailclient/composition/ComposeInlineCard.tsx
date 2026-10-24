@@ -124,6 +124,7 @@ export default function ComposeInlineCard() {
               fromValue={fromValue}
               identities={identities} identityId={identityId} identityDisabled={identityDisabled} senderMessage={senderMessage} senderAction={senderAction} onSenderRetry={onSenderRetry} onIdentityChange={onIdentityChange}
               inReplyToMessage={inReplyToMessage}
+              inReplyToIsForward={composeMode === "forward"}
               onJumpToMessage={jumpToMessage}
               setComposeSubject={setComposeSubject}
               setComposeTo={setComposeTo}
