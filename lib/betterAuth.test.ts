@@ -89,7 +89,7 @@ describe("two-factor (TOTP)", () => {
     expect(wrong.body?.code).toBe("INVALID_PASSWORD");
 
     const enrolment = await enrolTotp(jar, "totp-password-1");
-    expect(enrolment.totpURI).toStartWith("otpauth://totp/Noctua:totp%40example.test?");
+    expect(enrolment.totpURI).toStartWith("otpauth://totp/Mail:totp%40example.test?");
     expect(enrolment.backupCodes.length).toBe(10);
     const afterEnable = await auth.api.getSession({ headers: jar.headers() });
     expect((afterEnable?.user as { twoFactorEnabled?: boolean }).twoFactorEnabled).toBe(true);
@@ -178,7 +178,7 @@ describe("passkey", () => {
     await createUser("passkey@example.test", "passkey-password-1");
     const { jar } = await signIn("passkey@example.test", "passkey-password-1");
     const options = await auth.api.generatePasskeyRegistrationOptions({ headers: jar.headers() });
-    expect(options.rp).toEqual({ name: "Noctua", id: "localhost" });
+    expect(options.rp).toEqual({ name: "Mail", id: "localhost" });
     expect(options.challenge).toBeString();
     expect(options.user.name).toBe("passkey@example.test");
     expect(options.pubKeyCredParams.length).toBeGreaterThan(0);

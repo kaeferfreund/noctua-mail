@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
-import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
+import { DEFAULT_APP_TITLE, versionedIconUrl } from "@/lib/appBranding";
+import { defaultLocale } from "@/lib/i18n/config";
+import { getTranslator } from "@/lib/i18n/translator";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -9,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: DEFAULT_APP_TITLE,
     short_name: DEFAULT_APP_TITLE,
-    description: "Modern webmail client prototype",
+    description: getTranslator(defaultLocale)("Pwa.description"),
     start_url: "/",
     display: "standalone",
     background_color: "#f3f1ec",
@@ -19,17 +21,17 @@ export default function manifest(): MetadataRoute.Manifest {
     // distinguishable (and returns the plain base art otherwise).
     icons: [
       {
-        src: "/icons/badged/192",
+        src: versionedIconUrl("/icons/badged/192"),
         sizes: "192x192",
         type: "image/png"
       },
       {
-        src: "/icons/badged/512",
+        src: versionedIconUrl("/icons/badged/512"),
         sizes: "512x512",
         type: "image/png"
       },
       {
-        src: "/icons/badged/32",
+        src: versionedIconUrl("/icons/badged/32"),
         sizes: "32x32",
         type: "image/png"
       }

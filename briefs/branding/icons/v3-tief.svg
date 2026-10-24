@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Noctua branding proposal v3-tief: original envelope drawing, full-bleed (iOS applies its own mask). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F89B3C"/>
+      <stop offset="1" stop-color="#D9501C"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3F4F7"/>
+    </linearGradient>
+    <linearGradient id="flap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7F8FA"/>
+    </linearGradient>
+    <clipPath id="envClip">
+      <rect x="192" y="296" width="640" height="456" rx="52"/>
+    </clipPath>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22"/>
+      <feOffset dy="18" result="blur"/>
+      <feFlood flood-color="#7A2E00" flood-opacity="0.32"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="flapShadow" x="-10%" y="-10%" width="120%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="9"/>
+      <feOffset dy="8" result="blur"/>
+      <feFlood flood-color="#2B3240" flood-opacity="0.16"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect x="192" y="296" width="640" height="456" rx="52" fill="url(#paper)" filter="url(#shadow)"/>
+  <g clip-path="url(#envClip)">
+    
+    <path d="M 220.6 319.6379 L 466 522.461 Q 512 568.48 558 522.461 L 803.4 319.6379 L 832 296 L 192 296 Z" fill="url(#flap)" filter="url(#flapShadow)"/>
+    <path d="M 220.6 319.6379 L 466 522.461 Q 512 568.48 558 522.461 L 803.4 319.6379" fill="none" stroke="#E3E5EA" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    
+  </g>
+  
+</svg>
