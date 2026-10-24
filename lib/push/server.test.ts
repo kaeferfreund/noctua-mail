@@ -28,6 +28,20 @@ describe("readPushConfig", () => {
 });
 
 describe("isAllowedPushEndpoint", () => {
+  test("rejects authorities that URL parsers and HTTP clients may read differently (review-r1 P1)", () => {
+    for (const endpoint of [
+      "https://127.0.0.1;.fcm.googleapis.com/x",
+      "https://127.0.0.1\\.fcm.googleapis.com/x",
+      "https://fcm.googleapis.com@127.0.0.1/x",
+      "https://127.0.0.1%2e.fcm.googleapis.com/x",
+      "https://fcm.googleapis.com./x",
+      "https://FCM.GOOGLEAPIS.COM:443/x",
+      "https://[::1].push.apple.com/x",
+      "https://x_y.push.apple.com/x",
+      "https://.push.apple.com/x"
+    ]) expect(isAllowedPushEndpoint(endpoint)).toBe(false);
+    expect(isAllowedPushEndpoint("https://Fcm.GoogleApis.com/fcm/send/abc")).toBe(true);
+  });
   test("accepts the browser push services", () => {
     for (const endpoint of [
       "https://fcm.googleapis.com/fcm/send/synthetic",
