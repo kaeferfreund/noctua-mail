@@ -52,6 +52,13 @@ test("creates every mode, lists a token in both mailboxes, editor sees own and m
   expect((await DELETE(request(sharedId, "DELETE"), params(sharedId, otherId))).status).toBe(404);
   const managerList = await (await GET(request(sharedId, "GET", undefined, other), params(sharedId))).json();
   expect(managerList.tokens.map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining([...tokens, otherId]));
+  // The manager of the shared mailbox cannot access the creator's own mailbox: no ID (nor primary), only a count.
+  for (const item of managerList.tokens.filter((token: { id: string }) => tokens.includes(token.id))) {
+    expect(item).toMatchObject({ accountIds: [sharedId], hiddenMailboxCount: 1 });
+    expect(item).not.toHaveProperty("accountId");
+  }
+  expect((await (await GET(request(accountId), params(accountId))).json()).tokens.find((token: { id: string }) => token.id === tokens[0]))
+    .toMatchObject({ accountIds: [accountId, sharedId].sort(), hiddenMailboxCount: 0 });
   for (const tokenId of tokens) {
     expect((await DELETE(request(sharedId, "DELETE"), params(sharedId, tokenId))).status).toBe(200);
     const master = fixture.master;
@@ -75,7 +82,8 @@ test("mailbox cascade preserves a multi token, replaces deleted primary, removes
   fixture.master.prepare("DELETE FROM mcp_token_accounts WHERE tokenId=?").run(legacy.id);
   expect(await deleteAccountControlPlane(accountId)).toBe(true);
   const kept = await (await GET(request(sharedId), params(sharedId))).json();
-  expect(kept.tokens.find((token: { id: string }) => token.id === multi.id)).toMatchObject({ accountId: sharedId, accountIds: [sharedId] });
+  expect(kept.tokens.find((token: { id: string }) => token.id === multi.id)).toMatchObject({ accountIds: [sharedId], hiddenMailboxCount: 0 });
+  expect(fixture.master.prepare("SELECT accountId FROM mcp_tokens WHERE id=?").get(multi.id)).toEqual({ accountId: sharedId });
   expect(fixture.master.prepare("SELECT id FROM mcp_tokens WHERE id=?").get(legacy.id)).toBeNull();
   expect(await deleteAccountControlPlane(sharedId)).toBe(true);
   expect(fixture.master.prepare("SELECT id FROM mcp_tokens WHERE id=?").get(multi.id)).toBeNull();
