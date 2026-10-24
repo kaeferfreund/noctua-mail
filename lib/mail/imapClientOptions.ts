@@ -351,10 +351,28 @@ export async function connectImapClientWithRetry(params: {
       return client;
     } catch (error) {
       lastError = error;
+      // The owner's close()/logout() (stream teardown, abort, deadline) also rejects a pending
+      // connect with "Unexpected close". Read before disposing, which marks the client itself.
+      const closedByOwner = client.closedByClient === true;
       try {
         await (disposeClient ? disposeClient(client) : client.logout());
       } catch {
         // ignore cleanup failures on failed connect attempts
+      }
+      if (closedByOwner) {
+        // A cancellation, not a server failure: no retry and no breaker count.
+        if (logger !== false) {
+          logger.info?.({
+            event: "imap.connect_cancelled",
+            accountId: logContext.accountId ?? account.id,
+            clientId: logContext.clientId ?? null,
+            mailbox: logContext.mailbox ?? null,
+            host: account.imap.host,
+            attempt,
+            error: (error as Error | undefined)?.message ?? String(error ?? "")
+          });
+        }
+        throw error;
       }
       const retryable = isRetryableImapConnectError(error);
       const isLastAttempt = attempt === maxAttempts;
