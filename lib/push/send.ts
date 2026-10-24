@@ -6,7 +6,7 @@ import { loadMailboxSpamSettings, loadSpamConfig } from "@/lib/mail/spam/setting
 import { emptyDeepLink, serializeDeepLink } from "@/lib/navigation/deepLinks";
 import { extractDisplayName } from "@/lib/senderIdentity";
 import { findInboxFolder } from "@/lib/specialFolders";
-import { createWebPushTransport, readPushConfig, type PushDelivery, type PushSendOptions, type PushTransport } from "./server";
+import { createWebPushTransport, isAllowedPushEndpoint, readPushConfig, type PushDelivery, type PushSendOptions, type PushTransport } from "./server";
 import { isWithinQuietHours, pushSettingsIncludeAccount } from "./settings";
 import {
   deletePushSubscription,
@@ -299,6 +299,12 @@ export function createPushNotifier(options: PushNotifierOptions = {}): PushNotif
   /** Never throws. 404/410 drops the device; other failures count towards PUSH_MAX_FAILURES. */
   async function send(transport: PushTransport, subscription: StoredPushSubscription, payload: PushPayload, sendOptions: PushSendOptions) {
     try {
+      // Rows stored before the allowlist was tightened (review-r1 P1) are never contacted.
+      if (!isAllowedPushEndpoint(subscription.endpoint)) {
+        await deletePushSubscription(subscription.id);
+        console.warn("[push] device removed: endpoint not allowed", { subscriptionId: subscription.id });
+        return false;
+      }
       const result: PushDelivery = await transport(subscription, JSON.stringify(payload), sendOptions)
         .catch((error: unknown) => ({ ok: false, gone: false, error: String(error) }));
       if (result.ok) {

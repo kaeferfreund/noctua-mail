@@ -389,14 +389,13 @@ async function renewPushSubscription(oldSubscription, newSubscription) {
         applicationServerKey: key
       });
     }
-    const response = await sendSubscriptionRequest("POST", {
-      subscription: subscription.toJSON(),
-      userAgent: self.navigator?.userAgent
-    });
+    // The server carries the old device's settings over and drops its row.
     const oldEndpoint = oldSubscription?.endpoint;
-    if (response.ok && oldEndpoint && oldEndpoint !== subscription.endpoint) {
-      await sendSubscriptionRequest("DELETE", { endpoint: oldEndpoint });
-    }
+    await sendSubscriptionRequest("POST", {
+      subscription: subscription.toJSON(),
+      userAgent: self.navigator?.userAgent,
+      ...(oldEndpoint && oldEndpoint !== subscription.endpoint ? { previousEndpoint: oldEndpoint } : {})
+    });
   } catch {
     // Signed out or offline: the settings page subscribes again on next use.
   }
