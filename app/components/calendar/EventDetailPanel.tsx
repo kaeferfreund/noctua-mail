@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { ArrowLeft } from "lucide-react";
 import type { CalendarEvent, CalendarReminder } from "@/lib/data";
 import { buildCalendarIcsFilename } from "@/lib/calendarIcs";
@@ -44,6 +45,7 @@ export default function EventDetailPanel({
   onEventDeleted,
   onEditEvent
 }: Props) {
+  const t = useTranslations("Reader");
   const isCalEvent = kind === "event";
   const calEv = isCalEvent ? (event as CalendarEvent) : null;
   const reminder = !isCalEvent ? (event as CalendarReminder) : null;
@@ -131,7 +133,7 @@ export default function EventDetailPanel({
           onEventUpdated={onEventUpdated}
           onEventDeleted={onEventDeleted}
           onEditEvent={onEditEvent}
-          responseOccurrenceLabel="This occurrence"
+          responseOccurrenceLabel={t("thisOccurrence")}
         />
       </div>
     </div>

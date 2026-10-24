@@ -1,10 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Dialog, Flex, Select, Text } from "@radix-ui/themes";
 import {
   CALENDAR_REMINDER_LEAD_OPTIONS,
   type CalendarReminder
 } from "@/app/components/mailclient/utils/calendarReminders";
+import { reminderLeadUnit } from "@/app/components/mailclient/status/upcomingEntries";
 import styles from "./EventDetailView.module.css";
 
 export type EventReminderDialogProps = {
@@ -33,6 +35,7 @@ export default function EventReminderDialog({
   onSchedule,
   savingReminder
 }: EventReminderDialogProps) {
+  const t = useTranslations("Calendar.reminderDialog");
   return (
     <Dialog.Root
       open={open}
@@ -42,30 +45,30 @@ export default function EventReminderDialog({
     >
       <Dialog.Content size="2" className={styles.reminderDialog}>
         <Flex direction="column" gap="3">
-          <Dialog.Title size="4">{existingReminder ? "Modify Reminder" : "Schedule Reminder"}</Dialog.Title>
-          <Dialog.Description size="2" color="gray">{title || "Calendar event"}</Dialog.Description>
+          <Dialog.Title size="4">{existingReminder ? t("modifyTitle") : t("scheduleTitle")}</Dialog.Title>
+          <Dialog.Description size="2" color="gray">{title || t("untitled")}</Dialog.Description>
           {existingReminder && (
             <Text size="2" color="gray">
-              Current: {existingReminder.leadLabel}
+              {t("current", reminderLeadUnit(existingReminder.leadMinutes))}
             </Text>
           )}
           <Flex direction="column" gap="2">
-            <Text size="2" weight="medium">Notify me</Text>
+            <Text size="2" weight="medium">{t("notifyMe")}</Text>
             <Select.Root value={leadOptionValue} onValueChange={onLeadOptionChange}>
               <Select.Trigger />
               <Select.Content position="popper">
                 {CALENDAR_REMINDER_LEAD_OPTIONS.map((opt) => (
-                  <Select.Item key={opt.value} value={opt.value}>{opt.label}</Select.Item>
+                  <Select.Item key={opt.value} value={opt.value}>{t("lead", reminderLeadUnit(opt.minutes))}</Select.Item>
                 ))}
               </Select.Content>
             </Select.Root>
           </Flex>
           <Flex justify="end" gap="2">
             <Button variant="soft" color="gray" onClick={() => onOpenChange(false)} disabled={savingReminder}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button onClick={() => void onSchedule()} disabled={savingReminder}>
-              {savingReminder ? "Saving…" : existingReminder ? "Update reminder" : "Schedule reminder"}
+              {savingReminder ? t("saving") : existingReminder ? t("update") : t("schedule")}
             </Button>
           </Flex>
         </Flex>
