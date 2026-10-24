@@ -10,7 +10,6 @@ import {
   type SenderProfileRow
 } from "../mail/spam/senderProfile";
 import { getAccountDb, getDb } from "./connection";
-import { messageAuthorEmailSql } from "./ownAddressSql";
 import { sentToAddressInDb } from "./sentRecipients";
 
 const EXAMPLES_PER_ACCOUNT = 2000;
@@ -184,8 +183,10 @@ const TRUST_CANARY_SQL = `spamReasons LIKE '["trusted:canary%'`;
  * A row whose author is `senderKey` (spamSenderKey: IDNA and case normalised,
  * without display name), also for legacy rows that only carry fromAddr.
  */
-const SENDER_ROW_SQL = `mailbox_address_in(COALESCE(NULLIF(fromEmail, ''), fromAddr), ?) = 1`;
-const senderRowParam = (senderKey: string) => JSON.stringify([senderKey]);
+const SENDER_ROW_SQL = `instr(lower(COALESCE(NULLIF(fromEmail, ''), fromAddr)), ?) > 0
+  AND mailbox_address_in(COALESCE(NULLIF(fromEmail, ''), fromAddr), ?) = 1`;
+// The ASCII local part is a cheap prefilter, so the exact check runs only on candidate rows.
+const senderRowParams = (senderKey: string) => [senderKey.slice(0, senderKey.lastIndexOf("@") + 1), JSON.stringify([senderKey])];
 
 /**
  * Revocation: the sender's INBOX rows skipped as trusted since `since` (check
@@ -197,18 +198,27 @@ export async function resetTrustedSpamChecks(accountId: string, folderId: string
     const db = await getAccountDb(accountId);
     const rows = db.prepare(`UPDATE messages SET spamVerdict = NULL, spamConfidence = NULL, spamReasons = NULL, spamCheckedAt = NULL
       WHERE accountId = ? AND folderId = ? AND spamCheckedAt >= ? AND ${TRUSTED_SKIP_SQL} AND ${SENDER_ROW_SQL}
-      RETURNING id`).all(accountId, folderId, since, senderRowParam(senderKey)) as Array<{ id: string }>;
+      RETURNING id`).all(accountId, folderId, since, ...senderRowParams(senderKey)) as Array<{ id: string }>;
     return rows.map((row) => row.id);
   });
 }
 
-/** Other mails of a sender in a folder within `windowMs` of `date` (burst rule): date and To/Cc. */
-export async function listSenderMailsAround(accountId: string, folderId: string, senderKey: string, date: number, windowMs: number, excludeId: string) {
+export type SenderMailNear = {
+  id: string; dateValue: number; toAddr: string | null; ccAddr: string | null; hasSource: number | null; spamCheckedAt: number | null;
+};
+
+/**
+ * Other mails of a sender in a folder for the burst rule: the `limit` rows
+ * stored closest to `messageId` (rowid follows ingestion; the sender's Date
+ * header can be anything). The caller derives each one's arrival.
+ */
+export async function listSenderMailsNear(accountId: string, folderId: string, senderKey: string, messageId: string, limit: number) {
   const db = await getAccountDb(accountId);
-  return db.prepare(`SELECT id, dateValue, toAddr, ccAddr FROM messages
-    WHERE accountId = ? AND folderId = ? AND dateValue BETWEEN ? AND ? AND id != ? AND COALESCE(deleted, 0) = 0
-      AND ${messageAuthorEmailSql()} = ? LIMIT 50`)
-    .all(accountId, folderId, date - windowMs, date + windowMs, excludeId, senderKey) as Array<{ id: string; dateValue: number; toAddr: string | null; ccAddr: string | null }>;
+  const anchor = db.prepare(`SELECT rowid AS position FROM messages WHERE accountId = ? AND id = ?`).get(accountId, messageId) as { position: number } | null;
+  return db.prepare(`SELECT id, dateValue, toAddr, ccAddr, hasSource, spamCheckedAt FROM messages
+    WHERE accountId = ? AND folderId = ? AND id != ? AND COALESCE(deleted, 0) = 0 AND ${SENDER_ROW_SQL}
+    ORDER BY abs(rowid - ?) LIMIT ?`)
+    .all(accountId, folderId, messageId, ...senderRowParams(senderKey), anchor?.position ?? Number.MAX_SAFE_INTEGER, limit) as SenderMailNear[];
 }
 
 export type SpamTrustCounters = { trustedSkips: number; canaryChecks: number; canaryMismatches: number };

@@ -179,7 +179,11 @@ describe("sender profiles", () => {
     expect((await f.api.resetTrustedSpamChecks(f.accountId, f.folderId, sender, now - 7 * day)).sort()).toEqual([legacy.id, backdated.id].sort());
     expect(await f.api.resetTrustedSpamChecks(f.accountId, f.folderId, idnSender, now - 7 * day)).toEqual([idn.id]);
 
-    const around = await f.api.listSenderMailsAround(f.accountId, f.folderId, sender, now - day, 60 * 60_000, skipped.id);
-    expect(around.map((row) => row.id)).toEqual([modelChecked.id]);
+    // Burst candidates: the sender's rows stored closest to the mail, whatever their Date header says.
+    const near = await f.api.listSenderMailsNear(f.accountId, f.folderId, sender, skipped.id, 2);
+    expect(near.map((row) => row.id)).toEqual([modelChecked.id, old.id]);
+    expect(near[0]).toMatchObject({ dateValue: now - day, spamCheckedAt: expect.any(Number), hasSource: 0 });
+    expect((await f.api.listSenderMailsNear(f.accountId, f.folderId, sender, skipped.id, 20)).map((row) => row.id))
+      .toEqual([modelChecked.id, old.id, canary.id, canaryMismatch.id, legacy.id, backdated.id]);
   });
 });
