@@ -55,6 +55,16 @@ function sourceFilePath(accountId: string, messageId: string) {
   return path.join(getSourcesAccountDir(accountId), sourceObjectFileName(messageId));
 }
 
+/** Path of the retained source stored under exactly this final row id. */
+export function getExactMessageSourcePath(accountId: string, messageId: string) {
+  return sourceFilePath(accountId, messageId);
+}
+
+/** Ownership digest stored in `messages.sourceSha256` for a retained source. */
+export function messageSourceSha256(source: string | Buffer) {
+  return createHash("sha256").update(source).digest("hex");
+}
+
 function sourceLegacyFilePath(accountId: string, messageId: string) {
   return path.join(sourcesDir, sourceFileName(accountId, messageId));
 }
@@ -232,8 +242,7 @@ export async function stageMessageFiles(accountId: string, messages: Array<{
       }
       entries.push({
         source,
-        sourceSha256: message.source !== undefined
-          ? createHash("sha256").update(message.source).digest("hex") : null,
+        sourceSha256: message.source !== undefined ? messageSourceSha256(message.source) : null,
         attachments
       });
     }
