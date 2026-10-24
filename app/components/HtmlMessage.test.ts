@@ -2,9 +2,25 @@ import { describe, expect, test } from "bun:test";
 import { buildPreviewDocument } from "./HtmlMessage";
 import { extractBodyContent } from "@/lib/html";
 
-const build = (html: string, hostViewportHeight?: number) => buildPreviewDocument({
-  html, safeHtml: html, darkMode: false, fontScale: 1, zoom: 1,
+const build = (html: string, hostViewportHeight?: number, darkMode = false) => buildPreviewDocument({
+  html, safeHtml: html, darkMode, fontScale: 1, zoom: 1,
   showViewerFrame: false, hostViewportHeight, remoteContent: "block", token: "test-preview"
+});
+
+describe("HTML preview document text colour", () => {
+  // The srcdoc frame does not inherit the app's custom properties, so the host
+  // colour must be a literal: a var() fell back to dark text in dark mode.
+  const bodyRule = (output: string) => output.match(/\nbody \{[^}]*\}/)?.[0] ?? "";
+  test("plain mails get the theme's text colour as a literal", () => {
+    expect(bodyRule(build("<p>Plain</p>", undefined, true))).toContain("color: #eeeeee;");
+    expect(bodyRule(build("<p>Plain</p>", undefined, false))).toContain("color: #1a1a1a;");
+    expect(build("<p>Plain</p>", undefined, true)).not.toContain("var(--mail-view-fg");
+  });
+  test("mails with their own colours keep them in both themes", () => {
+    for (const dark of [true, false]) {
+      expect(bodyRule(build('<p style="color:#123456">Own</p>', undefined, dark))).not.toContain("color:");
+    }
+  });
 });
 
 describe("HTML preview document heights", () => {
