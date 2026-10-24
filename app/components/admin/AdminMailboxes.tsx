@@ -7,6 +7,7 @@ import { Theme } from "@radix-ui/themes";
 import type { Account, AccountRole } from "@/lib/data";
 import AccountTabContent from "@/app/components/account-settings/tabs/AccountTabContent";
 import MembersTabContent from "@/app/components/account-settings/tabs/MembersTabContent";
+import { nativeControlClass } from "@/app/components/account-settings/Field";
 import { Button } from "@/app/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";
 import AdminConfirmDialog from "./AdminConfirmDialog";
@@ -62,7 +63,7 @@ export function CreateMailbox({ apiFetch, currentUserId, onClose, onCreated, onA
     <DialogTitle className="pr-6">{t(createdAccountId ? "mailboxes.selfGrantTitle" : "mailboxes.create")}</DialogTitle><Theme asChild><div className="flex max-h-[75dvh] flex-col gap-3 overflow-auto">
       <p className="text-sm">{t(createdAccountId ? "mailboxes.selfGrantHelp" : "mailboxes.help")}</p>{Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}
       {createdAccountId ? <>
-        <label className="grid gap-1 text-sm">{t("role")}<select aria-label={t("role")} className="w-full min-w-0 rounded-md border bg-background p-2" value={role} disabled={busy} onChange={event => setRole(event.target.value as AccountRole)}>
+        <label className="grid gap-1 text-sm">{t("role")}<select aria-label={t("role")} className={nativeControlClass} value={role} disabled={busy} onChange={event => setRole(event.target.value as AccountRole)}>
           {(["manager", "editor", "viewer"] as const).map(value => <option key={value} value={value}>{t(`roles.${value}`)}</option>)}
         </select></label>
         <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" disabled={busy} onClick={onClose}>{t("mailboxes.later")}</Button><Button disabled={busy || !currentUserId} onClick={() => void grant()}>{t("mailboxes.grantAccess")}</Button></div>

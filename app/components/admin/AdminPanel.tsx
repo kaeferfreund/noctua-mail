@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/i18n/format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/app/components/ui/dialog";
 import SettingsFrame, { SettingsTitle } from "@/app/components/shell/SettingsFrame";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
@@ -102,7 +103,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
         {loading && <p role="status">{t("users.loading")}</p>}
         <table className="w-full text-left text-sm"><thead><tr><th>{t("users.nameEmail")}</th><th>{t("role")}</th><th>{t("status")}</th><th>{t("users.security")}</th><th>{t("tabs.mailboxes")}</th><th>{t("actions")}</th></tr></thead>
           <tbody>{users.map(user => <tr key={user.id} className="border-b align-top"><td className="p-2">{user.name || "—"}<div>{user.email}</div></td>
-            <td className="p-2"><select aria-label={t("users.roleFor", {email: user.email})} value={user.role} disabled={busy} onChange={event => begin({ user, type: "role", role: event.target.value as "admin" | "user" })}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></td>
+            <td className="p-2"><select className={nativeControlBaseClass} aria-label={t("users.roleFor", {email: user.email})} value={user.role} disabled={busy} onChange={event => begin({ user, type: "role", role: event.target.value as "admin" | "user" })}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></td>
             <td className="p-2">{user.disabled ? t("users.disabled") : user.disabled === false ? t("users.enabled") : t("users.unknown")}</td>
             <td className="p-2">{t("users.password", {value: t(securityValue(user.hasPassword))})}<br />{t("users.totp", {value: t(securityValue(user.twoFactorEnabled))})}<br />{t("users.passkeys", {value: user.passkeyCount ?? user.passkeys?.length ?? t("users.unknown")})}</td>
             <td className="p-2">{user.accounts?.map(account => <div key={account.id}>{account.name || account.email} · {t(`roles.${account.role}`)}{(account.isOwner === true) ? <> · {t("owner")}</> : null}</div>)}</td>
@@ -115,7 +116,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       </section>}
       {tab === "invites" && <section className="space-y-4" aria-label={t("tabs.invites")}><h3 className="font-medium">{t("invites.heading")}</h3><p className="text-sm text-muted-foreground">{t("invites.help")}</p>
         <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
-          <label className="grid gap-1">{t("invites.role")}<select value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button disabled={busy}>{t("invites.issue")}</Button></form>
+          <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button disabled={busy}>{t("invites.issue")}</Button></form>
         <InviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
       {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} currentUserId={currentUserId} onAccessChanged={onAccessChanged} />}
@@ -125,9 +126,9 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
     {pending && !reauthOpen && <AdminConfirmDialog title={t(`actionTitles.${pending.type}`)} description={pending.type === "role" ? t("confirmations.role", {email: pending.user.email, role: t(`roles.${pending.role!}`)}) : pending.type === "status" ? t(pending.user.disabled ? "confirmations.enable" : "confirmations.disable", {email: pending.user.email}) : t("confirmations.access", {email: pending.user.email})} busy={busy} error={actionError ? formatAdminError(actionError, t, locale) : undefined}
       disabled={Boolean(((pending.type === "recovery" || pending.type === "mfa-reset") && !verified) || (pending.type === "delete" && isOwner(pending.user) && !owner) || (pending.type === "passkey" && !passkeyId.trim()))}
       onCancel={cancel} onConfirm={() => void submit()}>
-      {pending.type === "delete" && <label className="grid gap-1">{t("users.reassign")}<select value={owner} onChange={event => setOwner(event.target.value)}><option value="">{t("users.chooseEnabled")}</option>{users.filter(user => user.id !== pending.user.id && user.disabled === false).map(user => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>}
+      {pending.type === "delete" && <label className="grid gap-1">{t("users.reassign")}<select className={nativeControlClass} value={owner} onChange={event => setOwner(event.target.value)}><option value="">{t("users.chooseEnabled")}</option>{users.filter(user => user.id !== pending.user.id && user.disabled === false).map(user => <option key={user.id} value={user.id}>{user.email}</option>)}</select></label>}
       {(pending.type === "recovery" || pending.type === "mfa-reset") && <label className="flex items-start gap-2"><input type="checkbox" checked={verified} onChange={event => setVerified(event.target.checked)} />{t("users.verified")}</label>}
-      {pending.type === "passkey" && <label className="grid gap-1">{t("users.passkey")}<select aria-label={t("users.passkey")} value={passkeyId} onChange={event => setPasskeyId(event.target.value)}><option value="">{t("users.choosePasskey")}</option>{pending.user.passkeys?.map(key => <option key={key.id} value={key.id}>{key.name || t("users.unnamedPasskey")}{key.createdAt == null ? "" : ` · ${dateTime(key.createdAt)}`}</option>)}</select></label>}
+      {pending.type === "passkey" && <label className="grid gap-1">{t("users.passkey")}<select className={nativeControlClass} aria-label={t("users.passkey")} value={passkeyId} onChange={event => setPasskeyId(event.target.value)}><option value="">{t("users.choosePasskey")}</option>{pending.user.passkeys?.map(key => <option key={key.id} value={key.id}>{key.name || t("users.unnamedPasskey")}{key.createdAt == null ? "" : ` · ${dateTime(key.createdAt)}`}</option>)}</select></label>}
 
     </AdminConfirmDialog>}
     {reauthOpen && pending && <ReauthDialog purpose="admin.recovery" client={auth} onCancel={cancel} onVerified={proof => submit(proof)} />}
