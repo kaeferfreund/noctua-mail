@@ -8,8 +8,11 @@ import { requireActiveUserSession } from "@/lib/auth";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
 
-/** Private, revalidated cache, same pattern as attachment bytes. Source files are rewritten on resync, so this is not immutable. */
-export const MESSAGE_SOURCE_CACHE_CONTROL = "private, max-age=86400";
+/**
+ * Private cache, revalidated on every use (ETag/304), same pattern as attachment bytes: a stored copy is only
+ * shown after the server re-checked session and membership, so logout/revocation take effect immediately.
+ */
+export const MESSAGE_SOURCE_CACHE_CONTROL = "private, no-cache";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;

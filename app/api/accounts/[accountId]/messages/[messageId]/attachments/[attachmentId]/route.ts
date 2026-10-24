@@ -15,8 +15,11 @@ import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/rout
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
 
-/** Private, revalidated cache. Attachment ids are reused across resync, so this is not immutable. */
-export const ATTACHMENT_CACHE_CONTROL = "private, max-age=86400";
+/**
+ * Private cache, revalidated on every use (ETag/304): a stored copy is only shown after the server re-checked
+ * session and membership, so logout/revocation take effect immediately. Attachment ids are reused across resync.
+ */
+export const ATTACHMENT_CACHE_CONTROL = "private, no-cache";
 
 export const attachmentEntityTag = entityTagForStat;
 export { ifNoneMatchMatches };
