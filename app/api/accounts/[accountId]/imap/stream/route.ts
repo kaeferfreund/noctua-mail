@@ -25,7 +25,7 @@ import {
   loadImapFlow,
   streamTimers
 } from "@/lib/mail/imapStreamRuntime";
-import { registerStream } from "@/lib/mail/imapStreamRegistry";
+import { isStreamKey, registerStream } from "@/lib/mail/imapStreamRegistry";
 import { normalizeImapFlags } from "@/lib/messageFlags";
 import { mailboxPathFromFolderId } from "@/lib/mailboxPaths";
 import { findInboxFolder } from "@/lib/specialFolders";
@@ -43,7 +43,9 @@ const MAX_STREAM_LIFETIME_MS = 60 * 60 * 1000;
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const { searchParams } = new URL(request.url);
   const accountIdParam = await getAccountIdFromParams(params);
-  const activeFolderId = searchParams.get("activeFolderId");
+  // Folder switches arrive later through `stream/folder`; see `switchActiveFolder`.
+  let activeFolderId = searchParams.get("activeFolderId");
+  const streamKey = searchParams.get("streamKey");
   const accountContext = await requireAccountContext(request, accountIdParam, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId"
@@ -67,7 +69,10 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       account?.settings?.sync?.pollIntervalMs ||
       DEFAULT_BACKGROUND_POLL_INTERVAL;
 
-    const folders = await getFolders(accountId);
+    if (streamKey !== null && !isStreamKey(streamKey)) {
+      return NextResponse.json({ ok: false, message: "Invalid streamKey" }, { status: 400 });
+    }
+    let folders = await getFolders(accountId);
     const inboxFolder = findInboxFolder(folders, accountId) ?? folders[0];
 
     const encoder = new TextEncoder();
@@ -129,7 +134,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           removeFolder: async (folderId: string) => {
             removedFolderIds.add(folderId);
             await closeSession(folderId);
-          }
+          },
+          owner: streamKey ? { key: streamKey, userId, sessionId } : undefined,
+          setActiveFolder: (folderId, seq) => switchActiveFolder(folderId, seq)
         });
 
         const stopAll = async () => {
@@ -401,16 +408,44 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           }
         };
 
+        // One connect per folder even when a switch races the initial watchers.
+        const pendingWatchers = new Map<string, Promise<void>>();
+        const watchFolder = (folderId: string) => {
+          const pending = pendingWatchers.get(folderId);
+          if (pending) return pending;
+          const task = openWatcher(folderId).finally(() => pendingWatchers.delete(folderId));
+          pendingWatchers.set(folderId, task);
+          return task;
+        };
+
+        // A folder switch keeps the INBOX IDLE session and the recently used
+        // folder sessions (LRU up to maxIdleSessions) instead of reconnecting.
+        let lastSwitchSeq = -1;
+        const switchActiveFolder = async (folderId: string | null, seq: number) => {
+          if (stopped || seq <= lastSwitchSeq) return;
+          lastSwitchSeq = seq;
+          activeFolderId = folderId;
+          if (!folderId) return;
+          if (!folders.some((folder) => folder.id === folderId)) {
+            // Created after this stream started; the caller validated the account.
+            folders = await getFolders(accountId);
+            if (stopped || activeFolderId !== folderId) return;
+          }
+          try {
+            await watchFolder(folderId);
+          } catch (error) {
+            // Same outcome as a failing initial watcher: report, end the stream.
+            await send("error", error);
+            authStream.close();
+          }
+        };
+
         try {
           if (inboxFolder) {
-            await openWatcher(inboxFolder.id);
+            await watchFolder(inboxFolder.id);
           }
-          const uniqueFolders = new Set<string>();
-          if (activeFolderId) uniqueFolders.add(activeFolderId);
-          for (const fid of uniqueFolders) {
-            if (!inboxFolder || fid !== inboxFolder.id) {
-              await openWatcher(fid);
-            }
+          if (activeFolderId && activeFolderId !== inboxFolder?.id) {
+            await watchFolder(activeFolderId);
           }
 
           // Polling loop for remaining folders

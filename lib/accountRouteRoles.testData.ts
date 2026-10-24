@@ -168,6 +168,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "minRole": "viewer"
   },
   {
+    "method": "POST",
+    "path": "imap/stream/folder",
+    "minRole": "viewer"
+  },
+  {
     "method": "GET",
     "path": "mcp-tokens",
     "minRole": "editor"
