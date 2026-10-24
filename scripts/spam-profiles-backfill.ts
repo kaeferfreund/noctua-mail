@@ -38,14 +38,14 @@ const started = performance.now();
 if (!write) {
   const data = openSpamDataDir(dataDir);
   try {
-    console.log(`Dry run (read-only): ${dataDir}, ${data.accounts.length} accounts`);
+    console.log(`Dry run (read-only): ${dataDir}, ${data.accounts.length} accounts${accountFilter ? ` (only ${accountFilter})` : ""}`);
     const file = await buildProfileFile(data, (accountId, account, ms) => {
-      if (accountFilter && accountId !== accountFilter) return;
       console.log(`${accountId}: ${account.rows} rows (${account.withSource} source heads) → would write ${accountSenders(account).size} profiles `
         + `(${Object.keys(account.userSpam).length} with "Als Spam"), ${seconds(ms)}`);
-    });
+    }, accountFilter);
     const household = householdProfiles(file, data.own.ownAddresses, "built");
-    console.log(`Household: ${household.senders} senders, ${household.trusted} trusted now, ${household.rows} rows, ${seconds(performance.now() - started)}`);
+    console.log(`${accountFilter ? "This account" : "Household"}: ${household.senders} senders, ${household.trusted} trusted now, ${household.rows} rows, `
+      + seconds(performance.now() - started));
     if (out) {
       writeProfileFile(out, file);
       console.log(`Wrote ${out}`);

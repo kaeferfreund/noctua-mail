@@ -24,9 +24,15 @@ export type AccountProfiles = {
 };
 export type ProfileFile = { version: 2; generatedAt: string; accounts: Record<string, AccountProfiles> };
 
-export async function buildProfileFile(data: ReturnType<typeof openSpamDataDir>, onAccount?: (accountId: string, account: AccountProfiles, ms: number) => void) {
+type SpamDataDir = Pick<ReturnType<typeof openSpamDataDir>, "accounts" | "shard" | "own" | "sourcesDir">;
+
+/** Builds the histories of every account, or only of `accountId` (other shards are never opened). */
+export async function buildProfileFile(data: SpamDataDir, onAccount?: (accountId: string, account: AccountProfiles, ms: number) => void,
+  accountId: string | null = null) {
   const file: ProfileFile = { version: 2, generatedAt: new Date().toISOString(), accounts: {} };
-  for (const account of data.accounts) {
+  const accounts = data.accounts.filter((account) => accountId === null || account.id === accountId);
+  if (accountId !== null && !accounts.length) throw new Error(`Account ${accountId} not found`);
+  for (const account of accounts) {
     const started = performance.now();
     const { db, folders } = data.shard(account.id);
     const built = await buildAccountSenderProfiles({ accountId: account.id, db, folders, ownAddresses: data.own.ownAddresses, sourcesDir: data.sourcesDir });
