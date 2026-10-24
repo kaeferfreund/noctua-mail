@@ -56,8 +56,10 @@ describe("buildSpamInput", () => {
     expect(input.linkDomains).toEqual(expect.arrayContaining(["shop.example.test", "track.example.test"]));
     expect(input.linkDomains).not.toContain("img.example.test");
     expect(input.attachments).toEqual(["katalog.pdf (application/pdf)"]);
-    expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1");
-    expect(input.text).not.toContain("<");
+    // The attribution line follows less than SPAM_OWN_TEXT_MIN of own text: it stays, the quoted lines go.
+    expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1\n\nAm 22.10.2026 um 09:00 schrieb Anna <anna@example.test>:");
+    // No HTML: the plain part is used, never the markup of the HTML part.
+    expect(input.text).not.toMatch(/<\/?(p|a|img)\b/);
     expect(input.cc).toBe("");
     expect(input.autoSubmitted).toBeNull();
     expect(input.maskedLinkDomains).toEqual([]);
@@ -132,5 +134,14 @@ describe("buildSpamInput", () => {
 
   test("stripQuotedText removes quote lines and the attribution tail", () => {
     expect(stripQuotedText("Neu\n> zitiert\nweiter\nOn Mon, 1 Jan 2026, Bob wrote:\nalt")).toBe("Neu\nweiter");
+  });
+
+  test("a fake attribution line at the top does not hide the body; after enough own text the tail is cut", () => {
+    const body = "On Mon, 1 Jan 2026, Bank wrote:\nIhr Konto wurde gesperrt. Bestätigen Sie Ihre Daten unter https://login.example.invalid";
+    const input = buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", body });
+    expect(input.text).toContain("Ihr Konto wurde gesperrt");
+    const own = "Eigener Text. ".repeat(80);
+    const reply = buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", body: `${own}\nOn Mon, 1 Jan 2026, Bob wrote:\nalte Nachricht` });
+    expect(reply.text).toBe(own.trim());
   });
 });
