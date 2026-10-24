@@ -51,7 +51,7 @@ async function interact(fire: () => void) {
 }
 
 describe("folder tree lazy menus", () => {
-  it("mounts no menu or count title for idle rows, only for the active row", () => {
+  it("mounts no menu for idle rows, only for the active row", () => {
     const { view, row, actionButton } = renderTree();
     // Radix triggers carry data-state; the plain placeholder does not.
     expect(view.container.querySelectorAll("[data-state]").length).toBe(1);
@@ -62,18 +62,44 @@ describe("folder tree lazy menus", () => {
       expect(button.getAttribute("aria-haspopup")).toBe("menu");
       expect(button.getAttribute("aria-expanded")).toBe("false");
     }
-    for (const folder of folders) expect(row(folder.id).getAttribute("title")).toBeNull();
     expect(view.queryByRole("menu")).toBeNull();
   });
 
-  it("mounts the menu and the count title once the pointer or focus reaches a row", async () => {
+  it("describes every row with its counts before any pointer or focus", () => {
+    const { view, row } = renderTree();
+    // Screen-reader browse mode reaches a row without hovering or focusing it.
+    expect(row("synthetic:INBOX").getAttribute("title")).toBe("Inbox (12 Messages, 3 Unread)");
+    expect(row("synthetic:Archive/2025").getAttribute("title")).toBe("Archive/2025 (2 Messages, 0 Unread)");
+    expect(view.getByRole("button", { name: /^Archive\b/, description: "Archive (4 Messages, 0 Unread)" })).toBe(row("synthetic:Archive"));
+  });
+
+  it("mounts the menu once the pointer or focus reaches a row", async () => {
     const { row, actionButton } = renderTree();
     fireEvent.pointerEnter(row("synthetic:Archive/2025"));
     expect(actionButton("synthetic:Archive/2025").getAttribute("data-state")).toBe("closed");
-    expect(row("synthetic:Archive/2025").getAttribute("title")).toContain("Archive/2025");
     await interact(() => { row("synthetic:Archive").focus(); });
     expect(actionButton("synthetic:Archive").getAttribute("data-state")).toBe("closed");
-    expect(row("synthetic:Archive").getAttribute("title")).toContain("Archive");
+  });
+
+  it("selects a folder from its row but never from its action button or menu", async () => {
+    const { view, calls, row, actionButton } = renderTree();
+    const selected = () => calls.filter(call => call.startsWith("select:"));
+    await interact(() => { row("synthetic:Archive").focus(); });
+    const trigger = actionButton("synthetic:Archive");
+    for (const key of ["Enter", " "]) {
+      await interact(() => { trigger.focus(); fireEvent.keyDown(trigger, { key }); });
+      const menu = within(view.getByRole("menu"));
+      // A menu item chosen by keyboard, then one chosen by pointer.
+      await interact(() => { fireEvent.keyDown(menu.getByRole("menuitem", { name: "Rename" }), { key: "Enter" }); });
+      await interact(() => { fireEvent.keyDown(trigger, { key: "Enter" }); });
+      await interact(() => { fireEvent.click(within(view.getByRole("menu")).getByRole("menuitem", { name: "Delete" })); });
+    }
+    expect(calls).toContain("rename:synthetic:Archive");
+    expect(calls).toContain("delete:synthetic:Archive");
+    expect(selected()).toEqual([]);
+    await interact(() => { fireEvent.keyDown(row("synthetic:Archive"), { key: "Enter" }); });
+    await interact(() => { fireEvent.click(row("synthetic:Archive/2025")); });
+    expect(selected()).toEqual(["select:synthetic:Archive", "select:synthetic:Archive/2025"]);
   });
 
   it("opens the menu by keyboard and runs sync, rename and delete", async () => {

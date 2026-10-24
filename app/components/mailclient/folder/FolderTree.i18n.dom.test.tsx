@@ -22,9 +22,6 @@ for (const locale of ["de", "en"] as const) test(`folder tree localizes flags an
   expect(row("synthetic-inbox")?.textContent).toContain(locale === "de" ? "Posteingang" : "Inbox");
   expect(row("synthetic-sent")?.textContent).toContain(locale === "de" ? "Gesendet" : "Sent");
   expect(row("synthetic-literal")?.textContent).toBe("Sent");
-  // The count title is built when the pointer or focus reaches the row.
-  expect(row("synthetic-child")?.title).toBe("");
-  fireEvent.pointerEnter(row("synthetic-child")!);
   expect(row("synthetic-child")?.title).toContain(locale === "de" ? "Posteingang/Synthetic child" : "Inbox/Synthetic child");
   fireEvent.click(row("synthetic-inbox")!);
   expect(selected).toEqual(["synthetic-inbox"]);
