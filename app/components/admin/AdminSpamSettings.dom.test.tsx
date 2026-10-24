@@ -16,10 +16,14 @@ describe("spam settings", () => {
     const apiFetch: AdminFetch = async (input, init) => {
       calls.push({ url: String(input), init });
       if (init?.method === "PUT") effective = { ...effective, ...JSON.parse(String(init.body)), model: "claude-haiku-5-5" };
-      return response({ ok: true, settings: {}, effective });
+      return response({ ok: true, settings: {}, effective, trust: [
+        { accountId: "a", email: "a@example.test", trustedSkips: 1200, canaryChecks: 24, canaryMismatches: 1 },
+        { accountId: "b", email: "b@example.test", trustedSkips: 34, canaryChecks: 1, canaryMismatches: 0 }
+      ] });
     };
     const page = render(<Theme><AdminSpamSettings apiFetch={apiFetch} /></Theme>);
     expect(await page.findByText("Provider: anthropic")).toBeTruthy();
+    expect(page.getByText("Trusted senders: 1,234 skipped without the model, 25 samples, 1 of them disagreeing")).toBeTruthy();
     expect(page.getByText(/no API key \(ANTHROPIC_API_KEY\)/)).toBeTruthy();
     fireEvent.click(page.getByLabelText("Spam detection enabled"));
     fireEvent.change(page.getByLabelText(/Threshold/), { target: { value: "0,9" } });

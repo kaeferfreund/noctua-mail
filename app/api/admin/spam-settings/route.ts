@@ -3,10 +3,11 @@ import { requireAdminSessionOr403 } from "../_auth";
 import { withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
-import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
+import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, loadSpamTrustCounters, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
 
 async function body() {
-  return NextResponse.json({ ok: true, settings: await loadSpamAdminSettings(), effective: describeSpamConfig(await loadSpamConfig()) });
+  return NextResponse.json({ ok: true, settings: await loadSpamAdminSettings(), effective: describeSpamConfig(await loadSpamConfig()),
+    trust: await loadSpamTrustCounters() });
 }
 
 export async function GET(request: Request) {
