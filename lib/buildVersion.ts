@@ -8,8 +8,9 @@ const TRAILING_TIMEZONE_PATTERN = /\s(?:UTC|GMT(?:[+-]\d{1,2}(?::?\d{2})?)?|[A-Z
 
 const SHORT_COMMIT_LENGTH = 7;
 // CI writes `date -u '+%Y-%m-%d %H:%M'`; build stamps without an offset are UTC.
-const UNZONED_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
-const ZONED_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/;
+// Groups: year, month, day, hour, minute, optional second.
+const UNZONED_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$/;
+const ZONED_TIMESTAMP_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/;
 
 const readBuildHash = (value?: string) => {
   const trimmed = value?.trim() ?? "";
@@ -56,9 +57,9 @@ const firstSet = (...values: (string | undefined)[]) => values.find(value => val
 const buildHashValue = (env: EnvMap) => firstSet(env.NOCTUA_BUILD_HASH, env.NEXT_PUBLIC_BUILD_HASH);
 const buildTimeValue = (env: EnvMap) => firstSet(env.NOCTUA_BUILD_TIME, env.NEXT_PUBLIC_BUILD_TIME);
 
-/** True when the stamp's calendar fields exist (Date.parse rolls 2026-02-30 over to March). */
-const isCalendarDateTime = (value: string) => {
-  const [year, month, day, hour, minute, second = 0] = (value.match(/\d+/g) ?? []).map(Number);
+/** True when the matched calendar fields exist (Date.parse rolls 2026-02-30 over to March). */
+const isCalendarDateTime = (fields: RegExpMatchArray) => {
+  const [year, month, day, hour, minute, second] = fields.slice(1, 7).map(field => Number(field ?? 0));
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCMonth() === month - 1 && date.getUTCDate() === day && hour < 24 && minute < 60 && second < 60;
 };
@@ -66,10 +67,10 @@ const isCalendarDateTime = (value: string) => {
 /** UTC ISO instant (`2026-10-23T13:16:05Z`), or null when the stamp is not a date-time. */
 const parseBuildTime = (value?: string) => {
   const trimmed = value?.trim() ?? "";
-  const candidate = UNZONED_TIMESTAMP_PATTERN.test(trimmed)
-    ? `${trimmed.replace(" ", "T")}Z`
-    : ZONED_TIMESTAMP_PATTERN.test(trimmed) ? trimmed : "";
-  const time = candidate && isCalendarDateTime(candidate) ? Date.parse(candidate) : Number.NaN;
+  const unzoned = trimmed.match(UNZONED_TIMESTAMP_PATTERN);
+  const fields = unzoned ?? trimmed.match(ZONED_TIMESTAMP_PATTERN);
+  const candidate = unzoned ? `${trimmed.replace(" ", "T")}Z` : trimmed;
+  const time = fields && isCalendarDateTime(fields) ? Date.parse(candidate) : Number.NaN;
   return Number.isNaN(time) ? null : new Date(time).toISOString().replace(/\.000Z$/, "Z");
 };
 
