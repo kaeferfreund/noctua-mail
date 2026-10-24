@@ -1,5 +1,6 @@
 /** Browser-only auth boundary. Capabilities live in call/component memory, never storage. */
 import { publishLocalePreference } from "./i18n/localeEvents";
+import { forgetPushSubscriptionOnServer } from "./push/client";
 import type { Account, User } from "./data";
 
 export type MailboxState = "enrollment" | "none" | "unselected" | "selected";
@@ -126,6 +127,8 @@ export function createAuthClient(fetcher: AuthFetch = (input, init) => fetch(inp
     me: () => request<AuthMe>("/api/auth/me"),
     methods: () => request<{ ok: true; methods: { password: boolean; passkey: boolean; imap: boolean } }>("/api/auth/methods"),
     logout: async () => {
+      // Needs the session, so it runs before the logout request.
+      await forgetPushSubscriptionOnServer(fetcher);
       const result = await request<{ ok: true }>("/api/auth/logout", undefined, undefined, "POST");
       publishLocalePreference(null);
       return result;

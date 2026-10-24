@@ -56,6 +56,12 @@ export function isAllowedPushEndpoint(endpoint: string) {
   }
   if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
   const host = url.hostname.toLowerCase();
+  // Defence in depth (review-r1 P1): web-push's HTTP client may parse an unusual
+  // authority differently from the URL parser, e.g. "127.0.0.1;.fcm.googleapis.com".
+  // Only plain DNS hostnames pass, and the raw authority must be exactly that host.
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(host)) return false;
+  const rawAuthority = endpoint.slice("https://".length).split(/[/?#]/, 1)[0];
+  if (rawAuthority.toLowerCase() !== host) return false;
   return PUSH_SERVICE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix) && host.length > suffix.length);
 }
 
