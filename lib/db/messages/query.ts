@@ -1604,7 +1604,7 @@ async function getGroupCounts(params: {
         FROM messages m
         WHERE ${where}
         GROUP BY key
-        ORDER BY count DESC
+        ORDER BY count DESC, key ASC
       `
       )
       .all(...args) as Array<{ key: string; count: number }>;
@@ -1619,7 +1619,7 @@ async function getGroupCounts(params: {
         FROM messages m
         WHERE ${where}
         GROUP BY key
-        ORDER BY count DESC
+        ORDER BY count DESC, key ASC
       `
       )
       .all(...args) as Array<{ key: string; count: number }>;
@@ -1634,7 +1634,7 @@ async function getGroupCounts(params: {
         FROM messages m
         WHERE ${where}
         GROUP BY key
-        ORDER BY count DESC
+        ORDER BY count DESC, key ASC
       `
       )
       .all(...args) as Array<{ key: string; count: number }>;
