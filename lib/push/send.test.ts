@@ -105,6 +105,18 @@ describe("push sending rules", () => {
     expect(other.mine()).toEqual([]);
   });
 
+  test("names mail without a From header after the catalog's unknown sender, in the user's language", async () => {
+    const t = await setup();
+    await t.arrive({ from: "" });
+    await t.sync();
+    expect(t.mine()[0].payload).toMatchObject({ type: "new-mail", from: "Unbekannt" });
+    (await getDb()).prepare("UPDATE users SET uiLocale = 'en' WHERE id = ?").run(t.user.id);
+    await Bun.sleep(80);
+    await t.arrive({ from: "   " });
+    await t.sync();
+    expect(t.mine()[1].payload).toMatchObject({ type: "new-mail", from: "Unknown" });
+  });
+
   test("sends nothing during quiet hours", async () => {
     // 03:00 UTC is 04:00 in Berlin, inside 22:00–07:00.
     const fixed = Date.parse("2026-01-15T03:00:00Z");

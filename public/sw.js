@@ -321,8 +321,9 @@ function pushNotification(payload) {
   }
   if (payload.type !== "new-mail") return null;
   const accountId = nonEmptyString(payload.accountId);
-  const from = nonEmptyString(payload.from);
-  if (!accountId || !from) return null;
+  if (!accountId || typeof payload.from !== "string") return null;
+  // Mail without a sender still needs a visible notification (iOS revokes silent pushes).
+  const from = nonEmptyString(payload.from) ?? "Unbekannt";
   const count = Number.isInteger(payload.count) && payload.count > 1 ? payload.count : 1;
   const subject = nonEmptyString(payload.subject);
   const accountName = nonEmptyString(payload.accountName);

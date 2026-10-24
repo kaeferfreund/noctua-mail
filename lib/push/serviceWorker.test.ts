@@ -99,6 +99,16 @@ describe("service worker push", () => {
     ]);
   });
 
+  it("names an empty sender as unknown instead of dropping the notification", async () => {
+    const worker = loadWorker();
+    await worker.push({ ...mail, from: "" });
+    await worker.push({ ...mail, from: "  ", count: 2 });
+    expect(worker.notifications.map((n) => [n.title, n.options.body])).toEqual([
+      ["Unbekannt", "Rechnung März\nTeam Postfach"],
+      ["2 neue Nachrichten", "Unbekannt — Rechnung März\nTeam Postfach"]
+    ]);
+  });
+
   it("collapses counts into the title and names the newest sender in the body", async () => {
     const worker = loadWorker();
     await worker.push({ ...mail, count: 3 });
@@ -133,7 +143,7 @@ describe("service worker push", () => {
   it("drops malformed payloads without a notification or an exception", async () => {
     const worker = loadWorker();
     const malformed = [undefined, "{not json", "null", "[1]", "42", { type: "unknown" }, { ...mail, accountId: "" },
-      { ...mail, from: 5 }, { type: "badge", badge: "3" }, { type: "badge", badge: -1 }, { type: "badge", badge: Number.NaN }];
+      { ...mail, from: 5 }, { ...mail, from: undefined }, { type: "badge", badge: "3" }, { type: "badge", badge: -1 }, { type: "badge", badge: Number.NaN }];
     for (const payload of malformed) await worker.push(payload);
     expect(worker.notifications).toEqual([]);
     expect(worker.badges).toEqual([]);

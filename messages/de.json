@@ -358,6 +358,7 @@
       "noDevices": "Noch kein Gerät angemeldet.",
       "currentDevice": "Dieses Gerät",
       "unknownDevice": "Unbekanntes Gerät",
+      "unknownSender": "Unbekannt",
       "lastSeen": "Zuletzt aktiv: {date}",
       "showSettings": "Einstellungen",
       "hideSettings": "Einstellungen ausblenden",
