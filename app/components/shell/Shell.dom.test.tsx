@@ -183,6 +183,81 @@ describe("shell sidebar", () => {
   });
 });
 
+/** Stands in for the `window.Image` probe Radix Avatar loads its source with,
+ * so a test decides which avatar sources load and which fail. */
+function stubAvatarImages() {
+  const probes: Array<{ src: string; settle: (ok: boolean) => void }> = [];
+  class ProbeImage extends EventTarget {
+    complete = false;
+    naturalWidth = 0;
+    referrerPolicy = "";
+    crossOrigin: string | null = null;
+    #src = "";
+    get src() { return this.#src; }
+    set src(value: string) {
+      this.#src = value;
+      probes.push({ src: value, settle: (ok) => {
+        this.complete = true;
+        this.naturalWidth = ok ? 16 : 0;
+        this.dispatchEvent(new Event(ok ? "load" : "error"));
+      } });
+    }
+  }
+  const original = window.Image;
+  window.Image = ProbeImage as unknown as typeof window.Image;
+  return {
+    probes,
+    settle: (src: string, ok: boolean) => act(() => { probes.filter(probe => probe.src === src).forEach(probe => probe.settle(ok)); }),
+    restore: () => { window.Image = original; }
+  };
+}
+
+describe("mailbox avatars", () => {
+  const avatarOf = (view: ReturnType<typeof renderSidebar>, name: string) =>
+    view.getByRole("button", { name: new RegExp(name) }).querySelector<HTMLElement>("[data-slot=avatar]")!;
+
+  it("loads the mailbox's own address through the sender-icon route and keeps the initials until or unless it loads", async () => {
+    const images = stubAvatarImages();
+    try {
+      const quiet = { ...account("c", "Charlie"), settings: { appearance: { senderIcons: false } } } as ShellAccount;
+      const view = renderSidebar([account("a", "Alpha", "brand.example.test"), account("b", "Bravo"), quiet], () => {});
+      const iconSrc = (row: ShellAccount) => `/api/accounts/${row.id}/sender-icon?${new URLSearchParams({ from: row.name, fromEmail: row.email, fallback: "none" })}`;
+      const alphaSrc = iconSrc(account("a", "Alpha", "brand.example.test"));
+      const bravoSrc = iconSrc(account("b", "Bravo"));
+      expect(images.probes.map(probe => probe.src).sort()).toEqual([alphaSrc, bravoSrc]);
+      // While loading: initials only.
+      expect(avatarOf(view, "Alpha").textContent).toBe("AL");
+      expect(avatarOf(view, "Alpha").querySelector("img")).toBeNull();
+
+      await images.settle(alphaSrc, true);
+      await images.settle(bravoSrc, false);
+      await waitFor(() => expect(avatarOf(view, "Alpha").querySelector("img")?.getAttribute("src")).toBe(alphaSrc));
+      expect(avatarOf(view, "Alpha").textContent).toBe("");
+      // No logo (the route answers 404): the initials stay, with the fallback colouring.
+      expect(avatarOf(view, "Bravo").querySelector("img")).toBeNull();
+      expect(avatarOf(view, "Bravo").querySelector("[data-slot=avatar-fallback]")?.textContent).toBe("BR");
+      expect(avatarOf(view, "Bravo").querySelector("[data-slot=avatar-fallback]")?.className).toContain("bg-muted");
+      // Sender icons switched off for the mailbox: no request, initials.
+      expect(avatarOf(view, "Charlie").textContent).toBe("CH");
+    } finally {
+      images.restore();
+    }
+  });
+
+  it("keeps a custom avatar URL instead of the sender icon", async () => {
+    const images = stubAvatarImages();
+    try {
+      const custom = { ...account("a", "Alpha"), avatar: "https://avatars.example.test/alpha.png" };
+      const view = renderSidebar([custom], () => {});
+      expect(images.probes.map(probe => probe.src)).toEqual([custom.avatar]);
+      await images.settle(custom.avatar, true);
+      await waitFor(() => expect(avatarOf(view, "Alpha").querySelector("img")?.getAttribute("src")).toBe(custom.avatar));
+    } finally {
+      images.restore();
+    }
+  });
+});
+
 describe("theme menu", () => {
   it("selects light, dark and system through next-themes", async () => {
     const view = render(<ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem><ThemeToggle /></ThemeProvider>);
