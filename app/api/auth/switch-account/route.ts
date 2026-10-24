@@ -1,6 +1,7 @@
 import { readAuthJson } from "@/app/api/_helpers/readAuthJson";
 import { NextResponse } from "next/server";
-import { getAuth, setActiveAccountId } from "@/lib/betterAuth";
+import { compareAndSetActiveAccountId, getAuth, setActiveAccountId } from "@/lib/betterAuth";
+import { getDb } from "@/lib/db/connection";
 import { requireActiveUserSession, requireAccountAccessOr403, withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
     if (!updated) return NextResponse.json({ok:false,message:"Unauthorized"},{status:401});
     const stillAllowed = await requireAccountAccessOr403(session, accountId);
     if (stillAllowed instanceof NextResponse) {
-      await setActiveAccountId(await getAuth(), session.sessionToken, null);
+      // Undo only this request's write: a switch another tab committed meanwhile passed its own check and stays.
+      await compareAndSetActiveAccountId(await getDb(), session.sessionToken, accountId, null);
       return stillAllowed;
     }
     return NextResponse.json({ok:true,accountId});
