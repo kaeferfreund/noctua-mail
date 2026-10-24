@@ -10,6 +10,8 @@ import AdminConfirmDialog from "@/app/components/admin/AdminConfirmDialog";
 import type { AdminUser, Member, MemberCandidate } from "@/app/components/admin/types";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
+import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
+import styles from "./MembersTabContent.module.css";
 
 const roles: AccountRole[] = ["viewer", "editor", "manager"];
 export default function MembersTabContent({ accountId, accessRole, apiFetch = fetch, admin = false, initialMembers, users, currentUserId, onChanged }: {
@@ -95,12 +97,12 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
     {cleanupPending && <p role="status">{t("members.cleanup")}</p>}
     {loading && <p role="status">{t("members.loading")}</p>}
     {Boolean(error) && !pending && <p role="alert" className="text-destructive">{formatAdminError(error, adminT, locale)}</p>}
-    <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{t("members.caption")}</caption>
+    <div data-members-table className={styles.tableScroll}><table className="w-full text-left text-sm"><caption className="sr-only">{t("members.caption")}</caption>
       <thead><tr><th>{t("members.member")}</th><th>{t("members.role")}</th><th>{t("members.status")}</th><th>{t("members.actions")}</th></tr></thead>
       <tbody>{members.map(member => {
         const lastManager = !member.disabled && member.role === "manager" && enabledManagers <= 1;
         return <tr key={member.userId} className="border-b"><td className="py-3">{member.name || member.email}<div className="text-muted-foreground">{member.email}</div>{member.isOwner && <span>{t("members.owner")}</span>}</td>
-          <td><select aria-label={t("members.roleFor", {email: member.email})} value={member.role} disabled={busy || member.disabled || member.isOwner || (!admin && (!actor || member.userId === actor))}
+          <td><select className={nativeControlBaseClass} aria-label={t("members.roleFor", {email: member.email})} value={member.role} disabled={busy || member.disabled || member.isOwner || (!admin && (!actor || member.userId === actor))}
             onChange={event => { setError(null); setPending({ member, role: event.target.value as AccountRole }); }}>
             {roles.map(role => <option key={role} value={role} disabled={lastManager && role !== "manager"}>{t(`roles.${role}`)}</option>)}
           </select></td><td>{member.disabled ? t("members.disabled") : t("members.enabled")}</td>
@@ -112,10 +114,10 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
       <p className="text-sm text-muted-foreground">{t("members.searchHelp")}</p>
     </form>}
     <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
-      <label className="grid gap-1 text-sm">{t("members.addEnabled")}<select aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
+      <label className="grid gap-1 text-sm">{t("members.addEnabled")}<select className={nativeControlClass} aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
         <option value="">{t("members.choose")}</option>{available.map(user => <option key={user.id} value={user.id}>{user.name || user.email} ({user.email})</option>)}
       </select></label>
-      <label className="grid gap-1 text-sm">{t("members.newRole")}<select value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select></label>
+      <label className="grid gap-1 text-sm">{t("members.newRole")}<select className={nativeControlClass} value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select></label>
       <Button disabled={busy || !target}>{t("members.add")}</Button>
     </form>
 
