@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import { SidebarInset, SidebarProvider, useSidebar } from "@/app/components/ui/sidebar";
 import { MOBILE_QUERY } from "@/app/hooks/use-mobile";
 import type { ShellAccount } from "./types";
+import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import ShellSidebar, { type ShellSidebarProps } from "./ShellSidebar";
 import ShellPanes from "./ShellPanes";
 import ShellHeader, { ThemeToggle, type ShellHeaderProps } from "./ShellHeader";
@@ -45,11 +46,12 @@ function renderSidebar(
   locale: UiLocale = "en",
   buildInfo: ShellSidebarProps["brand"]["buildInfo"] = null,
   sidebar: { open?: boolean; openMobile?: boolean } = {},
-  activeAccountId = accounts[0]?.id ?? ""
+  activeAccountId = accounts[0]?.id ?? "",
+  mailboxOverrides: Partial<ShellSidebarProps["mailboxes"]> = {}
 ) {
   const props: ShellSidebarProps = {
     brand: { buildInfo },
-    mailboxes: { accounts, activeAccountId, onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined },
+    mailboxes: { accounts, activeAccountId, onSwitch, onAdd: userOverrides.isAdminUser ? () => {} : undefined, ...mailboxOverrides },
     compose: { onCompose: () => {}, draftsCount: 0, onOpenDrafts: null },
     sync: { isSyncing: false, onCheckNewMail: onSync },
     user: {
@@ -193,6 +195,91 @@ describe("shell sidebar", () => {
     const current = committed.getByRole("button", { name: /Charlie/ });
     expect(current.getAttribute("aria-current")).toBe("true");
     expect(current.getAttribute("aria-busy")).toBeNull();
+  });
+});
+
+describe("collapsible domain groups", () => {
+  const brand = ["a", "b", "c", "d"].map(id => account(id, `Brand ${id}`, "brand.example.test"));
+  const plain = ["e", "f", "g"].map(id => account(id, `Plain ${id}`, "plain.example.test"));
+  const summary = (row: ShellAccount, unread: number | null, assignedToMe: number): UserMailboxSummary => ({
+    accountId: row.id, name: row.name, email: row.email, accessRole: "manager", isOwner: true, shared: false,
+    unread, assignedToMe, unassignedOpen: 5, open: 5, watcher: { state: "idling" }
+  });
+  const summaries = [summary(brand[0], 3, 0), summary(brand[1], 4, 1), summary(brand[2], null, 2), summary(brand[3], 0, 0),
+    summary(plain[0], 0, 0), summary(plain[1], 0, 0), summary(plain[2], 0, 0)];
+  const renderGroups = (userId = "user-1", activeAccountId = plain[0].id) =>
+    renderSidebar([...brand, ...plain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, activeAccountId, { userId, summaries });
+  const headerOf = (view: ReturnType<typeof renderSidebar>, domain: string) =>
+    view.getByText(domain, { selector: "span" }).closest("button")!;
+  const rowTitles = (view: ReturnType<typeof renderSidebar>, domain: string) =>
+    [...view.container.querySelectorAll<HTMLButtonElement>(`button[title*="@${domain}"]`)];
+
+  it("toggles a group's rows from its heading button", () => {
+    const view = renderGroups();
+    const header = headerOf(view, "brand.example.test");
+    expect(header.getAttribute("type")).toBe("button");
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+    const list = document.getElementById(header.getAttribute("aria-controls")!)!;
+    expect(list.getAttribute("data-sidebar")).toBe("menu");
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
+    fireEvent.click(header);
+    expect(header.getAttribute("aria-expanded")).toBe("false");
+    expect(list.hidden).toBe(true);
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(0);
+    // The other group stays open.
+    expect(rowTitles(view, "plain.example.test")).toHaveLength(3);
+    fireEvent.click(header);
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(list.hidden).toBe(false);
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
+  });
+
+  it("restores the collapsed groups per user after a remount", () => {
+    const first = renderGroups("user-1");
+    fireEvent.click(headerOf(first, "brand.example.test"));
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
+    first.unmount();
+    const again = renderGroups("user-1");
+    expect(headerOf(again, "brand.example.test").getAttribute("aria-expanded")).toBe("false");
+    expect(headerOf(again, "plain.example.test").getAttribute("aria-expanded")).toBe("true");
+    again.unmount();
+    const other = renderGroups("user-2");
+    expect(headerOf(other, "brand.example.test").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("shows the summed counters only on a collapsed heading, hiding zero totals", () => {
+    const view = renderGroups();
+    const brandHeader = headerOf(view, "brand.example.test");
+    const plainHeader = headerOf(view, "plain.example.test");
+    expect(brandHeader.querySelector("[data-domain-counts]")).toBeNull();
+    fireEvent.click(brandHeader);
+    fireEvent.click(plainHeader);
+    // 3 + 4 unread (the unavailable count adds nothing), 1 + 2 assigned to me.
+    const counts = brandHeader.querySelector("[data-domain-counts]")!;
+    expect(within(counts as HTMLElement).getByLabelText("7 unread").textContent).toBe("7");
+    expect(within(counts as HTMLElement).getByLabelText("3 assigned to me").textContent).toBe("3");
+    expect(counts.querySelectorAll("svg")).toHaveLength(2);
+    // All totals zero: no counters at all.
+    expect(plainHeader.querySelector("[data-domain-counts]")).toBeNull();
+    expect(plainHeader.textContent).toBe("plain.example.test");
+  });
+
+  it("tints a collapsed heading that hides the active mailbox, without expanding it", () => {
+    window.localStorage.setItem("noctua:sidebarDomainsCollapsed:user-1", '["brand.example.test"]');
+    const view = renderGroups("user-1", brand[1].id);
+    const brandHeader = headerOf(view, "brand.example.test");
+    expect(brandHeader.getAttribute("aria-expanded")).toBe("false");
+    expect(brandHeader.getAttribute("data-active")).toBe("true");
+    expect(headerOf(view, "plain.example.test").hasAttribute("data-active")).toBe(false);
+    fireEvent.click(brandHeader);
+    expect(brandHeader.hasAttribute("data-active")).toBe(false);
+    expect(view.getByRole("button", { name: /Brand b/ }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("keeps ungrouped sections without a toggle", () => {
+    const view = renderSidebar(brand, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
+    expect(view.container.querySelector("button[aria-expanded][aria-controls]")).toBeNull();
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
   });
 });
 

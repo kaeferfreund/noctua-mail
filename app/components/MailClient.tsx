@@ -5209,6 +5209,7 @@ export default function MailClient({
             accounts,
             summaries: mailboxSummaries,
             activeAccountId,
+            userId: currentUser?.id ?? null,
             // Deep links own mailbox navigation (history + URL); the sidebar shows the
             // clicked row as pending until the returned value settles.
             onSwitch: navigateLinkedAccount,
