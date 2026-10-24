@@ -325,8 +325,8 @@ These rehearsals do not merge or modify the reader/sender branches.
 
 ## Round 2 calendar validation
 
-The composite calendar reuses the floating calendar's flex/min-height body in
-a bounded frame; mobile fills its Sheet. The status popover is at 9990, the
+The composite calendar sits in a flex/min-height body (`BottomStatusBar.module.css`
+`.calendarBody`) in a bounded frame; mobile fills its Sheet. The status popover is at 9990, the
 mobile Sheet at 9994, event dialogs at 9995, and their pickers at 9998.
 EventDialog now reuses `useDialogFocusRestore` and explicitly focuses its title
 on opening; creation/editing returns focus to the calendar action.
