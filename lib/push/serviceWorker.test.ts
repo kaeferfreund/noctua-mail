@@ -75,24 +75,37 @@ const mail = {
 };
 
 describe("service worker push", () => {
-  it("shows one notification per mailbox tag with sender and subject", async () => {
+  it("shows one notification per mailbox tag with the sender as title, subject and mailbox in the body", async () => {
     const worker = loadWorker();
     await worker.push({ ...mail, badge: 4 });
     expect(worker.notifications).toEqual([{
-      title: "Team Postfach",
+      title: "Alice Example",
       options: {
         icon: "/icons/icon-192.png", badge: "/icons/icon-96-mono.png", data: { url: mail.url },
-        body: "Alice Example — Rechnung März", tag: "mail:acc-1", renotify: true
+        body: "Rechnung März\nTeam Postfach", tag: "mail:acc-1", renotify: true
       }
     }]);
     expect(worker.badges).toEqual([4]);
   });
 
-  it("collapses counts into the title and leaves the subject out when absent", async () => {
+  it("shows only the mailbox in the body when the subject is absent", async () => {
     const worker = loadWorker();
+    await worker.push({ ...mail, subject: null });
+    await worker.push({ ...mail, subject: null, accountName: "" });
+    expect(worker.notifications.map((n) => [n.title, n.options.body])).toEqual([
+      ["Alice Example", "Team Postfach"],
+      ["Alice Example", ""]
+    ]);
+  });
+
+  it("collapses counts into the title and names the newest sender in the body", async () => {
+    const worker = loadWorker();
+    await worker.push({ ...mail, count: 3 });
     await worker.push({ ...mail, count: 3, subject: null });
-    expect(worker.notifications[0].title).toBe("Team Postfach · 3 neue");
-    expect(worker.notifications[0].options.body).toBe("Alice Example");
+    expect(worker.notifications.map((n) => [n.title, n.options.body])).toEqual([
+      ["3 neue Nachrichten", "Alice Example — Rechnung März\nTeam Postfach"],
+      ["3 neue Nachrichten", "Alice Example\nTeam Postfach"]
+    ]);
     expect(worker.badges).toEqual([]);
   });
 
