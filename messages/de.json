@@ -1131,6 +1131,9 @@
   "List": {
     "markRead": "Als gelesen markieren",
     "markUnread": "Als ungelesen markieren",
+    "swipeRead": "Gelesen",
+    "swipeUnread": "Ungelesen",
+    "swipeMore": "Mehr",
     "flag": "Markieren",
     "todo": "Aufgabe",
     "copyAccount": "In Postfach kopieren …",
