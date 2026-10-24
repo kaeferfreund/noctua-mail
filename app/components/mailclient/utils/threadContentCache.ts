@@ -149,8 +149,9 @@ export function mergeThreadWindowItems(cached: Message[] | undefined, page: Mess
   if (!cached || cached.length === 0) return page;
   const byId = new Map(cached.map((item) => [item.id, item]));
   page.forEach((item) => byId.set(item.id, { ...item, groupKey: byId.get(item.id)?.groupKey ?? item.groupKey }));
+  // Same order as the window's SQL keyset: dateValue, then id in binary order.
   return Array.from(byId.values()).sort(
-    (a, b) => a.dateValue - b.dateValue || a.id.localeCompare(b.id)
+    (a, b) => a.dateValue - b.dateValue || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   );
 }
 

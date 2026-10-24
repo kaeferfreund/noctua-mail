@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { Message } from "@/lib/data";
 import {
   evictMessagesFromThreadCacheMap,
+  mergeThreadWindowItems,
   updateThreadCacheMapWithCategory,
   updateThreadCacheMapWithFlags,
   updateThreadCacheWithMessageMap,
@@ -145,5 +146,15 @@ describe("updateThreadCacheMapWithCategory", () => {
     expect(result.t1[1].category).toBe("personal");
     expect(result.t1[1].categoryScore).toBe(0.9);
     expect(result.t1[0].category).toBeUndefined();
+  });
+});
+
+describe("mergeThreadWindowItems", () => {
+  it("orders equal dates by id in binary order, like the window's SQL keyset", () => {
+    const merged = mergeThreadWindowItems(
+      [makeMessage({ id: "m-b", dateValue: 5 }), makeMessage({ id: "m-a", dateValue: 1 })],
+      [makeMessage({ id: "m-B", dateValue: 5 })]
+    );
+    expect(merged.map((message) => message.id)).toEqual(["m-a", "m-B", "m-b"]);
   });
 });

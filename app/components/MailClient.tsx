@@ -1504,6 +1504,7 @@ export default function MailClient({
     updateMessageBody,
     loadThreadContent,
     abortThreadContent,
+    abortBodyReadsOutside,
     loadThreadPage
   } = useThreadContent({
     activeAccountId,
@@ -4467,10 +4468,13 @@ export default function MailClient({
         reason: "missing-active-message"
       });
       abortThreadContent();
+      abortBodyReadsOutside(null);
       return;
     }
     const threadId = active.threadId ?? active.messageId ?? active.id;
     if (!threadId) return;
+    // Bodies still loading for the conversation just left are not needed any more.
+    abortBodyReadsOutside(threadId);
     const cachedThread = threadContentByIdRef.current[threadId];
     if (cachedThread?.some((item) => item.id === active.id)) {
       logListDebug("info", "thread-related:content-effect:skip", {
@@ -4509,6 +4513,7 @@ export default function MailClient({
       threadDateSource
     });
   }, [
+    abortBodyReadsOutside,
     abortThreadContent,
     activeAccountId,
     activeFolderId,
