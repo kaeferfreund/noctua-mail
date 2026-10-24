@@ -18,6 +18,33 @@ describe("Noctua auth client boundary", () => {
     expect(calls[3].init?.method).toBe("POST"); expect(calls[3].init?.body).toBeUndefined();
     expect(new Headers(calls[3].init?.headers).has("content-type")).toBe(false);
   });
+  it("removes this browser's push device on the server before logout, best effort, and keeps the browser subscription", async () => {
+    const endpoint = "https://push.example.test/send/synthetic-logout";
+    let unsubscribed = false;
+    const subscription = { endpoint, unsubscribe: async () => { unsubscribed = true; return true; } };
+    const registration = { pushManager: { getSubscription: async () => subscription } };
+    const hadWindow = "window" in globalThis;
+    const serviceWorker = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
+    Object.defineProperty(globalThis, "window", { configurable: true, writable: true, value: { navigator, PushManager: function PushManager() {}, Notification: {}, dispatchEvent: () => true } });
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration: async () => registration } });
+    try {
+      for (const deleteStatus of [200, 404, 500, 0]) {
+        const calls: { path: string; init?: RequestInit }[] = [];
+        const client = createAuthClient(async (path, init) => {
+          calls.push({ path: String(path), init });
+          if (String(path) === "/api/push/subscriptions" && deleteStatus === 0) throw new TypeError("synthetic network failure");
+          return Response.json({ ok: String(path) !== "/api/push/subscriptions" || deleteStatus === 200 }, { status: String(path) === "/api/push/subscriptions" ? deleteStatus : 200 });
+        });
+        await client.logout();
+        expect(calls.map(call => `${call.init?.method} ${call.path}`)).toEqual(["DELETE /api/push/subscriptions", "POST /api/auth/logout"]);
+        expect(JSON.parse(String(calls[0].init?.body))).toEqual({ endpoint });
+      }
+      expect(unsubscribed).toBe(false);
+    } finally {
+      if (serviceWorker) Object.defineProperty(navigator, "serviceWorker", serviceWorker); else Reflect.deleteProperty(navigator, "serviceWorker");
+      if (!hadWindow) Reflect.deleteProperty(globalThis, "window");
+    }
+  });
   it("maps stable codes/status, preserves 403 sessions and Retry-After, and ignores message text", async () => {
     for (const status of [401, 403, 429]) {
       const client = createAuthClient(async () => Response.json({ code: "invalid_proof", message: "synthetic-private-upstream-detail" }, { status, headers: { "Retry-After": "900" } }));
