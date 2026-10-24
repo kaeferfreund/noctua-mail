@@ -620,6 +620,27 @@
       }
     }
   },
+  "Calendar": {
+    "toolbar": {
+      "addEvent": "＋ Termin",
+      "addEventHint": "Neuer Termin",
+      "today": "Heute",
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "todayHint": "{unit, select, day {Heute} week {Diese Woche} month {Dieser Monat} other {Heute}}",
+      "prevHint": "{unit, select, day {Vorheriger Tag} week {Vorherige Woche} month {Vorheriger Monat} other {Zurück}}",
+      "nextHint": "{unit, select, day {Nächster Tag} week {Nächste Woche} month {Nächster Monat} other {Weiter}}",
+      "viewHint": "{view, select, dayGridMonth {Monatsansicht} timeGridWeek {Wochenansicht} timeGridDay {Tagesansicht} other {Ansicht}}",
+      "viewChangeHint": "Ansicht wechseln"
+    },
+    "panel": {
+      "title": "Kalender",
+      "openWindow": "In neuem Fenster öffnen",
+      "openWindowLabel": "Kalender in neuem Fenster öffnen",
+      "close": "Kalender schließen"
+    }
+  },
   "Search": {
     "scope": {
       "everywhere": "Überall",

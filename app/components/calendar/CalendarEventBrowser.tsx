@@ -39,6 +39,8 @@ const CalendarView = dynamic(() => import("./CalendarView"), { ssr: false });
 type Props = {
   accountId: string;
   firstDay?: 0 | 1;
+  /** Level of the calendar's title heading inside the surrounding outline. */
+  headingLevel?: number;
   calendarRef?: React.RefObject<CalendarRef | null>;
   onOpenMessage?: (messageId: string) => void;
   onFindRelatedByInviteUid?: (uid: string) => void;
@@ -47,6 +49,7 @@ type Props = {
 export default function CalendarEventBrowser({
   accountId,
   firstDay,
+  headingLevel,
   calendarRef: externalCalendarRef,
   onOpenMessage,
   onFindRelatedByInviteUid
@@ -228,6 +231,7 @@ export default function CalendarEventBrowser({
       accountId={accountId}
       calendarRef={calendarRef}
       firstDay={firstDay}
+      headingLevel={headingLevel}
       onEventClick={handleEventClick}
       onDateClick={handleDateClick}
       onCreateEvent={handleCreateEvent}

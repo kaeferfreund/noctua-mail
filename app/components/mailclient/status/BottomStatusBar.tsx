@@ -108,6 +108,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
     </Button>
     </div>
     {openPanel === "calendar" ? <div data-calendar-frame={isMobile ? "phone" : "popover"} className={isMobile ? mobileStyles.calendarBody : calendarFrame.body}><CalendarEventBrowser accountId={props.activeAccountId} firstDay={props.calendarFirstDay}
+      headingLevel={isMobile ? 3 : 4}
       onOpenMessage={props.onOpenCalendarMessage ? id => { props.onOpenCalendarMessage?.(id); close(); } : undefined}
       onFindRelatedByInviteUid={props.onFindRelatedCalendarInviteUid ? uid => { props.onClearMobileSelection?.(); props.onFindRelatedCalendarInviteUid?.(uid); close(); } : undefined} /></div> : null}
   </div>;

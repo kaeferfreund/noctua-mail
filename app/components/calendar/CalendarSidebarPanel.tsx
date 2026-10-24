@@ -1,6 +1,7 @@
 "use client";
 
 import { Flex, Heading } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import { X, ExternalLink } from "lucide-react";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { formatCalendarPageTitle } from "@/lib/appBranding";
@@ -25,6 +26,7 @@ export default function CalendarSidebarPanel({
   onOpenMessage,
   onFindRelatedByInviteUid
 }: Props) {
+  const t = useTranslations("Calendar.panel");
   const { dropProps, isDragOver, status, resetStatus } = useCalendarIcsDrop({ accountId });
 
   const handleOpenWindow = () => {
@@ -36,14 +38,14 @@ export default function CalendarSidebarPanel({
   return (
     <div className={styles.panel} {...dropProps}>
       <Flex align="center" justify="between" className={styles.header}>
-        <Heading size="2">Calendar</Heading>
+        <Heading size="2">{t("title")}</Heading>
         <Flex gap="1" align="center">
           <TooltipIconButton
             size="1"
             variant="ghost"
             color="gray"
-            tooltip="Open in window"
-            aria-label="Open calendar in window"
+            tooltip={t("openWindow")}
+            aria-label={t("openWindowLabel")}
             onClick={handleOpenWindow}
           >
             <ExternalLink size={13} />
@@ -53,7 +55,7 @@ export default function CalendarSidebarPanel({
             variant="ghost"
             color="gray"
             onClick={onClose}
-            tooltip="Close calendar"
+            tooltip={t("close")}
           >
             <X size={15} />
           </TooltipIconButton>
