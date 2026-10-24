@@ -9,6 +9,7 @@ import MessageListView from "@/app/components/mailclient/messagelist/MessageList
 import { reviewListProps } from "@/tests/helpers/i18nSlice2b";
 import { handleMessageRowKeyDown } from "@/app/components/mailclient/messagelist/listInteractions";
 import { useReaderFocusPlacement } from "./useReaderFocusPlacement";
+import { expectFocused } from "@/lib/testDomAssertions";
 import { useReaderFocus } from "./useReaderFocus";
 import { isReaderRowActivation, readerShortcut, READER_HINT_KEY, READER_LAYOUT_KEY } from "./readerFocus";
 
@@ -212,4 +213,30 @@ test("focus dropped by a disabled or removed control returns to Back while focus
   remove.blur();
   await frame();
   expect(document.activeElement).toBe(document.body);
+});
+
+test("a focused control disabled for a short busy phase hands focus to Back without waiting for a blur", async () => {
+  // Chromium blurs a disabled control only at its next focus check. A Delete that is
+  // busy for less than that keeps focus, so the hook must not rely on that blur.
+  function Harness({ busy }: { busy: boolean }) {
+    const list = useRef<HTMLDivElement>(null), savedScroll = useRef<number | null>(null);
+    useReaderFocusPlacement(true, "synthetic", list, savedScroll);
+    return <><div ref={list} tabIndex={-1} /><div data-reader-toolbar=""><button>Back</button>
+      <button disabled={busy}>Delete</button><button>Archive</button></div></>;
+  }
+  const frame = () => act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
+  const view = render(<Harness busy={false} />);
+  await frame();
+  view.getByText("Delete").focus();
+  // The request runs between the two commits; no blur and no frame happen meanwhile.
+  view.rerender(<Harness busy />);
+  await act(async () => { await Promise.resolve(); });
+  view.rerender(<Harness busy={false} />);
+  await frame();
+  expectFocused(view.getByText("Back"));
+  // Disabling a control that does not hold focus leaves focus where it is.
+  view.getByText("Archive").focus();
+  view.rerender(<Harness busy />);
+  await frame();
+  expectFocused(view.getByText("Archive"));
 });
