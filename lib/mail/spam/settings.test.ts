@@ -1,8 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { dbModulePromise } from "../../testDbHarness";
 
 const db = await dbModulePromise;
 const { loadMailboxSpamSettings, loadSpamAdminSettings, mailboxSpamScope, saveMailboxSpamSettings, saveSpamAdminSettings } = await import("./settings");
+
+// The global row is shared by every test file of the process: restore it afterwards.
+let previousGlobal: unknown = null;
+beforeAll(async () => { previousGlobal = await db.getSpamSettings("global"); });
+afterAll(async () => { await db.saveSpamSettings("global", (previousGlobal ?? {}) as object, "spam-settings-test"); });
 
 const auditFor = async (actorUserId: string) => (await db.listAdminAudit({ limit: 500 })).filter((entry) => entry.actorUserId === actorUserId);
 
