@@ -43,6 +43,22 @@ The separate preview `https://remote-arm.tail31b4a1.ts.net:3790` has isolated da
 secrets, its own URL and RP ID `remote-arm.tail31b4a1.ts.net`, preview-only trust and new passkeys.
 Never add preview trust to production or claim canonical passkey reuse there.
 
+### Optional Web Push (PWA notifications)
+
+Push notifications stay off unless all three are set (doc/PUSH-NOTIFICATIONS.md). Generate a pair
+once with `bun scripts/push-vapid-keys.ts mailto:admin@example.test` (prints, never writes) and keep
+it: changing the keys invalidates every device subscription.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOCTUA_VAPID_PUBLIC_KEY` | unset (push off) | VAPID public key, base64url (65-byte P-256 point). Served to clients by `GET /api/push/vapid-public-key`. |
+| `NOCTUA_VAPID_PRIVATE_KEY` | unset (push off) | VAPID private key, base64url (32 bytes). Secret: environment file only, never in source or logs. |
+| `NOCTUA_VAPID_SUBJECT` | unset (push off) | Contact for the push services, `mailto:` address or `https:` URL. |
+
+Outbound HTTPS (443) to the browser push services is required: `*.googleapis.com` (Chrome, Edge,
+Android), `*.push.services.mozilla.com` (Firefox), `*.push.apple.com` (Safari, iOS home-screen apps),
+`*.notify.windows.com` (legacy Edge).
+
 ### Optional search tuning
 
 Leave both unset in normal operation. Searches resolve their matching message ids once from the
