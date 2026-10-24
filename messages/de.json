@@ -1076,7 +1076,11 @@
       "thresholdHelp": "Markiert wird nur bei „Spam“ mit mindestens dieser Sicherheit.",
       "unavailable": "Modell nicht nutzbar ({reason}). Bis dahin greifen nur Allowlist und feste Regeln.",
       "save": "Speichern",
-      "saved": "Gespeichert."
+      "saved": "Gespeichert.",
+      "unavailableReasons": {
+        "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
+        "unsupported-provider": "Anbieter wird nicht unterstützt"
+      }
     }
   },
   "List": {

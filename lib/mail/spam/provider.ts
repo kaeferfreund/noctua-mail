@@ -23,7 +23,8 @@ export function getSpamProviderOptions(config: SpamConfig): SpamModelProviderOpt
   return config.provider === "anthropic" ? { anthropic: { effort: "low" } } : undefined;
 }
 
+/** Why the model cannot be used: "missing-key" or "unsupported-provider" (null when usable). */
 export function spamModelUnavailableReason(config: SpamConfig) {
-  if (config.provider !== "anthropic") return `unsupported provider ${config.provider}`;
-  return config.apiKey ? null : "ANTHROPIC_API_KEY is not set";
+  if (config.provider !== "anthropic") return "unsupported-provider" as const;
+  return config.apiKey ? null : "missing-key" as const;
 }

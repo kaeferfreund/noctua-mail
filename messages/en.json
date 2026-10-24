@@ -1076,7 +1076,11 @@
       "thresholdHelp": "A message is marked only for \"spam\" with at least this confidence.",
       "unavailable": "Model not usable ({reason}). Until then only the allowlist and fixed rules apply.",
       "save": "Save",
-      "saved": "Saved."
+      "saved": "Saved.",
+      "unavailableReasons": {
+        "missing-key": "no API key (ANTHROPIC_API_KEY)",
+        "unsupported-provider": "provider not supported"
+      }
     }
   },
   "List": {

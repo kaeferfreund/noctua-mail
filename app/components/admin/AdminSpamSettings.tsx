@@ -10,7 +10,7 @@ import { adminActionRow } from "./adminLayout";
 
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
-  effective: { enabled: boolean; provider: string; model: string; threshold: number; modelUnavailable: string | null };
+  effective: { enabled: boolean; provider: string; model: string; threshold: number; modelUnavailable: "missing-key" | "unsupported-provider" | null };
 };
 
 /** Global spam detection switch, model and threshold (doc/SPAM-DETECTION.md). */
@@ -56,7 +56,7 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
     {data && <form onSubmit={(event) => void save(event)} className="grid max-w-lg gap-3">
       <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />{t("spam.enabled")}</label>
       <p className="text-sm text-muted-foreground">{t("spam.provider", { provider: data.effective.provider })}</p>
-      {data.effective.modelUnavailable && <p className="text-sm font-medium" role="status">{t("spam.unavailable", { reason: data.effective.modelUnavailable })}</p>}
+      {data.effective.modelUnavailable && <p className="text-sm font-medium" role="status">{t("spam.unavailable", { reason: t(`spam.unavailableReasons.${data.effective.modelUnavailable}`) })}</p>}
       <label className="grid gap-1">{t("spam.model")}<Input value={model} placeholder={data.effective.model} onChange={(event) => setModel(event.target.value)} /></label>
       <label className="grid gap-1">{t("spam.threshold")}<Input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
         <span className="text-sm text-muted-foreground">{t("spam.thresholdHelp")}</span></label>
