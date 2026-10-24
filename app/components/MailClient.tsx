@@ -5,7 +5,7 @@ import { useStartupSync } from "./mailclient/useStartupSync";
 import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
 import { isAccountFolder } from "@/lib/folderAccount";
 import { findInboxFolder } from "@/lib/specialFolders";
-import ReaderToolbar from "./mailclient/message/ReaderToolbar";
+import ReaderToolbar, { ReaderFocusHint } from "./mailclient/message/ReaderToolbar";
 import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
@@ -5527,8 +5527,6 @@ export default function MailClient({
                 mailboxLabel: readerFocused ? currentAccount?.name || currentAccount?.email : undefined,
                 toolbar: !isMobile && activeMessage ? <ReaderToolbar
                   layout={readerLayout}
-                  showHint={readerHintId === activeMessage.id}
-                  dismissHint={dismissReaderHint}
                   toggleLayout={() => readerLayout === "focus" ? closeReaderFocus() : openReaderFocus(activeMessage)}
                   back={closeReaderFocus}
                   archive={() => { void handleArchiveMessage(activeMessage); }}
@@ -5555,6 +5553,9 @@ export default function MailClient({
                   canNext={readerNavigation.canNext}
                   navigating={readerNavigation.pending || loadingMessages}
                 /> : undefined,
+                toolbarInSubjectRow: !readerFocused,
+                notice: !isMobile && !readerFocused && activeMessage && readerHintId === activeMessage.id
+                  ? <ReaderFocusHint dismiss={dismissReaderHint} /> : undefined,
                 activeMessage: activeMessage ?? null,
                 activeThread,
                 getAssignedThreadTopics,
