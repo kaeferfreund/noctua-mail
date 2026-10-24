@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, partitionMailboxes } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, partitionMailboxes } from "./types";
 
 function account(overrides: Partial<Account> & { id: string }): Account {
   return {
@@ -72,6 +72,7 @@ describe("groupMailboxes", () => {
     const accounts = Array.from({ length: 7 }, (_, i) => account({
       id: String(i), email: `box${i}@${i % 2 ? "Z.EXAMPLE" : "a.example"}`
     }));
+    expect(MAILBOX_GROUPING_MIN).toBe(7);
     expect(groupMailboxes(accounts.slice(0, 6))[0].domain).toBeNull();
     const grouped = groupMailboxes(accounts);
     expect(grouped.map((group) => group.domain)).toEqual(["a.example", "z.example"]);

@@ -91,12 +91,15 @@ export function mailboxLabel(account: Pick<Account, "name" | "email">): string {
   return account.name.trim() || account.email;
 }
 
+/** Sections with at least this many mailboxes are grouped by domain. */
+export const MAILBOX_GROUPING_MIN = 7;
+
 /** Group long mailbox sections by domain, preserving name order within each group. */
 export function groupMailboxes(accounts: readonly ShellAccount[]): Array<{
   domain: string | null;
   accounts: ShellAccount[];
 }> {
-  if (accounts.length <= 6) return [{ domain: null, accounts: [...accounts] }];
+  if (accounts.length < MAILBOX_GROUPING_MIN) return [{ domain: null, accounts: [...accounts] }];
   const groups = new Map<string | null, ShellAccount[]>();
   for (const account of accounts) {
     const domain = account.email.trim().split("@")[1]?.toLowerCase() || null;
