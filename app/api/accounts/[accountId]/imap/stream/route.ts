@@ -3,9 +3,9 @@ import { validateAccountFolders } from "@/app/api/_helpers/folderAccount";
 import { formatEnvelopeAddresses, resolveMessageSenderKey } from "@/lib/mail/imap/parser";
 import type { ImapEnvelope } from "@/lib/mail/imap/_shared";
 import { connectIdleImapClient, runImapIdleLoop } from "@/lib/mail/imap/idle";
-import { mailboxFailureDto } from "@/lib/mailboxFailure";
 import { getImapHttpError } from "@/lib/mail/imapError";
-import { assertStreamAuthorized, registerAuthStream } from "@/lib/authStreams";
+import { registerAuthStream } from "@/lib/authStreams";
+import { createStreamEventSender } from "./streamEventSender";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
@@ -94,16 +94,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         let pollClient: import("imapflow").ImapFlow | null = null;
         const { userId, sessionId, generation, authenticatedAt, expiresAt } = accountContext.session;
         const identity = { userId, sessionId, generation, authenticatedAt, expiresAt, accountId, minRole: "viewer" as const };
-        const send = async (event: string, data: unknown) => {
-          if (stopped) return;
-          try {
-            const safeData = event === "error" ? getImapHttpError(data) ? await mailboxFailureDto(accountId, accountContext.role) : { accountId, message: "Mailbox unavailable" } : data;
-            await assertStreamAuthorized(identity, () => {
-              if (stopped) return;
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(safeData)}\n\n`));
-            });
-          } catch { authStream.close(); }
-        };
+        const send = createStreamEventSender({ identity, accountId, role: accountContext.role, controller,
+          isStopped: () => stopped, close: () => authStream.close() });
 
         type Session = {
           mailbox: string;

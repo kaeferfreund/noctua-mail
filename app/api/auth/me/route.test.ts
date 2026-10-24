@@ -96,6 +96,24 @@ describe("shell mutation contracts",()=>{
   expect((await switchAccount(req(f.jar.header(),"POST",{accountId:forbidden}))).status).toBe(403);
   expect((await switchAccount(req(f.jar.header(),"POST",{accountId:id},{origin:"https://foreign.example.test"}))).status).toBe(403);
  });
+ test("membership revoked mid-switch: 403, the switch is undone",async()=>{
+  const f=await createAuthenticatedTestSession();const a=await account("A");await f.addMembership(f.user.id,a);
+  const trigger=`switch_revoke_${randomUUID().replaceAll("-","")}`;
+  await withDbWriteRetry("test.race",()=>f.master.exec(`CREATE TRIGGER ${trigger} AFTER UPDATE OF activeAccountId ON auth_session WHEN NEW.id='${f.session.id}' AND NEW.activeAccountId='${a}' BEGIN DELETE FROM user_accounts WHERE userId=NEW.userId AND accountId=NEW.activeAccountId; END`));
+  try {expect((await switchAccount(req(f.jar.header(),"POST",{accountId:a}))).status).toBe(403);}
+  finally {await withDbWriteRetry("test.raceCleanup",()=>f.master.exec(`DROP TRIGGER ${trigger}`));}
+  expect((f.master.prepare("SELECT activeAccountId FROM auth_session WHERE id=?").get(f.session.id) as {activeAccountId:string|null}).activeAccountId).toBeNull();
+ });
+ test("membership revoked mid-switch: the undo keeps a switch another tab committed meanwhile",async()=>{
+  const f=await createAuthenticatedTestSession();const a=await account("A");const b=await account("B");
+  await f.addMembership(f.user.id,a);await f.addMembership(f.user.id,b);
+  // After this request writes A: A is revoked and a parallel switch-account (another tab) commits B.
+  const trigger=`switch_race_${randomUUID().replaceAll("-","")}`;
+  await withDbWriteRetry("test.race",()=>f.master.exec(`CREATE TRIGGER ${trigger} AFTER UPDATE OF activeAccountId ON auth_session WHEN NEW.id='${f.session.id}' AND NEW.activeAccountId='${a}' BEGIN DELETE FROM user_accounts WHERE userId=NEW.userId AND accountId=NEW.activeAccountId; UPDATE auth_session SET activeAccountId='${b}' WHERE id=NEW.id; END`));
+  try {expect((await switchAccount(req(f.jar.header(),"POST",{accountId:a}))).status).toBe(403);}
+  finally {await withDbWriteRetry("test.raceCleanup",()=>f.master.exec(`DROP TRIGGER ${trigger}`));}
+  expect((f.master.prepare("SELECT activeAccountId FROM auth_session WHERE id=?").get(f.session.id) as {activeAccountId:string|null}).activeAccountId).toBe(b);
+ });
  test("bodyless logout deletes cookie, DB session, sidecar, grants and source challenges; next me rejects",async()=>{
   const f=await createAuthenticatedTestSession();const saved=f.jar.header();
   const context = await f.auth.$context;
