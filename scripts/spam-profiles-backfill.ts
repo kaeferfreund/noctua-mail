@@ -19,6 +19,7 @@
 import { openSpamDataDir } from "../lib/mail/spam/evalData";
 import { PROFILE_BACKFILL_USAGE, parseProfileBackfillArgs } from "../lib/mail/spam/profileBackfillArgs";
 import { accountSenders, buildProfileFile, householdProfiles, writeProfileFile } from "../lib/mail/spam/profileFile";
+import { assertShardsInsideDataDir } from "../lib/mail/spam/evalData";
 
 const args = parseProfileBackfillArgs(process.argv.slice(2));
 if (args.kind === "help") {
@@ -62,6 +63,7 @@ if (!write) {
   if (missingSchema.length) {
     throw new Error(`Shards without the spam schema (start the deployed app first, deploy runbook): ${missingSchema.join(", ")}`);
   }
+  assertShardsInsideDataDir(targets, dataDir);
   // The app's DB layer reads NOCTUA_DATA_DIR; the explicit --data wins over .env.local.
   process.env.NOCTUA_DATA_DIR = dataDir;
   const { backfillSenderProfiles, getAccounts, getFolders } = await import("../lib/db");

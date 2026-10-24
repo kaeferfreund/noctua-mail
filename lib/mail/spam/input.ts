@@ -107,7 +107,13 @@ export type HeaderLine = { key: string; value: string };
  * each X-Spam-* header. Copies further down come from earlier hops or the sender.
  */
 function topAuthenticationResults(lines: HeaderLine[]) {
-  const results = lines.filter((line) => line.key === "authentication-results");
+  // Our receiving server writes its Received line and its Authentication-Results
+  // next to each other at the top. Anything below the second Received line was
+  // written by an earlier hop or by the sender, so a forged block that copies the
+  // authserv-id of our server is ignored there (verify-r2 R1).
+  const receivedIndexes = lines.flatMap((line, index) => (line.key === "received" ? [index] : []));
+  const limit = receivedIndexes.length >= 2 ? receivedIndexes[1] : lines.length;
+  const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit);
   const servId = (value: string) => value.split(";")[0].trim().toLowerCase();
   const first = results[0] ? servId(results[0].value) : "";
   return results.filter((line) => servId(line.value) === first).map((line) => line.value);
