@@ -1,5 +1,6 @@
 import { getAccounts, updateMessageFolder } from "@/lib/db";
 import { moveImapMessages } from "@/lib/mail/imap";
+import { learnFromMessageMoves } from "@/lib/mail/spam/moveLearning";
 
 export type QueuedMessageMove = {
   accountId: string;
@@ -10,6 +11,8 @@ export type QueuedMessageMove = {
   destinationFolderId: string;
   destinationMailboxPath: string;
   clientId?: string;
+  /** The acting user; moves into or out of Junk are recorded as that user's spam decision. */
+  userId?: string | null;
 };
 
 type AccountMoveState = {
@@ -127,6 +130,16 @@ async function processAccountQueue(accountId: string, state: AccountMoveState) {
               uidMap.get(task.sourceUid) ?? null
             )
           )
+        );
+        // Only after IMAP and the local rows agree: a rolled-back move teaches nothing.
+        await learnFromMessageMoves(
+          batch.map((task) => ({
+            accountId: task.accountId,
+            messageId: task.messageId,
+            sourceFolderId: task.sourceFolderId,
+            destinationFolderId: task.destinationFolderId,
+            userId: task.userId ?? null
+          }))
         );
       } catch (error) {
         console.warn("[move-jobs] failed to move IMAP message batch", {

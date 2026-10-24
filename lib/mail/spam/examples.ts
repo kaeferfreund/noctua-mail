@@ -15,7 +15,8 @@ export const SPAM_EXAMPLE_LIMIT = 16;
 const MIN_PER_LABEL = 3;
 const SNIPPET_LENGTH = 280;
 
-export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious";
+/** `move-*`: a folder move into / out of Junk (moveLearning.ts), stored with the same payload as the buttons. */
+export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious" | "move-junk" | "move-from-junk";
 export type SpamExampleTarget = { senderEmail: string | null; subject: string };
 
 export function senderParts(from: string | null | undefined) {

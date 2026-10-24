@@ -446,11 +446,19 @@ export type { MailboxSummary, WatcherState } from "./db/mailboxSummary";
 export { InvalidAccountPreferencesError } from "./db/userAccountPrefs";
 export { listSenderIdentities, getAccountOwnAddresses } from "./db/senderIdentities";
 export {
+  backfillSenderProfiles,
+  countSpamTrustDecisions,
   getLatestSpamDecision,
+  getSenderProfile,
   getSpamSettings,
   hasSentToAddress,
+  listSenderMailsAround,
   listSpamExampleCandidates,
   listUncheckedSpamMessageIds,
+  markSenderProfileUserSpam,
+  recordSenderProfileMail,
+  replaceSenderProfiles,
+  resetTrustedSpamChecks,
   saveSpamExample,
   saveSpamSettings,
   saveSpamVerdict

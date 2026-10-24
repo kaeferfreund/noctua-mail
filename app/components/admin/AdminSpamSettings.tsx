@@ -11,7 +11,14 @@ import { adminActionRow } from "./adminLayout";
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
   effective: { enabled: boolean; provider: string; model: string; threshold: number; modelUnavailable: "missing-key" | "unsupported-provider" | null };
+  /** Read-only trusted-sender counters per mailbox. */
+  trust?: Array<{ accountId: string; email: string; trustedSkips: number; canaryChecks: number; canaryMismatches: number }>;
 };
+
+function trustTotals(trust: NonNullable<SpamAdminResponse["trust"]>) {
+  return trust.reduce((sum, entry) => ({ skips: sum.skips + entry.trustedSkips, canaries: sum.canaries + entry.canaryChecks,
+    mismatches: sum.mismatches + entry.canaryMismatches }), { skips: 0, canaries: 0, mismatches: 0 });
+}
 
 /** Global spam detection switch, model and threshold (doc/SPAM-DETECTION.md). */
 export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: AdminFetch }) {
@@ -62,5 +69,8 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
         <span className="text-sm text-muted-foreground">{t("spam.thresholdHelp")}</span></label>
       <div className={adminActionRow}><Button disabled={busy}>{t("spam.save")}</Button>{saved && <span role="status" className="text-sm">{t("spam.saved")}</span>}</div>
     </form>}
+    {data?.trust && <p className="max-w-2xl text-sm text-muted-foreground"
+      title={data.trust.map((entry) => `${entry.email}: ${t("spam.trustCounters", { skips: entry.trustedSkips, canaries: entry.canaryChecks, mismatches: entry.canaryMismatches })}`).join("\n")}>
+      {t("spam.trustCounters", trustTotals(data.trust))}</p>}
   </section>;
 }

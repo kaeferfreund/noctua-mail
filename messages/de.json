@@ -1075,6 +1075,7 @@
       "model": "Modell",
       "threshold": "Schwelle (0,5–1)",
       "thresholdHelp": "Markiert wird nur bei „Spam“ mit mindestens dieser Sicherheit.",
+      "trustCounters": "Vertraute Absender: {skips, number} ohne Modell übersprungen, {canaries, number} Stichproben, davon {mismatches, number} abweichend",
       "unavailable": "Modell nicht nutzbar ({reason}). Bis dahin greifen nur Allowlist und feste Regeln.",
       "save": "Speichern",
       "saved": "Gespeichert.",

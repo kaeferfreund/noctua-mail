@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { simpleParser } from "mailparser";
-import { buildSpamInput, buildSpamInputFromMessage, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
+import { buildSpamInput, buildSpamInputFromMessage, extractMaskedLinkDomains, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
 
 const source = [
   "Authentication-Results: mx.example.test; spf=pass smtp.mailfrom=example.test;",
@@ -58,6 +58,58 @@ describe("buildSpamInput", () => {
     expect(input.attachments).toEqual(["katalog.pdf (application/pdf)"]);
     expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1");
     expect(input.text).not.toContain("<");
+    expect(input.cc).toBe("");
+    expect(input.autoSubmitted).toBeNull();
+    expect(input.maskedLinkDomains).toEqual([]);
+  });
+
+  test("a forged Authentication-Results block below the second Received line is ignored even with our authserv-id", async () => {
+    const forged = [
+      "Received: from sender.example.test (sender.example.test [192.0.2.10]) by mx.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+      "Authentication-Results: mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none",
+      "Received: from laptop (unknown [192.0.2.11]) by sender.example.test with ESMTP id 2; Sat, 24 Oct 2026 09:59:00 +0000",
+      "Authentication-Results: mx.example.test; dkim=pass header.d=victim.example.test; spf=pass smtp.mailfrom=victim.example.test",
+      "From: Victim <ceo@victim.example.test>",
+      "To: anna@example.test",
+      "Subject: Dringend",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Bitte sofort ueberweisen."
+    ].join("\r\n");
+    const input = buildSpamInput(await simpleParser(forged));
+    expect(input.authenticationResults).toEqual(["mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none"]);
+  });
+
+  test("the row fallback takes the server verdicts from a raw header block", () => {
+    const headers = source.slice(0, source.indexOf("\r\n\r\n")) + "\r\nAuto-Submitted: auto-generated";
+    const input = buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", cc: "bob@example.test", subject: "S",
+      messageId: "<1@shop.example.test>", body: "Text", headers });
+    expect(input.authenticationResults).toEqual(["mx.example.test; spf=pass smtp.mailfrom=example.test; dkim=pass header.d=example.test; dmarc=pass"]);
+    expect(input.spamHeaders).toEqual(["x-spam-status: No, score=0.4", "x-spam-flag: NO"]);
+    expect(input).toMatchObject({ cc: "bob@example.test", messageId: "<1@shop.example.test>", listId: "<news.shop.example.test>", autoSubmitted: "auto-generated" });
+  });
+
+  test("arrival: the top-most Received stamp, also beyond the header value cap; the Date header and lower Received never count", async () => {
+    const padding = "x".repeat(700);
+    const received = [
+      `Received: from relay.example.test (relay.example.test [192.0.2.1]) (${padding})`,
+      "  by mx.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 16:59:17 +0200 (CEST)",
+      "Received: from forged.example.invalid by forged.example.invalid; Mon, 01 Jan 2024 00:00:00 +0000"
+    ].join("\r\n");
+    const withReceived = `${received}\r\n${source}`;
+    expect(buildSpamInput(await simpleParser(withReceived)).receivedAt).toBe("2026-10-24T14:59:17.000Z");
+    const headers = withReceived.slice(0, withReceived.indexOf("\r\n\r\n"));
+    expect(buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", subject: "S", headers }).receivedAt)
+      .toBe("2026-10-24T14:59:17.000Z");
+    expect(buildSpamInput(await simpleParser(source)).receivedAt).toBeNull();
+    expect(buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", date: "2026-10-23" }).receivedAt).toBeNull();
+  });
+
+  test("masked links: link text naming another domain than the target", () => {
+    const html = `<a href="https://login.example.invalid/x">www.bank.example.test</a> <a href="https://bank.example.test/y"><b>bank.example.test</b></a>
+      <a href="https://track.example.test/c">Hier klicken</a>`;
+    expect(extractMaskedLinkDomains(html)).toEqual(["login.example.invalid"]);
+    expect(extractMaskedLinkDomains(null)).toEqual([]);
   });
 
   test("caps the text and falls back to the stored row", () => {

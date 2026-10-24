@@ -1,5 +1,6 @@
 import addressParser from "nodemailer/lib/addressparser/index.js";
 import * as punycode from "nodemailer/lib/punycode/index.js";
+import { publicSuffixLabels } from "./publicSuffixes";
 
 const FREE_MAIL_DOMAINS = new Set([
   "gmail.com",
@@ -259,11 +260,12 @@ export function extractPrimaryEmail(value?: string | null) {
   return mailbox?.address ? canonicalizeMailboxAddress(mailbox.address) : null;
 }
 
+/** Organisational domain: the public suffix (publicSuffixes.ts) plus one label. */
 export function getRootDomain(domain?: string | null) {
   const normalized = normalizeEmailAddress(domain);
   if (!normalized) return null;
   const parts = normalized.split(".").filter(Boolean);
-  if (parts.length >= 2) return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+  if (parts.length >= 2) return parts.slice(-Math.min(parts.length, publicSuffixLabels(parts) + 1)).join(".");
   return normalized;
 }
 
