@@ -445,6 +445,13 @@ function scheduleSpamSweepAfterSync(accountId: string) {
     .catch((error) => console.warn("[spam] failed to schedule spam checks", { accountId, error: String(error) }));
 }
 
+// Web Push for new INBOX mail (doc/PUSH-NOTIFICATIONS.md): fire-and-forget, never fails the job.
+function schedulePushAfterSync(accountId: string) {
+  void import("@/lib/push/send")
+    .then(({ notifyPushAfterSync }) => notifyPushAfterSync(accountId))
+    .catch((error) => console.warn("[push] failed to schedule new-mail check", { accountId, error: String(error) }));
+}
+
 function spawnSyncWorker(job: SyncJob, clientId?: string) {
   jobClientIds.set(job, clientId);
   job.status = "queued";
@@ -560,6 +567,7 @@ async function launchSyncWorker(job: SyncJob, release: () => Promise<void>, clie
             updatedAt: Date.now()
           });
           scheduleSpamSweepAfterSync(job.payload.accountId);
+          schedulePushAfterSync(job.payload.accountId);
         } else {
           const errorMessage = stderrText || `Sync worker exited with code ${exitCode}`;
           markJobFailed(job, errorMessage);

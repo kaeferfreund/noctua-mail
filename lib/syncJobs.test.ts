@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { cancelWatcherSyncJobs, getSyncJob, startSyncJob } from "./syncJobs";
+import { replacePushNotifier } from "./push/send";
 import { dbModulePromise } from "./testDbHarness";
 const { saveFoldersForAccount } = await dbModulePromise;
 import type { SyncPayload } from "./syncOperation";
@@ -294,4 +295,29 @@ test("watcher cancellation during folder validation prevents late queue admissio
   await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   await flush();
   expect(spawned).toHaveLength(0);
+});
+
+test("a failing push hook never fails the sync job or holds up the queue", async () => {
+  const calls: string[] = [];
+  replacePushNotifier({
+    onSyncCompleted(accountId) { calls.push(accountId); throw new Error("synthetic push failure"); },
+    sendTest: async () => null,
+    idle: async () => {}
+  });
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const accountId = await nextAccountId("push-failure");
+    const first = await startSyncJob({ accountId, folderId: `${accountId}:INBOX`, mode: "new" });
+    const queued = await startSyncJob({ accountId, folderId: `${accountId}:Sent`, mode: "new" });
+    await finishNextWorker();
+    // The hook is loaded with a dynamic import after the job has completed.
+    for (let i = 0; i < 200 && !calls.includes(accountId); i += 1) await Bun.sleep(10);
+    expect(calls).toEqual([accountId]);
+    expect(getSyncJob(first.id)?.status).toBe("done");
+    expect(getSyncJob(queued.id)?.status).toBe("running");
+    expect(warn.mock.calls.some(([line]) => String(line).includes("[push] failed to schedule new-mail check"))).toBe(true);
+  } finally {
+    replacePushNotifier(undefined);
+    warn.mockRestore();
+  }
 });
