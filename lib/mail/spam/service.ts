@@ -5,15 +5,22 @@ import {
   getFolders,
   getLatestSpamDecision,
   getMessageById,
+  getSenderProfile,
   hasSentToAddress,
+  listSenderMailsAround,
   listUncheckedSpamMessageIds,
+  markSenderProfileUserSpam,
+  recordSenderProfileMail,
+  resetTrustedSpamChecks,
   saveSpamVerdict
 } from "@/lib/db";
 import type { Message } from "@/lib/data";
+import { parseAddressEmails } from "@/lib/ownAddresses";
 import { getMessageSource } from "@/lib/storage";
 import { findInboxFolder, findSentFolder } from "@/lib/specialFolders";
 import { moveMessageToJunk } from "@/app/api/_helpers/message/junkMove";
 import { buildOwnIdentitySets, type SpamAllowlistContext } from "./allowlist";
+import { BURST_WINDOW_MS, type SpamTrustContext } from "./anomaly";
 import { classifySpam, shouldMarkAsSpam } from "./classifySpam";
 import { isSpamDetectionOn, resolveMailboxThreshold } from "./config";
 import { findSpamExamples } from "./examples";
@@ -21,6 +28,7 @@ import { buildSpamInput, buildSpamInputFromMessage } from "./input";
 import { getSpamLanguageModel, getSpamProviderOptions, spamModelUnavailableReason } from "./provider";
 import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
+import { mergeSenderProfiles, recipientCircleOf, senderMailFacts, spamSenderKey, type SenderProfile } from "./senderProfile";
 import { loadStaticRules } from "./staticRules";
 import type { SpamVerdict } from "./types";
 import { addSpamUsage, EMPTY_SPAM_USAGE, spamCacheHitRate, spamUsageLogFields, type SpamTokenUsage } from "./usage";
@@ -36,12 +44,14 @@ const SWEEP_LIMIT = 50;
 const PROCESSED_TTL_MS = 24 * 60 * 60_000;
 const PROCESSED_LIMIT = 20_000;
 const IDENTITY_TTL_MS = 10 * 60_000;
+/** "Als Spam" on a sender re-checks its trusted skips of this many days. */
+const REVOKE_WINDOW_MS = 7 * 24 * 60 * 60_000;
 
 type SpamServiceState = {
   queue: ReturnType<typeof createSpamQueue>;
   logFailure: ReturnType<typeof createSpamFailureLogger>;
   claims: ReturnType<typeof createSpamClaims>;
-  identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets> };
+  identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets>; accountIds: string[] };
   /** Model token usage per account since that account's last sweep summary. */
   usage: Map<string, SpamTokenUsage>;
 };
@@ -94,12 +104,23 @@ function recordUsage(accountId: string, usage: SpamTokenUsage) {
   state.usage.set(accountId, addSpamUsage(state.usage.get(accountId) ?? EMPTY_SPAM_USAGE, usage));
 }
 
-async function householdIdentity() {
-  if (state.identity && Date.now() - state.identity.loadedAt < IDENTITY_TTL_MS) return state.identity.sets;
+async function household() {
+  if (state.identity && Date.now() - state.identity.loadedAt < IDENTITY_TTL_MS) return state.identity;
   const accounts = await getAccounts();
   const sets = buildOwnIdentitySets(accounts.flatMap((account) => [account.email, ...(account.ownAddresses ?? [])]));
-  state.identity = { loadedAt: Date.now(), sets };
-  return sets;
+  state.identity = { loadedAt: Date.now(), sets, accountIds: accounts.map((account) => account.id) };
+  return state.identity;
+}
+
+async function householdIdentity() {
+  return (await household()).sets;
+}
+
+/** The sender's profiles of every mailbox, merged (concept §3.4); a mailbox that fails to open is left out. */
+async function loadHouseholdSenderProfile(senderKey: string, now: number) {
+  const profiles = await Promise.all((await household()).accountIds.map((accountId) =>
+    getSenderProfile(accountId, senderKey).catch(() => null)));
+  return mergeSenderProfiles(profiles.filter((profile): profile is SenderProfile => profile !== null), now);
 }
 
 async function loadSpamInput(accountId: string, message: Message) {
@@ -121,10 +142,18 @@ async function checkMessage(job: SpamCheckJob) {
   if (message.folderId !== findInboxFolder(folders, job.accountId)?.id) return;
   const input = await loadSpamInput(job.accountId, message);
   const sentFolder = findSentFolder(folders, job.accountId);
+  const identity = await householdIdentity();
   const allowlist: SpamAllowlistContext = {
-    ...await householdIdentity(),
+    ...identity,
     isCorrespondent: async (email) => sentFolder ? hasSentToAddress(job.accountId, sentFolder.id, email) : false,
     latestDecision: (email) => getLatestSpamDecision(job.accountId, email)
+  };
+  const trust: SpamTrustContext = {
+    ownAddresses: identity.ownAddresses,
+    loadProfile: loadHouseholdSenderProfile,
+    loadRecent: async (senderKey, date) => (await listSenderMailsAround(job.accountId, message.folderId, senderKey, date, BURST_WINDOW_MS, message.id))
+      .map((row) => ({ date: row.dateValue, circle: recipientCircleOf(row.toAddr, row.ccAddr, senderKey, identity.ownAddresses) })),
+    canaryKey: message.id
   };
   const decision = await classifySpam({
     input,
@@ -133,17 +162,55 @@ async function checkMessage(job: SpamCheckJob) {
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
     model: getSpamLanguageModel(config),
     providerOptions: getSpamProviderOptions(config),
-    onUsage: (usage) => recordUsage(job.accountId, usage)
+    onUsage: (usage) => recordUsage(job.accountId, usage),
+    trust
   });
   if (!decision) {
     state.logFailure(job.accountId, "model unavailable; messages stay unchecked", { reason: spamModelUnavailableReason(config) });
     return;
   }
+  if (decision.trust?.kind === "canary" && decision.trust.mismatch) {
+    console.warn("[spam] canary mismatch", { accountId: job.accountId, messageId: message.id, verdict: decision.verdict, confidence: decision.confidence });
+  }
   const marked = shouldMarkAsSpam(decision, resolveMailboxThreshold(config, mailbox));
   // "spam" is stored only when the mark applies; a spam verdict below the threshold is kept as "unsure".
   const verdict: SpamVerdict = marked ? "spam" : decision.verdict === "spam" ? "unsure" : decision.verdict;
   const saved = await saveSpamVerdict(job.accountId, message.id, { verdict, confidence: decision.confidence, reasons: decision.reasons }, { automatic: true });
+  // Each message is saved once (spamCheckedAt), so it enters the profile once; marked spam never teaches the pattern.
+  if (saved && verdict !== "spam") await learnSenderProfile(job.accountId, input, message, identity.ownAddresses);
   if (saved && marked && mailbox.autoMove) await autoMoveToJunk(job.accountId, message);
+}
+
+async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, message: Message, ownAddresses: ReadonlySet<string>) {
+  const facts = senderMailFacts(input, { ownAddresses, date: message.dateValue });
+  if (!facts) return;
+  try {
+    await recordSenderProfileMail(accountId, facts);
+  } catch (error) {
+    state.logFailure(accountId, "sender profile update failed", { error: String(error) });
+  }
+}
+
+/**
+ * "Als Spam" by a user (concept §4): the sender is never trusted again in any
+ * mailbox, and its INBOX mail of the last 7 days that was skipped as trusted
+ * is checked again. Never throws: the user's action must not fail.
+ */
+export async function revokeSenderTrust(accountId: string, from: string) {
+  const senderKey = spamSenderKey(parseAddressEmails(from)[0]);
+  if (!senderKey) return;
+  try {
+    const now = Date.now();
+    await markSenderProfileUserSpam(accountId, senderKey, now);
+    for (const id of (await household()).accountIds) {
+      const inbox = findInboxFolder(await getFolders(id), id);
+      if (!inbox) continue;
+      const ids = await resetTrustedSpamChecks(id, inbox.id, senderKey, now - REVOKE_WINDOW_MS);
+      if (ids.length) state.queue.enqueue(ids.map((messageId) => ({ accountId: id, messageId })));
+    }
+  } catch (error) {
+    console.warn("[spam] failed to revoke sender trust", { accountId, error: String(error) });
+  }
 }
 
 async function autoMoveToJunk(accountId: string, message: Message) {

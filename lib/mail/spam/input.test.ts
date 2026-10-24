@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { simpleParser } from "mailparser";
-import { buildSpamInput, buildSpamInputFromMessage, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
+import { buildSpamInput, buildSpamInputFromMessage, extractMaskedLinkDomains, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
 
 const source = [
   "Authentication-Results: mx.example.test; spf=pass smtp.mailfrom=example.test;",
@@ -58,6 +58,25 @@ describe("buildSpamInput", () => {
     expect(input.attachments).toEqual(["katalog.pdf (application/pdf)"]);
     expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1");
     expect(input.text).not.toContain("<");
+    expect(input.cc).toBe("");
+    expect(input.autoSubmitted).toBeNull();
+    expect(input.maskedLinkDomains).toEqual([]);
+  });
+
+  test("the row fallback takes the server verdicts from a raw header block", () => {
+    const headers = source.slice(0, source.indexOf("\r\n\r\n")) + "\r\nAuto-Submitted: auto-generated";
+    const input = buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", cc: "bob@example.test", subject: "S",
+      messageId: "<1@shop.example.test>", body: "Text", headers });
+    expect(input.authenticationResults).toEqual(["mx.example.test; spf=pass smtp.mailfrom=example.test; dkim=pass header.d=example.test; dmarc=pass"]);
+    expect(input.spamHeaders).toEqual(["x-spam-status: No, score=0.4", "x-spam-flag: NO"]);
+    expect(input).toMatchObject({ cc: "bob@example.test", messageId: "<1@shop.example.test>", listId: "<news.shop.example.test>", autoSubmitted: "auto-generated" });
+  });
+
+  test("masked links: link text naming another domain than the target", () => {
+    const html = `<a href="https://login.example.invalid/x">www.bank.example.test</a> <a href="https://bank.example.test/y"><b>bank.example.test</b></a>
+      <a href="https://track.example.test/c">Hier klicken</a>`;
+    expect(extractMaskedLinkDomains(html)).toEqual(["login.example.invalid"]);
+    expect(extractMaskedLinkDomains(null)).toEqual([]);
   });
 
   test("caps the text and falls back to the stored row", () => {
