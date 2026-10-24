@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setSystemTime, test } from "bun:test";
 import webpush from "web-push";
 import { createPushNotifier, replacePushNotifier } from "@/lib/push/send";
 import type { PushTransport } from "@/lib/push/server";
@@ -211,9 +211,36 @@ describe("push API", () => {
     expect(await (await sendTest(request("/test", "POST", user.cookie))).json()).toEqual({ ok: true, sent: 2, failed: 0 });
     expect(sent.sort()).toEqual([phone.endpoint, laptop.endpoint].sort());
     sent.length = 0;
-    expect(await (await sendTest(request("/test", "POST", user.cookie, { id }))).json()).toEqual({ ok: true, sent: 1, failed: 0 });
+    setSystemTime(Date.now() + 10_000);
+    try {
+      expect(await (await sendTest(request("/test", "POST", user.cookie, { id }))).json()).toEqual({ ok: true, sent: 1, failed: 0 });
+    } finally {
+      setSystemTime();
+    }
     expect(sent).toEqual([phone.endpoint]);
     expect((await sendTest(request("/test", "POST", user.cookie, { id: 5 }))).status).toBe(400);
     expect((await sendTest(request("/test", "POST", user.cookie, { id, extra: true }))).status).toBe(400);
+  });
+
+  test("test push is limited to one call per user every 10 s", async () => {
+    const user = await signedIn();
+    const other = await signedIn();
+    await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: subscription() }));
+    const start = Date.now();
+    setSystemTime(start);
+    try {
+      expect((await sendTest(request("/test", "POST", user.cookie))).status).toBe(200);
+      const limited = await sendTest(request("/test", "POST", user.cookie));
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("retry-after")).toBe("10");
+      // Per user: someone else is not affected.
+      expect((await sendTest(request("/test", "POST", other.cookie))).status).toBe(200);
+      setSystemTime(start + 9_999);
+      expect((await sendTest(request("/test", "POST", user.cookie))).status).toBe(429);
+      setSystemTime(start + 10_000);
+      expect((await sendTest(request("/test", "POST", user.cookie))).status).toBe(200);
+    } finally {
+      setSystemTime();
+    }
   });
 });
