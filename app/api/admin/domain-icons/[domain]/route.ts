@@ -30,11 +30,12 @@ function rateLimited(request: Request, userId: string) {
   return actor || ip ? failure(429, "rate_limited", { "Retry-After": "60" }) : null;
 }
 
-async function mailboxEmailsOf(domain: string) {
-  return (await getAccounts()).map(account => account.email).filter(email => mailboxDomain(email) === domain);
+async function mailboxesOf(domain: string) {
+  return (await getAccounts()).filter(account => mailboxDomain(account.email) === domain);
 }
 
-/** The icon the sidebar shows for the domain: the upload, else the favicon. */
+/** The icon the sidebar shows for the domain: the upload, else the favicon
+ * through the first mailbox with sender icons on (none fetched otherwise). */
 export async function GET(request: Request, { params }: Params) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
@@ -42,9 +43,10 @@ export async function GET(request: Request, { params }: Params) {
     if (!domain) return failure(400, "invalid_domain");
     const override = await readDomainIconOverride(domain);
     if (override) return domainIconOverrideResponse(request, override);
-    const [email] = await mailboxEmailsOf(domain);
-    if (!email) return failure(404, "unknown_domain");
-    return senderIconResponse(await resolveSenderIcon({ from: domain, fromEmail: email, enabled: true }), true);
+    const mailboxes = await mailboxesOf(domain);
+    if (!mailboxes.length) return failure(404, "unknown_domain");
+    const source = mailboxes.find(account => account.settings?.appearance?.senderIcons ?? true);
+    return senderIconResponse(await resolveSenderIcon({ from: domain, fromEmail: (source ?? mailboxes[0]).email, enabled: Boolean(source) }), true);
   });
 }
 
@@ -56,7 +58,7 @@ export async function PUT(request: Request, { params }: Params) {
     const limited = rateLimited(request, session.userId); if (limited) return limited;
     const domain = normalizeIconDomain((await params).domain);
     if (!domain) return failure(400, "invalid_domain");
-    if (!(await mailboxEmailsOf(domain)).length) return failure(404, "unknown_domain");
+    if (!(await mailboxesOf(domain)).length) return failure(404, "unknown_domain");
     let bytes: Uint8Array | null;
     try {
       bytes = await readBoundedBody(request, DOMAIN_ICON_MAX_BYTES);
