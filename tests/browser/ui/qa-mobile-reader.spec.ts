@@ -35,9 +35,28 @@ const source = [
   html
 ].join("\r\n");
 
+// A template mail with its own white table but no CSS text colour.
+const whiteSubject = "Ihre Bestellbestätigung mit weißem Hintergrund";
+const whiteSource = [
+  "From: Synthetic Shop <shop@mail.example.test>",
+  "To: demo@monkeydent.test",
+  "Message-ID: <qa-mobile-reader-white@example.test>",
+  `Date: ${new Date(Date.now() + 3_500_000).toUTCString()}`,
+  `Subject: =?UTF-8?B?${Buffer.from(whiteSubject).toString("base64")}?=`,
+  "MIME-Version: 1.0",
+  "Content-Type: text/html; charset=utf-8",
+  "Content-Transfer-Encoding: 8bit",
+  "",
+  `<html><body><table bgcolor="#ffffff" width="100%" cellpadding="16"><tr><td><h1>Bestellung 4711</h1>
+${Array.from({ length: 6 }, (_, n) => `<p>Synthetische Position ${n + 1} der Bestellung.</p>`).join("\n")}
+</td></tr></table></body></html>`
+].join("\r\n");
+
 test.beforeAll(async () => {
-  const response = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, { method: "POST", body: JSON.stringify({ source, flags: ["\\Seen"] }) });
-  expect(response.ok).toBe(true);
+  for (const item of [source, whiteSource]) {
+    const response = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, { method: "POST", body: JSON.stringify({ source: item, flags: ["\\Seen"] }) });
+    expect(response.ok).toBe(true);
+  }
 });
 
 async function openMail(page: Page) {
@@ -139,4 +158,29 @@ test("mobile reader: compact header rows leave room for the mail body", async ({
   }
   writeFileSync(path.join(evidence, `${prefix}.json`), JSON.stringify(results, null, 2));
   console.log("mobile-reader", JSON.stringify(results));
+});
+
+test("dark mode: a mail with its own white background keeps dark text", async ({ page }) => {
+  mkdirSync(evidence, { recursive: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signInQa(page);
+  const row = page.locator('[data-message-list-row="true"]').filter({ hasText: whiteSubject });
+  await expect.poll(async () => {
+    if (await row.count()) return true;
+    await page.waitForTimeout(3000); await page.goto("/");
+    return false;
+  }, { timeout: 120000, intervals: [500] }).toBe(true);
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => { localStorage.setItem("noctua:theme", "dark"); });
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await row.click();
+    await expect(page.getByRole("combobox", { name: "Zuständig", exact: true })).toBeVisible();
+    await page.waitForTimeout(800);
+    const bodyText = await bodyTextLuminance(page);
+    await page.screenshot({ path: path.join(evidence, `${prefix}-white-background-${viewport.width}-dark.png`) });
+    console.log("mobile-reader-white", viewport.width, JSON.stringify(bodyText));
+    expect(bodyText.luminance).toBeLessThan(0.05);
+  }
 });
