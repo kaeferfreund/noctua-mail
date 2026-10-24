@@ -49,10 +49,11 @@ id or not one's own, 413 body too large, 503 push off.
 Rules of `POST /api/push/subscriptions`:
 
 - The endpoint must be `https:` on a browser push service:
-  `*.googleapis.com` (Chrome, Edge, Android), `*.push.services.mozilla.com`
-  (Firefox), `*.push.apple.com` (Safari, iOS), `*.notify.windows.com`
-  (legacy Edge). Anything else is rejected, because the server sends requests
-  to that URL (SSRF guard). `keys.p256dh` must be a 65-byte P-256 point and
+  `fcm.googleapis.com` (Chrome, Edge, Android),
+  `updates.push.services.mozilla.com` (Firefox), `web.push.apple.com`
+  (Safari, iOS), `*.notify.windows.com` (legacy Edge). Anything else is
+  rejected, because the server sends requests to that URL (SSRF guard).
+  Stored devices on other hosts are removed at their next delivery. `keys.p256dh` must be a 65-byte P-256 point and
   `keys.auth` 16 bytes, both base64url.
 - A re-POST by the same user refreshes keys, `userAgent` and `lastSeenAt`,
   resets the failure count and keeps the stored settings unless new ones are
