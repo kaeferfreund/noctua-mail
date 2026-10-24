@@ -37,7 +37,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
-import { groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 
 export type ShellSidebarProps = {
@@ -78,12 +78,21 @@ const ACTIVE_ROW_CLASS = "data-[active=true]:bg-[var(--iris-3)] data-[active=tru
 /** A clicked mailbox row before the switch commits: the accent fill at once
  * (also under the pointer), pulsing while the mailbox loads. */
 const PENDING_ROW_CLASS = "aria-busy:bg-[var(--iris-3)] aria-busy:text-[var(--iris-11)] aria-busy:animate-pulse aria-busy:cursor-progress";
+/** Rows under a domain heading: the name (or custom avatar) starts where the
+ * heading's text does (icon slot + gap), while the row's hover and active
+ * fill still spans the indent. */
+const GROUPED_ROW_CLASS = "pl-8";
+/** Thin tree guide down the left of a domain group's rows, under the centre
+ * of the heading's 16 px icon slot; drawn above the row fills. */
+const DOMAIN_GROUP_GUIDE_CLASS = "relative isolate before:pointer-events-none before:absolute before:inset-y-0 before:left-[15px] before:z-10 before:w-px before:bg-sidebar-border";
 
 type MailboxRowProps = {
   account: ShellAccount;
   summary: UserMailboxSummary | undefined;
   isActive: boolean;
   isPending: boolean;
+  /** Indented under a domain heading. */
+  grouped: boolean;
   onSwitch: (accountId: string) => void;
 };
 
@@ -107,7 +116,7 @@ function MailboxCount({ label, title, icon, value }: { label: string; title?: st
 }
 
 /** One mailbox row; memoized so a switch re-renders only the rows whose state changed. */
-const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPending, onSwitch }: MailboxRowProps) {
+const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPending, grouped, onSwitch }: MailboxRowProps) {
   const t = useTranslations("Shell");
   // The badge shows only news (unread, assigned to me) and an unhealthy
   // watcher; zero counts, the unassigned count and the unread-unavailable case
@@ -130,7 +139,7 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
           : account.email}
         aria-current={isActive ? "true" : undefined}
         aria-busy={isPending ? "true" : undefined}
-        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
+        className={cn(ACTIVE_ROW_CLASS, PENDING_ROW_CLASS, grouped && GROUPED_ROW_CLASS, mailboxBadgePadding(Number(showUnread) + Number(showAssigned), showWatcher))}
       >
         {avatarSrc ? (
           <Avatar size="sm" className="empty:hidden">
@@ -187,17 +196,22 @@ export function MailboxRows({
   const t = useTranslations("Shell");
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
+  const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
   return (
-    <div className="space-y-1">
+    <div>
       {groups.map((group) => (
-        <div key={group.domain ?? "all"}>
-          {group.domain || accounts.length > 6 ? (
-            <div className="flex items-center gap-1.5 px-2 pt-2 pb-1 text-xs text-muted-foreground">
-              {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+        <div key={group.domain ?? "all"} className={cn(grouped && "mt-3 first:mt-1")}>
+          {grouped ? (
+            <div className="flex items-center gap-2 px-2 pb-1 text-sm font-medium text-sidebar-foreground">
+              {/* The slot keeps the heading text in line with the rows'
+                  names while the icon loads, and when there is none. */}
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+              </span>
               <span className="truncate">{group.domain ?? t("mailboxes.other")}</span>
             </div>
           ) : null}
-          <SidebarMenu>
+          <SidebarMenu className={cn(grouped && DOMAIN_GROUP_GUIDE_CLASS)} data-domain-group={grouped ? "" : undefined}>
             {group.accounts.map((account) => (
               <MailboxRow
                 key={account.id}
@@ -205,6 +219,7 @@ export function MailboxRows({
                 summary={summaryById.get(account.id)}
                 isActive={account.id === activeAccountId}
                 isPending={account.id === pendingAccountId}
+                grouped={grouped}
                 onSwitch={onSwitch}
               />
             ))}
