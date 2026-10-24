@@ -305,6 +305,7 @@ import {
   markReminderDeliveredOnClientById
 } from "./mailclient/utils/calendarReminders";
 import {
+  DEEP_LINK_LIST_PAGE_LIMIT,
   NOTICE_TIMEOUTS,
   THREAD_COLLAPSE_SETTLE_MS
 } from "./mailclient/constants";
@@ -1292,6 +1293,7 @@ export default function MailClient({
     setMessages,
     groupMeta,
     setGroupMeta,
+    messagesPage,
     setMessagesPage,
     hasMoreMessages,
     setHasMoreMessages,
@@ -4892,10 +4894,12 @@ export default function MailClient({
       selectionStore.setSelection(new Set([target.id]), target.id); setActiveMessageId(target.id);
       setPendingSelectionCollapseMessageId(target.id); setPendingSelectionScrollMessageId(target.id);
       deepLinkSelectionRef.current = null;
-    } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId) {
+    } else if (hasMoreMessages && !loadingMessages && !refreshingMessages && !messageListError && !query && !activeVirtualFolderId &&
+      messagesPage < DEEP_LINK_LIST_PAGE_LIMIT) {
+      // The reader is already open; an old target deep in a large folder is not worth loading the whole folder.
       setMessagesPage(page => page + 1);
     }
-  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
+  }, [activeAccountId, activeVirtualFolderId, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessage?.id]);
 
   useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
   const handleNoticeOpen = (notice: InAppNotice) => {
