@@ -15,6 +15,17 @@ describe("getBuildInfo", () => {
       .toBe("2026-10-23T13:16:05.250Z");
   });
 
+  it("accepts compact and extended offsets and Z with or without seconds", () => {
+    const builtAt = (time: string) => getBuildInfo({ NOCTUA_BUILD_HASH: HASH, NOCTUA_BUILD_TIME: time })?.builtAt;
+    expect(builtAt("2026-10-23T15:16+0200")).toBe("2026-10-23T13:16:00Z");
+    expect(builtAt("2026-10-23T15:16:05+0200")).toBe("2026-10-23T13:16:05Z");
+    expect(builtAt("2026-10-23T15:16+02:00")).toBe("2026-10-23T13:16:00Z");
+    expect(builtAt("2026-10-23T15:16:05+02:00")).toBe("2026-10-23T13:16:05Z");
+    expect(builtAt("2026-10-23T13:16Z")).toBe("2026-10-23T13:16:00Z");
+    expect(builtAt("2026-10-23T13:16:05Z")).toBe("2026-10-23T13:16:05Z");
+    expect(builtAt("2026-10-23T08:16-0500")).toBe("2026-10-23T13:16:00Z");
+  });
+
   it("reads the CI stamp without an offset as UTC", () => {
     expect(getBuildInfo({ NOCTUA_BUILD_HASH: HASH, NOCTUA_BUILD_TIME: "2026-10-23 13:16" })?.builtAt)
       .toBe("2026-10-23T13:16:00Z");
