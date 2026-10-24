@@ -139,7 +139,7 @@ describe("row menu focus return", () => {
     const originalMatches = Element.prototype.matches;
     Element.prototype.matches = function (this: Element, selector: string) {
       return selector === ":focus-visible" ? this === document.activeElement : originalMatches.call(this, selector);
-    };
+    } as typeof Element.prototype.matches;
     try {
       const menu = setup();
       const trigger = menu.view.getByRole("button", { name: "Message actions" });
