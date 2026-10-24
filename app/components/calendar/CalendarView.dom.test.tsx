@@ -113,3 +113,42 @@ test("calendar toolbar reads its labels and hints from the active catalog", asyn
     }
   }
 });
+
+// FullCalendar formats its title, column headers and axis labels itself; they
+// follow the UI locale, not FullCalendar's built-in English.
+test("calendar grid follows the UI locale", async () => {
+  spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+    async () => Response.json({ items: [] }),
+    { preconnect: globalThis.fetch.preconnect }
+  ));
+  const expected = {
+    de: { title: "Oktober 2026", monday: "Mo", mondayName: "Montag", allDay: "Ganztägig", timed: "Mit Uhrzeit", hour: "13 Uhr" },
+    en: { title: "October 2026", monday: "Mon", mondayName: "Monday", allDay: "All-day", timed: "Timed", hour: "1pm" }
+  } as const;
+  for (const locale of ["de", "en"] as const) {
+    for (const viewType of ["dayGridMonth", "timeGridWeek"] as const) {
+      localStorage.setItem("noctua:calendarView", viewType);
+      sessionStorage.setItem("noctua:calendarDate", new Date(2026, 9, 1).toISOString());
+      const view = render(<CalendarView accountId="synthetic-account" firstDay={1} onCreateEvent={() => {}} />,
+        { wrapper: ({ children }) => <I18nTestProvider locale={locale}>{children}</I18nTestProvider> });
+      const title = await waitFor(() => {
+        const element = view.container.querySelector<HTMLElement>(".fc-toolbar-title");
+        if (!element) throw new Error("title not rendered");
+        return element;
+      });
+      const headers = [...view.container.querySelectorAll<HTMLElement>(".fc-col-header-cell-cushion")]
+        .map(element => element.textContent?.trim() ?? "");
+      if (viewType === "dayGridMonth") {
+        expect(title.textContent).toBe(expected[locale].title);
+        expect(headers[0]).toBe(expected[locale].monday);
+        expect(view.container.querySelector("[role='columnheader']")?.textContent).toStartWith(expected[locale].mondayName);
+      } else {
+        expect(headers[0]).toStartWith(expected[locale].monday);
+        expect(view.container.textContent).toContain(expected[locale].allDay);
+        expect(view.container.textContent).toContain(expected[locale].timed);
+        expect(view.container.textContent).toContain(expected[locale].hour);
+      }
+      view.unmount();
+    }
+  }
+});

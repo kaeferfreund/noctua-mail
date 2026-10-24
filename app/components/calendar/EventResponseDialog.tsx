@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Dialog, Flex, Select, Switch, Text } from "@radix-ui/themes";
 import type { CalendarParticipationScope, CalendarParticipationStatus } from "@/lib/data";
 import styles from "./EventDetailView.module.css";
@@ -24,13 +25,6 @@ export type EventResponseDialogProps = {
   onSubmit: () => void | Promise<void>;
   isReplyChoice: (status: CalendarParticipationStatus) => boolean;
 };
-
-function getReplyActionLabel(status?: CalendarParticipationStatus) {
-  if (status === "ACCEPTED") return "Accept";
-  if (status === "DECLINED") return "Decline";
-  if (status === "TENTATIVE") return "Mark tentative";
-  return "Respond";
-}
 
 /**
  * Modal that captures an attendee's RSVP choice, whether the RSVP applies to a
@@ -58,7 +52,7 @@ export default function EventResponseDialog({
   onSubmit,
   isReplyChoice
 }: EventResponseDialogProps) {
-  const replyActionLabel = getReplyActionLabel(draftPartstat);
+  const t = useTranslations("Calendar.responseDialog");
   return (
     <Dialog.Root
       open={open}
@@ -68,20 +62,20 @@ export default function EventResponseDialog({
     >
       <Dialog.Content size="2" className={styles.responseDialog}>
         <Flex direction="column" gap="3">
-          <Dialog.Title size="4">Respond to invitation</Dialog.Title>
+          <Dialog.Title size="4">{t("title")}</Dialog.Title>
 
           <div className={styles.responseSummary}>
-            <Dialog.Description size="2" weight="medium">{title || "Untitled Event"}</Dialog.Description>
+            <Dialog.Description size="2" weight="medium">{title || t("untitled")}</Dialog.Description>
             {timeRange && (
               <Text size="1" color="gray">{responseTargetLabel}</Text>
             )}
             {organizer && (
-              <Text size="1" color="gray">Organizer: {organizer}</Text>
+              <Text size="1" color="gray">{t("organizer", { organizer })}</Text>
             )}
           </div>
 
           <Flex direction="column" gap="2">
-            <Text size="2" weight="medium">Your response</Text>
+            <Text size="2" weight="medium">{t("yourResponse")}</Text>
             <Flex gap="2" wrap="wrap">
               <Button
                 size="1"
@@ -89,7 +83,7 @@ export default function EventResponseDialog({
                 color="green"
                 onClick={() => onDraftPartstatChange("ACCEPTED")}
               >
-                Accept
+                {t("accept")}
               </Button>
               <Button
                 size="1"
@@ -97,7 +91,7 @@ export default function EventResponseDialog({
                 color="orange"
                 onClick={() => onDraftPartstatChange("TENTATIVE")}
               >
-                Tentative
+                {t("tentative")}
               </Button>
               <Button
                 size="1"
@@ -105,14 +99,14 @@ export default function EventResponseDialog({
                 color="red"
                 onClick={() => onDraftPartstatChange("DECLINED")}
               >
-                Decline
+                {t("decline")}
               </Button>
             </Flex>
           </Flex>
 
           {canChooseOccurrenceScope && (
             <Flex direction="column" gap="2">
-              <Text size="2" weight="medium">Apply to</Text>
+              <Text size="2" weight="medium">{t("applyTo")}</Text>
               <Select.Root
                 value={draftScope}
                 onValueChange={(value) => onDraftScopeChange(value as CalendarParticipationScope)}
@@ -120,28 +114,26 @@ export default function EventResponseDialog({
                 <Select.Trigger />
                 <Select.Content position="popper">
                   <Select.Item value="occurrence">{responseOccurrenceLabel}</Select.Item>
-                  <Select.Item value="series">Whole series</Select.Item>
+                  <Select.Item value="series">{t("wholeSeries")}</Select.Item>
                 </Select.Content>
               </Select.Root>
             </Flex>
           )}
 
           <Flex direction="column" gap="2">
-            <Text size="2" weight="medium">Notify organizer</Text>
+            <Text size="2" weight="medium">{t("notifyOrganizer")}</Text>
             <Flex align="center" justify="between" gap="3" className={styles.responseToggleRow}>
               <div className={styles.responseToggleText}>
-                <Text size="2">Send reply email</Text>
+                <Text size="2">{t("sendReply")}</Text>
                 {replyRequested === false && (
-                  <Text size="1" color="gray">
-                    The organizer did not request a reply. You can still send one.
-                  </Text>
+                  <Text size="1" color="gray">{t("replyNotRequested")}</Text>
                 )}
               </div>
               <Switch
                 checked={sendReply}
                 onCheckedChange={onSendReplyChange}
                 disabled={submittingResponse}
-                aria-label="Send reply to organizer"
+                aria-label={t("sendReplyLabel")}
               />
             </Flex>
           </Flex>
@@ -153,17 +145,15 @@ export default function EventResponseDialog({
               disabled={submittingResponse}
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               disabled={submittingResponse || !isReplyChoice(draftPartstat)}
               onClick={() => void onSubmit()}
             >
               {submittingResponse
-                ? "Saving..."
-                : sendReply
-                  ? `${replyActionLabel} and send response`
-                  : `${replyActionLabel} and save without sending response`}
+                ? t("saving")
+                : t(sendReply ? "submitAndSend" : "submitWithoutSending", { status: draftPartstat })}
             </Button>
           </Flex>
         </Flex>
