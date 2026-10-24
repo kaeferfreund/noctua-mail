@@ -20,6 +20,8 @@ env:
 
 jobs:
   build-and-push:
+    # Upstream only: the fork deploys manually using its ops runbooks.
+    if: ${{ github.repository == 'paulwellnerbou/noctua-mail' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
