@@ -16,7 +16,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: DEFAULT_APP_TITLE,
     description: getTranslator(locale)("Pwa.description"),
-    manifest: "/manifest.webmanifest"
+    manifest: "/manifest.webmanifest",
+    // Home-screen web app on iOS (needed there for Web Push). The opaque
+    // "default" status bar keeps the clock readable in the light theme; the
+    // shell has no safe-area insets for a translucent bar or viewport-fit=cover.
+    appleWebApp: { capable: true, statusBarStyle: "default", title: DEFAULT_APP_TITLE }
   };
 }
 
