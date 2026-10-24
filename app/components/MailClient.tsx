@@ -5432,6 +5432,8 @@ export default function MailClient({
                 toggleMessageSelection,
                 selectRangeTo,
                 selectCollapsedThread,
+                toggleRowRead: (message, seen) =>
+                  bindRowReadAction(message.id, seen, selectionActions, getSelectionActionTargets).onSelect(),
                 handleAddSuggestedThread: handleAddActiveTopicSuggestion
               }}
               listViewHelpers={{

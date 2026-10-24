@@ -1131,6 +1131,9 @@
   "List": {
     "markRead": "Mark as read",
     "markUnread": "Mark as unread",
+    "swipeRead": "Read",
+    "swipeUnread": "Unread",
+    "swipeMore": "More",
     "flag": "Flag",
     "todo": "To-Do",
     "copyAccount": "Copy to account...",
