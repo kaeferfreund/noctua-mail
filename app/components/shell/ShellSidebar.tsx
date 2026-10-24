@@ -40,6 +40,7 @@ import type { BuildIdentity } from "@/lib/buildVersion";
 import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
+import { versionedIconUrl } from "@/lib/appBranding";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -382,7 +383,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
         <div className="flex h-full min-h-0 flex-col bg-sidebar text-sm">
           <SidebarHeader className="flex-row items-center gap-2 px-3">
             {/* eslint-disable-next-line @next/next/no-img-element -- plain SVG, served unoptimized */}
-            <img src="/icons/logo.svg" alt="" width={28} height={28} className="size-7 rounded-md" />
+            <img src={versionedIconUrl("/icons/logo.svg")} alt="" width={28} height={28} className="size-7 rounded-md" />
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="truncate text-sm font-semibold">{DEFAULT_APP_TITLE}</span>
               <BuildInfo info={brand.buildInfo} className="truncate text-2xs text-muted-foreground tabular-nums" />

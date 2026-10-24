@@ -4,7 +4,7 @@ import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import Script from "next/script";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
-import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
+import { DEFAULT_APP_TITLE, versionedIconUrl } from "@/lib/appBranding";
 import "./globals.css";
 import { getLocaleSettings } from "@/i18n/request";
 import { getTranslator } from "@/lib/i18n/translator";
@@ -17,6 +17,12 @@ export async function generateMetadata(): Promise<Metadata> {
     title: DEFAULT_APP_TITLE,
     description: getTranslator(locale)("Pwa.description"),
     manifest: "/manifest.webmanifest",
+    // Explicit, versioned URLs instead of app/icon.tsx and app/apple-icon.tsx,
+    // whose generated links only change with their source file.
+    icons: {
+      icon: { url: versionedIconUrl("/icons/badged/256"), sizes: "256x256", type: "image/png" },
+      apple: { url: versionedIconUrl("/icons/apple-touch"), sizes: "180x180", type: "image/png" }
+    },
     // Home-screen web app on iOS (needed there for Web Push). The opaque
     // "default" status bar keeps the clock readable in the light theme; the
     // shell has no safe-area insets for a translucent bar or viewport-fit=cover.

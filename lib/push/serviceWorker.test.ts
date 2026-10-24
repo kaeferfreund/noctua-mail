@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { NOTIFICATION_BADGE_ICON, NOTIFICATION_ICON } from "@/lib/appBranding";
 
 const workerSource = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
 const origin = "https://noctua.example.test";
@@ -81,7 +82,7 @@ describe("service worker push", () => {
     expect(worker.notifications).toEqual([{
       title: "Alice Example",
       options: {
-        icon: "/icons/icon-192.png", badge: "/icons/icon-96-mono.png", data: { url: mail.url },
+        icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE_ICON, data: { url: mail.url },
         body: "Rechnung März\nTeam Postfach", tag: "mail:acc-1", renotify: true
       }
     }]);
@@ -113,7 +114,7 @@ describe("service worker push", () => {
     const worker = loadWorker();
     await worker.push({ type: "test", url: "https://evil.example.invalid/phish", sentAt: 1 });
     await worker.push({ ...mail, url: `${origin}/?m=x#top` });
-    expect(worker.notifications[0].title).toBe("Noctua: Benachrichtigungen aktiv");
+    expect(worker.notifications[0].title).toBe("Mail: Benachrichtigungen aktiv");
     expect(worker.notifications[0].options.data).toEqual({ url: "/" });
     expect(worker.notifications[1].options.data).toEqual({ url: "/?m=x#top" });
   });

@@ -481,7 +481,7 @@
     }
   },
   "Pwa": {
-    "description": "Moderner Webmail-Client als Prototyp"
+    "description": "Webmail für persönliche und gemeinsame Postfächer"
   },
   "Shell": {
     "theme": {
@@ -767,7 +767,7 @@
     },
     "login": {
       "signupTitle": "Konto erstellen",
-      "title": "Bei Noctua anmelden",
+      "title": "Bei Mail anmelden",
       "signupHelp": "Verwende die Einladung deiner Administration und wähle ein eigenes App-Passwort.",
       "help": "Mit deinem persönlichen Konto hast du Zugriff auf deine Postfächer.",
       "created": "Dein Konto wurde erstellt. Melde dich an, um deinen Authenticator einzurichten.",
@@ -808,7 +808,7 @@
       "restart": "Einrichtung neu starten",
       "passkeyHelp": "Du kannst auch einen Passkey mit deiner Geräte-PIN, deinem Fingerabdruck oder deiner Gesichtserkennung hinzufügen.",
       "addPasskey": "Passkey hinzufügen",
-      "continue": "Weiter zu Noctua",
+      "continue": "Weiter zu Mail",
       "defaultPasskeyName": "Mein Passkey"
     },
     "gate": {
