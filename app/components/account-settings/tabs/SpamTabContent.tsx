@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button, Callout, Flex, Switch, Text, TextField } from "@radix-ui/themes";
 import { Info } from "lucide-react";
 import Field from "@/app/components/account-settings/Field";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
+import { isValidThreshold } from "@/lib/mail/spam/config";
 
 type MailboxSpamSettings = { settings: { enabled?: boolean; autoMove?: boolean; threshold?: number }; globalThreshold: number; enabled: boolean };
 
@@ -18,6 +19,8 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
   const [autoMove, setAutoMove] = useState(false);
   const [threshold, setThreshold] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [thresholdInvalid, setThresholdInvalid] = useState(false);
+  const thresholdErrorId = useId();
 
   useEffect(() => {
     let active = true;
@@ -32,10 +35,18 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
   }, [apiFetch, url]);
 
   const save = async () => {
-    setStatus("saving");
     const value = threshold.trim().replace(",", ".");
+    // Empty clears the own threshold; anything else must be a valid threshold, never silently dropped.
+    const own = value ? Number(value) : null;
+    if (own !== null && !isValidThreshold(own)) {
+      setThresholdInvalid(true);
+      setStatus("idle");
+      return;
+    }
+    setThresholdInvalid(false);
+    setStatus("saving");
     try {
-      const result = await adminRequest<MailboxSpamSettings>(apiFetch, url, jsonMutation("PUT", { enabled, autoMove, threshold: value ? Number(value) : null }));
+      const result = await adminRequest<MailboxSpamSettings>(apiFetch, url, jsonMutation("PUT", { enabled, autoMove, threshold: own }));
       setData(result);
       setStatus("saved");
     } catch {
@@ -52,8 +63,10 @@ export default function SpamTabContent({ accountId, apiFetch = fetch }: { accoun
       <Text as="label" size="2"><Flex gap="2" align="center"><Switch checked={enabled} onCheckedChange={setEnabled} />{t("enabled")}</Flex></Text>
       <Text as="label" size="2"><Flex gap="2" align="center"><Switch checked={autoMove} disabled={!enabled} onCheckedChange={setAutoMove} />{t("autoMove")}</Flex></Text>
       <Field label={t("threshold", { threshold: data.globalThreshold })} hint={t("thresholdHelp")}>
-        <TextField.Root inputMode="decimal" value={threshold} placeholder={String(data.globalThreshold)} onChange={(event) => setThreshold(event.target.value)} />
+        <TextField.Root inputMode="decimal" value={threshold} placeholder={String(data.globalThreshold)} onChange={(event) => { setThreshold(event.target.value); setThresholdInvalid(false); }}
+          aria-invalid={thresholdInvalid || undefined} aria-describedby={thresholdInvalid ? thresholdErrorId : undefined} />
       </Field>
+      {thresholdInvalid && <Text id={thresholdErrorId} size="1" color="red" role="alert">{t("thresholdInvalid")}</Text>}
       <Flex gap="3" align="center">
         <Button disabled={status === "saving"} onClick={() => void save()}>{t("save")}</Button>
         {status === "saved" && <Text size="2" role="status">{t("saved")}</Text>}
