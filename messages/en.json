@@ -230,10 +230,12 @@
       "primaryMailboxHint": "This mailbox remains the token’s default mailbox.",
       "permissionMode": "Permissions",
       "tokenMailboxes": "Mailboxes: {mailboxes}",
+      "tokenMailboxesHidden": "{count, plural, one {+# more mailbox} other {+# more mailboxes}}",
       "mode": {
         "read": "Read only",
         "drafts": "Read and create drafts (no sending)",
-        "full": "Full access (including sending)"
+        "full": "Full access (including sending)",
+        "invalid": "Invalid (no access)"
       },
       "serverHeading": "MCP server",
       "endpointHint": "Use the MCP endpoint below with an <code>{header}</code> header.",
@@ -267,6 +269,7 @@
       "invalidExpiry": "Choose an expiry between one minute and one year from now.",
       "createFailed": "Failed to create MCP token.",
       "deleteConfirm": "Delete this MCP token?",
+      "deleteConfirmShared": "Delete this MCP token? It is revoked for every covered mailbox, including: {mailboxes}",
       "deleteFailed": "Failed to delete MCP token."
     },
     "calendar": {
@@ -615,6 +618,27 @@
         "iris": "Iris",
         "plum": "Plum"
       }
+    }
+  },
+  "Calendar": {
+    "toolbar": {
+      "addEvent": "＋ Event",
+      "addEventHint": "New event",
+      "today": "Today",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "todayHint": "{unit, select, day {Today} week {This week} month {This month} other {Today}}",
+      "prevHint": "{unit, select, day {Previous day} week {Previous week} month {Previous month} other {Previous}}",
+      "nextHint": "{unit, select, day {Next day} week {Next week} month {Next month} other {Next}}",
+      "viewHint": "{view, select, dayGridMonth {Month view} timeGridWeek {Week view} timeGridDay {Day view} other {View}}",
+      "viewChangeHint": "Change view"
+    },
+    "panel": {
+      "title": "Calendar",
+      "openWindow": "Open in window",
+      "openWindowLabel": "Open calendar in window",
+      "close": "Close calendar"
     }
   },
   "Search": {
@@ -1150,6 +1174,7 @@
     "loadFailed": "Failed to load messages. {error}",
     "emptyNamedFolder": "No messages in {folder}.",
     "unreadCount": "{count, plural, one {# unread} other {# unread}}",
+    "draftCount": "{count, plural, one {# draft} other {# drafts}}",
     "searching": "Searching",
     "folderCount": "{count, plural, one {# total} other {# total}}",
     "folderCountTitle": "{path} ({total, plural, one {# Messages} other {# Messages}}, {unread, plural, one {# Unread} other {# Unread}})",
@@ -1507,6 +1532,7 @@
     "sender": {
       "chooseSender": "Choose a sender",
       "reviewSender": "Review sender",
+      "reviewRecipients": "Review recipients",
       "unavailableDraft": "This draft's From address is unavailable. Choose an enabled sender and save the draft.",
       "chooseEnabledSender": "Choose an enabled From address before sending.",
       "confirmKeepEditedSignature": "Keep the edited signature and add the new signature? Your edited text will be preserved.",
@@ -1717,6 +1743,27 @@
     "fieldsScope": "in fields {fields}",
     "filterCriteria": "filter {badges}",
     "queryCriteria": "\"{query}\""
+  },
+  "EventSchedule": {
+    "start": "Start",
+    "end": "End",
+    "startTime": "Start time",
+    "endTime": "End time",
+    "allDay": "All day",
+    "repeat": "Repeat",
+    "location": "Location",
+    "locationPlaceholder": "Location (optional)",
+    "openTimePicker": "Open time picker",
+    "recurrence": {
+      "none": "Does not repeat",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "everyTwoWeeks": "Every two weeks",
+      "monthly": "Monthly",
+      "monthlyByDay": "Monthly on weekday",
+      "monthlyByDayOn": "Monthly on the {ordinal, select, 1 {first} 2 {second} 3 {third} 4 {fourth} other {last}} {weekday}",
+      "yearly": "Yearly"
+    }
   },
   "Folders": {
     "inbox": "Inbox",

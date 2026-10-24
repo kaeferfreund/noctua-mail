@@ -150,7 +150,6 @@ export {
   getUsers,
   listAccountMemberCandidates,
   listAdminUserPasskeys,
-  listAccessibleAccountIdsForUser,
   listUserAccountLinks,
   listUserAccountLinksForUser,
   normalizeUserEmail,

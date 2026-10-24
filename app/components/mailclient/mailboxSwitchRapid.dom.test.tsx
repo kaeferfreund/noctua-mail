@@ -17,7 +17,7 @@ const folders = (id: string) => [{ id: `${id}:INBOX`, accountId: id, name: "Inbo
 let server: { selected: string; accounts: string[] };
 let calls: string[];
 // Abort signal of every list request, per mailbox.
-let listSignals: { accountId: string; signal?: AbortSignal | null }[];
+let listSignals: { accountId: string; url: string; signal?: AbortSignal | null }[];
 // Selection writes in the order the server applied them.
 let applied: string[];
 let pendingWrites: number;
@@ -36,7 +36,7 @@ beforeEach(() => {
     const path = url.split("?")[0];
     calls.push(url);
     const listAccount = /^\/api\/accounts\/([^/]+)\/(threads|messages)$/.exec(path)?.[1];
-    if (listAccount) listSignals.push({ accountId: listAccount, signal: init?.signal });
+    if (listAccount) listSignals.push({ accountId: listAccount, url, signal: init?.signal });
     if (path === "/api/me/events") return new Response(new ReadableStream<Uint8Array>({ start() {} }), { headers: { "content-type": "text/event-stream" } });
     if (path === "/api/auth/me") return Response.json({ user: { id: "synthetic-user", email: "user@example.test", role: "user" },
       accounts: server.accounts.map(account), accountId: server.selected, mailboxState: "selected", security: {}, ttlSeconds: 3600 });
@@ -65,6 +65,10 @@ async function mount() {
   const active = () => document.querySelector("[aria-current='true'][data-sidebar='menu-button']")?.textContent ?? "";
   await waitFor(() => expect(active()).toContain(names["account-a"]));
   await waitFor(() => expect(row(names["account-c"])).not.toBeNull());
+  // The sidebar appears before bootstrap has selected A's inbox. Prefetching B
+  // requires that inbox view, so wait for its concrete first-page request.
+  await waitFor(() => expect(listSignals.some(entry => entry.accountId === "account-a"
+    && new URL(entry.url, "http://localhost").searchParams.get("folderId") === "account-a:INBOX")).toBe(true));
   // Every mailbox the sidebar showed as active from here on.
   const shown: string[] = [];
   tick = setInterval(() => {
@@ -73,8 +77,14 @@ async function mount() {
   }, 2);
   const mark = calls.length;
   const clickInOrder = async (...ids: string[]) => {
-    for (const [index, id] of ids.entries()) {
-      await act(async () => { if (index) await delay(10); fireEvent.click(row(names[id])!); });
+    for (const id of ids) {
+      await act(async () => { fireEvent.click(row(names[id])!); });
+      // Navigation runs in an effect. Supersede B only once its prefetch exists,
+      // rather than assuming the next render happens within a fixed delay.
+      if (id === "account-b") {
+        await waitFor(() => expect(listSignals.filter(entry => entry.accountId === id)).toHaveLength(1));
+        expect(listSignals.find(entry => entry.accountId === id)?.signal?.aborted).toBe(false);
+      }
     }
   };
   // Waits until every selection write was applied and the client had time to commit.

@@ -136,4 +136,17 @@ describe("secondary startup requests", () => {
     rerender({ accountId: "account-a" });
     expect(result.current.allTopics).toEqual([]);
   });
+  it("an update that settles after a switch never replaces the next mailbox's topics", async () => {
+    const topicsOf = (id: string) => Response.json({ ok: true, topics: [{ id: `topic-${id}`, name: `Synthetic ${id}` }] });
+    const apiFetch = async (input: RequestInfo | URL) => topicsOf(String(input).split("/")[3]);
+    const { result, rerender } = renderHook(({ accountId }) => useTopics({ activeAccountId: accountId, apiFetch }),
+      { initialProps: { accountId: "account-a" } });
+    await waitFor(() => expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-a"]));
+    // A topic is created in A; the switch to B happens while its POST is pending.
+    const setTopicsOfA = result.current.setAllTopics;
+    rerender({ accountId: "account-b" });
+    await waitFor(() => expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-b"]));
+    act(() => { setTopicsOfA(prev => [...prev, { id: "topic-new", name: "Synthetic new" } as never]); });
+    expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-b"]);
+  });
 });

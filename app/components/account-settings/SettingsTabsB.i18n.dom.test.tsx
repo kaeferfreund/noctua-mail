@@ -7,6 +7,7 @@ import type { TopicStat } from "@/lib/topics/core";
 import type { McpTokenMetadata } from "@/lib/data";
 import TopicsTabContent from "./tabs/TopicsTabContent";
 import McpTabContent from "./tabs/McpTabContent";
+import { mcpTokenListItem } from "@/lib/mcpPermissions";
 import CalendarTabContent from "./tabs/CalendarTabContent";
 import TranslationTabContent from "./tabs/TranslationTabContent";
 import type { Account } from "@/lib/data";
@@ -53,7 +54,8 @@ const tokenRecord = (overrides: Partial<McpTokenMetadata> = {}): McpTokenMetadat
 
 describe("MCP settings in German", () => {
   it("localizes presets, token metadata and dates while keeping protocol text", async () => {
-    const apiFetch = async () => json({ ok: true, tokens: [tokenRecord()] });
+    const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetisches Postfach", email: "own@example.test" }];
+    const apiFetch = async () => json({ ok: true, mailboxes, tokens: [mcpTokenListItem(tokenRecord({ accountIds: ["synthetic-mailbox", "synthetic-hidden"] }), new Set(["synthetic-mailbox"]))] });
     const page = render(<I18nTestProvider locale="de"><Theme><McpTabContent
       accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={apiFetch} onClose={() => {}}
     /></Theme></I18nTestProvider>);
@@ -63,6 +65,7 @@ describe("MCP settings in German", () => {
     expect(page.getByText("Erstellt: 23. Okt. 2026, 12:05")).toBeTruthy();
     expect(page.getByText("Läuft ab: 21. Apr. 2027, 12:05")).toBeTruthy();
     expect(page.getByText("Zuletzt verwendet: Nie")).toBeTruthy();
+    expect(page.getByText("Postfächer: Synthetisches Postfach (own@example.test), +1 weiteres Postfach")).toBeTruthy();
     fireEvent.click(page.getByRole("combobox"));
     expect(await page.findByRole("option", { name: "30 Tage" })).toBeTruthy();
     fireEvent.click(page.getByRole("option", { name: "Benutzerdefiniert" }));

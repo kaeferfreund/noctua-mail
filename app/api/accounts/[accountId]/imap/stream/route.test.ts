@@ -55,7 +55,9 @@ mock.module("@/lib/mail/imapStreamRuntime", () => ({
   safeLogoutImapClient: async (client: FakeClient | null | undefined) => { await client?.logout(); },
   streamTimers: {
     setInterval(callback: () => unknown, ms: number) { const id = nextTimer++; timers.set(id, { callback, ms }); return id; },
-    clearInterval(id?: number) { if (id !== undefined) timers.delete(id); }
+    clearInterval(id?: number) { if (id !== undefined) timers.delete(id); },
+    setTimeout(callback: () => unknown, ms: number) { const id = nextTimer++; timers.set(id, { callback, ms }); return id; },
+    clearTimeout(id?: number) { if (id !== undefined) timers.delete(id); }
   }
 }));
 const { GET } = await import("./route");
@@ -94,6 +96,55 @@ async function initial(stream: Awaited<ReturnType<typeof open>>) {
 const authError = () => Object.assign(new Error("Synthetic opaque upstream failure"), { authenticationFailed: true, serverResponseCode: "AUTHENTICATIONFAILED" });
 
 describe("production IMAP stream acceptance", () => {
+  test("one-hour lifetime delivers reconnect before closing and disposes watchers, pending poll and all timers", async () => {
+    const f = await fixture(), stream = await open(f);
+    await initial(stream);
+    const gate = deferred();
+    configure = client => { client.statusGate = gate.promise; };
+    const poll = [...timers.values()].find(t => t.ms === 123456)!.callback();
+    await until(() => clients.length === 2 && clients[1].statuses > 0);
+    try {
+      await [...timers.values()].find(t => t.ms === 60 * 60 * 1000)!.callback();
+      const chunk = new TextDecoder().decode((await stream.reader.read()).value);
+      expect(chunk.split("\n")[0]).toBe("event: reconnect");
+      expect(JSON.parse(chunk.split("data: ")[1])).toEqual({ streamId: expect.stringMatching(/^[a-f0-9]{8}$/) });
+      expect((await stream.reader.read()).done).toBe(true);
+      expect(timers.size).toBe(0);
+      expect(clients.every(c => c.closed && c.logouts === 1)).toBe(true);
+    } finally {
+      gate.resolve();
+      await poll;
+    }
+    expect(clients.every(c => c.logouts === 1)).toBe(true);
+  });
+
+  test("lifetime also bounds a pending initial connection without installing later timers", async () => {
+    const f = await fixture(), gate = deferred();
+    configure = client => { client.connectGate = gate.promise; };
+    const stream = await open(f);
+    await until(() => clients.length === 1);
+    try {
+      await [...timers.values()].find(t => t.ms === 60 * 60 * 1000)!.callback();
+      expect(new TextDecoder().decode((await stream.reader.read()).value)).toContain("event: reconnect");
+      expect(clients[0].closed).toBe(true);
+    } finally {
+      gate.resolve();
+    }
+    expect((await stream.reader.read()).done).toBe(true);
+    expect(clients[0].logouts).toBe(1);
+    expect(timers.size).toBe(0);
+  });
+
+  test("lifetime cannot emit reconnect after authorization is lost without a revocation notification", async () => {
+    const f = await fixture(), stream = await open(f);
+    await initial(stream);
+    f.master.prepare("DELETE FROM auth_session WHERE id=?").run(f.session.id);
+    await [...timers.values()].find(t => t.ms === 60 * 60 * 1000)!.callback();
+    expect((await stream.reader.read()).done).toBe(true);
+    expect(timers.size).toBe(0);
+    expect(clients.every(c => c.closed && c.logouts === 1)).toBe(true);
+  });
+
   test("QA-006 folder counts use STATUS for initial SELECT, EXISTS, flags, poll and reconnect", async () => {
     const f = await fixture();
     configure = client => { client.messages = 300; client.unseen = 110; client.uidNext = 301; client.selectedUidNext = 301; };
@@ -105,7 +156,7 @@ describe("production IMAP stream acceptance", () => {
     expect(await readEvent()).toEqual({ event: "event: folder:update", data: [
       { id: `${f.id}:INBOX`, uidNext: 301, exists: 300, unseen: 110 }
     ] });
-    await until(() => timers.size === 2);
+    await until(() => timers.size === 3);
     expect(clients[0].statusQueries[0]).toEqual({ uidNext: true, uidValidity: true, messages: true, unseen: true });
     clients[0].messages = 305; clients[0].unseen = 115; clients[0].uidNext = 306;
     clients[0].emit("exists");
@@ -126,7 +177,7 @@ describe("production IMAP stream acceptance", () => {
     const reconnected = await open(f);
     const reconnect = new TextDecoder().decode((await reconnected.reader.read()).value);
     expect(JSON.parse(reconnect.split("data: ")[1])[0].unseen).toBe(110);
-    await until(() => timers.size === 2);
+    await until(() => timers.size === 3);
   });
 
   test.each(["fetch", "poll", "connect"])("revocation during pending %s blocks the next sensitive enqueue", async (phase: string) => {
@@ -171,7 +222,7 @@ describe("production IMAP stream acceptance", () => {
     else if (reason === "cancel") await a.reader.cancel();
     else revokeAuthStreams({ sessionId: f.session.id });
     expect(clients[0].closed).toBe(true); expect(clients[2].closed).toBe(true);
-    expect(survivor.closed).toBe(false); expect(timers.size).toBe(2);
+    expect(survivor.closed).toBe(false); expect(timers.size).toBe(3);
     gate.resolve(); await sleep(10);
     if (reason !== "cancel") expect((await a.reader.read()).done).toBe(true);
     survivor.emit("flags", { uid: 1, flags: ["\\Seen"] });

@@ -230,10 +230,12 @@
       "primaryMailboxHint": "Dieses Postfach bleibt das Standardpostfach des Tokens.",
       "permissionMode": "Berechtigungen",
       "tokenMailboxes": "Postfächer: {mailboxes}",
+      "tokenMailboxesHidden": "{count, plural, one {+# weiteres Postfach} other {+# weitere Postfächer}}",
       "mode": {
         "read": "Nur lesen",
         "drafts": "Lesen und Entwürfe anlegen (kein Senden)",
-        "full": "Vollzugriff (auch senden)"
+        "full": "Vollzugriff (auch senden)",
+        "invalid": "Ungültig (kein Zugriff)"
       },
       "serverHeading": "MCP-Server",
       "endpointHint": "Verwende den MCP-Endpunkt unten mit dem Header <code>{header}</code>.",
@@ -267,6 +269,7 @@
       "invalidExpiry": "Wähle einen Ablaufzeitpunkt zwischen einer Minute und einem Jahr ab jetzt.",
       "createFailed": "MCP-Token konnte nicht erstellt werden.",
       "deleteConfirm": "Dieses MCP-Token löschen?",
+      "deleteConfirmShared": "Dieses MCP-Token löschen? Es wird für alle abgedeckten Postfächer widerrufen, auch für: {mailboxes}",
       "deleteFailed": "MCP-Token konnte nicht gelöscht werden."
     },
     "calendar": {
@@ -615,6 +618,27 @@
         "iris": "Iris",
         "plum": "Pflaume"
       }
+    }
+  },
+  "Calendar": {
+    "toolbar": {
+      "addEvent": "＋ Termin",
+      "addEventHint": "Neuer Termin",
+      "today": "Heute",
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "todayHint": "{unit, select, day {Heute} week {Diese Woche} month {Dieser Monat} other {Heute}}",
+      "prevHint": "{unit, select, day {Vorheriger Tag} week {Vorherige Woche} month {Vorheriger Monat} other {Zurück}}",
+      "nextHint": "{unit, select, day {Nächster Tag} week {Nächste Woche} month {Nächster Monat} other {Weiter}}",
+      "viewHint": "{view, select, dayGridMonth {Monatsansicht} timeGridWeek {Wochenansicht} timeGridDay {Tagesansicht} other {Ansicht}}",
+      "viewChangeHint": "Ansicht wechseln"
+    },
+    "panel": {
+      "title": "Kalender",
+      "openWindow": "In neuem Fenster öffnen",
+      "openWindowLabel": "Kalender in neuem Fenster öffnen",
+      "close": "Kalender schließen"
     }
   },
   "Search": {
@@ -1150,6 +1174,7 @@
     "loadFailed": "Nachrichten konnten nicht geladen werden. {error}",
     "emptyNamedFolder": "Keine Nachrichten in „{folder}“.",
     "unreadCount": "{count, plural, one {# ungelesen} other {# ungelesen}}",
+    "draftCount": "{count, plural, one {# Entwurf} other {# Entwürfe}}",
     "searching": "Suche",
     "folderCount": "{count, plural, one {# insgesamt} other {# insgesamt}}",
     "folderCountTitle": "{path} ({total, plural, one {# Nachricht} other {# Nachrichten}}, {unread, plural, one {# ungelesen} other {# ungelesen}})",
@@ -1433,7 +1458,7 @@
     "deepLink": {
       "forbidden": "Auf dieses Postfach hast du keinen Zugriff. Das bisherige Postfach bleibt geöffnet.",
       "missing": "Diese Nachricht ist nicht mehr verfügbar. Der Ordner bleibt geöffnet.",
-      "moved": "Diese Nachricht wurde verschoben. Ihr aktueller Ordner wurde geöffnet.",
+      "moved": "Diese Nachricht wurde verschoben. Der aktuelle Ordner der Nachricht wurde geöffnet.",
       "failed": "Die verlinkte Nachricht konnte nicht geladen werden. Bitte versuche es erneut."
     },
     "operationFailed": "Vorgang fehlgeschlagen",
@@ -1507,6 +1532,7 @@
     "sender": {
       "chooseSender": "Absender auswählen",
       "reviewSender": "Absender prüfen",
+      "reviewRecipients": "Empfänger prüfen",
       "unavailableDraft": "Die Absenderadresse dieses Entwurfs ist nicht verfügbar. Wähle einen aktiven Absender und speichere den Entwurf.",
       "chooseEnabledSender": "Wähle vor dem Senden eine aktive Absenderadresse.",
       "confirmKeepEditedSignature": "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten.",
@@ -1717,6 +1743,27 @@
     "fieldsScope": "in den Feldern {fields}",
     "filterCriteria": "Filter: {badges}",
     "queryCriteria": "„{query}“"
+  },
+  "EventSchedule": {
+    "start": "Beginn",
+    "end": "Ende",
+    "startTime": "Uhrzeit Beginn",
+    "endTime": "Uhrzeit Ende",
+    "allDay": "Ganztägig",
+    "repeat": "Wiederholung",
+    "location": "Ort",
+    "locationPlaceholder": "Ort (optional)",
+    "openTimePicker": "Zeitauswahl öffnen",
+    "recurrence": {
+      "none": "Keine Wiederholung",
+      "daily": "Täglich",
+      "weekly": "Wöchentlich",
+      "everyTwoWeeks": "Alle zwei Wochen",
+      "monthly": "Monatlich",
+      "monthlyByDay": "Monatlich am selben Wochentag",
+      "monthlyByDayOn": "Monatlich am {ordinal, select, 1 {ersten} 2 {zweiten} 3 {dritten} 4 {vierten} other {letzten}} {weekday}",
+      "yearly": "Jährlich"
+    }
   },
   "Folders": {
     "inbox": "Posteingang",

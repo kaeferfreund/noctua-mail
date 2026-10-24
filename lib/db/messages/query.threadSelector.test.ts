@@ -197,6 +197,11 @@ describe("thread selector flagged EXISTS differential", () => {
       const week = await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "week" });
       expect(statements.some(sql => sql.includes("strftime('%Y-W%W'"))).toBe(true);
       expect((week.groups ?? []).reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(week.items.length);
+      // The remaining thread bucket SQL serves "year" as well; "date" never reaches it (checked above).
+      statements.length = 0;
+      const year = await listThreads({ accountId: fixture.a.accountId, folderId: "inbox", page: 1, pageSize: 5, groupBy: "year" });
+      expect(statements.some(sql => sql.includes("strftime('%Y', t."))).toBe(true);
+      expect((year.groups ?? []).reduce((sum, group) => sum + group.count, 0)).toBeGreaterThan(year.items.length);
     } finally {
       spy.mockRestore();
     }

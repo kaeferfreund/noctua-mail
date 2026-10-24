@@ -64,11 +64,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     const groupBy = payload.groupBy ?? "date";
     const threadDateSource = normalizeThreadDateSource(payload.threadDateSource);
-    const enrich = async (items: Message[]) => {
+    const enrich = async (items: Message[], includeSuggestions = true) => {
       await enrichMessagesWithThreadTopics(items, {
         accountId: context.accountId,
         accountEmail: getOwnAddresses(context.account),
-        includeSuggestions: true
+        includeSuggestions
       });
       await enrichMessagesWithThreadCollab(items, { accountId: context.accountId });
     };
@@ -94,7 +94,13 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
           groupBy,
           threadDateSource
         });
-        await enrich(data.items);
+        // Every row of the window shares the thread's suggestions: only the anchor row
+        // carries them, which keeps header rows small, and a cursor page reuses those.
+        const firstWindow = typeof windowRequest.cursor !== "string" || !windowRequest.cursor;
+        await enrich(data.items, firstWindow);
+        for (const item of data.items) {
+          if (item.id !== data.window.anchorId) delete item.topicSuggestions;
+        }
         return compressedJsonResponse(request, data);
       } catch (error) {
         if (error instanceof ThreadWindowCursorError) {

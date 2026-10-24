@@ -27,6 +27,8 @@ test.beforeEach(async ({page}, info) => {
   await page.context().setExtraHTTPHeaders({'x-forwarded-for':`192.0.2.${51+index}`});
 });
 let lastSignInAt=0;
+// Catalog text and addresses are literal labels, never patterns.
+const escapeRegExp=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 
 
 async function post(page: Page, url: string, body: unknown) {
@@ -217,7 +219,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
   for (const format of ['Text', 'Markdown']) {
     await page.getByRole('tab',{name:format,exact:true}).click();
     await from.click();
-    await page.getByRole('option',{name:new RegExp(aliasEmail.replace(/\./g,'\\.'))}).click();
+    await page.getByRole('option',{name:new RegExp(escapeRegExp(aliasEmail))}).click();
     await page.getByRole('tab',{name:'HTML',exact:true}).click();
     await expect(editor).toContainText(aliasEmail);
     await expect(editor).not.toContainText('demo@monkeydent.test');
@@ -286,7 +288,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
     await expect(otherEditor).toContainText('Team regards,');
     await expect(otherEditor).not.toContainText('Synthetic Alex');
     await otherFrom.click();
-    await otherPage.getByRole('option',{name:new RegExp(aliasEmail.replace(/\./g,'\\.'))}).click();
+    await otherPage.getByRole('option',{name:new RegExp(escapeRegExp(aliasEmail))}).click();
     await expect(otherEditor).toContainText(aliasEmail);
     await otherPage.getByLabel('To:',{exact:true}).fill('recipient@example.test');
     await otherPage.getByLabel('Subject:',{exact:true}).fill('Synthetic second sender signature proof');
@@ -320,7 +322,7 @@ for (const locale of ['de', 'en'] as const) {
     // Shell, reader and compose copy follow the UI language; read it from the catalogs the app renders.
     const chrome={toggleSidebar:catalog.Shell.sidebar.toggle as string,newMail:catalog.Shell.compose.new as string,drafts:catalog.Folders.drafts as string,editDraft:catalog.Reader.editDraft as string};
     // The relative save time always contains a number; "not saved yet" never does.
-    const draftSaved=new RegExp(copy.draft.savedAgo.split('{time}').map((part:string)=>part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('.*\\d.*'));
+    const draftSaved=new RegExp(copy.draft.savedAgo.split('{time}').map(escapeRegExp).join('.*\\d.*'));
     expect((await page.request.put('/api/auth/preferences',{headers,data:{uiLocale:locale}})).status()).toBe(200);
     const longName='Synthetic Long Display Name NNNNNNNNNNNN';
     const longEmail=`${'a'.repeat(47)}@example.test`;
@@ -356,7 +358,7 @@ for (const locale of ['de', 'en'] as const) {
     async function reopen() {
       await page.goto('/');
       await page.getByRole('button',{name:chrome.toggleSidebar,exact:true}).click();
-      await page.getByRole('button',{name:new RegExp(chrome.drafts)}).first().click();
+      await page.getByRole('button',{name:new RegExp(escapeRegExp(chrome.drafts))}).first().click();
       await page.getByText(subject,{exact:true}).first().click();
       await page.getByRole('button',{name:chrome.editDraft,exact:true}).click();
       await expect(page.getByLabel(copy.fields.subject,{exact:true})).toHaveValue(subject);

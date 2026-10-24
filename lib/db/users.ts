@@ -3,7 +3,7 @@ import type { AccountRole, User, UserAccountLink } from "../data";
 import { isAccountRole } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
-import { deleteMcpTokenRowsForUser } from "./mcpTokens";
+import { deleteMcpTokenAccountRows, deleteMcpTokenRowsForUser } from "./mcpTokens";
 import {
   USER_ROW_SELECT,
   mapUserAccountLinkRow,
@@ -136,22 +136,6 @@ export async function getUserAccounts(): Promise<UserAccountLink[]> {
   return rows.map(mapUserAccountLinkRow);
 }
 
-export async function listAccessibleAccountIdsForUser(userId: string) {
-  const db = await getDb();
-  const rows = db
-    .prepare(
-      `SELECT DISTINCT a.id as id
-       FROM accounts a
-       LEFT JOIN user_accounts ua ON ua.accountId = a.id
-       WHERE ua.userId = ? OR a.ownerUserId = ?
-       ORDER BY a.id ASC`
-    )
-    .all(userId, userId) as Array<{ id?: string | null }>;
-  return rows
-    .map((row) => String(row.id ?? "").trim())
-    .filter(Boolean);
-}
-
 /**
  * Synchronous core of `addUserAccountLink` for callers that compose one
  * transaction on the master connection (signup). Returns true when a new
@@ -238,13 +222,18 @@ export async function getUserAccountRole(
 }
 
 /** Revokes a membership. Returns true when a link was removed. */
+/** Same MCP token cleanup as a membership revoke (`changeAccountMember`), so re-adding the link never re-enables a token. */
 export async function removeUserAccountLink(userId: string, accountId: string) {
   return withDbWriteRetry("removeUserAccountLink", async () => {
     const db = await getDb();
-    const result = db
-      .prepare(`DELETE FROM user_accounts WHERE userId = ? AND accountId = ?`)
-      .run(userId, accountId);
-    return changedRows(result) > 0;
+    return db.transaction(() => {
+      const result = db
+        .prepare(`DELETE FROM user_accounts WHERE userId = ? AND accountId = ?`)
+        .run(userId, accountId);
+      const removed = changedRows(result) > 0;
+      if (removed) deleteMcpTokenAccountRows(db, accountId, userId);
+      return removed;
+    }).immediate();
   });
 }
 

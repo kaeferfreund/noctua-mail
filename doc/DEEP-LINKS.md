@@ -33,6 +33,8 @@ compact IDs are ignored. The existing membership checks and authorized detail re
 after decoding.
 
 `f` contains the folder path after `<accountId>:` without repeating the account.
+That path is the server's folder name (for example `INBOX/Rechnungen`), so a
+shared or copied URL shows the folder names it points to.
 A relative path starting with `~` gains an extra `~` escape. Unrelated folder IDs
 and folders without an account use `~:<full folder id>` so arbitrary folder IDs
 also round trip. Spaces, umlauts, slashes and reserved characters use normal URL
@@ -77,8 +79,9 @@ marker and resolve through the authorized message route.
 
 Mailbox, folder, view, message, settings, subsection and panel changes push.
 Search typing replaces the current entry. When a cold mailbox discovers its first
-default folder after initial sync, that enrichment also replaces its mailbox entry. Keyboard row navigation (j/k and arrow
-keys) replaces, as does canonicalizing an initial URL. Scroll is absent
+default folder after initial sync, that enrichment also replaces its mailbox entry. Keyboard row navigation (j/k)
+replaces, as does canonicalizing an initial URL; arrow keys only scroll and do not
+mark the next change. Scroll is absent
 from URLs. Publication never calls the switch controller; URL restoration calls
 it once, even when reselecting A must cancel an in-flight switch to B. It keeps
 its existing write ordering and authorization. A destination token and abort
@@ -92,19 +95,26 @@ Network/server errors display a retry notice and preserve the requested message
 in the address bar so reload can retry. Deleted messages settle on the folder;
 moved messages open their current folder with a notice. A forbidden account from
 the URL is discarded before a detail request and falls back to the session's
-currently authorized selection, or the normal mailbox gate when none exists.
+currently authorized selection, or the normal mailbox gate when none exists. If
+that selection is revoked as well, the link finishes with one notice and the
+bootstrap resolves the server's selection.
 
 `useMobileNavigation` still derives phone visibility and supplies header Back;
 with URL management enabled it neither pushes nor consumes a second history
 entry. Header Back invokes browser Back. Transient Sheets retain capture-phase
-interception and navigation deferral in `useMobileOverlayHistory`. Settings and
+interception and navigation deferral in `useMobileOverlayHistory`; a pick made
+inside a Sheet waits for the Sheet's own Back, so it never leaves a duplicate
+Forward entry. Settings and
 status panels use the URL history owner, preventing duplicate pushes. Initial
 message links establish one list predecessor when no marked message entry exists;
 this does not rely on `history.length`. Forward re-resolves the message.
 
 The reader opens from its detail response without waiting for inbox pagination.
 Existing selection/collapse/scroll-by-message-ID behavior targets the linked row;
-additional pages may load afterwards to select that row. Exact history-specific
+up to four additional list pages (`DEEP_LINK_LIST_PAGE_LIMIT`) may load afterwards
+to select that row; an older target further down stays open in the reader without
+a highlighted row. Links from reminders, calendar entries and notices keep the
+status panel, calendar sidebar and composer as they are when the link applies. Exact history-specific
 list and reader pixel/semantic anchors, cancellation of delayed scroll restoration
 on user gestures, calendar date/view/event state, sort/threading preferences,
 unsaved settings, nested dialogs and draft contents are outside this change.

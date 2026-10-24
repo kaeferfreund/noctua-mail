@@ -43,6 +43,25 @@ describe("compose From control", () => {
     expect(view.getByRole("alert").textContent).toContain("Choose an enabled sender");
     expect(view.getByRole("link", { name: "Review sender" }).getAttribute("href")).toBe("#compose-inline-from");
   });
+  test("SMTP rejections point to the field that can fix them (QA-211)", () => {
+    const recipient = fields("inline", { senderMessage: "A recipient was rejected.", senderAction: "recipients" });
+    expect(recipient.view.getByRole("link", { name: "Review recipients" }).getAttribute("href")).toBe("#compose-inline-to");
+    expect(recipient.view.queryByRole("link", { name: "Review sender" })).toBeNull();
+    cleanup();
+    const temporary = fields("modal", { senderMessage: "The provider is temporarily unavailable.", senderAction: null });
+    expect(temporary.view.getByRole("alert").textContent).toContain("temporarily unavailable");
+    expect(temporary.view.queryByRole("link")).toBeNull();
+  });
+  test("the referenced message is labelled per mode: forwarded vs replied to", () => {
+    const source = { id: "m1", subject: "Synthetic quarterly report", from: "sender@example.test" } as React.ComponentProps<typeof ComposeFields>["inReplyToMessage"];
+    const forward = fields("modal", { inReplyToMessage: source, inReplyToIsForward: true });
+    expect(forward.view.getByText("Forwarded mail:")).toBeTruthy();
+    expect(forward.view.queryByText("In Reply To:")).toBeNull();
+    cleanup();
+    const reply = fields("inline", { inReplyToMessage: source });
+    expect(reply.view.getByText("In Reply To:")).toBeTruthy();
+    expect(reply.view.queryByText("Forwarded mail:")).toBeNull();
+  });
   test("viewer From selection and send are disabled", () => {
     const { view } = fields("modal", { identityDisabled: true });
     expect((view.getByLabelText("From:") as HTMLButtonElement).disabled).toBe(true);

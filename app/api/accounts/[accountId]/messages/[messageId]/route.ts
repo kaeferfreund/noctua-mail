@@ -40,7 +40,9 @@ export async function GET(request: Request, { params }: Params) {
       const state = await getThreadCollabState(context.accountId,message.threadId);
       message.collab = {status:state.status,assigneeUserId:state.assigneeUserId,commentCount:state.commentCount,updatedAt:state.updatedAt};
       message.topics = await getTopicsForThread(context.accountId, message.threadId);
-      if (message.topics.length === 0) {
+      // Bodies read per expanded reader card skip them: the conversation window already has them.
+      const includeSuggestions = new URL(request.url).searchParams.get("suggestions") !== "0";
+      if (message.topics.length === 0 && includeSuggestions) {
         message.topicSuggestions = await getTopicSuggestionsForThread(
           context.accountId,
           message.threadId,

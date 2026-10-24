@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import FullCalendar, {
   type CalendarOptions,
   type CalendarRef,
@@ -37,7 +38,6 @@ import {
   dayElapsedFraction,
   msUntilNextMinute
 } from "./calendarNowIndicator";
-import { removeDateLabelsFromTabOrder } from "./calendarFocus";
 import "./fullcalendar-theme.css";
 
 // v7 exposes styling hooks instead of stable DOM class names. Keep Noctua's
@@ -72,13 +72,15 @@ type Props = {
   accountId: string;
   compact?: boolean;
   firstDay?: 0 | 1;
+  /** Level of the toolbar title heading; FullCalendar defaults to 2. */
+  headingLevel?: number;
   onEventClick?: (
     event: CalendarEvent | CalendarReminder,
     kind: "event" | "reminder",
     occurrenceStartAtMs?: number
   ) => void;
   onDateClick?: (date: Date, allDay: boolean) => void;
-  /** Opens the new-event dialog (wired to the toolbar "＋ Event" button). */
+  /** Opens the new-event dialog (wired to the toolbar "＋ Termin" button). */
   onCreateEvent?: () => void;
   calendarRef?: React.RefObject<CalendarRef | null>;
 };
@@ -195,12 +197,27 @@ export default function CalendarView({
   accountId,
   compact = false,
   firstDay = 1,
+  headingLevel,
   onEventClick,
   onDateClick,
   onCreateEvent,
   calendarRef: externalRef
 }: Props) {
   const dateFormat = useAccountDateFormat();
+  const t = useTranslations("Calendar.toolbar");
+  // FullCalendar's own English texts and hint templates, replaced from the
+  // catalog. Hints get the unit/view code so each locale can inflect.
+  const toolbarText = useMemo<CalendarOptions>(() => ({
+    todayText: t("today"),
+    monthText: t("month"),
+    weekTextLong: t("week"),
+    dayText: t("day"),
+    todayHint: (_text: string, unit: string) => t("todayHint", { unit }),
+    prevHint: (_text: string, unit: string) => t("prevHint", { unit }),
+    nextHint: (_text: string, unit: string) => t("nextHint", { unit }),
+    viewHint: (_text: string, view: string) => t("viewHint", { view }),
+    viewChangeHint: t("viewChangeHint")
+  }), [t]);
   const internalRef = useRef<CalendarRef>(null);
   const calendarRef = (externalRef ?? internalRef) as React.RefObject<CalendarRef>;
   const [fullCalendarEvents, setFullCalendarEvents] = useState<EventInput[]>([]);
@@ -377,8 +394,6 @@ export default function CalendarView({
           firstDay={firstDay}
           events={fullCalendarEvents}
           eventDidMount={handleEventDidMount}
-          dayCellDidMount={removeDateLabelsFromTabOrder}
-          dayHeaderDidMount={removeDateLabelsFromTabOrder}
           datesSet={handleDatesSet}
           eventClick={handleEventClick}
           dateClick={handleDateClick}
@@ -398,6 +413,7 @@ export default function CalendarView({
       <FullCalendar
         ref={calendarRef}
         {...calendarClasses}
+        {...toolbarText}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin, classicTheme]}
         initialView={initialView}
         initialDate={initialDate}
@@ -414,8 +430,8 @@ export default function CalendarView({
                 addEvent: {
                   // FullCalendar buttons are text-only; the leading "＋" reads as
                   // a create affordance and `hint` supplies the title/aria-label.
-                  text: "＋ Event",
-                  hint: "New event",
+                  text: t("addEvent"),
+                  hint: t("addEventHint"),
                   click: (event) => {
                     // v7 also tries CalendarApi.addEvent after the callback.
                     // This button opens our dialog before an event exists.
@@ -432,10 +448,9 @@ export default function CalendarView({
           right: "dayGridMonth,timeGridWeek,timeGridDay"
         }}
         firstDay={firstDay}
+        headingLevel={headingLevel}
         events={fullCalendarEvents}
         eventDidMount={handleEventDidMount}
-        dayCellDidMount={removeDateLabelsFromTabOrder}
-        dayHeaderDidMount={removeDateLabelsFromTabOrder}
         nowIndicator
         datesSet={handleDatesSet}
         eventClick={handleEventClick}
