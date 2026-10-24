@@ -14,7 +14,7 @@ const row = (accountId: string, n: number) => ({ id: `${accountId}-m${n}`, accou
 const page = (accountId: string, from: number, hasMore: boolean) =>
   Response.json({ items: [row(accountId, from), row(accountId, from + 1)], hasMore, total: 6 });
 
-type Props = { accountId: string; folderId?: string; query?: string };
+type Props = { accountId: string; folderId?: string; query?: string; threads?: boolean };
 
 function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: MailboxViewCache) {
   const held: Held[] = [];
@@ -22,14 +22,14 @@ function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: Mai
   const apiFetch: UseMessageDataParams["apiFetch"] = (input, init) => new Promise<Response>(resolve => {
     held.push({ url: String(input), signal: init?.signal ?? undefined, resolve });
   });
-  const view = renderHook(({ accountId, folderId = `${accountId}:INBOX`, query = "" }: Props) => {
+  const view = renderHook(({ accountId, folderId = `${accountId}:INBOX`, query = "", threads = true }: Props) => {
     const messagesKey = `${accountId}|folder|${folderId}|${query}`;
     const currentKeyRef = useRef(messagesKey);
     currentKeyRef.current = messagesKey;
     return useMessageData({
       messagesKey, activeAccountId: accountId, searchScope: "folder", activeFolderId: folderId,
       isRelatedSearch: false, relatedQueryId: "", selectedSearchFields: [], searchBadges: DEFAULT_SEARCH_BADGES,
-      effectiveSearchBadges: [], currentSearchExcludedFolderIds: [], supportsThreads: true, groupBy: "date",
+      effectiveSearchBadges: [], currentSearchExcludedFolderIds: [], supportsThreads: threads, groupBy: "date",
       threadDateSource: "latestReceivedDateValue", sortBy: "date", query, authState: "ok", apiFetch,
       readErrorMessage: async () => "Error", reportError: message => { errors.push(message); },
       setRelatedContext: () => {}, relatedContext: null, setCollapsedGroups: () => {}, setCollapsedThreads: () => {},
@@ -328,9 +328,28 @@ describe("a list visited earlier in this tab", () => {
     expect(cache.readList(inboxUrl, "account-b")).toBeNull();
   });
 
+  it("a thread-setting change without a key change never caches the old row format under the new URL", async () => {
+    const { h, cache } = await visitedAandB({ accountId: "account-a" });
+    await waitFor(() => expect(h.pending("account-a")).toHaveLength(1));
+    const threadedUrl = h.pending("account-a")[0].url;
+    await h.release(h.pending("account-a")[0], pageOf("account-a", [1, 2]));
+    await waitFor(() => expect(h.held).toHaveLength(0));
+    // Same key, other URL: the rows on screen were read as threads.
+    h.rerender({ accountId: "account-a", threads: false });
+    await act(async () => { await Promise.resolve(); });
+    h.rerender({ accountId: "account-b", threads: false });
+    h.rerender({ accountId: "account-a", threads: false });
+    expect(ids(h)).toEqual([]);
+    expect(cache.readList(threadedUrl, "account-a")?.rows).toHaveLength(2);
+  });
+
   for (const status of [401, 403]) {
-    it(`a ${status} on the re-read clears the cached rows and the mailbox's cache, then shows the error`, async () => {
+    it(`a ${status} on the re-read clears the rows and that list's cache entry, then shows the error`, async () => {
       const { h, cache } = await visitedAandB({ accountId: "account-a" });
+      const folders = [{ id: "account-a:INBOX", accountId: "account-a", name: "Inbox" }] as Folder[];
+      cache.writeFolders("account-a", folders);
+      cache.writeList("synthetic-archive-url", { accountId: "account-a", rows: [row("account-a", 9)], groupMeta: [],
+        hasMore: false, total: 1, loadedCount: 1 });
       expect(ids(h)).toEqual(["account-a-m1", "account-a-m2"]);
       await waitFor(() => expect(h.pending("account-a")).toHaveLength(1));
       await h.release(h.pending("account-a")[0], Response.json({ ok: false }, { status }));
@@ -341,7 +360,9 @@ describe("a list visited earlier in this tab", () => {
       expect(ids(h)).toEqual(["account-b-m1", "account-b-m2"]);
       h.rerender({ accountId: "account-a" });
       expect(ids(h)).toEqual([]);
-      expect(cache.readFolders("account-a")).toBeNull();
+      // Speed only: the mailbox's other entries stay; session end and revocation clear them elsewhere.
+      expect(cache.readFolders("account-a")).toEqual(folders);
+      expect(cache.readList("synthetic-archive-url", "account-a")?.rows).toHaveLength(1);
     });
   }
 });
