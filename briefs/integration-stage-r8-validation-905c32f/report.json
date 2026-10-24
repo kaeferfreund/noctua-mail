@@ -1,0 +1,741 @@
+{
+  "status": "complete",
+  "worktree": "/home/monkey/code/noctua-mail/wt-integration-dryrun",
+  "branch": "integration/stage",
+  "final_sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+  "round7_base": "9424150f5aa0a446ed9bc03ed199e6825129467d",
+  "resumed_from": "9386f4eb5a701fc5df721ccac633b33bf13c0bab",
+  "validated_source_head": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+  "round8_commits": [
+    {
+      "sha": "84d5457b282660e0f60ef61e8f4f58073027e201",
+      "subject": "Merge fix/launcher-log-redaction 3766c92 into integration/stage (round 8)"
+    },
+    {
+      "sha": "9386f4eb5a701fc5df721ccac633b33bf13c0bab",
+      "subject": "Merge chore/deps-nodemailer-mcp 3fe0562 into integration/stage (round 8)"
+    },
+    {
+      "sha": "939dcc064b10f298dc6ceb42b3a0992a6088af95",
+      "subject": "Merge fix/qa-round2 bdcdd3a into integration/stage (round 8)"
+    },
+    {
+      "sha": "b558a0598610653264c9e8b4090bd9700ec0aeb8",
+      "subject": "Merge feat/i18n-strings e970552 into integration/stage (round 8)"
+    },
+    {
+      "sha": "f28c16bc5a9b91f759a4fea051fdd7dac7a78851",
+      "subject": "Merge feat/i18n-strings-b 46d629e into integration/stage (round 8)"
+    },
+    {
+      "sha": "7865096b31fc1107f4d8938422179063470e507e",
+      "subject": "Merge perf/fts-identity-v3 36be023 into integration/stage (round 8)"
+    },
+    {
+      "sha": "42310d831697020952c343b4888804cb5820cbbd",
+      "subject": "fix(integration): provide locale context to round 2 QA DOM regressions"
+    },
+    {
+      "sha": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+      "subject": "fix(integration): adapt production acceptance fixtures for round 8"
+    },
+    {
+      "sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+      "subject": "fix(integration): record round 8 validation and deployment handoff"
+    }
+  ],
+  "commits_created_in_continuation": [
+    {
+      "sha": "939dcc064b10f298dc6ceb42b3a0992a6088af95",
+      "subject": "Merge fix/qa-round2 bdcdd3a into integration/stage (round 8)"
+    },
+    {
+      "sha": "b558a0598610653264c9e8b4090bd9700ec0aeb8",
+      "subject": "Merge feat/i18n-strings e970552 into integration/stage (round 8)"
+    },
+    {
+      "sha": "f28c16bc5a9b91f759a4fea051fdd7dac7a78851",
+      "subject": "Merge feat/i18n-strings-b 46d629e into integration/stage (round 8)"
+    },
+    {
+      "sha": "7865096b31fc1107f4d8938422179063470e507e",
+      "subject": "Merge perf/fts-identity-v3 36be023 into integration/stage (round 8)"
+    },
+    {
+      "sha": "42310d831697020952c343b4888804cb5820cbbd",
+      "subject": "fix(integration): provide locale context to round 2 QA DOM regressions"
+    },
+    {
+      "sha": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+      "subject": "fix(integration): adapt production acceptance fixtures for round 8"
+    },
+    {
+      "sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+      "subject": "fix(integration): record round 8 validation and deployment handoff"
+    }
+  ],
+  "pins": {
+    "fix/launcher-log-redaction": "3766c927dcc6932223c33b321524e154c22d1c5d",
+    "chore/deps-nodemailer-mcp": "3fe0562ada13f4df517b4885fc7dd2bfb285e73d",
+    "fix/qa-round2": "bdcdd3a562f3401e5b69dd96649120712c28e64d",
+    "feat/i18n-strings": "e9705524e7bd7ea93cd72eb04d5dad36b199b830",
+    "feat/i18n-strings-b": "46d629ea200567ace7d44137cbb01c853f42315a",
+    "perf/fts-identity-v3": "36be02371b88a6a5a0576dcf4592122a763abb6e"
+  },
+  "conflicts_per_input": {
+    "1": [],
+    "2": [],
+    "5": [],
+    "6": [],
+    "7": [
+      {
+        "files": [
+          "messages/de.json",
+          "messages/en.json"
+        ],
+        "resolution": "Union namespace/key sets in existing order; keep slice 2a shared copy and slice 2b reviewed List/Reader/Notifications copy."
+      },
+      {
+        "files": [
+          "lib/i18n/catalogs.test.ts"
+        ],
+        "resolution": "One shape-validating leaf walker, strict ICU/parity checks and every case from both slices."
+      },
+      {
+        "files": [
+          "app/components/shell/Shell.dom.test.tsx"
+        ],
+        "resolution": "Shared render/I18nTestProvider import and slice 2a provider-wrapped SSR/hydration test."
+      },
+      {
+        "files": [
+          "app/components/shell/ShellHeader.tsx",
+          "app/components/shell/ShellSidebar.tsx"
+        ],
+        "resolution": "Translated accessible labels plus slice 2b stable data-shell-action attributes."
+      },
+      {
+        "files": [
+          "app/components/mailclient/useMessageMutations.ts"
+        ],
+        "resolution": "Additional overlap with input 5: preserve useEffect/useRef folder refresh generation and useTranslations notifications together."
+      }
+    ],
+    "9": []
+  },
+  "inputs_3_4": "Contained in input 2; not merged separately.",
+  "gates": {
+    "deps-paths": {
+      "name": "deps-paths",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "test",
+        "--timeout",
+        "20000",
+        "app/api/mcp",
+        "lib/mail",
+        "lib/drafts.test.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 29.176,
+      "passed": [
+        282
+      ],
+      "failed": [
+        0
+      ],
+      "assertions": [
+        858
+      ],
+      "verbatim_summary": [
+        " 282 pass",
+        " 0 fail",
+        " 858 expect() calls",
+        "Ran 282 tests across 28 files. [28.38s]"
+      ]
+    },
+    "install-final": {
+      "name": "install-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.043
+    },
+    "typecheck-complete": {
+      "name": "typecheck-complete",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.461
+    },
+    "ci": {
+      "name": "ci",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "timeout",
+        "1800",
+        "bun",
+        "run",
+        "test:ci"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 503.652,
+      "passed": [
+        2804,
+        462
+      ],
+      "failed": [
+        0,
+        0
+      ],
+      "assertions": [
+        15275,
+        2679
+      ],
+      "verbatim_summary": [
+        " 2804 pass",
+        " 0 fail",
+        " 15275 expect() calls",
+        "Ran 2804 tests across 304 files. [431.36s]",
+        " 462 pass",
+        " 0 fail",
+        " 2679 expect() calls",
+        "Ran 462 tests across 58 files. [67.61s]"
+      ]
+    },
+    "stress": {
+      "name": "stress",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "timeout",
+        "2400",
+        "bun",
+        "run",
+        "test:stress"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 1219.049,
+      "passed": [
+        8412
+      ],
+      "failed": [
+        0
+      ],
+      "assertions": [
+        45825
+      ],
+      "verbatim_summary": [
+        " 8412 pass",
+        " 0 fail",
+        " 45825 expect() calls",
+        "Ran 8412 tests across 304 files. [1211.97s]"
+      ]
+    },
+    "lint": {
+      "name": "lint",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "timeout",
+        "600",
+        "bun",
+        "run",
+        "lint"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 48.862
+    },
+    "lint-baseline-comparison": {
+      "name": "lint-baseline-comparison",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "node",
+        ".tmp/lint-compare.mjs"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 6.047
+    },
+    "build-final": {
+      "name": "build-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "timeout",
+        "1200",
+        "bun",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 61.318
+    },
+    "standalone-packages-final": {
+      "name": "standalone-packages-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        ".tmp/standalone-check.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.317
+    },
+    "standalone-workers-final": {
+      "name": "standalone-workers-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "build-scripts/verifyStandaloneWorkerBuild.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.055
+    },
+    "auth-browser": {
+      "name": "auth-browser",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "env",
+        "AUTH_BROWSER_USE_BUILD=1",
+        "AUTH_BROWSER_PORT=3799",
+        "bun",
+        "run",
+        "test:auth-browser"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 477.351
+    },
+    "html-privacy": {
+      "name": "html-privacy",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "test",
+        "--config=bunfig.browser.toml",
+        "--timeout",
+        "120000",
+        "./tests/browser/htmlPrivacy.test.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 60.143,
+      "passed": [
+        1
+      ],
+      "failed": [
+        0
+      ],
+      "assertions": [
+        177
+      ],
+      "verbatim_summary": [
+        " 1 pass",
+        " 0 fail",
+        " 177 expect() calls",
+        "Ran 1 test across 1 file. [60.10s]"
+      ]
+    },
+    "qa-all": {
+      "name": "qa-all",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "python3",
+        ".tmp/qa-all.py"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 203.45
+    },
+    "smoke": {
+      "name": "smoke",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "env",
+        "AUTH_SMOKE_PORT=3799",
+        "bun",
+        "scripts/smokeTeamAuth.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 16.325
+    },
+    "security": {
+      "name": "security",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bash",
+        "tests/runTeamAuthSecurityControls.sh"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 76.163,
+      "passed": [
+        156
+      ],
+      "failed": [
+        0
+      ],
+      "assertions": [
+        861
+      ],
+      "verbatim_summary": [
+        " 156 pass",
+        " 0 fail",
+        " 861 expect() calls",
+        "Ran 156 tests across 5 files. [75.77s]"
+      ]
+    },
+    "migration": {
+      "name": "migration",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        ".tmp/migration-gate.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 24.05
+    },
+    "shutdown-idle-final": {
+      "name": "shutdown-idle-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "env",
+        "NOCTUA_MAILBOX_WATCHER=",
+        "bun",
+        "scripts/checkGracefulShutdown.ts",
+        "--port",
+        "3799",
+        "--data-dir",
+        "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 1.269
+    },
+    "shutdown-watcher-final": {
+      "name": "shutdown-watcher-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        ".tmp/watcher-shutdown.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 2.419
+    },
+    "i18n-standalone-final": {
+      "name": "i18n-standalone-final",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        ".tmp/locale-gate.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 2.032
+    },
+    "german320": {
+      "name": "german320",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "env",
+        "QA_SHELL_USE_BUILD=1",
+        "QA_SHELL_PORT=3799",
+        "NOCTUA_MAILBOX_WATCHER=1",
+        "QA_ROUND2_FIXTURE=1",
+        "bun",
+        ".tmp/qa-standalone.ts",
+        "--config=.tmp/german320.config.ts"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 25.136
+    },
+    "integration-files-lint-complete": {
+      "name": "integration-files-lint-complete",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "bun",
+        "x",
+        "eslint",
+        "scripts/runQaShellBrowserTests.ts",
+        "tests/browser/htmlPrivacyFixture.tsx",
+        "app/components/mailclient/useMessageMutations.dom.test.tsx",
+        "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 1.987
+    },
+    "diff-check": {
+      "name": "diff-check",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "git",
+        "diff",
+        "--check",
+        "9424150",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.046
+    },
+    "diff-check-worktree": {
+      "name": "diff-check-worktree",
+      "command": [
+        "nice",
+        "-n",
+        "15",
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.008
+    }
+  },
+  "acceptance": {
+    "typecheck_errors": 0,
+    "typecheck_files": 1195,
+    "ci_unit": 2804,
+    "ci_dom": 462,
+    "stress": 8412,
+    "auth_browser": 20,
+    "html_privacy_assertions": 177,
+    "qa": {
+      "total": 11,
+      "compose": 4,
+      "shell": 4,
+      "admin_breakpoint": 1,
+      "translation": 1,
+      "unread_count": 1,
+      "skipped": 0,
+      "read_settled_ms": 1235,
+      "unread_ms": 1437,
+      "new_mail_ms": 1977
+    },
+    "smoke": "SMOKE PASS",
+    "security": 156,
+    "lint": {
+      "errors": 1,
+      "warnings": 25,
+      "new": 0,
+      "baseline_error": "app/components/calendar/useCalendarConflicts.ts:58:5 react-hooks/set-state-in-effect"
+    },
+    "standalone_locale_cases": 5,
+    "german320_screenshots": [
+      "german-list-320.png",
+      "german-reader-320.png"
+    ],
+    "git_diff_check": true
+  },
+  "bundle": {
+    "method": "Unique root firstLoadChunkPaths, Node node:zlib gzipSync level 6 per asset; retained round-7 build reproduces recorded baseline exactly.",
+    "before": {
+      "sha": "9424150f5aa0a446ed9bc03ed199e6825129467d",
+      "js_assets": 27,
+      "raw_bytes": 2115748,
+      "gzip_bytes": 638891
+    },
+    "after": {
+      "sha": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+      "js_assets": 26,
+      "raw_bytes": 2207028,
+      "gzip_bytes": 664843
+    },
+    "delta_raw_bytes": 91280,
+    "delta_gzip_bytes": 25952,
+    "gzip_increase_percent": 4.062039
+  },
+  "shutdown": {
+    "idle": {
+      "pid": 2148934,
+      "port": 3799,
+      "dataDir": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 80,
+      "forced": false
+    },
+    "watcher": {
+      "pid": 2149050,
+      "port": 3799,
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 49,
+      "forced": false,
+      "watcherStateBeforeSignal": "idling"
+    },
+    "idle_over_300_ms": false,
+    "before_optional_cleanup_ms": {
+      "idle": 77,
+      "watcher": 50
+    },
+    "historical_baselines_ms": {
+      "round7_idle": 102,
+      "imapflow2_branch_under_load": 505
+    }
+  },
+  "fts_migrations": [
+    {
+      "kind": "round7",
+      "beforeVersion": 2,
+      "afterVersion": 3,
+      "messages": 11000,
+      "accounts": 2,
+      "guards": 81,
+      "durationMs": 987.0301070000005,
+      "searchComparisons": 48,
+      "inventory": {
+        "shardPath": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db",
+        "shardVersion": 2,
+        "ftsOrphanCount": 0,
+        "sharedMessageIdCount": 5500,
+        "sharedMessageRowCount": 11000,
+        "storedAccountCount": 2,
+        "legacyMessageKey": false,
+        "resyncRequiredForLegacySharedShard": false,
+        "note": "Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."
+      },
+      "sourceUnchanged": true,
+      "beforeFileBytes": 13557760,
+      "afterFileBytes": 17133568
+    },
+    {
+      "kind": "legacy",
+      "beforeVersion": 0,
+      "afterVersion": 3,
+      "messages": 11000,
+      "accounts": 2,
+      "guards": 81,
+      "durationMs": 4304.074644000002,
+      "searchComparisons": 24,
+      "inventory": {
+        "shardPath": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db",
+        "shardVersion": 0,
+        "ftsOrphanCount": 0,
+        "sharedMessageIdCount": 5500,
+        "sharedMessageRowCount": 11000,
+        "storedAccountCount": 2,
+        "legacyMessageKey": true,
+        "resyncRequiredForLegacySharedShard": true,
+        "note": "Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."
+      },
+      "sourceUnchanged": true,
+      "beforeFileBytes": 4927488,
+      "afterFileBytes": 15790080
+    }
+  ],
+  "remaining_typecheck_errors": [],
+  "deploy_handoff_delta": {
+    "dependencies": {
+      "sharp_override": "0.35.5",
+      "sharp_libvips": "1.3.4 / 8.18.7",
+      "imapflow": "2.9.1",
+      "nodemailer": "10.2.1",
+      "mcp_sdk": "1.32.1",
+      "tracing_includes": [
+        "/* -> ./node_modules/@img/sharp-libvips-*/lib/**",
+        "/api/accounts/*/sync -> ./node_modules/imapflow/**"
+      ],
+      "standalone_entry": "bun --bun server.js; ship noctua-server.mjs, .next/static and public"
+    },
+    "fts_v3": {
+      "migration": "One-way transaction at first configured open per physical shard; open every mapped account, including cold/inactive shards. Stop all old/new clients first and retain a coordinated verified backup of master/auth, mapped shards with WAL/SHM, sources, attachments and matching private keys.",
+      "planning": "For the reviewed 11,000-message v2 workload, budget 2.0-3.0 seconds per shard for whole open; present smaller synthetic v2 copy measured 987.030 ms and legacy format-0 copy 4304.075 ms including configured API/runtime probes. Allow additional time for pre-v2 composite-key conversion; serially budget every shard and validate representative stopped copies. No larger-shard latency guarantee.",
+      "space": "At least 2 x largest shard file + 56 MB WAL headroom per shard filesystem, plus backup and normal reserve; reviewed process RSS approximately 220 MB. Larger/concurrent migrations need larger allowances.",
+      "verification": "Follow doc/FTS-V3-MIGRATION.md steps 3-5 in order: readonly collision/orphan inventory; timed configured first open; exact schema/81 guards, bijection/FTS/FKs, scoped search/page boundaries, then provenance/privacy. Record orphan decisions. Resync every historically shared account even if current collisions are zero.",
+      "rollback": "Stop writers and restore the complete coordinated snapshot with the matching old binary and keys. No in-place downgrade, version lowering, guard removal, ANALYZE or PRAGMA optimize."
+    },
+    "i18n": {
+      "default": "German (du); German and English catalogs bundled in standalone.",
+      "precedence": [
+        "stored users.uiLocale",
+        "validated noctua-ui-locale cookie",
+        "Accept-Language",
+        "de"
+      ],
+      "verification": "Five standalone locale cases, static assets HTTP 200, German list and reader captured at 320 px without document overflow.",
+      "followups": "Server bucket boundaries versus Europe/Berlin remain the documented doc/I18N.md follow-up, outside round 8."
+    },
+    "required_new_environment_variables": [],
+    "retained_systemd": {
+      "TimeoutStopSec": "10s",
+      "KillSignal": "SIGTERM",
+      "KillMode": "mixed"
+    }
+  },
+  "dropped_inputs": [
+    {
+      "input": 8,
+      "branch": "feat/sender-identities-2",
+      "pin": "d5ae17b",
+      "reason": "Deferred to round 9 while fix round 4 is under decisive performance review."
+    },
+    {
+      "input": 10,
+      "branch": "feat/sender-identities-3",
+      "reason": "Deferred to round 9; in fix round 2."
+    }
+  ],
+  "lockfile_sha256": "8d774d14a506cff89e1a22f447f29af4e12e6b664720b5cdcac6f5df7ce039fa",
+  "lock_unchanged_from_input_2": true,
+  "cleanup": {
+    "live_worktree_processes": [],
+    "reserved_ports": {
+      "3798": {
+        "ipv4": "free",
+        "ipv6": "free"
+      },
+      "3799": {
+        "ipv4": "free",
+        "ipv6": "free"
+      }
+    },
+    "temporary_directory_removed": true
+  },
+  "pushed": false,
+  "pr_created": false,
+  "deployed": false,
+  "artifact_directory": "/home/monkey/code/noctua-mail/briefs/integration-stage-r8-validation-905c32f"
+}

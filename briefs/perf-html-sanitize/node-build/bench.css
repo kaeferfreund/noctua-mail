@@ -1,0 +1,32 @@
+/* app/components/HtmlMessage.module.css */
+.htmlMessage_zvrs2w {
+  display: block;
+  box-sizing: border-box;
+  background: var(--mail-view-bg);
+  color: var(--mail-view-fg);
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+}
+
+.frame_zvrs2w {
+  display: block;
+  background: none;
+  border: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 1px;
+}
+
+.framed_zvrs2w {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.unframed_zvrs2w {
+  border: 0;
+  border-radius: 0;
+}

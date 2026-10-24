@@ -1,0 +1,62 @@
+Pairwise merge resolution notes (R2; no source/index merge performed)
+
+origin/feat/status-bar-compact 5809d898:
+- AppShell.tsx, ShellHeader toolbar/indicators hunk: retain reader-focus's combined
+  (mobile thread OR desktop focus) condition that hides header.toolbar. Choose
+  indicators={statusBar} from compact status for both desktop and mobile. Keep
+  compact's styles.workspace and footer removal, plus reader's onReaderNavigate.
+- doc/SHELL.md, entire add/add document: combine status indicator/density and
+  reader-layout sections. Preserve compact R2 integration decisions and evidence
+  links and reader R2 behavior. Correct compact's obsolete list-only notice claim:
+  split measures the list; focus measures #reader. Keep scoped mail-only printing,
+  explicit JSON commands, accessible position, focus fallback and archive/delete
+  continuation, and external briefs evidence paths.
+- Automatic merges need semantic checking: ShellPanes keeps compact spacing and
+  separator hit targets alongside focus's hidden mounted list/resize persistence.
+  MessageViewPane keeps spacing variables alongside the R2 print allowlist.
+  Recheck collapsed-sidebar Undo, status popover, 1024/1280px and 390px after the
+  actual stack is integrated; pairwise trees do not establish stack correctness.
+
+origin/feat/sender-identities-3 pinned 26d82d8:
+- MailClient.tsx, initial import hunk: keep useSenderMessages and ALL five reader
+  imports, including the new useReaderFocusPlacement. Retain sender refresh logic.
+- PreferencesTabContent.tsx, import hunk: keep next-intl useLocale/useTranslations
+  plus useEffect/useState/type ReactNode from React.
+- PreferencesTabContent.tsx, signature label hunk: combine !senderPreferences with
+  t("preferences.signature") and preserve the matching conditional closing brace.
+- resyncMessage.senderKey.test.ts, helper/first declaration hunk: retain the HEAD
+  runIsolated/NOCTUA_RESYNC_TEST_CHILD scheme as one complete implementation.
+  Preserve both real IMAP cases and all assertions. Keep the existing 20000ms Bun
+  budget and 25000ms process watchdog unchanged; do not combine environment flags.
+- Same test, second declaration hunk: retain test(...) plus HEAD's child guard.
+- de.json and en.json, Settings hunk (one each): merge sender/edit additions into
+  the full localized Settings object, retaining members/preferences/roles.
+- de.json and en.json, Compose/Errors hunk (one each): merge Compose.sender,
+  Errors.sender and related Compose keys into the complete namespaces. Keep all
+  Reader.focus keys, including toolbarLabel, and every other namespace. Parse
+  both JSON files and run catalog parity after actual resolution.
+
+origin/fix/admin-mailbox-self-grant pinned b6c1ba9:
+- playwright.qa-round2.config.ts, testMatch hunk: keep BOTH qa-admin-self-grant and
+  qa-reader-focus alternatives, alongside qa-shell, qa-compose, qa-unread-count,
+  qa-translation and qa-admin-breakpoint. Other changes auto-merge.
+
+origin/fix/sync-folder-account-mismatch pinned 20d93cf:
+- MailClient.tsx, initial import hunk: retain useStartupSync, useEmptyFolderRepair,
+  isAccountFolder and findInboxFolder alongside all five reader imports. Keep
+  sync's account-scoped folder/startup/empty-folder logic and reader's selection,
+  focus placement, navigation rows and notice observation. All other hunks merge.
+
+origin/integration/stage 11dc3c5:
+- Pairwise clean.
+
+origin/fix/i18n-views latest 4d812228 (supersedes the initial 992b220 probe):
+- lazyAdmin.dom.test.tsx, role-change Retry/cancellation hunk: retain reader's
+  async act around Retry and the combined waitFor assertions for absent Admin
+  and idleTasks.size === 1. The i18n R2 change now also awaits idle cancellation;
+  reader's stronger effect-flushing synchronization includes that intent.
+  Preserve the exact assertions and all existing timeout/retry budgets.
+- The translated English Add mailbox loading-dialog assertions auto-merge, as
+  do the latest i18n browser cases, catalogs and doc/I18N.md integration notes.
+  Keep these newer changes. The reader branch itself retains its lazy-admin
+  synchronization file byte-for-byte from 14a1f8e.

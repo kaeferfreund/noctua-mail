@@ -1,0 +1,259 @@
+[
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=50",
+  "sha256": "1f6a38f3a5ff4e93d004537cd02808fb85ae1e3396a609230d2b2d589c41bcbd",
+  "bytes": 232488,
+  "itemsWithSuggestions": 63
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=50",
+  "p50": 19.147815999998784,
+  "p90": 23.348973999998634,
+  "sqlP50": 11.420262999999977,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=50",
+  "p50": 8.279195999999502,
+  "p90": 8.420357000000877,
+  "sqlP50": 7.290264000001116,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=100",
+  "sha256": "9326fc94962a9b29b3fbcf49fee54caad1e090958af6b50c0bb2d31cb23a060f",
+  "bytes": 570528,
+  "itemsWithSuggestions": 204
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=100",
+  "p50": 25.516514000000825,
+  "p90": 29.92959499999961,
+  "sqlP50": 13.316929000011442,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=100",
+  "p50": 9.378125999999611,
+  "p90": 9.67124799999874,
+  "sqlP50": 8.281274000004487,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=300",
+  "sha256": "94307a5af1688a73035c423f3ca892668ef1f764afe584d664b198cc2805b88e",
+  "bytes": 1748598,
+  "itemsWithSuggestions": 639
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=300",
+  "p50": 50.61006400000042,
+  "p90": 55.01926500000263,
+  "sqlP50": 19.53045999997994,
+  "execs": 47
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=300",
+  "p50": 14.888976999998704,
+  "p90": 15.432781999999861,
+  "sqlP50": 12.781316999982664,
+  "execs": 19
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics+suggestions (900 items)",
+  "p50": 23.83749899999748,
+  "p90": 27.04172800000015,
+  "sqlP50": 4.749242999994749,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics only (no suggestions)",
+  "p50": 1.206091000000015,
+  "p90": 1.3568919999997888,
+  "sqlP50": 0.6624460000093677,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich collab",
+  "p50": 1.2076909999996133,
+  "p90": 1.2916110000005574,
+  "sqlP50": 0.5405659999996715,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   slim + JSON.stringify",
+  "p50": 0.9924089999985881,
+  "p90": 1.0598099999988335,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   buildTimeGroupKey x 900",
+  "p50": 0.529884999999922,
+  "p90": 0.6366060000000289,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   requireAccountContext (guard+role+account)",
+  "p50": 1.5735350000031758,
+  "p90": 1.6959349999997357,
+  "sqlP50": 0.4824860000007902,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   validateAccountFolders",
+  "p50": 0.24812200000087614,
+  "p90": 0.2929629999998724,
+  "sqlP50": 0.1316420000002836,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=50",
+  "sha256": "cb54a31375e34e0fae95d7dc58d0893a2e8218a01e33acef4fc318f351a7db67",
+  "bytes": 350804,
+  "itemsWithSuggestions": 150
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=50",
+  "p50": 51.837915000000066,
+  "p90": 55.82531200000085,
+  "sqlP50": 42.373789999997825,
+  "execs": 45
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=50",
+  "p50": 39.361440999997285,
+  "p90": 40.19616899999892,
+  "sqlP50": 38.26078899999993,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=100",
+  "sha256": "f4b35f7dc63205685496e492307da2144cbb63af7a050aff0b184b7f3fdee9c1",
+  "bytes": 701233,
+  "itemsWithSuggestions": 300
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=100",
+  "p50": 60.054831000001286,
+  "p90": 64.92831599999772,
+  "sqlP50": 45.21065400000225,
+  "execs": 45
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=100",
+  "p50": 41.93494499999724,
+  "p90": 42.862434000002395,
+  "sqlP50": 40.563208999999915,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=300",
+  "sha256": "fc9e5649ababb87d00975c7f2ba9fa89bd54a3ad59f4582cde5e55186da0050d",
+  "bytes": 1972751,
+  "itemsWithSuggestions": 804
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=300",
+  "p50": 88.34729100000186,
+  "p90": 91.35471799999868,
+  "sqlP50": 53.52189199998975,
+  "execs": 47
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=300",
+  "p50": 48.762447000000975,
+  "p90": 49.67253599999822,
+  "sqlP50": 46.4217880000142,
+  "execs": 19
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics+suggestions (900 items)",
+  "p50": 29.18322800000169,
+  "p90": 32.05649400000402,
+  "sqlP50": 5.440811999993457,
+  "execs": 10
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics only (no suggestions)",
+  "p50": 1.1118900000001304,
+  "p90": 1.223652000000584,
+  "sqlP50": 0.5986849999899277,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich collab",
+  "p50": 1.2341319999977713,
+  "p90": 1.42561299999943,
+  "sqlP50": 0.6042850000085309,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   slim + JSON.stringify",
+  "p50": 1.2080109999951674,
+  "p90": 1.2947720000011032,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   buildTimeGroupKey x 900",
+  "p50": 0.48436499999661464,
+  "p90": 0.5997250000000349,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   requireAccountContext (guard+role+account)",
+  "p50": 1.5465339999936987,
+  "p90": 1.688655000005383,
+  "sqlP50": 0.4966409999979078,
+  "execs": 10
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   validateAccountFolders",
+  "p50": 0.23732200000085868,
+  "p90": 0.3245230000029551,
+  "sqlP50": 0.12072000000625849,
+  "execs": 4
+ },
+ {
+  "label": "requireActiveUserSession",
+  "p50": 1.34457200000179,
+  "p90": 1.5885750000015832,
+  "sqlP50": 0.4016429999974207,
+  "execs": 7
+ }
+]

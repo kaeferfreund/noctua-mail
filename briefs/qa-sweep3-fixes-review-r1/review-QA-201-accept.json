@@ -1,0 +1,26 @@
+{
+  "html-forward": {
+    "prompts": 1,
+    "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+    "back": "\"-------- Forwarded message --------\\n\\nViele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+    "sigIndexStart": 0,
+    "sigIndexBack": 37,
+    "sigs": 1
+  },
+  "text-forward": {
+    "prompts": 1,
+    "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:17 UTC\\nSubject: QA long subject checks wra\"",
+    "back": "\"\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:17 UTC\\nSubject: QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrappi\"",
+    "sigIndexStart": 0,
+    "sigIndexBack": 613,
+    "sigs": 1
+  },
+  "text-reply": {
+    "prompts": 2,
+    "start": "\"\\n\\nOn 23.10.2026, 17:17, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n>\\n\\nViele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+    "back": "\"\\n\\nOn 23.10.2026, 17:17, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n>\\n\\n\\n\\nViele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+    "sigIndexStart": 123,
+    "sigIndexBack": 125,
+    "sigs": 1
+  }
+}

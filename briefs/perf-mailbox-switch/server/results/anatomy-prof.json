@@ -1,0 +1,134 @@
+[
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=50",
+  "sha256": "3893839045ff9427974bc5cfd774f6ed11ffc370cba4664ec29435bf9c9e7b59",
+  "bytes": 232488,
+  "itemsWithSuggestions": 63
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=50",
+  "p50": 20.863750999999866,
+  "p90": 27.453891000000112,
+  "sqlP50": 12.809638000002451,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=50",
+  "p50": 9.551126999999724,
+  "p90": 10.181172999999944,
+  "sqlP50": 8.446277000001828,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=100",
+  "sha256": "bbeabd04759cac7335185dae2f58c46f2e478abe27568288fa377ff1fad2b37e",
+  "bytes": 570528,
+  "itemsWithSuggestions": 204
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=100",
+  "p50": 27.967295999998896,
+  "p90": 32.739259999999376,
+  "sqlP50": 14.409090999992259,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=100",
+  "p50": 10.95545999999922,
+  "p90": 11.47506500000054,
+  "sqlP50": 9.548406999996587,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=300",
+  "sha256": "9a75a9a11b58affbcbeadf80b099202d9d578845b05b1bcaeb01cc5569cabc6b",
+  "bytes": 1748598,
+  "itemsWithSuggestions": 639
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=300",
+  "p50": 48.67868500000077,
+  "p90": 57.8031289999999,
+  "sqlP50": 19.5480999999927,
+  "execs": 47
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=300",
+  "p50": 16.151307000000088,
+  "p90": 16.9822750000003,
+  "sqlP50": 13.74780899999314,
+  "execs": 19
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics+suggestions (900 items)",
+  "p50": 23.142652000000453,
+  "p90": 24.251702000001387,
+  "sqlP50": 4.0859960000016144,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics only (no suggestions)",
+  "p50": 1.191410999999789,
+  "p90": 1.2916519999998854,
+  "sqlP50": 0.6762460000027204,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich collab",
+  "p50": 1.1875710000022082,
+  "p90": 1.2670919999982289,
+  "sqlP50": 0.5676860000021406,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   slim + JSON.stringify",
+  "p50": 1.0346900000004098,
+  "p90": 1.094410000001517,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   buildTimeGroupKey x 900",
+  "p50": 0.48788499999864143,
+  "p90": 0.5644860000029439,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   requireAccountContext (guard+role+account)",
+  "p50": 1.9434179999989283,
+  "p90": 2.717544999999518,
+  "sqlP50": 0.6372470000023895,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   validateAccountFolders",
+  "p50": 0.25204200000007404,
+  "p90": 0.3187230000003183,
+  "sqlP50": 0.11228200000550714,
+  "execs": 4
+ },
+ {
+  "label": "requireActiveUserSession",
+  "p50": 1.469493999997212,
+  "p90": 1.8842570000015257,
+  "sqlP50": 0.446643999996013,
+  "execs": 7
+ }
+]

@@ -1,0 +1,20 @@
+import { test, expect } from "@playwright/test";
+import { signInQa } from "../../tests/browser/ui/qaRound2Session";
+test.use({ locale: "en-GB" });
+const describe = () => { const a = document.activeElement as HTMLElement | null; return a ? `${a.tagName}${a.dataset.messageId ? ":" + a.dataset.messageId : ""}${a.getAttribute("aria-label") ? ":" + a.getAttribute("aria-label") : ""}` : "null"; };
+for (const mode of ["escape-tooltip", "button-click", "escape-twice"] as const) test(`probe ${mode}`, async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await signInQa(page);
+  const rows = page.locator('[data-message-list-row="true"]');
+  await expect(rows.first()).toBeVisible();
+  const id = await rows.first().getAttribute("data-message-id");
+  await page.evaluate(() => { (window as any).__log = []; document.addEventListener("focusin", e => (window as any).__log.push("in:" + ((e.target as HTMLElement).tagName) + ":" + ((e.target as HTMLElement).dataset.messageId ?? (e.target as HTMLElement).getAttribute("aria-label") ?? "")), true); });
+  await rows.first().focus(); await page.keyboard.press("Enter");
+  await expect(page.locator("[data-reader-layout]")).toHaveAttribute("data-reader-layout", "focus");
+  await page.waitForTimeout(500);
+  console.log(mode, "entered", await page.evaluate(describe), "tooltip", await page.getByRole("tooltip").count());
+  if (mode === "button-click") await page.getByRole("button", { name: "Back to messages", exact: true }).click();
+  else { await page.keyboard.press("Escape"); if (mode === "escape-twice") { await page.waitForTimeout(300); if (await page.locator("[data-reader-layout]").getAttribute("data-reader-layout") === "focus") { console.log(mode, "second escape needed"); await page.keyboard.press("Escape"); } } }
+  for (let i = 0; i < 6; i++) { console.log(mode, "t", i * 150, await page.evaluate(describe)); await page.waitForTimeout(150); }
+  console.log(mode, "id", id, "log", JSON.stringify(await page.evaluate(() => (window as any).__log)));
+});

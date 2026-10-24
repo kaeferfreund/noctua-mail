@@ -1,0 +1,10 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/useSearchState.dom.test.tsx:
+(pass) summary owns all collaboration view counts; search never requests a listThreads message total [434.02ms]
+(pass) QA-101 virtual unread counts follow authoritative folder counts without a full sync [1017.47ms]
+
+ 2 pass
+ 0 fail
+ 30 expect() calls
+Ran 2 tests across 1 file. [1.74s]

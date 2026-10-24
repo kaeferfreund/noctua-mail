@@ -1,0 +1,21 @@
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/measure.mjs	2026-10-23 16:08:39.535866348 +0000
++++ h/measure.mjs	2026-10-23 18:45:33.362010883 +0000
+@@ -10,7 +10,7 @@
+ const { values: args } = parseArgs({ options: {
+   series: { type: "string", default: "adhoc" }, mode: { type: "string", default: "warm" },
+   pairs: { type: "string", default: "small:large" }, reps: { type: "string", default: "10" },
+-  "second-tab": { type: "boolean", default: false }, out: { type: "string", default: "/tmp/spike-switch-e2e/results" },
++  "second-tab": { type: "boolean", default: false }, out: { type: "string", default: "/home/monkey/code/noctua-mail/repo/wt-switch-tree/.tmp/e2e/results" },
+   "settle-ms": { type: "string", default: "500" }, "timeout-ms": { type: "string", default: "30000" },
+ } });
+ const REPS = Number(args.reps), SETTLE = Number(args["settle-ms"]), TIMEOUT = Number(args["timeout-ms"]);
+@@ -33,6 +33,9 @@
+     const set = (k, ok) => { if (ok && s.marks[k] === undefined) s.marks[k] = now; };
+     const cur = document.querySelector('[data-sidebar="menu-button"][aria-current="true"]');
+     set("highlight", !!cur && (cur.textContent ?? "").includes(wt.name));
++    // V1: first visible feedback on the clicked row (aria-busy pending state, or aria-current if that lands first).
++    const busy = document.querySelector('[data-sidebar="menu-button"][aria-busy="true"]');
++    set("feedback", (!!busy && (busy.textContent ?? "").includes(wt.name)) || (!!cur && (cur.textContent ?? "").includes(wt.name)));
+     set("oldRowsGone", !document.querySelector(`[data-folder-id^="${wt.from}:"]`) || ![...document.querySelectorAll("[data-message-id]")].some(r => (r.textContent ?? "").includes(` ${wt.fromKey} #`)));
+     set("folders", !!document.querySelector(`[data-folder-id^="${wt.id}:"]`));
+     set("folderTreeComplete", document.querySelectorAll(`[data-folder-id^="${wt.id}:"]`).length >= wt.minFolders);

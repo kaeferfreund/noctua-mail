@@ -1,0 +1,465 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:
+158 |   });
+159 | }
+160 | function waitForWrapper(callback, options) {
+161 |   // create the error here so its stack trace is as close to the
+162 |   // calling code as possible
+163 |   const stackTraceError = new Error('STACK_TRACE_MESSAGE');
+                                    ^
+TestingLibraryElementError: Unable to find role="dialog" and name "Create mailbox"
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mdata-scroll-locked[39m=[32m"1"[39m
+  [33mstyle[39m=[32m"pointer-events: none;"[39m
+[36m>[39m
+  [36m<span[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-radix-focus-guard[39m=[32m""[39m
+    [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+  [36m<div[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+  [36m>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"radix-themes"[39m
+      [33mdata-accent-color[39m=[32m"indigo"[39m
+      [33mdata-gray-color[39m=[32m"slate"[39m
+      [33mdata-has-background[39m=[32m"true"[39m
+      [33mdata-is-root-theme[39m=[32m"true"[39m
+      [33mdata-panel-background[39m=[32m"translucent"[39m
+      [33mdata-radius[39m=[32m"medium"[39m
+      [33mdata-scaling[39m=[32m"100%"[39m
+    [36m/>[39m
+  [36m</div>[39m
+  [36m<div[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mclass[39m=[32m"fixed inset-0 z-[9994] bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none motion-reduce:transition-none motion-reduce:duration-0"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-slot[39m=[32m"sheet-overlay"[39m
+    [33mdata-state[39m=[32m"open"[39m
+    [33mstyle[39m=[32m"pointer-events: auto;"[39m
+  [36m/>[39m
+  [36m<div[39m
+    [33maria-labelledby[39m=[32m"radix-_r_t_"[39m
+    [33mclass[39m=[32m"fixed z-[9994] flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none motion-reduce:transition-none motion-reduce:duration-0"[39m
+    [33mdata-side[39m=[32m"right"[39m
+    [33mdata-slot[39m=[32m"sheet-content"[39m
+    [33mdata-state[39m=[32m"open"[39m
+    [33mid[39m=[32m"radix-_r_s_"[39m
+    [33mrole[39m=[32m"dialog"[39m
+    [33mstyle[39m=[32m"pointer-events: auto;"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+  [36m>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"radix-themes"[39m
+      [33mdata-accent-color[39m=[32m"indigo"[39m
+      [33mdata-gray-color[39m=[32m"slate"[39m
+      [33mdata-has-background[39m=[32m"false"[39m
+      [33mdata-is-root-theme[39m=[32m"false"[39m
+      [33mdata-panel-background[39m=[32m"translucent"[39m
+      [33mdata-radius[39m=[32m"medium"[39m
+      [33mdata-scaling[39m=[32m"100%"[39m
+    [36m>[39m
+      [36m<h2[39m
+        [33mclass[39m=[32m"font-heading text-base font-medium text-foreground m-0"[39m
+        [33mdata-slot[39m=[32m"sheet-title"[39m
+        [33mid[39m=[32m"radix-_r_t_"[39m
+      [36m>[39m
+        [0mAdmin[0m
+      [36m</h2>[39m
+      [36m<section[39m
+        [33maria-label[39m=[32m"Mailboxes"[39m
+        [33mclass[39m=[32m"space-y-4"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex justify-between gap-2"[39m
+        [36m>[39m
+          [36m<h3[39m
+            [33mclass[39m=[32m"font-medium"[39m
+          [36m>[39m
+            [0mMailboxes[0m
+          [36m</h3>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex gap-2"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+              [33mdata-size[39m=[32m"default"[39m
+              [33mdata-slot[39m=[32m"button"[39m
+              [33mdata-variant[39m=[32m"outline"[39m
+            [36m>[39m
+              [0mRefresh mailboxes[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+              [33mdata-size[39m=[32m"default"[39m
+              [33mdata-slot[39m=[32m"button"[39m
+              [33mdata-variant[39m=[32m"default"[39m
+            [36m>[39m
+              [0mCreate mailbox[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</section>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+  [36m<span[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-radix-focus-guard[39m=[32m""[39m
+    [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body[39m
+    [33mdata-scroll-locked[39m=[32m"1"[39m
+    [33mstyle[39m=[32m"pointer-events: none;"[39m
+  [36m>[39m
+    [36m<span[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-radix-focus-guard[39m=[32m""[39m
+      [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+      [33mtabindex[39m=[32m"0"[39m
+    [36m/>[39m
+    [36m<div[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"radix-themes"[39m
+        [33mdata-accent-color[39m=[32m"indigo"[39m
+        [33mdata-gray-color[39m=[32m"slate"[39m
+        [33mdata-has-background[39m=[32m"true"[39m
+        [33mdata-is-root-theme[39m=[32m"true"[39m
+        [33mdata-panel-background[39m=[32m"translucent"[39m
+        [33mdata-radius[39m=[32m"medium"[39m
+        [33mdata-scaling[39m=[32m"100%"[39m
+      [36m/>[39m
+    [36m</div>[39m
+    [36m<div[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mclass[39m=[32m"fixed inset-0 z-[9994] bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none motion-reduce:transition-none motion-reduce:duration-0"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-slot[39m=[32m"sheet-overlay"[39m
+      [33mdata-state[39m=[32m"open"[39m
+      [33mstyle[39m=[32m"pointer-events: auto;"[39m
+    [36m/>[39m
+    [36m<div[39m
+      [33maria-labelledby[39m=[32m"radix-_r_t_"[39m
+      [33mclass[39m=[32m"fixed z-[9994] flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none motion-reduce:transition-none motion-reduce:duration-0"[39m
+      [33mdata-side[39m=[32m"right"[39m
+      [33mdata-slot[39m=[32m"sheet-content"[39m
+      [33mdata-state[39m=[32m"open"[39m
+      [33mid[39m=[32m"radix-_r_s_"[39m
+      [33mrole[39m=[32m"dialog"[39m
+      [33mstyle[39m=[32m"pointer-events: auto;"[39m
+      [33mtabindex[39m=[32m"-1"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"radix-themes"[39m
+        [33mdata-accent-color[39m=[32m"indigo"[39m
+        [33mdata-gray-color[39m=[32m"slate"[39m
+        [33mdata-has-background[39m=[32m"false"[39m
+        [33mdata-is-root-theme[39m=[32m"false"[39m
+        [33mdata-panel-background[39m=[32m"translucent"[39m
+        [33mdata-radius[39m=[32m"medium"[39m
+        [33mdata-scaling[39m=[32m"100%"[39m
+      [36m>[39m
+        [36m<h2[39m
+          [33mclass[39m=[32m"font-heading text-base font-medium text-foreground m-0"[39m
+          [33mdata-slot[39m=[32m"sheet-title"[39m
+          [33mid[39m=[32m"radix-_r_t_"[39m
+        [36m>[39m
+          [0mAdmin[0m
+        [36m</h2>[39m
+        [36m<section[39m
+          [33maria-label[39m=[32m"Mailboxes"[39m
+          [33mclass[39m=[32m"space-y-4"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex justify-between gap-2"[39m
+          [36m>[39m
+            [36m<h3[39m
+              [33mclass[39m=[32m"font-medium"[39m
+            [36m>[39m
+              [0mMailboxes[0m
+            [36m</h3>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex gap-2"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                [33mdata-size[39m=[32m"default"[39m
+                [33mdata-slot[39m=[32m"button"[39m
+                [33mdata-variant[39m=[32m"outline"[39m
+              [36m>[39m
+                [0mRefresh mailboxes[0m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                [33mdata-size[39m=[32m"default"[39m
+                [33mdata-slot[39m=[32m"button"[39m
+                [33mdata-variant[39m=[32m"default"[39m
+              [36m>[39m
+                [0mCreate mailbox[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</section>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+    [36m<span[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-radix-focus-guard[39m=[32m""[39m
+      [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+      [33mtabindex[39m=[32m"0"[39m
+    [36m/>[39m
+  [36m</body>[39m
+[36m</html>[39m
+      at waitForWrapper (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/dom/dist/wait-for.js:163:31)
+      at /home/monkey/code/noctua-mail/wt-qa-fix3/app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:31:15
+(fail) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [1289.35ms]
+158 |   });
+159 | }
+160 | function waitForWrapper(callback, options) {
+161 |   // create the error here so its stack trace is as close to the
+162 |   // calling code as possible
+163 |   const stackTraceError = new Error('STACK_TRACE_MESSAGE');
+                                    ^
+TestingLibraryElementError: Unable to find role="dialog" and name "Create mailbox"
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mdata-scroll-locked[39m=[32m"1"[39m
+  [33mstyle[39m=[32m"pointer-events: none;"[39m
+[36m>[39m
+  [36m<span[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-radix-focus-guard[39m=[32m""[39m
+    [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+  [36m<div[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+  [36m>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"radix-themes"[39m
+      [33mdata-accent-color[39m=[32m"indigo"[39m
+      [33mdata-gray-color[39m=[32m"slate"[39m
+      [33mdata-has-background[39m=[32m"true"[39m
+      [33mdata-is-root-theme[39m=[32m"true"[39m
+      [33mdata-panel-background[39m=[32m"translucent"[39m
+      [33mdata-radius[39m=[32m"medium"[39m
+      [33mdata-scaling[39m=[32m"100%"[39m
+    [36m/>[39m
+  [36m</div>[39m
+  [36m<div[39m
+    [33mclass[39m=[32m"radix-themes rt-BaseDialogOverlay rt-DialogOverlay"[39m
+    [33mdata-accent-color[39m=[32m"indigo"[39m
+    [33mdata-gray-color[39m=[32m"slate"[39m
+    [33mdata-has-background[39m=[32m"false"[39m
+    [33mdata-is-root-theme[39m=[32m"false"[39m
+    [33mdata-panel-background[39m=[32m"translucent"[39m
+    [33mdata-radius[39m=[32m"medium"[39m
+    [33mdata-scaling[39m=[32m"100%"[39m
+    [33mdata-state[39m=[32m"open"[39m
+    [33mstyle[39m=[32m"pointer-events: auto;"[39m
+  [36m>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"rt-BaseDialogScroll rt-DialogScroll"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"rt-BaseDialogScrollPadding rt-DialogScrollPadding rt-r-align-center"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33maria-labelledby[39m=[32m"radix-_r_1s_"[39m
+          [33mclass[39m=[32m"rt-BaseDialogContent rt-DialogContent rt-r-size-4 rt-r-w rt-r-max-w account-settings-modal"[39m
+          [33mdata-state[39m=[32m"open"[39m
+          [33mid[39m=[32m"radix-_r_1r_"[39m
+          [33mrole[39m=[32m"dialog"[39m
+          [33mstyle[39m=[32m"--width: 94vw; --max-width: 980px; overflow: hidden; pointer-events: auto;"[39m
+          [33mtabindex[39m=[32m"-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"rt-Heading rt-r-size-5 rt-r-weight-bold rt-r-lt-start rt-r-mb-3"[39m
+            [33mid[39m=[32m"radix-_r_1s_"[39m
+          [36m>[39m
+            [0mAdmin[0m
+          [36m</h1>[39m
+          [36m<section[39m
+            [33maria-label[39m=[32m"Mailboxes"[39m
+            [33mclass[39m=[32m"space-y-4"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex justify-between gap-2"[39m
+            [36m>[39m
+              [36m<h3[39m
+                [33mclass[39m=[32m"font-medium"[39m
+              [36m>[39m
+                [0mMailboxes[0m
+              [36m</h3>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"flex gap-2"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                  [33mdata-size[39m=[32m"default"[39m
+                  [33mdata-slot[39m=[32m"button"[39m
+                  [33mdata-variant[39m=[32m"outline"[39m
+                [36m>[39m
+                  [0mRefresh mailboxes[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                  [33mdata-size[39m=[32m"default"[39m
+                  [33mdata-slot[39m=[32m"button"[39m
+                  [33mdata-variant[39m=[32m"default"[39m
+                [36m>[39m
+                  [0mCreate mailbox[0m
+                [36m</button>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</section>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+  [36m<span[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-radix-focus-guard[39m=[32m""[39m
+    [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body[39m
+    [33mdata-scroll-locked[39m=[32m"1"[39m
+    [33mstyle[39m=[32m"pointer-events: none;"[39m
+  [36m>[39m
+    [36m<span[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-radix-focus-guard[39m=[32m""[39m
+      [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+      [33mtabindex[39m=[32m"0"[39m
+    [36m/>[39m
+    [36m<div[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"radix-themes"[39m
+        [33mdata-accent-color[39m=[32m"indigo"[39m
+        [33mdata-gray-color[39m=[32m"slate"[39m
+        [33mdata-has-background[39m=[32m"true"[39m
+        [33mdata-is-root-theme[39m=[32m"true"[39m
+        [33mdata-panel-background[39m=[32m"translucent"[39m
+        [33mdata-radius[39m=[32m"medium"[39m
+        [33mdata-scaling[39m=[32m"100%"[39m
+      [36m/>[39m
+    [36m</div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"radix-themes rt-BaseDialogOverlay rt-DialogOverlay"[39m
+      [33mdata-accent-color[39m=[32m"indigo"[39m
+      [33mdata-gray-color[39m=[32m"slate"[39m
+      [33mdata-has-background[39m=[32m"false"[39m
+      [33mdata-is-root-theme[39m=[32m"false"[39m
+      [33mdata-panel-background[39m=[32m"translucent"[39m
+      [33mdata-radius[39m=[32m"medium"[39m
+      [33mdata-scaling[39m=[32m"100%"[39m
+      [33mdata-state[39m=[32m"open"[39m
+      [33mstyle[39m=[32m"pointer-events: auto;"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"rt-BaseDialogScroll rt-DialogScroll"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"rt-BaseDialogScrollPadding rt-DialogScrollPadding rt-r-align-center"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33maria-labelledby[39m=[32m"radix-_r_1s_"[39m
+            [33mclass[39m=[32m"rt-BaseDialogContent rt-DialogContent rt-r-size-4 rt-r-w rt-r-max-w account-settings-modal"[39m
+            [33mdata-state[39m=[32m"open"[39m
+            [33mid[39m=[32m"radix-_r_1r_"[39m
+            [33mrole[39m=[32m"dialog"[39m
+            [33mstyle[39m=[32m"--width: 94vw; --max-width: 980px; overflow: hidden; pointer-events: auto;"[39m
+            [33mtabindex[39m=[32m"-1"[39m
+          [36m>[39m
+            [36m<h1[39m
+              [33mclass[39m=[32m"rt-Heading rt-r-size-5 rt-r-weight-bold rt-r-lt-start rt-r-mb-3"[39m
+              [33mid[39m=[32m"radix-_r_1s_"[39m
+            [36m>[39m
+              [0mAdmin[0m
+            [36m</h1>[39m
+            [36m<section[39m
+              [33maria-label[39m=[32m"Mailboxes"[39m
+              [33mclass[39m=[32m"space-y-4"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"flex justify-between gap-2"[39m
+              [36m>[39m
+                [36m<h3[39m
+                  [33mclass[39m=[32m"font-medium"[39m
+                [36m>[39m
+                  [0mMailboxes[0m
+                [36m</h3>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"flex gap-2"[39m
+                [36m>[39m
+                  [36m<button[39m
+                    [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                    [33mdata-size[39m=[32m"default"[39m
+                    [33mdata-slot[39m=[32m"button"[39m
+                    [33mdata-variant[39m=[32m"outline"[39m
+                  [36m>[39m
+                    [0mRefresh mailboxes[0m
+                  [36m</button>[39m
+                  [36m<button[39m
+                    [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 bg-primary text-primary-foreground hover:bg-primary/80 h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2"[39m
+                    [33mdata-size[39m=[32m"default"[39m
+                    [33mdata-slot[39m=[32m"button"[39m
+                    [33mdata-variant[39m=[32m"default"[39m
+                  [36m>[39m
+                    [0mCreate mailbox[0m
+                  [36m</button>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+            [36m</section>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+    [36m<span[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-radix-focus-guard[39m=[32m""[39m
+      [33mstyle[39m=[32m"opacity: 0; position: fixed; pointer-events: none; outline-color: none; outline-style: none; outline-width: initial;"[39m
+      [33mtabindex[39m=[32m"0"[39m
+    [36m/>[39m
+  [36m</body>[39m
+[36m</html>[39m
+      at waitForWrapper (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/dom/dist/wait-for.js:163:31)
+      at /home/monkey/code/noctua-mail/wt-qa-fix3/app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:31:15
+(fail) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [1146.61ms]
+
+ 0 pass
+ 2 fail
+Ran 2 tests across 1 file. [2.92s]

@@ -1,0 +1,10 @@
+$ bun test --timeout 20000 --randomize --seed=1337 --rerun-each=3
+bun test v1.4.4 (38afee6c8)
+
+lib/db.messageSizes.test.ts: (run #1)
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4f9W38",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4f9W38/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+error: script "test:stress" was terminated by signal SIGTERM (Polite quit request)

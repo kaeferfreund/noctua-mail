@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="4" assertions="2" failures="1" skipped="2" time="0.256601224">
+  <testsuite name="special/resync.copy.test.ts" file="special/resync.copy.test.ts" tests="4" assertions="2" failures="1" skipped="2" time="0.252788789" hostname="ubuntu-26-arm-310784">
+    <testcase name="real IMAP resync replaces an unkeyed legacy row with the parsed sender key" classname="" time="0" file="special/resync.copy.test.ts" line="29" assertions="0">
+      <skipped />
+    </testcase>
+    <testcase name="collision-variant resync preserves the base source and refreshes only the variant&apos;s ownership and sender" classname="" time="0" file="special/resync.copy.test.ts" line="29" assertions="0">
+      <skipped />
+    </testcase>
+    <testcase name="special &lt;tag&gt; &amp; &quot;double&quot; &apos;single&apos; [x] (y) $z ^a* +b? {c} |d \e" classname="" time="0.000047" file="special/resync.copy.test.ts" line="29" assertions="1" />
+    <testcase name="special failing &lt;b&gt; &amp; &quot;q&quot; &apos;a&apos;" classname="" time="0.000209" file="special/resync.copy.test.ts" line="29" assertions="1">
+      <failure type="AssertionError" message="expect(received).toBe(expected)&#10;&#10;Expected: 3&#10;Received: 2&#10;">AssertionError: expect(received).toBe(expected)&#10;&#10;Expected: 3&#10;Received: 2&#10;&#10;      at special/resync.copy.test.ts:110:17&#10;</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

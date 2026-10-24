@@ -1,0 +1,1051 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db.collisionVariantInlineImages.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-UvyHF0",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-UvyHF0/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/outboundWrite.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 3,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 11,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 133,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 135,
+}
+
+lib/processLeases.hint.test.ts:
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 135,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 150,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 96,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 97,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 109,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 112,
+}
+
+lib/processLeases.integration.test.ts:
+LEASE_PROOF independent-graph admission: 4 processes, maximum 2 workers
+LEASE_PROOF restart recovery: expired live orphan retained; dead orphan reclaimed; stale child rejected
+LEASE_PROOF starvation bound: watcher admitted after 8 interactive bypasses
+LEASE_PROOF confirmed-exit failure: a live recorded PID retains capacity
+LEASE_PROOF scheduler: independent graphs share one owner, dead-owner takeover and orderly handoff pass
+LEASE_PROOF production monitor: SIGKILL waits for confirmed exit, rejected exit retains capacity
+LEASE_PROOF PASS
+
+lib/calendarInviteProcessor.test.ts:
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "fails@example.test",
+  actionType: "invitation",
+  error: 1072 |   });
+1073 | 
+1074 |   test("returns failures for groups that throw while leaving other imports intact", async () => {
+1075 |     // Two events in one ICS — make the upsert fail for the first one only.
+1076 |     upsertCalendarEventByUid.mockImplementationOnce(async () => {
+1077 |       throw new Error("db unavailable");
+                       ^
+error: db unavailable
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1077:17)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.ts:659:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1095:26)
+,
+}
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "lookup-fails@example.test",
+  actionType: "unknown",
+  error: 1117 | 
+1118 |   test("isolates a per-group failure when the existing-event lookup throws", async () => {
+1119 |     // First group's lookup blows up; second group should still process fine.
+1120 |     getCalendarEventByUid
+1121 |       .mockImplementationOnce(async () => {
+1122 |         throw new Error("lookup failed");
+                         ^
+error: lookup failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1122:19)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.ts:563:35)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1140:26)
+,
+}
+
+lib/outboundWrite.revocation.test.ts:
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 15,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 16,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 30,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 134,
+  elapsedMs: 21,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/dbWriteRetry.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 2,
+  attempts: 5,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 3,
+  attempts: 5,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 4,
+  attempts: 5,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic-budget",
+  retries: 4,
+  elapsedMs: 1800,
+}
+retry shutdown proof {
+  durationMs: 181,
+  delayMs: 1500,
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 3,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 7,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 15,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 23,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 31,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 39,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 47,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 55,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 63,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 71,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 79,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 87,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 95,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 103,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 17,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 111,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 18,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 231,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 19,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 471,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 20,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 951,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 20,
+  attempts: 21,
+  elapsedMs: 1911,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 4,
+  attempts: 5,
+  elapsedMs: 1800,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 1800,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1801,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 1803,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1807,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1815,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1823,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1831,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1839,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1847,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1855,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1863,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1871,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 17,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1879,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 18,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1887,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 19,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1895,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 20,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1903,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 20,
+  attempts: 21,
+  elapsedMs: 1911,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic elapsed budget",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 1100,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic elapsed budget",
+  retries: 1,
+  attempts: 2,
+  elapsedMs: 2201,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic delayed wake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic delayed wake",
+  retries: 1,
+  attempts: 1,
+  elapsedMs: 2201,
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/db/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/ftsIdentity.test.ts:
+[shard-format-v3] dropped 2 orphan FTS rows
+
+lib/db/messages/senderKey.retrieval.test.ts:
+[db-write-retry] retry {
+  operation: "upsertAccount",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 117,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertAccount",
+  retries: 1,
+  elapsedMs: 161,
+}
+
+ 393 pass
+ 0 fail
+ 1690 expect() calls
+Ran 393 tests across 55 files. [71.46s]

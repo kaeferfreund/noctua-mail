@@ -1,0 +1,27 @@
+syn-m0 route GET threads pageSize=50                         p50 23.49 p90 27.97 sql 13.66 execs 44
+syn-m0   listThreads pageSize=50                             p50 11.75 p90 12.05 sql 9.54 execs 17
+syn-m0 route GET threads pageSize=100                        p50 33.81 p90 40.16 sql 15.65 execs 44
+syn-m0   listThreads pageSize=100                            p50 14.15 p90 14.75 sql 10.57 execs 17
+syn-m0 route GET threads pageSize=300                        p50 72.89 p90 80.84 sql 21.82 execs 46
+syn-m0   listThreads pageSize=300                            p50 23.84 p90 26.01 sql 14.49 execs 19
+syn-m0   enrich topics+suggestions (900 items)               p50 35.84 p90 38.16 sql 5.37 execs 9
+syn-m0   enrich topics only (no suggestions)                 p50 1.29 p90 1.44 sql 0.68 execs 4
+syn-m0   enrich collab                                       p50 1.33 p90 1.54 sql 0.56 execs 4
+syn-m0   slim + JSON.stringify                               p50 1.29 p90 1.41 sql 0.00 execs 0
+syn-m0   buildTimeGroupKey x 900                             p50 4.45 p90 5.07 sql 0.00 execs 0
+syn-m0   requireAccountContext (guard+role+account)          p50 1.72 p90 2.05 sql 0.50 execs 10
+syn-m0   validateAccountFolders                              p50 0.24 p90 0.32 sql 0.12 execs 4
+syn-l0 route GET threads pageSize=50                         p50 67.90 p90 74.32 sql 54.97 execs 44
+syn-l0   listThreads pageSize=50                             p50 52.09 p90 53.13 sql 49.88 execs 17
+syn-l0 route GET threads pageSize=100                        p50 80.30 p90 86.32 sql 57.85 execs 44
+syn-l0   listThreads pageSize=100                            p50 55.95 p90 56.92 sql 52.35 execs 17
+syn-l0 route GET threads pageSize=300                        p50 122.42 p90 127.91 sql 65.48 execs 46
+syn-l0   listThreads pageSize=300                            p50 67.87 p90 73.71 sql 58.36 execs 19
+syn-l0   enrich topics+suggestions (900 items)               p50 42.96 p90 45.42 sql 5.58 execs 9
+syn-l0   enrich topics only (no suggestions)                 p50 1.12 p90 1.25 sql 0.61 execs 4
+syn-l0   enrich collab                                       p50 1.30 p90 1.42 sql 0.62 execs 4
+syn-l0   slim + JSON.stringify                               p50 1.29 p90 1.42 sql 0.00 execs 0
+syn-l0   buildTimeGroupKey x 900                             p50 4.51 p90 5.07 sql 0.00 execs 0
+syn-l0   requireAccountContext (guard+role+account)          p50 1.72 p90 2.03 sql 0.52 execs 10
+syn-l0   validateAccountFolders                              p50 0.23 p90 0.30 sql 0.12 execs 4
+requireActiveUserSession                                     p50 1.26 p90 1.36 sql 0.38 execs 7

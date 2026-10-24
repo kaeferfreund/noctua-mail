@@ -1,0 +1,264 @@
+fix(integration): record round 9 validation and deployment handoff
+
+Round 9 of integration/stage: 6 pinned inputs merged on top of the round-8
+record 11dc3c5, plus 6 fix(integration) commits. Validated head (production
+source): 97dd982 (= 6e4bbcb minus test-only changes). No pushes, no PRs.
+
+Pinned inputs (tips verified against origin):
+  feat/sender-identities-3          26d82d81126639afd82cf5d0d53ff1093b9959c7
+  feat/sender-identities-2          327f6d96b21651a34f5178330bb9fb473b4990f3
+  chore/deps-next-16-4              4547815960a2bddc93bc42c5203d517d2ccfe433
+  fix/admin-mailbox-self-grant      b6c1ba94019dad49410dba7df623ece2f10a26a8
+  fix/sync-folder-account-mismatch  1ee8d6470c6cc00573b8d7bd244751b8f15d113f
+  fix/i18n-views                    4d812228be2e447e1181caa1c808a5ea437e0bba
+Dropped: none.
+
+First-parent round-9 commits before this record:
+  09b2695 Merge feat/sender-identities-3 26d82d8 into integration/stage (round 9)
+  13e7971 Merge feat/sender-identities-2 327f6d9 into integration/stage (round 9)
+  6a22653 Merge chore/deps-next-16-4 4547815 into integration/stage (round 9)
+  cc128a8 Merge fix/admin-mailbox-self-grant b6c1ba9 into integration/stage (round 9)
+  747eeb3 Merge fix/sync-folder-account-mismatch 1ee8d64 into integration/stage (round 9)
+  9dfbc2c Merge fix/i18n-views 4d81222 into integration/stage (round 9)
+  98b4301 fix(integration): keep upcoming relative-time grouping pure during render
+  fc8aab3 fix(integration): read the resync child pass marker from a JUnit report
+  97dd982 fix(integration): keep the API error resolver stable across UI language switches
+  2bb472f fix(integration): use the German settings dialog name in the locale switch scenario
+  34a5263 fix(integration): follow the localized folder and watcher labels in QA-101
+  6e4bbcb fix(integration): use the localized shell labels in the German compose editor matrix
+
+Conflicts and resolutions (details in each merge body):
+- 1 sender-3: PreferencesTabContent.tsx (2 hunks: stage i18n + branch
+  ReactNode/senderPreferences slot, one signature selector);
+  resyncMessage.senderKey.test.ts (branch realResyncTest wrapper, stage
+  runIsolated removed); messages/de+en.json (868 stage + 75 branch leaves =
+  943; de Settings.language.saving kept from stage). Catalog parity 54/0.
+- 2 sender-2: lib/db/messages/upsert.ts 3 hunks (stage FTS-v3 identity
+  writer kept, branch v2 FTS planning dropped, guard/rollback kept;
+  byte-identical to the review-r6 merged snapshot); resync test as input 1;
+  doc/SENDER-IDENTITIES.md additive.
+- 3 deps-next-16-4, 4 admin-self-grant: conflict-free, trees equal the
+  merge-tree previews.
+- 5 sync-folder: MailClient.tsx imports union + useStartupSync next to the
+  sender-3 sender-settings refresh effect.
+- 6 i18n-views: AccountSettingsModal.tsx (4 hunks), MailClient.tsx (2),
+  lib/i18n/catalogs.test.ts, messages/*.json 3-way leaf merge (952 + 150 =
+  1102 leaves per locale).
+
+Integration fixes:
+- 98b4301: new react-hooks/purity error from inputs 3+6 combined
+  (UpcomingStatusPopover.tsx:176:81); restored the helper's default nowMs.
+- fc8aab3 (test only): resync child pass marker read from a JUnit report.
+  Cause of "ci-claudecode-env" (2913/2) and "resync-alone" (0/2): Bun 1.4.4
+  hides "(pass)" lines when CLAUDECODE/AGENT/REPL_ID is set; not
+  order-dependent, no product defect. Now passes with CLAUDECODE=1 (2/0).
+- 97dd982 (PRODUCTION, data loss): an unsent inline reply was unmounted by a
+  UI language switch. Bisect 09b2695 pass, 6a22653 pass, cc128a8 pass,
+  747eeb3 FAIL. Responsible input: fix/sync-folder-account-mismatch 1ee8d64
+  (useApiErrorMessage's useCallback depended on the locale translator ->
+  new readErrorMessage identity -> loadInitialData re-ran the mailbox
+  bootstrap: setInitialDataReady(false), setFolders([])). Fix: translator in
+  a ref, resolver identity-stable (+6/-2 in useApiErrorMessage.ts) + DOM
+  regression test (12/1 without, 13/0 with the fix).
+- 2bb472f, 34a5263, 6e4bbcb (tests only): selectors follow intended copy of
+  round-8/9 inputs: Settings.accountTitle "Postfacheinstellungen" (79283b2),
+  folder tree title "Inbox (" via getFolderDisplayName (79283b2/8273d15),
+  watcher "Watcher: Listening for new mail" (79283b2), German shell chrome
+  in the sender-3 de editor matrix (b2cddb5 Shell.sidebar.toggle /
+  Shell.compose.new, dc6274f Reader.editDraft, 79283b2 Folders.drafts;
+  sender-3 was branched from round 7 before the shell was localized). No
+  assertion, matrix size or timeout changed.
+
+Defects found and preview impact:
+- D1 (data loss, fixed in 97dd982): preview round 8.9 (deploy/dev-stage
+  0ac6cfa = tree 98b4301) loses an open, unsent inline reply (and any other
+  state below the mailbox bootstrap) when the user changes the UI language.
+  Present since merge 747eeb3; not in round 8. The preview needs a redeploy
+  from this head to remove it.
+- No other product defect. Stale selectors (3 specs) and harness issues
+  (runner scratch prefix, Playwright loader in the .tmp probe copy) were
+  test-side only.
+
+Environment: Bun 1.4.4, Next 16.4.2 (Turbopack), React 19.3.1, Node 24.22.1
+for the Playwright CLI of the r4 probe; all heavy gates sequential at
+nice -n 15; every bun test / test:ci / test:stress / Playwright gate run of
+this finishing pass with CLAUDECODE, AGENT and REPL_ID unset (the gate
+wrapper records env_unset), except resync-alone-claudecode-r9-final which
+sets CLAUDECODE=1 on purpose. TMPDIR worktree-local .tmp. App servers only
+on 3798/3799, fixtures on OS-assigned loopback ports, synthetic data only.
+PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64.
+Frozen bun.lock SHA-256: 326073eee764c5c45295a6cf608bb05761474891aef9fab6711fb757dd512fb3
+
+Final-source coverage: production code last changed in 97dd982. After it:
+build-r9-fix + standalone-workers-r9-fix, auth-browser-r9-final (20/20 incl.
+the data-loss scenario shell.spec.ts:229), qa-specs-r9c, qa-compose-r9e,
+sender3-review-r4-probe-r9, typecheck-r9-final, ci-r9-final, lint-r9-final,
+bundle-after-r9-final, diff checks, frozen install. Not rerun after 97dd982
+(ran on 98b4301): stress (per this pass's instructions, not rerun after
+the +6/-2 client hook change in 97dd982; ci-r9-final covers it), migration,
+shutdown, i18n standalone, and the orchestrator-run smoke/security/privacy;
+97dd982 touches only the client-side error resolver.
+
+Verbatim gate results (.tmp/gates.jsonl, in order; "->" = result excerpt):
+install: {"name": "install", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.048}
+  -> Checked 1087 installs across 1094 packages (no changes); bun.lock unchanged
+typecheck: {"name": "typecheck", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.651}
+  -> No type errors in 1,244 files
+lint: {"name": "lint", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 1, "duration_seconds": 54.107}
+  -> 182 problems (1 error, 181 warnings) on 9dfbc2c: react-hooks/purity UpcomingStatusPopover.tsx:176:81 -> fixed by 98b4301
+syncfolder-probes: {"name": "syncfolder-probes", "command": ["nice", "-n", "15", "timeout", "600", "bun", "test", "--config=bunfig.dom.toml", "./r9-probes/"], "exit_code": 0, "duration_seconds": 0.357}
+  -> 16 pass / 0 fail / 53 expect()
+syncfolder-notice-dom: {"name": "syncfolder-notice-dom", "command": ["nice", "-n", "15", "timeout", "600", "bun", "test", "--config=bunfig.dom.toml", "app/components/mailclient/useSyncController.notice.dom.test.tsx", "app/components/mailclient/useSyncController.dom.test.tsx", "app/components/mailclient/useEmptyFolderRepair.dom.test.tsx", "app/components/mailclient/useAccountController.dom.test.tsx"], "exit_code": 0, "duration_seconds": 0.964}
+  -> 29 pass / 0 fail / 111 expect()
+lint: {"name": "lint", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 0, "duration_seconds": 50.098}
+  -> 181 problems (0 errors, 181 warnings)
+bundle-before: {"name": "bundle-before", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "905c32fb4fdcee7047eca146272ef873a6a639f9", "before"], "exit_code": 0, "duration_seconds": 0.135}
+  -> 905c32f (round 8) route /: 26 JS assets, raw 2207028 B, gzip 664843 B
+ci-claudecode-env: {"name": "ci-claudecode-env", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 1, "duration_seconds": 440.287}
+  -> 2913 pass / 2 fail / 18269 expect() / 2915 tests / 315 files: only the two lib/mail/resyncMessage.senderKey.test.ts cases (child 1 pass / 0 fail, '(pass)' line suppressed by Bun under CLAUDECODE) -> fixed by fc8aab3
+resync-alone: {"name": "resync-alone", "command": ["nice", "-n", "15", "timeout", "300", "bun", "test", "--timeout", "20000", "lib/mail/resyncMessage.senderKey.test.ts"], "exit_code": 1, "duration_seconds": 1.416}
+  -> 0 pass / 2 fail with CLAUDECODE set (same cause) -> fixed by fc8aab3
+ci: {"name": "ci", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 0, "duration_seconds": 514.595}
+  -> server 2915 pass / 0 fail / 18271 expect() / 315 files [431.70s]; DOM 563 pass / 0 fail / 3191 expect() / 73 files [79.19s] (tree 98b4301, CLAUDECODE unset)
+stress: {"name": "stress", "command": ["nice", "-n", "15", "timeout", "2400", "bun", "run", "test:stress"], "exit_code": 0, "duration_seconds": 1192.614}
+  -> 8745 pass / 0 fail / 54813 expect() / 315 files [1184.46s] (98b4301)
+build: {"name": "build", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 60.425}
+  -> Next.js 16.4.2 (Turbopack) build exit 0 (98b4301)
+migration-fixtures-r9: {"name": "migration-fixtures-r9", "command": ["nice", "-n", "15", "bun", ".tmp/src-r7/gen/create-migration-fixtures.ts"], "exit_code": 0, "duration_seconds": 1.823}
+  -> legacy (v0) and round-7 (v2) shard fixtures generated
+migration-retained-fixtures-r9: {"name": "migration-retained-fixtures-r9", "command": ["nice", "-n", "15", "bun", ".tmp/add-migration-files.ts"], "exit_code": 0, "duration_seconds": 0.41}
+  -> retained fixture files added
+migration-r9: {"name": "migration-r9", "command": ["nice", "-n", "15", "timeout", "600", "bun", ".tmp/migration-gate.ts"], "exit_code": 0, "duration_seconds": 19.974}
+  -> MIGRATION PASS round7 v2->v3 11000 msgs / 2 accounts / guards 81 / 48 search comparisons; MIGRATION PASS legacy v0->v3 11000 msgs / guards 81 / 24 comparisons; MASTER fresh PASS; MASTER older PASS (two actual reopens each)
+migration-suites-r9: {"name": "migration-suites-r9", "command": ["nice", "-n", "15", "timeout", "900", "bun", "test", "--timeout", "20000", "lib/db/accountKeys.test.ts", "lib/db/shardFormat.test.ts", "lib/db/ftsIdentity.test.ts", "lib/db.senderKey.test.ts"], "exit_code": 0, "duration_seconds": 6.282}
+  -> accountKeys, shardFormat (incl. v1), ftsIdentity, db.senderKey: 50 pass / 0 fail / 513 expect()
+bundle-after: {"name": "bundle-after", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "98b4301f55e6365021f9899ba16c61303c1c2672", "after"], "exit_code": 0, "duration_seconds": 0.102}
+  -> 98b4301 route /: 24 JS assets, raw 2141750 B, gzip 658194 B
+shutdown-idle-r9: {"name": "shutdown-idle-r9", "command": ["nice", "-n", "15", "env", "BETTER_AUTH_URL=http://127.0.0.1:3798", "PASSKEY_RP_ID=127.0.0.1", "BETTER_AUTH_SECRET=synthetic-shutdown-idle-secret-0123456789", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3798", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-r9-data"], "exit_code": 0, "duration_seconds": 3.413}
+  -> exit 0, durationMs 37, forced false
+shutdown-watcher-r9: {"name": "shutdown-watcher-r9", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown-3798.ts"], "exit_code": 0, "duration_seconds": 2.907}
+  -> WATCHER SHUTDOWN PASS: exit 0, durationMs 110, watcher state before signal idling, forced false
+i18n-standalone-r9: {"name": "i18n-standalone-r9", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate-3798.ts"], "exit_code": 0, "duration_seconds": 2.362}
+  -> I18N STANDALONE PASS: 5 locale cases (de/en header, cookie overrides both ways, invalid cookie ignored)
+auth-browser-r9-fix: {"name": "auth-browser-r9-fix", "command": ["nice", "-n", "15", "timeout", "1800", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", "run", "test:auth-browser"], "exit_code": 1, "duration_seconds": 493.989}
+  -> 19 passed / 1 failed: shell.spec.ts:229 (inline reply lost after language switch; data-loss regression, fixed by 97dd982)
+auth-diag-shell-mailbox: {"name": "auth-diag-shell-mailbox", "command": ["nice", "-n", "15", "timeout", "900", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", ".tmp/auth-diag-run.ts", "-g", "shell persists mailbox switch", "--trace", "on", "--reporter=list"], "exit_code": 1, "duration_seconds": 48.897}
+  -> diagnostic: shell.spec.ts:229 alone with trace, reproduces (expected failure)
+auth-diag-steps: {"name": "auth-diag-steps", "command": ["nice", "-n", "15", "timeout", "900", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", ".tmp/auth-diag-run.ts", "tests/browser/auth/zz-diag.spec.ts", "--reporter=list"], "exit_code": 1, "duration_seconds": 15.19}
+  -> diagnostic step probe (temporary spec, removed), expected failure
+auth-diag-steps: {"name": "auth-diag-steps", "command": ["nice", "-n", "15", "timeout", "900", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", ".tmp/auth-diag-run.ts", "tests/browser/auth/zz-diag.spec.ts", "--reporter=list"], "exit_code": 1, "duration_seconds": 22.698}
+  -> diagnostic step probe, expected failure
+auth-diag-steps: {"name": "auth-diag-steps", "command": ["nice", "-n", "15", "timeout", "900", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", ".tmp/auth-diag-run.ts", "tests/browser/auth/zz-diag.spec.ts", "--reporter=list"], "exit_code": 1, "duration_seconds": 47.781}
+  -> diagnostic step probe: composer unmounts right after <html lang> turns de
+build-r9-fix: {"name": "build-r9-fix", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 63.275}
+  -> Next.js 16.4.2 build exit 0 on 97dd982 production source (= final production source)
+standalone-workers-r9-fix: {"name": "standalone-workers-r9-fix", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.058}
+  -> [standalone-worker-check] Verified worker runtime files in .next/standalone; noctua-server.mjs present
+auth-browser-r9-final: {"name": "auth-browser-r9-final", "command": ["nice", "-n", "15", "timeout", "1800", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", "run", "test:auth-browser"], "exit_code": 0, "duration_seconds": 476.505}
+  -> 20 passed (7.6m); shell.spec.ts:229 passed (7.1s)
+qa-specs-r9: {"name": "qa-specs-r9", "command": ["nice", "-n", "15", "timeout", "3000", "python3", ".tmp/qa-all-r9.py", "qa-shell.spec.ts", "qa-admin-breakpoint.spec.ts", "qa-translation.spec.ts", "qa-unread-count.spec.ts", "qa-admin-self-grant.spec.ts", "qa-i18n-views.spec.ts"], "exit_code": 1, "duration_seconds": 197.554}
+  -> qa-shell 4 passed; qa-admin-breakpoint 1 passed; qa-translation 1 passed; qa-unread-count 1 failed (stale 'INBOX (' selector) -> 34a5263
+qa-specs-r9b: {"name": "qa-specs-r9b", "command": ["nice", "-n", "15", "timeout", "3000", "python3", ".tmp/qa-all-r9.py", "qa-unread-count.spec.ts", "qa-admin-self-grant.spec.ts", "qa-i18n-views.spec.ts"], "exit_code": 1, "duration_seconds": 41.968}
+  -> qa-unread-count 1 failed (stale 'Watcher: idling' selector) -> 34a5263
+qa-specs-r9c: {"name": "qa-specs-r9c", "command": ["nice", "-n", "15", "timeout", "3000", "python3", ".tmp/qa-all-r9.py", "qa-unread-count.spec.ts", "qa-admin-self-grant.spec.ts", "qa-i18n-views.spec.ts"], "exit_code": 0, "duration_seconds": 173.741}
+  -> qa-unread-count 1 passed; qa-admin-self-grant 1 passed; qa-i18n-views 3 passed
+qa-compose-r9: {"name": "qa-compose-r9", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/qa-compose-run.ts"], "exit_code": 1, "duration_seconds": 0.691}
+  -> harness only: .tmp runner scratch prefix rejected by the seed guard (requires qa-shell-); fixed in the runner copy
+qa-compose-r9: {"name": "qa-compose-r9", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/qa-compose-run.ts"], "exit_code": 1, "duration_seconds": 606.876}
+  -> 6 passed / 2 failed: P2-E/P2-G de (English 'Toggle sidebar' while UI German; click hung to the 480 s test timeout) and en (follow-on: uiLocale left at de) -> 6e4bbcb
+qa-compose-r9d-focus: {"name": "qa-compose-r9d-focus", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/qa-compose-run.ts", "-g", "P2-E/P2-G"], "exit_code": 0, "duration_seconds": 264.541, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> P2-E/P2-G de + en: 2 passed (4.2m)
+qa-compose-r9e: {"name": "qa-compose-r9e", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/qa-compose-run.ts"], "exit_code": 0, "duration_seconds": 366.808, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> 8 passed (5.9m): QA-001, QA-002 x3, QA-008, sender identities, P2-E/P2-G de, en
+sender3-review-r4-probe-r9: {"name": "sender3-review-r4-probe-r9", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/r4-probe-run.ts"], "exit_code": 1, "duration_seconds": 4.234, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> harness only: playwright cli under bun cannot load the .tmp config (esm.preflight); runner switched to node
+typecheck-r9-final: {"name": "typecheck-r9-final", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.587, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> No type errors in 1,244 files
+sender3-review-r4-probe-r9: {"name": "sender3-review-r4-probe-r9", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/r4-probe-run.ts"], "exit_code": 1, "duration_seconds": 5.413, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> harness only: directory import of an absolute @playwright/test path under node ESM; switched to the bare specifier
+sender3-review-r4-probe-r9: {"name": "sender3-review-r4-probe-r9", "command": ["nice", "-n", "15", "timeout", "1800", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "bun", ".tmp/r4-probe-run.ts"], "exit_code": 0, "duration_seconds": 121.811, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> 4 passed (1.9m): adversarial de, adversarial en, desktop baseline comparison, keyboard detail
+bundle-after-r9-final: {"name": "bundle-after-r9-final", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "6e4bbcbe41a10576700ce45a19695e8d3bbde021", "after-r9-final"], "exit_code": 0, "duration_seconds": 0.099, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> 6e4bbcb route /: 24 JS assets, raw 2141813 B, gzip 658204 B
+ci-r9-final: {"name": "ci-r9-final", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 0, "duration_seconds": 502.17, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> server 2915 pass / 0 fail / 18271 expect() / 315 files [419.72s]; DOM 564 pass / 0 fail / 3200 expect() / 73 files [79.08s] (CLAUDECODE/AGENT/REPL_ID unset)
+lint-r9-final: {"name": "lint-r9-final", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 0, "duration_seconds": 50.829, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> 181 problems (0 errors, 181 warnings); same files and count as the 98b4301 lint
+resync-alone-claudecode-r9-final: {"name": "resync-alone-claudecode-r9-final", "command": ["env", "CLAUDECODE=1", "nice", "-n", "15", "timeout", "300", "bun", "test", "--timeout", "20000", "lib/mail/resyncMessage.senderKey.test.ts"], "exit_code": 0, "duration_seconds": 1.49, "env_set": {"CLAUDECODE": "1"}}
+  -> CLAUDECODE=1: 2 pass / 0 fail
+diff-check-r9-final: {"name": "diff-check-r9-final", "command": ["nice", "-n", "15", "git", "diff", "--check", "11dc3c5", "HEAD"], "exit_code": 0, "duration_seconds": 0.044, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> clean
+diff-check-worktree-r9-final: {"name": "diff-check-worktree-r9-final", "command": ["nice", "-n", "15", "git", "diff", "--check"], "exit_code": 0, "duration_seconds": 0.009, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> clean
+install-r9-final: {"name": "install-r9-final", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.045, "env_unset": ["CLAUDECODE", "AGENT", "REPL_ID"]}
+  -> Checked 1087 installs across 1094 packages (no changes); bun.lock unchanged
+
+Additional log-only checks (previous agent, not in gates.jsonl):
+  fts-r8-open-legacy / fts-r8-open-round7: copies of round-8 v3 shards opened
+  with the merged binary: user_version 3 -> 3, sqlite_master SHA-256
+  unchanged, schema_version unchanged (232 / 334), v3_guards 81,
+  integrity ok, migrated=false, ftsValidated=true, open 17.1 / 16.1 ms.
+  Focused post-merge suites: input 2 393/0 (55 files), no-bypass permanent
+  95/0, adversarial 40/0, deadline contract 1/0; input 5 99/0 + DOM 29/0;
+  input 6 lib/i18n 67/0, DOM 78/0, catalogs+folderNames 20/0; typecheck
+  after inputs 2/3/5/6: 0 errors (1,219 / 1,221 / 1,236 / 1,244 files).
+
+Orchestrator-run gates on 98b4301 (ops/r89-gates-20261023T131558Z.log,
+labelled orchestrator-run, not rerun here):
+  smoke rc=0 18s :: SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun 1.4.4, port 3799, synthetic isolated storage only
+    (note: "Next 16.2.4" is a hardcoded literal in scripts/smokeTeamAuth.ts:175; the build under test is 16.4.2)
+  security rc=0 74s :: 156 pass  0 fail
+  privacy rc=0 60s :: 1 pass  0 fail (177 assertions per briefs/security-recheck-98b4301.md)
+  auth rc=1 702s :: 19 passed (shell.spec.ts:229 failed; superseded by auth-browser-r9-final 20/20 on the fixed build)
+
+Bundle "/" first-load JS (gzip level 6): before 905c32f (round 8) 26 assets,
+raw 2207028 B, gzip 664843 B; after 6e4bbcb 24 assets, raw 2141813 B,
+gzip 658204 B (-65215 B raw, -6639 B gzip).
+Shutdown: idle 37 ms, watcher 110 ms (both exit 0, not forced).
+Lint baseline (new, from input 3): 0 errors / 181 warnings, same file set
+and count before and after the integration fixes; no new warning in any
+touched file.
+
+Deploy handoff delta vs round 8 (11dc3c5):
+- Schema: none. git diff --name-only 11dc3c5..HEAD -- lib/db lists
+  lib/db/accountAccess.ts (db.prepare -> db.query for the role recheck),
+  lib/db/calendar/events.ts (calendar override/event upserts wrapped in
+  withOutboundWrite with an optional beforeWrite authorization; same
+  tables/columns), lib/db/messages/upsert.ts (authorization guard + metadata
+  preparation before the guarded write; FTS-v3 identity writer unchanged),
+  lib/db/processLeases.ts (bounded writer handshakes, lease write dedup),
+  lib/db/senderIdentities.ts (prepare -> query), and
+  lib/db/senderIdentityMetadata.test.ts. No CREATE/ALTER/DROP, no
+  user_version or shard format change (still v3, 81 guards). sender
+  identities tables exist since round 8; no migration on deploy, the
+  standard pre-deploy backup is sufficient, no stopped backup required.
+- Runtime: Next 16.4.2 / React 19.3.1 / @types/react 19.3.0 /
+  eslint-config-next 16.4.2 / eslint-plugin-react-hooks 7.1.1; flat
+  standalone with noctua-server.mjs launcher (verified); sharp override and
+  libvips tracing unchanged.
+- Env vars: none new for the runtime (new names appear only in doc probe
+  scripts and playwright.sync-folder.config.ts).
+- API: new 400 codes folder_account_mismatch and signature_template_invalid;
+  identityId accepted on send/draft/calendar/MCP.
+- Docker worker-image gate: release condition, run on the Docker host
+  before shipping (no Docker on this box).
+
+Known follow-ups:
+- Preview round 8.9 has D1; redeploy from this head.
+- Compose field labels (Subject:, To:, Cancel, Send, Save draft, Discard
+  Draft, "Draft saved ...") and the "Open in modal" tooltip are not
+  localized yet.
+- briefs/security-recheck-98b4301.md P3 F1 (bodyless-command guard buffers
+  up to 16 MiB before 400, pre-session on two routes) and P3 F2 (launcher
+  redaction misses non-canonical reset-path spellings).
+- briefs/qa-ui-sweep-98b4301.md: 3 P2 / 15 P3 UI findings for triage.
+- r4 probe measurement (not asserted by the probe): in the "unavailable"
+  sender state after the wheel the editor centre point is not the hit
+  target (visible height 120 px); the qa-compose matrix asserts editor
+  hit-testing in its unavailable states and passes.
+- The Playwright default actionTimeout (none) let a stale selector hang a
+  test for the full 480 s; consider an actionTimeout in the QA configs.
+- Round 10 (not in round 9): feat/reader-focus, feat/status-bar-compact,
+  deps perf branches, rank-2 account batching.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

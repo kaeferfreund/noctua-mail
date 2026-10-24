@@ -1,0 +1,35 @@
+
+Running 3 tests using 1 worker
+
+(node:1752369) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1752369) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+QA-102 [{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":390,"height":844,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"}]
+  ✓  1 tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions (16.6s)
+QA-103 {"results":[{"theme":"light","width":1440,"height":900,"renders":true,"shell":true,"dialog":{"x":230,"y":52,"width":980,"height":774}},{"theme":"light","width":1280,"height":720,"renders":true,"shell":true,"dialog":{"x":150,"y":44.8125,"width":980,"height":619.1875}},{"theme":"light","width":834,"height":1112,"renders":true,"shell":true,"dialog":{"x":25.015625,"y":60.484375,"width":783.953125,"height":956.3125}},{"theme":"light","width":390,"height":844,"renders":true,"shell":true,"dialog":{"x":0,"y":0,"width":390,"height":844}},{"theme":"light","width":360,"height":780,"renders":true,"shell":true,"dialog":{"x":0,"y":0,"width":360,"height":780}},{"theme":"dark","width":1440,"height":900,"renders":true,"shell":true,"dialog":{"x":230,"y":52,"width":980,"height":774}},{"theme":"dark","width":1280,"height":720,"renders":true,"shell":true,"dialog":{"x":150,"y":44.8125,"width":980,"height":619.1875}},{"theme":"dark","width":834,"height":1112,"renders":true,"shell":true,"dialog":{"x":25.015625,"y":60.484375,"width":783.953125,"height":956.3125}},{"theme":"dark","width":390,"height":844,"renders":true,"shell":true,"dialog":{"x":0,"y":0,"width":390,"height":844}},{"theme":"dark","width":360,"height":780,"renders":true,"shell":true,"dialog":{"x":0,"y":0,"width":360,"height":780}}],"pageErrors":[]}
+  ✓  2 tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes (36.4s)
+  ✘  3 tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 (3.3m)
+
+
+  1) tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Search messages', exact: true })[22m
+
+
+      27 |   const posts: unknown[] = [];
+      28 |   page.on("request", req => { if (req.method() === "POST" && /\/messages\/[^/]+\/flags$/.test(new URL(req.url()).pathname)) posts.push(req.postDataJSON()); });
+    > 29 |   await page.getByRole("button", { name: "Search messages", exact: true }).click();
+         |                                                                            ^
+      30 |   const search = page.getByRole("textbox", { name: /^Search/ });
+      31 |   await search.fill("QA synthetic 014"); await search.press("Enter"); await page.keyboard.press("Escape");
+      32 |   await page.getByText("QA synthetic 014", { exact: true }).first().click();
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-unread-count.spec.ts:29:76
+
+  1 interrupted
+    tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 
+  2 passed (4.2m)

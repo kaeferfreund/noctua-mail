@@ -1,0 +1,83 @@
+{
+  "before": {
+    "MailClient.tsx": {
+      "errors": 0,
+      "warnings": 73,
+      "rules": {
+        "react-hooks/immutability": 1,
+        "react-hooks/purity": 2,
+        "react-hooks/refs": 22,
+        "react-hooks/set-state-in-effect": 12,
+        "react-hooks/exhaustive-deps": 19,
+        "react-hooks/use-memo": 1,
+        "react-hooks/preserve-manual-memoization": 16
+      }
+    },
+    "ComposeActions.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    },
+    "ComposeOrchestrator.tsx": {
+      "errors": 0,
+      "warnings": 44,
+      "rules": {
+        "react-hooks/refs": 8,
+        "react-hooks/preserve-manual-memoization": 36
+      }
+    },
+    "VirtualizedList.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    }
+  },
+  "final": {
+    "MailClient.tsx": {
+      "errors": 0,
+      "warnings": 73,
+      "rules": {
+        "react-hooks/immutability": 1,
+        "react-hooks/purity": 2,
+        "react-hooks/refs": 22,
+        "react-hooks/set-state-in-effect": 12,
+        "react-hooks/exhaustive-deps": 19,
+        "react-hooks/use-memo": 1,
+        "react-hooks/preserve-manual-memoization": 16
+      }
+    },
+    "ComposeActions.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    },
+    "ComposeOrchestrator.tsx": {
+      "errors": 0,
+      "warnings": 44,
+      "rules": {
+        "react-hooks/refs": 8,
+        "react-hooks/preserve-manual-memoization": 36
+      }
+    },
+    "DraftSavedLabel.dom.test.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    },
+    "DraftSavedLabel.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    },
+    "VirtualizedList.dom.test.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    },
+    "VirtualizedList.tsx": {
+      "errors": 0,
+      "warnings": 0,
+      "rules": {}
+    }
+  }
+}

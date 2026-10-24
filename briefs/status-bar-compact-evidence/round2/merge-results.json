@@ -1,0 +1,39 @@
+{
+  "stage": {
+    "ref": "origin/integration/stage",
+    "sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+    "exit": 0,
+    "tree": "e8b87d20332214d91234d50ef61022321d26c265",
+    "conflictFiles": []
+  },
+  "i18n": {
+    "ref": "origin/fix/i18n-views",
+    "sha": "992b220bd65d8fcb3540b58a3a835d48d47a0e2e",
+    "exit": 0,
+    "tree": "e8b87d20332214d91234d50ef61022321d26c265",
+    "conflictFiles": []
+  },
+  "reader": {
+    "ref": "origin/feat/reader-focus",
+    "sha": "14a1f8ef8ba54cb5eab0cf75de72606746d70a10",
+    "exit": 1,
+    "tree": "245c0fd58617a30c1aded04cb131e352e1025608",
+    "conflictFiles": [
+      "app/components/shell/AppShell.tsx",
+      "doc/SHELL.md"
+    ]
+  },
+  "sender": {
+    "ref": "origin/feat/sender-identities-3",
+    "sha": "26d82d81126639afd82cf5d0d53ff1093b9959c7",
+    "exit": 1,
+    "tree": "c244312413ba7441ea3c6c3695ec43b5db584577",
+    "conflictFiles": [
+      "app/components/AccountSettingsModal.tsx",
+      "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+      "lib/mail/resyncMessage.senderKey.test.ts",
+      "messages/de.json",
+      "messages/en.json"
+    ]
+  }
+}

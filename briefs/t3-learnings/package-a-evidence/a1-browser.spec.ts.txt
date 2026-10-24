@@ -1,0 +1,73 @@
+import { test, expect } from '@playwright/test';
+import { signInQa } from '../tests/browser/ui/qaRound2Session';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+const evidence = '/home/monkey/code/noctua-mail/briefs/t3-learnings/package-a-evidence';
+const phase = process.env.A1_PHASE ?? 'after';
+const prefix = `a1-${phase}`;
+const metrics: Record<string, unknown> = {};
+test('saved draft clock and mobile list reveal', async ({ page }) => {
+  mkdirSync(evidence, { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInQa(page);
+  await expect(page.locator('[data-message-list-row="true"]').first()).toBeVisible();
+  await page.getByRole('button', { name: 'New mail', exact: true }).click();
+  await page.getByLabel('To:', { exact: true }).fill('recipient@example.test');
+  await page.getByLabel('Subject:', { exact: true }).fill('Synthetic A1 saved draft');
+  await page.locator('[data-lexical-editor="true"]').fill('Synthetic idle draft for the isolated render measurement.');
+  await expect(page.getByText(/Draft saved/)).toBeVisible();
+  await page.waitForTimeout(3000);
+  const count = () => page.evaluate(() => (globalThis as typeof globalThis & { __a1MailClientRenders: number }).__a1MailClientRenders);
+  const initial = await count();
+  for (let n = 0; n < 13; n++) await page.waitForTimeout(5000);
+  const final = await count();
+  metrics.clock = { seconds: 65, initial, final, idleRenders: final - initial, label: await page.getByText(/Draft saved/).textContent() };
+  if (phase === 'after') expect(final - initial).toBeLessThan(5);
+  await page.screenshot({ path: path.join(evidence, `${prefix}-desktop.png`) });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const geometry = () => page.locator('[data-message-list-row="true"]').first().evaluate(row => {
+    let scroll = row.parentElement;
+    while (scroll && getComputedStyle(scroll).overflowY !== 'auto' && getComputedStyle(scroll).overflowY !== 'scroll') scroll = scroll.parentElement;
+    if (!scroll) throw Error('Missing scroll pane');
+    const bounds = scroll.getBoundingClientRect();
+    const rows = [...scroll.querySelectorAll('[data-message-list-row="true"]')].map(item => item.getBoundingClientRect()).filter(item => item.bottom > bounds.top && item.top < bounds.bottom);
+    return { scrollTop: scroll.scrollTop, height: scroll.clientHeight, visibleRows: rows.length, firstTop: rows[0]?.top ?? null, lastBottom: rows.at(-1)?.bottom ?? null, paneTop: bounds.top, paneBottom: bounds.bottom };
+  });
+  await page.locator('[data-message-list-row="true"]').first().evaluate(row => {
+    let scroll = row.parentElement;
+    while (scroll && getComputedStyle(scroll).overflowY !== 'auto' && getComputedStyle(scroll).overflowY !== 'scroll') scroll = scroll.parentElement;
+    if (!scroll) throw Error('Missing scroll pane');
+    scroll.scrollTop = 18000;
+  });
+  await page.waitForTimeout(500);
+  const before = await geometry();
+  const visible = page.locator('[data-message-list-row="true"]').filter({ visible: true });
+  // Pick a row that intersects the scroll viewport, not an overscan row.
+  await visible.evaluateAll(rows => {
+    const row = rows.find(row => { const r = row.getBoundingClientRect(); return r.top > 180 && r.bottom < innerHeight - 80; }) as HTMLElement;
+    if (!row) throw Error('No visible row'); row.click();
+  });
+  await expect(page.locator('[data-mobile-view="thread"]')).toBeVisible();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.setViewportSize({ width: 390, height: 430 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Return to portrait after landscape and a keyboard-sized viewport.
+  await page.waitForTimeout(500);
+  const back = page.getByRole('button', { name: /Back to|Zurück zur|Back$/, exact: false });
+  await back.first().click();
+  await page.waitForTimeout(500);
+  const after = await geometry();
+  metrics.geometry = { before, after };
+  await page.screenshot({ path: path.join(evidence, `${prefix}-390.png`) });
+  if (phase === 'after') {
+    expect(after.scrollTop).toBe(before.scrollTop);
+    expect(after.visibleRows).toBeGreaterThan(0);
+    expect(after.visibleRows).toBe(before.visibleRows);
+    expect(after.firstTop).toBe(before.firstTop);
+    expect(after.lastBottom).toBe(before.lastBottom);
+  }
+  writeFileSync(path.join(evidence, `${prefix}-metrics.json`), JSON.stringify(metrics, null, 2));
+  console.log('A1 metrics', JSON.stringify(metrics));
+});

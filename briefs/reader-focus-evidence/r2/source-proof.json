@@ -1,0 +1,25 @@
+{
+  "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+  "lazyAdminSynchronizationUnchanged": true,
+  "allCommitTrailersValid": true,
+  "worktree": "/home/monkey/code/noctua-mail/wt-reader-focus",
+  "branch": "feat/reader-focus",
+  "loadStart": [
+    8.44,
+    12.46,
+    13.44
+  ],
+  "startedAt": "2026-10-23T10:49:31Z",
+  "workingTreeClean": true,
+  "loadEnd": [
+    8.26,
+    8.09,
+    9.18
+  ],
+  "endedAt": "2026-10-23T11:41:34.486958+00:00",
+  "generatedCiOutputPreserved": {
+    "files": 81,
+    "bytes": 56054,
+    "path": "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/reader-focus-r2-generated-ci-output"
+  }
+}

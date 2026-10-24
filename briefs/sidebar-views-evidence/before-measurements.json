@@ -1,0 +1,760 @@
+{
+  "light-1440": {
+    "rows": [
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          220,
+          272,
+          256
+        ],
+        "bg": "rgb(232, 232, 232)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          256,
+          228,
+          292
+        ],
+        "badge": [
+          228,
+          264,
+          268,
+          284
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          16,
+          292,
+          217,
+          328
+        ],
+        "badge": [
+          217,
+          300,
+          268,
+          320
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          328,
+          244,
+          384
+        ],
+        "badge": [
+          244,
+          346,
+          268,
+          366
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          384,
+          272,
+          420
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          420,
+          248,
+          456
+        ],
+        "badge": [
+          248,
+          428,
+          268,
+          448
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      }
+    ],
+    "tooltipText": null,
+    "tooltipBox": null
+  },
+  "light-1440-focus": {
+    "focusVisible": true,
+    "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(91, 91, 214) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+  },
+  "light-1280": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "active": "true",
+        "text": "Posteingang",
+        "row": [
+          16,
+          220,
+          244,
+          256
+        ],
+        "badge": [
+          244,
+          228,
+          268,
+          248
+        ],
+        "bg": "rgb(232, 232, 232)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          256,
+          272,
+          292
+        ],
+        "bg": "rgb(232, 232, 232)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          292,
+          228,
+          328
+        ],
+        "badge": [
+          228,
+          300,
+          268,
+          320
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          16,
+          328,
+          217,
+          364
+        ],
+        "badge": [
+          217,
+          336,
+          268,
+          356
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          364,
+          244,
+          420
+        ],
+        "badge": [
+          244,
+          382,
+          268,
+          402
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          420,
+          272,
+          456
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          456,
+          248,
+          492
+        ],
+        "badge": [
+          248,
+          464,
+          268,
+          484
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      }
+    ],
+    "tooltipText": null,
+    "tooltipBox": null
+  },
+  "light-1280-focus": {
+    "focusVisible": true,
+    "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(91, 91, 214) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+  },
+  "dark-1440": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "active": "true",
+        "text": "Posteingang",
+        "row": [
+          16,
+          220,
+          244,
+          256
+        ],
+        "badge": [
+          244,
+          228,
+          268,
+          248
+        ],
+        "bg": "rgb(49, 49, 49)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          256,
+          272,
+          292
+        ],
+        "bg": "rgb(49, 49, 49)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          292,
+          228,
+          328
+        ],
+        "badge": [
+          228,
+          300,
+          268,
+          320
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          16,
+          328,
+          217,
+          364
+        ],
+        "badge": [
+          217,
+          336,
+          268,
+          356
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          364,
+          244,
+          420
+        ],
+        "badge": [
+          244,
+          382,
+          268,
+          402
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          420,
+          272,
+          456
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          456,
+          248,
+          492
+        ],
+        "badge": [
+          248,
+          464,
+          268,
+          484
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      }
+    ],
+    "tooltipText": null,
+    "tooltipBox": null
+  },
+  "dark-1440-focus": {
+    "focusVisible": true,
+    "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(177, 169, 255) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+  },
+  "dark-1280": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "active": "true",
+        "text": "Posteingang",
+        "row": [
+          16,
+          220,
+          244,
+          256
+        ],
+        "badge": [
+          244,
+          228,
+          268,
+          248
+        ],
+        "bg": "rgb(49, 49, 49)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          256,
+          272,
+          292
+        ],
+        "bg": "rgb(49, 49, 49)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          292,
+          228,
+          328
+        ],
+        "badge": [
+          228,
+          300,
+          268,
+          320
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          16,
+          328,
+          217,
+          364
+        ],
+        "badge": [
+          217,
+          336,
+          268,
+          356
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          364,
+          244,
+          420
+        ],
+        "badge": [
+          244,
+          382,
+          268,
+          402
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          420,
+          272,
+          456
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          456,
+          248,
+          492
+        ],
+        "badge": [
+          248,
+          464,
+          268,
+          484
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      }
+    ],
+    "tooltipText": null,
+    "tooltipBox": null
+  },
+  "dark-1280-focus": {
+    "focusVisible": true,
+    "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(177, 169, 255) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+  },
+  "collapsed": {
+    "sidebarState": "collapsed"
+  },
+  "mobile-light": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "active": "true",
+        "text": "Posteingang",
+        "row": [
+          8,
+          212,
+          256,
+          256
+        ],
+        "badge": [
+          256,
+          224,
+          280,
+          244
+        ],
+        "bg": "rgb(232, 232, 232)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          8,
+          256,
+          284,
+          300
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          8,
+          300,
+          240,
+          344
+        ],
+        "badge": [
+          240,
+          312,
+          280,
+          332
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          8,
+          344,
+          229,
+          388
+        ],
+        "badge": [
+          229,
+          356,
+          280,
+          376
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          8,
+          388,
+          256,
+          432
+        ],
+        "badge": [
+          256,
+          400,
+          280,
+          420
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          8,
+          432,
+          284,
+          476
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          8,
+          476,
+          260,
+          520
+        ],
+        "badge": [
+          260,
+          488,
+          280,
+          508
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(32, 32, 32)"
+      }
+    ]
+  },
+  "mobile-dark": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "active": "true",
+        "text": "Posteingang",
+        "row": [
+          8,
+          212,
+          256,
+          256
+        ],
+        "badge": [
+          256,
+          224,
+          280,
+          244
+        ],
+        "bg": "rgb(49, 49, 49)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "active": "false",
+        "text": "Mir zugewiesen",
+        "row": [
+          8,
+          256,
+          284,
+          300
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "active": "false",
+        "text": "Nicht zugewiesen",
+        "row": [
+          8,
+          300,
+          240,
+          344
+        ],
+        "badge": [
+          240,
+          312,
+          280,
+          332
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:open",
+        "active": "false",
+        "text": "Offen",
+        "row": [
+          8,
+          344,
+          229,
+          388
+        ],
+        "badge": [
+          229,
+          356,
+          280,
+          376
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:focused",
+        "active": "false",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          8,
+          388,
+          256,
+          432
+        ],
+        "badge": [
+          256,
+          400,
+          280,
+          420
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "active": "false",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          8,
+          432,
+          284,
+          476
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "active": "false",
+        "text": "Kalendereinladungen",
+        "row": [
+          8,
+          476,
+          260,
+          520
+        ],
+        "badge": [
+          260,
+          488,
+          280,
+          508
+        ],
+        "bg": "rgba(0, 0, 0, 0)",
+        "color": "rgb(238, 238, 238)"
+      }
+    ]
+  }
+}

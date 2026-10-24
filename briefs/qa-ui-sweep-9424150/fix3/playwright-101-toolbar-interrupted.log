@@ -1,0 +1,30 @@
+
+Running 1 test using 1 worker
+
+(node:1763506) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1763506) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 (1.6m)
+
+
+  1) tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Message actions: open message', exact: true })[22m
+
+
+      32 |   await expect(page.getByText("QA synthetic 014", { exact: true }).first()).toBeVisible();
+      33 |   await page.getByText("QA synthetic 014", { exact: true }).first().click();
+    > 34 |   await page.getByRole("button", { name: "Message actions: open message", exact: true }).click();
+         |                                                                                          ^
+      35 |   const responsePromise = page.waitForResponse(res => /\/messages\/[^/]+\/flags$/.test(new URL(res.url()).pathname) && res.request().method() === "POST");
+      36 |   const started = Date.now();
+      37 |   await page.getByRole("menuitem", { name: /^Mark as read/ }).click();
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-unread-count.spec.ts:34:90
+
+  1 interrupted
+    tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 

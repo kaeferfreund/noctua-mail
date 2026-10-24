@@ -1,0 +1,476 @@
+{
+ "root": "/home/monkey/code/noctua-mail/repo/wt-switch-server/.tmp/final",
+ "topics": false,
+ "loadStart": [
+  7.68,
+  9.55,
+  11.19
+ ],
+ "rows": [
+  {
+   "label": "syn-m0 route warm",
+   "n": 40,
+   "p50": 23.0701310000004,
+   "p90": 28.220736999999644,
+   "sqlP50": 13.087519999993674,
+   "execs": 40,
+   "top": [
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 4.497417174999919,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 2.852869075000035,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 1.5208638000000974,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 0.9952421749999303,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.8394946999994317,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 0.5849153499999374,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT * FROM thread_collab_state WHERE accountId=? AND threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.4701051999996707,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.3503181249994668,
+     "execsPerCall": 6
+    },
+    {
+     "sql": "shard | SELECT tt.threadId, t.* FROM topics t JOIN thread_topics tt ON t.id = tt.topicId WHERE tt.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.331151074999525,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+     "msPerCall": 0.17246569999942948,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.1543466499986607,
+     "execsPerCall": 7
+    },
+    {
+     "sql": "auth | select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+     "msPerCall": 0.12907227499999863,
+     "execsPerCall": 1
+    }
+   ]
+  },
+  {
+   "label": "syn-m0 route cold-shard",
+   "n": 15,
+   "p50": 28.712822000001324,
+   "p90": 35.22300200000245,
+   "sqlP50": 17.498757000004844,
+   "execs": 122,
+   "top": [
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 4.3353384000001824,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 3.2794164666661043,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 1.4284612666667575,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 0.849535666667604,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.7794418666669419,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | PRAGMA journal_mode = WAL;",
+     "msPerCall": 0.7606308666664214,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT m.name FROM pragma_table_list m WHERE m.schema = 'main' AND m.type = 'table' AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'accountId'",
+     "msPerCall": 0.6678193999990375,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 0.5677332000001721,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT name, type, sql FROM sqlite_master",
+     "msPerCall": 0.5582851999997123,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT * FROM thread_collab_state WHERE accountId=? AND threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.4379427333328446,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | CREATE TABLE IF NOT EXISTS mailbox_summary ( accountId TEXT PRIMARY KEY, lastSyncAt INTEGER, watcherState TEXT NOT NULL DEFAULT 'disabled' ); CREATE TABLE IF NO",
+     "msPerCall": 0.34659280000050785,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT name FROM pragma_table_list WHERE schema='main' AND type='shadow' AND name GLOB 'message_fts_v3_*'",
+     "msPerCall": 0.30697606666969174,
+     "execsPerCall": 3
+    }
+   ]
+  },
+  {
+   "label": "syn-m0   listThreads",
+   "n": 40,
+   "p50": 14.070169000002352,
+   "p90": 15.171338000000105,
+   "sqlP50": 10.728618999997707,
+   "execs": 14,
+   "top": [
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 4.230815649999568,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 2.706629675000113,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 1.432128174999616,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 0.8891750499998125,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.8645350000008876,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 0.5707903250008712,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.1519516000004842,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.04498737500043717,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT total_changes() AS changes",
+     "msPerCall": 0.015400149999732094,
+     "execsPerCall": 2
+    }
+   ]
+  },
+  {
+   "label": "syn-m0   enrich topics+suggestions",
+   "n": 40,
+   "p50": 1.0078890000004321,
+   "p90": 1.1008499999988999,
+   "sqlP50": 0.4411630000031437,
+   "execs": 8,
+   "top": [
+    {
+     "sql": "shard | SELECT tt.threadId, t.* FROM topics t JOIN thread_topics tt ON t.id = tt.topicId WHERE tt.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.2737534500002766,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.08791565000019545,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.034064224999201545,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "shard | SELECT 1 FROM topics WHERE accountId = ? LIMIT 1",
+     "msPerCall": 0.028246250000029248,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT total_changes() AS changes",
+     "msPerCall": 0.013087049999921874,
+     "execsPerCall": 2
+    }
+   ]
+  },
+  {
+   "label": "syn-l0 route warm",
+   "n": 40,
+   "p50": 49.265770000001794,
+   "p90": 54.77282099999866,
+   "sqlP50": 40.986532000020816,
+   "execs": 40,
+   "top": [
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 14.1104179750002,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 11.059953174999373,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 8.57042727500002,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 3.2591238499998325,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 1.1389722500000972,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.7907462749997649,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT * FROM thread_collab_state WHERE accountId=? AND threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.5007355499998084,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.4823048999999628,
+     "execsPerCall": 6
+    },
+    {
+     "sql": "shard | SELECT tt.threadId, t.* FROM topics t JOIN thread_topics tt ON t.id = tt.topicId WHERE tt.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.2963326750000306,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.13767150000103356,
+     "execsPerCall": 7
+    },
+    {
+     "sql": "master | SELECT * FROM accounts WHERE id = ?",
+     "msPerCall": 0.13764532500026688,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+     "msPerCall": 0.12950514999920415,
+     "execsPerCall": 1
+    }
+   ]
+  },
+  {
+   "label": "syn-l0 route cold-shard",
+   "n": 15,
+   "p50": 59.57974499999909,
+   "p90": 71.07248899999831,
+   "sqlP50": 48.512118000002374,
+   "execs": 122,
+   "top": [
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 17.092974733333296,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 11.168859266667278,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 8.694402066666953,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 3.312059533333619,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 1.186226799999713,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "auth | select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+     "msPerCall": 0.912688466666441,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.8395278666658366,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.7997539333334619,
+     "execsPerCall": 6
+    },
+    {
+     "sql": "shard | PRAGMA journal_mode = WAL;",
+     "msPerCall": 0.7636708666667498,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT m.name FROM pragma_table_list m WHERE m.schema = 'main' AND m.type = 'table' AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'accountId'",
+     "msPerCall": 0.6672356000000339,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "shard | SELECT * FROM thread_collab_state WHERE accountId=? AND threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.5186581333335198,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT name, type, sql FROM sqlite_master",
+     "msPerCall": 0.4731991333331583,
+     "execsPerCall": 3
+    }
+   ]
+  },
+  {
+   "label": "syn-l0   listThreads",
+   "n": 40,
+   "p50": 41.98934400000144,
+   "p90": 43.23715500000253,
+   "sqlP50": 38.76891400001114,
+   "execs": 14,
+   "top": [
+    {
+     "sql": "shard | SELECT t.*, t.latestReceivedDateValue as effectiveThreadDateValue FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messag",
+     "msPerCall": 13.918564174999755,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT m.id, m.accountId, m.folderId, m.mailboxPath, m.imapUid, m.threadId, m.parentId, m.messageId, m.inReplyTo, m.\"references\" as \"references\", m.xForwardedMe",
+     "msPerCall": 10.981701424999846,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM threads t WHERE t.accountId = ? AND t.threadId IN (SELECT DISTINCT m.threadId FROM messages m WHERE m.accountId = ? AND m.folderId",
+     "msPerCall": 8.545696099999896,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0",
+     "msPerCall": 3.238477724999939,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT COUNT(*) as count FROM messages m INDEXED BY idx_messages_account_thread_date WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0 AND",
+     "msPerCall": 1.1451993750003566,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "shard | SELECT messageId, eventUid, inviteActionType, processedAtMs, processedByUserId, processedAutomatically, unprocessedReason FROM message_calendar_events WHERE acc",
+     "msPerCall": 0.8025932500002455,
+     "execsPerCall": 3
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.14595624999965368,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.043059475000427484,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT total_changes() AS changes",
+     "msPerCall": 0.0185630999998466,
+     "execsPerCall": 2
+    }
+   ]
+  },
+  {
+   "label": "syn-l0   enrich topics+suggestions",
+   "n": 40,
+   "p50": 1.0565299999980198,
+   "p90": 1.1857310000013968,
+   "sqlP50": 0.46120399999563233,
+   "execs": 8,
+   "top": [
+    {
+     "sql": "shard | SELECT tt.threadId, t.* FROM topics t JOIN thread_topics tt ON t.id = tt.topicId WHERE tt.threadId IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?",
+     "msPerCall": 0.3287190249998275,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT id,email FROM accounts WHERE id=?",
+     "msPerCall": 0.12209917499994845,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "master | SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+     "msPerCall": 0.035755225000593784,
+     "execsPerCall": 2
+    },
+    {
+     "sql": "shard | SELECT 1 FROM topics WHERE accountId = ? LIMIT 1",
+     "msPerCall": 0.026746300000104382,
+     "execsPerCall": 1
+    },
+    {
+     "sql": "master | SELECT total_changes() AS changes",
+     "msPerCall": 0.012056074999964039,
+     "execsPerCall": 2
+    }
+   ]
+  }
+ ],
+ "loadEnd": [
+  7.38,
+  9.46,
+  11.15
+ ]
+}

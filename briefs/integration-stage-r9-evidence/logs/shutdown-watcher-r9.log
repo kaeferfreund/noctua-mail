@@ -1,0 +1,2 @@
+{"pid":3584589,"port":3798,"exitCode":0,"signal":null,"durationMs":110,"forced":false,"watcherStateBeforeSignal":"idling"}
+WATCHER SHUTDOWN PASS: isolated synthetic mailbox and OS-assigned IMAP fixture

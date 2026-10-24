@@ -1,0 +1,18 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/ui/readerFocus.dom.test.tsx:
+(pass) split/focus round trip keeps the list node, its selection and scroll position [230.03ms]
+(pass) Enter, Shift+Enter, Escape and sidebar navigation; preferred layout survives remount [125.03ms]
+(pass) hint is one line of translated copy, dismissible and seen only once across messages/remount [54.09ms]
+(pass) mobile ignores saved focus and focus entry paths, leaving desktop preference intact [12.32ms]
+(pass) card: real row supports double-click and Enter without activating from child controls [36.95ms]
+(pass) compact: real row supports double-click and Enter without activating from child controls [16.65ms]
+(pass) table: real row supports double-click and Enter without activating from child controls [18.04ms]
+(pass) threads: real row supports double-click and Enter without activating from child controls [12.16ms]
+(fail) every focus entry places focus on Back; exit restores scroll with a virtualized-row fallback [5071.04ms]
+  ^ this test timed out after 5000ms.
+
+ 8 pass
+ 1 fail
+ 44 expect() calls
+Ran 9 tests across 1 file. [6.59s]

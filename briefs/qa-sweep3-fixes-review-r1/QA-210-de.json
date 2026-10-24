@@ -1,0 +1,29 @@
+{
+  "placeholder": "Posteingang durchsuchen",
+  "results": [
+    {
+      "width": 1440,
+      "colorScheme": "light",
+      "text": 173,
+      "available": 178
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "text": 173,
+      "available": 178
+    },
+    {
+      "width": 1440,
+      "colorScheme": "dark",
+      "text": 173,
+      "available": 178
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "text": 173,
+      "available": 178
+    }
+  ]
+}

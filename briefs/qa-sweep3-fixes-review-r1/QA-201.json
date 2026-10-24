@@ -1,0 +1,9 @@
+{
+  "rounds": [
+    "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+    "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+    "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\""
+  ],
+  "promptsWhileUntouched": 0,
+  "promptsAfterAuthoredText": 1
+}

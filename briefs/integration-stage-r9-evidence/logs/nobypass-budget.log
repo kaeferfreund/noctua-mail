@@ -1,0 +1,34 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/reviewerBudget.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic overslept handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic overslept handshake",
+  retries: 1,
+  attempts: 1,
+  elapsedMs: 2201,
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+BUDGET_DIAGNOSTIC {"attempts":1,"times":[0],"elapsed":2201,"value":{"code":"SQLITE_BUSY"}}
+
+ 1 pass
+ 0 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [30.00ms]

@@ -1,0 +1,23 @@
+[
+  {
+    "width": 1440,
+    "height": 900,
+    "dialogs": 1,
+    "name": "Synthetic keyboard mailbox",
+    "email": "keyboard@example.test"
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "dialogs": 1,
+    "name": "Synthetic keyboard mailbox",
+    "email": "keyboard@example.test"
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "dialogs": 1,
+    "name": "Synthetic keyboard mailbox",
+    "email": "keyboard@example.test"
+  }
+]

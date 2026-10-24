@@ -1,0 +1,6 @@
+POST /api/accounts/synthetic/threads/recompute [one chunk then stall] -> HTTP/1.1 400 Bad Request after 19 ms
+POST /api/accounts/synthetic/threads/recompute [no chunk, stall] -> HTTP/1.1 400 Bad Request after 10007 ms
+DELETE /api/accounts/synthetic/mcp-tokens/synthetic [one chunk then stall] -> HTTP/1.1 401 Unauthorized after 21 ms
+DELETE /api/accounts/synthetic/mcp-tokens/synthetic [no chunk, stall] -> HTTP/1.1 401 Unauthorized after 5 ms
+POST /api/auth/logout [one chunk then stall] -> HTTP/1.1 400 Bad Request after 23 ms
+POST /api/auth/logout [no chunk, stall] -> HTTP/1.1 400 Bad Request after 10008 ms

@@ -1,0 +1,14 @@
+import { chromium, ensureSession, BASE, redact } from "./common.mjs";
+const browser = await chromium.launch({ headless: true });
+const state = await ensureSession(browser, { fresh: true, accountId: "spike-small" });
+const ctx = await browser.newContext({ baseURL: BASE, storageState: state, viewport: { width: 1440, height: 900 } });
+const page = await ctx.newPage();
+const t0 = Date.now(); const reqs = [];
+page.on("request", r => reqs.push({ t: Date.now() - t0, m: r.method(), u: redact(r.url()) }));
+page.on("console", m => { if (m.type() === "error") console.log("console.error", m.text().slice(0, 200)); });
+await page.goto("/"); await page.waitForTimeout(8000);
+await page.screenshot({ path: "/tmp/spike-switch-e2e/probe.png" });
+console.log(JSON.stringify(reqs.filter(r => r.u.startsWith("/api")), null, 0));
+const html = await page.evaluate(() => [...document.querySelectorAll('[data-sidebar]')].map(e => `${e.tagName} ${e.getAttribute("data-sidebar")} ${e.getAttribute("aria-current") ?? ""} ${(e.textContent ?? "").slice(0, 60)}`).slice(0, 80).join("\n"));
+console.log(html);
+await browser.close();

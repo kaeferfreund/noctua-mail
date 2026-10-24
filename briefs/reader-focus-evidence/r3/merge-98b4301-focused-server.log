@@ -1,0 +1,13 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/mutationOrigins.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-BRVYON",
+  dbPath: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-BRVYON/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+ 131 pass
+ 0 fail
+ 6050 expect() calls
+Ran 131 tests across 5 files. [10.34s]

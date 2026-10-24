@@ -1,0 +1,27 @@
+process-first  switch      p50 15.58 p90 15.58 p99 15.58 ms | sql 7.57 | execs 10 compiles 9 | opened 0/1 | writes 1
+process-first  me          p50 13.07 p90 13.07 p99 13.07 ms | sql 4.25 | execs 86 compiles 49 | opened 0/1 | writes 0
+process-first  folders     p50 5.01 p90 5.01 p99 5.01 ms | sql 1.28 | execs 15 compiles 11 | opened 0/1 | writes 0
+process-first  threads     p50 50.06 p90 50.06 p99 50.06 ms | sql 16.73 | execs 45 compiles 29 | opened 0/1 | writes 0
+process-first  topics      p50 4.06 p90 4.06 p99 4.06 ms | sql 0.83 | execs 14 compiles 10 | opened 0/1 | writes 0
+process-first  topicStats  p50 7.56 p90 7.56 p99 7.56 ms | sql 0.87 | execs 14 compiles 10 | opened 0/1 | writes 0
+process-first  aliases     p50 3.47 p90 3.47 p99 3.47 ms | sql 0.78 | execs 14 compiles 10 | opened 0/1 | writes 0
+process-first  calendar    p50 4.11 p90 4.11 p99 4.11 ms | sql 0.83 | execs 14 compiles 10 | opened 0/1 | writes 0
+warm           switch      p50 5.37 p90 7.71 p99 11.93 ms | sql 3.75 | execs 10 compiles 8 | opened 0/180 | writes 1
+warm           me          p50 6.80 p90 8.84 p99 22.26 ms | sql 3.59 | execs 86 compiles 49 | opened 0/180 | writes 0
+warm           folders     p50 2.56 p90 4.10 p99 9.88 ms | sql 1.06 | execs 15 compiles 11 | opened 0/180 | writes 0
+warm           threads     p50 23.12 p90 54.58 p99 85.50 ms | sql 15.68 | execs 45 compiles 29 | opened 0/180 | writes 0
+warm           topics      p50 2.19 p90 7.25 p99 12.32 ms | sql 0.73 | execs 14 compiles 10 | opened 0/180 | writes 0
+warm           topicStats  p50 1.96 p90 3.14 p99 8.39 ms | sql 0.69 | execs 14 compiles 10 | opened 0/180 | writes 0
+warm           aliases     p50 1.87 p90 2.75 p99 7.20 ms | sql 0.69 | execs 14 compiles 10 | opened 0/180 | writes 0
+warm           calendar    p50 1.91 p90 2.63 p99 7.66 ms | sql 0.74 | execs 14 compiles 10 | opened 0/180 | writes 0
+warm           summary     p50 36.90 p90 45.73 p99 66.36 ms | sql 30.16 | execs 201 compiles 104 | opened 0/30 | writes 0
+cold-shard     switch      p50 5.09 p90 7.26 p99 9.01 ms | sql 3.61 | execs 10 compiles 8 | opened 0/72 | writes 1
+cold-shard     me          p50 6.81 p90 10.34 p99 15.58 ms | sql 3.60 | execs 86 compiles 49 | opened 0/72 | writes 0
+cold-shard     folders     p50 10.18 p90 13.35 p99 21.69 ms | sql 6.00 | execs 97 compiles 93 | opened 72/72 | writes 6
+cold-shard     threads     p50 23.99 p90 58.72 p99 80.69 ms | sql 16.51 | execs 45 compiles 29 | opened 0/72 | writes 0
+cold-shard     topics      p50 2.12 p90 7.43 p99 11.75 ms | sql 0.75 | execs 14 compiles 10 | opened 0/72 | writes 0
+cold-shard     topicStats  p50 1.92 p90 3.28 p99 6.34 ms | sql 0.70 | execs 14 compiles 10 | opened 0/72 | writes 0
+cold-shard     aliases     p50 1.82 p90 3.52 p99 6.59 ms | sql 0.68 | execs 14 compiles 10 | opened 0/72 | writes 0
+cold-shard     calendar    p50 1.84 p90 2.58 p99 5.05 ms | sql 0.74 | execs 14 compiles 10 | opened 0/72 | writes 0
+per-switch critical path {"warm":{"n":180,"p50":38.44919100000698,"p90":72.27558399999543,"p99":119.00341200000548,"max":123.87037600000622,"mean":43.20419490555566},"cold-shard":{"n":72,"p50":47.17483300000458,"p90":83.17520199999854,"p99":112.65459400000691,"max":113.86200599999574,"mean":52.774795958333826}}
+load [ 7.43, 12.68, 12.16 ] [ 6.99, 11.62, 11.83 ]

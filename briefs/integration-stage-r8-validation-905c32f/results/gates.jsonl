@@ -1,0 +1,46 @@
+{"name": "deps-paths", "command": ["nice", "-n", "15", "bun", "test", "--timeout", "20000", "app/api/mcp", "lib/mail", "lib/drafts.test.ts"], "exit_code": 0, "duration_seconds": 29.176}
+{"name": "merge-focused", "command": ["nice", "-n", "15", "bun", "test", "--timeout", "20000", "lib/i18n"], "exit_code": 0, "duration_seconds": 0.703}
+{"name": "merge-dom", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.dom.toml", "app/components/shell/Shell.dom.test.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/mailclient/useSearchState.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx", "app/components/account-settings/Field.dom.test.tsx"], "exit_code": 1, "duration_seconds": 3.237}
+{"name": "migration-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/create-migration-fixtures.ts"], "exit_code": 1, "duration_seconds": 0.545}
+{"name": "migration-fixtures-retry", "command": ["nice", "-n", "15", "bun", ".tmp/create-migration-fixtures.ts"], "exit_code": 0, "duration_seconds": 0.735}
+{"name": "merge-dom-fixed", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.dom.toml", "app/components/shell/Shell.dom.test.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/mailclient/useSearchState.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx", "app/components/account-settings/Field.dom.test.tsx"], "exit_code": 0, "duration_seconds": 3.356}
+{"name": "install", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.042}
+{"name": "typecheck", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.624}
+{"name": "ci", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 0, "duration_seconds": 503.652}
+{"name": "stress", "command": ["nice", "-n", "15", "timeout", "2400", "bun", "run", "test:stress"], "exit_code": 0, "duration_seconds": 1219.049}
+{"name": "lint", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 1, "duration_seconds": 48.862}
+{"name": "build", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 68.615}
+{"name": "lint-baseline-comparison", "command": ["nice", "-n", "15", "node", ".tmp/lint-compare.mjs"], "exit_code": 1, "duration_seconds": 0.194}
+{"name": "lint-baseline-comparison", "command": ["nice", "-n", "15", "node", ".tmp/lint-compare.mjs"], "exit_code": 0, "duration_seconds": 6.047}
+{"name": "typecheck-final", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.554}
+{"name": "integration-files-lint", "command": ["nice", "-n", "15", "bun", "x", "eslint", "scripts/runQaShellBrowserTests.ts", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"], "exit_code": 0, "duration_seconds": 2.016}
+{"name": "bundle-after", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "42310d831697020952c343b4888804cb5820cbbd", "after"], "exit_code": 0, "duration_seconds": 0.104}
+{"name": "standalone-packages", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 1, "duration_seconds": 0.026}
+{"name": "standalone-packages", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 0, "duration_seconds": 0.45}
+{"name": "standalone-workers", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.056}
+{"name": "auth-browser", "command": ["nice", "-n", "15", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", "run", "test:auth-browser"], "exit_code": 0, "duration_seconds": 477.351}
+{"name": "html-privacy", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.browser.toml", "--timeout", "120000", "./tests/browser/htmlPrivacy.test.ts"], "exit_code": 0, "duration_seconds": 60.143}
+{"name": "qa-all", "command": ["nice", "-n", "15", "python3", ".tmp/qa-all.py"], "exit_code": 0, "duration_seconds": 203.45}
+{"name": "smoke", "command": ["nice", "-n", "15", "env", "AUTH_SMOKE_PORT=3799", "bun", "scripts/smokeTeamAuth.ts"], "exit_code": 0, "duration_seconds": 16.325}
+{"name": "security", "command": ["nice", "-n", "15", "bash", "tests/runTeamAuthSecurityControls.sh"], "exit_code": 0, "duration_seconds": 76.163}
+{"name": "migration-retained-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/add-migration-files.ts"], "exit_code": 0, "duration_seconds": 0.364}
+{"name": "migration", "command": ["nice", "-n", "15", "bun", ".tmp/migration-gate.ts"], "exit_code": 1, "duration_seconds": 18.581}
+{"name": "migration-retained-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/add-migration-files.ts"], "exit_code": 0, "duration_seconds": 0.427}
+{"name": "migration", "command": ["nice", "-n", "15", "bun", ".tmp/migration-gate.ts"], "exit_code": 0, "duration_seconds": 24.05}
+{"name": "shutdown-idle", "command": ["nice", "-n", "15", "env", "BETTER_AUTH_URL=http://127.0.0.1:3799", "PASSKEY_RP_ID=127.0.0.1", "BETTER_AUTH_SECRET=synthetic-shutdown-idle-secret-0123456789", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3799", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-data"], "exit_code": 0, "duration_seconds": 1.319}
+{"name": "shutdown-watcher", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 1, "duration_seconds": 30.942}
+{"name": "shutdown-watcher", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 0, "duration_seconds": 2.438}
+{"name": "i18n-standalone", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate.ts"], "exit_code": 0, "duration_seconds": 2.047}
+{"name": "german320", "command": ["nice", "-n", "15", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "QA_ROUND2_FIXTURE=1", "bun", ".tmp/qa-standalone.ts", "--config=.tmp/german320.config.ts"], "exit_code": 0, "duration_seconds": 25.136}
+{"name": "install-final", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.043}
+{"name": "build-final", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 61.318}
+{"name": "standalone-packages-final", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 0, "duration_seconds": 0.317}
+{"name": "standalone-workers-final", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.055}
+{"name": "typecheck-complete", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.461}
+{"name": "integration-files-lint-complete", "command": ["nice", "-n", "15", "bun", "x", "eslint", "scripts/runQaShellBrowserTests.ts", "tests/browser/htmlPrivacyFixture.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"], "exit_code": 0, "duration_seconds": 1.987}
+{"name": "bundle-final", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "905c32f", "after-final"], "exit_code": 0, "duration_seconds": 0.094}
+{"name": "shutdown-idle-final", "command": ["nice", "-n", "15", "env", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3799", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data"], "exit_code": 0, "duration_seconds": 1.269}
+{"name": "shutdown-watcher-final", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 0, "duration_seconds": 2.419}
+{"name": "i18n-standalone-final", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate.ts"], "exit_code": 0, "duration_seconds": 2.032}
+{"name": "diff-check", "command": ["nice", "-n", "15", "git", "diff", "--check", "9424150", "HEAD"], "exit_code": 0, "duration_seconds": 0.046}
+{"name": "diff-check-worktree", "command": ["nice", "-n", "15", "git", "diff", "--check"], "exit_code": 0, "duration_seconds": 0.008}

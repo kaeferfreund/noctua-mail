@@ -1,0 +1,7 @@
+[imap-probe] {"cold":{"ms":20.331066999999166,"status":200,"body":"{\"ok\":true,\"folderId\":\"syn-sync-a:INBOX\",\"mailboxPath\":\"INBOX\",\"needsRepair\":true,\"recommendedMode\":\"repair\",\"reasons\":[\"count-mismatch\"],\"local\":{\"count\":42,\"h"},"warm":{"n":30,"p50":5.206407999998191,"p90":6.10977599999751,"p99":11.931349999998929,"max":11.931349999998929},"coldRepeat":{"n":5,"p50":8.258315999999468,"p90":8.329236999998102,"p99":8.329236999998102,"max":8.329236999998102}}
+[phase] quiet switches=379 critical p50 44.7 p90 84.1 p99 234.7 | switch p50 10.7 p99 219.1 retries 0 | me p50 6.1 p99 17.2 retries 0 | folders p50 2.5 p99 9.2 retries 0 | threads p50 23.4 p99 67.9 retries 0 | load 16.98->15.84
+[phase] a switches=362 critical p50 43.9 p90 126.9 p99 317.5 | switch p50 8.1 p99 166.8 retries 37 | me p50 6.0 p99 20.1 retries 0 | folders p50 2.5 p99 28.8 retries 0 | threads p50 23.9 p99 81.7 retries 0 | load 16.09->14.27
+[phase] b switches=315 critical p50 43.9 p90 182.2 p99 461.6 | switch p50 6.5 p99 425.3 retries 82 | me p50 5.9 p99 18.2 retries 0 | folders p50 2.4 p99 15.5 retries 0 | threads p50 23.4 p99 99.0 retries 0 | load 14.17->15.35
+[phase] c switches=309 critical p50 71.2 p90 133.4 p99 189.0 | switch p50 9.9 p99 77.8 retries 0 | me p50 6.9 p99 75.8 retries 0 | folders p50 4.7 p99 68.4 retries 0 | threads p50 26.2 p99 88.0 retries 0 | load 15.35->12.28
+  error: {
+SQLiteError: database is locked

@@ -1,0 +1,45 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/account-settings/Field.dom.test.tsx:
+(pass) QA-007 labels all ten Create mailbox inputs and both security selectors [191.66ms]
+(pass) QA-007 labels textarea and wrapped switch consumers and describes hints separately [10.91ms]
+(pass) QA-103 preserves a single child through Flex asChild and Slottable while labelling nested controls [9.54ms]
+(pass) QA-103 mounts Translation in the settings frame with all controls labelled [66.00ms]
+(pass) QA-103 preserves labels for every Calendar and Signatures Field consumer [61.89ms]
+(pass) QA-103 preserves the mailbox credential repair Field labels [23.12ms]
+
+app/components/mailclient/useMessageMutations.dom.test.tsx:
+(pass) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [10.33ms]
+(pass) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [4.98ms]
+(pass) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [4.86ms]
+(pass) QA-101 watcher-off: one read transition settles at 109 without a second decrement [4.45ms]
+(pass) QA-101 discards out-of-order folder reads and reads from a departed account [4.01ms]
+(pass) QA-101 unrelated flags do not fetch folders [2.63ms]
+
+app/components/mailclient/useSearchState.dom.test.tsx:
+(pass) summary owns all collaboration view counts; search never requests a listThreads message total [406.42ms]
+(pass) QA-101 virtual unread counts follow authoritative folder counts without a full sync [1018.91ms]
+
+app/components/shell/Shell.dom.test.tsx:
+(pass) shell sidebar > shows mailbox creation only when admin=false [44.09ms]
+(pass) shell sidebar > shows mailbox creation only when admin=true [23.75ms]
+(pass) shell sidebar > sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable [35.17ms]
+(pass) shell sidebar > renders domain headings only for sections with more than six mailboxes [35.38ms]
+(pass) shell sidebar > keeps the thread JSON and thread cache developer tools reachable from the user menu [125.61ms]
+(pass) theme menu > selects light, dark and system through next-themes [213.24ms]
+(pass) shell header > puts the list toolbar right after the title, inside a header container [16.81ms]
+(pass) shell header > renders mailbox and folder as one heading with a quiet separator [10.91ms]
+(pass) Radix components in shadcn portals > resolves the kept component's --space-2 inside a Sheet [208.88ms]
+(pass) resizable shell panes > keeps the list viewport and reader mounted when the calendar opens and closes [27.23ms]
+(pass) shell landmarks > keeps a single main landmark when SidebarInset sits inside the root main [2.12ms]
+(pass) sidebar editable target guard > leaves native text fields and nested contenteditable targets to their own shortcuts [4.11ms]
+(pass) saved shell hydration > hydrates a saved pane layout and theme without attribute or tree mismatches [29.64ms]
+
+app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:
+(pass) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [127.44ms]
+(pass) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [110.06ms]
+
+ 29 pass
+ 0 fail
+ 164 expect() calls
+Ran 29 tests across 5 files. [3.33s]

@@ -1,0 +1,127 @@
+
+Running 11 tests using 1 worker
+
+(node:1721104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1721104) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"finding":"QA-001","run":0,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":1,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":2,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":3,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":4,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+  ✓   1 tests/browser/compose/qa-compose.spec.ts:31:1 › QA-001 rapid subject remains intact through autosave and SMTP (29.7s)
+{"finding":"QA-002","viewport":{"width":360,"height":780},"send":{"x":288,"y":724,"width":60,"height":44}}
+  ✓   2 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 360px (6.0s)
+{"finding":"QA-002","viewport":{"width":390,"height":844},"send":{"x":318,"y":788,"width":60,"height":44}}
+  ✓   3 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 390px (6.2s)
+  ✓   4 tests/browser/compose/qa-compose.spec.ts:90:1 › QA-008 desktop modal contains keyboard focus and restores its opener (3.9s)
+  ✘   5 tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions (511ms)
+(node:1723676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1723676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘   6 tests/browser/ui/qa-shell.spec.ts:36:1 › QA-003/009: create a 180-day token, reveal it once, refresh metadata, dismiss Settings (0ms)
+  -   7 tests/browser/ui/qa-shell.spec.ts:58:1 › QA-004/009: pointer-operated members and confirmations stack above Admin; Escape removes one layer
+  -   8 tests/browser/ui/qa-shell.spec.ts:96:1 › QA-005: 360px and 390px reader retains 40% of the viewport with long subject and note open
+  -   9 tests/browser/ui/qa-shell.spec.ts:116:1 › QA-011/012/013: 44px phone header actions, reduced-motion sidebar, folder search empty state
+(node:1723849) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1723849) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  10 tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes (588ms)
+(node:1724006) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1724006) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  11 tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 (588ms)
+
+
+  1) tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m200[39m
+    Received: [31m429[39m
+
+       at ui/qaRound2Session.ts:15
+
+      13 |   ] as const) {
+      14 |     const result = await page.request.post(url, { data: body, headers: { origin: new URL(page.url()).origin } });
+    > 15 |     expect(result.status()).toBe(200);
+         |                             ^
+      16 |   }
+      17 |   await page.reload();
+      18 |   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
+        at signInQa (/home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qaRound2Session.ts:15:29)
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-admin-breakpoint.spec.ts:6:3
+
+    Error Context: .tmp/qa-round2-browser-results/ui-qa-admin-breakpoint-QA--7457b--both-breakpoint-directions/error-context.md
+
+  2) tests/browser/ui/qa-shell.spec.ts:36:1 › QA-003/009: create a 180-day token, reveal it once, refresh metadata, dismiss Settings 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m200[39m
+    Received: [31m429[39m
+
+      23 |   const context = await browser.newContext({ baseURL: process.env.QA_SHELL_BASE_URL ?? "http://localhost:3799" }), page = await context.newPage();
+      24 |   await page.goto("/");
+    > 25 |   expect((await post(page, "/api/ba/sign-in/email", { email: seeds[0].email, password: seeds[0].password })).status).toBe(200);
+         |                                                                                                                      ^
+      26 |   expect((await post(page, "/api/ba/two-factor/verify-totp", { code: totpFromUri(seeds[0].totpURI) })).status).toBe(200);
+      27 |   expect((await post(page, "/api/auth/switch-account", { accountId: "qa-shared" })).status).toBe(200);
+      28 |   cookies = await context.cookies(); await context.close();
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-shell.spec.ts:25:118
+
+    Error Context: .tmp/qa-round2-browser-results/ui-qa-shell-QA-003-009-cre-6dca6-h-metadata-dismiss-Settings/error-context.md
+
+  3) tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m200[39m
+    Received: [31m429[39m
+
+       at ui/qaRound2Session.ts:15
+
+      13 |   ] as const) {
+      14 |     const result = await page.request.post(url, { data: body, headers: { origin: new URL(page.url()).origin } });
+    > 15 |     expect(result.status()).toBe(200);
+         |                             ^
+      16 |   }
+      17 |   await page.reload();
+      18 |   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
+        at signInQa (/home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qaRound2Session.ts:15:29)
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-translation.spec.ts:7:3
+
+    Error Context: .tmp/qa-round2-browser-results/ui-qa-translation-QA-103-T-58d21-e-viewports-and-both-themes/error-context.md
+
+  4) tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m200[39m
+    Received: [31m429[39m
+
+       at ui/qaRound2Session.ts:15
+
+      13 |   ] as const) {
+      14 |     const result = await page.request.post(url, { data: body, headers: { origin: new URL(page.url()).origin } });
+    > 15 |     expect(result.status()).toBe(200);
+         |                             ^
+      16 |   }
+      17 |   await page.reload();
+      18 |   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
+        at signInQa (/home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qaRound2Session.ts:15:29)
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-unread-count.spec.ts:23:3
+
+    Error Context: .tmp/qa-round2-browser-results/ui-qa-unread-count-QA-101--6e451-unread-→-110-new-mail-→-111/error-context.md
+
+  4 failed
+    tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions 
+    tests/browser/ui/qa-shell.spec.ts:36:1 › QA-003/009: create a 180-day token, reveal it once, refresh metadata, dismiss Settings 
+    tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes 
+    tests/browser/ui/qa-unread-count.spec.ts:19:1 › QA-101 one Mark as read gives 110 → 109 within 2s, stable at 10s; unread → 110; new mail → 111 
+  3 did not run
+  4 passed (54.1s)

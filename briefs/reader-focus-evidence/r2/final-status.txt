@@ -1,0 +1,4 @@
+branch feat/reader-focus
+HEAD ccddc4dafc3007f6235db6f27f98b585139fbf4b
+working tree clean
+no push performed

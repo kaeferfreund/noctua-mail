@@ -1,0 +1,436 @@
+{
+  "initial": {
+    "api": 110,
+    "summary": 110,
+    "mailbox": 110,
+    "inbox": 110,
+    "tree": 110,
+    "focused": 110,
+    "total": 300
+  },
+  "streamStatuses": [
+    200,
+    200
+  ],
+  "mutationStatus": 200,
+  "readPosts": [
+    {
+      "flag": "seen",
+      "value": true
+    }
+  ],
+  "settledMs": 1175,
+  "samples": [
+    {
+      "ms": 468,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 110,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 110,
+      "total": 300
+    },
+    {
+      "ms": 605,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 110,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 734,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 110,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 955,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 110,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 1174,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 1280,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 1552,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 1835,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 2108,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 2379,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 2652,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 2924,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 3199,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 3471,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 3742,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 4016,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 4288,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 4559,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 4831,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 5102,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 5372,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 5643,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 5915,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 6187,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 6457,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 6727,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 7002,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 7273,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 7544,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 7817,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 8088,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 8360,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 8636,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 8908,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 9181,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 9453,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 9726,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 10001,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    },
+    {
+      "ms": 10271,
+      "api": 109,
+      "summary": 109,
+      "mailbox": 109,
+      "inbox": 109,
+      "tree": 109,
+      "focused": 109,
+      "total": 300
+    }
+  ],
+  "unread": {
+    "api": 110,
+    "summary": 110,
+    "mailbox": 110,
+    "inbox": 110,
+    "tree": 110,
+    "focused": 110,
+    "total": 300
+  },
+  "unreadMs": 1519,
+  "newMail": {
+    "api": 111,
+    "summary": 111,
+    "mailbox": 111,
+    "inbox": 111,
+    "tree": 111,
+    "focused": 111,
+    "total": 301
+  },
+  "newMailMs": 2014,
+  "injectionStatus": 200
+}

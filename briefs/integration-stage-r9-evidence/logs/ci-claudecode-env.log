@@ -1,0 +1,1841 @@
+$ bun test --timeout 20000 && bun run test:dom
+bun test v1.4.4 (38afee6c8)
+
+lib/membershipCleanup.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-SyFlRY",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-SyFlRY/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/syncJobs.test.ts:
+[sync] worker started {"jobId":"44740189-8824-476e-97f4-cafbc6327956","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"807b2a4f-bc88-4de5-8876-6f4fe385cf2e","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Archive","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"46595abf-ee62-463a-8aed-7c42398d39d8","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"3876503e-86c7-4e67-8b9c-37e87acbea76","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"516629db-6bb3-413e-af0e-4a1d9d2ba467","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"c90532d2-07d1-400d-ad99-5029a7196570","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"92f28d7d-a097-4126-b612-7a38a9e27b43","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"37daa351-dbde-4b6a-94fc-c0cc967be782","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"bc3aecae-dd60-4ede-934b-e59a23f8fd65","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"0430c68f-6d2a-49f2-bab4-864506dbeb96","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"ad93edef-7c3a-4654-b380-ac18484f0a71","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Archive","mode":"full","pid":3016827}
+[sync] worker started {"jobId":"f2ac8125-5d35-4bce-a679-8df5fae7901e","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"d314fba4-1e2b-43a9-beb0-d8f698dd9ed8","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"7efda258-3265-4ec8-93c5-44b846959b15","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Archive","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"2b071a74-09ea-4e00-8e35-2de51b2f8070","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"6952f545-c12b-4e22-ab22-b7034ace2af4","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:Sent","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"e545e2ad-375d-460a-8234-258e78739933","accountId":"acc-busy-7","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"1dc20ee7-4a9c-4a28-a751-def9a24ee078","accountId":"acc-busy-8","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"e5aa0985-75ac-4b0a-ab63-6c84a7922825","accountId":"acc-interactive-11","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"44b1f084-4694-4f32-a07c-119e284bfeee","accountId":"acc-watcher-10","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"8b035a2b-21aa-4f5b-8479-569fefac4341","accountId":"acc-sweep-9","mode":"full","pid":3016827}
+[sync] worker started {"jobId":"4bec6f6f-7dae-41be-8654-23b4d34911af","accountId":"acc-busy-head-12","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"7eb96b9b-1f46-4d0c-a4d5-c9c995624c99","accountId":"acc-busy-head-13","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"daf1161b-e2ae-44b4-bcd1-b29eeb105f5a","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:INBOX","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"78330a16-68d3-4bc7-942c-e695f10bf980","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:Archive","mode":"full","pid":3016827}
+[sync] worker started {"jobId":"68a3d506-311e-4047-a6c9-3a7c7ef4c733","accountId":"acc-busy-cancel-15","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"5b5fcde4-656c-4413-a7c5-d97a52a3d62e","accountId":"acc-busy-cancel-16","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"0fdde425-745d-46c3-bbb8-598b5451a3eb","accountId":"acc-joined-watcher-18","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"3212bfcd-5803-4d10-84c4-17dbf5af2c89","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","pid":3016827}
+[sync] worker failed {"jobId":"3212bfcd-5803-4d10-84c4-17dbf5af2c89","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","exitCode":1,"error":"Sync worker exited with code 1"}
+[sync] worker started {"jobId":"8a501459-04f0-4c05-a01b-4e3609df886e","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:initial","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"23a9a712-13a4-46f5-b8d8-8d770982fe93","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-0","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"5afb4749-bc16-4d00-abb1-be6c98239a2c","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-1","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"4e8eaaf8-a7a6-4e63-9e26-1acbe024c838","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-2","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"3c34493a-9675-47eb-8dc8-9d05f645423f","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-3","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"9152a343-565b-41f5-91f8-e8d6977188b9","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-4","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"97623b98-b74d-4859-babe-cfb4b72be50c","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-5","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"71f767c4-4a41-45e5-9a09-65bf96eaa919","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-6","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"b1ce6125-8e76-4085-a5f5-17d765c86f73","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-7","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"3e522e86-c7cd-417c-8c65-dbb64899e419","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:INBOX","mode":"repair","pid":3016827}
+[sync] worker started {"jobId":"af385260-165a-4fcf-8c92-ef5e45a2afa4","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-8","mode":"new","pid":3016827}
+[sync] worker started {"jobId":"d0bbb64f-be30-440a-8c24-70b26b47f0b2","accountId":"acc-folder-guard-21","folderId":"acc-folder-guard-21:INBOX","mode":"new","pid":3016827}
+
+lib/threadCollab.send.test.ts:
+PASS fixture direct appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture direct failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture direct SMTP rejected: no delivery, no Sent APPEND
+PASS fixture direct lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture direct stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct flag-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture draft failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture draft SMTP rejected: no delivery, no Sent APPEND
+PASS fixture draft lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft cleanup-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture calendar failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture calendar SMTP rejected: no delivery, no Sent APPEND
+PASS fixture calendar lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture single-draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and own Sent files verified
+PASS fixture new outbound: Sent ingested and attributed without reply activity
+PASS 31 fixture send scenarios
+
+lib/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/messageMoveJobs.test.ts:
+[move-jobs] failed to move IMAP message batch {
+  accountId: "acc-move-jobs",
+  messageIds: [ "m-1", "m-2" ],
+  sourceMailboxPath: "Source",
+  sourceUidSample: [ 20, 21 ],
+  destinationMailboxPath: "Target",
+  error: warn: move failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/messageMoveJobs.test.ts:157:44)
+,
+}
+
+lib/outboundWrite.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 2,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 4,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 126,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 127,
+}
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.revision.test.ts:
+R6-server interleaved final revisions {"A":7,"B":2}
+R6-migration 0 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 1 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 2 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 3 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-lifecycle actual service {"revision":1,"live":[1,1],"hidden":[0,0],"restored":[1,1]}
+R6-lifecycle public deletion/reimport {"revision":1,"lengths":[1,0,1]}
+
+lib/betterAuth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:01.685Z WARN [Better Auth]: Password is too short
+2026-10-23T12:09:06.262Z WARN [Better Auth]: Invalid password
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:07.212Z ERROR [Better Auth]: Invalid origin: https://evil.example
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:09.067Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:13.927Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:25.243Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:26.734Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:09:28.276Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/testAuthHarness.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "testAuthHarness.createUser",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 102,
+  elapsedMs: 2,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.createUser",
+  retries: 1,
+  elapsedMs: 112,
+}
+[db-write-retry] retry {
+  operation: "testAuthHarness.linkAccount",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 127,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.linkAccount",
+  retries: 1,
+  elapsedMs: 133,
+}
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T12:11:04.177Z ERROR [Better Auth]: Error 244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+# SERVER_ERROR:  244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/processLeases.hint.test.ts:
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 140,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 141,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 135,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 136,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 124,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 127,
+}
+
+lib/processLeases.integration.test.ts:
+LEASE_PROOF independent-graph admission: 4 processes, maximum 2 workers
+LEASE_PROOF restart recovery: expired live orphan retained; dead orphan reclaimed; stale child rejected
+LEASE_PROOF starvation bound: watcher admitted after 8 interactive bypasses
+LEASE_PROOF confirmed-exit failure: a live recorded PID retains capacity
+LEASE_PROOF scheduler: independent graphs share one owner, dead-owner takeover and orderly handoff pass
+LEASE_PROOF production monitor: SIGKILL waits for confirmed exit, rejected exit retains capacity
+LEASE_PROOF PASS
+
+lib/mailboxWatcher.integration.test.ts:
+WATCHER_FIXTURE independent watcher graphs: one IDLE owner, orderly takeover
+WATCHER_FIXTURE injection ingested in 410ms
+WATCHER_FIXTURE UIDVALIDITY browser-before-repair: OLD=0 NEW=1 reused UID=61 replacement subject/body, watermarks and pending moves cleared
+WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61
+WATCHER_FIXTURE UIDVALIDITY direct-new and resumed-full reset re-ingest replacement UID=61
+WATCHER_FIXTURE auth_failed suspended: 0 new authentication attempts over 800ms (minimum reconnect=150ms)
+WATCHER_FIXTURE shared shard: both accounts retain rows, thread indexes and FTS for identical RFC Message-IDs
+WATCHER_FIXTURE PASS bootstrap=60 injected=1 flags=ok expunge=ok periodic-Sent=ok singleton=ok DB-credentials=ok auth-reload=ok add/remove=ok events=ok shutdown=ok
+
+lib/calendarInviteProcessor.test.ts:
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "fails@example.test",
+  actionType: "invitation",
+  error: 1072 |   });
+1073 | 
+1074 |   test("returns failures for groups that throw while leaving other imports intact", async () => {
+1075 |     // Two events in one ICS — make the upsert fail for the first one only.
+1076 |     upsertCalendarEventByUid.mockImplementationOnce(async () => {
+1077 |       throw new Error("db unavailable");
+                       ^
+error: db unavailable
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1077:17)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.ts:659:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1095:26)
+,
+}
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "lookup-fails@example.test",
+  actionType: "unknown",
+  error: 1117 | 
+1118 |   test("isolates a per-group failure when the existing-event lookup throws", async () => {
+1119 |     // First group's lookup blows up; second group should still process fine.
+1120 |     getCalendarEventByUid
+1121 |       .mockImplementationOnce(async () => {
+1122 |         throw new Error("lookup failed");
+                         ^
+error: lookup failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1122:19)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.ts:563:35)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/calendarInviteProcessor.test.ts:1140:26)
+,
+}
+
+lib/crossAccountCopy.test.ts:
+[cross-account-copy] failed to read back appended message {
+  destinationMailboxPath: "Archive",
+  uid: 4242,
+  error: warn: read-back boom
+      at syncImapMessage (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/crossAccountCopy.test.ts:80:37)
+      at copyMessageToAccount (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/crossAccountCopy.ts:135:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/crossAccountCopy.test.ts:163:26)
+,
+}
+
+lib/signatureTemplates.save.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/outboundWrite.revocation.test.ts:
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 9,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 5,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 6,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 131,
+  elapsedMs: 9,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/dbWriteRetry.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 2,
+  attempts: 5,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 3,
+  attempts: 5,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 4,
+  attempts: 5,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic-budget",
+  retries: 4,
+  elapsedMs: 1800,
+}
+retry shutdown proof {
+  durationMs: 151,
+  delayMs: 1500,
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 3,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 7,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 15,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 23,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 31,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 39,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 47,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 55,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 63,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 71,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 79,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 87,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 95,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 103,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 17,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 111,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 18,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 231,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 19,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 471,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 20,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 951,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 20,
+  attempts: 21,
+  elapsedMs: 1911,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 4,
+  attempts: 5,
+  elapsedMs: 1800,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 240,
+  elapsedMs: 120,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 480,
+  elapsedMs: 360,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 960,
+  elapsedMs: 840,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 1800,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1801,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 1803,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1807,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1815,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1823,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1831,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1839,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1847,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1855,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1863,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1871,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 17,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1879,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 18,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1887,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 19,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1895,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic bounded retries",
+  attempt: 20,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 1903,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic bounded retries",
+  retries: 20,
+  attempts: 21,
+  elapsedMs: 1911,
+  error: {
+    name: "Error",
+    message: "Synthetic busy",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic elapsed budget",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 1100,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic elapsed budget",
+  retries: 1,
+  attempts: 2,
+  elapsedMs: 2201,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic delayed wake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] exhausted {
+  operation: "synthetic delayed wake",
+  retries: 1,
+  attempts: 1,
+  elapsedMs: 2201,
+  error: {
+    name: "Error",
+    message: "Synthetic master BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/mail/resyncMessage.senderKey.test.ts:
+25 |     const { stdout, stderr } = await promisify(execFile)(process.execPath, [
+26 |       "test", "--timeout", "20000", "--test-name-pattern", pattern, fileURLToPath(import.meta.url)
+27 |     ], { cwd: process.cwd(), env: { ...process.env, NOCTUA_REAL_RESYNC_SENDER_KEY: "1" },
+28 |       timeout: 20_000, maxBuffer: 10 * 1024 * 1024 });
+29 |     const output = stdout + stderr;
+30 |     expect(output).toContain(`(pass) ${name}`);
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "(pass) real IMAP resync replaces an unkeyed legacy row with the parsed sender key"
+Received: "bun test v1.4.4 (38afee6c8)\n[startup] opened storage {\n  dataDir: \"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-ZTQqzM\",\n  dbPath: \"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-ZTQqzM/db/main.db\",\n}\n[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).\n{\"src\":\"connection\",\"msg\":\"Established TCP connection\",\"cid\":\"ufgxazguz5jz0i4w06s8\",\"secure\":false,\"host\":\"127.0.0.1\",\"servername\":false,\"port\":33473,\"address\":\"127.0.0.1\",\"localAddress\":\"127.0.0.1\",\"localPort\":50370}\n{\"event\":\"imap.socket_connect\",\"accountId\":\"collab-f21d03c8-9846-4860-983c-ecabe3717977\",\"clientId\":null,\"mailbox\":null,\"socket\":{\"secureConnection\":false,\"sessionReused\":null,\"authorized\":null,\"authorizationError\":null,\"remoteAddress\":\"127.0.0.1\",\"remotePort\":33473,\"localAddress\":\"127.0.0.1\",\"localPort\":50370,\"alpnProtocol\":null,\"cipher\":null,\"protocol\":null,\"peerCertificate\":{\"subject\":null,\"issuer\":null,\"subjectAltName\":null,\"serialNumber\":null,\"fingerprint\":null,\"fingerprint256\":null,\"validFrom\":null,\"validTo\":null},\"hasPeerCertificateData\":false}}\n{\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"ufgxazguz5jz0i4w06s8\",\"user\":\"team@example.test\"}\n[imap] connect account=collab-f21d03c8-9846-4860-983c-ecabe3717977 23ms\n[imap] mailboxOpen mailbox=INBOX account=collab-f21d03c8-9846-4860-983c-ecabe3717977 10ms\n[imap] fetchOne mailbox=INBOX account=collab-f21d03c8-9846-4860-983c-ecabe3717977 14ms\n[imap] pool-drain account=collab-f21d03c8-9846-4860-983c-ecabe3717977 2ms\n{\"event\":\"imap.socket_close\",\"accountId\":\"collab-f21d03c8-9846-4860-983c-ecabe3717977\",\"clientId\":null,\"mailbox\":null,\"hadError\":false,\"socket\":{\"secureConnection\":false,\"sessionReused\":null,\"authorized\":null,\"authorizationError\":null,\"remoteAddress\":\"127.0.0.1\",\"remotePort\":33473,\"localAddress\":null,\"localPort\":null,\"alpnProtocol\":null,\"cipher\":null,\"protocol\":null,\"peerCertificate\":{\"subject\":null,\"issuer\":null,\"subjectAltName\":null,\"serialNumber\":null,\"fingerprint\":null,\"fingerprint256\":null,\"validFrom\":null,\"validTo\":null},\"hasPeerCertificateData\":false}}\n\nlib/mail/resyncMessage.senderKey.test.ts:\n{\"msg\":\"Server does not support STARTTLS, continuing over an unencrypted connection\",\"host\":\"127.0.0.1\",\"port\":33473,\"cid\":\"ufgxazguz5jz0i4w06s8\"}\n\n 1 pass\n 1 filtered out\n 0 fail\n 4 expect() calls\nRan 1 test across 1 file. [696.00ms]\n"
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/mail/resyncMessage.senderKey.test.ts:30:20)
+(fail) real IMAP resync replaces an unkeyed legacy row with the parsed sender key [725.93ms]
+25 |     const { stdout, stderr } = await promisify(execFile)(process.execPath, [
+26 |       "test", "--timeout", "20000", "--test-name-pattern", pattern, fileURLToPath(import.meta.url)
+27 |     ], { cwd: process.cwd(), env: { ...process.env, NOCTUA_REAL_RESYNC_SENDER_KEY: "1" },
+28 |       timeout: 20_000, maxBuffer: 10 * 1024 * 1024 });
+29 |     const output = stdout + stderr;
+30 |     expect(output).toContain(`(pass) ${name}`);
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "(pass) collision-variant resync preserves the base source and refreshes only the variant's ownership and sender"
+Received: "bun test v1.4.4 (38afee6c8)\n[startup] opened storage {\n  dataDir: \"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-EIMr34\",\n  dbPath: \"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-EIMr34/db/main.db\",\n}\n[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).\n{\"src\":\"connection\",\"msg\":\"Established TCP connection\",\"cid\":\"b12mi88m8zdii9uoag37\",\"secure\":false,\"host\":\"127.0.0.1\",\"servername\":false,\"port\":35679,\"address\":\"127.0.0.1\",\"localAddress\":\"127.0.0.1\",\"localPort\":47582}\n{\"event\":\"imap.socket_connect\",\"accountId\":\"collab-347ca198-7965-465f-ae14-56313ce35d51\",\"clientId\":null,\"mailbox\":null,\"socket\":{\"secureConnection\":false,\"sessionReused\":null,\"authorized\":null,\"authorizationError\":null,\"remoteAddress\":\"127.0.0.1\",\"remotePort\":35679,\"localAddress\":\"127.0.0.1\",\"localPort\":47582,\"alpnProtocol\":null,\"cipher\":null,\"protocol\":null,\"peerCertificate\":{\"subject\":null,\"issuer\":null,\"subjectAltName\":null,\"serialNumber\":null,\"fingerprint\":null,\"fingerprint256\":null,\"validFrom\":null,\"validTo\":null},\"hasPeerCertificateData\":false}}\n{\"src\":\"auth\",\"msg\":\"User authenticated\",\"cid\":\"b12mi88m8zdii9uoag37\",\"user\":\"team@example.test\"}\n[imap] connect account=collab-347ca198-7965-465f-ae14-56313ce35d51 21ms\n[imap] mailboxOpen mailbox=Archive account=collab-347ca198-7965-465f-ae14-56313ce35d51 9ms\n[imap] fetchOne mailbox=Archive account=collab-347ca198-7965-465f-ae14-56313ce35d51 7ms\n[imap] pool-drain account=collab-347ca198-7965-465f-ae14-56313ce35d51 2ms\n{\"event\":\"imap.socket_close\",\"accountId\":\"collab-347ca198-7965-465f-ae14-56313ce35d51\",\"clientId\":null,\"mailbox\":null,\"hadError\":false,\"socket\":{\"secureConnection\":false,\"sessionReused\":null,\"authorized\":null,\"authorizationError\":null,\"remoteAddress\":\"127.0.0.1\",\"remotePort\":35679,\"localAddress\":null,\"localPort\":null,\"alpnProtocol\":null,\"cipher\":null,\"protocol\":null,\"peerCertificate\":{\"subject\":null,\"issuer\":null,\"subjectAltName\":null,\"serialNumber\":null,\"fingerprint\":null,\"fingerprint256\":null,\"validFrom\":null,\"validTo\":null},\"hasPeerCertificateData\":false}}\n\nlib/mail/resyncMessage.senderKey.test.ts:\n{\"msg\":\"Server does not support STARTTLS, continuing over an unencrypted connection\",\"host\":\"127.0.0.1\",\"port\":35679,\"cid\":\"b12mi88m8zdii9uoag37\"}\n\n 1 pass\n 1 filtered out\n 0 fail\n 6 expect() calls\nRan 1 test across 1 file. [757.00ms]\n"
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/lib/mail/resyncMessage.senderKey.test.ts:30:20)
+(fail) collision-variant resync preserves the base source and refreshes only the variant's ownership and sender [796.85ms]
+
+lib/db/accountKeys.test.ts:
+[shard-migration-timing] 50000 messages: migration=2246.41ms repeat=4.48ms
+
+lib/db/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/connection.auth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "isolated-write",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 24,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "isolated-write",
+  retries: 1,
+  elapsedMs: 29,
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 142,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 147,
+}
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 107,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 108,
+}
+
+lib/db/ftsIdentity.test.ts:
+[shard-format-v3] dropped 2 orphan FTS rows
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/stableLoops.test.ts:
+[RECOMPUTE CATEGORIES] Starting for account collab-195b2b64-51ac-4f07-9796-75eaa43ee073
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+[RECOMPUTE CATEGORIES] Starting for account collab-195b2b64-51ac-4f07-9796-75eaa43ee073
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+
+scripts/dev-fixture/fixture.test.ts:
+{"src":"connection","msg":"Established TCP connection","cid":"90scu0mpofowclo7wp6f","secure":false,"host":"127.0.0.1","servername":false,"port":43323,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":51218}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":43323,"localAddress":"127.0.0.1","localPort":51218,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":43323,"cid":"90scu0mpofowclo7wp6f"}
+{"src":"auth","msg":"User authenticated","cid":"90scu0mpofowclo7wp6f","user":"demo@monkeydent.test"}
+[imap] connect account=fixture 19ms
+[imap] logout account=fixture 2ms
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":43323,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"src":"connection","msg":"Established TCP connection","cid":"1gfv78ej27vjcjq2udh3","secure":false,"host":"127.0.0.1","servername":false,"port":43323,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":51230}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":43323,"localAddress":"127.0.0.1","localPort":51230,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":43323,"cid":"1gfv78ej27vjcjq2udh3"}
+{"err":{"response":"2 NO [AUTHENTICATIONFAILED] Invalid fixture credentials","responseStatus":"NO","executedCommand":"2 AUTHENTICATE PLAIN","responseText":"Invalid fixture credentials","serverResponseCode":"AUTHENTICATIONFAILED","authenticationFailed":true},"cid":"1gfv78ej27vjcjq2udh3"}
+[imap] connect account=fixture 6ms error=Command failed
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":43323,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+
+app/api/_helpers/smtpUpstreamError.test.ts:
+[smtp] upstream failure {
+  accountId: "synthetic",
+  op: "test",
+  code: undefined,
+  command: undefined,
+}
+
+app/api/accounts/[accountId]/sync/new-candidates/route.test.ts:
+[imap] sync.new-candidates unavailable account=acc-new-candidates-b8945815-eef0-4210-b774-d4a5222ca6c1 error=Peer certificate is empty for hostname "imap.example.test"
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.connect mailbox=poll account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=Archive account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.connect mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.status mailbox=INBOX account=stream-f5e742a4-0f9f-4ab3-a409-c905f9012484 0ms
+[imap] imap.connect mailbox=INBOX account=stream-eca16dac-4cd9-4ca2-8bf1-78033e9b078e 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-eca16dac-4cd9-4ca2-8bf1-78033e9b078e 0ms
+[imap] imap.status mailbox=INBOX account=stream-eca16dac-4cd9-4ca2-8bf1-78033e9b078e 0ms
+[imap] imap.status mailbox=INBOX account=stream-eca16dac-4cd9-4ca2-8bf1-78033e9b078e 3ms
+[imap] imap.fetch mailbox=INBOX account=stream-eca16dac-4cd9-4ca2-8bf1-78033e9b078e 0ms
+[imap] imap.connect mailbox=INBOX account=stream-c2feb5aa-09c4-4b46-8587-a9c5224ef7be 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-c2feb5aa-09c4-4b46-8587-a9c5224ef7be 0ms
+[imap] imap.status mailbox=INBOX account=stream-c2feb5aa-09c4-4b46-8587-a9c5224ef7be 0ms
+[imap] imap.connect mailbox=poll account=stream-c2feb5aa-09c4-4b46-8587-a9c5224ef7be 0ms
+[imap] imap.status mailbox=Archive account=stream-c2feb5aa-09c4-4b46-8587-a9c5224ef7be 8ms
+[imap] imap.connect mailbox=INBOX account=stream-56130e3f-b473-46ca-ad20-da63d3b45ea3 4ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-56130e3f-b473-46ca-ad20-da63d3b45ea3 0ms
+[imap] imap.status mailbox=INBOX account=stream-56130e3f-b473-46ca-ad20-da63d3b45ea3 0ms
+[imap] imap.connect mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.status mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.connect mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.status mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.connect mailbox=poll account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.status mailbox=Archive account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 6ms
+[imap] imap.status mailbox=INBOX account=stream-bc1b1b61-aca4-4bd3-a224-2cc21919bc38 0ms
+[imap] imap.connect mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.status mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.connect mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.status mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.connect mailbox=poll account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 1ms
+[imap] imap.status mailbox=Archive account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 5ms
+[imap] imap.status mailbox=INBOX account=stream-1d8911c3-1779-4890-b9a3-fac9fdcebb31 0ms
+[imap] imap.connect mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.status mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.connect mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.status mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 1ms
+[imap] imap.connect mailbox=poll account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.status mailbox=Archive account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 5ms
+[imap] imap.status mailbox=INBOX account=stream-09e70c3f-2d27-49ce-b1b9-452ddae5a12f 0ms
+[imap] imap.connect mailbox=INBOX account=stream-930693eb-edbb-452b-a780-0037e3fc416f 1ms
+[imap] imap.connect mailbox=INBOX account=stream-511855ec-ac28-4783-b002-6d830c485c26 0ms
+[imap] imap.connect mailbox=INBOX account=stream-0cbc11cb-09ae-4fe2-8e88-5f7739683203 0ms
+[imap] imap.connect mailbox=INBOX account=stream-bcd9dfe4-319a-492b-9cf8-7eb064eb80bd 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-14ce6eb1-4ccb-484c-a958-47f050009303 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-c556eb4f-1730-4405-8c1d-d2591ea6cd64 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-44b30d90-77c7-4a85-a25d-bdcb0f2449db 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-ae739241-cc3c-4932-85b1-a43df67df02e 1ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-ae739241-cc3c-4932-85b1-a43df67df02e","clientId":null,"mailbox":"INBOX","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+[imap] imap.connect mailbox=INBOX account=stream-bffbecec-7814-4914-bc03-bd9f4c79e8c1 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-bffbecec-7814-4914-bc03-bd9f4c79e8c1 0ms
+[imap] imap.status mailbox=INBOX account=stream-bffbecec-7814-4914-bc03-bd9f4c79e8c1 1ms
+[imap] imap.connect mailbox=poll account=stream-bffbecec-7814-4914-bc03-bd9f4c79e8c1 0ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-bffbecec-7814-4914-bc03-bd9f4c79e8c1","clientId":null,"mailbox":"poll","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+[imap] imap.connect mailbox=INBOX account=stream-715f10bc-0df7-4b1c-8432-f8e4bb921e47 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-715f10bc-0df7-4b1c-8432-f8e4bb921e47 0ms
+[imap] imap.status mailbox=INBOX account=stream-715f10bc-0df7-4b1c-8432-f8e4bb921e47 0ms
+[imap] imap.status mailbox=INBOX account=stream-715f10bc-0df7-4b1c-8432-f8e4bb921e47 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-715f10bc-0df7-4b1c-8432-f8e4bb921e47 1ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-0fe869ca-8864-4fa0-8519-17b61ddbe844 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-0fe869ca-8864-4fa0-8519-17b61ddbe844 0ms
+[imap] imap.status mailbox=INBOX account=stream-0fe869ca-8864-4fa0-8519-17b61ddbe844 0ms
+[imap] imap.connect mailbox=INBOX account=stream-b030eed7-c458-4c2b-a884-a869f9884920 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-b030eed7-c458-4c2b-a884-a869f9884920 0ms
+[imap] imap.status mailbox=INBOX account=stream-b030eed7-c458-4c2b-a884-a869f9884920 0ms
+[imap] imap.connect mailbox=poll account=stream-b030eed7-c458-4c2b-a884-a869f9884920 0ms
+[imap] imap.status mailbox=Archive account=stream-b030eed7-c458-4c2b-a884-a869f9884920 0ms error=Synthetic opaque upstream failure
+
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:
+[imap] folder.consistency unavailable account=acc-consistency-unreachable-1e6af52b-d63a-472e-8b4f-36158301efb0 error=Peer certificate is empty for hostname "imap.example.com"
+
+ 2913 pass
+ 2 fail
+ 18269 expect() calls
+Ran 2915 tests across 315 files. [432.75s]
+error: script "test:ci" exited with code 1

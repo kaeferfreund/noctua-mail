@@ -1,0 +1,971 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/outboundWrite.test.ts: (run #1)
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-cllKmT",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-cllKmT/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 5,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 7,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 96,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 100,
+}
+
+lib/outboundWrite.test.ts: (run #2)
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 4,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 125,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 126,
+}
+
+lib/outboundWrite.test.ts: (run #3)
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 3,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 102,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 102,
+}
+
+lib/outboundWrite.test.ts: (run #4)
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 6,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 139,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 139,
+}
+
+lib/outboundWrite.test.ts: (run #5)
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic handshake",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 2,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic handshake",
+  retries: 2,
+  elapsedMs: 4,
+}
+[db-write-retry] retry {
+  operation: "synthetic shard contention",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 117,
+  elapsedMs: 0,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic shard contention",
+  retries: 1,
+  elapsedMs: 118,
+}
+
+lib/processLeases.hint.test.ts: (run #1)
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 144,
+  elapsedMs: 1,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 145,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 131,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 132,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 130,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 135,
+}
+
+lib/processLeases.hint.test.ts: (run #2)
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 110,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 110,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 123,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 123,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 122,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 126,
+}
+
+lib/processLeases.hint.test.ts: (run #3)
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 138,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 139,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 132,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 133,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 118,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 124,
+}
+
+lib/processLeases.hint.test.ts: (run #4)
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 140,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 141,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 128,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 132,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 144,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 151,
+}
+
+lib/processLeases.hint.test.ts: (run #5)
+[db-write-retry] retry {
+  operation: "bindSyncWorkerProcess",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 110,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "bindSyncWorkerProcess",
+  retries: 1,
+  elapsedMs: 110,
+}
+[db-write-retry] retry {
+  operation: "acquireMailboxScheduler",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 139,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "acquireMailboxScheduler",
+  retries: 1,
+  elapsedMs: 140,
+}
+[db-write-retry] retry {
+  operation: "releaseSyncWorker",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 112,
+  elapsedMs: 0,
+  phase: "handshake",
+  policy: "coarse",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "releaseSyncWorker",
+  retries: 1,
+  elapsedMs: 124,
+}
+
+lib/outboundWrite.revocation.test.ts: (run #1)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 49,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 12,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 14,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 127,
+  elapsedMs: 98,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/outboundWrite.revocation.test.ts: (run #2)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 30,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 7,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 10,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 111,
+  elapsedMs: 20,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/outboundWrite.revocation.test.ts: (run #3)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 26,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 9,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 10,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 130,
+  elapsedMs: 21,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/outboundWrite.revocation.test.ts: (run #4)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 22,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 11,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 7,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 116,
+  elapsedMs: 11,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+lib/outboundWrite.revocation.test.ts: (run #5)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 13,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE draft {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarEvent",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 9,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE series {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertCalendarParticipationOverride",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 9,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+OUTBOUND_REVOKE occurrence {
+  preparations: 2,
+  finalAssertions: 0,
+  failedMasterBegins: 1,
+  shardRollbacks: 1,
+  status: 403,
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 129,
+  elapsedMs: 17,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic database is locked after publication",
+    code: "SQLITE_BUSY",
+  },
+}
+
+ 95 pass
+ 0 fail
+ 820 expect() calls
+Ran 95 tests across 3 files. [30.26s]

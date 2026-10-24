@@ -1,0 +1,37 @@
+✓ Running next.config took 11ms
+Ready on http://127.0.0.1:3798
+[2026-10-23 13:32:25.610 +00:00] [startup] opened storage {
+[2026-10-23 13:32:25.610 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data',
+[2026-10-23 13:32:25.610 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data/db/main.db'
+[2026-10-23 13:32:25.610 +00:00] }
+[2026-10-23 13:32:25.720 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 13:32:26.410 +00:00] [startup] opened storage {
+[2026-10-23 13:32:26.410 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data',
+[2026-10-23 13:32:26.410 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data/db/main.db'
+[2026-10-23 13:32:26.410 +00:00] }
+[2026-10-23 13:32:26.412 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 13:32:26.961 +00:00] [shutdown] starting {
+[2026-10-23 13:32:26.961 +00:00]   signal: 'SIGTERM',
+[2026-10-23 13:32:26.961 +00:00]   hooks: [
+[2026-10-23 13:32:26.961 +00:00]     'http:stop',
+[2026-10-23 13:32:26.961 +00:00]     'http:drain',
+[2026-10-23 13:32:26.961 +00:00]     'background:stop',
+[2026-10-23 13:32:26.961 +00:00]     'background:drain',
+[2026-10-23 13:32:26.961 +00:00]     'auth-streams:drain',
+[2026-10-23 13:32:26.961 +00:00]     'auth-streams',
+[2026-10-23 13:32:26.961 +00:00]     'admission:3584740:2eb36348-bcc6-4140-a3e4-f4db10d17593:stop',
+[2026-10-23 13:32:26.961 +00:00]     'admission:3584740:2eb36348-bcc6-4140-a3e4-f4db10d17593:drain',
+[2026-10-23 13:32:26.961 +00:00]     'db:close',
+[2026-10-23 13:32:26.961 +00:00]     'background:stop',
+[2026-10-23 13:32:26.961 +00:00]     'background:drain',
+[2026-10-23 13:32:26.961 +00:00]     'auth-streams:drain',
+[2026-10-23 13:32:26.961 +00:00]     'auth-streams',
+[2026-10-23 13:32:26.961 +00:00]     'admission:3584740:eec5bc7c-9809-4c69-a532-e6c9482ebd7c:stop',
+[2026-10-23 13:32:26.961 +00:00]     'admission:3584740:eec5bc7c-9809-4c69-a532-e6c9482ebd7c:drain',
+[2026-10-23 13:32:26.961 +00:00]     'db:close'
+[2026-10-23 13:32:26.961 +00:00]   ]
+[2026-10-23 13:32:26.961 +00:00] }
+[2026-10-23 13:32:26.962 +00:00] [shutdown] HTTP requests { active: 0 }
+[2026-10-23 13:32:26.962 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 13:32:26.963 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 13:32:26.972 +00:00] [shutdown] complete {}

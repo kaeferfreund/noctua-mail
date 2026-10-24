@@ -1,0 +1,83 @@
+[2026-10-23 15:49:48.675 +00:00] [db-write-retry] retry {
+[2026-10-23 15:49:48.675 +00:00]   operation: 'acquireMailboxScheduler',
+[2026-10-23 15:49:48.675 +00:00]   attempt: 1,
+[2026-10-23 15:49:48.675 +00:00]   attempts: 21,
+[2026-10-23 15:49:48.675 +00:00]   delayMs: 106,
+[2026-10-23 15:49:48.675 +00:00]   elapsedMs: 1,
+[2026-10-23 15:49:48.675 +00:00]   phase: 'handshake',
+[2026-10-23 15:49:48.675 +00:00]   policy: 'coarse',
+[2026-10-23 15:49:48.675 +00:00]   error: {
+[2026-10-23 15:49:48.675 +00:00]     name: 'SQLiteError',
+[2026-10-23 15:49:48.675 +00:00]     message: 'database is locked',
+[2026-10-23 15:49:48.675 +00:00]     code: 'SQLITE_BUSY'
+[2026-10-23 15:49:48.675 +00:00]   }
+--
+[2026-10-23 15:49:48.782 +00:00] [db-write-retry] retry {
+[2026-10-23 15:49:48.782 +00:00]   operation: 'acquireMailboxScheduler',
+[2026-10-23 15:49:48.782 +00:00]   attempt: 2,
+[2026-10-23 15:49:48.782 +00:00]   attempts: 21,
+[2026-10-23 15:49:48.782 +00:00]   delayMs: 246,
+[2026-10-23 15:49:48.782 +00:00]   elapsedMs: 108,
+[2026-10-23 15:49:48.782 +00:00]   phase: 'handshake',
+[2026-10-23 15:49:48.782 +00:00]   policy: 'coarse',
+[2026-10-23 15:49:48.782 +00:00]   error: {
+[2026-10-23 15:49:48.782 +00:00]     name: 'SQLiteError',
+[2026-10-23 15:49:48.782 +00:00]     message: 'database is locked',
+[2026-10-23 15:49:48.782 +00:00]     code: 'SQLITE_BUSY'
+[2026-10-23 15:49:48.782 +00:00]   }
+--
+[2026-10-23 15:49:49.032 +00:00] [db-write-retry] success { operation: 'acquireMailboxScheduler', retries: 2, elapsedMs: 357 }
+[2026-10-23 15:49:49.152 +00:00] [sync-status] {"outcome":"ok","routeAccountId":"spike-folders","jobId":"2a4e2f6e-bf7f-48a8-bb5e-59d84d54e84c","accountId":"spike-folders","status":"done","progressPhase":"done","progressProcessed":0,"progressUpdatedAt":17927705
+[2026-10-23 15:49:49.169 +00:00] [sync] worker started {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mode":"full","pid":3951141}
+[2026-10-23 15:49:49.441 +00:00] [sync] unknown% progress on {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mailboxPath":"Projekte/P08","mode":"full","phase":"starting","processed":0,"messag
+[2026-10-23 15:49:49.441 +00:00] [sync] unknown% progress on {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mailboxPath":"Projekte/P08","mode":"full","phase":"fetching","processed":0,"messag
+[2026-10-23 15:49:49.459 +00:00] [sync-worker] [2026-10-23 15:49:49.459 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3909,"cid":"17o4maj5wm6lpniwedz9"}
+[2026-10-23 15:49:49.472 +00:00] [sync-status] {"outcome":"ok","routeAccountId":"spike-folders","jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","status":"running","pid":3951141,"progressPhase":"fetching","progressProcessed":0,"progre
+[2026-10-23 15:49:49.508 +00:00] [sync] unknown% progress on {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mailboxPath":"Projekte/P08","mode":"full","phase":"fetching","processed":0,"messag
+[2026-10-23 15:49:49.508 +00:00] [sync] 100% progress on {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mailboxPath":"Projekte/P08","mode":"full","phase":"finalizing","processed":0,"estimate
+[2026-10-23 15:49:49.509 +00:00] [sync] 100% progress on {"jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","folderId":"spike-folders:Projekte/P08","mailboxPath":"Projekte/P08","mode":"full","phase":"done","processed":0,"percent":100,"
+[2026-10-23 15:49:49.782 +00:00] [sync-status] {"outcome":"ok","routeAccountId":"spike-folders","jobId":"c240004c-0b39-41e8-b139-8835f56757bc","accountId":"spike-folders","status":"done","progressPhase":"done","progressProcessed":0,"progressUpdatedAt":17927705
+[2026-10-23 15:49:49.835 +00:00] [sync] worker started {"jobId":"1da8e114-faec-46a7-b9a7-c5c9e0f82eb4","accountId":"spike-folders","folderId":"spike-folders:Projekte/P12","mode":"full","pid":3951193}
+[2026-10-23 15:49:50.089 +00:00] [sync] unknown% progress on {"jobId":"1da8e114-faec-46a7-b9a7-c5c9e0f82eb4","accountId":"spike-folders","folderId":"spike-folders:Projekte/P12","mailboxPath":"Projekte/P12","mode":"full","phase":"starting","processed":0,"messag
+--
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00] [db-write-retry] retry {
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   operation: 'initializeMasterSchema',
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   attempt: 1,
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   attempts: 5,
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   delayMs: 102,
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   elapsedMs: 1,
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   phase: 'write',
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   policy: 'coarse',
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   error: {
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]     name: 'SQLiteError',
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]     message: 'database is locked',
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]     code: 'SQLITE_BUSY'
+[2026-10-23 15:52:49.563 +00:00] [sync-worker] [2026-10-23 15:52:49.545 +00:00]   }
+--
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00] [db-write-retry] retry {
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   operation: 'initializeMasterSchema',
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   attempt: 1,
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   attempts: 5,
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   delayMs: 120,
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   elapsedMs: 2,
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   phase: 'write',
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   policy: 'coarse',
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   error: {
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]     name: 'SQLiteError',
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]     message: 'database is locked',
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]     code: 'SQLITE_BUSY'
+[2026-10-23 15:53:59.298 +00:00] [sync-worker] [2026-10-23 15:53:59.291 +00:00]   }
+--
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00] [db-write-retry] retry {
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   operation: 'initializeMasterSchema',
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   attempt: 1,
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   attempts: 5,
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   delayMs: 102,
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   elapsedMs: 1,
+[2026-10-23 16:07:10.074 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   phase: 'write',
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   policy: 'coarse',
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   error: {
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]     name: 'SQLiteError',
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]     message: 'database is locked',
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]     code: 'SQLITE_BUSY'
+[2026-10-23 16:07:10.075 +00:00] [sync-worker] [2026-10-23 16:07:10.029 +00:00]   }

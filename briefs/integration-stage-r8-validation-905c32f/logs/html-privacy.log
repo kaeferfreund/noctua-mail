@@ -1,0 +1,14 @@
+bun test v1.4.4 (38afee6c8)
+
+tests/browser/htmlPrivacy.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-InR7vi",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-InR7vi/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) reader and standalone enforce sender permissions, send no Referer and never request remote CSS [58707.36ms]
+
+ 1 pass
+ 0 fail
+ 177 expect() calls
+Ran 1 test across 1 file. [60.10s]

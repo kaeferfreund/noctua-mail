@@ -1,0 +1,6 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/r9open-data-round7",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/r9open-data-round7/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+OPEN {"file":"r9-open-r8-round7.db","before":{"user_version":3,"schema_version":334,"sqlite_master_sha256":"b29bf0ee51cf5a6e1173bac10b98ef752802442eadea7e5f7d83e1db1839cd2d","v3_guards":81,"counts":[{"accountId":"synthetic-a","n":5500},{"accountId":"synthetic-b","n":5500}],"integrity":"ok"},"after":{"user_version":3,"schema_version":334,"sqlite_master_sha256":"b29bf0ee51cf5a6e1173bac10b98ef752802442eadea7e5f7d83e1db1839cd2d","v3_guards":81,"counts":[{"accountId":"synthetic-a","n":5500},{"accountId":"synthetic-b","n":5500}],"integrity":"ok"},"openMs":16.1,"guardsInstalled":true,"ftsValidated":true,"selectiveHits":[{"accountId":"synthetic-b","n":1100}],"migrated":false,"bytes":16744448}

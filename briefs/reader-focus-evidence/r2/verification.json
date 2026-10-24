@@ -1,0 +1,58 @@
+{
+  "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+  "server": {
+    "passed": 2805,
+    "failed": 0,
+    "assertions": 15332,
+    "files": 305,
+    "duration": "339.62s"
+  },
+  "dom": {
+    "passed": 486,
+    "failed": 0,
+    "assertions": 2768,
+    "files": 60,
+    "duration": "63.27s"
+  },
+  "ciExit": 0,
+  "focusedDom": {
+    "runs": 3,
+    "passedPerRun": 40,
+    "assertionsPerRun": 160,
+    "failed": 0
+  },
+  "playwright": {
+    "passed": 6,
+    "failed": 0,
+    "exit": 0
+  },
+  "typecheck": {
+    "errors": 0,
+    "files": 1207,
+    "exit": 0
+  },
+  "lint": {
+    "errors": 1,
+    "warnings": 24,
+    "newFindings": 0,
+    "exit": 1
+  },
+  "buildExit": 0,
+  "catalogs": {
+    "passed": 7,
+    "failed": 0,
+    "assertions": 3542
+  },
+  "diffCheckExit": 0,
+  "loadStart": [
+    8.44,
+    12.46,
+    13.44
+  ],
+  "loadEnd": [
+    8.26,
+    8.09,
+    9.18
+  ],
+  "endedAt": "2026-10-23T11:41:34.486958+00:00"
+}

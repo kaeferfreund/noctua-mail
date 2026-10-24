@@ -1,0 +1,16 @@
+ 8 |  if(kind==='round7'){configureAccountDb(db);initAccountSchema(db);} else db.exec(readFileSync('lib/testFixtures/sharedShardLegacy.sql','utf8'));
+ 9 |  const insert=db.prepare(`INSERT INTO messages(id,accountId,folderId,threadId,messageId,subject,fromAddr,toAddr,preview,date,dateValue,body) VALUES(?,?,'INBOX',?,?,'Synthetic needle','sender@example.test','team@example.test','common preview','2026-01-01',1,?)`);
+10 |  db.transaction(()=>{for(let i=0;i<11000;i++){const account=i%2?'synthetic-a':'synthetic-b';const id=kind==='round7'?`shared-${Math.floor(i/2)}`:`legacy-${i}`;insert.run(id,account,`thread-${Math.floor(i/4)}`,`<rfc-${Math.floor(i/2)}@example.test>`,`${i%10===0?'selective ':''}common synthetic phrase ${i}`);}})();
+11 |  if(kind==='round7') {
+12 |   db.exec(`UPDATE messages SET senderKey=CASE WHEN dateValue=1 AND accountId='synthetic-a' THEN 'sender@example.test' ELSE NULL END,sourceSha256=CASE WHEN accountId='synthetic-a' THEN '${'a'.repeat(64)}' ELSE NULL END`);
+13 |   db.exec(`INSERT INTO message_fts_v2(messageId,accountId,subject,fromAddr,toAddr,ccAddr,bccAddr,body,attachments) SELECT id,accountId,subject,fromAddr,toAddr,ccAddr,bccAddr,body,'' FROM messages`);
+          ^
+SQLiteError: table message_fts_v2 has no column named attachments
+      errno: 1,
+ byteOffset: -1,
+       code: "SQLITE_ERROR"
+
+      at run (bun:sqlite:318:19)
+      at /home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/create-migration-fixtures.ts:13:6
+
+Bun v1.4.4 (Linux arm64)

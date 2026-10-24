@@ -1,0 +1,259 @@
+[
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=50",
+  "sha256": "3893839045ff9427974bc5cfd774f6ed11ffc370cba4664ec29435bf9c9e7b59",
+  "bytes": 232488,
+  "itemsWithSuggestions": 63
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=50",
+  "p50": 21.125434000001405,
+  "p90": 26.410281999997096,
+  "sqlP50": 12.382110999980796,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=50",
+  "p50": 9.347845999996935,
+  "p90": 9.826049999999668,
+  "sqlP50": 8.160432000000583,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=100",
+  "sha256": "bbeabd04759cac7335185dae2f58c46f2e478abe27568288fa377ff1fad2b37e",
+  "bytes": 570528,
+  "itemsWithSuggestions": 204
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=100",
+  "p50": 27.577132999998867,
+  "p90": 33.503546999996615,
+  "sqlP50": 14.293093000000226,
+  "execs": 45
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=100",
+  "p50": 10.444774999999936,
+  "p90": 11.397544000003109,
+  "sqlP50": 9.127602999989904,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=300",
+  "sha256": "9a75a9a11b58affbcbeadf80b099202d9d578845b05b1bcaeb01cc5569cabc6b",
+  "bytes": 1748598,
+  "itemsWithSuggestions": 639
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=300",
+  "p50": 52.23555800000031,
+  "p90": 58.13997299999755,
+  "sqlP50": 20.439587000004394,
+  "execs": 47
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=300",
+  "p50": 15.445341999999073,
+  "p90": 16.071067000000767,
+  "sqlP50": 13.121399999996356,
+  "execs": 19
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics+suggestions (900 items)",
+  "p50": 24.017539999997098,
+  "p90": 28.17117800000051,
+  "sqlP50": 4.701603000001342,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics only (no suggestions)",
+  "p50": 1.2982520000005024,
+  "p90": 1.390573000000586,
+  "sqlP50": 0.704885999995895,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich collab",
+  "p50": 1.304811999998492,
+  "p90": 1.4154529999977967,
+  "sqlP50": 0.6100049999913608,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   slim + JSON.stringify",
+  "p50": 1.0314890000008745,
+  "p90": 1.1136499999993248,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   buildTimeGroupKey x 900",
+  "p50": 0.5090440000021772,
+  "p90": 0.6482859999996435,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   requireAccountContext (guard+role+account)",
+  "p50": 1.7036150000021735,
+  "p90": 1.8502169999992475,
+  "sqlP50": 0.5836439999948198,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   validateAccountFolders",
+  "p50": 0.2696030000006431,
+  "p90": 0.3244029999987106,
+  "sqlP50": 0.14604099999996834,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=50",
+  "sha256": "7017a1bcea830b00be25ac19e4596af4a789f0032f69b4cbba574180b60ec503",
+  "bytes": 350804,
+  "itemsWithSuggestions": 150
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=50",
+  "p50": 53.17480699999942,
+  "p90": 57.56536699999924,
+  "sqlP50": 43.3178339999904,
+  "execs": 45
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=50",
+  "p50": 40.37424900000042,
+  "p90": 40.88581400000112,
+  "sqlP50": 39.26904000000286,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=100",
+  "sha256": "d57ddf33cbd8978d7083cd866518931e4c7615fdcf0f20cd3af56fd04f3598f3",
+  "bytes": 701233,
+  "itemsWithSuggestions": 300
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=100",
+  "p50": 61.13011899999765,
+  "p90": 65.85040200000003,
+  "sqlP50": 45.9074980000114,
+  "execs": 45
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=100",
+  "p50": 42.53510900000401,
+  "p90": 43.16195499999594,
+  "sqlP50": 41.17709100001957,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=300",
+  "sha256": "e18cdb373cb3d3b7d7a8da6ed3cfbd7143a56829399069837c3345539898fde8",
+  "bytes": 1972751,
+  "itemsWithSuggestions": 804
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=300",
+  "p50": 90.71231000000262,
+  "p90": 93.76937799999723,
+  "sqlP50": 54.59230399999797,
+  "execs": 47
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=300",
+  "p50": 49.42661300000327,
+  "p90": 50.32634099999996,
+  "sqlP50": 47.068752999992284,
+  "execs": 19
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics+suggestions (900 items)",
+  "p50": 29.079226000001654,
+  "p90": 32.71697900000436,
+  "sqlP50": 5.517609000009543,
+  "execs": 10
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics only (no suggestions)",
+  "p50": 1.0532900000034715,
+  "p90": 1.109729999996489,
+  "sqlP50": 0.6027249999970081,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich collab",
+  "p50": 1.2688120000020717,
+  "p90": 1.3340519999983371,
+  "sqlP50": 0.6110849999895436,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   slim + JSON.stringify",
+  "p50": 1.0865699999994831,
+  "p90": 1.1524099999951432,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   buildTimeGroupKey x 900",
+  "p50": 0.5269249999983003,
+  "p90": 0.619645999999193,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   requireAccountContext (guard+role+account)",
+  "p50": 1.5762939999985974,
+  "p90": 1.871936999996251,
+  "sqlP50": 0.4928459999864572,
+  "execs": 10
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   validateAccountFolders",
+  "p50": 0.22804200000246055,
+  "p90": 0.2851630000004661,
+  "sqlP50": 0.12272200000734301,
+  "execs": 4
+ },
+ {
+  "label": "requireActiveUserSession",
+  "p50": 1.4176529999967897,
+  "p90": 1.7394159999967087,
+  "sqlP50": 0.44780499998887535,
+  "execs": 7
+ }
+]

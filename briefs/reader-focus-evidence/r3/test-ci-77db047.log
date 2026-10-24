@@ -1,0 +1,1202 @@
+$ bun test --timeout 20000 && bun run test:dom
+bun test v1.4.4 (38afee6c8)
+
+lib/membershipCleanup.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-Fd4VPL",
+  dbPath: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-Fd4VPL/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/syncJobs.test.ts:
+[sync] worker started {"jobId":"3a2ee1ab-75b4-4f89-86a9-cde2176b47df","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"100d92ac-5ec4-478c-8866-e7cb2832e4a4","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Archive","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"dd02c5f1-f54b-4b48-8e1f-d2a1df9df16c","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"6e5aaec3-cd6c-4148-a02a-9f394cf7a1aa","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"c8ab8b5a-c20c-4475-a90a-a39219d16347","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"1c0f6f1e-d5e9-4612-8259-d082df1324a2","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"c0f1793c-a1f2-4d88-9c5f-0bc5c812b248","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"c447a024-94d0-4906-a6e3-73545591ff28","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"17f37b42-a302-4a30-aa53-c4461db5eae9","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"8fb7f6c3-5146-4e71-a048-547fdbc65fd2","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"d29ad3e6-48d6-41f5-8bcf-9118227ac106","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Archive","mode":"full","pid":3622001}
+[sync] worker started {"jobId":"45a9a1db-8561-499b-b569-d14d46ee9a64","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"7e74f98b-47b3-424b-a1ce-78fd0834efeb","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"940b6c4f-37b2-4cac-9559-4def197e6d41","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Archive","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"94bd5b77-ee98-46ea-b490-95af280e1c31","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"271d0c45-695b-407f-ba84-7534cff73654","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:Sent","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"ce816d9b-bd71-4e78-9e3d-0da07973c7d0","accountId":"acc-busy-7","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"26e6d87e-3d80-43e6-9f00-b4a5a193cc3f","accountId":"acc-busy-8","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"fb600635-5360-483a-867f-bd0b4eda56b3","accountId":"acc-interactive-11","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"f5428cac-e363-4609-92cd-abeac18c6f3c","accountId":"acc-watcher-10","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"f89e8799-b830-47d3-b5f2-00ed573fd48a","accountId":"acc-sweep-9","mode":"full","pid":3622001}
+[sync] worker started {"jobId":"8308582f-ab33-4af9-9199-ab0b405151a8","accountId":"acc-busy-head-12","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"1aa3c908-7c6d-4f99-ba72-9c317b816137","accountId":"acc-busy-head-13","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"99ebc1c4-ac5c-4773-b45c-a3a2d3dd6b51","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:INBOX","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"c3798bdf-96ab-4050-b6d4-e3bf77453343","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:Archive","mode":"full","pid":3622001}
+[sync] worker started {"jobId":"5b7e3d5c-7b64-42ba-88d6-4ed18239d2b0","accountId":"acc-busy-cancel-15","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"4c0572be-10b7-4961-b290-ff255890de83","accountId":"acc-busy-cancel-16","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"d76d6287-b606-427b-8499-ae95001e5a08","accountId":"acc-joined-watcher-18","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"4fdb9aad-f740-410d-9658-0a944e925361","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","pid":3622001}
+[sync] worker failed {"jobId":"4fdb9aad-f740-410d-9658-0a944e925361","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","exitCode":1,"error":"Sync worker exited with code 1"}
+[sync] worker started {"jobId":"a2c58af1-f925-4d53-a03e-d734565f4645","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:initial","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"ca1a94bc-5409-4b37-af6b-f818f79634f6","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-0","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"6ceba9d9-ce37-4052-af40-f1e43ac5fd52","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-1","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"61e28416-fae6-4043-8ba5-ebd3757aeee8","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-2","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"424e35d9-457c-4002-b21e-851d825c69f7","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-3","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"7271ec80-9cb2-47ba-af23-8e629553e768","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-4","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"899c4338-f175-4d30-9015-e3eff10831cc","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-5","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"0159586d-e1cf-4e01-b6b0-0f6fb26f0432","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-6","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"5243b67d-45d7-4b59-9e24-2302ea383433","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-7","mode":"new","pid":3622001}
+[sync] worker started {"jobId":"9677736b-4144-4399-9303-9b4e653358a0","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:INBOX","mode":"repair","pid":3622001}
+[sync] worker started {"jobId":"4bc7fc83-cba2-4ec0-b420-2e82bdefc65d","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-8","mode":"new","pid":3622001}
+
+lib/threadCollab.send.test.ts:
+PASS fixture direct appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture direct failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture direct SMTP rejected: no delivery, no Sent APPEND
+PASS fixture direct lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture direct stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture direct flag-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture draft failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture draft SMTP rejected: no delivery, no Sent APPEND
+PASS fixture draft lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture draft stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture draft cleanup-deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar retry: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-uid: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar no-sent-folder: SMTP=1 APPEND=0 sentCopy=no-sent-folder; A attribution verified
+PASS fixture calendar failed: SMTP=1 APPEND=2 sentCopy=failed; A attribution verified
+PASS fixture calendar SMTP rejected: no delivery, no Sent APPEND
+PASS fixture calendar lost-ack: SMTP=1 APPEND=1 sentCopy=appended; A attribution and B shared view verified
+PASS fixture calendar deadline: SMTP=1 APPEND=1 sentCopy=failed; A attribution verified
+PASS fixture calendar stale-folder: SMTP=1 APPEND=2 sentCopy=appended; A attribution and B shared view verified
+PASS fixture single-draft appended: SMTP=1 APPEND=1 sentCopy=appended; A attribution and own Sent files verified
+PASS fixture new outbound: Sent ingested and attributed without reply activity
+PASS 31 fixture send scenarios
+
+lib/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/messageMoveJobs.test.ts:
+[move-jobs] failed to move IMAP message batch {
+  accountId: "acc-move-jobs",
+  messageIds: [ "m-1", "m-2" ],
+  sourceMailboxPath: "Source",
+  sourceUidSample: [ 20, 21 ],
+  destinationMailboxPath: "Target",
+  error: warn: move failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/messageMoveJobs.test.ts:157:44)
+,
+}
+
+lib/imapLoginPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/threadCollab.revision.test.ts:
+R6-server interleaved final revisions {"A":7,"B":2}
+R6-migration 0 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 1 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 2 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-migration 3 [{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""},{"code":0,"output":"ready-after-preflight\nmigrated [1,1]\n","errors":""}]
+R6-lifecycle actual service {"revision":1,"live":[1,1],"hidden":[0,0],"restored":[1,1]}
+R6-lifecycle public deletion/reimport {"revision":1,"lengths":[1,0,1]}
+
+lib/betterAuth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:04.769Z WARN [Better Auth]: Password is too short
+2026-10-23T13:45:11.044Z WARN [Better Auth]: Invalid password
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:13.408Z ERROR [Better Auth]: Invalid origin: https://evil.example
+
+lib/authPolicyFlows.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:16.587Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic verified fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:23.947Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:37.683Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:39.354Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/insert-query-builder.js:1101:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/insert-query-builder.js:1113:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async create (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:501:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:45:40.994Z ERROR [Better Auth]: SQLiteError 57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+# SERVER_ERROR:  57 | 	}
+58 | 	executeQuery(compiledQuery) {
+59 | 		const { sql, parameters } = compiledQuery;
+60 | 		const stmt = this.#db.prepare(sql);
+61 | 		const params = parameters;
+62 | 		if (stmt.columnNames.length > 0) return Promise.resolve({ rows: stmt.all(...params) });
+                                                                            ^
+SQLiteError: synthetic activation fault
+      errno: 1811,
+ byteOffset: -1,
+       code: "SQLITE_CONSTRAINT_TRIGGER"
+
+      at executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)
+      at provideConnection (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)
+      at async executeQuery (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)
+      at async execute (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)
+      at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)
+      at async update (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/teamAuthMigration.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/testAuthHarness.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "testAuthHarness.createUser",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 136,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.createUser",
+  retries: 1,
+  elapsedMs: 143,
+}
+[db-write-retry] retry {
+  operation: "testAuthHarness.linkAccount",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 142,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "testAuthHarness.linkAccount",
+  retries: 1,
+  elapsedMs: 147,
+}
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T13:47:26.739Z ERROR [Better Auth]: Error 244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+# SERVER_ERROR:  244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/processLeases.integration.test.ts:
+LEASE_PROOF independent-graph admission: 4 processes, maximum 2 workers
+LEASE_PROOF restart recovery: expired live orphan retained; dead orphan reclaimed; stale child rejected
+LEASE_PROOF starvation bound: watcher admitted after 8 interactive bypasses
+LEASE_PROOF confirmed-exit failure: a live recorded PID retains capacity
+LEASE_PROOF scheduler: independent graphs share one owner, dead-owner takeover and orderly handoff pass
+LEASE_PROOF production monitor: SIGKILL waits for confirmed exit, rejected exit retains capacity
+LEASE_PROOF PASS
+
+lib/mailboxWatcher.integration.test.ts:
+WATCHER_FIXTURE independent watcher graphs: one IDLE owner, orderly takeover
+WATCHER_FIXTURE injection ingested in 586ms
+WATCHER_FIXTURE UIDVALIDITY browser-before-repair: OLD=0 NEW=1 reused UID=61 replacement subject/body, watermarks and pending moves cleared
+WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61
+WATCHER_FIXTURE UIDVALIDITY direct-new and resumed-full reset re-ingest replacement UID=61
+WATCHER_FIXTURE auth_failed suspended: 0 new authentication attempts over 800ms (minimum reconnect=150ms)
+WATCHER_FIXTURE shared shard: both accounts retain rows, thread indexes and FTS for identical RFC Message-IDs
+WATCHER_FIXTURE PASS bootstrap=60 injected=1 flags=ok expunge=ok periodic-Sent=ok singleton=ok DB-credentials=ok auth-reload=ok add/remove=ok events=ok shutdown=ok
+
+lib/calendarInviteProcessor.test.ts:
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "fails@example.test",
+  actionType: "invitation",
+  error: 1072 |   });
+1073 | 
+1074 |   test("returns failures for groups that throw while leaving other imports intact", async () => {
+1075 |     // Two events in one ICS — make the upsert fail for the first one only.
+1076 |     upsertCalendarEventByUid.mockImplementationOnce(async () => {
+1077 |       throw new Error("db unavailable");
+                       ^
+error: db unavailable
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.test.ts:1077:17)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.ts:659:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.test.ts:1095:26)
+,
+}
+[calendarInviteProcessor] failed to import standalone invite {
+  accountId: "acc-1",
+  eventUid: "lookup-fails@example.test",
+  actionType: "unknown",
+  error: 1117 | 
+1118 |   test("isolates a per-group failure when the existing-event lookup throws", async () => {
+1119 |     // First group's lookup blows up; second group should still process fine.
+1120 |     getCalendarEventByUid
+1121 |       .mockImplementationOnce(async () => {
+1122 |         throw new Error("lookup failed");
+                         ^
+error: lookup failed
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.test.ts:1122:19)
+      at processStandaloneCalendarInvite (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.ts:563:35)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/calendarInviteProcessor.test.ts:1140:26)
+,
+}
+
+lib/crossAccountCopy.test.ts:
+[cross-account-copy] failed to read back appended message {
+  destinationMailboxPath: "Archive",
+  uid: 4242,
+  error: warn: read-back boom
+      at syncImapMessage (/home/monkey/code/noctua-mail/wt-reader-focus/lib/crossAccountCopy.test.ts:80:37)
+      at copyMessageToAccount (/home/monkey/code/noctua-mail/wt-reader-focus/lib/crossAccountCopy.ts:135:32)
+      at async <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/lib/crossAccountCopy.test.ts:163:26)
+,
+}
+
+lib/dbWriteRetry.test.ts:
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 120,
+  elapsedMs: 0,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 2,
+  attempts: 5,
+  delayMs: 240,
+  elapsedMs: 120,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 3,
+  attempts: 5,
+  delayMs: 480,
+  elapsedMs: 360,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] retry {
+  operation: "synthetic-budget",
+  attempt: 4,
+  attempts: 5,
+  delayMs: 960,
+  elapsedMs: 840,
+  error: {
+    name: "Error",
+    message: "SQLITE_BUSY",
+    code: "",
+  },
+}
+[db-write-retry] success {
+  operation: "synthetic-budget",
+  retries: 4,
+  elapsedMs: 1800,
+}
+retry shutdown proof {
+  durationMs: 169,
+  delayMs: 1500,
+}
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/accountKeys.test.ts:
+[shard-migration-timing] 50000 messages: migration=3433.40ms repeat=19.93ms
+
+lib/db/senderIdentities.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/connection.auth.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "isolated-write",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 17,
+  elapsedMs: 1,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "isolated-write",
+  retries: 1,
+  elapsedMs: 28,
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 123,
+  elapsedMs: 0,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 127,
+}
+[db-write-retry] retry {
+  operation: "setActiveAccountId",
+  attempt: 1,
+  attempts: 5,
+  delayMs: 123,
+  elapsedMs: 0,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+  retries: 1,
+  elapsedMs: 124,
+}
+
+lib/db/ftsIdentity.test.ts:
+[shard-format-v3] dropped 2 orphan FTS rows
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+lib/db/stableLoops.test.ts:
+[RECOMPUTE CATEGORIES] Starting for account collab-5681457c-23d5-41ab-8be7-d8f37bc6fad5
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+[RECOMPUTE CATEGORIES] Starting for account collab-5681457c-23d5-41ab-8be7-d8f37bc6fad5
+[RECOMPUTE CATEGORIES] Found 2 eligible messages
+Recomputing categories for 2 messages...
+Finished: 2/2 processed, 2 categorized
+
+scripts/dev-fixture/fixture.test.ts:
+{"src":"connection","msg":"Established TCP connection","cid":"qis2t638jx3k34w8zj4h","secure":false,"host":"127.0.0.1","servername":false,"port":34847,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":42266}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":34847,"localAddress":"127.0.0.1","localPort":42266,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":34847,"cid":"qis2t638jx3k34w8zj4h"}
+{"src":"auth","msg":"User authenticated","cid":"qis2t638jx3k34w8zj4h","user":"demo@monkeydent.test"}
+[imap] connect account=fixture 19ms
+[imap] logout account=fixture 2ms
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":34847,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"src":"connection","msg":"Established TCP connection","cid":"i3ab7gjhtpvue9xpebt9","secure":false,"host":"127.0.0.1","servername":false,"port":34847,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":42278}
+{"event":"imap.socket_connect","accountId":"fixture","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":34847,"localAddress":"127.0.0.1","localPort":42278,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":34847,"cid":"i3ab7gjhtpvue9xpebt9"}
+{"err":{"response":"2 NO [AUTHENTICATIONFAILED] Invalid fixture credentials","responseStatus":"NO","executedCommand":"2 AUTHENTICATE PLAIN","responseText":"Invalid fixture credentials","serverResponseCode":"AUTHENTICATIONFAILED","authenticationFailed":true},"cid":"i3ab7gjhtpvue9xpebt9"}
+[imap] connect account=fixture 6ms error=Command failed
+{"event":"imap.socket_close","accountId":"fixture","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":34847,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+
+app/api/_helpers/smtpUpstreamError.test.ts:
+[smtp] upstream failure {
+  accountId: "synthetic",
+  op: "test",
+  code: undefined,
+  command: undefined,
+}
+
+app/api/accounts/[accountId]/sync/new-candidates/route.test.ts:
+[imap] sync.new-candidates unavailable account=acc-new-candidates-b7b6da2d-91b9-4dcc-b46b-02289f9413ff error=Peer certificate is empty for hostname "imap.example.test"
+
+app/api/accounts/[accountId]/imap/stream/route.test.ts:
+[imap] imap.connect mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 1ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 1ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 1ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 1ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.connect mailbox=poll account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.status mailbox=Archive account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.connect mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.status mailbox=INBOX account=stream-d3361c1e-73cf-472f-a689-42f67c14854d 0ms
+[imap] imap.connect mailbox=INBOX account=stream-c8356777-4b46-4752-9d15-8bde4a405c78 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-c8356777-4b46-4752-9d15-8bde4a405c78 0ms
+[imap] imap.status mailbox=INBOX account=stream-c8356777-4b46-4752-9d15-8bde4a405c78 0ms
+[imap] imap.status mailbox=INBOX account=stream-c8356777-4b46-4752-9d15-8bde4a405c78 3ms
+[imap] imap.fetch mailbox=INBOX account=stream-c8356777-4b46-4752-9d15-8bde4a405c78 0ms
+[imap] imap.connect mailbox=INBOX account=stream-8d0bab50-3634-42da-89c2-3707f9e0fd92 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-8d0bab50-3634-42da-89c2-3707f9e0fd92 0ms
+[imap] imap.status mailbox=INBOX account=stream-8d0bab50-3634-42da-89c2-3707f9e0fd92 0ms
+[imap] imap.connect mailbox=poll account=stream-8d0bab50-3634-42da-89c2-3707f9e0fd92 0ms
+[imap] imap.status mailbox=Archive account=stream-8d0bab50-3634-42da-89c2-3707f9e0fd92 8ms
+[imap] imap.connect mailbox=INBOX account=stream-4f63eae4-021a-4c2c-9adf-92b795c461f3 6ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-4f63eae4-021a-4c2c-9adf-92b795c461f3 0ms
+[imap] imap.status mailbox=INBOX account=stream-4f63eae4-021a-4c2c-9adf-92b795c461f3 0ms
+[imap] imap.connect mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.status mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.connect mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.status mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.connect mailbox=poll account=stream-07708020-71e9-4263-a96d-8658950ac06c 0ms
+[imap] imap.status mailbox=Archive account=stream-07708020-71e9-4263-a96d-8658950ac06c 6ms
+[imap] imap.status mailbox=INBOX account=stream-07708020-71e9-4263-a96d-8658950ac06c 1ms
+[imap] imap.connect mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.status mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.connect mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.status mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.connect mailbox=poll account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 0ms
+[imap] imap.status mailbox=Archive account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 6ms
+[imap] imap.status mailbox=INBOX account=stream-df23d608-fcfe-40ac-a72d-58e0e37448bf 1ms
+[imap] imap.connect mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.status mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.connect mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.status mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 0ms
+[imap] imap.connect mailbox=poll account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 1ms
+[imap] imap.status mailbox=Archive account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 5ms
+[imap] imap.status mailbox=INBOX account=stream-a8a00b7f-e592-419a-8847-666897a7efdd 1ms
+[imap] imap.connect mailbox=INBOX account=stream-e580cea7-6701-45f8-9b98-32a61821d63e 0ms
+[imap] imap.connect mailbox=INBOX account=stream-8928eb1e-6398-45eb-8147-de649e6d18e9 1ms
+[imap] imap.connect mailbox=INBOX account=stream-f266b82f-07c6-41e8-b64c-2e13a3e01fc7 0ms
+[imap] imap.connect mailbox=INBOX account=stream-b82d5644-bf8f-45a2-b7e6-6ab3dab3cd9d 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-705eb7c4-14c1-4fe5-ad75-e766ced15860 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-870738af-e3b7-4a70-b59c-af2c6d239071 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-e311b575-f461-4f4c-81bd-2bedffb89bf3 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-38058fa0-1bbb-42b7-9e95-888765f22b91 0ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-38058fa0-1bbb-42b7-9e95-888765f22b91","clientId":null,"mailbox":"INBOX","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+[imap] imap.connect mailbox=INBOX account=stream-66c4527b-4501-449c-8fd2-20dbffaddeb3 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-66c4527b-4501-449c-8fd2-20dbffaddeb3 0ms
+[imap] imap.status mailbox=INBOX account=stream-66c4527b-4501-449c-8fd2-20dbffaddeb3 0ms
+[imap] imap.connect mailbox=poll account=stream-66c4527b-4501-449c-8fd2-20dbffaddeb3 1ms error=Synthetic connection reset
+{"event":"imap.connect_retry","accountId":"stream-66c4527b-4501-449c-8fd2-20dbffaddeb3","clientId":null,"mailbox":"poll","host":"imap.example.test","attempt":1,"maxAttempts":2,"delayMs":10,"error":"Synthetic connection reset"}
+[imap] imap.connect mailbox=INBOX account=stream-9897411b-ebaf-4a03-ac27-e6b286b6b6e6 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-9897411b-ebaf-4a03-ac27-e6b286b6b6e6 0ms
+[imap] imap.status mailbox=INBOX account=stream-9897411b-ebaf-4a03-ac27-e6b286b6b6e6 0ms
+[imap] imap.status mailbox=INBOX account=stream-9897411b-ebaf-4a03-ac27-e6b286b6b6e6 0ms
+[imap] imap.fetch mailbox=INBOX account=stream-9897411b-ebaf-4a03-ac27-e6b286b6b6e6 0ms error=Synthetic opaque upstream failure
+[imap] imap.connect mailbox=INBOX account=stream-e765b0db-2b21-4d09-9f13-329e8538891d 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-e765b0db-2b21-4d09-9f13-329e8538891d 0ms
+[imap] imap.status mailbox=INBOX account=stream-e765b0db-2b21-4d09-9f13-329e8538891d 0ms
+[imap] imap.connect mailbox=INBOX account=stream-00b3c866-5b51-44ab-9296-4678772c2477 0ms
+[imap] imap.mailboxOpen mailbox=INBOX account=stream-00b3c866-5b51-44ab-9296-4678772c2477 0ms
+[imap] imap.status mailbox=INBOX account=stream-00b3c866-5b51-44ab-9296-4678772c2477 0ms
+[imap] imap.connect mailbox=poll account=stream-00b3c866-5b51-44ab-9296-4678772c2477 0ms
+[imap] imap.status mailbox=Archive account=stream-00b3c866-5b51-44ab-9296-4678772c2477 0ms error=Synthetic opaque upstream failure
+
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:
+[imap] folder.consistency unavailable account=acc-consistency-unreachable-6f496f8f-c636-42c0-9742-ec7ce956d5c1 error=Peer certificate is empty for hostname "imap.example.com"
+
+ 2808 pass
+ 0 fail
+ 15342 expect() calls
+Ran 2808 tests across 306 files. [489.12s]
+$ bun test --config=bunfig.dom.toml dom.test
+bun test v1.4.4 (38afee6c8)
+
+app/components/ComposeEditor.imageDrop.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+app/components/auth/MailboxGate.dom.test.tsx:
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LanguageSelector inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+app/components/mailclient/composition/sendMailRace.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763578682-1",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763579012-2",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua] failed to open composer: 544 | describe("compose initialization errors", () => {
+545 |   it("reports hydration failures without rejecting fire-and-forget callers", async () => {
+546 |     const errors: string[] = [];
+547 |     const { view, handleRef } = renderCompose({
+548 |       ensureMessageContent: async () => {
+549 |         throw new Error("hydration failed");
+                        ^
+error: hydration failed
+      at ensureMessageContent (/home/monkey/code/noctua-mail/wt-reader-focus/app/components/mailclient/composition/sendMailRace.dom.test.tsx:549:19)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/app/components/mailclient/composition/ComposeOrchestrator.tsx:1201:30)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/app/components/mailclient/composition/ComposeOrchestrator.tsx:1220:13)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/app/components/mailclient/composition/sendMailRace.dom.test.tsx:568:32)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-reader-focus/app/components/mailclient/composition/sendMailRace.dom.test.tsx:567:11)
+
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763587090-3",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763587235-4",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763587363-5",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763587490-6",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763587593-7",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763590094-8",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763590202-9",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763590286-10",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763592581-11",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+app/components/mailclient/composition/lazyComposeConversions.dom.test.tsx:
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763594938-12",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+[noctua][sync-policy] {
+  triggerId: "post-send-sent-refresh-1792763597114-13",
+  caller: "post-send-sent-refresh",
+  policy: "decidePostSendSentSync",
+  accountId: "acc-test",
+  folderId: null,
+  input: {
+    sentFolderId: null,
+  },
+  decision: {
+    kind: "skip",
+    reason: "No Sent folder is configured for post-send refresh.",
+  },
+}
+TableNode: hasHorizontalScroll is active but theme.tableScrollableWrapper is not defined.
+
+ 488 pass
+ 0 fail
+ 2775 expect() calls
+Ran 488 tests across 60 files. [71.57s]
+exit 0

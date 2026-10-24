@@ -1,0 +1,13 @@
+{
+  "live_worktree_processes": [],
+  "reserved_ports": {
+    "3798": {
+      "ipv4": "free",
+      "ipv6": "free"
+    },
+    "3799": {
+      "ipv4": "free",
+      "ipv6": "free"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+9ff41b1fb0fbe6a8473b2f29c2e6474de87a7b07
+app/components/shell/AppShell.tsx
+doc/SHELL.md
+
+Auto-merging app/components/MailClient.tsx
+Auto-merging app/components/mailclient/message/MessageViewPane.module.css
+Auto-merging app/components/shell/AppShell.tsx
+CONFLICT (content): Merge conflict in app/components/shell/AppShell.tsx
+Auto-merging app/components/shell/ShellPanes.module.css
+Auto-merging app/components/shell/ShellPanes.tsx
+Auto-merging doc/SHELL.md
+CONFLICT (add/add): Merge conflict in doc/SHELL.md
+Auto-merging messages/de.json
+Auto-merging messages/en.json

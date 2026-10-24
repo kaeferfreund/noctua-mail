@@ -1,0 +1,382 @@
+[
+  {
+    "width": 320,
+    "height": 568,
+    "sheetLayer": 9994,
+    "dialogLayer": 9995,
+    "views": {
+      "month": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 17,
+            "right": 57.84375
+          },
+          {
+            "left": 57.84375,
+            "right": 98.6875
+          },
+          {
+            "left": 98.6875,
+            "right": 139.53125
+          },
+          {
+            "left": 139.53125,
+            "right": 180.375
+          },
+          {
+            "left": 180.375,
+            "right": 221.21875
+          },
+          {
+            "left": 221.21875,
+            "right": 262.0625
+          },
+          {
+            "left": 262.0625,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 272,
+        "toolbar": 96
+      },
+      "week": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 102.421875
+          },
+          {
+            "left": 102.421875,
+            "right": 135.84375
+          },
+          {
+            "left": 135.84375,
+            "right": 169.265625
+          },
+          {
+            "left": 169.265625,
+            "right": 202.6875
+          },
+          {
+            "left": 202.6875,
+            "right": 236.109375
+          },
+          {
+            "left": 236.109375,
+            "right": 269.53125
+          },
+          {
+            "left": 269.53125,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 272,
+        "toolbar": 96
+      },
+      "day": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 272,
+        "toolbar": 96
+      }
+    }
+  },
+  {
+    "width": 320,
+    "height": 500,
+    "sheetLayer": 9994,
+    "dialogLayer": 9995,
+    "views": {
+      "month": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 17,
+            "right": 57.84375
+          },
+          {
+            "left": 57.84375,
+            "right": 98.6875
+          },
+          {
+            "left": 98.6875,
+            "right": 139.53125
+          },
+          {
+            "left": 139.53125,
+            "right": 180.375
+          },
+          {
+            "left": 180.375,
+            "right": 221.21875
+          },
+          {
+            "left": 221.21875,
+            "right": 262.0625
+          },
+          {
+            "left": 262.0625,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 236,
+        "toolbar": 96
+      },
+      "week": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 102.421875
+          },
+          {
+            "left": 102.421875,
+            "right": 135.84375
+          },
+          {
+            "left": 135.84375,
+            "right": 169.265625
+          },
+          {
+            "left": 169.265625,
+            "right": 202.6875
+          },
+          {
+            "left": 202.6875,
+            "right": 236.109375
+          },
+          {
+            "left": 236.109375,
+            "right": 269.53125
+          },
+          {
+            "left": 269.53125,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 236,
+        "toolbar": 96
+      },
+      "day": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 303
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 236,
+        "toolbar": 96
+      }
+    }
+  },
+  {
+    "width": 360,
+    "height": 640,
+    "sheetLayer": 9994,
+    "dialogLayer": 9995,
+    "views": {
+      "month": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 17,
+            "right": 63.5625
+          },
+          {
+            "left": 63.5625,
+            "right": 110.125
+          },
+          {
+            "left": 110.125,
+            "right": 156.6875
+          },
+          {
+            "left": 156.6875,
+            "right": 203.25
+          },
+          {
+            "left": 203.25,
+            "right": 249.8125
+          },
+          {
+            "left": 249.8125,
+            "right": 296.375
+          },
+          {
+            "left": 296.375,
+            "right": 343
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 396,
+        "toolbar": 96
+      },
+      "week": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 108.140625
+          },
+          {
+            "left": 108.140625,
+            "right": 147.28125
+          },
+          {
+            "left": 147.28125,
+            "right": 186.421875
+          },
+          {
+            "left": 186.421875,
+            "right": 225.5625
+          },
+          {
+            "left": 225.5625,
+            "right": 264.703125
+          },
+          {
+            "left": 264.703125,
+            "right": 303.84375
+          },
+          {
+            "left": 303.84375,
+            "right": 343
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 396,
+        "toolbar": 96
+      },
+      "day": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 343
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 396,
+        "toolbar": 96
+      }
+    }
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "sheetLayer": 9994,
+    "dialogLayer": 9995,
+    "views": {
+      "month": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 17,
+            "right": 67.84375
+          },
+          {
+            "left": 67.84375,
+            "right": 118.6875
+          },
+          {
+            "left": 118.6875,
+            "right": 169.53125
+          },
+          {
+            "left": 169.53125,
+            "right": 220.375
+          },
+          {
+            "left": 220.375,
+            "right": 271.21875
+          },
+          {
+            "left": 271.21875,
+            "right": 322.0625
+          },
+          {
+            "left": 322.0625,
+            "right": 373
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 600,
+        "toolbar": 96
+      },
+      "week": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 112.421875
+          },
+          {
+            "left": 112.421875,
+            "right": 155.84375
+          },
+          {
+            "left": 155.84375,
+            "right": 199.265625
+          },
+          {
+            "left": 199.265625,
+            "right": 242.6875
+          },
+          {
+            "left": 242.6875,
+            "right": 286.109375
+          },
+          {
+            "left": 286.109375,
+            "right": 329.53125
+          },
+          {
+            "left": 329.53125,
+            "right": 373
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 600,
+        "toolbar": 96
+      },
+      "day": {
+        "overflow": [],
+        "columns": [
+          {
+            "left": 69,
+            "right": 373
+          }
+        ],
+        "foreign": [],
+        "pageOverflow": false,
+        "harness": 600,
+        "toolbar": 96
+      }
+    }
+  }
+]

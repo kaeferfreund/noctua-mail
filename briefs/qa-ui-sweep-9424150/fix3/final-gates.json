@@ -1,0 +1,17 @@
+[
+  {
+    "gate": "playwright-final",
+    "exit": 0,
+    "seconds": 150.144
+  },
+  {
+    "gate": "typecheck-final",
+    "exit": 0,
+    "seconds": 0.643
+  },
+  {
+    "gate": "lint-final",
+    "exit": 1,
+    "seconds": 50.935
+  }
+]

@@ -1,0 +1,32 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/message/ThreadView.isolation.dom.test.tsx:
+A2 collapse: 200 card renders
+A2 tab: 200 card renders
+A2 zoom: 200 card renders
+A2 font: 200 card renders
+A2 pending: 200 card renders
+A2 loading: 200 card renders
+A2 translation: 200 card renders
+A2 collaboration: 200 card renders
+A2 callback and mailbox/role change: 200 card renders
+43 |   update("collaboration", {activeThread: messages.map((m, i) => i === 5 ? {...m, collab: {status: "closed" as const, assigneeUserId: null, commentCount: 1, updatedAt: 1}} : m)});
+44 |   update("callback and mailbox/role change", {messageCardProps: {...props.messageCardProps, activeFolderId: "mailbox-b:INBOX",
+45 |     renderQuickActions: message => <button onClick={() => calls.push(`mailbox-b:member:${message.id}`)}>Synthetic action {message.id}</button>}}, 200);
+46 |   fireEvent.click(view.getByRole("button", {name: "Synthetic action synthetic-5"}));
+47 |   expect(calls).toEqual(["mailbox-b:member:synthetic-5"]);
+48 |   for (const [name, count] of Object.entries(counts)) if (name !== "callback and mailbox/role change") expect(count).toBe(1);
+                                                                                                                          ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 200
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-ui-perf-a2/app/components/mailclient/message/ThreadView.isolation.dom.test.tsx:48:118)
+(fail) 200-message thread isolates card state and sibling collaboration; callbacks stay current [4699.53ms]
+
+ 0 pass
+ 2 filtered out
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [5.42s]

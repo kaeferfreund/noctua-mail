@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ testDir: '.', testMatch: 'a1-browser.spec.ts', workers: 1, retries: 0, timeout: 240000, expect: { timeout: 30000 }, outputDir: './a1-results', reporter: 'list', use: { baseURL: 'http://localhost:4010', browserName: 'chromium', headless: true } });

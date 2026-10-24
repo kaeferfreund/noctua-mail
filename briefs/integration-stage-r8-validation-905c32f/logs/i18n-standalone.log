@@ -1,0 +1,6 @@
+PASS German header: lang=de; HTML 200; static JS 200
+PASS English header: lang=en; HTML 200; static JS 200
+PASS German cookie overrides English: lang=de; HTML 200; static JS 200
+PASS English cookie overrides German: lang=en; HTML 200; static JS 200
+PASS invalid cookie ignored: lang=en; HTML 200; static JS 200
+I18N STANDALONE PASS: 5 locale cases; catalogs bundled; .next/static + public copied; port 3799; fresh isolated storage

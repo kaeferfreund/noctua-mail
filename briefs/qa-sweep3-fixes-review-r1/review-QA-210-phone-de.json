@@ -1,0 +1,30 @@
+[
+  {
+    "width": 390,
+    "scheme": "light",
+    "placeholder": "Posteingang durchsuchen",
+    "text": 189,
+    "available": 246
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "placeholder": "Posteingang durchsuchen",
+    "text": 189,
+    "available": 246
+  },
+  {
+    "width": 320,
+    "scheme": "light",
+    "placeholder": "Posteingang durchsuchen",
+    "text": 189,
+    "available": 176
+  },
+  {
+    "width": 320,
+    "scheme": "dark",
+    "placeholder": "Posteingang durchsuchen",
+    "text": 189,
+    "available": 176
+  }
+]

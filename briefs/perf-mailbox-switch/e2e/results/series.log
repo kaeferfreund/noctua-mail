@@ -1,0 +1,19 @@
+== cold 15:26:37  15:26:37 up 1 day,  1:28,  1 user,  load average: 7.21, 8.38, 7.71
+   exit 0 15:33:54
+== warm 15:33:54  15:33:54 up 1 day,  1:36,  1 user,  load average: 12.51, 14.20, 11.04
+   exit 0 15:37:59
+== contention-watcher 15:37:59  15:37:59 up 1 day,  1:40,  1 user,  load average: 10.23, 13.02, 11.35
+--- restart 15:5x: fixture/server restarted, re-primed ---
+== baseline-r2 15:50:03  15:50:03 up 1 day,  1:52,  1 user,  load average: 4.09, 7.55, 10.06
+   exit 0 15:51:51
+== contention-watcher 15:51:51  15:51:51 up 1 day,  1:54,  1 user,  load average: 7.45, 7.49, 9.75
+   exit 0 15:54:05
+== contention-second-tab 15:54:05  15:54:05 up 1 day,  1:56,  1 user,  load average: 16.28, 10.18, 10.39
+   exit 0 15:56:07
+ALL DONE 15:56:07
+== imap-latency-50 16:01:41  16:01:41 up 1 day,  2:03,  1 user,  load average: 21.44, 15.98, 12.89
+   exit 0 16:03:48
+== imap-latency-50b 16:04:06  16:04:06 up 1 day,  2:06,  1 user,  load average: 12.86, 15.62, 13.28
+   exit 0 16:05:06  16:05:06 up 1 day,  2:07,  1 user,  load average: 14.45, 15.41, 13.34
+== baseline-r3-lat0 16:07:07  16:07:07 up 1 day,  2:09,  1 user,  load average: 17.65, 16.46, 14.00
+   exit 0 16:08:03  16:08:03 up 1 day,  2:10,  1 user,  load average: 15.86, 16.20, 14.05

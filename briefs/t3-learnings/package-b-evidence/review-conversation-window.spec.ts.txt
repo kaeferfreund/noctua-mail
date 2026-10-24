@@ -1,0 +1,209 @@
+import { test, expect, type Page } from "@playwright/test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { signInQa } from "./qaRound2Session";
+
+// Review-only spec (scratch copy): long synthetic conversation, window buttons,
+// screenshots at 1440 / 390 px in light and dark.
+test.use({ locale: "de-DE" });
+const evidence = path.resolve(process.env.REVIEW_EVIDENCE_DIR ?? ".tmp/review-evidence");
+const subject = "Planung Hofeinfahrt Synthetik";
+const COUNT = 48;
+const subject2 = "Angebot Zaunbau Synthetik";
+const COUNT2 = 40;
+const source2For = (n: number) => {
+  const ids = Array.from({ length: n }, (_, i) => `<review-zaun-${i}@example.test>`);
+  const date = new Date(now - (COUNT2 - n) * 5 * 3_600_000 - 1_800_000);
+  return [
+    `From: ${n % 2 ? "Synthetic Builder <builder@example.test>" : "Synthetic Reader <reader@example.test>"}`,
+    "To: demo@monkeydent.test",
+    `Message-ID: <review-zaun-${n}@example.test>`,
+    ...(n > 0 ? [`In-Reply-To: ${ids[n - 1]}`, `References: ${ids.join(" ")}`] : []),
+    `Date: ${date.toUTCString()}`,
+    `Subject: ${n > 0 ? "Re: " : ""}${subject2}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    `Zaunbau Nachricht ${n}. Archivierte synthetische Unterhaltung.`
+  ].join("\r\n");
+};
+const now = Date.now();
+const sourceFor = (n: number) => {
+  const ids = Array.from({ length: n }, (_, i) => `<review-conv-${i}@example.test>`);
+  const date = new Date(now - (COUNT - n) * 6 * 3_600_000);
+  return [
+    `From: ${n % 2 ? "Synthetic Partner <partner@example.test>" : "Synthetic Reader <reader@example.test>"}`,
+    "To: demo@monkeydent.test",
+    `Message-ID: <review-conv-${n}@example.test>`,
+    ...(n > 0 ? [`In-Reply-To: ${ids[n - 1]}`, `References: ${ids.join(" ")}`] : []),
+    `Date: ${date.toUTCString()}`,
+    `Subject: ${n > 0 ? "Re: " : ""}${subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    `Nachricht Nummer ${n} der synthetischen Unterhaltung. Marker${String(n).padStart(2, "0")}x.`,
+    "",
+    "Zweiter Absatz mit etwas Fülltext für die Leseansicht."
+  ].join("\r\n");
+};
+
+test.beforeAll(async () => {
+  for (let n = 0; n < COUNT; n++) {
+    const response = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, {
+      method: "POST",
+      body: JSON.stringify({ source: sourceFor(n), flags: n < COUNT - 2 ? ["\\Seen"] : [] })
+    });
+    expect(response.ok).toBe(true);
+  }
+  for (let n = 0; n < COUNT2; n++) {
+    const response = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, {
+      method: "POST",
+      body: JSON.stringify({ source: source2For(n), folder: "Archive", flags: ["\\Seen"] })
+    });
+    expect(response.ok).toBe(true);
+  }
+});
+
+type Net = { url: string; method: string; status: number; bytes: number; body?: unknown };
+function trackNetwork(page: Page, log: Net[]) {
+  page.on("response", async (response) => {
+    const url = response.url();
+    if (!/\/thread\/related|\/messages\/[^/]+$|\/resync/.test(new URL(url).pathname)) return;
+    let bytes = 0;
+    try { bytes = (await response.body()).length; } catch { /* aborted */ }
+    let body: unknown;
+    try { body = JSON.parse(response.request().postData() ?? "null"); } catch { body = null; }
+    log.push({ url: new URL(url).pathname, method: response.request().method(), status: response.status(), bytes, body });
+  });
+}
+
+async function shot(page: Page, name: string) {
+  mkdirSync(evidence, { recursive: true });
+  await page.screenshot({ path: path.join(evidence, name) });
+}
+
+async function cardsInfo(page: Page) {
+  return page.evaluate(() => {
+    const bodies = [...document.querySelectorAll('[data-mail-print="body"]')].map((el) => el.textContent?.slice(0, 60));
+    const expandBtns = document.querySelectorAll('[aria-label="Nachricht ausklappen"]').length;
+    const collapseBtns = document.querySelectorAll('[aria-label="Nachricht einklappen"]').length;
+    return { bodies, expandBtns, collapseBtns, overflow: document.documentElement.scrollWidth > innerWidth };
+  });
+}
+
+test("conversation window: buttons, anchor window, light/dark, 1440/390", async ({ page }) => {
+  test.setTimeout(900000);
+  const net: Net[] = [];
+  const results: Record<string, unknown> = {};
+  trackNetwork(page, net);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInQa(page);
+  const row = page.locator('[data-message-list-row="true"]').filter({ hasText: subject });
+  await expect.poll(async () => {
+    if (await row.count()) return true;
+    await page.waitForTimeout(3000); await page.goto("/");
+    return false;
+  }, { timeout: 180000, intervals: [500] }).toBe(true);
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    for (const scheme of ["light", "dark"] as const) {
+      const tag = `${viewport.width}-${scheme}`;
+      net.length = 0;
+      await page.setViewportSize(viewport);
+      await page.evaluate((value) => { localStorage.setItem("noctua:theme", value); }, scheme);
+      await page.goto("/");
+      await expect(page.locator("html")).toHaveClass(new RegExp(scheme));
+      await row.first().click();
+      const older = page.getByRole("button", { name: "Ältere Nachrichten laden", exact: true });
+      await expect(older).toBeVisible();
+      await page.waitForTimeout(1500);
+      await older.scrollIntoViewIfNeeded();
+      await shot(page, `conv-open-${tag}.png`);
+      results[`open-${tag}`] = { net: [...net], cards: await cardsInfo(page) };
+      net.length = 0;
+      await older.click();
+      await page.waitForTimeout(1500);
+      await shot(page, `conv-older-loaded-${tag}.png`);
+      results[`older-${tag}`] = { net: [...net], cards: await cardsInfo(page), olderStillVisible: await older.isVisible() };
+
+      // Second conversation: only one old message lies in the inbox, the rest in
+      // Archive. Opening it anchors the window at that old message.
+      if (!results.archiveSynced) {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.goto("/");
+        await page.getByText("Archiv", { exact: true }).first().click();
+        await expect.poll(async () => {
+          if (await page.locator('[data-message-list-row="true"]').filter({ hasText: subject2 }).count()) return true;
+          await page.waitForTimeout(2000);
+          return false;
+        }, { timeout: 120000, intervals: [500] }).toBe(true);
+        results.archiveSynced = true;
+        const archiveIds = await page.locator('[data-message-list-row="true"]').filter({ hasText: subject2 }).evaluateAll(els => els.map(el => el.getAttribute("data-message-id")));
+        const diag: unknown[] = [];
+        for (const id of archiveIds.slice(0, 3)) {
+          const detail = await (await page.request.get(`/api/accounts/qa-shared/messages/${id}`)).json();
+          diag.push({ id, threadId: detail.message?.threadId, messageId: detail.message?.messageId, folderId: detail.message?.folderId, contentState: detail.message?.contentState });
+          const rel = await page.request.post("/api/accounts/qa-shared/thread/related", { headers: { origin: new URL(page.url()).origin },
+            data: { threadIds: [detail.message?.threadId], projection: "headers", window: { anchorMessageId: id } } });
+          const body = await rel.json();
+          diag.push({ status: rel.status(), items: body.items?.length, window: body.window, placeholders: body.placeholders?.length });
+        }
+        results.diag = diag;
+        // Late inbox reply into the middle of the archived conversation.
+        const lateIds = Array.from({ length: 4 }, (_, i) => `<review-zaun-${i}@example.test>`);
+        const late = [
+          "From: Synthetic Builder <builder@example.test>", "To: demo@monkeydent.test",
+          "Message-ID: <review-zaun-late@example.test>", `In-Reply-To: ${lateIds[3]}`, `References: ${lateIds.join(" ")}`,
+          `Date: ${new Date(now - (COUNT2 - 3) * 5 * 3_600_000 + 600_000).toUTCString()}`,
+          `Subject: Re: ${subject2}`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "",
+          "Zaunbau Nachricht spät im Posteingang."
+        ].join("\r\n");
+        expect((await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, { method: "POST", body: JSON.stringify({ source: late, flags: ["\\Seen"] }) })).ok).toBe(true);
+        await page.goto("/");
+        await expect.poll(async () => {
+          if (await page.locator('[data-message-list-row="true"]').filter({ hasText: subject2 }).count()) return true;
+          await page.waitForTimeout(3000); await page.goto("/");
+          return false;
+        }, { timeout: 120000, intervals: [500] }).toBe(true);
+        await page.setViewportSize(viewport);
+      }
+      net.length = 0;
+      await page.goto("/");
+      const row2 = page.locator('[data-message-list-row="true"]').filter({ hasText: subject2 });
+      await expect(row2.first()).toBeVisible();
+      const known = await page.locator('[data-message-list-row="true"]').evaluateAll(els => els.map(el => el.getAttribute("data-message-id")));
+      await row2.first().locator("xpath=preceding-sibling::*[1]").click({ timeout: 10000 }).catch(() => undefined);
+      await page.waitForTimeout(1500);
+      const kids = await page.locator('[data-message-list-row="true"]').evaluateAll((els, k) => els
+        .filter(el => !k.includes(el.getAttribute("data-message-id")))
+        .map(el => ({ id: el.getAttribute("data-message-id"), text: (el.textContent ?? "").slice(0, 90) })), known);
+      results[`kids-${tag}`] = kids;
+      const pick = kids.find(kid => /spät im Posteingang|late/.test(kid.text)) ?? kids[kids.length - 1];
+      if (pick?.id) await page.locator(`[data-message-list-row="true"][data-message-id="${pick.id}"]`).click();
+      else await row2.first().click();
+      const newer = page.getByRole("button", { name: "Weitere Nachrichten laden", exact: true });
+      try {
+        await expect(newer).toBeVisible({ timeout: 20000 });
+        await page.waitForTimeout(1500);
+        await newer.scrollIntoViewIfNeeded();
+        await shot(page, `conv-anchor-${tag}.png`);
+        results[`anchor-${tag}`] = { net: [...net], cards: await cardsInfo(page),
+          olderVisible: await page.getByRole("button", { name: "Ältere Nachrichten laden", exact: true }).isVisible() };
+        net.length = 0;
+        await newer.click();
+        await page.waitForTimeout(1500);
+        results[`newer-${tag}`] = { net: [...net], cards: await cardsInfo(page), newerStillVisible: await newer.isVisible() };
+        if (await newer.isVisible()) { await newer.click(); await page.waitForTimeout(1500); }
+        results[`newer2-${tag}`] = { cards: await cardsInfo(page), newerStillVisible: await newer.isVisible() };
+        await shot(page, `conv-anchor-all-loaded-${tag}.png`);
+      } catch (error) {
+        await shot(page, `conv-anchor-FAILED-${tag}.png`);
+        results[`anchor-${tag}`] = { error: String(error).slice(0, 300), net: [...net], cards: await cardsInfo(page) };
+      }
+      mkdirSync(evidence, { recursive: true });
+      writeFileSync(path.join(evidence, "review-results.json"), JSON.stringify(results, null, 2));
+    }
+  }
+  mkdirSync(evidence, { recursive: true });
+  writeFileSync(path.join(evidence, "review-results.json"), JSON.stringify(results, null, 2));
+});

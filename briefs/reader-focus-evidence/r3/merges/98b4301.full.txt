@@ -1,0 +1,21 @@
+9d0cb25bb4dcb2e5b10677fee43760c7c451f33c
+100644 1fb2e4040040cf62e4761533da75ea278ae99d90 1	app/components/MailClient.tsx
+100644 9496d7d005fe68489f8fa0598d1cf1ae9a0b8563 2	app/components/MailClient.tsx
+100644 cd897de7557b7b4b63247da4bbc875deacfd205b 3	app/components/MailClient.tsx
+100644 5e195d878a9ab530f29adf2cb20af5aef22f9615 1	app/components/mailclient/lazyAdmin.dom.test.tsx
+100644 42e323105575684c3558051c42fe22da710ff000 2	app/components/mailclient/lazyAdmin.dom.test.tsx
+100644 4dec13aa7a57c851a477bcbec8203788be6b9bbe 3	app/components/mailclient/lazyAdmin.dom.test.tsx
+100644 bc816534576e22069621057bb1536847c7e35c0a 1	playwright.qa-round2.config.ts
+100644 d6538e5c8ee97a01aaa66de6d321e56e8d0966b2 2	playwright.qa-round2.config.ts
+100644 b59bc05cf4e00173d38eaa156bd31cd90846ddb9 3	playwright.qa-round2.config.ts
+
+Auto-merging app/api/accounts/[accountId]/folders/[folderId]/consistency/route.ts
+Auto-merging app/api/accounts/[accountId]/folders/[folderId]/delete/route.ts
+Auto-merging app/components/MailClient.tsx
+CONFLICT (content): Merge conflict in app/components/MailClient.tsx
+Auto-merging app/components/mailclient/lazyAdmin.dom.test.tsx
+CONFLICT (content): Merge conflict in app/components/mailclient/lazyAdmin.dom.test.tsx
+Auto-merging messages/de.json
+Auto-merging messages/en.json
+Auto-merging playwright.qa-round2.config.ts
+CONFLICT (content): Merge conflict in playwright.qa-round2.config.ts

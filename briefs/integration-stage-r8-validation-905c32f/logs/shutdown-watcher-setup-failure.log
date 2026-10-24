@@ -1,0 +1,36 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+19 |  const deadline=Date.now()+30000;let idling=false;
+20 |  while(Date.now()<deadline&&child.exitCode===null){
+21 |   if(output.includes('Ready on')){try{const db=new Database(path.join(process.env.NOCTUA_DATA_DIR!,'db/accounts/synthetic-shutdown.db'),{readonly:true});try{idling=db.query("SELECT watcherState FROM mailbox_summary WHERE accountId='synthetic-shutdown'").get()?.watcherState==='idling';}finally{db.close();}}catch{}}
+22 |   if(idling)break;await Bun.sleep(50);
+23 |  }
+24 |  assert(idling,'Owned standalone watcher did not reach idling: '+output);
+      ^
+AssertionError: Owned standalone watcher did not reach idling: Ready on http://127.0.0.1:3799
+[2026-10-23 07:29:02.843 +00:00] Failed to prepare server Error: An error occurred while loading instrumentation hook: Auth datastore lifetime lock is held by an application or operator; stop the service before recovery.
+[2026-10-23 07:29:02.843 +00:00]     at u (.next/server/chunks/_0ob.4ej._.js:1:1037) {
+[2026-10-23 07:29:02.843 +00:00]   code: 'auth_lifetime_lock'
+[2026-10-23 07:29:02.843 +00:00] }
+[2026-10-23 07:29:02.851 +00:00] Error: An error occurred while loading instrumentation hook: Auth datastore lifetime lock is held by an application or operator; stop the service before recovery.
+[2026-10-23 07:29:02.851 +00:00]     at u (.next/server/chunks/_0ob.4ej._.js:1:1037) {
+[2026-10-23 07:29:02.851 +00:00]   code: 'auth_lifetime_lock'
+[2026-10-23 07:29:02.851 +00:00] }
+[2026-10-23 07:29:02.851 +00:00] ⨯ unhandledRejection:  Error: An error occurred while loading instrumentation hook: Auth datastore lifetime lock is held by an application or operator; stop the service before recovery.
+[2026-10-23 07:29:02.851 +00:00]     at u (.next/server/chunks/_0ob.4ej._.js:1:1037) {
+[2026-10-23 07:29:02.851 +00:00]   code: 'auth_lifetime_lock'
+[2026-10-23 07:29:02.851 +00:00] }
+
+ generatedMessage: false,
+     actual: false,
+   expected: true,
+   operator: "==",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at /home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/watcher-shutdown.ts:24:2
+
+Bun v1.4.4 (Linux arm64)

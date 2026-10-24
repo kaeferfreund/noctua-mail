@@ -1,0 +1,33 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/useSearchState.dom.test.tsx:
+(pass) summary owns all collaboration view counts; search never requests a listThreads message total [428.61ms]
+42 |   computedStyleSupportsPseudoElements: false
+43 | };
+44 | function runWithExpensiveErrorDiagnosticsDisabled(callback) {
+45 |   try {
+46 |     config._disableExpensiveErrorDiagnostics = true;
+47 |     return callback();
+                ^
+error: expect(received).toBe(expected)
+
+Expected: 109
+Received: 110
+
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div />[39m
+  [36m</body>[39m
+[36m</html>[39m
+      at runWithExpensiveErrorDiagnosticsDisabled (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/dom/dist/config.js:47:12)
+      at checkCallback (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/dom/dist/wait-for.js:124:36)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/happy-dom/lib/window/BrowserWindow.js:2045:30)
+(fail) QA-101 virtual unread counts follow authoritative folder counts without a full sync [1211.89ms]
+
+ 1 pass
+ 1 fail
+ 33 expect() calls
+Ran 2 tests across 1 file. [1.94s]

@@ -1,0 +1,40 @@
+├ ƒ /api/admin/users/[userId]/passkeys/[passkeyId]
+├ ƒ /api/admin/users/[userId]/recovery
+├ ƒ /api/admin/users/[userId]/sessions
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/methods
+├ ƒ /api/auth/preferences
+├ ƒ /api/auth/reauth
+├ ƒ /api/auth/security
+├ ƒ /api/auth/security/backup-codes
+├ ƒ /api/auth/security/passkeys/remove
+├ ƒ /api/auth/security/passkeys/rename
+├ ƒ /api/auth/security/password
+├ ƒ /api/auth/security/sessions/revoke
+├ ƒ /api/auth/signup
+├ ƒ /api/auth/switch-account
+├ ƒ /api/auth/totp/replace
+├ ƒ /api/ba/[...all]
+├ ƒ /api/calendar/import
+├ ƒ /api/calendar/test
+├ ƒ /api/mcp
+├ ƒ /api/me/events
+├ ƒ /api/me/mailboxes/summary
+├ ƒ /api/probe
+├ ƒ /api/version
+├ ƒ /apple-icon
+├ ƒ /calendar/import
+├ ƒ /calendar/window
+├ ƒ /compose/window
+├ ƒ /icon
+├ ƒ /icons/badged/[size]
+├ ƒ /icons/logo.svg
+├ ○ /manifest.webmanifest
+├ ƒ /message/window
+└ ƒ /reset-password
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

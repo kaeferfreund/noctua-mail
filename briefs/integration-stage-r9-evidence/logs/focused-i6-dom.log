@@ -1,0 +1,9 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/shell/Shell.dom.test.tsx:
+Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).
+
+ 78 pass
+ 0 fail
+ 531 expect() calls
+Ran 78 tests across 9 files. [24.46s]

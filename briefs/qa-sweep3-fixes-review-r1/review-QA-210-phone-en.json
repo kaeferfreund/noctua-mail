@@ -1,0 +1,30 @@
+[
+  {
+    "width": 390,
+    "scheme": "light",
+    "placeholder": "Search Inbox",
+    "text": 98,
+    "available": 246
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "placeholder": "Search Inbox",
+    "text": 98,
+    "available": 246
+  },
+  {
+    "width": 320,
+    "scheme": "light",
+    "placeholder": "Search Inbox",
+    "text": 98,
+    "available": 176
+  },
+  {
+    "width": 320,
+    "scheme": "dark",
+    "placeholder": "Search Inbox",
+    "text": 98,
+    "available": 176
+  }
+]

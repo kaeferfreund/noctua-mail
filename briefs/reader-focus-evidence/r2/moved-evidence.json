@@ -1,0 +1,32 @@
+[
+  {
+    "name": "reader-focus-dark-1280.png",
+    "bytes": 149799,
+    "sha256": "426c9685bc53f98eb203f64897899345d4012103f3c9b4ac8b059fb7ef584833",
+    "preserved": true
+  },
+  {
+    "name": "reader-focus-light-1024.png",
+    "bytes": 143122,
+    "sha256": "d6a0dc31b8b7f87c7ae42d5a15a2a93f626945119e6bed64602c2efd6613d391",
+    "preserved": true
+  },
+  {
+    "name": "reader-focus-light-1280.png",
+    "bytes": 147737,
+    "sha256": "c0c8eb3432d202851cb79c03aac972196468493fd3008837d9ff0a85b87f6783",
+    "preserved": true
+  },
+  {
+    "name": "reader-focus-dark-1024.png",
+    "bytes": 145415,
+    "sha256": "999e13e267a05eaa9c4c9c784c712f83ca9bf4449587d290fba0936bd6a878a2",
+    "preserved": true
+  },
+  {
+    "name": "reader-mobile-390.png",
+    "bytes": 55434,
+    "sha256": "09cd6db61b506615e5e0b772f051dd5f540068510ad40d6477ad6eb33ddb1ffe",
+    "preserved": true
+  }
+]

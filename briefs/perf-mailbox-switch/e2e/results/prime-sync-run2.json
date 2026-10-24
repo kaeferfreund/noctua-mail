@@ -1,0 +1,43 @@
+{
+ "at": "2026-10-23T15:49:54.494Z",
+ "perFolderFullSync": {
+  "small": {
+   "ms": 13944,
+   "jobs": 6,
+   "notDone": []
+  },
+  "medium": {
+   "ms": 5694,
+   "jobs": 6,
+   "notDone": []
+  },
+  "large": {
+   "ms": 38712,
+   "jobs": 6,
+   "notDone": []
+  },
+  "folders": {
+   "ms": 32444,
+   "jobs": 50,
+   "notDone": []
+  }
+ },
+ "folders": {
+  "small": {
+   "folders": 6,
+   "messages": 50
+  },
+  "medium": {
+   "folders": 6,
+   "messages": 2000
+  },
+  "large": {
+   "folders": 6,
+   "messages": 10000
+  },
+  "folders": {
+   "folders": 50,
+   "messages": 1350
+  }
+ }
+}

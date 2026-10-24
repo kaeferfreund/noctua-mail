@@ -1,0 +1,3769 @@
+{
+  "root": "/home/monkey/code/noctua-mail/wt-perf-account-batching/.tmp/c-266867e",
+  "runs": 9,
+  "bun": "1.4.4",
+  "startLoad": [
+    19,
+    17.05,
+    15.49
+  ],
+  "endLoad": [
+    19,
+    17.05,
+    15.49
+  ],
+  "at": "2026-10-23T16:20:58.050Z",
+  "results": [
+    {
+      "id": "accessible/1",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 0.32168299999830197,
+      "msMin": 0.2578819999998814,
+      "msMax": 1.8105759999998554,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 0,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-lib/1",
+      "entry": "getUserMailboxSummary(all)",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 1.2588510000005044,
+      "msMin": 1.1199309999992693,
+      "msMax": 3.2569899999998597,
+      "compiles": 5,
+      "cached": 9,
+      "execs": 14,
+      "txs": 1,
+      "execsRange": [
+        14,
+        14
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 9,
+          "execs": 11,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/1",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 4.0375569999996515,
+      "msMin": 3.273710999999821,
+      "msMax": 8.490798999999242,
+      "compiles": 12,
+      "cached": 11,
+      "execs": 23,
+      "txs": 2,
+      "execsRange": [
+        23,
+        23
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 271
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 7,
+          "cached": 11,
+          "execs": 18,
+          "txs": 2
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-lib/1",
+      "entry": "getUserMailboxSummary(scope=1)",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 1.1653299999998126,
+      "msMin": 1.0885699999998906,
+      "msMax": 3.028628000000026,
+      "compiles": 5,
+      "cached": 9,
+      "execs": 14,
+      "txs": 1,
+      "execsRange": [
+        14,
+        14
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 9,
+          "execs": 11,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/1",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 2.5103429999999207,
+      "msMin": 2.298342000000048,
+      "msMax": 4.728003999998691,
+      "compiles": 5,
+      "cached": 11,
+      "execs": 16,
+      "txs": 2,
+      "execsRange": [
+        16,
+        16
+      ],
+      "result": {
+        "delivered": true,
+        "ms": 2.3502619999999297
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 11,
+          "execs": 13,
+          "txs": 2
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/1",
+      "entry": "GET /api/auth/me",
+      "variant": "normal",
+      "accounts": 1,
+      "ms": 8.639759000001504,
+      "msMin": 7.583269999999175,
+      "msMax": 11.253504000000248,
+      "compiles": 11,
+      "cached": 7,
+      "execs": 18,
+      "txs": 0,
+      "execsRange": [
+        18,
+        18
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 1156
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 8,
+          "cached": 7,
+          "execs": 15,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.id as id FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE ua.userId = ? OR a.ownerUserId = ? ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "update \"auth_session\" set \"updatedAt\" = ?, \"activeAccountId\" = ? where \"auth_session\".\"token\" = ? returning *",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "accessible/2",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 0.32068299999991723,
+      "msMin": 0.29352300000027753,
+      "msMax": 2.5717039999999542,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 0,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "rows": 2
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-lib/2",
+      "entry": "getUserMailboxSummary(all)",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 2.121379000000161,
+      "msMin": 1.850657000000865,
+      "msMax": 5.008406999999352,
+      "compiles": 10,
+      "cached": 14,
+      "execs": 24,
+      "txs": 1,
+      "execsRange": [
+        24,
+        24
+      ],
+      "result": {
+        "rows": 2
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 4,
+          "cached": 14,
+          "execs": 18,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 6,
+          "cached": 0,
+          "execs": 6,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 4,
+          "cached": 0,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/2",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 4.688524000001053,
+      "msMin": 3.9750370000001567,
+      "msMax": 9.875170999999682,
+      "compiles": 17,
+      "cached": 17,
+      "execs": 34,
+      "txs": 2,
+      "execsRange": [
+        34,
+        34
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 513
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 9,
+          "cached": 17,
+          "execs": 26,
+          "txs": 2
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        },
+        "shard": {
+          "compiles": 6,
+          "cached": 0,
+          "execs": 6,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 5,
+          "execs": 5
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 4,
+          "cached": 0,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-lib/2",
+      "entry": "getUserMailboxSummary(scope=1)",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 1.2029710000006162,
+      "msMin": 1.0768500000012864,
+      "msMax": 2.1403800000007323,
+      "compiles": 5,
+      "cached": 9,
+      "execs": 14,
+      "txs": 1,
+      "execsRange": [
+        14,
+        14
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 9,
+          "execs": 11,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/2",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 3.1211089999997057,
+      "msMin": 2.435622000000876,
+      "msMax": 6.3170179999997345,
+      "compiles": 5,
+      "cached": 11,
+      "execs": 16,
+      "txs": 2,
+      "execsRange": [
+        16,
+        16
+      ],
+      "result": {
+        "delivered": true,
+        "ms": 2.435622000000876
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 11,
+          "execs": 13,
+          "txs": 2
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/2",
+      "entry": "GET /api/auth/me",
+      "variant": "normal",
+      "accounts": 2,
+      "ms": 11.316103999999541,
+      "msMin": 8.637160000000222,
+      "msMax": 20.030264999999417,
+      "compiles": 11,
+      "cached": 7,
+      "execs": 18,
+      "txs": 0,
+      "execsRange": [
+        18,
+        18
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 1865
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 8,
+          "cached": 7,
+          "execs": 15,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.id as id FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE ua.userId = ? OR a.ownerUserId = ? ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "update \"auth_session\" set \"updatedAt\" = ?, \"activeAccountId\" = ? where \"auth_session\".\"token\" = ? returning *",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "accessible/12",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 0.709606000000349,
+      "msMin": 0.6478860000006534,
+      "msMax": 0.8043269999998302,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 0,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "rows": 12
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-lib/12",
+      "entry": "getUserMailboxSummary(all)",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 9.988011999999799,
+      "msMin": 9.396006999999372,
+      "msMax": 11.388904999999795,
+      "compiles": 60,
+      "cached": 64,
+      "execs": 124,
+      "txs": 1,
+      "execsRange": [
+        124,
+        124
+      ],
+      "result": {
+        "rows": 12
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 24,
+          "cached": 64,
+          "execs": 88,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 36,
+          "cached": 0,
+          "execs": 36,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 24,
+          "cached": 0,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 24,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 24,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 13,
+          "execs": 13
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/12",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 12.059910999998465,
+      "msMin": 11.319304999999076,
+      "msMax": 16.458952000000863,
+      "compiles": 67,
+      "cached": 77,
+      "execs": 144,
+      "txs": 2,
+      "execsRange": [
+        144,
+        144
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 2813
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 29,
+          "cached": 77,
+          "execs": 106,
+          "txs": 2
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        },
+        "shard": {
+          "compiles": 36,
+          "cached": 0,
+          "execs": 36,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 25,
+          "execs": 25
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 24,
+          "cached": 0,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 24,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 24,
+          "execs": 24
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 12,
+          "cached": 0,
+          "execs": 12
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-lib/12",
+      "entry": "getUserMailboxSummary(scope=1)",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 1.4340530000008584,
+      "msMin": 1.3434530000013183,
+      "msMax": 1.9087770000005548,
+      "compiles": 5,
+      "cached": 9,
+      "execs": 14,
+      "txs": 1,
+      "execsRange": [
+        14,
+        14
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 9,
+          "execs": 11,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/12",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 2.768506000000343,
+      "msMin": 2.6527839999998832,
+      "msMax": 3.3035500000005413,
+      "compiles": 5,
+      "cached": 11,
+      "execs": 16,
+      "txs": 2,
+      "execsRange": [
+        16,
+        16
+      ],
+      "result": {
+        "delivered": true,
+        "ms": 2.962868000000526
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 2,
+          "cached": 11,
+          "execs": 13,
+          "txs": 2
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/12",
+      "entry": "GET /api/auth/me",
+      "variant": "normal",
+      "accounts": 12,
+      "ms": 8.440237999999226,
+      "msMin": 7.482428999999684,
+      "msMax": 18.774772999999186,
+      "compiles": 11,
+      "cached": 7,
+      "execs": 18,
+      "txs": 0,
+      "execsRange": [
+        18,
+        18
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 8485
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 8,
+          "cached": 7,
+          "execs": 15,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.id as id FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE ua.userId = ? OR a.ownerUserId = ? ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "update \"auth_session\" set \"updatedAt\" = ?, \"activeAccountId\" = ? where \"auth_session\".\"token\" = ? returning *",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "accessible/12-disabled",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 0.26008200000069337,
+      "msMin": 0.23952299999837123,
+      "msMax": 0.37668399999893154,
+      "compiles": 0,
+      "cached": 2,
+      "execs": 2,
+      "txs": 0,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 0
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-lib/12-disabled",
+      "entry": "getUserMailboxSummary(all)",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 0.2968430000000808,
+      "msMin": 0.27608299999883457,
+      "msMax": 0.40216399999917485,
+      "compiles": 0,
+      "cached": 2,
+      "execs": 2,
+      "txs": 1,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 0
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2,
+          "txs": 1
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/12-disabled",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 1.3407729999998992,
+      "msMin": 1.233211000000665,
+      "msMax": 8.060113999999885,
+      "compiles": 3,
+      "cached": 0,
+      "execs": 3,
+      "txs": 0,
+      "execsRange": [
+        3,
+        3
+      ],
+      "result": {
+        "status": 401,
+        "bytes": 37
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-lib/12-disabled",
+      "entry": "getUserMailboxSummary(scope=1)",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 0.3604430000013963,
+      "msMin": 0.2686420000009093,
+      "msMax": 0.438003999999637,
+      "compiles": 0,
+      "cached": 2,
+      "execs": 2,
+      "txs": 1,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 0
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2,
+          "txs": 1
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/12-disabled",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 1.2869309999987308,
+      "msMin": 1.177890999999363,
+      "msMax": 1.4452130000008765,
+      "compiles": 3,
+      "cached": 0,
+      "execs": 3,
+      "txs": 0,
+      "execsRange": [
+        3,
+        3
+      ],
+      "result": {
+        "status": "stream-denied"
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/12-disabled",
+      "entry": "GET /api/auth/me",
+      "variant": "disabled",
+      "accounts": 11,
+      "ms": 1.1848509999999806,
+      "msMin": 1.123650000001362,
+      "msMax": 1.5599739999997837,
+      "compiles": 3,
+      "cached": 0,
+      "execs": 3,
+      "txs": 0,
+      "execsRange": [
+        3,
+        3
+      ],
+      "result": {
+        "status": 401,
+        "bytes": 37
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "accessible/12-revoked",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 4.271758999999292,
+      "msMin": 3.8264749999998457,
+      "msMax": 7.279146999999284,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 0,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "rows": 10
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-lib/12-revoked",
+      "entry": "getUserMailboxSummary(all)",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 13.578725000001214,
+      "msMin": 11.162423000001581,
+      "msMax": 18.11476699999912,
+      "compiles": 66,
+      "cached": 59,
+      "execs": 125,
+      "txs": 1,
+      "execsRange": [
+        125,
+        125
+      ],
+      "result": {
+        "rows": 10
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 33,
+          "cached": 59,
+          "execs": 92,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 33,
+          "cached": 0,
+          "execs": 33,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 22,
+          "cached": 0,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 22,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 22,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 12,
+          "execs": 12
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "SELECT id, dbPath FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/12-revoked",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 15.552223999999114,
+      "msMin": 13.712805999999546,
+      "msMax": 18.113806999999724,
+      "compiles": 73,
+      "cached": 70,
+      "execs": 143,
+      "txs": 2,
+      "execsRange": [
+        143,
+        143
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 2329
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 38,
+          "cached": 70,
+          "execs": 108,
+          "txs": 2
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        },
+        "shard": {
+          "compiles": 33,
+          "cached": 0,
+          "execs": 33,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 22,
+          "cached": 0,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 22,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 22,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 22,
+          "execs": 22
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "SELECT id, dbPath FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 11,
+          "cached": 0,
+          "execs": 11
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-lib/12-revoked",
+      "entry": "getUserMailboxSummary(scope=1)",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 4.249159000000873,
+      "msMin": 3.2171499999985826,
+      "msMax": 4.9093660000016826,
+      "compiles": 6,
+      "cached": 9,
+      "execs": 15,
+      "txs": 1,
+      "execsRange": [
+        15,
+        15
+      ],
+      "result": {
+        "rows": 0
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 3,
+          "cached": 9,
+          "execs": 12,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT id, dbPath FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/12-revoked",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 6.061015999999654,
+      "msMin": 5.145007999999507,
+      "msMax": 12.151911999999356,
+      "compiles": 6,
+      "cached": 9,
+      "execs": 15,
+      "txs": 1,
+      "execsRange": [
+        15,
+        15
+      ],
+      "result": {
+        "delivered": false,
+        "ms": 10.1896940000006
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 3,
+          "cached": 9,
+          "execs": 12,
+          "txs": 1
+        },
+        "shard": {
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 2,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT id, dbPath FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/12-revoked",
+      "entry": "GET /api/auth/me",
+      "variant": "revoked-mid-read",
+      "accounts": 11,
+      "ms": 15.482222999999067,
+      "msMin": 10.374056000000564,
+      "msMax": 41.5971040000004,
+      "compiles": 13,
+      "cached": 9,
+      "execs": 22,
+      "txs": 0,
+      "execsRange": [
+        22,
+        22
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 6780
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 9,
+          "cached": 9,
+          "execs": 18,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 4,
+          "cached": 0,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT DISTINCT a.id as id FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE ua.userId = ? OR a.ownerUserId = ? ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "update \"auth_session\" set \"updatedAt\" = ?, \"activeAccountId\" = ? where \"auth_session\".\"token\" = ? returning *",
+          "handle": "auth",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/2-foreign-mailbox",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "foreign mailbox",
+      "accounts": 2,
+      "ms": 1.627295000000231,
+      "msMin": 1.556934000000183,
+      "msMax": 1.7568160000009811,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 1,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "delivered": false,
+        "ms": 1.7568160000009811
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 1
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "scoped-event/11-foreign-mailbox",
+      "entry": "SSE mailbox-summary event (scope=1)",
+      "variant": "foreign mailbox",
+      "accounts": 11,
+      "ms": 2.8913469999988592,
+      "msMin": 1.964617999999973,
+      "msMax": 7.752631000001202,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 1,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "delivered": false,
+        "ms": 5.216768000000229
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 1
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "event-fanout/4-streams",
+      "entry": "SSE fan-out, 1 event x 4 open streams",
+      "variant": "normal",
+      "accounts": "1+2+12+11",
+      "ms": 8.332995999999184,
+      "msMin": 6.972664999999324,
+      "msMax": 20.394787999999608,
+      "compiles": 16,
+      "cached": 37,
+      "execs": 53,
+      "txs": 7,
+      "execsRange": [
+        53,
+        53
+      ],
+      "result": {
+        "delivered": false,
+        "ms": 9.43312700000024
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 7,
+          "cached": 37,
+          "execs": 44,
+          "txs": 7
+        },
+        "shard": {
+          "compiles": 9,
+          "cached": 0,
+          "execs": 9,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 10,
+          "execs": 10
+        },
+        {
+          "sql": "SELECT * FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 6,
+          "cached": 0,
+          "execs": 6
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId=? ORDER BY isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 6,
+          "execs": 6
+        },
+        {
+          "sql": "SELECT total_changes() AS changes",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 6,
+          "execs": 6
+        },
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4
+        },
+        {
+          "sql": "SELECT COUNT(*) AS unreadInbox FROM messages WHERE accountId = ? AND unread = 1 AND COALESCE(deleted, 0) = 0 AND folderId IN (SELECT id FROM folders WHERE accou",
+          "handle": "shard",
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT lastSyncAt, watcherState FROM mailbox_summary WHERE accountId = ?",
+          "handle": "shard",
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT s.expiresAt,ss.authenticatedAt FROM auth_session s JOIN users p ON p.id=s.userId JOIN auth_user u ON u.id=p.id JOIN auth_session_security ss ON ss.sessio",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 3,
+          "execs": 3
+        },
+        {
+          "sql": "WITH live AS ( SELECT threads.threadId, tc.assigneeUserId, (tc.status IS NULL OR tc.status IN ('open','in_progress','waiting')) AS isOpen FROM (SELECT DISTINCT ",
+          "handle": "shard",
+          "compiles": 3,
+          "cached": 0,
+          "execs": 3
+        },
+        {
+          "sql": "SELECT id, dbPath FROM accounts WHERE id = ?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "me/12-mfa-restricted",
+      "entry": "GET /api/auth/me",
+      "variant": "mfa-restricted",
+      "accounts": 11,
+      "ms": 2.032059000001027,
+      "msMin": 1.5204140000005282,
+      "msMax": 3.9621169999991253,
+      "compiles": 8,
+      "cached": 0,
+      "execs": 8,
+      "txs": 0,
+      "execsRange": [
+        8,
+        8
+      ],
+      "result": {
+        "status": 200,
+        "bytes": 373
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 6,
+          "cached": 0,
+          "execs": 6,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "summary-route/12-mfa-restricted",
+      "entry": "GET /api/me/mailboxes/summary",
+      "variant": "mfa-restricted",
+      "accounts": 11,
+      "ms": 1.4572540000008303,
+      "msMin": 1.3832930000007764,
+      "msMax": 3.66355300000032,
+      "compiles": 7,
+      "cached": 0,
+      "execs": 7,
+      "txs": 0,
+      "execsRange": [
+        7,
+        7
+      ],
+      "result": {
+        "status": 403,
+        "bytes": 70
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 5,
+          "cached": 0,
+          "execs": 5,
+          "txs": 0
+        },
+        "auth": {
+          "compiles": 2,
+          "cached": 0,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_session\" where \"auth_session\".\"token\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "select \"primary\".* from (select * from \"auth_user\" where \"auth_user\".\"id\" = ?) as \"primary\"",
+          "handle": "auth",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM admin_lifecycle_operations WHERE slot=? AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT 1 FROM user_provisioning WHERE userId=? AND state NOT IN ('complete','cancelled')",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT s.userId,s.generation,s.assurance,s.authenticatedAt,s.method, u.generation AS currentGeneration FROM auth_session_security s JOIN auth_security_state u O",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT u.twoFactorEnabled, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id) AS factors, (SELECT COUNT(*) FROM auth_two_factor f WHERE f.userId=u.id ",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "accessible/12-mfa-restricted",
+      "entry": "listAccessibleAccountsForUser",
+      "variant": "mfa-restricted",
+      "accounts": 11,
+      "ms": 0.695966999999655,
+      "msMin": 0.6173260000014125,
+      "msMax": 2.886985999999524,
+      "compiles": 0,
+      "cached": 4,
+      "execs": 4,
+      "txs": 0,
+      "execsRange": [
+        4,
+        4
+      ],
+      "result": {
+        "rows": 11
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 0,
+          "cached": 4,
+          "execs": 4,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT * FROM sender_identities WHERE accountId IN (SELECT value FROM json_each(?)) ORDER BY accountId, isDefault DESC, email COLLATE NOCASE, id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT a.id AS accountId, CASE WHEN a.ownerUserId=? THEN 'manager' ELSE ua.role END AS role FROM accounts a JOIN users p ON p.id=? JOIN auth_user u ON u.id=p.id",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT DISTINCT a.* FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId = a.id WHERE (ua.userId = ? OR a.ownerUserId = ?) ORDER BY a.id ASC",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT m.accountId AS accountId, COUNT(*) AS memberCount FROM (SELECT accountId, userId FROM user_accounts WHERE accountId IN (SELECT value FROM json_each(?1)) ",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "members/syn-acct-00",
+      "entry": "listAccountMembers",
+      "variant": "owner only (0 links)",
+      "accounts": 1,
+      "ms": 0.08056099999885191,
+      "msMin": 0.07080099999984668,
+      "msMax": 0.12820099999953527,
+      "compiles": 1,
+      "cached": 1,
+      "execs": 2,
+      "txs": 0,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 1
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 1,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT ownerUserId FROM accounts WHERE id=?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "members/syn-acct-05",
+      "entry": "listAccountMembers",
+      "variant": "5 links incl. disabled member",
+      "accounts": 1,
+      "ms": 0.20728200000121433,
+      "msMin": 0.16612200000054145,
+      "msMax": 0.5993660000003729,
+      "compiles": 1,
+      "cached": 1,
+      "execs": 2,
+      "txs": 0,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 11
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 1,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT ownerUserId FROM accounts WHERE id=?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "members/syn-acct-06",
+      "entry": "listAccountMembers",
+      "variant": "6 links incl. disabled member",
+      "accounts": 1,
+      "ms": 0.15192100000058417,
+      "msMin": 0.12352199999986624,
+      "msMax": 0.1777620000011666,
+      "compiles": 1,
+      "cached": 1,
+      "execs": 2,
+      "txs": 0,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 11
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 1,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT ownerUserId FROM accounts WHERE id=?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    },
+    {
+      "id": "members/syn-acct-01-revoked",
+      "entry": "listAccountMembers",
+      "variant": "revoked-mid-read",
+      "accounts": 1,
+      "ms": 7.951752999999371,
+      "msMin": 2.178620000000592,
+      "msMax": 27.779615999999805,
+      "compiles": 1,
+      "cached": 1,
+      "execs": 2,
+      "txs": 0,
+      "execsRange": [
+        2,
+        2
+      ],
+      "result": {
+        "rows": 5
+      },
+      "byHandle": {
+        "master": {
+          "compiles": 1,
+          "cached": 1,
+          "execs": 2,
+          "txs": 0
+        }
+      },
+      "statements": [
+        {
+          "sql": "SELECT ownerUserId FROM accounts WHERE id=?",
+          "handle": "master",
+          "compiles": 1,
+          "cached": 0,
+          "execs": 1
+        },
+        {
+          "sql": "SELECT p.id, u.email, u.name, u.role, p.createdAt, p.uiLocale, EXISTS(SELECT 1 FROM auth_account c WHERE c.userId=u.id AND c.providerId='credential' AND c.passw",
+          "handle": "master",
+          "compiles": 0,
+          "cached": 1,
+          "execs": 1
+        }
+      ]
+    }
+  ]
+}

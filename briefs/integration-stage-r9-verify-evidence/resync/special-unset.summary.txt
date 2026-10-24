@@ -1,0 +1,9 @@
+(pass) real IMAP resync replaces an unkeyed legacy row with the parsed sender key [678.40ms]
+(pass) collision-variant resync preserves the base source and refreshes only the variant's ownership and sender [818.23ms]
+(pass) special <tag> & "double" 'single' [x] (y) $z ^a* +b? {c} |d \e [381.64ms]
+(fail) special failing <b> & "q" 'a' [0.45ms]
+ 0 pass
+ 1 fail
+(fail) special failing <b> & "q" 'a' [344.89ms]
+ 3 pass
+ 1 fail

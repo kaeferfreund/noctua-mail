@@ -1,0 +1,276 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/useSyncController.dom.test.tsx:
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-b",
+  folderId: "synthetic-b:INBOX",
+  mode: "new",
+  fullSync: false,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+
+app/components/mailclient/useSyncController.notice.dom.test.tsx:
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] full sync cancelled {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+[noctua][sync] full sync cancelled {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+
+app/components/mailclient/useAccountController.dom.test.tsx:
+[noctua][sync-policy] {
+  triggerId: "startup-1792756710726-1",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756710782-2",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756710836-3",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711002-4",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711059-5",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: null,
+  input: {
+    hasAccountFolders: false,
+    activeFolderId: "",
+  },
+  decision: {
+    kind: "account",
+    mode: "full",
+    reason: "Initial startup sync fell back to full because no folders are loaded locally.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711221-6",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: "account-a:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-a:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-a:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711273-7",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: "account-b:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-b:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-b:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711276-8",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-a",
+  folderId: "account-a:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-a:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-a:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+[noctua][sync-policy] {
+  triggerId: "startup-1792756711328-9",
+  caller: "startup",
+  policy: "decideStartupSync",
+  accountId: "account-b",
+  folderId: "account-b:INBOX",
+  input: {
+    hasAccountFolders: true,
+    activeFolderId: "account-b:INBOX",
+  },
+  decision: {
+    kind: "folder",
+    folderId: "account-b:INBOX",
+    mode: "new",
+    reason: "Initial startup sync for the active folder after page load.",
+  },
+}
+
+ 29 pass
+ 0 fail
+ 111 expect() calls
+Ran 29 tests across 4 files. [948.00ms]

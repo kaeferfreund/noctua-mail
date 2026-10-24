@@ -1,0 +1,10 @@
+[
+  {
+    "path": "node_modules/@img/sharp-linuxmusl-arm64",
+    "version": "0.34.5"
+  },
+  {
+    "path": "node_modules/@img/sharp-libvips-linuxmusl-arm64",
+    "version": "1.2.4"
+  }
+]

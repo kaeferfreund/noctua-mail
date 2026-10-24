@@ -1,0 +1,24 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/gate-data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/gate-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+MIGRATION PASS {"kind":"round7","beforeVersion":2,"afterVersion":3,"messages":11000,"accounts":2,"guards":81,"durationMs":987.0301070000005,"searchComparisons":48,"inventory":{"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."},"sourceUnchanged":true,"beforeFileBytes":13557760,"afterFileBytes":17133568}
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db","shardVersion":0,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":true,"resyncRequiredForLegacySharedShard":true,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+MIGRATION PASS {"kind":"legacy","beforeVersion":0,"afterVersion":3,"messages":11000,"accounts":2,"guards":81,"durationMs":4304.074644000002,"searchComparisons":24,"inventory":{"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db","shardVersion":0,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":true,"resyncRequiredForLegacySharedShard":true,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."},"sourceUnchanged":true,"beforeFileBytes":4927488,"afterFileBytes":15790080}
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/master-fresh",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/master-fresh/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+MASTER fresh PASS: nullable locale + CHECK; provisioning covering index and one receipt; two actual reopens; synthetic profile and auth epoch preserved
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/master-older",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/master-older/db/main.db",
+}
+MASTER older PASS: nullable locale + CHECK; provisioning covering index and one receipt; two actual reopens; synthetic profile and auth epoch preserved

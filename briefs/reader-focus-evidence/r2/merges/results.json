@@ -1,0 +1,65 @@
+[
+  {
+    "ref": "origin/integration/stage",
+    "sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 0,
+    "tree": "628f42515fdf09cdca0d802d9489b5610e4d2595",
+    "conflicts": []
+  },
+  {
+    "ref": "origin/feat/status-bar-compact",
+    "sha": "5809d898b7077793be30bfde7262d4977862d2b2",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 1,
+    "tree": "d11714ee7f86adadc9b0b1fa7506b793f25d1974",
+    "conflicts": [
+      "app/components/shell/AppShell.tsx",
+      "doc/SHELL.md"
+    ]
+  },
+  {
+    "ref": "origin/fix/i18n-views",
+    "sha": "4d812228be2e447e1181caa1c808a5ea437e0bba",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 1,
+    "tree": "b02665ff87924fb9335b56d30d8545cbe526aee0",
+    "conflicts": [
+      "app/components/mailclient/lazyAdmin.dom.test.tsx"
+    ]
+  },
+  {
+    "ref": "26d82d8",
+    "sha": "26d82d81126639afd82cf5d0d53ff1093b9959c7",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 1,
+    "tree": "5d8329a09da55289e3508601bffe277136eb5a08",
+    "conflicts": [
+      "app/components/MailClient.tsx",
+      "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+      "lib/mail/resyncMessage.senderKey.test.ts",
+      "messages/de.json",
+      "messages/en.json"
+    ]
+  },
+  {
+    "ref": "b6c1ba9",
+    "sha": "b6c1ba94019dad49410dba7df623ece2f10a26a8",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 1,
+    "tree": "95d4915429c17686b4ed4473866a68cc070363c9",
+    "conflicts": [
+      "playwright.qa-round2.config.ts"
+    ]
+  },
+  {
+    "ref": "20d93cf",
+    "sha": "20d93cf4bca6df4d7c128ae173710f188882d6b4",
+    "head": "ccddc4dafc3007f6235db6f27f98b585139fbf4b",
+    "exit": 1,
+    "tree": "65c942cb72a2ede9b8718f8b827ba2c51846e5ff",
+    "conflicts": [
+      "app/components/MailClient.tsx"
+    ]
+  }
+]

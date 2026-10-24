@@ -1,0 +1,56 @@
+Pairwise merge resolution notes (R3; head e7d00ee; no source/index merge performed in any worktree)
+
+Command: git -C ROOT/repo merge-tree --write-tree <ref> e7d00ee (HEAD of feat/reader-focus).
+Raw outputs: merges/98b4301.merge.txt (+ .full.txt), merges/a864dfc.merge.txt (+ .full.txt).
+R3 adds no conflict files over ccddc4d: the conflict sets for both refs are identical to
+ccddc4d's (checked with the same command on ccddc4d).
+
+Round-9 candidate 98b4301 (exit 1, tree 9d0cb25bb4dcb2e5b10677fee43760c7c451f33c):
+- app/components/MailClient.tsx, the single import hunk (lines 2-16 of the merged file):
+  keep BOTH sides. 98b4301 adds useSenderMessages, useStartupSync, useEmptyFolderRepair,
+  isAccountFolder, findInboxFolder; reader-focus adds ReaderToolbar,
+  useReaderFocusPlacement, useReaderFocus, useReaderNavigation, readerShortcut.
+  All other MailClient hunks auto-merge, including R3's move of the activeMessage memo
+  above handleBeforeSelectMessage and the readerFocused gating of list paging, notice
+  anchor and scroll capture.
+- app/components/mailclient/lazyAdmin.dom.test.tsx, role-change Retry hunk: take the
+  reader-focus side (async act around the Retry click plus one combined waitFor for
+  "Admin absent" and idleTasks.size === 1). It contains the 98b4301 intent (wait for
+  idle cancellation). Assertions and timeouts unchanged.
+- playwright.qa-round2.config.ts, testMatch hunk: keep both alternatives:
+  /(?:qa-shell|qa-compose|qa-unread-count|qa-translation|qa-admin-breakpoint|qa-admin-self-grant|qa-reader-focus)\.spec\.ts/
+- Verified on a scratch copy (git archive of the merge tree into wt-reader-focus/.tmp,
+  the three hunks resolved exactly as above, dependencies installed from 98b4301's own
+  lockfile because it pins next 16.4.2): bun check 0 errors / 1,258 files; focused DOM
+  59/59 (reader focus/navigation, list orchestrator, delete/mutation hooks, review
+  corrections, lazyAdmin); focused server 131/131 (requestOrigin, readAuthJson,
+  auth bodyLimit, mutation origin inventory, catalogs). Logs: merge-98b4301-*.log.
+- The API fix alone (eb3740b) applies to 98b4301 without conflicts:
+  git merge-tree --write-tree --merge-base ccddc4d 98b4301 eb3740b -> exit 0,
+  tree 3a191f215e0648ea7b9721ff7f217267d55d6646 (merges/api-commit-eb3740b-onto-98b4301.merge.txt).
+  It touches only requestOrigin.ts, the 19 guarded routes (one line each) and new files
+  (requestOrigin.test.ts, qa-bodyless-commands.spec.ts, playwright.qa-bodyless.config.ts).
+- The three API commits together (eb3740b, 60e9a95 bounded bodyless reads / security
+  re-check F1, e7d00ee matrix client replay) apply to a clean git archive of 98b4301 with
+  git apply --check (merges/api-commits-eb3740b-60e9a95.patch covers the product files;
+  e7d00ee is the new spec only). On that tree: bun check 0 errors / 1,243 files;
+  requestOrigin, readAuthJson, auth bodyLimit, mutationOrigins 114/114.
+  readAuthJson.ts, auth/logout/route.ts and admin/_users.ts are identical in 98b4301.
+
+origin/feat/status-bar-compact a864dfc (exit 1, tree f3b84491898f02621d0afede8fc90ac031a66afe):
+- app/components/shell/AppShell.tsx, ShellHeader toolbar/indicators hunk: keep the
+  reader-focus toolbar condition
+    toolbar={(isMobile && navigation.view === "thread") || (!isMobile && panes.readerLayout === "focus") ? undefined : header.toolbar}
+  and take compact's indicators={statusBar} (desktop and mobile). Unchanged from R2.
+- doc/SHELL.md, whole-document add/add conflict: combine both documents. Keep compact's
+  status indicator/density sections and its integration notes; keep all reader-layout
+  sections including the R3 additions (one Escape with an open tooltip; saved preference
+  only applies with an open message, paging/scroll capture/notice anchor follow the shown
+  layout; focus returns to Back when the focused control disappears or is disabled;
+  sender avatars excluded from print; evidence default ROOT/briefs/reader-focus-evidence/latest).
+  Correct compact's list-only notice claim: split measures the list, focus measures #reader.
+- Semantic checks after the real stack integration (pairwise trees do not prove stack
+  correctness): ShellPanes compact spacing with focus's hidden mounted list; collapsed-
+  sidebar Undo position; status popover; 1024/1280 px and 390 px.
+- Verified on a scratch copy as above (AppShell hunk resolved as described, a864dfc's
+  own lockfile): bun check 0 errors / 1,215 files (merge-a864dfc-typecheck.log).

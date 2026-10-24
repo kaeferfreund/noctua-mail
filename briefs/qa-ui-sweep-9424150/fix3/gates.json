@@ -1,0 +1,17 @@
+[
+  {
+    "gate": "test-ci",
+    "exit": 0,
+    "seconds": 531.423
+  },
+  {
+    "gate": "lint",
+    "exit": 1,
+    "seconds": 47.618
+  },
+  {
+    "gate": "build",
+    "exit": 0,
+    "seconds": 61.626
+  }
+]

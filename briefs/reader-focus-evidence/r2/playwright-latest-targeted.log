@@ -1,0 +1,287 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+R2 owned production server PID 2801407
+▲ Next.js 16.2.4
+- Local:         http://localhost:3870
+- Network:       http://localhost:3870
+✓ Ready in 144ms
+⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+[2026-10-23 11:18:55.913 +00:00] [startup] opened storage {
+[2026-10-23 11:18:55.913 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data',
+[2026-10-23 11:18:55.913 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data/db/main.db'
+[2026-10-23 11:18:55.913 +00:00] }
+[2026-10-23 11:18:56.852 +00:00] [startup] opened storage {
+[2026-10-23 11:18:56.852 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data',
+[2026-10-23 11:18:56.852 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data/db/main.db'
+[2026-10-23 11:18:56.852 +00:00] }
+
+Running 2 tests using 1 worker
+
+(node:2801597) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2801597) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2026-10-23 11:19:11.311 +00:00] [startup] opened storage {
+[2026-10-23 11:19:11.311 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data',
+[2026-10-23 11:19:11.311 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/qa-shell-OhnGXN/data/db/main.db'
+[2026-10-23 11:19:11.311 +00:00] }
+[2026-10-23 11:19:12.782 +00:00] [sync] worker started {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mode":"full","pid":2801967}
+[2026-10-23 11:19:12.798 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","status":"running","pid":2801967,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754352765,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:13.044 +00:00] [sync] unknown% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:13.076 +00:00] [sync-worker] [2026-10-23 11:19:13.076 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"ox6ibx1kehmwap4f6afw"}
+[2026-10-23 11:19:13.112 +00:00] [sync] 0% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":0,"estimatedTotal":300,"percent":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.218 +00:00] [sync] 10% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":30,"estimatedTotal":300,"percent":10,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.265 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","status":"running","pid":2801967,"progressPhase":"fetching","progressProcessed":30,"progressUpdatedAt":1792754353217,"progressMessage":"Fetched message batch."}
+[2026-10-23 11:19:13.271 +00:00] [sync] 20% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":60,"estimatedTotal":300,"percent":20,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.308 +00:00] [sync] 30% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":90,"estimatedTotal":300,"percent":30,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.352 +00:00] [sync] 40% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":120,"estimatedTotal":300,"percent":40,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.385 +00:00] [sync] 50% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":150,"estimatedTotal":300,"percent":50,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.416 +00:00] [sync] 60% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":180,"estimatedTotal":300,"percent":60,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.444 +00:00] [sync] 70% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":210,"estimatedTotal":300,"percent":70,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.477 +00:00] [sync] 80% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":240,"estimatedTotal":300,"percent":80,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.503 +00:00] [sync] 90% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":270,"estimatedTotal":300,"percent":90,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.528 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":300,"estimatedTotal":300,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.729 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","status":"running","pid":2801967,"progressPhase":"fetching","progressProcessed":300,"progressUpdatedAt":1792754353528,"progressMessage":"Fetched message batch."}
+[2026-10-23 11:19:13.836 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":300,"estimatedTotal":300,"percent":100,"message":"Batch written to database."}
+[2026-10-23 11:19:13.837 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"fetching","processed":300,"estimatedTotal":300,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:13.838 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"finalizing","processed":300,"estimatedTotal":300,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:13.838 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"finalizing","processed":300,"estimatedTotal":300,"percent":100,"message":"Recomputing message threads."}
+[2026-10-23 11:19:13.916 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"finalizing","processed":300,"estimatedTotal":300,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:13.917 +00:00] [sync] 100% progress on {"jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","mailboxPath":"INBOX","mode":"full","phase":"done","processed":300,"estimatedTotal":300,"percent":100,"message":"Sync completed."}
+[2026-10-23 11:19:14.192 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"57800422-cd7c-44c5-85f6-5bac401af0fd","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":300,"progressUpdatedAt":1792754353975,"progressMessage":"Sync completed."}
+[2026-10-23 11:19:14.229 +00:00] [sync] worker started {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mode":"recent","pid":2802001}
+[2026-10-23 11:19:14.330 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"axdvd50hx13m7c1jol60","secure":false,"host":"127.0.0.1","servername":false,"port":3872,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":53706}
+[2026-10-23 11:19:14.331 +00:00] {"event":"imap.socket_connect","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":"127.0.0.1","localPort":53706,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:14.341 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"axdvd50hx13m7c1jol60"}
+[2026-10-23 11:19:14.345 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","status":"running","pid":2802001,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754354217,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:14.350 +00:00] {"src":"auth","msg":"User authenticated","cid":"axdvd50hx13m7c1jol60","user":"demo@monkeydent.test"}
+[2026-10-23 11:19:14.352 +00:00] [imap] imap.connect mailbox=INBOX account=qa-shared 28ms
+[2026-10-23 11:19:14.364 +00:00] [imap] imap.mailboxOpen mailbox=INBOX account=qa-shared 10ms
+[2026-10-23 11:19:14.373 +00:00] [imap] imap.status mailbox=INBOX account=qa-shared 5ms
+[2026-10-23 11:19:14.492 +00:00] [sync] unknown% progress on {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"recent","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:14.493 +00:00] [sync] unknown% progress on {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"recent","phase":"fetching","processed":0,"message":"Checking for changes (lightweight)."}
+[2026-10-23 11:19:14.509 +00:00] [sync-worker] [2026-10-23 11:19:14.509 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"1ew5kd9adgqy3xqc2rsi"}
+[2026-10-23 11:19:14.615 +00:00] [sync] unknown% progress on {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"recent","phase":"fetching","processed":0,"message":"Lightweight check done: 0 removed, 0 flag updates, 0 new."}
+[2026-10-23 11:19:14.615 +00:00] [sync] 100% progress on {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"recent","phase":"finalizing","processed":0,"estimatedTotal":0,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:14.616 +00:00] [sync] 100% progress on {"jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"recent","phase":"done","processed":0,"percent":100,"message":"Sync completed (no new messages to download)."}
+reader-focus: signed in; synthetic rows visible [33m1280[39m
+[2026-10-23 11:19:15.117 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"958d9c18-8f35-4e72-befc-9718e7f614bd","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":0,"progressUpdatedAt":1792754354656,"progressMessage":"Sync completed."}
+[2026-10-23 11:19:15.142 +00:00] [sync] worker started {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mode":"recent","pid":2802031}
+[2026-10-23 11:19:15.227 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","status":"running","pid":2802031,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754355129,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:15.355 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"vtr3pfei0jmddje02zpw","secure":false,"host":"127.0.0.1","servername":false,"port":3872,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":53722}
+[2026-10-23 11:19:15.355 +00:00] {"event":"imap.socket_connect","accountId":"qa-shared","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":"127.0.0.1","localPort":53722,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:15.356 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"vtr3pfei0jmddje02zpw"}
+[2026-10-23 11:19:15.359 +00:00] {"src":"auth","msg":"User authenticated","cid":"vtr3pfei0jmddje02zpw","user":"demo@monkeydent.test"}
+[2026-10-23 11:19:15.360 +00:00] [imap] connect account=qa-shared client=8a709627-23f9-4205-b225-b7919575dbcf 6ms
+[2026-10-23 11:19:15.365 +00:00] [imap] mailboxOpen mailbox=INBOX account=qa-shared client=8a709627-23f9-4205-b225-b7919575dbcf 4ms
+[2026-10-23 11:19:15.370 +00:00] [imap] messageMove mailbox=INBOX account=qa-shared client=8a709627-23f9-4205-b225-b7919575dbcf 4ms
+[2026-10-23 11:19:15.401 +00:00] [sync] unknown% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"recent","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:15.401 +00:00] [sync] unknown% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"recent","phase":"fetching","processed":0,"message":"Checking for changes (lightweight)."}
+[2026-10-23 11:19:15.423 +00:00] [sync-worker] [2026-10-23 11:19:15.419 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"1auzbli9f3o5p3h36rzb"}
+[2026-10-23 11:19:15.472 +00:00] [sync] unknown% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"recent","phase":"fetching","processed":0,"message":"Lightweight check done: 0 removed, 0 flag updates, 14 new."}
+[2026-10-23 11:19:15.473 +00:00] [sync] unknown% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:15.485 +00:00] [sync] unknown% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"fetching","processed":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:15.558 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"fetching","processed":14,"estimatedTotal":14,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:15.594 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"fetching","processed":14,"estimatedTotal":14,"percent":100,"message":"Batch written to database."}
+[2026-10-23 11:19:15.597 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"finalizing","processed":14,"estimatedTotal":14,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:15.598 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"finalizing","processed":14,"estimatedTotal":14,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:15.599 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"new","phase":"done","processed":14,"estimatedTotal":14,"percent":100,"message":"Sync completed."}
+[2026-10-23 11:19:15.599 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"recent","phase":"finalizing","processed":14,"estimatedTotal":14,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:15.600 +00:00] [sync] 100% progress on {"jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","folderId":"qa-shared:Sent","mailboxPath":"Sent","mode":"recent","phase":"done","processed":14,"percent":100,"message":"Two-phase sync completed."}
+[2026-10-23 11:19:16.104 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"f5a22c79-7929-49b4-adfd-8d2a1c852005","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":14,"progressUpdatedAt":1792754355640,"progressMessage":"Sync completed."}
+reader-focus-archive-row {"status":200,"id":"imap-77d110a2c0394d2f1adcca1e","result":{"ok":true,"action":"moved","archiveFolderId":"qa-shared:Archive","archiveMailbox":"Archive","previousMessageId":"imap-77d110a2c0394d2f1adcca1e","messageId":"imap-77d110a2c0394d2f1adcca1e"},"from":"qa-shared:INBOX","to":"qa-shared:Archive","nextId":"imap-083019d402a42875aeceb162"}
+[2026-10-23 11:19:16.492 +00:00] [sync] worker started {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mode":"recent","pid":2802059}
+[2026-10-23 11:19:16.643 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","status":"running","pid":2802059,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754356477,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:16.779 +00:00] [sync] unknown% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"recent","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:16.779 +00:00] [sync] unknown% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"recent","phase":"fetching","processed":0,"message":"Checking for changes (lightweight)."}
+[2026-10-23 11:19:16.796 +00:00] [sync-worker] [2026-10-23 11:19:16.796 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"pmzy5v7z36taclcma1ez"}
+[2026-10-23 11:19:16.852 +00:00] [sync] unknown% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"recent","phase":"fetching","processed":0,"message":"Lightweight check done: 0 removed, 0 flag updates, 3 new."}
+[2026-10-23 11:19:16.853 +00:00] [sync] unknown% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:16.871 +00:00] [sync] unknown% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"fetching","processed":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:16.910 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"fetching","processed":3,"estimatedTotal":3,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:16.930 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"fetching","processed":3,"estimatedTotal":3,"percent":100,"message":"Batch written to database."}
+[2026-10-23 11:19:16.933 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"finalizing","processed":3,"estimatedTotal":3,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:16.934 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"finalizing","processed":3,"estimatedTotal":3,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:16.934 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"new","phase":"done","processed":3,"estimatedTotal":3,"percent":100,"message":"Sync completed."}
+[2026-10-23 11:19:16.935 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"recent","phase":"finalizing","processed":3,"estimatedTotal":3,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:16.935 +00:00] [sync] 100% progress on {"jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","folderId":"qa-shared:Drafts","mailboxPath":"Drafts","mode":"recent","phase":"done","processed":3,"percent":100,"message":"Two-phase sync completed."}
+[2026-10-23 11:19:17.244 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"206ab78a-c553-43eb-b1f6-7d91ab58abf4","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":3,"progressUpdatedAt":1792754356977,"progressMessage":"Sync completed."}
+[2026-10-23 11:19:17.295 +00:00] [sync] worker started {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mode":"recent","pid":2802149}
+[2026-10-23 11:19:17.445 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","status":"running","pid":2802149,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754357281,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:17.462 +00:00] [imap] mailboxOpen mailbox=INBOX account=qa-shared client=8a709627-23f9-4205-b225-b7919575dbcf 2ms
+[2026-10-23 11:19:17.464 +00:00] [imap] messageMove mailbox=INBOX account=qa-shared client=8a709627-23f9-4205-b225-b7919575dbcf 2ms
+[2026-10-23 11:19:17.564 +00:00] [sync] unknown% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"recent","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:17.564 +00:00] [sync] unknown% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"recent","phase":"fetching","processed":0,"message":"Checking for changes (lightweight)."}
+[2026-10-23 11:19:17.581 +00:00] [sync-worker] [2026-10-23 11:19:17.581 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"grkb7psv5dzs0gqwtyvh"}
+[2026-10-23 11:19:17.636 +00:00] [sync] unknown% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"recent","phase":"fetching","processed":0,"message":"Lightweight check done: 0 removed, 0 flag updates, 4 new."}
+[2026-10-23 11:19:17.637 +00:00] [sync] unknown% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:17.650 +00:00] [sync] unknown% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"fetching","processed":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:17.691 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"fetching","processed":4,"estimatedTotal":4,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:17.709 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"fetching","processed":4,"estimatedTotal":4,"percent":100,"message":"Batch written to database."}
+[2026-10-23 11:19:17.712 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"finalizing","processed":4,"estimatedTotal":4,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:17.713 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"finalizing","processed":4,"estimatedTotal":4,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:17.714 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"new","phase":"done","processed":4,"estimatedTotal":4,"percent":100,"message":"Sync completed."}
+[2026-10-23 11:19:17.714 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"recent","phase":"finalizing","processed":4,"estimatedTotal":4,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:17.715 +00:00] [sync] 100% progress on {"jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","folderId":"qa-shared:Archive","mailboxPath":"Archive","mode":"recent","phase":"done","processed":4,"percent":100,"message":"Two-phase sync completed."}
+reader-focus-archive-toolbar {"status":200,"id":"imap-083019d402a42875aeceb162","result":{"ok":true,"action":"moved","archiveFolderId":"qa-shared:Archive","archiveMailbox":"Archive","previousMessageId":"imap-083019d402a42875aeceb162","messageId":"imap-083019d402a42875aeceb162"},"from":"qa-shared:INBOX","to":"qa-shared:Archive","nextId":"imap-c6efd4b59b3126681d1c6e84"}
+[2026-10-23 11:19:17.974 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"41c34fd0-f962-4ce8-92cb-2f582114d1ef","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":4,"progressUpdatedAt":1792754357761,"progressMessage":"Sync completed."}
+[2026-10-23 11:19:18.034 +00:00] [sync] worker started {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mode":"recent","pid":2802178}
+[2026-10-23 11:19:18.137 +00:00] [sync-status] {"outcome":"ok","clientId":"8a709627-23f9-4205-b225-b7919575dbcf","routeAccountId":"qa-shared","jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","status":"running","pid":2802178,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754358019,"progressMessage":"Sync starting."}
+reader-focus-archive-browser-log ["[noctua][list-debug] selecting message {\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"currentMessage\":null,\"nextMessage\":{\"id\":\"imap-77d110a2c0394d2f1adcca1e\",\"messageId\":\"<qa-shell-t0-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t0-m0@monkeydent.test>\",\"parentId\":null,\"seen\":false,\"unread\":true,\"dateValue\":1792746132000}}","[noctua][list-debug] message pruned from current results {\"source\":\"archive-message\",\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"selectedSearchBadges\":[],\"prunedCount\":1,\"prunedSample\":[{\"reason\":\"updater-null\",\"before\":{\"id\":\"imap-77d110a2c0394d2f1adcca1e\",\"messageId\":\"<qa-shell-t0-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t0-m0@monkeydent.test>\",\"parentId\":null,\"seen\":false,\"unread\":true,\"dateValue\":1792746132000},\"after\":null}]}","[noctua][list-debug] selecting message {\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"currentMessage\":{\"id\":\"imap-083019d402a42875aeceb162\",\"messageId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":null,\"seen\":true,\"unread\":false,\"dateValue\":1791795836000},\"nextMessage\":{\"id\":\"imap-e1efdd49dcd7ee53daa37f75\",\"messageId\":\"<qa-shell-t5-m2@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":\"imap-b40baf5c2b5dde6570e6f185\",\"seen\":true,\"unread\":false,\"dateValue\":1791969669000}}","[noctua][list-debug] selecting message {\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"currentMessage\":{\"id\":\"imap-083019d402a42875aeceb162\",\"messageId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":null,\"seen\":true,\"unread\":false,\"dateValue\":1791795836000},\"nextMessage\":{\"id\":\"imap-e1efdd49dcd7ee53daa37f75\",\"messageId\":\"<qa-shell-t5-m2@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":\"imap-b40baf5c2b5dde6570e6f185\",\"seen\":true,\"unread\":false,\"dateValue\":1791969669000}}","[noctua][list-debug] selecting message {\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"currentMessage\":{\"id\":\"imap-083019d402a42875aeceb162\",\"messageId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":null,\"seen\":true,\"unread\":false,\"dateValue\":1791795836000},\"nextMessage\":{\"id\":\"imap-083019d402a42875aeceb162\",\"messageId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":null,\"seen\":true,\"unread\":false,\"dateValue\":1791795836000}}","[noctua][list-debug] message pruned from current results {\"source\":\"archive-message\",\"activeAccountId\":\"qa-shared\",\"activeFolderId\":\"qa-shared:INBOX\",\"searchScope\":\"folder\",\"selectedSearchBadges\":[],\"prunedCount\":1,\"prunedSample\":[{\"reason\":\"updater-null\",\"before\":{\"id\":\"imap-083019d402a42875aeceb162\",\"messageId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"accountId\":\"qa-shared\",\"folderId\":\"qa-shared:INBOX\",\"threadId\":\"<qa-shell-t5-m0@monkeydent.test>\",\"parentId\":null,\"seen\":true,\"unread\":false,\"dateValue\":1791795836000},\"after\":null}]}"]
+reader-focus-archive-state {"counter":"2 / 265","rows":[{"id":"imap-b40baf5c2b5dde6570e6f185","active":"false","selected":"false"},{"id":"imap-c6efd4b59b3126681d1c6e84","active":"true","selected":"true"},{"id":"imap-41d8070d6fcf762cc349167f","active":"false","selected":"false"},{"id":"imap-672e4679b4f6ac6e60a48d32","active":"false","selected":"false"},{"id":"imap-4b50fd7fb6aada3e7247eb79","active":"false","selected":"false"},{"id":"imap-f2665959af39d2598ea328e1","active":"false","selected":"false"},{"id":"imap-c1fe451e627b4cb1562725db","active":"false","selected":"false"},{"id":"imap-b4ea188a26e3fbff0bf7d143","active":"false","selected":"false"},{"id":"imap-d831a0729edd05b5878c31f3","active":"false","selected":"false"},{"id":"imap-e60b6a8cc1713769c8f8e39b","active":"false","selected":"false"},{"id":"imap-1fc91d74c030566b3788f52f","active":"false","selected":"false"},{"id":"imap-b6390afdbbdd4742c239d464","active":"false","selected":"false"},{"id":"imap-5de9b997d9cbcc2dd5a3eaa7","active":"false","selected":"false"},{"id":"imap-567e47ffcace139e25a74613","active":"false","selected":"false"},{"id":"imap-db06e585e48c5f68b9f0be46","active":"false","selected":"false"},{"id":"imap-9a69cf8265c6c00160ce9a73","active":"false","selected":"false"},{"id":"imap-5f4515452e3453be2befd367","active":"false","selected":"false"},{"id":"imap-053ba839e099d7df116c0848","active":"false","selected":"false"}]}
+[2026-10-23 11:19:18.287 +00:00] [sync] unknown% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"recent","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:18.287 +00:00] [sync] unknown% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"recent","phase":"fetching","processed":0,"message":"Checking for changes (lightweight)."}
+[2026-10-23 11:19:18.310 +00:00] [sync-worker] [2026-10-23 11:19:18.310 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"10xsos1vidgokw9ypw20"}
+[2026-10-23 11:19:18.359 +00:00] {"msg":"IDLE session failed","err":{"code":"NoConnection","cid":"axdvd50hx13m7c1jol60","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"},"cid":"axdvd50hx13m7c1jol60"}
+[2026-10-23 11:19:18.360 +00:00] {"msg":"Failed to break IDLE while closing","err":{"code":"NoConnection","cid":"axdvd50hx13m7c1jol60","reason":"Fixture logging out","rejectedFrom":"preCheckWaiter","cause":{"code":"NoConnection","cid":"axdvd50hx13m7c1jol60","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"}},"cid":"axdvd50hx13m7c1jol60"}
+[2026-10-23 11:19:18.360 +00:00] [imap] imap.logout account=qa-shared 6ms
+[2026-10-23 11:19:18.360 +00:00] {"event":"imap.socket_close","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:18.360 +00:00] [sync] unknown% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"recent","phase":"fetching","processed":0,"message":"Lightweight check done: 0 removed, 0 flag updates, 2 new."}
+[2026-10-23 11:19:18.360 +00:00] [sync] unknown% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+  ✓  1 tests/browser/ui/qa-reader-focus.spec.ts:145:1 › reader focus: archive row action and toolbar use real HTTP and continue to the next rendered message (18.3s)
+[2026-10-23 11:19:18.372 +00:00] [sync] unknown% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"fetching","processed":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:18.400 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"fetching","processed":2,"estimatedTotal":2,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:18.417 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"fetching","processed":2,"estimatedTotal":2,"percent":100,"message":"Batch written to database."}
+[2026-10-23 11:19:18.420 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"finalizing","processed":2,"estimatedTotal":2,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:18.420 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"finalizing","processed":2,"estimatedTotal":2,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:18.421 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"new","phase":"done","processed":2,"estimatedTotal":2,"percent":100,"message":"Sync completed."}
+[2026-10-23 11:19:18.421 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"recent","phase":"finalizing","processed":2,"estimatedTotal":2,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:18.422 +00:00] [sync] 100% progress on {"jobId":"c37b48a1-60bc-47f1-b722-768f335a7cc3","accountId":"qa-shared","folderId":"qa-shared:Junk","mailboxPath":"Junk","mode":"recent","phase":"done","processed":2,"percent":100,"message":"Two-phase sync completed."}
+[2026-10-23 11:19:30.398 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"1hv91j3pgafxp4jco1oa","secure":false,"host":"127.0.0.1","servername":false,"port":3872,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":33390}
+[2026-10-23 11:19:30.398 +00:00] {"event":"imap.socket_connect","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":"127.0.0.1","localPort":33390,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:30.399 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"1hv91j3pgafxp4jco1oa"}
+[2026-10-23 11:19:30.401 +00:00] {"src":"auth","msg":"User authenticated","cid":"1hv91j3pgafxp4jco1oa","user":"demo@monkeydent.test"}
+[2026-10-23 11:19:30.402 +00:00] [imap] imap.connect mailbox=INBOX account=qa-shared 10ms
+[2026-10-23 11:19:30.406 +00:00] [imap] imap.mailboxOpen mailbox=INBOX account=qa-shared 3ms
+[2026-10-23 11:19:30.412 +00:00] [imap] imap.status mailbox=INBOX account=qa-shared 1ms
+[2026-10-23 11:19:30.491 +00:00] [imap] status mailbox=INBOX account=qa-shared client=2253cc45-a955-4763-80bc-b91fbabe75d8 4ms
+[2026-10-23 11:19:30.491 +00:00] [noctua][sync-policy] {
+[2026-10-23 11:19:30.491 +00:00]   triggerId: 'folder-consistency-route-1792754370491-1',
+[2026-10-23 11:19:30.491 +00:00]   caller: 'folder-consistency-route',
+[2026-10-23 11:19:30.491 +00:00]   policy: 'determineFolderConsistency',
+[2026-10-23 11:19:30.491 +00:00]   accountId: 'qa-shared',
+[2026-10-23 11:19:30.491 +00:00]   folderId: 'qa-shared:INBOX',
+[2026-10-23 11:19:30.491 +00:00]   input: {
+[2026-10-23 11:19:30.491 +00:00]     remote: {
+[2026-10-23 11:19:30.491 +00:00]       count: 298,
+[2026-10-23 11:19:30.491 +00:00]       uidNext: 301,
+[2026-10-23 11:19:30.491 +00:00]       uidValidity: '1792754332',
+[2026-10-23 11:19:30.491 +00:00]       highestModSeq: null
+[2026-10-23 11:19:30.491 +00:00]     },
+[2026-10-23 11:19:30.491 +00:00]     local: {
+[2026-10-23 11:19:30.491 +00:00]       count: 298,
+[2026-10-23 11:19:30.491 +00:00]       highestUid: 300,
+[2026-10-23 11:19:30.491 +00:00]       uidValidity: '1792754332',
+[2026-10-23 11:19:30.491 +00:00]       highestModSeq: null,
+[2026-10-23 11:19:30.491 +00:00]       supportsQresync: false
+[2026-10-23 11:19:30.491 +00:00]     }
+[2026-10-23 11:19:30.491 +00:00]   },
+[2026-10-23 11:19:30.491 +00:00]   decision: { needsRepair: false, recommendedMode: 'none', reasons: [] }
+[2026-10-23 11:19:30.491 +00:00] }
+[2026-10-23 11:19:30.552 +00:00] [sync] worker started {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mode":"new","pid":2802496}
+[2026-10-23 11:19:30.553 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"1d2ajv8fw5cr4xvpdajl","secure":false,"host":"127.0.0.1","servername":false,"port":3872,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":33396}
+[2026-10-23 11:19:30.553 +00:00] {"event":"imap.socket_connect","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":"127.0.0.1","localPort":33396,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:30.554 +00:00] {"msg":"IDLE session failed","err":{"code":"NoConnection","cid":"1hv91j3pgafxp4jco1oa","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"},"cid":"1hv91j3pgafxp4jco1oa"}
+[2026-10-23 11:19:30.554 +00:00] {"msg":"Failed to break IDLE while closing","err":{"code":"NoConnection","cid":"1hv91j3pgafxp4jco1oa","reason":"Fixture logging out","rejectedFrom":"preCheckWaiter","cause":{"code":"NoConnection","cid":"1hv91j3pgafxp4jco1oa","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"}},"cid":"1hv91j3pgafxp4jco1oa"}
+[2026-10-23 11:19:30.554 +00:00] [imap] imap.logout account=qa-shared 23ms
+[2026-10-23 11:19:30.555 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"1d2ajv8fw5cr4xvpdajl"}
+[2026-10-23 11:19:30.555 +00:00] {"event":"imap.socket_close","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 11:19:30.557 +00:00] {"src":"auth","msg":"User authenticated","cid":"1d2ajv8fw5cr4xvpdajl","user":"demo@monkeydent.test"}
+[2026-10-23 11:19:30.558 +00:00] [imap] imap.connect mailbox=INBOX account=qa-shared 22ms
+[2026-10-23 11:19:30.562 +00:00] [imap] imap.mailboxOpen mailbox=INBOX account=qa-shared 3ms
+[2026-10-23 11:19:30.564 +00:00] [imap] imap.status mailbox=INBOX account=qa-shared 1ms
+[2026-10-23 11:19:30.574 +00:00] [sync-status] {"outcome":"ok","clientId":"2253cc45-a955-4763-80bc-b91fbabe75d8","routeAccountId":"qa-shared","jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","status":"running","pid":2802496,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792754370538,"progressMessage":"Sync starting."}
+[2026-10-23 11:19:30.805 +00:00] [sync] unknown% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 11:19:30.828 +00:00] [sync-worker] [2026-10-23 11:19:30.828 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":3872,"cid":"cygphevqd0zdexlahwhf"}
+[2026-10-23 11:19:30.869 +00:00] [sync] unknown% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"fetching","processed":0,"message":"Fetched message batch."}
+[2026-10-23 11:19:30.885 +00:00] [sync] 100% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"fetching","processed":0,"estimatedTotal":0,"percent":100,"message":"Fetched message batch."}
+[2026-10-23 11:19:30.885 +00:00] [sync] 100% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"finalizing","processed":0,"estimatedTotal":0,"percent":100,"message":"Applying synchronized changes."}
+[2026-10-23 11:19:30.885 +00:00] [sync] 100% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"finalizing","processed":0,"estimatedTotal":0,"percent":100,"message":"Saving folder list."}
+[2026-10-23 11:19:30.885 +00:00] [sync] 100% progress on {"jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","folderId":"qa-shared:INBOX","mailboxPath":"INBOX","mode":"new","phase":"done","processed":0,"estimatedTotal":0,"percent":100,"message":"Sync completed."}
+reader-focus: signed in; synthetic rows visible [33m1280[39m
+[2026-10-23 11:19:31.449 +00:00] [sync-status] {"outcome":"ok","clientId":"2253cc45-a955-4763-80bc-b91fbabe75d8","routeAccountId":"qa-shared","jobId":"0bdd9db0-03da-44a0-8db5-c4f85b6251ca","accountId":"qa-shared","status":"done","progressPhase":"done","progressProcessed":0,"progressUpdatedAt":1792754370903,"progressMessage":"Sync completed."}
+[2026-10-23 11:19:51.416 +00:00] {"msg":"IDLE session failed","err":{"code":"NoConnection","cid":"1d2ajv8fw5cr4xvpdajl","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"},"cid":"1d2ajv8fw5cr4xvpdajl"}
+[2026-10-23 11:19:51.416 +00:00] {"msg":"Failed to break IDLE while closing","err":{"code":"NoConnection","cid":"1d2ajv8fw5cr4xvpdajl","reason":"Fixture logging out","rejectedFrom":"preCheckWaiter","cause":{"code":"NoConnection","cid":"1d2ajv8fw5cr4xvpdajl","rejectedFrom":"pendingRequest","command":"IDLE","reason":"Fixture logging out"}},"cid":"1d2ajv8fw5cr4xvpdajl"}
+[2026-10-23 11:19:51.416 +00:00] [imap] imap.logout account=qa-shared 4ms
+[2026-10-23 11:19:51.416 +00:00] {"event":"imap.socket_close","accountId":"qa-shared","clientId":null,"mailbox":"INBOX","hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":3872,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+  ✘  2 tests/browser/ui/qa-reader-focus.spec.ts:193:1 › reader focus: real print PDF excludes an unsent inline reply and internal controls (33.0s)
+
+
+  1) tests/browser/ui/qa-reader-focus.spec.ts:193:1 › reader focus: real print PDF excludes an unsent inline reply and internal controls 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('[data-message-list-row="true"]').first()
+    Expected substring: [32m"QA synthetic"[39m
+    Received string:    [31m"SRSynthetic ReaderQA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone.24/10/2026, 13:18"[39m
+    Timeout: 20000ms
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 20000ms[22m
+    [2m  - waiting for locator('[data-message-list-row="true"]').first()[22m
+    [2m    22 × locator resolved to <div tabindex="0" role="button" draggable="true" data-active="false" data-selected="false" data-message-narrow="true" data-message-list-row="true" data-message-layout="stacked" class="MessageThreadList-module__eZkQ8G__row" data-message-id="imap-b4ea188a26e3fbff0bf7d143">…</div>[22m
+    [2m       - unexpected value "SRSynthetic ReaderQA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone.24/10/2026, 13:18"[22m
+
+
+      194 |   await start(page);
+      195 |   await page.getByRole("textbox", { name: "Search messages in INBOX", exact: true }).fill('QA synthetic');
+    > 196 |   await expect(rows(page).first()).toContainText("QA synthetic");
+          |                                    ^
+      197 |   await rows(page).first().dblclick();
+      198 |   await expect(page.locator('[data-reader-print]').getByText("Synthetic QA round two message.", { exact: true })).toBeVisible();
+      199 |   await page.getByRole("button", { name: "Reply", exact: true }).first().click();
+        at /home/monkey/code/noctua-mail/wt-reader-focus/tests/browser/ui/qa-reader-focus.spec.ts:196:36
+
+    Error Context: .tmp/qa-round2-browser-results/ui-qa-reader-focus-reader--d0a70-reply-and-internal-controls/error-context.md
+
+  1 failed
+    tests/browser/ui/qa-reader-focus.spec.ts:193:1 › reader focus: real print PDF excludes an unsent inline reply and internal controls 
+  1 passed (53.2s)
+[2026-10-23 11:19:51.596 +00:00] [shutdown] starting {
+[2026-10-23 11:19:51.596 +00:00]   signal: 'SIGTERM',
+[2026-10-23 11:19:51.596 +00:00]   hooks: [
+[2026-10-23 11:19:51.596 +00:00]     'background:stop',
+[2026-10-23 11:19:51.596 +00:00]     'background:drain',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams:drain',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:4c67dcad-5df3-424d-98c8-8b0e8df5e085:stop',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:4c67dcad-5df3-424d-98c8-8b0e8df5e085:drain',
+[2026-10-23 11:19:51.596 +00:00]     'db:close',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams:drain',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams',
+[2026-10-23 11:19:51.596 +00:00]     'background:stop',
+[2026-10-23 11:19:51.596 +00:00]     'background:drain',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:51d1c5da-f435-4fc9-8c0b-b3de0eafac68:stop',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:51d1c5da-f435-4fc9-8c0b-b3de0eafac68:drain',
+[2026-10-23 11:19:51.596 +00:00]     'imap-pool',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:1dd02da1-ff25-43ec-b5dc-85c32dc8ec54:stop',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:1dd02da1-ff25-43ec-b5dc-85c32dc8ec54:drain',
+[2026-10-23 11:19:51.596 +00:00]     'db:close',
+[2026-10-23 11:19:51.596 +00:00]     'background:stop',
+[2026-10-23 11:19:51.596 +00:00]     'background:drain',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams:drain',
+[2026-10-23 11:19:51.596 +00:00]     'auth-streams',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:3bb24ec3-6c02-4cfa-bf09-f0a273b39dde:stop',
+[2026-10-23 11:19:51.596 +00:00]     'admission:2801409:3bb24ec3-6c02-4cfa-bf09-f0a273b39dde:drain',
+[2026-10-23 11:19:51.596 +00:00]     'db:close'
+[2026-10-23 11:19:51.596 +00:00]   ]
+[2026-10-23 11:19:51.596 +00:00] }
+[2026-10-23 11:19:51.597 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 11:19:51.597 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 11:19:51.598 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 11:19:51.598 +00:00] [shutdown] complete {}
+error: "next" exited with code 143
+18 |   QA_SHELL_SEED_FILE: path.join(scratch, "seed.json") };
+19 | Object.assign(process.env, env);
+20 | async function run(args: string[]) {
+21 |   const child = spawn("bun", args, { cwd: root, env, stdio: "inherit" });
+22 |   const code = await new Promise<number>((resolve, reject) => { child.on("error", reject); child.on("exit", code => resolve(code ?? 1)); });
+23 |   if (code !== 0) throw new Error(`QA command exited ${code}: bun ${args.join(" ")}`);
+                                 ^
+error: QA command exited 1: bun x playwright test --config=playwright.qa-shell.config.ts --config=playwright.qa-round2.config.ts --grep reader focus: (archive|real print)
+      at run (/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/run-reader-focus-r2.ts:23:29)
+
+Bun v1.4.4 (Linux arm64)

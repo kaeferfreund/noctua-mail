@@ -1,0 +1,39 @@
+{
+  "nativePackages": [
+    {
+      "name": "sharp-libvips-linux-arm64",
+      "version": "1.3.4"
+    },
+    {
+      "name": "sharp-linux-arm64",
+      "version": "0.35.5"
+    }
+  ],
+  "versions": {
+    "sharp": "0.35.5",
+    "imapflow": "2.9.1",
+    "nodemailer": "10.2.1",
+    "@modelcontextprotocol/sdk": "1.32.1"
+  },
+  "sharpVips": "8.18.7",
+  "noctua_server_mjs_bytes": 136298,
+  "rewritten_server_js_require_count": 1,
+  "nodemailerManifests": [
+    {
+      "path": "node_modules/nodemailer/package.json",
+      "version": "10.2.1"
+    },
+    {
+      "path": "node_modules/mailparser/node_modules/nodemailer/package.json",
+      "version": "10.2.0"
+    },
+    {
+      "path": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.next/standalone/node_modules/nodemailer/package.json",
+      "version": "10.2.1"
+    },
+    {
+      "path": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.next/standalone/node_modules/mailparser/node_modules/nodemailer/package.json",
+      "version": "10.2.0"
+    }
+  ]
+}

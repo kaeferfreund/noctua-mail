@@ -1,0 +1,106 @@
+{
+  "text-Antworten": {
+    "initialFrom": "QA Shared <demo@monkeydent.test> (Postfachstandard)",
+    "initialTab": "text",
+    "initialSigs": 0,
+    "initial": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA\"",
+    "firstTeam": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n>\"",
+    "firstTeamSigs": 0,
+    "promptsOnFirstTeam": 1,
+    "rounds": [
+      {
+        "without": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n\"",
+        "back": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n>\"",
+        "tab": "text",
+        "sigs": 0,
+        "startsWithSig": false
+      },
+      {
+        "without": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n\"",
+        "back": "\"\\n\\nOn 23.10.2026, 17:14, Synthetic Reader <reader@example.test> wrote:\\n> Synthetic reader body for QA shell regressions.\\n>\"",
+        "tab": "text",
+        "sigs": 0,
+        "startsWithSig": false
+      }
+    ],
+    "promptsDismissedTotal": 3
+  },
+  "text-Weiterleiten": {
+    "initialFrom": "QA Team <team@example.test>",
+    "initialTab": "text",
+    "initialSigs": 1,
+    "initial": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic \"",
+    "firstTeam": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:14\"",
+    "firstTeamSigs": 1,
+    "promptsOnFirstTeam": 0,
+    "rounds": [
+      {
+        "without": "\"\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:14 UTC\"",
+        "back": "\"\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:14 UTC\\nSubject: QA long subject checks wrappin\"",
+        "tab": "text",
+        "sigs": 0,
+        "startsWithSig": false
+      },
+      {
+        "without": "\"\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:14 UTC\"",
+        "back": "\"\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@example.test>\\nDate: Fr., 23. Okt. 2026, 17:14 UTC\\nSubject: QA long subject checks wrappin\"",
+        "tab": "text",
+        "sigs": 0,
+        "startsWithSig": false
+      }
+    ],
+    "promptsDismissedTotal": 2
+  },
+  "html-Antworten": {
+    "initialFrom": "QA Shared <demo@monkeydent.test> (Postfachstandard)",
+    "initialTab": "html",
+    "initialSigs": 0,
+    "initial": "\"\\n\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+    "firstTeam": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+    "firstTeamSigs": 1,
+    "promptsOnFirstTeam": 0,
+    "rounds": [
+      {
+        "without": "\"\\n\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      }
+    ],
+    "promptsDismissedTotal": 0
+  },
+  "html-Weiterleiten": {
+    "initialFrom": "QA Team <team@example.test>",
+    "initialTab": "html",
+    "initialSigs": 1,
+    "initial": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEd\"",
+    "firstTeam": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+    "firstTeamSigs": 1,
+    "promptsOnFirstTeam": 0,
+    "rounds": [
+      {
+        "without": "\"-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+        "back": "\"-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+        "tab": "html",
+        "sigs": 0,
+        "startsWithSig": false
+      },
+      {
+        "without": "\"-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+        "back": "\"-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove details\\nRemove\"",
+        "tab": "html",
+        "sigs": 0,
+        "startsWithSig": false
+      }
+    ],
+    "promptsDismissedTotal": 2
+  }
+}

@@ -1,0 +1,63 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/shell/Shell.dom.test.tsx:
+(pass) shell sidebar > shows mailbox creation only when admin=false [276.71ms]
+(pass) shell sidebar > shows mailbox creation only when admin=true [94.03ms]
+(pass) shell sidebar > sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable [137.49ms]
+(pass) shell sidebar > renders domain headings only for sections with more than six mailboxes [282.98ms]
+(pass) shell sidebar > keeps the thread JSON and thread cache developer tools reachable from the user menu [510.79ms]
+(pass) theme menu > selects light, dark and system through next-themes [362.53ms]
+(pass) shell header > puts the list toolbar right after the title, inside a header container [37.27ms]
+(pass) shell header > renders mailbox and folder as one heading with a quiet separator [22.83ms]
+(pass) Radix components in shadcn portals > resolves the kept component's --space-2 inside a Sheet [715.87ms]
+(pass) resizable shell panes > keeps the list viewport and reader mounted when the calendar opens and closes [64.51ms]
+(pass) shell landmarks > keeps a single main landmark when SidebarInset sits inside the root main [3.58ms]
+(pass) sidebar editable target guard > leaves native text fields and nested contenteditable targets to their own shortcuts [10.32ms]
+(pass) saved shell hydration > hydrates a saved pane layout and theme without attribute or tree mismatches [61.62ms]
+(pass) renders all seven sidebar views and descriptions in de, selecting stable IDs [54.84ms]
+(pass) renders all seven sidebar views and descriptions in en, selecting stable IDs [68.27ms]
+
+app/components/shell/MobileFrames.dom.test.tsx:
+(pass) mobile kept component frames > renders existing message actions in the shadcn menu and invokes the same handler [251.98ms]
+(pass) mobile kept component frames > keeps the existing Move to submenu working inside the shadcn root [184.04ms]
+(pass) mobile kept component frames > shows the shared process content inside a themed Sheet [24.21ms]
+(pass) mobile kept component frames > keeps the exception content and clear handler in the mobile Sheet [45.19ms]
+(pass) mobile message rows > switches desktop narrow thread rows and virtual spacing together [59.62ms]
+(pass) mobile message rows > allocates 72px for Compact on mobile and 60px on desktop [74.44ms]
+(pass) mobile message rows > keeps Table selection independent from unread and row activation on mobile [37.53ms]
+(pass) mobile message rows > marks unread rows with a ring on the sender icon instead of a dot [184.66ms]
+(pass) mobile message rows > allocates nonoverlapping 72px virtual rows and restores desktop density at the breakpoint [38.16ms]
+(pass) mobile message rows > opens Message actions with Enter inside a real thread row without selecting it [112.43ms]
+(pass) status Sheet focus > restores the header indicator after Escape dismisses Processes [18.30ms]
+
+app/components/mailclient/status/BottomStatusBar.dom.test.tsx:
+(pass) compact header status > maps idle without opening a panel [7.71ms]
+(pass) compact header status > maps busy without opening a panel [4.08ms]
+(pass) compact header status > maps progress without opening a panel [6.37ms]
+(pass) compact header status > maps retry two without opening a panel [4.88ms]
+(pass) compact header status > maps retry three without opening a panel [4.20ms]
+(pass) compact header status > maps failed without opening a panel [3.71ms]
+(pass) compact header status > maps exceptions win over busy without opening a panel [3.76ms]
+(pass) compact header status > maps combined without opening a panel [3.78ms]
+(pass) compact header status > maps completed without opening a panel [3.65ms]
+(pass) compact header status > maps recomputing without opening a panel [3.28ms]
+(pass) compact header status > opens all four explained section headings and routes between their contents [46.94ms]
+(pass) compact header status > routes external openPanel=process [14.43ms]
+(pass) compact header status > routes external openPanel=exception [15.88ms]
+(pass) compact header status > routes external openPanel=reminder [13.82ms]
+(pass) compact header status > routes external openPanel=mail-check [12.59ms]
+(pass) compact header status > routes external openPanel=calendar [29.12ms]
+(pass) compact header status > routes external openPanel=exceptions [25.49ms]
+(pass) compact header status > routes external openPanel=reminders [18.17ms]
+(pass) compact header status > opens the PWA calendar route and consumes only its flag [159.99ms]
+(pass) compact header status > resolves private identifiers to names and invokes retry; Details are readable [31.54ms]
+(pass) compact header status > uses a translated fallback for unresolved folders, never mailboxPath [17.06ms]
+(pass) compact header status > clears exceptions and displays an absolute timestamp [40.43ms]
+(pass) compact header status > toggles the calendar sidebar through the shared action and closes [39.08ms]
+(pass) compact header status > keeps the mobile dropdown → Sheet route and restores focus [102.37ms]
+(pass) compact header status > keeps a selected section when crossing the mobile breakpoint [74.87ms]
+
+ 51 pass
+ 0 fail
+ 228 expect() calls
+Ran 51 tests across 3 files. [5.34s]

@@ -1,0 +1,29 @@
+{
+  "clock": {
+    "seconds": 65,
+    "initial": 89,
+    "final": 223,
+    "idleRenders": 134,
+    "label": "Draft saved 1m ago"
+  },
+  "geometry": {
+    "before": {
+      "scrollTop": 18000,
+      "height": 796,
+      "visibleRows": 10,
+      "firstTop": 69,
+      "lastBottom": 843,
+      "paneTop": 48,
+      "paneBottom": 844
+    },
+    "after": {
+      "scrollTop": 18000,
+      "height": 796,
+      "visibleRows": 0,
+      "firstTop": null,
+      "lastBottom": null,
+      "paneTop": 48,
+      "paneBottom": 844
+    }
+  }
+}

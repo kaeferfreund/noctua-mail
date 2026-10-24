@@ -1,0 +1,311 @@
+{
+ "at": "2026-10-23T15:57:29.398Z",
+ "summary": [
+  {
+   "from": "small",
+   "to": "large",
+   "i": 0,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 853.4,
+   "topLevel": {
+    "RunTask": 852,
+    "EventDispatch": 1.3,
+    "V8.RunMicrotasks": 0.2,
+    "v8.newInstance": 0
+   },
+   "inclusive": {
+    "FunctionCall": 746.8,
+    "MinorGC": 30.2,
+    "UpdateLayoutTree": 22.3,
+    "Paint": 16.6,
+    "Layout": 9.2,
+    "Layerize": 6.7,
+    "EventDispatch": 6.6,
+    "PrePaint": 5,
+    "Commit": 2,
+    "TimerFire": 1.2,
+    "HitTest": 0.2
+   }
+  },
+  {
+   "from": "large",
+   "to": "small",
+   "i": 1,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 468.3,
+   "topLevel": {
+    "RunTask": 467.2,
+    "EventDispatch": 1,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 355,
+    "UpdateLayoutTree": 25,
+    "Paint": 17,
+    "MinorGC": 10.6,
+    "Layout": 10.2,
+    "Layerize": 7.2,
+    "EventDispatch": 6.6,
+    "PrePaint": 5.5,
+    "Commit": 2.3,
+    "TimerFire": 1.5,
+    "HitTest": 0.2
+   }
+  },
+  {
+   "from": "small",
+   "to": "large",
+   "i": 2,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 925,
+   "topLevel": {
+    "RunTask": 923.9,
+    "EventDispatch": 1,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 812.9,
+    "MinorGC": 30.6,
+    "UpdateLayoutTree": 22.4,
+    "Paint": 17.4,
+    "Layout": 10.4,
+    "Layerize": 6.6,
+    "EventDispatch": 6.4,
+    "PrePaint": 4.9,
+    "TimerFire": 4.3,
+    "Commit": 2.1,
+    "HitTest": 0.2
+   }
+  },
+  {
+   "from": "large",
+   "to": "small",
+   "i": 3,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 522.9,
+   "topLevel": {
+    "RunTask": 521.7,
+    "EventDispatch": 1,
+    "V8.RunMicrotasks": 0.2
+   },
+   "inclusive": {
+    "FunctionCall": 399.5,
+    "UpdateLayoutTree": 30.6,
+    "Paint": 19.4,
+    "MinorGC": 13.3,
+    "EventDispatch": 11,
+    "Layout": 11,
+    "Layerize": 7.1,
+    "Commit": 5.8,
+    "PrePaint": 5.6,
+    "TimerFire": 1.4,
+    "HitTest": 0.3
+   }
+  },
+  {
+   "from": "small",
+   "to": "large",
+   "i": 4,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 911.1,
+   "topLevel": {
+    "RunTask": 908.5,
+    "EventDispatch": 1.4,
+    "V8.RunMicrotasks": 1.2
+   },
+   "inclusive": {
+    "FunctionCall": 725.8,
+    "MinorGC": 34.5,
+    "MajorGC": 25.5,
+    "UpdateLayoutTree": 23.9,
+    "Paint": 17,
+    "Layout": 10.3,
+    "EventDispatch": 10.2,
+    "Layerize": 7.4,
+    "PrePaint": 5.4,
+    "Commit": 3.2,
+    "TimerFire": 1.6,
+    "HitTest": 0.2
+   }
+  },
+  {
+   "from": "large",
+   "to": "small",
+   "i": 5,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 570.4,
+   "topLevel": {
+    "RunTask": 569.1,
+    "EventDispatch": 1.2,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 373.1,
+    "Paint": 55.2,
+    "Layout": 42.9,
+    "UpdateLayoutTree": 28.8,
+    "PrePaint": 12,
+    "EventDispatch": 11,
+    "Layerize": 8.9,
+    "MinorGC": 5.7,
+    "Commit": 5.2,
+    "TimerFire": 1.4,
+    "HitTest": 0.2,
+    "ParseHTML": 0.2
+   }
+  },
+  {
+   "from": "folders",
+   "to": "large",
+   "i": 0,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 1258.7,
+   "topLevel": {
+    "RunTask": 1257.5,
+    "EventDispatch": 1.1,
+    "V8.RunMicrotasks": 0.1,
+    "v8.newInstance": 0
+   },
+   "inclusive": {
+    "FunctionCall": 1098.9,
+    "MinorGC": 65.1,
+    "UpdateLayoutTree": 30.2,
+    "Paint": 14.5,
+    "Layout": 8,
+    "Layerize": 5,
+    "PrePaint": 4.4,
+    "Commit": 4.3,
+    "EventDispatch": 3.4,
+    "TimerFire": 1.4,
+    "HitTest": 0.7
+   }
+  },
+  {
+   "from": "large",
+   "to": "folders",
+   "i": 1,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 1449.2,
+   "topLevel": {
+    "RunTask": 1448.1,
+    "EventDispatch": 1,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 1193.2,
+    "MinorGC": 123.2,
+    "UpdateLayoutTree": 66.9,
+    "Commit": 41.3,
+    "Paint": 20.9,
+    "Layout": 16.5,
+    "PrePaint": 8.4,
+    "Layerize": 8.3,
+    "TimerFire": 7.6,
+    "EventDispatch": 6.9,
+    "HitTest": 0.8
+   }
+  },
+  {
+   "from": "folders",
+   "to": "large",
+   "i": 2,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 1167.8,
+   "topLevel": {
+    "RunTask": 1166.2,
+    "EventDispatch": 1.4,
+    "V8.RunMicrotasks": 0.2
+   },
+   "inclusive": {
+    "FunctionCall": 988.7,
+    "MinorGC": 43.2,
+    "UpdateLayoutTree": 24.2,
+    "Paint": 17.3,
+    "MajorGC": 16.8,
+    "Layout": 10.6,
+    "EventDispatch": 7.2,
+    "Layerize": 6.2,
+    "PrePaint": 5.1,
+    "Commit": 4.8,
+    "TimerFire": 1.6,
+    "HitTest": 0.3
+   }
+  },
+  {
+   "from": "large",
+   "to": "folders",
+   "i": 3,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 958.6,
+   "topLevel": {
+    "RunTask": 957.3,
+    "EventDispatch": 1.2,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 786.2,
+    "UpdateLayoutTree": 35.2,
+    "MinorGC": 33.8,
+    "Paint": 33.1,
+    "Layout": 31.2,
+    "Commit": 12.9,
+    "Layerize": 8.6,
+    "PrePaint": 8.4,
+    "EventDispatch": 8.2,
+    "TimerFire": 2.7,
+    "HitTest": 0.8,
+    "ParseHTML": 0.1
+   }
+  },
+  {
+   "from": "folders",
+   "to": "large",
+   "i": 4,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 1204.1,
+   "topLevel": {
+    "RunTask": 1202.9,
+    "EventDispatch": 1.1,
+    "V8.RunMicrotasks": 0.2
+   },
+   "inclusive": {
+    "FunctionCall": 1039.5,
+    "MinorGC": 49.1,
+    "UpdateLayoutTree": 35.5,
+    "Paint": 18.1,
+    "Commit": 15.5,
+    "Layout": 12.9,
+    "EventDispatch": 12.5,
+    "Layerize": 6.4,
+    "PrePaint": 5.7,
+    "TimerFire": 1.4,
+    "HitTest": 0.8
+   }
+  },
+  {
+   "from": "large",
+   "to": "folders",
+   "i": 5,
+   "windowMs": 1500,
+   "mainThreadBusyMs": 1435.8,
+   "topLevel": {
+    "RunTask": 1434.3,
+    "EventDispatch": 1.4,
+    "V8.RunMicrotasks": 0.1
+   },
+   "inclusive": {
+    "FunctionCall": 1201.3,
+    "UpdateLayoutTree": 30.6,
+    "Layout": 17,
+    "Commit": 14,
+    "Paint": 12.8,
+    "TimerFire": 11.7,
+    "MinorGC": 11.5,
+    "Layerize": 10,
+    "PrePaint": 7.3,
+    "EventDispatch": 1.4,
+    "HitTest": 0.5
+   }
+  }
+ ]
+}

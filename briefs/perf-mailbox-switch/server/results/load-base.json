@@ -1,0 +1,605 @@
+{
+ "root": "/home/monkey/code/noctua-mail/wt-spike-switch-server",
+ "phaseMs": 60000,
+ "imapProbe": {
+  "cold": {
+   "ms": 14.435652000000118,
+   "status": 200,
+   "body": "{\"ok\":true,\"folderId\":\"syn-sync-a:INBOX\",\"mailboxPath\":\"INBOX\",\"needsRepair\":true,\"recommendedMode\":\"repair\",\"reasons\":[\"count-mismatch\"],\"local\":{\"count\":42,\"h"
+  },
+  "warm": {
+   "n": 30,
+   "p50": 4.15655799999513,
+   "p90": 4.70008300000336,
+   "p99": 16.931234999996377,
+   "max": 16.931234999996377
+  },
+  "coldRepeat": {
+   "n": 5,
+   "p50": 6.541859999997541,
+   "p90": 6.964984000005643,
+   "p99": 6.964984000005643,
+   "max": 6.964984000005643
+  }
+ },
+ "results": [
+  {
+   "phase": "quiet",
+   "loadStart": [
+    4.14,
+    7.45,
+    10
+   ],
+   "loadEnd": [
+    5.99,
+    7.28,
+    9.78
+   ],
+   "switches": 334,
+   "criticalPath": {
+    "n": 334,
+    "p50": 65.19104000000516,
+    "p90": 114.35569300000498,
+    "p99": 420.309457000003,
+    "max": 592.3260350000055
+   },
+   "steps": {
+    "switch": {
+     "n": 334,
+     "p50": 5.521330000003218,
+     "p90": 13.970008999996935,
+     "p99": 335.58724000000075,
+     "max": 351.5087459999995,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 334
+     }
+    },
+    "me": {
+     "n": 334,
+     "p50": 8.280755999992834,
+     "p90": 15.089578999992227,
+     "p99": 94.67886900000303,
+     "max": 281.4885030000005,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 334
+     }
+    },
+    "folders": {
+     "n": 334,
+     "p50": 2.2715010000101756,
+     "p90": 3.6982740000021295,
+     "p99": 10.817059000000881,
+     "max": 31.99585500000103,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 334
+     }
+    },
+    "threads": {
+     "n": 334,
+     "p50": 47.04123200000322,
+     "p90": 89.4807839999994,
+     "p99": 105.3518069999991,
+     "max": 195.33507200000167,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 334
+     }
+    }
+   },
+   "children": {}
+  },
+  {
+   "phase": "a",
+   "loadStart": [
+    5.99,
+    7.28,
+    9.78
+   ],
+   "loadEnd": [
+    7.71,
+    7.57,
+    9.72
+   ],
+   "switches": 321,
+   "criticalPath": {
+    "n": 321,
+    "p50": 67.68414299999131,
+    "p90": 134.41131799996947,
+    "p99": 507.2598300000245,
+    "max": 1121.5986039999989
+   },
+   "steps": {
+    "switch": {
+     "n": 322,
+     "p50": 5.425329999998212,
+     "p90": 12.000830000004498,
+     "p99": 144.11968699999852,
+     "max": 969.7577270000038,
+     "retries": 12,
+     "retryOps": {
+      "setActiveAccountId": 12
+     },
+     "retryDelayMs": 2095,
+     "statuses": {
+      "200": 322
+     }
+    },
+    "me": {
+     "n": 322,
+     "p50": 8.472198000003118,
+     "p90": 15.142099000018789,
+     "p99": 148.29004500000156,
+     "max": 1010.2211400000087,
+     "retries": 17,
+     "retryOps": {
+      "setActiveAccountId": 17
+     },
+     "retryDelayMs": 2628,
+     "statuses": {
+      "200": 322
+     }
+    },
+    "folders": {
+     "n": 322,
+     "p50": 2.2806210000126157,
+     "p90": 3.9795169999997597,
+     "p99": 13.138481000001775,
+     "max": 39.66244499999448,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 322
+     }
+    },
+    "threads": {
+     "n": 321,
+     "p50": 48.995770999987144,
+     "p90": 92.52697200002149,
+     "p99": 129.73875399999088,
+     "max": 480.1099000000104,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 321
+     }
+    }
+   },
+   "children": {
+    "auth": {
+     "kinds": {
+      "session": {
+       "attempts": 1019,
+       "busy": 38
+      },
+      "member": {
+       "attempts": 113,
+       "busy": 5
+      }
+     }
+    }
+   }
+  },
+  {
+   "phase": "b",
+   "loadStart": [
+    7.66,
+    7.57,
+    9.71
+   ],
+   "loadEnd": [
+    11.22,
+    8.55,
+    9.91
+   ],
+   "switches": 212,
+   "criticalPath": {
+    "n": 212,
+    "p50": 110.38985700000194,
+    "p90": 379.06844899998396,
+    "p99": 1113.4948500000173,
+    "max": 2145.5954299999867
+   },
+   "steps": {
+    "switch": {
+     "n": 212,
+     "p50": 7.536908999987645,
+     "p90": 146.6778710000217,
+     "p99": 788.0190139999904,
+     "max": 877.3903960000025,
+     "retries": 58,
+     "retryOps": {
+      "setActiveAccountId": 58
+     },
+     "retryDelayMs": 9341,
+     "statuses": {
+      "200": 212
+     }
+    },
+    "me": {
+     "n": 212,
+     "p50": 9.92257100000279,
+     "p90": 133.00526499998523,
+     "p99": 1018.9594199999992,
+     "max": 1939.2403310000082,
+     "retries": 53,
+     "retryOps": {
+      "setActiveAccountId": 53
+     },
+     "retryDelayMs": 12281,
+     "statuses": {
+      "200": 212
+     }
+    },
+    "folders": {
+     "n": 212,
+     "p50": 2.5277029999997467,
+     "p90": 7.944672999990871,
+     "p99": 28.575222999992548,
+     "max": 34.44903700001305,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 212
+     }
+    },
+    "threads": {
+     "n": 212,
+     "p50": 50.982709000003524,
+     "p90": 97.67837900001905,
+     "p99": 151.37535400001798,
+     "max": 217.13907800000743,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 212
+     }
+    }
+   },
+   "children": {
+    "sync-syn-sync-a": {
+     "completed": 583,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "initializeMasterSchema": 1,
+      "releaseSyncWorker": 72,
+      "queueSyncWorker": 67,
+      "reserveSyncWorker": 11
+     },
+     "exhausted": []
+    },
+    "sync-syn-sync-b": {
+     "completed": 569,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "releaseSyncWorker": 72,
+      "queueSyncWorker": 68,
+      "reserveSyncWorker": 6
+     },
+     "exhausted": []
+    }
+   }
+  },
+  {
+   "phase": "c",
+   "loadStart": [
+    11.2,
+    8.6,
+    9.92
+   ],
+   "loadEnd": [
+    19.39,
+    11.31,
+    10.76
+   ],
+   "switches": 219,
+   "criticalPath": {
+    "n": 219,
+    "p50": 109.71237000005203,
+    "p90": 239.71720700000878,
+    "p99": 394.8002349999733,
+    "max": 2776.214355000062
+   },
+   "steps": {
+    "switch": {
+     "n": 219,
+     "p50": 8.65783900002134,
+     "p90": 45.28293699998176,
+     "p99": 141.70494500000495,
+     "max": 1710.518945000018,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 219
+     }
+    },
+    "me": {
+     "n": 219,
+     "p50": 13.069760999991558,
+     "p90": 62.914378999965265,
+     "p99": 119.00265499998932,
+     "max": 416.66123600001447,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 219
+     }
+    },
+    "folders": {
+     "n": 219,
+     "p50": 3.965596000023652,
+     "p90": 37.92554900000687,
+     "p99": 125.6953569999896,
+     "max": 534.9277240000083,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 219
+     }
+    },
+    "threads": {
+     "n": 219,
+     "p50": 56.28859799998463,
+     "p90": 129.29899000003934,
+     "p99": 223.4694170000148,
+     "max": 238.88507900002878,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 219
+     }
+    }
+   },
+   "children": {
+    "second": {
+     "requests": 1405,
+     "errors": 0,
+     "firstErrors": [],
+     "statuses": {
+      "200": 1405
+     },
+     "requestMs": {
+      "n": 1405,
+      "p50": 12.1713119999622,
+      "p90": 79.02540699997917,
+      "p99": 179.10252900002524,
+      "max": 1081.9259590000147
+     },
+     "retries": {}
+    }
+   }
+  },
+  {
+   "phase": "all",
+   "loadStart": [
+    18.56,
+    11.28,
+    10.75
+   ],
+   "loadEnd": [
+    15.52,
+    12.05,
+    11.07
+   ],
+   "switches": 218,
+   "criticalPath": {
+    "n": 218,
+    "p50": 114.14441099995747,
+    "p90": 315.665146000043,
+    "p99": 583.6852530000033,
+    "max": 936.8199840000598
+   },
+   "steps": {
+    "switch": {
+     "n": 218,
+     "p50": 8.293316000024788,
+     "p90": 146.35526699997718,
+     "p99": 378.22944099997403,
+     "max": 407.9330360000022,
+     "retries": 49,
+     "retryOps": {
+      "setActiveAccountId": 49
+     },
+     "retryDelayMs": 6692,
+     "statuses": {
+      "200": 218
+     }
+    },
+    "me": {
+     "n": 218,
+     "p50": 10.73581899999408,
+     "p90": 134.29379600001266,
+     "p99": 455.9340770000126,
+     "max": 871.4329809999908,
+     "retries": 37,
+     "retryOps": {
+      "setActiveAccountId": 37
+     },
+     "retryDelayMs": 5945,
+     "statuses": {
+      "200": 218
+     }
+    },
+    "folders": {
+     "n": 218,
+     "p50": 3.0900280000059865,
+     "p90": 13.463083999988157,
+     "p99": 96.37888700002804,
+     "max": 107.20854699995834,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 218
+     }
+    },
+    "threads": {
+     "n": 218,
+     "p50": 53.59221300005447,
+     "p90": 96.74605100002373,
+     "p99": 195.26219799998216,
+     "max": 211.24502499995288,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 218
+     }
+    }
+   },
+   "children": {
+    "auth": {
+     "kinds": {
+      "session": {
+       "attempts": 1034,
+       "busy": 230
+      },
+      "member": {
+       "attempts": 114,
+       "busy": 31
+      }
+     }
+    },
+    "sync-syn-sync-a": {
+     "completed": 405,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "queueSyncWorker": 83,
+      "releaseSyncWorker": 105,
+      "reserveSyncWorker": 10
+     },
+     "exhausted": []
+    },
+    "sync-syn-sync-b": {
+     "completed": 465,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "initializeMasterSchema": 1,
+      "releaseSyncWorker": 86,
+      "queueSyncWorker": 81,
+      "reserveSyncWorker": 3
+     },
+     "exhausted": []
+    },
+    "second": {
+     "requests": 1204,
+     "errors": 1,
+     "firstErrors": [
+      "SQLiteError: database is locked\n    at all (unknown)\n    at executeQuery (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)\n    at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)\n    at provideConnection (/home/monkey/code/n"
+     ],
+     "statuses": {
+      "200": 1204
+     },
+     "requestMs": {
+      "n": 1204,
+      "p50": 11.467265999992378,
+      "p90": 99.50031600001967,
+      "p99": 376.68422699999064,
+      "max": 1730.5882109999657
+     },
+     "retries": {
+      "setActiveAccountId": 109
+     }
+    }
+   }
+  },
+  {
+   "phase": "quiet-2",
+   "loadStart": [
+    15.52,
+    12.05,
+    11.07
+   ],
+   "loadEnd": [
+    10,
+    11.03,
+    10.78
+   ],
+   "switches": 354,
+   "criticalPath": {
+    "n": 354,
+    "p50": 66.72545400005765,
+    "p90": 112.71227800002089,
+    "p99": 155.91399499989348,
+    "max": 410.05069499998353
+   },
+   "steps": {
+    "switch": {
+     "n": 354,
+     "p50": 5.642131000000518,
+     "p90": 10.558856999967247,
+     "p99": 43.256157999974675,
+     "max": 87.42248499998823,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 354
+     }
+    },
+    "me": {
+     "n": 354,
+     "p50": 8.703919999999925,
+     "p90": 12.987078999984078,
+     "p99": 26.1159200000111,
+     "max": 78.52036299998872,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 354
+     }
+    },
+    "folders": {
+     "n": 354,
+     "p50": 2.26742099999683,
+     "p90": 3.7515950000379235,
+     "p99": 11.453625000023749,
+     "max": 17.888043999962974,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 354
+     }
+    },
+    "threads": {
+     "n": 354,
+     "p50": 48.50368699996034,
+     "p90": 91.80700499995146,
+     "p99": 128.92610599996988,
+     "max": 364.8983989999979,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 354
+     }
+    }
+   },
+   "children": {}
+  }
+ ]
+}

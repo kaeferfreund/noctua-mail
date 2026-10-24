@@ -1,0 +1,49 @@
+
+Running 11 tests using 1 worker
+
+(node:1729378) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1729378) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"finding":"QA-001","run":0,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":1,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":2,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":3,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":4,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+  ✓   1 tests/browser/compose/qa-compose.spec.ts:31:1 › QA-001 rapid subject remains intact through autosave and SMTP (30.4s)
+{"finding":"QA-002","viewport":{"width":360,"height":780},"send":{"x":288,"y":724,"width":60,"height":44}}
+  ✓   2 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 360px (5.8s)
+{"finding":"QA-002","viewport":{"width":390,"height":844},"send":{"x":318,"y":788,"width":60,"height":44}}
+  ✓   3 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 390px (5.7s)
+  ✓   4 tests/browser/compose/qa-compose.spec.ts:90:1 › QA-008 desktop modal contains keyboard focus and restores its opener (3.5s)
+QA-102 [{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":390,"height":844,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"}]
+  ✓   5 tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions (16.5s)
+QA-003 {"post":201,"ttlSeconds":15552000,"secretShownOnce":true,"listRefreshed":true}
+  ✓   6 tests/browser/ui/qa-shell.spec.ts:36:1 › QA-003/009: create a 180-day token, reveal it once, refresh metadata, dismiss Settings (3.3s)
+QA-004/009 {"layers":[9996,9997],"pointerAdd":true,"pointerConfirm":true,"focusRestored":true}
+  ✓   7 tests/browser/ui/qa-shell.spec.ts:58:1 › QA-004/009: pointer-operated members and confirmations stack above Admin; Escape removes one layer (4.2s)
+  ✘   8 tests/browser/ui/qa-shell.spec.ts:96:1 › QA-005: 360px and 390px reader retains 40% of the viewport with long subject and note open (2.4m)
+
+
+  1) tests/browser/ui/qa-shell.spec.ts:96:1 › QA-005: 360px and 390px reader retains 40% of the viewport with long subject and note open 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+    [2m  - waiting for getByText('QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone.', { exact: true }).first()[22m
+
+
+       98 |     await page.emulateMedia({ colorScheme }); await page.setViewportSize(viewport); await page.goto("/");
+       99 |     await expect(page.locator("html")).toHaveClass(new RegExp(colorScheme));
+    > 100 |     await page.getByText(subject, { exact: true }).first().click();
+          |                                                            ^
+      101 |     await page.getByRole("button", { name: "Internal note", exact: true }).click();
+      102 |     await page.getByLabel("Internal note · Markdown supported").fill("Synthetic note open during reader measurement.");
+      103 |     const header = page.locator('[class*="threadHeader"]');
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-shell.spec.ts:100:60
+
+  1 interrupted
+    tests/browser/ui/qa-shell.spec.ts:96:1 › QA-005: 360px and 390px reader retains 40% of the viewport with long subject and note open 
+  3 did not run
+  7 passed (3.6m)

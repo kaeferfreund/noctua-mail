@@ -1,0 +1,943 @@
+{
+  "runtime": "bun 1.4.4",
+  "runs": 15,
+  "warmup": 3,
+  "at": "2026-10-23T16:52:06.409Z",
+  "diff": {
+    "inputs": 72,
+    "mismatches": [],
+    "hasRemoteMismatch": [],
+    "skipAllowTaken": 42,
+    "remoteInputs": 30
+  },
+  "results": [
+    {
+      "name": "gmail-5k",
+      "bytes": 5400,
+      "styleAttrs": 1,
+      "uniqueStyleAttrs": 1,
+      "styleBlocks": 0,
+      "remoteRewrites": 0,
+      "loadAtStart": 6.57,
+      "loadAtEnd": 6.57,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.008,
+          "p25": 0.008,
+          "p75": 0.008,
+          "min": 0.008,
+          "max": 0.012,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.058,
+          "p25": 0.056,
+          "p75": 0.06,
+          "min": 0.054,
+          "max": 0.081,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 0.415,
+          "p25": 0.388,
+          "p75": 0.444,
+          "min": 0.37,
+          "max": 0.503,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 0.319,
+          "p25": 0.278,
+          "p75": 0.331,
+          "min": 0.258,
+          "max": 0.391,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 0.015,
+          "p25": 0.014,
+          "p75": 0.016,
+          "min": 0.012,
+          "max": 0.047,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 0.834,
+          "p25": 0.803,
+          "p75": 0.87,
+          "min": 0.76,
+          "max": 1.208,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 0.876,
+          "p25": 0.863,
+          "p75": 0.929,
+          "min": 0.757,
+          "max": 1.085,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 1.576,
+          "p25": 1.55,
+          "p75": 1.651,
+          "min": 1.463,
+          "max": 1.747,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 1.118,
+          "p25": 1.078,
+          "p75": 1.153,
+          "min": 1.033,
+          "max": 3.166,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 1.041,
+          "p25": 1.017,
+          "p75": 1.104,
+          "min": 1.003,
+          "max": 1.267,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 0.798,
+          "p25": 0.784,
+          "p75": 0.818,
+          "min": 0.762,
+          "max": 0.852,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 0.776,
+          "p25": 0.769,
+          "p75": 0.805,
+          "min": 0.725,
+          "max": 0.851,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 0.098,
+          "p25": 0.087,
+          "p75": 0.109,
+          "min": 0.075,
+          "max": 0.149,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "legacy-table-54k",
+      "bytes": 54381,
+      "styleAttrs": 450,
+      "uniqueStyleAttrs": 1,
+      "styleBlocks": 0,
+      "remoteRewrites": 450,
+      "loadAtStart": 6.57,
+      "loadAtEnd": 6.68,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.05,
+          "p25": 0.05,
+          "p75": 0.052,
+          "min": 0.05,
+          "max": 0.166,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.04,
+          "p25": 0.04,
+          "p75": 0.044,
+          "min": 0.04,
+          "max": 0.099,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 4.72,
+          "p25": 4.55,
+          "p75": 4.823,
+          "min": 4.36,
+          "max": 7.811,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 11.115,
+          "p25": 10.999,
+          "p75": 12.01,
+          "min": 10.748,
+          "max": 16.761,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 4.746,
+          "p25": 4.665,
+          "p75": 5.105,
+          "min": 4.414,
+          "max": 6.646,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 23.641,
+          "p25": 22.905,
+          "p75": 24.902,
+          "min": 21.202,
+          "max": 26.432,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 22.516,
+          "p25": 21.929,
+          "p75": 24.956,
+          "min": 21.015,
+          "max": 27.079,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 48.422,
+          "p25": 46.972,
+          "p75": 50.01,
+          "min": 41.58,
+          "max": 52.3,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 40.79,
+          "p25": 39.89,
+          "p75": 41.577,
+          "min": 36.985,
+          "max": 42.533,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 28.096,
+          "p25": 27.507,
+          "p75": 30.804,
+          "min": 26.312,
+          "max": 32.384,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 29.681,
+          "p25": 28.338,
+          "p75": 31.67,
+          "min": 27.28,
+          "max": 32.248,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 42.194,
+          "p25": 41.976,
+          "p75": 44.881,
+          "min": 39.105,
+          "max": 48.979,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 4.145,
+          "p25": 3.954,
+          "p75": 4.208,
+          "min": 3.527,
+          "max": 4.51,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "newsletter-120k",
+      "bytes": 122708,
+      "styleAttrs": 630,
+      "uniqueStyleAttrs": 20,
+      "styleBlocks": 1,
+      "remoteRewrites": 126,
+      "loadAtStart": 6.68,
+      "loadAtEnd": 6.59,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.268,
+          "p25": 0.249,
+          "p75": 0.284,
+          "min": 0.245,
+          "max": 0.579,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.049,
+          "p25": 0.048,
+          "p75": 0.053,
+          "min": 0.046,
+          "max": 0.107,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 8.447,
+          "p25": 8.256,
+          "p75": 9.368,
+          "min": 8.047,
+          "max": 11.721,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 17.798,
+          "p25": 17.443,
+          "p75": 22.181,
+          "min": 17.211,
+          "max": 23.039,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 11.213,
+          "p25": 10.444,
+          "p75": 13.661,
+          "min": 9.976,
+          "max": 26.048,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 45.381,
+          "p25": 43.366,
+          "p75": 47.21,
+          "min": 40.692,
+          "max": 49.134,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 44.616,
+          "p25": 43.754,
+          "p75": 46.766,
+          "min": 42.31,
+          "max": 50.91,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 91.897,
+          "p25": 90.985,
+          "p75": 94.003,
+          "min": 83.201,
+          "max": 101.301,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 80.655,
+          "p25": 80.329,
+          "p75": 85.694,
+          "min": 75.2,
+          "max": 92.199,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 56.296,
+          "p25": 54.428,
+          "p75": 59.222,
+          "min": 51.874,
+          "max": 100.906,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 52.998,
+          "p25": 52.547,
+          "p75": 60.048,
+          "min": 48.099,
+          "max": 75.479,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 84.407,
+          "p25": 82.714,
+          "p75": 88.11,
+          "min": 77.565,
+          "max": 147.548,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 6.599,
+          "p25": 6.229,
+          "p75": 12.04,
+          "min": 6.03,
+          "max": 18.654,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "newsletter-300k",
+      "bytes": 307988,
+      "styleAttrs": 1590,
+      "uniqueStyleAttrs": 20,
+      "styleBlocks": 1,
+      "remoteRewrites": 318,
+      "loadAtStart": 6.59,
+      "loadAtEnd": 7.12,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.692,
+          "p25": 0.675,
+          "p75": 0.719,
+          "min": 0.659,
+          "max": 0.919,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.048,
+          "p25": 0.039,
+          "p75": 0.053,
+          "min": 0.034,
+          "max": 0.18,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 21.638,
+          "p25": 20.918,
+          "p75": 24.881,
+          "min": 20.225,
+          "max": 29.994,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 52.454,
+          "p25": 50.451,
+          "p75": 55.163,
+          "min": 44.47,
+          "max": 58.073,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 28.649,
+          "p25": 27.869,
+          "p75": 30.388,
+          "min": 27.649,
+          "max": 30.657,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 110.233,
+          "p25": 109.638,
+          "p75": 115.778,
+          "min": 107.33,
+          "max": 119.703,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 116.225,
+          "p25": 112.255,
+          "p75": 120.394,
+          "min": 109,
+          "max": 131.232,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 227.13,
+          "p25": 225.829,
+          "p75": 229.466,
+          "min": 210.861,
+          "max": 335.788,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 200.326,
+          "p25": 198.791,
+          "p75": 208.746,
+          "min": 190.548,
+          "max": 213.48,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 137.308,
+          "p25": 134.295,
+          "p75": 143.776,
+          "min": 125.043,
+          "max": 190.864,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 135.734,
+          "p25": 133.087,
+          "p75": 137.999,
+          "min": 128.003,
+          "max": 163.539,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 212.567,
+          "p25": 207.408,
+          "p75": 257.361,
+          "min": 191.142,
+          "max": 324.747,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 16.714,
+          "p25": 15.61,
+          "p75": 17.154,
+          "min": 14.639,
+          "max": 19.612,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "newsletter-unique-120k",
+      "bytes": 137694,
+      "styleAttrs": 630,
+      "uniqueStyleAttrs": 630,
+      "styleBlocks": 1,
+      "remoteRewrites": 126,
+      "loadAtStart": 7.12,
+      "loadAtEnd": 7.4,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.289,
+          "p25": 0.285,
+          "p75": 0.322,
+          "min": 0.279,
+          "max": 0.332,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.036,
+          "p25": 0.034,
+          "p75": 0.046,
+          "min": 0.033,
+          "max": 0.051,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 9.818,
+          "p25": 9.249,
+          "p75": 14.883,
+          "min": 8.71,
+          "max": 18.444,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 20.484,
+          "p25": 20.25,
+          "p75": 24.598,
+          "min": 19.506,
+          "max": 24.966,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 12.421,
+          "p25": 12.198,
+          "p75": 14.754,
+          "min": 11.836,
+          "max": 17.995,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 50.395,
+          "p25": 49.425,
+          "p75": 52.059,
+          "min": 46.354,
+          "max": 54.987,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 53.983,
+          "p25": 52.836,
+          "p75": 55.188,
+          "min": 50.269,
+          "max": 56.783,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 101.968,
+          "p25": 98.69,
+          "p75": 114.651,
+          "min": 94.315,
+          "max": 187.101,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 92.281,
+          "p25": 90.606,
+          "p75": 95.09,
+          "min": 83.4,
+          "max": 98.968,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 74.462,
+          "p25": 72.899,
+          "p75": 76.386,
+          "min": 70.63,
+          "max": 80.011,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 77.014,
+          "p25": 71.914,
+          "p75": 79.438,
+          "min": 69.689,
+          "max": 103.92,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 92.978,
+          "p25": 90.266,
+          "p75": 99.656,
+          "min": 87.319,
+          "max": 186.483,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 7.683,
+          "p25": 7.614,
+          "p75": 7.946,
+          "min": 7.377,
+          "max": 9.559,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "outlook-300k",
+      "bytes": 308950,
+      "styleAttrs": 1486,
+      "uniqueStyleAttrs": 6,
+      "styleBlocks": 2,
+      "remoteRewrites": 165,
+      "loadAtStart": 7.4,
+      "loadAtEnd": 7.47,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 1.329,
+          "p25": 1.279,
+          "p75": 1.426,
+          "min": 1.238,
+          "max": 3.397,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.063,
+          "p25": 0.05,
+          "p75": 0.07,
+          "min": 0.046,
+          "max": 0.208,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 22.189,
+          "p25": 21.819,
+          "p75": 23.831,
+          "min": 21.541,
+          "max": 31.489,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 47.275,
+          "p25": 43.529,
+          "p75": 56.921,
+          "min": 40.347,
+          "max": 75.768,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 23.083,
+          "p25": 22.154,
+          "p75": 24.332,
+          "min": 21.64,
+          "max": 25.575,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 100.865,
+          "p25": 99.184,
+          "p75": 102.882,
+          "min": 92.2,
+          "max": 105.437,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 100.708,
+          "p25": 100.082,
+          "p75": 109.487,
+          "min": 91.71,
+          "max": 228.359,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 206.064,
+          "p25": 201.809,
+          "p75": 207.989,
+          "min": 184.087,
+          "max": 248.315,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 175.342,
+          "p25": 172.35,
+          "p75": 184.338,
+          "min": 160.944,
+          "max": 191.497,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 121.436,
+          "p25": 120.023,
+          "p75": 127.072,
+          "min": 117.603,
+          "max": 130.742,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 120.707,
+          "p25": 119.305,
+          "p75": 122.206,
+          "min": 110.749,
+          "max": 136.77,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 184.278,
+          "p25": 175.233,
+          "p75": 191.574,
+          "min": 167.056,
+          "max": 250.561,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 16.112,
+          "p25": 15.806,
+          "p75": 17.423,
+          "min": 15.542,
+          "max": 18.41,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "outlook-54k",
+      "bytes": 57433,
+      "styleAttrs": 271,
+      "uniqueStyleAttrs": 6,
+      "styleBlocks": 2,
+      "remoteRewrites": 30,
+      "loadAtStart": 7.47,
+      "loadAtEnd": 7.35,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.221,
+          "p25": 0.188,
+          "p75": 0.265,
+          "min": 0.182,
+          "max": 0.314,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.047,
+          "p25": 0.046,
+          "p75": 0.048,
+          "min": 0.045,
+          "max": 0.08,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 4.275,
+          "p25": 4.153,
+          "p75": 4.598,
+          "min": 3.92,
+          "max": 5.548,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 7.346,
+          "p25": 7.263,
+          "p75": 7.528,
+          "min": 7.157,
+          "max": 10.081,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 3.947,
+          "p25": 3.905,
+          "p75": 4.171,
+          "min": 3.754,
+          "max": 6.545,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 16.881,
+          "p25": 16.616,
+          "p75": 19.689,
+          "min": 16.223,
+          "max": 20.313,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 17.131,
+          "p25": 16.975,
+          "p75": 19.905,
+          "min": 16.594,
+          "max": 20.245,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 37.243,
+          "p25": 33.952,
+          "p75": 38.08,
+          "min": 33.095,
+          "max": 38.734,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 30.648,
+          "p25": 29.462,
+          "p75": 34.062,
+          "min": 28.813,
+          "max": 36.132,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 20.929,
+          "p25": 20.543,
+          "p75": 23.516,
+          "min": 19.692,
+          "max": 25.419,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 22.968,
+          "p25": 20.838,
+          "p75": 24.974,
+          "min": 19.618,
+          "max": 39.714,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 30.458,
+          "p25": 28.855,
+          "p75": 32.386,
+          "min": 28.287,
+          "max": 36.686,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 2.977,
+          "p25": 2.874,
+          "p75": 3.166,
+          "min": 2.493,
+          "max": 6.277,
+          "runs": 15
+        }
+      }
+    },
+    {
+      "name": "outlook-5k",
+      "bytes": 6972,
+      "styleAttrs": 28,
+      "uniqueStyleAttrs": 6,
+      "styleBlocks": 2,
+      "remoteRewrites": 3,
+      "loadAtStart": 7.35,
+      "loadAtEnd": 7.35,
+      "passes": {
+        "stripConditionalComments": {
+          "median": 0.027,
+          "p25": 0.014,
+          "p75": 0.032,
+          "min": 0.013,
+          "max": 0.042,
+          "runs": 15
+        },
+        "shouldShowHtmlViewerFrame": {
+          "median": 0.048,
+          "p25": 0.04,
+          "p75": 0.052,
+          "min": 0.038,
+          "max": 0.116,
+          "runs": 15
+        },
+        "normalizeHtmlStructure": {
+          "median": 0.576,
+          "p25": 0.518,
+          "p75": 0.652,
+          "min": 0.432,
+          "max": 0.718,
+          "runs": 15
+        },
+        "sanitizeHtmlCore_block_noCss": {
+          "median": 0.902,
+          "p25": 0.833,
+          "p75": 1.061,
+          "min": 0.748,
+          "max": 3.001,
+          "runs": 15
+        },
+        "privateCss_all_calls_one_pass": {
+          "median": 0.531,
+          "p25": 0.52,
+          "p75": 0.57,
+          "min": 0.476,
+          "max": 0.687,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_block": {
+          "median": 1.92,
+          "p25": 1.878,
+          "p75": 2.009,
+          "min": 1.73,
+          "max": 2.192,
+          "runs": 15
+        },
+        "sanitizeHtmlForDisplay_allow": {
+          "median": 2.054,
+          "p25": 1.97,
+          "p75": 2.22,
+          "min": 1.852,
+          "max": 2.554,
+          "runs": 15
+        },
+        "today_pair": {
+          "median": 3.819,
+          "p25": 3.799,
+          "p75": 3.971,
+          "min": 3.721,
+          "max": 6.249,
+          "runs": 15
+        },
+        "A_sharedNormalize_pair": {
+          "median": 3.314,
+          "p25": 3.29,
+          "p75": 3.444,
+          "min": 3.249,
+          "max": 3.534,
+          "runs": 15
+        },
+        "B_sharedCss_pair": {
+          "median": 2.442,
+          "p25": 2.373,
+          "p75": 2.507,
+          "min": 2.317,
+          "max": 2.808,
+          "runs": 15
+        },
+        "C_skipAllow_pair": {
+          "median": 2.387,
+          "p25": 2.334,
+          "p75": 2.578,
+          "min": 2.298,
+          "max": 4.801,
+          "runs": 15
+        },
+        "D_skipAllowNoMemo_pair": {
+          "median": 3.367,
+          "p25": 3.273,
+          "p75": 3.452,
+          "min": 3.174,
+          "max": 5.384,
+          "runs": 15
+        },
+        "buildPreviewDocument": {
+          "median": 0.38,
+          "p25": 0.344,
+          "p75": 0.449,
+          "min": 0.32,
+          "max": 0.505,
+          "runs": 15
+        }
+      }
+    }
+  ]
+}

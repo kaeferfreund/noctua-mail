@@ -1,0 +1,72 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/db.senderKey.test.ts:
+(pass) senderKey migration is additive, nullable and leaves the v3 writer guard/version intact [30.63ms]
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-tpdX2l",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-tpdX2l/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) unkeyed legacy rows stay unknown without source, and re-ingestion stores every wire sender key [358.01ms]
+(pass) opening individual messages and threads backfills senderKey only from owned retained raw From [149.97ms]
+(pass) raw sources without a valid From stay unknown and existing keys are never re-derived [43.89ms]
+(pass) sender backfill never borrows a collision base row's source [27.11ms]
+(pass) legacy exact caches without ownership provenance cannot backfill a sender permission [27.64ms]
+(pass) source ownership digest rejects a file replaced outside the final-id writer [33.92ms]
+
+lib/db/accountKeys.test.ts:
+(pass) account shard key migration > legacy files preserve ids and dependent data, rebuild FTS, and migrate idempotently [27.62ms]
+(pass) account shard key migration > sender provenance added before the v2 rebuild survives reopen with writer guards [28.13ms]
+(pass) account shard key migration > sender provenance added after the v2 rebuild survives reopen with writer guards [37.16ms]
+(pass) account shard key migration > a failed rebuild rolls back every table and restores foreign key enforcement [23.80ms]
+(pass) account shard key migration > an initialized shard's key check needs no writer lock on another connection [26.87ms]
+(pass) account shard key migration > unowned legacy dependents fail migration without discarding data [2.41ms]
+(pass) account shard key migration > failure after CREATE TABLE message_fts_identity rolls back keys, FTS, guards and format version together [26.53ms]
+(pass) account shard key migration > failure after CREATE TRIGGER rolls back keys, FTS, guards and format version together [23.48ms]
+(pass) account shard key migration > failure after PRAGMA user_version = rolls back keys, FTS, guards and format version together [27.72ms]
+(pass) account shard key migration > a legacy connection and DELETE prepared before migration fail closed after migration [47.61ms]
+(pass) account shard key migration > round-1 composite-key shards gain writer guards without rebuilding or losing FTS [39.69ms]
+[shard-migration-timing] 50000 messages: migration=2720.22ms repeat=4.24ms
+(pass) account shard key migration > 50k-message legacy migration preserves every row and FTS entry with idempotent reopen [2936.88ms]
+(pass) account shard key migration > collision inventory CLI opens an existing shard read-only and deduplicates paths [24.28ms]
+(pass) account shard key migration > collision inventory counts surviving shared headers without changing the file [1.40ms]
+
+lib/db/shardFormat.test.ts:
+(pass) account shard writer format boundary > rejecting regression S1: legacy unscoped DELETE/UPDATE/INSERT fail at prepare before changing either account or FTS [71.51ms]
+(pass) account shard writer format boundary > every account-scoped ordinary table rejects all three legacy mutations, including empty tables [62.33ms]
+(pass) account shard writer format boundary > evicted/reopened handles and membership cleanup install the connection-local writer marker [67.31ms]
+(pass) account shard writer format boundary > future shard formats are refused before configuration, marker registration or schema changes [0.40ms]
+(pass) production shard-opening inventory routes every writable shard connection through configureAccountDb [43.47ms]
+(pass) all 112 legacy-binary DML sites fail on v3 with FK enforcement disabled [57.84ms]
+(pass) 81 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation [48.51ms]
+
+lib/db/ftsIdentity.test.ts:
+[shard-format-v3] dropped 2 orphan FTS rows
+(pass) FTS integer identity > v2 migration drops and reports orphans, repairs duplicate/missing FTS rows from canonical messages, preserves every message column [33.29ms]
+(pass) FTS integer identity > pre-migration inventory CLI reports v2 orphans without changing schema, rows or version [56.34ms]
+(pass) FTS integer identity > SIGKILL at side-table restores complete v2 state; retry migrates exactly once [100.94ms]
+(pass) FTS integer identity > SIGKILL at population restores complete v2 state; retry migrates exactly once [97.65ms]
+(pass) FTS integer identity > SIGKILL at guards restores complete v2 state; retry migrates exactly once [110.54ms]
+(pass) FTS integer identity > SIGKILL at before-version restores complete v2 state; retry migrates exactly once [115.11ms]
+(pass) FTS integer identity > SIGKILL at after-version restores complete v2 state; retry migrates exactly once [114.68ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP TABLE message_fts_v3 [12.18ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP VIEW message_fts_v2 [11.94ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP TABLE message_fts_identity [10.22ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP TABLE topics [11.14ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP TRIGGER noctua_writer_v3_messages_update [12.92ms]
+(pass) FTS integer identity > damaged v3 shape fails explicitly before additive initialization: DROP TRIGGER noctua_writer_v3_messages_update;
+      CREATE TRIGGER noctua_writer_v3_messages_update BEFORE UPDATE ON messages BEGIN SELECT 1; END [11.58ms]
+(pass) FTS integer identity > cold open checks schema without a writer lock, even with a concurrent writer [59.65ms]
+(pass) FTS integer identity > v2 upgrade keeps foreign keys ON; failed validation rolls back with original enforcement [62.01ms]
+(pass) FTS integer identity > existing identities survive repeated updates; deleted IDs allocate new integers, collisions own separate integers [95.36ms]
+(pass) FTS integer identity > missing existing mapping errors and rolls back without a key-scan fallback [72.68ms]
+(pass) stale v2 statements prepared before migration fail after the guard/view swap [63.03ms]
+(pass) two simultaneous production openers converge on one migration [127.00ms]
+(pass) a reader retains its v2 snapshot during migration; busy writer failure leaves v2 untouched and retries [71.10ms]
+(pass) a crash after commit leaves complete v3 and reopen performs no migration [103.97ms]
+(pass) failure allocating an identity rolls back message, attachment and FTS writes [62.50ms]
+
+ 50 pass
+ 0 fail
+ 513 expect() calls
+Ran 50 tests across 4 files. [5.99s]

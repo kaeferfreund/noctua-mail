@@ -1,0 +1,173 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/composition/DraftSavedLabel.dom.test.tsx:
+(pass) 65 seconds update only the saved label; MailClient is disconnected from draft ticks [85.88ms]
+(pass) locale, new saves, saving/error states and an empty draft stay current and clean up the timer [98.86ms]
+
+app/components/mailclient/composition/ComposeHeader.dom.test.tsx:
+(pass) P2-E header 320px light enabled [176.80ms]
+(pass) P2-E header 320px light unavailable [81.28ms]
+(pass) P2-E header 320px dark enabled [68.25ms]
+(pass) P2-E header 320px dark unavailable [92.95ms]
+(pass) P2-E header 360px light enabled [79.01ms]
+(pass) P2-E header 360px light unavailable [59.91ms]
+(pass) P2-E header 360px dark enabled [46.23ms]
+(pass) P2-E header 360px dark unavailable [47.41ms]
+(pass) P2-E header 390px light enabled [53.30ms]
+(pass) P2-E header 390px light unavailable [77.48ms]
+(pass) P2-E header 390px dark enabled [58.11ms]
+(pass) P2-E header 390px dark unavailable [52.44ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) P2-G clamped sender retains full accessible text: de enabled [48.17ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) P2-G clamped sender retains full accessible text: de unavailable [40.68ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) P2-G clamped sender retains full accessible text: en enabled [38.17ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) P2-G clamped sender retains full accessible text: en unavailable [40.26ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) keyboard scroll area contains metadata, body and footer: de [53.08ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) keyboard scroll area contains metadata, body and footer: en [42.27ms]
+(pass) German header, window controls and footer actions use the catalog copy [47.14ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) de: the in-reply-to row label is UI copy while subject and sender stay verbatim [42.98ms]
+An update to ForwardRef(PopperContent) inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+(pass) en: the in-reply-to row label is UI copy while subject and sender stay verbatim [38.80ms]
+
+app/components/mailclient/composition/ComposeFields.dom.test.tsx:
+(pass) compose From control > inline: From label is associated and only enabled identities can be selected [56.47ms]
+(pass) compose From control > modal: From label is associated and only enabled identities can be selected [58.62ms]
+(pass) compose From control > mobile modal retains the From row even with a single identity [15.50ms]
+(pass) compose From control > a stale draft retains its unavailable From label and exposes guidance [18.63ms]
+(pass) compose From control > viewer From selection and send are disabled [22.31ms]
+(pass) P2-D 320px: long From options and unavailable labels remain accessible [100.02ms]
+(pass) P2-D 360px: long From options and unavailable labels remain accessible [105.07ms]
+(pass) P2-D 390px: long From options and unavailable labels remain accessible [102.61ms]
+
+app/components/mailclient/status/BottomStatusBar.dom.test.tsx:
+(pass) compact header status > maps idle without opening a panel [22.88ms]
+(pass) compact header status > maps busy without opening a panel [6.58ms]
+(pass) compact header status > maps progress without opening a panel [4.32ms]
+(pass) compact header status > maps retry two without opening a panel [3.88ms]
+(pass) compact header status > maps retry three without opening a panel [4.22ms]
+(pass) compact header status > maps failed without opening a panel [3.89ms]
+(pass) compact header status > maps exceptions win over busy without opening a panel [3.85ms]
+(pass) compact header status > maps combined without opening a panel [4.14ms]
+(pass) compact header status > maps completed without opening a panel [4.27ms]
+(pass) compact header status > maps recomputing without opening a panel [3.67ms]
+(pass) compact header status > opens all four explained section headings and routes between their contents [101.25ms]
+(pass) compact header status > routes external openPanel=process [31.72ms]
+(pass) compact header status > routes external openPanel=exception [21.39ms]
+(pass) compact header status > routes external openPanel=reminder [20.38ms]
+(pass) compact header status > routes external openPanel=mail-check [15.78ms]
+(pass) compact header status > routes external openPanel=calendar [46.68ms]
+(pass) compact header status > routes external openPanel=exceptions [28.16ms]
+(pass) compact header status > routes external openPanel=reminders [21.29ms]
+(pass) compact header status > opens the PWA calendar route and consumes only its flag [199.46ms]
+(pass) compact header status > resolves private identifiers to names and invokes retry; Details are readable [76.27ms]
+(pass) compact header status > uses a translated fallback for unresolved folders, never mailboxPath [23.84ms]
+(pass) compact header status > clears exceptions and displays an absolute timestamp [76.79ms]
+(pass) compact header status > toggles the calendar sidebar through the shared action and closes [47.32ms]
+(pass) compact header status > keeps the mobile dropdown → Sheet route and restores focus [182.24ms]
+(pass) compact header status > gives each phone status Sheet one visible title row before its description [521.82ms]
+(pass) compact header status > shows the running build at the foot of the popover and of the phone menu [85.60ms]
+(pass) compact header status > keeps a selected section when crossing the mobile breakpoint [46.01ms]
+(pass) phone calendar frame > mounts the wrapping calendar frame in the fullscreen Sheet at 320px [137.91ms]
+(pass) phone calendar frame > mounts the wrapping calendar frame in the fullscreen Sheet at 360px [115.98ms]
+(pass) phone calendar frame > mounts the wrapping calendar frame in the fullscreen Sheet at 390px [151.77ms]
+(pass) phone calendar frame > keeps the bounded popover frame on desktop [83.22ms]
+(pass) phone calendar frame > wraps the toolbar, keeps 44px targets and a bounded grid in the phone CSS [8.04ms]
+
+app/components/mailclient/messagelist/VirtualizedList.dom.test.tsx:
+(pass) hidden scroll/resize events retain the far-down window; reveal measures the new pane without window resize [8.50ms]
+(pass) an initially hidden list measures on reveal and cleans up the observer and pending frame [5.14ms]
+
+app/components/mailclient/messagelist/MessageListOrchestrator.dom.test.tsx:
+(pass) QA-012 uses the search empty state in folder scope, including a virtual folder [13.99ms]
+(pass) QA-012 uses the search empty state in all scope, including a virtual folder [6.61ms]
+(pass) QA-012 preserves ordinary folder, syncing, related search, and failure states [10.07ms]
+(pass) archive continuation: next [3.89ms]
+(pass) archive continuation: previous [2.20ms]
+(pass) archive continuation: end [2.26ms]
+(pass) archive continuation: failed [1.83ms]
+(pass) archive completion uses the current reader: target [3.41ms]
+(pass) archive completion uses the current reader: other [2.55ms]
+(pass) archive completion uses the current reader: removed-row [2.56ms]
+
+ 75 pass
+ 0 fail
+ 348 expect() calls
+Ran 75 tests across 6 files. [4.70s]

@@ -1,0 +1,44 @@
+[
+  {
+    "colorScheme": "light",
+    "width": 390,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 378
+  },
+  {
+    "colorScheme": "light",
+    "width": 360,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 322
+  },
+  {
+    "colorScheme": "light",
+    "width": 320,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 214
+  },
+  {
+    "colorScheme": "dark",
+    "width": 390,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 378
+  },
+  {
+    "colorScheme": "dark",
+    "width": 360,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 322
+  },
+  {
+    "colorScheme": "dark",
+    "width": 320,
+    "buttons": 9,
+    "minHeight": 44,
+    "maxRight": 214
+  }
+]

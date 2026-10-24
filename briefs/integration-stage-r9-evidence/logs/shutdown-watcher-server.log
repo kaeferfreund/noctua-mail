@@ -1,0 +1,37 @@
+✓ Running next.config took 6ms
+Ready on http://127.0.0.1:3798
+[2026-10-23 13:32:23.462 +00:00] [startup] opened storage {
+[2026-10-23 13:32:23.462 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data',
+[2026-10-23 13:32:23.462 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data/db/main.db'
+[2026-10-23 13:32:23.462 +00:00] }
+[2026-10-23 13:32:23.472 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 13:32:23.900 +00:00] [mailbox-watcher] synthetic-shutdown: starting
+[2026-10-23 13:32:24.401 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"1e66d6a2d0ehuzyo8m3o","secure":false,"host":"127.0.0.1","servername":false,"port":39077,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":42814}
+[2026-10-23 13:32:24.403 +00:00] {"event":"imap.socket_connect","accountId":"synthetic-shutdown","clientId":null,"mailbox":"INBOX","socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":39077,"localAddress":"127.0.0.1","localPort":42814,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 13:32:24.430 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":39077,"cid":"1e66d6a2d0ehuzyo8m3o"}
+[2026-10-23 13:32:24.441 +00:00] {"src":"auth","msg":"User authenticated","cid":"1e66d6a2d0ehuzyo8m3o","user":"demo@monkeydent.test"}
+[2026-10-23 13:32:24.444 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-shutdown 329ms
+[2026-10-23 13:32:24.460 +00:00] [mailbox-watcher] synthetic-shutdown: idling
+[2026-10-23 13:32:24.510 +00:00] [sync] worker started {"jobId":"a3237bae-cb6f-4a02-846e-4156657715e4","accountId":"synthetic-shutdown","mode":"full","pid":3584709}
+[2026-10-23 13:32:24.512 +00:00] [shutdown] starting {
+[2026-10-23 13:32:24.512 +00:00]   signal: 'SIGTERM',
+[2026-10-23 13:32:24.512 +00:00]   hooks: [
+[2026-10-23 13:32:24.512 +00:00]     'http:stop',
+[2026-10-23 13:32:24.512 +00:00]     'http:drain',
+[2026-10-23 13:32:24.512 +00:00]     'background:stop',
+[2026-10-23 13:32:24.512 +00:00]     'background:drain',
+[2026-10-23 13:32:24.512 +00:00]     'auth-streams:drain',
+[2026-10-23 13:32:24.512 +00:00]     'auth-streams',
+[2026-10-23 13:32:24.512 +00:00]     'admission:3584589:6b382696-376f-4c4c-baee-bada7b859e29:stop',
+[2026-10-23 13:32:24.512 +00:00]     'admission:3584589:6b382696-376f-4c4c-baee-bada7b859e29:drain',
+[2026-10-23 13:32:24.512 +00:00]     'db:close',
+[2026-10-23 13:32:24.512 +00:00]     'admission:3584589:c9619b91-d059-44cc-b057-120eff2de6ee:stop',
+[2026-10-23 13:32:24.512 +00:00]     'admission:3584589:c9619b91-d059-44cc-b057-120eff2de6ee:drain',
+[2026-10-23 13:32:24.512 +00:00]     'imap-pool',
+[2026-10-23 13:32:24.512 +00:00]     'mailbox-watcher'
+[2026-10-23 13:32:24.512 +00:00]   ]
+[2026-10-23 13:32:24.512 +00:00] }
+[2026-10-23 13:32:24.513 +00:00] [shutdown] HTTP requests { active: 0 }
+[2026-10-23 13:32:24.518 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 13:32:24.527 +00:00] {"event":"imap.socket_close","accountId":"synthetic-shutdown","clientId":null,"mailbox":"INBOX","hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":39077,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 13:32:24.542 +00:00] [shutdown] complete {}

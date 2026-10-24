@@ -1,0 +1,57 @@
+--- scripts/runQaShellBrowserTests.ts
++++ .tmp/run-reader-focus-r2.ts
+@@ -23,21 +23,21 @@
+   if (code !== 0) throw new Error(`QA command exited ${code}: bun ${args.join(" ")}`);
+ }
+ let server: ChildProcess | undefined;
+-let imap: Awaited<ReturnType<typeof import("./dev-fixture/imap-server").startImapServer>> | undefined;
+-let smtp: Awaited<ReturnType<typeof import("./dev-fixture/smtp-sink").startSmtpSink>> | undefined;
++let imap: Awaited<ReturnType<typeof import("../scripts/dev-fixture/imap-server").startImapServer>> | undefined;
++let smtp: Awaited<ReturnType<typeof import("../scripts/dev-fixture/smtp-sink").startSmtpSink>> | undefined;
+ try {
+   await new Promise<void>((resolve, reject) => {
+     const probe = createServer(); probe.once("error", reject);
+     probe.listen(port, "localhost", () => probe.close(() => resolve()));
+   });
+   if (process.env.QA_SHELL_USE_BUILD !== "1") await run(["run", "build"]);
+-  const { startImapServer } = await import("./dev-fixture/imap-server");
+-  const { startSmtpSink } = await import("./dev-fixture/smtp-sink");
+-  imap = await startImapServer({ host: "127.0.0.1", port: 0, controlPort: 0, user: "demo@monkeydent.test", pass: "demo", seed: "qa-shell" });
++  const { startImapServer } = await import("../scripts/dev-fixture/imap-server");
++  const { startSmtpSink } = await import("../scripts/dev-fixture/smtp-sink");
++  imap = await startImapServer({ host: "127.0.0.1", port: 3872, user: "demo@monkeydent.test", pass: "demo", seed: "qa-shell" });
+   const longSubject = "QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. ".repeat(4).trim();
+   if (process.env.QA_ROUND2_FIXTURE === "1") {
+     // The unread regression uses the reviewed 300-message / 110-unread fixture.
+-    const { makeMessage } = await import("./dev-fixture/seed");
++    const { makeMessage } = await import("../scripts/dev-fixture/seed");
+     for (let n = 0; n < 240; n++) {
+       const isLongSubject = n === 239;
+       const subject = isLongSubject
+@@ -54,7 +54,7 @@
+   } else {
+     imap.store.append("INBOX", Buffer.from(`From: Synthetic Reader <reader@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-shell-long@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: ${longSubject}\r\n\r\nSynthetic reader body for QA shell regressions.\r\n`));
+   }
+-  smtp = await startSmtpSink({ host: "127.0.0.1", port: 0, user: "demo@monkeydent.test", pass: "demo", out: path.join(scratch, "outbox"), deliver: source => { imap!.store.append("INBOX", source); } });
++  smtp = await startSmtpSink({ host: "127.0.0.1", port: 3873, user: "demo@monkeydent.test", pass: "demo", out: path.join(scratch, "outbox"), deliver: source => { imap!.store.append("INBOX", source); } });
+   Object.assign(env, { QA_SHELL_IMAP_PORT: String(imap.port), QA_SHELL_SMTP_PORT: String(smtp.port), QA_SHELL_OUTBOX: path.join(scratch, "outbox"), COMPOSE_QA_OUTBOX: path.join(scratch, "outbox"), QA_SHELL_CONTROL_URL: `http://127.0.0.1:${imap.controlPort}` });
+   await run(["tests/browser/ui/seedQaShell.ts"]);
+   const [composeUser] = JSON.parse(readFileSync(env.QA_SHELL_SEED_FILE, "utf8"));
+@@ -62,6 +62,8 @@
+   writeFileSync(composeSeed, JSON.stringify({ ...composeUser, accountId: "qa-shared" }));
+   Object.assign(env, { COMPOSE_QA_SEED_FILE: composeSeed });
+   server = spawn("bun", ["--bun", "next", "start", "-p", String(port), "-H", "localhost"], { cwd: root, env, stdio: "inherit", detached: true });
++  console.log("R2 owned production server PID", server.pid);
++  writeFileSync("/home/monkey/code/noctua-mail/briefs/reader-focus-evidence/r2/owned-server.json", JSON.stringify({ runnerPid: process.pid, serverPid: server.pid, port, imapPort: imap.port, smtpPort: smtp.port }));
+   let ready = false;
+   for (let attempt = 0; attempt < 120; attempt++) {
+     if (server.exitCode !== null) throw new Error("QA server exited before readiness");
+@@ -75,7 +77,7 @@
+     const signal = (value: NodeJS.Signals) => { try { process.kill(-server!.pid!, value); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; } };
+     signal("SIGTERM");
+     if (server.exitCode === null) await Promise.race([new Promise<void>(resolve => server!.once("exit", () => resolve())), delay(5000)]);
+-    signal("SIGKILL");
++    if (server.exitCode === null) signal("SIGKILL");
+   }
+   await smtp?.stop(); await imap?.stop();
+   rmSync(scratch, { recursive: true, force: true });

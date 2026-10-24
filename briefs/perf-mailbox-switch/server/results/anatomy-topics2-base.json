@@ -1,0 +1,259 @@
+[
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=50",
+  "sha256": "3893839045ff9427974bc5cfd774f6ed11ffc370cba4664ec29435bf9c9e7b59",
+  "bytes": 232488,
+  "itemsWithSuggestions": 63
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=50",
+  "p50": 23.01933099999951,
+  "p90": 27.057887999999366,
+  "sqlP50": 13.406278999998904,
+  "execs": 44
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=50",
+  "p50": 11.620946999999433,
+  "p90": 11.888468999997713,
+  "sqlP50": 9.279879999990953,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=100",
+  "sha256": "bbeabd04759cac7335185dae2f58c46f2e478abe27568288fa377ff1fad2b37e",
+  "bytes": 570528,
+  "itemsWithSuggestions": 204
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=100",
+  "p50": 33.16670400000294,
+  "p90": 38.425192000002426,
+  "sqlP50": 15.333745000003546,
+  "execs": 44
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=100",
+  "p50": 14.011608000000706,
+  "p90": 14.649255000000267,
+  "sqlP50": 10.341012000000774,
+  "execs": 17
+ },
+ {
+  "id": "syn-m0",
+  "label": "hash syn-m0 pageSize=300",
+  "sha256": "9a75a9a11b58affbcbeadf80b099202d9d578845b05b1bcaeb01cc5569cabc6b",
+  "bytes": 1748598,
+  "itemsWithSuggestions": 639
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0 route GET threads pageSize=300",
+  "p50": 71.94377900000109,
+  "p90": 77.07498600000326,
+  "sqlP50": 21.193157000012434,
+  "execs": 46
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   listThreads pageSize=300",
+  "p50": 23.337772999999288,
+  "p90": 25.1907910000009,
+  "sqlP50": 14.088851999997132,
+  "execs": 19
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics+suggestions (900 items)",
+  "p50": 35.84452799999781,
+  "p90": 38.79087499999878,
+  "sqlP50": 5.18592699999499,
+  "execs": 9
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich topics only (no suggestions)",
+  "p50": 1.340331999999762,
+  "p90": 1.444852999997238,
+  "sqlP50": 0.7160869999934221,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   enrich collab",
+  "p50": 1.4212530000004335,
+  "p90": 1.4894940000012866,
+  "sqlP50": 0.6309260000052745,
+  "execs": 4
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   slim + JSON.stringify",
+  "p50": 1.4047729999983858,
+  "p90": 1.633174999999028,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   buildTimeGroupKey x 900",
+  "p50": 4.760844000000361,
+  "p90": 5.245208000000275,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   requireAccountContext (guard+role+account)",
+  "p50": 1.6641359999994165,
+  "p90": 2.058139000000665,
+  "sqlP50": 0.5170840000064345,
+  "execs": 10
+ },
+ {
+  "id": "syn-m0",
+  "label": "syn-m0   validateAccountFolders",
+  "p50": 0.24076299999796902,
+  "p90": 0.30680299999949057,
+  "sqlP50": 0.12427999999999884,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=50",
+  "sha256": "7017a1bcea830b00be25ac19e4596af4a789f0032f69b4cbba574180b60ec503",
+  "bytes": 350804,
+  "itemsWithSuggestions": 150
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=50",
+  "p50": 70.39240499999869,
+  "p90": 76.58478099999775,
+  "sqlP50": 56.053514000042924,
+  "execs": 44
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=50",
+  "p50": 54.093095000003814,
+  "p90": 55.23806599999807,
+  "sqlP50": 51.85095300000103,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=100",
+  "sha256": "d57ddf33cbd8978d7083cd866518931e4c7615fdcf0f20cd3af56fd04f3598f3",
+  "bytes": 701233,
+  "itemsWithSuggestions": 300
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=100",
+  "p50": 83.42524400000548,
+  "p90": 88.5367299999998,
+  "sqlP50": 58.51129399999627,
+  "execs": 44
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=100",
+  "p50": 56.941280999999435,
+  "p90": 57.708088999999745,
+  "sqlP50": 53.09936399997969,
+  "execs": 17
+ },
+ {
+  "id": "syn-l0",
+  "label": "hash syn-l0 pageSize=300",
+  "sha256": "e18cdb373cb3d3b7d7a8da6ed3cfbd7143a56829399069837c3345539898fde8",
+  "bytes": 1972751,
+  "itemsWithSuggestions": 804
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0 route GET threads pageSize=300",
+  "p50": 129.89010899999994,
+  "p90": 139.2307540000038,
+  "sqlP50": 67.37349699996412,
+  "execs": 46
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   listThreads pageSize=300",
+  "p50": 68.81130999999732,
+  "p90": 74.80176400000346,
+  "sqlP50": 59.74242499998945,
+  "execs": 19
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics+suggestions (900 items)",
+  "p50": 43.44663800000126,
+  "p90": 48.98276800000167,
+  "sqlP50": 5.625130000014906,
+  "execs": 9
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich topics only (no suggestions)",
+  "p50": 1.1646099999998114,
+  "p90": 1.5574540000015986,
+  "sqlP50": 0.6627260000022943,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   enrich collab",
+  "p50": 1.390333000003011,
+  "p90": 1.4968140000055428,
+  "sqlP50": 0.6719660000017029,
+  "execs": 4
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   slim + JSON.stringify",
+  "p50": 1.3084119999984978,
+  "p90": 1.4387729999943986,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   buildTimeGroupKey x 900",
+  "p50": 4.750404000005801,
+  "p90": 5.090846999999485,
+  "sqlP50": 0,
+  "execs": 0
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   requireAccountContext (guard+role+account)",
+  "p50": 1.6892960000041057,
+  "p90": 2.0138979999974254,
+  "sqlP50": 0.5314850000067963,
+  "execs": 10
+ },
+ {
+  "id": "syn-l0",
+  "label": "syn-l0   validateAccountFolders",
+  "p50": 0.2441220000036992,
+  "p90": 0.3382030000066152,
+  "sqlP50": 0.13044100000115577,
+  "execs": 4
+ },
+ {
+  "label": "requireActiveUserSession",
+  "p50": 1.3378519999969285,
+  "p90": 1.607614000000467,
+  "sqlP50": 0.4194040000002133,
+  "execs": 7
+ }
+]

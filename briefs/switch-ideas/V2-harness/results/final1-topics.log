@@ -1,0 +1,9 @@
+syn-m0 route warm                                        p50 39.24 p90 47.21 sql 17.04 execs 42
+syn-m0 route cold-shard                                  p50 45.14 p90 55.82 sql 22.46 execs 124
+syn-m0   listThreads                                     p50 13.60 p90 14.20 sql 10.41 execs 14
+syn-m0   enrich topics+suggestions                       p50 13.52 p90 16.67 sql 4.47 execs 10
+syn-l0 route warm                                        p50 76.26 p90 98.95 sql 51.55 execs 42
+syn-l0 route cold-shard                                  p50 89.72 p90 110.37 sql 59.93 execs 124
+syn-l0   listThreads                                     p50 46.18 p90 109.99 sql 42.94 execs 14
+syn-l0   enrich topics+suggestions                       p50 15.18 p90 19.62 sql 4.92 execs 10
+load [ 7.94, 9.43, 11.1 ] [ 9.51, 9.69, 11.16 ]

@@ -1,0 +1,29 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/gate-data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/gate-data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+MIGRATION PASS {"kind":"round7","beforeVersion":2,"afterVersion":3,"messages":11000,"accounts":2,"guards":81,"durationMs":1041.5553259999997,"searchComparisons":48,"inventory":{"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."},"sourceUnchanged":true,"beforeFileBytes":13557760,"afterFileBytes":17948672}
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db","shardVersion":0,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":true,"resyncRequiredForLegacySharedShard":true,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+73 |  if(kind==='round7'){assert.deepEqual(afterSql,beforeSql);assert.deepEqual(await appResults(currentQuery),beforeApp);}else {
+74 |   assert.deepEqual(afterSql,beforeSql);
+75 |   for(const accountId of accounts)for(const query of queries)for(const page of [1,2]){
+76 |    const result=await currentQuery.listMessages({accountId,page,pageSize:7,query,groupBy:'none'});
+77 |    const scopedSql=db.query(`SELECT messageId FROM message_fts_v3 WHERE message_fts_v3 MATCH ? AND accountId=? ORDER BY messageId`).all(query==='from:sender@example.test'?'fromAddr:sender':query,accountId);
+78 |    assert.equal(result.total,scopedSql.length);assert(result.items.every((item:any)=>item.accountId===accountId));
+               ^
+AssertionError: Expected values to be strictly equal:
+
+0 !== 5500
+
+ generatedMessage: true,
+     actual: 0,
+   expected: 5500,
+   operator: "strictEqual",
+       diff: "simple",
+       code: "ERR_ASSERTION"
+
+      at /home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration-gate.ts:78:11
+
+Bun v1.4.4 (Linux arm64)

@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "id": "imap-083019d402a42875aeceb162",
+  "result": {
+    "ok": true,
+    "action": "moved",
+    "archiveFolderId": "qa-shared:Archive",
+    "archiveMailbox": "Archive",
+    "previousMessageId": "imap-083019d402a42875aeceb162",
+    "messageId": "imap-083019d402a42875aeceb162"
+  },
+  "from": "qa-shared:INBOX",
+  "to": "qa-shared:Archive",
+  "nextId": "imap-c6efd4b59b3126681d1c6e84"
+}

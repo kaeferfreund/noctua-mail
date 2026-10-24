@@ -1,0 +1,31 @@
+c244312413ba7441ea3c6c3695ec43b5db584577
+100644 b3ca0bcfb99efa46dfb2c300df17bcc012b18124 1	app/components/AccountSettingsModal.tsx
+100644 a276dd99b7b244e30154ec1c6a764e5aff01e170 2	app/components/AccountSettingsModal.tsx
+100644 b3bc2568876620ba907bab7356eb5b9abc449a6a 3	app/components/AccountSettingsModal.tsx
+100644 d7e762cab655381e10e26ca68f575a5492b08ce4 1	app/components/account-settings/tabs/PreferencesTabContent.tsx
+100644 77b72179a7e7df967c7992c356848824764ba98a 2	app/components/account-settings/tabs/PreferencesTabContent.tsx
+100644 80c182099c9f9a7d782e7ce3cc2c747449037e85 3	app/components/account-settings/tabs/PreferencesTabContent.tsx
+100644 c46d1e73fcf97b42d51dfd749bad320632281440 1	lib/mail/resyncMessage.senderKey.test.ts
+100644 74c107c851bef9e37523856eecd0adc0f0359dcb 2	lib/mail/resyncMessage.senderKey.test.ts
+100644 0f96a368272a65842222252a8b3ce5b05bf98def 3	lib/mail/resyncMessage.senderKey.test.ts
+100644 4fee291be3619bf69042a3d9debb57414d884f02 1	messages/de.json
+100644 f897f4e693f1aa5120721c72205f607fa29f20d2 2	messages/de.json
+100644 76fd387d7f0753778ea2c183c80f16c46694e442 3	messages/de.json
+100644 864fc48defec5b50852748574afaf5ed2ae50d66 1	messages/en.json
+100644 4c12f930cc4ea150deb08f605ea49a556c0af7d9 2	messages/en.json
+100644 cce32575745698e125d22f8f225eea5d0e6067de 3	messages/en.json
+
+Auto-merging app/components/AccountSettingsModal.tsx
+CONFLICT (content): Merge conflict in app/components/AccountSettingsModal.tsx
+Auto-merging app/components/MailClient.tsx
+Auto-merging app/components/account-settings/tabs/PreferencesTabContent.tsx
+CONFLICT (content): Merge conflict in app/components/account-settings/tabs/PreferencesTabContent.tsx
+Auto-merging app/components/mailclient/composition/ComposeModal.tsx
+Auto-merging app/components/mailclient/composition/sendMailRace.dom.test.tsx
+Auto-merging lib/mail/resyncMessage.senderKey.test.ts
+CONFLICT (content): Merge conflict in lib/mail/resyncMessage.senderKey.test.ts
+Auto-merging messages/de.json
+CONFLICT (content): Merge conflict in messages/de.json
+Auto-merging messages/en.json
+CONFLICT (content): Merge conflict in messages/en.json
+Auto-merging tests/browser/compose/qa-compose.spec.ts

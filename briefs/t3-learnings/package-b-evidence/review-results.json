@@ -1,0 +1,825 @@
+{
+  "open-1440-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-028cf688a701fae090fbf331",
+        "method": "GET",
+        "status": 200,
+        "bytes": 2987,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 33665,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-028cf688a701fae090fbf331"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    }
+  },
+  "older-1440-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48323,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LWNvbnYtMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoib2xkZXIiLCJmcm9tIjpbMTc5MjU1NTEyODAwMCwiaW1hcC05YTJhMGZmMDM5MGM5MGQyODJhYWY3YWUiXX0"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderStillVisible": true
+  },
+  "archiveSynced": true,
+  "diag": [
+    {
+      "id": "imap-12e49352f07aa4c94d449441",
+      "threadId": "<review-zaun-0@example.test>",
+      "messageId": "<review-zaun-0@example.test>",
+      "folderId": "qa-shared:Archive",
+      "contentState": "stored"
+    },
+    {
+      "status": 200,
+      "items": 12,
+      "window": {
+        "total": 40,
+        "anchorId": "imap-12e49352f07aa4c94d449441",
+        "hasOlder": false,
+        "olderCursor": null,
+        "hasNewer": true,
+        "newerCursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LXphdW4tMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoibmV3ZXIiLCJmcm9tIjpbMTc5MjI1MDkyODAwMCwiaW1hcC03MDJkYjkxZDk3ZDA2ZTI4YmZhM2JlOTIiXSwidG8iOlsxNzkyNzcyOTI4MDAwLCJpbWFwLTA1YmE2MDNiNjU0ZGI0OTkwNDcwYWEwMiJdfQ"
+      },
+      "placeholders": 1
+    }
+  ],
+  "kids-1440-light": [
+    {
+      "id": "imap-abdffdf383b2ea7fc9752f1d",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik15.10.2026, 20:28"
+    },
+    {
+      "id": "imap-8fd3a06b9e81b32f25d21099",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 01:28"
+    },
+    {
+      "id": "imap-ba46ab31de66d888425a333a",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 06:28"
+    },
+    {
+      "id": "imap-89969186da2dacbbdb1c88d5",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 07:08"
+    },
+    {
+      "id": "imap-0824bb06949d12a60511cb40",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 11:28"
+    },
+    {
+      "id": "imap-eff936d3d90ac301cf873a49",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 16:28"
+    },
+    {
+      "id": "imap-7993af47cad2af123d1497cf",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 21:28"
+    },
+    {
+      "id": "imap-9a4134a9ca4fb3d9090bc7d7",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik17.10.2026, 02:28"
+    },
+    {
+      "id": "imap-41e33e2218bc91fefc96b0f1",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik17.10.2026, 07:28"
+    }
+  ],
+  "anchor-1440-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-41e33e2218bc91fefc96b0f1",
+        "method": "GET",
+        "status": 200,
+        "bytes": 1619,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 38912,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-41e33e2218bc91fefc96b0f1"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderVisible": false
+  },
+  "newer-1440-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48282,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LXphdW4tMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoibmV3ZXIiLCJmcm9tIjpbMTc5MjM5NDkyODAwMCwiaW1hcC0xNmVhODQxYjI3ZTk0NjdmMzFlOTU4OTciXSwidG8iOlsxNzkyNzcyOTI4MDAwLCJpbWFwLTA1YmE2MDNiNjU0ZGI0OTkwNDcwYWEwMiJdfQ"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "newer2-1440-light": {
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "open-1440-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-028cf688a701fae090fbf331",
+        "method": "GET",
+        "status": 200,
+        "bytes": 2987,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 33665,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-028cf688a701fae090fbf331"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    }
+  },
+  "older-1440-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48323,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LWNvbnYtMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoib2xkZXIiLCJmcm9tIjpbMTc5MjU1NTEyODAwMCwiaW1hcC05YTJhMGZmMDM5MGM5MGQyODJhYWY3YWUiXX0"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderStillVisible": true
+  },
+  "kids-1440-dark": [
+    {
+      "id": "imap-abdffdf383b2ea7fc9752f1d",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik15.10.2026, 20:28"
+    },
+    {
+      "id": "imap-8fd3a06b9e81b32f25d21099",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 01:28"
+    },
+    {
+      "id": "imap-ba46ab31de66d888425a333a",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 06:28"
+    },
+    {
+      "id": "imap-89969186da2dacbbdb1c88d5",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 07:08"
+    },
+    {
+      "id": "imap-0824bb06949d12a60511cb40",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 11:28"
+    },
+    {
+      "id": "imap-eff936d3d90ac301cf873a49",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 16:28"
+    },
+    {
+      "id": "imap-7993af47cad2af123d1497cf",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 21:28"
+    },
+    {
+      "id": "imap-9a4134a9ca4fb3d9090bc7d7",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik17.10.2026, 02:28"
+    },
+    {
+      "id": "imap-41e33e2218bc91fefc96b0f1",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik17.10.2026, 07:28"
+    }
+  ],
+  "anchor-1440-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-41e33e2218bc91fefc96b0f1",
+        "method": "GET",
+        "status": 200,
+        "bytes": 1619,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 38912,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-41e33e2218bc91fefc96b0f1"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderVisible": false
+  },
+  "newer-1440-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48282,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LXphdW4tMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoibmV3ZXIiLCJmcm9tIjpbMTc5MjM5NDkyODAwMCwiaW1hcC0xNmVhODQxYjI3ZTk0NjdmMzFlOTU4OTciXSwidG8iOlsxNzkyNzcyOTI4MDAwLCJpbWFwLTA1YmE2MDNiNjU0ZGI0OTkwNDcwYWEwMiJdfQ"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "newer2-1440-dark": {
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "open-390-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-028cf688a701fae090fbf331",
+        "method": "GET",
+        "status": 200,
+        "bytes": 2987,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 33665,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-028cf688a701fae090fbf331"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    }
+  },
+  "older-390-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48323,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LWNvbnYtMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoib2xkZXIiLCJmcm9tIjpbMTc5MjU1NTEyODAwMCwiaW1hcC05YTJhMGZmMDM5MGM5MGQyODJhYWY3YWUiXX0"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderStillVisible": true
+  },
+  "kids-390-light": [
+    {
+      "id": "imap-abdffdf383b2ea7fc9752f1d",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik15.10.2026, 20:28"
+    },
+    {
+      "id": "imap-8fd3a06b9e81b32f25d21099",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 01:28"
+    },
+    {
+      "id": "imap-ba46ab31de66d888425a333a",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 06:28"
+    },
+    {
+      "id": "imap-89969186da2dacbbdb1c88d5",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 07:08"
+    },
+    {
+      "id": "imap-0824bb06949d12a60511cb40",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 11:28"
+    },
+    {
+      "id": "imap-eff936d3d90ac301cf873a49",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 16:28"
+    },
+    {
+      "id": "imap-7993af47cad2af123d1497cf",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 21:28"
+    },
+    {
+      "id": "imap-9a4134a9ca4fb3d9090bc7d7",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik17.10.2026, 02:28"
+    },
+    {
+      "id": "imap-41e33e2218bc91fefc96b0f1",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik17.10.2026, 07:28"
+    }
+  ],
+  "anchor-390-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-41e33e2218bc91fefc96b0f1",
+        "method": "GET",
+        "status": 200,
+        "bytes": 1619,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 38912,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-41e33e2218bc91fefc96b0f1"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderVisible": false
+  },
+  "newer-390-light": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48282,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LXphdW4tMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoibmV3ZXIiLCJmcm9tIjpbMTc5MjM5NDkyODAwMCwiaW1hcC0xNmVhODQxYjI3ZTk0NjdmMzFlOTU4OTciXSwidG8iOlsxNzkyNzcyOTI4MDAwLCJpbWFwLTA1YmE2MDNiNjU0ZGI0OTkwNDcwYWEwMiJdfQ"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "newer2-390-light": {
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "open-390-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-028cf688a701fae090fbf331",
+        "method": "GET",
+        "status": 200,
+        "bytes": 2987,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 33665,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-028cf688a701fae090fbf331"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    }
+  },
+  "older-390-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48323,
+        "body": {
+          "threadIds": [
+            "<review-conv-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LWNvbnYtMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoib2xkZXIiLCJmcm9tIjpbMTc5MjU1NTEyODAwMCwiaW1hcC05YTJhMGZmMDM5MGM5MGQyODJhYWY3YWUiXX0"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Nachricht Nummer 47 der synthetischen Unterhaltung. Marker47"
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderStillVisible": true
+  },
+  "kids-390-dark": [
+    {
+      "id": "imap-abdffdf383b2ea7fc9752f1d",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik15.10.2026, 20:28"
+    },
+    {
+      "id": "imap-8fd3a06b9e81b32f25d21099",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 01:28"
+    },
+    {
+      "id": "imap-ba46ab31de66d888425a333a",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 06:28"
+    },
+    {
+      "id": "imap-89969186da2dacbbdb1c88d5",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 07:08"
+    },
+    {
+      "id": "imap-0824bb06949d12a60511cb40",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 11:28"
+    },
+    {
+      "id": "imap-eff936d3d90ac301cf873a49",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik16.10.2026, 16:28"
+    },
+    {
+      "id": "imap-7993af47cad2af123d1497cf",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik16.10.2026, 21:28"
+    },
+    {
+      "id": "imap-9a4134a9ca4fb3d9090bc7d7",
+      "text": "SBSynthetic BuilderRe: Angebot Zaunbau Synthetik17.10.2026, 02:28"
+    },
+    {
+      "id": "imap-41e33e2218bc91fefc96b0f1",
+      "text": "SRSynthetic ReaderRe: Angebot Zaunbau Synthetik17.10.2026, 07:28"
+    }
+  ],
+  "anchor-390-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/messages/imap-41e33e2218bc91fefc96b0f1",
+        "method": "GET",
+        "status": 200,
+        "bytes": 1619,
+        "body": null
+      },
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 38912,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "messageIds": [],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "anchorMessageId": "imap-41e33e2218bc91fefc96b0f1"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "olderVisible": false
+  },
+  "newer-390-dark": {
+    "net": [
+      {
+        "url": "/api/accounts/qa-shared/thread/related",
+        "method": "POST",
+        "status": 200,
+        "bytes": 48282,
+        "body": {
+          "threadIds": [
+            "<review-zaun-0@example.test>"
+          ],
+          "groupBy": "date",
+          "threadDateSource": "latestReceivedDateValue",
+          "projection": "headers",
+          "excludeFolderIds": [
+            "qa-shared:Junk",
+            "qa-shared:Trash"
+          ],
+          "window": {
+            "cursor": "eyJ2IjoxLCJ0aHJlYWQiOiI8cmV2aWV3LXphdW4tMEBleGFtcGxlLnRlc3Q-IiwiZGlyIjoibmV3ZXIiLCJmcm9tIjpbMTc5MjM5NDkyODAwMCwiaW1hcC0xNmVhODQxYjI3ZTk0NjdmMzFlOTU4OTciXSwidG8iOlsxNzkyNzcyOTI4MDAwLCJpbWFwLTA1YmE2MDNiNjU0ZGI0OTkwNDcwYWEwMiJdfQ"
+          }
+        }
+      }
+    ],
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  },
+  "newer2-390-dark": {
+    "cards": {
+      "bodies": [
+        "Zaunbau Nachricht 8. Archivierte synthetische Unterhaltung."
+      ],
+      "expandBtns": 0,
+      "collapseBtns": 1,
+      "overflow": false
+    },
+    "newerStillVisible": false
+  }
+}

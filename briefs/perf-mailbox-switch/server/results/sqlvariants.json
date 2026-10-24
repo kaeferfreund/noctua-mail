@@ -1,0 +1,210 @@
+[
+ {
+  "id": "syn-l0",
+  "name": "messages rows: ORDER BY m.dateValue DESC, m.rowid (planner picks thread index)",
+  "baseMs": 10.928499999999985,
+  "altMs": 3.8919559999994817,
+  "identical": true,
+  "rows": 900,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-l0",
+  "name": "messages rows: INDEXED BY idx_messages_account_thread_date + explicit tie-break",
+  "baseMs": 11.002141000000847,
+  "altMs": 4.294239999999263,
+  "identical": true,
+  "rows": 900,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-l0",
+  "name": "baseCount: INDEXED BY idx_messages_account_thread_date",
+  "baseMs": 5.329288999999335,
+  "altMs": 0.7887670000000071,
+  "identical": true,
+  "rows": 1,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=? AND folderId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+  ]
+ },
+ {
+  "id": "syn-l0",
+  "name": "selector: subquery via folder index",
+  "baseMs": 14.194610000000466,
+  "altMs": 15.638704000000871,
+  "identical": true,
+  "rows": 300,
+  "basePlan": [
+   "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH mf USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=? AND threadId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ],
+  "altPlan": [
+   "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_folder_date (accountId=? AND folderId=?)",
+   "USE TEMP B-TREE FOR DISTINCT",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH mf USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=? AND threadId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-l0",
+  "name": "thread count: subquery via folder index",
+  "baseMs": 8.566478000000643,
+  "altMs": 9.720848999999362,
+  "identical": true,
+  "rows": 1,
+  "basePlan": [
+   "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+  ],
+  "altPlan": [
+   "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_folder_date (accountId=? AND folderId=?)",
+   "USE TEMP B-TREE FOR DISTINCT"
+  ]
+ },
+ {
+  "id": "syn-m0",
+  "name": "messages rows: ORDER BY m.dateValue DESC, m.rowid (planner picks thread index)",
+  "baseMs": 3.8774350000003324,
+  "altMs": 8.847320999999283,
+  "identical": true,
+  "rows": 900,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-m0",
+  "name": "messages rows: INDEXED BY idx_messages_account_thread_date + explicit tie-break",
+  "baseMs": 4.327839000001404,
+  "altMs": 5.212687999999616,
+  "identical": true,
+  "rows": 900,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)",
+   "CORRELATED SCALAR SUBQUERY 1",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH a USING INDEX sqlite_autoindex_attachments_1 (accountId=? AND messageId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-m0",
+  "name": "baseCount: INDEXED BY idx_messages_account_thread_date",
+  "baseMs": 0.9424490000001242,
+  "altMs": 0.7207670000007056,
+  "identical": true,
+  "rows": 1,
+  "basePlan": [
+   "SEARCH m USING INDEX idx_messages_account_folder_unread (accountId=? AND folderId=?)"
+  ],
+  "altPlan": [
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+  ]
+ },
+ {
+  "id": "syn-m0",
+  "name": "selector: subquery via folder index",
+  "baseMs": 2.6483439999992697,
+  "altMs": 3.876715000000331,
+  "identical": true,
+  "rows": 300,
+  "basePlan": [
+   "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH mf USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=? AND threadId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ],
+  "altPlan": [
+   "SEARCH t USING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_folder_date (accountId=? AND folderId=?)",
+   "USE TEMP B-TREE FOR DISTINCT",
+   "CORRELATED SCALAR SUBQUERY 2",
+   "SEARCH mf USING INDEX idx_messages_account_flagged_thread (accountId=? AND flagged=? AND threadId=?)",
+   "USE TEMP B-TREE FOR ORDER BY"
+  ]
+ },
+ {
+  "id": "syn-m0",
+  "name": "thread count: subquery via folder index",
+  "baseMs": 1.3644120000008115,
+  "altMs": 1.4137730000002193,
+  "identical": true,
+  "rows": 1,
+  "basePlan": [
+   "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=?)"
+  ],
+  "altPlan": [
+   "SEARCH t USING COVERING INDEX sqlite_autoindex_threads_1 (accountId=? AND threadId=?)",
+   "LIST SUBQUERY 1",
+   "SEARCH m USING INDEX idx_messages_account_folder_date (accountId=? AND folderId=?)",
+   "USE TEMP B-TREE FOR DISTINCT"
+  ]
+ }
+]

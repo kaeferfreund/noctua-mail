@@ -1,0 +1,321 @@
+[
+  {
+    "width": 1440,
+    "scheme": "light",
+    "tab": "Benutzer",
+    "buttons": 18,
+    "minH": 28,
+    "maxH": 32,
+    "offenders": [],
+    "docScroll": 1440
+  },
+  {
+    "width": 1440,
+    "scheme": "light",
+    "tab": "Postfächer",
+    "buttons": 9,
+    "minH": 32,
+    "maxH": 32,
+    "offenders": [],
+    "docScroll": 1440
+  },
+  {
+    "width": 1440,
+    "scheme": "dark",
+    "tab": "Benutzer",
+    "buttons": 18,
+    "minH": 28,
+    "maxH": 32,
+    "offenders": [],
+    "docScroll": 1440
+  },
+  {
+    "width": 1440,
+    "scheme": "dark",
+    "tab": "Postfächer",
+    "buttons": 9,
+    "minH": 32,
+    "maxH": 32,
+    "offenders": [],
+    "docScroll": 1440
+  },
+  {
+    "width": 390,
+    "scheme": "light",
+    "tab": "Benutzer",
+    "buttons": 18,
+    "minH": 28,
+    "maxH": 44,
+    "offenders": [
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      }
+    ],
+    "docScroll": 390
+  },
+  {
+    "width": 390,
+    "scheme": "light",
+    "tab": "Postfächer",
+    "buttons": 9,
+    "minH": 44,
+    "maxH": 44,
+    "offenders": [],
+    "docScroll": 390
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "tab": "Benutzer",
+    "buttons": 18,
+    "minH": 28,
+    "maxH": 44,
+    "offenders": [
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      }
+    ],
+    "docScroll": 390
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "tab": "Postfächer",
+    "buttons": 9,
+    "minH": 44,
+    "maxH": 44,
+    "offenders": [],
+    "docScroll": 390
+  },
+  {
+    "width": 320,
+    "scheme": "dark",
+    "tab": "Benutzer",
+    "buttons": 18,
+    "minH": 28,
+    "maxH": 44,
+    "offenders": [
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Deaktivieren",
+        "right": 632,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Sitzungen widerrufen",
+        "right": 684,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Wiederherstellung",
+        "right": 667,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "MFA zurücksetzen",
+        "right": 666,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Passkey entfernen",
+        "right": 669,
+        "h": 28,
+        "clipped": false
+      },
+      {
+        "label": "Benutzer löschen",
+        "right": 660,
+        "h": 28,
+        "clipped": false
+      }
+    ],
+    "docScroll": 320
+  },
+  {
+    "width": 320,
+    "scheme": "dark",
+    "tab": "Postfächer",
+    "buttons": 9,
+    "minH": 44,
+    "maxH": 44,
+    "offenders": [],
+    "docScroll": 320
+  }
+]

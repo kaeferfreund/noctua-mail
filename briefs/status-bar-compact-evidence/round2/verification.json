@@ -1,0 +1,162 @@
+{
+  "branch": "feat/status-bar-compact",
+  "head": "5809d898b7077793be30bfde7262d4977862d2b2",
+  "commits": {
+    "fix(shell): record round two calendar and merge validation": "5809d898b7077793be30bfde7262d4977862d2b2",
+    "fix(shell): restore focus around calendar event dialogs": "f97896c24e0d40ec74ab266ab1d07bf59e6d0dd2",
+    "fix(shell): merge translated views with compact status owner": "97d3eff8e979259759d7c2f4a4b9f1e95aa97381",
+    "fix(shell): relocate status validation evidence to briefs": "57074da803891964bfe0cb677d9bcd1b492157a3",
+    "fix(shell): place status calendar beneath event dialogs": "25ff4e0359cea9f918af2df60f64b0e5883df939",
+    "fix(shell): restore bounded status calendar frames": "f8fc706978e35595f84b431aa1638d088e288f1c"
+  },
+  "calendar": [
+    {
+      "width": 1280,
+      "height": 900,
+      "harnessHeight": 426.328125,
+      "surfaceLayer": 9990,
+      "dialogLayer": 9995,
+      "pickerLayer": 9998,
+      "eventOpened": true,
+      "created": true,
+      "edited": true,
+      "focusRestored": true
+    },
+    {
+      "width": 1024,
+      "height": 900,
+      "harnessHeight": 426.328125,
+      "surfaceLayer": 9990,
+      "dialogLayer": 9995,
+      "pickerLayer": 9998,
+      "eventOpened": true,
+      "created": true,
+      "edited": true,
+      "focusRestored": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "harnessHeight": 683.5,
+      "surfaceLayer": 9994,
+      "dialogLayer": 9995,
+      "pickerLayer": 9998,
+      "eventOpened": true,
+      "created": true,
+      "edited": true,
+      "focusRestored": true
+    }
+  ],
+  "evidence": "/home/monkey/code/noctua-mail/briefs/status-bar-compact-evidence",
+  "mergeDecisions": "doc/SHELL.md: compact owner/embedding/absolute timestamps and 57 status keys retained; every other i18n-views key retained; per-hunk reader/sender decisions documented.",
+  "gates": {
+    "exitCodes": {
+      "browser": 0,
+      "lint": 1,
+      "catalog": 0,
+      "ci": 0,
+      "build": 0,
+      "merge-i18n": 0,
+      "dom-1": 0,
+      "merge-stage": 0,
+      "merge-reader": 1,
+      "merge-sender": 1,
+      "dom-2": 0,
+      "dom-3": 0,
+      "typecheck": 0
+    },
+    "server": {
+      "tests": 2816,
+      "files": 305,
+      "assertions": 16998,
+      "seconds": 442.25
+    },
+    "dom": {
+      "tests": 492,
+      "files": 60,
+      "assertions": 2824,
+      "seconds": 71.08
+    },
+    "domRepeated": {
+      "runs": 3,
+      "testsEach": 51,
+      "assertionsEach": 228
+    },
+    "catalog": {
+      "tests": 9,
+      "assertions": 5150,
+      "leavesEach": 1025,
+      "duplicateKeys": 0
+    },
+    "lint": {
+      "errors": 1,
+      "warnings": 25,
+      "new": 0
+    },
+    "browser": {
+      "tests": 7,
+      "seconds": 39.4,
+      "reviewProbes": 5
+    },
+    "diffCheck": 0
+  },
+  "mergeTree": {
+    "stage": {
+      "ref": "origin/integration/stage",
+      "sha": "11dc3c5f50826aec73f7547990e3b89def1dd08b",
+      "exit": 0,
+      "tree": "e8b87d20332214d91234d50ef61022321d26c265",
+      "conflictFiles": []
+    },
+    "i18n": {
+      "ref": "origin/fix/i18n-views",
+      "sha": "992b220bd65d8fcb3540b58a3a835d48d47a0e2e",
+      "exit": 0,
+      "tree": "e8b87d20332214d91234d50ef61022321d26c265",
+      "conflictFiles": []
+    },
+    "reader": {
+      "ref": "origin/feat/reader-focus",
+      "sha": "14a1f8ef8ba54cb5eab0cf75de72606746d70a10",
+      "exit": 1,
+      "tree": "245c0fd58617a30c1aded04cb131e352e1025608",
+      "conflictFiles": [
+        "app/components/shell/AppShell.tsx",
+        "doc/SHELL.md"
+      ]
+    },
+    "sender": {
+      "ref": "origin/feat/sender-identities-3",
+      "sha": "26d82d81126639afd82cf5d0d53ff1093b9959c7",
+      "exit": 1,
+      "tree": "c244312413ba7441ea3c6c3695ec43b5db584577",
+      "conflictFiles": [
+        "app/components/AccountSettingsModal.tsx",
+        "app/components/account-settings/tabs/PreferencesTabContent.tsx",
+        "lib/mail/resyncMessage.senderKey.test.ts",
+        "messages/de.json",
+        "messages/en.json"
+      ]
+    }
+  },
+  "followUp": "Exploratory mobile PWA-open/edit/Escape remounted the shell on history return; not baseline-compared. Normal mobile-menu focus and PWA flag/query/hash checks pass; shared history unchanged.",
+  "cleanup": {
+    "ownedServerProcessGroupsStopped": [
+      2686794,
+      2707211,
+      2712328,
+      2718244,
+      2722311,
+      2724349,
+      2728360
+    ],
+    "portsReleased": [
+      3875,
+      3876,
+      3877,
+      3878
+    ],
+    "tmpRemoved": true,
+    "pushed": false
+  }
+}

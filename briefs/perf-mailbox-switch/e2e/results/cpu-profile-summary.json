@@ -1,0 +1,219 @@
+{
+ "at": "2026-10-23T15:58:38.030Z",
+ "out": [
+  {
+   "from": "small",
+   "to": "large",
+   "perSwitchSampledJsMs": 659,
+   "topSelf": [
+    [
+     "r @ 013iha29f-oio.js:1",
+     41.6
+    ],
+    [
+     "t @ 013iha29f-oio.js:1",
+     39.4
+    ],
+    [
+     "(anon) @ 0bomfrlk_0g89.js:0",
+     38.9
+    ],
+    [
+     "(anon) @ 013iha29f-oio.js:1",
+     36.3
+    ],
+    [
+     "URL @ :undefined",
+     30.4
+    ],
+    [
+     "(anon) @ 1mx1wqpmp9sa6.js:3",
+     29
+    ],
+    [
+     "aG @ 0bomfrlk_0g89.js:0",
+     27.1
+    ],
+    [
+     "(garbage collector) @ :undefined",
+     21.3
+    ],
+    [
+     "(anon) @ 1_9_o3iok6nqq.js:0",
+     18.5
+    ],
+    [
+     "(anon) @ 0rqvshlk9e35x.js:0",
+     16.5
+    ],
+    [
+     "fetch @ :undefined",
+     16.2
+    ],
+    [
+     "e @ 1y5fvokl9hn96.js:0",
+     14.9
+    ],
+    [
+     "o4 @ 0rqvshlk9e35x.js:0",
+     13.3
+    ],
+    [
+     "tokenize @ 013iha29f-oio.js:1",
+     10.4
+    ],
+    [
+     "o @ 1y5fvokl9hn96.js:0",
+     10.2
+    ],
+    [
+     "i @ 0rqvshlk9e35x.js:0",
+     9.9
+    ],
+    [
+     "(anon) @ 3kmzblaysritu.js:0",
+     9.7
+    ],
+    [
+     "g @ 1y5fvokl9hn96.js:2",
+     9.4
+    ],
+    [
+     "checkChar @ 013iha29f-oio.js:1",
+     8.9
+    ],
+    [
+     "tryParsePluralOrSelectOptions @ 1y5fvokl9hn96.js:0",
+     8.7
+    ],
+    [
+     "oY @ 0rqvshlk9e35x.js:0",
+     7.8
+    ],
+    [
+     "put @ :undefined",
+     7.8
+    ],
+    [
+     "setAttribute @ :undefined",
+     7.2
+    ],
+    [
+     "m @ 3kmzblaysritu.js:0",
+     7.2
+    ],
+    [
+     "oc @ 0rqvshlk9e35x.js:0",
+     6.5
+    ]
+   ]
+  },
+  {
+   "from": "large",
+   "to": "folders",
+   "perSwitchSampledJsMs": 1148.9,
+   "topSelf": [
+    [
+     "e @ 1y5fvokl9hn96.js:0",
+     83.5
+    ],
+    [
+     "(garbage collector) @ :undefined",
+     78.4
+    ],
+    [
+     "(anon) @ 1mx1wqpmp9sa6.js:3",
+     70.1
+    ],
+    [
+     "(anon) @ 013iha29f-oio.js:1",
+     45.4
+    ],
+    [
+     "(anon) @ 0rqvshlk9e35x.js:0",
+     41.4
+    ],
+    [
+     "(anon) @ 1_9_o3iok6nqq.js:0",
+     41.1
+    ],
+    [
+     "(anon) @ 1y5fvokl9hn96.js:0",
+     40.9
+    ],
+    [
+     "aG @ 0bomfrlk_0g89.js:0",
+     30.5
+    ],
+    [
+     "t @ 013iha29f-oio.js:1",
+     28.3
+    ],
+    [
+     "fetch @ :undefined",
+     27.9
+    ],
+    [
+     "oY @ 0rqvshlk9e35x.js:0",
+     27.1
+    ],
+    [
+     "(anon) @ 0bomfrlk_0g89.js:0",
+     24.6
+    ],
+    [
+     "r.createElement @ 242x7dx0zu3hf.js:0",
+     23
+    ],
+    [
+     "r.cloneElement @ 242x7dx0zu3hf.js:0",
+     22.4
+    ],
+    [
+     "(anon) @ 43nigtyu141-5.js:0",
+     22.3
+    ],
+    [
+     "(anon) @ 1y5fvokl9hn96.js:2",
+     20.9
+    ],
+    [
+     "URL @ :undefined",
+     19.8
+    ],
+    [
+     "o4 @ 0rqvshlk9e35x.js:0",
+     18.8
+    ],
+    [
+     "y @ 0f9u2168-mrz_.js:0",
+     18.4
+    ],
+    [
+     "r @ 013iha29f-oio.js:1",
+     18.2
+    ],
+    [
+     "i @ 0rqvshlk9e35x.js:0",
+     18.2
+    ],
+    [
+     "os @ 0rqvshlk9e35x.js:0",
+     17.9
+    ],
+    [
+     "ih @ 0rqvshlk9e35x.js:0",
+     17.3
+    ],
+    [
+     "h @ 1y5fvokl9hn96.js:0",
+     17.2
+    ],
+    [
+     "oc @ 0rqvshlk9e35x.js:0",
+     14
+    ]
+   ]
+  }
+ ]
+}

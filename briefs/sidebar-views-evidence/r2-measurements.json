@@ -1,0 +1,249 @@
+{
+  "light-1440-hover": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "text": "Posteingang",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          244,
+          268,
+          "21"
+        ],
+        "bg": "rgb(240, 241, 254)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "3"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          228,
+          268,
+          "9111"
+        ],
+        "bg": "rgb(232, 232, 232)"
+      },
+      {
+        "id": "virtual:open",
+        "text": "Offen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          217,
+          268,
+          "12.345"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:focused",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "7"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          244,
+          268,
+          "48"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "2"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ],
+    "tooltips": [
+      {
+        "text": "Nicht zugewiesen: Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.",
+        "left": 282,
+        "right": 602,
+        "top": 280,
+        "display": "inline-flex",
+        "opacity": "1"
+      }
+    ]
+  },
+  "dark-1440-hover": {
+    "rows": [
+      {
+        "id": "folder:qa-shared:INBOX",
+        "text": "Posteingang",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          244,
+          268,
+          "21"
+        ],
+        "bg": "rgb(32, 34, 72)"
+      },
+      {
+        "id": "virtual:assigned-to-me",
+        "text": "Mir zugewiesen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "3"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:unassigned",
+        "text": "Nicht zugewiesen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          228,
+          268,
+          "9111"
+        ],
+        "bg": "rgb(49, 49, 49)"
+      },
+      {
+        "id": "virtual:open",
+        "text": "Offen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          217,
+          268,
+          "12.345"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:focused",
+        "text": "Ungelesen & unbeantwortet",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "7"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:action-queue",
+        "text": "Markiert & Aufgaben",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          244,
+          268,
+          "48"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "id": "virtual:invite-deck",
+        "text": "Kalendereinladungen",
+        "row": [
+          16,
+          272
+        ],
+        "badge": [
+          248,
+          268,
+          "2"
+        ],
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ],
+    "tooltips": [
+      {
+        "text": "Nicht zugewiesen: Hier findest du noch nicht erledigte Threads, die niemandem zugewiesen sind.",
+        "left": 282,
+        "right": 602,
+        "top": 280,
+        "display": "inline-flex",
+        "opacity": "1"
+      }
+    ]
+  },
+  "light-390-sheet": {
+    "afterHover": [],
+    "afterFocus": [],
+    "describedBy": null
+  },
+  "light-1440-collapsed-shift-tab-13": {
+    "path": [
+      "BODY",
+      "BUTTON",
+      "BUTTON",
+      "Open calendar",
+      "BUTTON",
+      "DIV",
+      "Nachrichtenaktionen",
+      "DIV",
+      "Nachrichtenaktionen",
+      "DIV",
+      "BUTTON",
+      "Nachrichtenaktionen",
+      "DIV"
+    ],
+    "tooltips": []
+  }
+}

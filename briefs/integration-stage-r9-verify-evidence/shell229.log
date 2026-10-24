@@ -1,0 +1,178 @@
+$ bun scripts/runAuthBrowserTests.ts "tests/browser/auth/shell.spec.ts:229" "--reporter=list"
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+▲ Next.js 16.4.2
+- Local:         http://localhost:3799
+- Network:       http://localhost:3799
+✓ Ready in 164ms
+✓ Running next.config.ts took 151ms
+⚠ "next start" does not work with "output: standalone" configuration. Use "node .next/standalone/server.js" instead.
+[2026-10-23 15:15:22.602 +00:00] [startup] opened storage {
+[2026-10-23 15:15:22.602 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data',
+[2026-10-23 15:15:22.602 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data/db/main.db'
+[2026-10-23 15:15:22.602 +00:00] }
+[2026-10-23 15:15:23.257 +00:00] [startup] opened storage {
+[2026-10-23 15:15:23.257 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data',
+[2026-10-23 15:15:23.257 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data/db/main.db'
+[2026-10-23 15:15:23.257 +00:00] }
+
+Running 1 test using 1 worker
+
+[2026-10-23 15:15:26.607 +00:00] [startup] opened storage {
+[2026-10-23 15:15:26.607 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data',
+[2026-10-23 15:15:26.607 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/noctua-auth-browser-Wgeij9/data/db/main.db'
+[2026-10-23 15:15:26.607 +00:00] }
+[2026-10-23 15:15:28.367 +00:00] [sync] worker started {"jobId":"325cddb0-a3a1-4762-b275-166d8b4e0421","accountId":"synthetic-mailbox-a","mode":"full","pid":3838835}
+[2026-10-23 15:15:28.532 +00:00] [sync-status] {"outcome":"ok","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","routeAccountId":"synthetic-mailbox-a","jobId":"325cddb0-a3a1-4762-b275-166d8b4e0421","accountId":"synthetic-mailbox-a","status":"running","pid":3838835,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792768528341,"progressMessage":"Sync starting."}
+[2026-10-23 15:15:28.696 +00:00] [sync] unknown% progress on {"jobId":"325cddb0-a3a1-4762-b275-166d8b4e0421","accountId":"synthetic-mailbox-a","mailboxPath":"INBOX","mode":"full","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 15:15:28.724 +00:00] [sync-worker] [2026-10-23 15:15:28.719 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"1i6msm6h5fvhdpxxe1gd"}
+[2026-10-23 15:15:28.724 +00:00] [sync-worker] [2026-10-23 15:15:28.720 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-a","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:28.724 +00:00] [sync-worker] [2026-10-23 15:15:28.720 +00:00] [imap] connect account=synthetic-mailbox-a client=f741f7b5-ebb1-4333-915a-629c37ec06ef 10ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:28.724 +00:00] [sync-worker] [2026-10-23 15:15:28.721 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-a","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:28.762 +00:00] [sync] worker started {"jobId":"6e99631e-52a9-4137-aa19-2eec6b84f56e","accountId":"synthetic-mailbox-b","folderId":"synthetic-mailbox-b:INBOX","mode":"new","pid":3838855}
+[2026-10-23 15:15:28.796 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"1henzjw6s5yv5nyni3f5"}
+[2026-10-23 15:15:28.797 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:28.797 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-mailbox-b 17ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:28.798 +00:00] [imap] imap.logout account=synthetic-mailbox-b 0ms error=Connection not available
+[2026-10-23 15:15:28.799 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:28.799 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:28.808 +00:00] [sync-status] {"outcome":"ok","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","routeAccountId":"synthetic-mailbox-b","jobId":"6e99631e-52a9-4137-aa19-2eec6b84f56e","accountId":"synthetic-mailbox-b","status":"running","pid":3838855,"progressPhase":"starting","progressProcessed":0,"progressUpdatedAt":1792768528748,"progressMessage":"Sync starting."}
+[2026-10-23 15:15:29.004 +00:00] [sync-worker] [2026-10-23 15:15:28.982 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"h6kj1t2o6fuxer9gzgma"}
+[2026-10-23 15:15:29.004 +00:00] [sync-worker] [2026-10-23 15:15:28.982 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-a","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.004 +00:00] [sync-worker] [2026-10-23 15:15:28.983 +00:00] [imap] connect account=synthetic-mailbox-a client=f741f7b5-ebb1-4333-915a-629c37ec06ef 9ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.004 +00:00] [sync-worker] [2026-10-23 15:15:28.983 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-a","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":2,"maxAttempts":3,"delayMs":500,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.097 +00:00] [sync] unknown% progress on {"jobId":"6e99631e-52a9-4137-aa19-2eec6b84f56e","accountId":"synthetic-mailbox-b","folderId":"synthetic-mailbox-b:INBOX","mailboxPath":"INBOX","mode":"new","phase":"starting","processed":0,"message":"Starting sync."}
+[2026-10-23 15:15:29.122 +00:00] [sync-worker] [2026-10-23 15:15:29.121 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"n3hdisa2s0cek9woexr2"}
+[2026-10-23 15:15:29.122 +00:00] [sync-worker] [2026-10-23 15:15:29.122 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.122 +00:00] [sync-worker] [2026-10-23 15:15:29.122 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 19ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.123 +00:00] [sync-worker] [2026-10-23 15:15:29.123 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.396 +00:00] [sync-worker] [2026-10-23 15:15:29.382 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"khjqoo584qlgugkdm0ga"}
+[2026-10-23 15:15:29.396 +00:00] [sync-worker] [2026-10-23 15:15:29.382 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.396 +00:00] [sync-worker] [2026-10-23 15:15:29.382 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 5ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.396 +00:00] [sync-worker] [2026-10-23 15:15:29.382 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":2,"maxAttempts":3,"delayMs":500,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.497 +00:00] [sync-worker] [2026-10-23 15:15:29.496 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"n1mgfujl2cflj6aolj0b"}
+[2026-10-23 15:15:29.497 +00:00] [sync-worker] [2026-10-23 15:15:29.496 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-a","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.499 +00:00] [sync-worker] [2026-10-23 15:15:29.496 +00:00] [imap] connect account=synthetic-mailbox-a client=f741f7b5-ebb1-4333-915a-629c37ec06ef 10ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.500 +00:00] [sync-worker] [2026-10-23 15:15:29.500 +00:00] [sync] attempt 1/11 failed (getaddrinfo ENOTFOUND imap.example.invalid), retrying in 12.856s
+[2026-10-23 15:15:29.500 +00:00] [sync] unknown% progress on {"jobId":"325cddb0-a3a1-4762-b275-166d8b4e0421","accountId":"synthetic-mailbox-a","mailboxPath":"INBOX","mode":"full","phase":"retrying","processed":0,"retryAttempt":1,"maxRetries":10,"message":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.669 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"6eo4ipy2aq86pef3lbei"}
+[2026-10-23 15:15:29.671 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.671 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 15ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.671 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.671 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.686 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"s1xzwkpj951u5ggensjz"}
+[2026-10-23 15:15:29.686 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.687 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-mailbox-b 4ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.687 +00:00] [imap] imap.logout account=synthetic-mailbox-b 0ms error=Connection not available
+[2026-10-23 15:15:29.687 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.687 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.898 +00:00] [sync-worker] [2026-10-23 15:15:29.898 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"7xncoaqzw2ttqn91mkk6"}
+[2026-10-23 15:15:29.898 +00:00] [sync-worker] [2026-10-23 15:15:29.898 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.898 +00:00] [sync-worker] [2026-10-23 15:15:29.898 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 8ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.900 +00:00] [sync-worker] [2026-10-23 15:15:29.899 +00:00] [sync] attempt 1/11 failed (getaddrinfo ENOTFOUND imap.example.invalid), retrying in 14.652s
+[2026-10-23 15:15:29.900 +00:00] [sync] unknown% progress on {"jobId":"6e99631e-52a9-4137-aa19-2eec6b84f56e","accountId":"synthetic-mailbox-b","folderId":"synthetic-mailbox-b:INBOX","mailboxPath":"INBOX","mode":"new","phase":"retrying","processed":0,"retryAttempt":1,"maxRetries":10,"message":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.924 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"gbl5c1kw7ywsydcopx36"}
+[2026-10-23 15:15:29.925 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.925 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 3ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.925 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":2,"maxAttempts":3,"delayMs":500,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.925 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.942 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"19oa0qpp5sm5cimntx8t"}
+[2026-10-23 15:15:29.942 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:29.942 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-mailbox-b 4ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:29.942 +00:00] [imap] imap.logout account=synthetic-mailbox-b 0ms error=Connection not available
+[2026-10-23 15:15:29.942 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","host":"imap.example.invalid","attempt":2,"maxAttempts":3,"delayMs":500,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:29.942 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.440 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"1ciic3ghjdy0x36y2vvn"}
+[2026-10-23 15:15:30.440 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.440 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 3ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:30.444 +00:00] ⨯ [DNSException: getaddrinfo ENOTFOUND imap.example.invalid] {
+[2026-10-23 15:15:30.444 +00:00]   code: 'ENOTFOUND',
+[2026-10-23 15:15:30.444 +00:00]   syscall: 'getaddrinfo',
+[2026-10-23 15:15:30.444 +00:00]   errno: 4,
+[2026-10-23 15:15:30.444 +00:00]   hostname: 'imap.example.invalid'
+[2026-10-23 15:15:30.444 +00:00] }
+[2026-10-23 15:15:30.445 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.449 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"hljip5ebazhhdv1mogte"}
+[2026-10-23 15:15:30.449 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.449 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-mailbox-b 3ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:30.449 +00:00] [imap] imap.logout account=synthetic-mailbox-b 0ms error=Connection not available
+[2026-10-23 15:15:30.450 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":null,"mailbox":"INBOX","hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.501 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"bnjcgcdyu9qz0e1x3hzv"}
+[2026-10-23 15:15:30.501 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.501 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 2ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:30.501 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":1,"maxAttempts":3,"delayMs":250,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:30.501 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.755 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"zdpbu70w1hpblxrv7ewf"}
+[2026-10-23 15:15:30.755 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:30.755 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 3ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:30.755 +00:00] {"event":"imap.connect_retry","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","attempt":2,"maxAttempts":3,"delayMs":500,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:30.755 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:31.259 +00:00] {"err":{"code":"ENOTFOUND","syscall":"getaddrinfo","errno":4,"name":"DNSException","hostname":"imap.example.invalid"},"cid":"119anr4jkp2q0el0jqn5"}
+[2026-10-23 15:15:31.259 +00:00] {"event":"imap.socket_error","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"error":"getaddrinfo ENOTFOUND imap.example.invalid","socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 15:15:31.259 +00:00] [imap] connect account=synthetic-mailbox-b client=f741f7b5-ebb1-4333-915a-629c37ec06ef 3ms error=getaddrinfo ENOTFOUND imap.example.invalid
+[2026-10-23 15:15:31.259 +00:00] {"event":"imap.connect_breaker_open","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"host":"imap.example.invalid","consecutiveFailures":3,"openedUntil":1792768561259,"error":"getaddrinfo ENOTFOUND imap.example.invalid"}
+[2026-10-23 15:15:31.260 +00:00] ⨯ [DNSException: getaddrinfo ENOTFOUND imap.example.invalid] {
+[2026-10-23 15:15:31.260 +00:00]   code: 'ENOTFOUND',
+[2026-10-23 15:15:31.260 +00:00]   syscall: 'getaddrinfo',
+[2026-10-23 15:15:31.260 +00:00]   errno: 4,
+[2026-10-23 15:15:31.260 +00:00]   hostname: 'imap.example.invalid'
+[2026-10-23 15:15:31.260 +00:00] }
+[2026-10-23 15:15:31.260 +00:00] {"event":"imap.socket_close","accountId":"synthetic-mailbox-b","clientId":"f741f7b5-ebb1-4333-915a-629c37ec06ef","mailbox":null,"hadError":true,"socket":{"secureConnection":true,"sessionReused":false,"authorized":false,"authorizationError":null,"remoteAddress":null,"remotePort":null,"localAddress":null,"localPort":null,"alpnProtocol":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+  ✓  1 tests/browser/auth/shell.spec.ts:229:1 › shell persists mailbox switch and keeps personal security independent (9.0s)
+
+  1 passed (10.7s)
+[2026-10-23 15:15:35.477 +00:00] [shutdown] starting {
+[2026-10-23 15:15:35.477 +00:00]   signal: 'SIGTERM',
+[2026-10-23 15:15:35.477 +00:00]   hooks: [
+[2026-10-23 15:15:35.477 +00:00]     'background:stop',
+[2026-10-23 15:15:35.477 +00:00]     'background:drain',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams:drain',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:4b66b54b-8a22-4f96-b0bf-14085fec20fe:stop',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:4b66b54b-8a22-4f96-b0bf-14085fec20fe:drain',
+[2026-10-23 15:15:35.477 +00:00]     'db:close',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams:drain',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams',
+[2026-10-23 15:15:35.477 +00:00]     'background:stop',
+[2026-10-23 15:15:35.477 +00:00]     'background:drain',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:bcc373c7-ae31-4145-b995-79806eb80d09:stop',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:bcc373c7-ae31-4145-b995-79806eb80d09:drain',
+[2026-10-23 15:15:35.477 +00:00]     'db:close',
+[2026-10-23 15:15:35.477 +00:00]     'background:stop',
+[2026-10-23 15:15:35.477 +00:00]     'background:drain',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams:drain',
+[2026-10-23 15:15:35.477 +00:00]     'auth-streams',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:5b5dd3ca-697f-4a1b-bde7-3120ca68d8d9:stop',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:5b5dd3ca-697f-4a1b-bde7-3120ca68d8d9:drain',
+[2026-10-23 15:15:35.477 +00:00]     'db:close',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:308e53a5-25cf-4d1a-ba90-5d22d9d96637:stop',
+[2026-10-23 15:15:35.477 +00:00]     'admission:3838298:308e53a5-25cf-4d1a-ba90-5d22d9d96637:drain',
+[2026-10-23 15:15:35.477 +00:00]     'imap-pool'
+[2026-10-23 15:15:35.477 +00:00]   ]
+[2026-10-23 15:15:35.477 +00:00] }
+[2026-10-23 15:15:35.478 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 15:15:35.478 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 15:15:35.478 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 15:15:35.479 +00:00] [shutdown] awaiting background work [
+[2026-10-23 15:15:35.479 +00:00]   'sync:325cddb0-a3a1-4762-b275-166d8b4e0421',
+[2026-10-23 15:15:35.479 +00:00]   'worker:3838835',
+[2026-10-23 15:15:35.479 +00:00]   'sync:6e99631e-52a9-4137-aa19-2eec6b84f56e',
+[2026-10-23 15:15:35.479 +00:00]   'worker:3838855'
+[2026-10-23 15:15:35.479 +00:00] ]
+[2026-10-23 15:15:35.479 +00:00] [shutdown] awaiting background work [
+[2026-10-23 15:15:35.479 +00:00]   'sync:325cddb0-a3a1-4762-b275-166d8b4e0421',
+[2026-10-23 15:15:35.479 +00:00]   'worker:3838835',
+[2026-10-23 15:15:35.479 +00:00]   'sync:6e99631e-52a9-4137-aa19-2eec6b84f56e',
+[2026-10-23 15:15:35.479 +00:00]   'worker:3838855'
+[2026-10-23 15:15:35.479 +00:00] ]
+[2026-10-23 15:15:35.480 +00:00] [shutdown] awaiting background work [
+[2026-10-23 15:15:35.480 +00:00]   'sync:325cddb0-a3a1-4762-b275-166d8b4e0421',
+[2026-10-23 15:15:35.480 +00:00]   'worker:3838835',
+[2026-10-23 15:15:35.480 +00:00]   'sync:6e99631e-52a9-4137-aa19-2eec6b84f56e',
+[2026-10-23 15:15:35.480 +00:00]   'worker:3838855'
+[2026-10-23 15:15:35.480 +00:00] ]
+[2026-10-23 15:15:35.490 +00:00] [shutdown] complete {}
+error: "next" exited with code 143

@@ -1,0 +1,328 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/authLifetimeLock.test.ts:
+(pass) application auth initialization refuses operator lifetime lock before touching the DB [581.37ms]
+(pass) instrumentation refuses operator lifetime lock before master DB or watcher startup [697.57ms]
+(pass) lifetime lock releases on normal exit; stale PID/start timestamp cannot block restart [13.41ms]
+(pass) lifetime lock releases on crash exit; stale PID/start timestamp cannot block restart [13.25ms]
+(pass) ambiguous stale metadata needs explicit operator override; override never bypasses live OS lock [13.74ms]
+(pass) database symlink aliases share one lifetime lock [561.99ms]
+(pass) migrateTeamAuth CLI refuses a live application lock before opening the database [569.14ms]
+(pass) recoverTeamAuth CLI refuses a live application lock before opening the database [567.00ms]
+(pass) migration CLI audits stale override, passes its operator lock and releases after migration [673.81ms]
+
+lib/teamAuthSlice5.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > missing invite has zero IMAP/SMTP calls and zero reservations [183.75ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > expired invite has zero IMAP/SMTP calls and zero reservations [23.96ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > exhausted invite has zero IMAP/SMTP calls and zero reservations [83.29ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > wrong-person invite has zero IMAP/SMTP calls and zero reservations [21.83ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > non-admin-bootstrap invite has zero IMAP/SMTP calls and zero reservations [20.63ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > all signups require a valid invite; app password has an explicit minimum and no mailbox fallback [58.14ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > legacy identity and existing mailbox conflict before reservation/network [447.50ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > first-admin and last invite use each have one winner across awaits [346.76ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > reserve rechecks invite and mailbox after network; complete history releases email [593.22ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after auth_user fault releases only its reservation [180.98ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after credential fault releases only its reservation [346.56ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after auth_created fault releases only its reservation [351.54ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after mailbox fault releases only its reservation [343.60ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after membership fault releases only its reservation [345.93ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after invite_claim fault releases only its reservation [415.21ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after audit fault releases only its reservation [353.51ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > compensation after complete fault releases only its reservation [342.07ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > failed compensation remains inaccessible; restart cleanup is idempotent at reserved/auth-created steps [356.21ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 provisioning > restart at auth-created boundary cancels exact identity and preserves live reservations [341.73ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > targeted invite, actor differs from target name, ban/unban/role and audit [720.18ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > last admin and self mutation cannot race; global slot precedes security slots [1057.25ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > admin API/audit fault retains inaccessible intent until restart reconciliation [1015.65ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > incomplete provisioned admin cannot satisfy the last-admin rule [680.18ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > admin factor/session cleanup consumes purpose-bound proof and preserves first-onboarding provenance [1515.58ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > complete user deletion requires owner reassignment, survives shard failure, then permits re-invite [1035.38ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > issuance requires admin proof or local operator, target confirmation; no public issuance/SMTP [1172.06ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > anonymous callback exact origin; JSON redemption is single-use, preserves MFA, creates no session [873.94ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) slice 5 lifecycle and recovery > expiry, unknown fields, query token and parallel redemption cannot reuse the capability [367.73ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+2026-10-23T07:25:50.330Z ERROR [Better Auth]: Error 244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/app/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/app/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+# SERVER_ERROR:  244 |     expect(results.filter(r=>r.status===200)).toHaveLength(1);
+245 |   });
+246 |   test("pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer",async()=>{
+247 |     let started!:()=>void,release!:()=>void;
+248 |     const callbackStarted=new Promise<void>(resolve=>{started=resolve;}),callbackRelease=new Promise<void>(resolve=>{release=resolve;});
+249 |     const f=await setup(options=>{options.emailAndPassword.onPasswordReset=async()=>{started();await callbackRelease;throw new Error("synthetic callback interruption");};}),target=await enrolled(f,"user");
+                                                                                                                                     ^
+error: synthetic callback interruption
+      at <anonymous> (/app/lib/teamAuthSlice5.test.ts:249:128)
+      at async <anonymous> (/app/node_modules/better-auth/dist/api/routes/password.mjs:163:104)
+
+(pass) slice 5 lifecycle and recovery > pre-reset challenge rejected and post-commit callback fault cannot revive an old bearer [1031.24ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) issuer demotion race at preflight-reservation cannot create an identity [1017.46ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) issuer demotion race at reservation-finalize cannot create an identity [1173.91ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) late mailbox collision before-reservation returns 409 and compensates exact identity [187.69ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) late mailbox collision before-finalize returns 409 and compensates exact identity [338.40ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery issuance reserve fault returns no capability; restart twice is idempotent [531.70ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery issuance mint fault returns no capability; restart twice is idempotent [522.93ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery issuance audit fault returns no capability; restart twice is idempotent [573.17ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery issuance complete fault returns no capability; restart twice is idempotent [515.50ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery issuance release fault returns no capability; restart twice is idempotent [518.69ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) lifecycle ban API/audit failure keeps target inaccessible until restart [1012.92ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) lifecycle unban API/audit failure keeps target inaccessible until restart [1032.92ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) lifecycle role API/audit failure keeps target inaccessible until restart [1020.09ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) lifecycle delete API/audit failure keeps target inaccessible until restart [1037.67ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) lifecycle disable-audit API/audit failure keeps target inaccessible until restart [1019.91ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last admin self-demotion and self-disable reject through lifecycle service [517.66ms]
+(pass) provenance adoption revokes historical targeted invites and preserves deliberate generic/operator issuance [1.47ms]
+
+tests/teamAuthSecurityControls.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) F1 fixed: demoted issuer invite rejects before network and reservation [1026.14ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) F1 fixed: banned issuer invite rejects before network and reservation [1046.12ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) bootstrap stale reserved journal prevents network and reservation [18.88ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) bootstrap stale auth_created journal prevents network and reservation [19.07ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) bootstrap stale cleanup_required journal prevents network and reservation [18.67ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) desktop tag has no invitation exemption [17.97ms]
+[startup] opened storage {
+  dataDir: "/scratch/tmp/mywebmail-test-db-2RjSJH",
+  dbPath: "/scratch/tmp/mywebmail-test-db-2RjSJH/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) incomplete identity rejects an already-issued session and login [543.86ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention demote/demote [1058.46ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention demote/ban [1011.94ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention demote/delete [1012.39ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention ban/demote [1009.90ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention ban/ban [1051.91ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention ban/delete [1015.75ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention delete/demote [1057.64ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention delete/ban [1026.20ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) last-admin contention delete/delete [1033.08ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) global-before-security enforced by SQL trigger; user contention releases global slot [1172.21ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) ban trigger invalidates live session, MCP and pending challenge before library failure [1184.21ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) all raw mutating admin routes blocked with valid admin cookie [515.34ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery wrong-purpose proof and explicit target confirmation fail [1335.11ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) reset rejects callback changes to scheme, port, subdomain, path and credentials [523.36ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) reset JSON origin, content type, anonymous invalid token and burst limit [25.84ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) signup/admin wrappers same-origin JSON, permission distinction, signup limit and recovery limit [1031.68ms]
+(pass) external BA mount activates the reviewed policy handler [1.57ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) normal lifecycle/recovery audits have one actor-bound secret-free row each [1022.11ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) audit finalization fault records committed update and a separate idempotent reconciliation [1026.24ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) F2 fixed: operator refuses live application lock without cancelling security intent; succeeds after release [2209.17ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) each successful slice5 mutation emits exactly one audit with correct actor [2077.80ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) reset path aliases cannot bypass strict request contract [529.81ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery fresh-factor proof cannot be replaced by password alone or backup code [840.65ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) recovery grant is consumed once and reset preserves entire factor records [1337.30ms]
+(pass) configured Next log exclusions and URL redaction exclude synthetic capability [205.40ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) valid reset redemption uses production library limits without consuming a throttled token [711.70ms]
+(pass) empty-install desktop-tagged HTTP signup cannot use mailbox credentials without an invite [699.01ms]
+
+lib/db/authPolicy.test.ts:
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > fresh library schema installs a covering index and reopen is idempotent [27.61ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > an existing master gains the index and receipt without changing auth state [203.71ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId) [20.03ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(state,userId) [20.27ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId COLLATE NOCASE,state) [20.73ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId DESC,state) [20.21ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE INDEX idx_user_provisioning_user_state ON user_provisioning(userId,state) WHERE state='reserved' [25.78ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > startup repairs malformed user index despite its existing receipt: CREATE UNIQUE INDEX idx_user_provisioning_user_state ON user_provisioning(userId,state) [19.67ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > a missing index is repaired even when its migration receipt exists [19.38ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > a failed upgrade rolls back the index together with its receipt [21.58ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) provisioning user index > indexed probes preserve results over completed history, active, pending and cancelled states [271.58ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > real adapter rollback and queued creation commit the matching profiles together [361.96ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > mirror constraint aborts the library statement and queued creation still works [176.25ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > a later after-hook exception cannot split a committed auth/profile pair [17.81ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > backfill preserves explicit IDs and integer profile time; second startup is empty [187.66ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > explicit operator ID insertion preserves the legacy profile and memberships [16.77ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup never resets an installed missing security generation or epoch [181.04ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed auth_security_state table without recreating it [174.49ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed auth_login_epoch table without recreating it [171.09ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed auth_session_security table without recreating it [173.59ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed auth_pending_challenges table without recreating it [173.48ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed auth_reauth_grants table without recreating it [173.22ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed user_provisioning table without recreating it [175.86ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a deleted installed admin_lifecycle_operations table without recreating it [172.81ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a missing installation witness: DROP TABLE auth_control_plane_installation [17.04ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a missing installation witness: DELETE FROM auth_control_plane_installation [15.89ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a missing installation witness: DROP TABLE noctua_auth_migrations [16.56ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup rejects a missing installation witness: DELETE FROM noctua_auth_migrations WHERE id='auth-control-plane-v1' [15.56ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > complete pre-marker planes gain both witnesses once without changing counters [203.75ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > pre-marker adoption rejects missing auth_security_state without writing witnesses [19.78ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > pre-marker adoption rejects missing auth_login_epoch without writing witnesses [16.88ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs malformed provisioning index: CREATE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state IN ('reserved','auth_created','cleanup_required') [20.71ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs malformed provisioning index: CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(userId) WHERE state IN ('reserved','auth_created','cleanup_required') [18.79ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs malformed provisioning index: CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state='reserved' [18.71ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs malformed provisioning index: CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) WHERE state IN ('RESERVED','AUTH_CREATED','CLEANUP_REQUIRED') [19.32ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs malformed provisioning index: CREATE UNIQUE INDEX idx_user_provisioning_active_email ON user_provisioning(normalizedEmail) [19.30ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > conflicting active reservations abort index repair and marker adoption atomically [19.65ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > generated ISO creation dates round exactly to Noctua milliseconds [196.76ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > startup repairs changed triggers and rejects malformed policy tables atomically [21.22ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) transactional mirrors > ambiguous normalized legacy identity fails backfill without taking an arbitrary ID [176.38ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > combined credential provider and identity move advances both principals [334.81ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > combined oauth provider and identity move advances both principals [343.32ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > combined provider and identity move aborts atomically with missing source state [339.93ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > combined provider and identity move aborts atomically with missing destination state [344.75ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > insert/update/remove password, provider and identity moves invalidate the affected users [336.46ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > missing state aborts credential insertion, update, move and standalone deletion [336.80ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > credential rollback restores generation and epoch; unrelated provider metadata has no effect [176.48ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > parent delete cascades auth children and sidecars without deleting domain profile [337.66ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > explicit fixture factors and session metadata do not promote other sessions [654.06ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > ban changes advance generation, ordinary profile edits do not [178.68ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) credential generation barrier > password reset remains revoked after onPasswordReset throws after commit [653.38ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) historical profile import > startup before identity binding transfers legacy ban and name exactly once in the operator transaction [24.52ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) historical profile import > upgrading the global receipt preserves authoritative fields [178.00ms]
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) historical profile import > imports name and permanent ban once without reviving legacy auth authority [185.52ms]
+
+app/api/admin/users/route.test.ts:
+(pass) HTTP admin onboarding, target update/recovery/delete and setup signup contract [1471.22ms]
+(pass) GET user accounts use each target's owner/viewer/editor/manager role [952.91ms]
+(pass) generic HTTP invite issuance uses shared actor audit and redemption [796.09ms]
+(pass) HTTP update has actor attempt budget and Retry-After [491.37ms]
+(pass) HTTP delete has actor attempt budget and Retry-After [502.36ms]
+(pass) HTTP invite has actor attempt budget and Retry-After [494.68ms]
+(pass) HTTP generic-invite has actor attempt budget and Retry-After [500.32ms]
+(pass) HTTP destructive mutation IP budget spans actors [569.35ms]
+(pass) HTTP desktop tag cannot bypass invite validation [497.35ms]
+(pass) HTTP mailbox signup keeps accountId null through enrollment with success sign-in [820.25ms]
+(pass) HTTP mailbox signup keeps accountId null through enrollment with response-failure sign-in [646.73ms]
+(pass) HTTP mailbox signup keeps accountId null through enrollment with throw sign-in [648.14ms]
+(pass) HTTP self-demotion and self-disable preserve last admin authority [479.39ms]
+(pass) HTTP mutation budgets span actions and independent Next module graphs [502.94ms]
+
+ 156 pass
+ 0 fail
+ 861 expect() calls
+Ran 156 tests across 5 files. [75.77s]

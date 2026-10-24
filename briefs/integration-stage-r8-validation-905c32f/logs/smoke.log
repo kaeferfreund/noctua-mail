@@ -1,0 +1,12 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/auth-smoke-hf0C52/data",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/auth-smoke-hf0C52/data/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+PASS migration CLI twice: stable IDs, chosen hashes, old MCP removed, no secret output
+PASS canonical proxy headers: Secure cookies, foreign origin/raw paths/old cookie rejected, enrollment gate and TOTP activation
+PASS cookie refresh, live MCP, session revoke invalidates MCP, admin ban enforced
+PASS operator handover, mounted reset redirect/redemption/reuse, no auto-session, MFA preserved
+PASS second startup/schema empty; isolated master/auth/shard/key restore preserves IDs, factor bytes, decryptable mailbox secret and signed MFA session
+PASS startup/request logs contain no known synthetic password, hash, TOTP seed, backup code, session/challenge cookie, MCP token or recovery capability
+SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun 1.4.4, port 3799, synthetic isolated storage only

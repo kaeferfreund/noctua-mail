@@ -1,0 +1,12 @@
+# Review: feat/deep-links 01b7727 (one round; correctness + mailbox-access lens)
+
+Read-only review of branch feat/deep-links at 01b7727 = implementation 774f0d8 (GPT 6.1 Sol) + merge of integration/stage f29fbd6 (by the orchestrator). Worktree ROOT/wt-deep-links — do not modify it, do not commit. For gates use a scratch copy under ROOT/wt-deep-links/.tmp/review-src (`git archive 01b7727 | tar -x -C …`, `bun install`). Ports 4030–4039.
+Brief: ROOT/briefs/deep-links.md (+ the steer hints in ROOT/briefs/t3-learnings/mobile-navigation.md §1, §2, §3, §9). Implementer report: ROOT/briefs/deep-links-report.md.
+
+## Check
+1. Correctness: URL ↔ state round trip (mailbox, folder, open message, search, views, settings, admin, calendar); push vs replace (no history spam while typing/scrolling/keyboard selection); Back/Forward incl. phone 390 px (integration with app/hooks/useMobileNavigation.ts + useMobileOverlayHistory.ts: no empty steps, overlays close first, Forward reopens the reader); cold link to a message beyond page 1; reload keeps the place; legacy params (accountId, messageId, openMessageId, mailto, openCalendar, service-worker notification-open) still work; "Link kopieren".
+2. Mailbox switching: last click wins (A→B→A, A→B→C) incl. popstate during an in-flight switch; no double switch or double list load caused by URL effects. `mailboxSwitchRapid.dom.test.tsx` "A -> B -> A before B commits" failed once in a combined DOM run on 01b7727 and passed twice alone — determine whether the branch makes it flaky or racy.
+3. Merge resolution in MailClient.tsx (~5194): sidebar `onSwitch` now calls `navigateLinkedAccount` (returns void) instead of `switchAccount` (promise) → the pending-row feedback from perf/switch-folder-tree likely clears immediately. Confirm and give the minimal fix (e.g. navigateAccount returns the switch promise).
+4. Access: link to a mailbox without membership / revoked / deleted → fallback to the default mailbox, no data, no loop; deleted/moved message → German notice + folder; no PII in URLs beyond the user's own search text; IDs only. (Note: the user accepts a short delay before revoked access takes effect — not a finding by itself.)
+
+Severity per ROOT/AGENTS.md rule 2 (P0–P3), each with file:line, repro, fix suggestion; P3 list only. Output: ROOT/briefs/deep-links-review-r1.md with verdict MERGE / FIX (P0–P2 list). Rules: ROOT/briefs/_rules-common.md. Do not modify any files except the report and your scratch dir.

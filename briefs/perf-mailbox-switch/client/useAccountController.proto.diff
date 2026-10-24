@@ -1,0 +1,152 @@
+--- app/components/mailclient/useAccountController.ts	2026-10-23 15:14:37.033961025 +0000
++++ app/components/mailclient/useAccountController.proto.spike.ts	2026-10-23 15:28:03.556878579 +0000
+@@ -12,6 +12,7 @@
+   buildAccountFoldersPath
+ } from "@/lib/accountApiPaths";
+ import type { Account, Folder, Message } from "@/lib/data";
++import { findInboxFolder } from "@/lib/specialFolders";
+ import { createAuthClient, type AuthMe, type AuthUser, type AuthSecurity, type MailboxState } from "@/lib/authClient";
+ import type {
+   SearchBadgesState,
+@@ -127,9 +128,16 @@
+   const instanceAdmin = useRef(false);
+   const lastIdentity = useRef<string | null>(null);
+   const selectedAccount = useRef("");
++  // A switch owns the mailbox selection while it runs; an overlapping bootstrap
++  // still publishes identity/accounts but leaves selection and folders to it.
++  const switchEpoch = useRef(0);
++  const switchInFlight = useRef(0);
++  const selectionSkipped = useRef(false);
+   const loadInitialData = useCallback(
+     async () => {
+       const version = ++loadVersion.current;
++      const epoch = switchEpoch.current;
++      const switchOwnsSelection = () => switchInFlight.current > 0 || switchEpoch.current !== epoch;
+       setInitialDataReady(false);
+       setInitialFoldersLoadedAccountId(null);
+       setBootstrapError(null);
+@@ -157,6 +165,11 @@
+         instanceAdmin.current = data.user?.role === "admin";
+         setAuthState("ok"); setCurrentUser(data.user); setSecurity(data.security);
+         setSessionTtlSeconds(data.ttlSeconds);
++        if (switchOwnsSelection() && data.mailboxState === "selected") {
++          setAccounts(data.accounts);
++          if (switchInFlight.current > 0) selectionSkipped.current = true;
++          return;
++        }
+         const restricted = data.mailboxState === "enrollment";
+         const nextAccounts = restricted ? [] : data.accounts;
+         // Only the server's persisted selection can activate a mailbox. A list
+@@ -174,7 +187,7 @@
+         setAccounts(nextAccounts); setActiveAccountId(selected); setFolders([]);
+         if (selected) {
+           const foldersRes = await apiFetch(buildAccountFoldersPath(selected));
+-          if (version !== loadVersion.current) return;
++          if (version !== loadVersion.current || switchOwnsSelection()) return;
+           if (foldersRes.ok) {
+             setFolders(await foldersRes.json() as Folder[]); setInitialFoldersLoadedAccountId(selected);
+           } else reportError(await readErrorMessage(foldersRes));
+@@ -203,20 +216,38 @@
+     }
+   };
+ 
++  // PROTOTYPE D1: persist the selection and read the new mailbox's folders in
++  // parallel, then commit the whole switch in one batch. No /auth/me re-read.
++  const switchVersion = useRef(0);
+   const switchAccount = useCallback(
+     async (nextAccountId: string) => {
+       const normalizedAccountId = nextAccountId.trim();
+       if (!normalizedAccountId || normalizedAccountId === activeAccountId) return;
++      const version = ++switchVersion.current;
++      switchEpoch.current++; switchInFlight.current++;
++      let committed = false;
++      let rebootstrap = false;
+       try {
+-        const response = await apiFetch("/api/auth/switch-account", {
+-          method: "POST",
+-          headers: { "Content-Type": "application/json" },
+-          body: JSON.stringify({ accountId: normalizedAccountId })
+-        });
+-        if (!response.ok) {
+-          reportError(await readErrorMessage(response));
++        const [response, foldersRes] = await Promise.all([
++          apiFetch("/api/auth/switch-account", {
++            method: "POST",
++            headers: { "Content-Type": "application/json" },
++            body: JSON.stringify({ accountId: normalizedAccountId })
++          }),
++          apiFetch(buildAccountFoldersPath(normalizedAccountId))
++        ]);
++        if (version !== switchVersion.current) return;
++        if (!response.ok || !foldersRes.ok) {
++          const failed = !response.ok ? response : foldersRes;
++          reportError(await readErrorMessage(failed));
++          // 401/403: the server is the authority; re-bootstrap drops the mailbox locally.
++          if (failed.status === 401 || failed.status === 403) rebootstrap = true;
+           return;
+         }
++        const nextFolders = await foldersRes.json() as Folder[];
++        if (version !== switchVersion.current) return;
++        selectedAccount.current = normalizedAccountId;
++        const inboxId = findInboxFolder(nextFolders, normalizedAccountId)?.id ?? nextFolders[0]?.id ?? "";
+         setExceptionEntries([]);
+         setMessageListError(null);
+         setMessages([]);
+@@ -230,36 +261,32 @@
+         setSearchFields({ ...defaultSearchFields });
+         setSearchBadges({ ...defaultSearchBadges });
+         setActiveVirtualFolderId(null);
+-        setActiveFolderId("");
+         setLastFolderId("");
+-        await loadInitialData();
++        setMailboxState("selected");
++        setActiveAccountId(normalizedAccountId);
++        setFolders(nextFolders);
++        setInitialFoldersLoadedAccountId(normalizedAccountId);
++        setActiveFolderId(inboxId);
++        setInitialDataReady(true);
++        committed = true;
+       } catch {
+-        reportError("Failed to switch account.");
++        if (version === switchVersion.current) reportError("Failed to switch account.");
++      } finally {
++        switchInFlight.current--; switchEpoch.current++;
++        // A bootstrap deferred to this switch must still resolve the selection.
++        if (switchInFlight.current === 0) {
++          if (!committed && selectionSkipped.current) rebootstrap = true;
++          selectionSkipped.current = false;
++        }
++        if (rebootstrap) void loadInitialData();
+       }
+     },
+     [
+-      activeAccountId,
+-      apiFetch,
+-      loadInitialData,
+-      readErrorMessage,
+-      reportError,
+-      setActiveMessageId,
+-      setActiveFolderId,
+-      setActiveVirtualFolderId,
+-      setExceptionEntries,
+-      setHasMoreMessages,
+-      setLastFolderId,
+-      setMessageListError,
+-      setMessages,
+-      setMessagesPage,
+-      setQuery,
+-      setSearchBadges,
+-      setSearchFields,
+-      setSearchScope,
+-      setTotalMessages,
+-      setViewMessage,
+-      defaultSearchBadges,
+-      defaultSearchFields
++      activeAccountId, apiFetch, loadInitialData, readErrorMessage, reportError, setActiveAccountId,
++      setActiveMessageId, setActiveFolderId, setActiveVirtualFolderId, setExceptionEntries, setFolders,
++      setHasMoreMessages, setInitialDataReady, setInitialFoldersLoadedAccountId, setLastFolderId,
++      setMessageListError, setMessages, setMessagesPage, setQuery, setSearchBadges, setSearchFields,
++      setSearchScope, setTotalMessages, setViewMessage, defaultSearchBadges, defaultSearchFields
+     ]
+   );
+ 

@@ -1,0 +1,448 @@
+diff --git a/app/components/MailClient.tsx b/app/components/MailClient.tsx
+index f7bfcf8a..96c9e4d3 100644
+--- a/app/components/MailClient.tsx
++++ b/app/components/MailClient.tsx
+@@ -208,6 +208,7 @@ import { useThreadContent } from "./mailclient/useThreadContent";
+ import { useSyncController } from "./mailclient/useSyncController";
+ import { registerRecentLocalDraftSave } from "./mailclient/recentLocalDraftSaves";
+ import { useTopics } from "./mailclient/useTopics";
++import { useSecondaryAccountReads } from "./mailclient/useSecondaryAccountReads";
+ import { useRecipientAliases } from "./mailclient/useRecipientAliases";
+ import { useAccountController } from "./mailclient/useAccountController";
+ import ThreadJsonModal from "./mailclient/message/ThreadJsonModal";
+@@ -498,16 +499,17 @@ export default function MailClient({
+     },
+     [clientId]
+   );
++  const { secondaryReadsReady, markFirstPageSettled } = useSecondaryAccountReads(activeAccountId);
+   const {
+     allTopics,
+     setAllTopics,
+     topicMessageCountById,
+     refreshTopicStats
+-  } = useTopics({ activeAccountId, apiFetch });
++  } = useTopics({ activeAccountId, apiFetch, readsEnabled: secondaryReadsReady });
+   const {
+     recipientAliases,
+     setRecipientAliases
+-  } = useRecipientAliases({ activeAccountId, apiFetch });
++  } = useRecipientAliases({ activeAccountId, apiFetch, readsEnabled: secondaryReadsReady });
+   const activeTopicSearchMode = useMemo(() => parseSimpleTopicSearchMode(query), [query]);
+   const activeTopicId = activeTopicSearchMode?.topicId ?? null;
+   const activeTopic = useMemo(
+@@ -543,7 +545,8 @@ export default function MailClient({
+     accounts,
+     clientId,
+     buildVersionLabel,
+-    apiFetch
++    apiFetch,
++    readsEnabled: secondaryReadsReady
+   });
+ 
+   const activeAccountIdRef = useRef(activeAccountId);
+@@ -896,7 +899,8 @@ export default function MailClient({
+         ? confirmFullSyncStart(state)
+         : Promise.resolve(true),
+     inboxFolder: inboxFolder ?? null,
+-    currentKeyRef
++    currentKeyRef,
++    secondaryReadsReady
+   });
+ 
+   // Search state hook (needs folderById to be defined first)
+@@ -913,7 +917,8 @@ export default function MailClient({
+     relatedQueryId,
+     virtualDefaultExcludedFolderIdsKey,
+     apiFetch,
+-    syncCompletionVersion
++    syncCompletionVersion,
++    secondaryReadsReady
+   });
+ 
+   // Destructure search state and actions
+@@ -1337,7 +1342,8 @@ export default function MailClient({
+     relatedContext,
+     setCollapsedGroups,
+     setCollapsedThreads,
+-    currentKeyRef
++    currentKeyRef,
++    onFirstPageSettled: markFirstPageSettled
+   });
+   refreshMailboxDataRef.current = refreshMailboxData;
+   setMessagesRef.current = setMessages;
+@@ -2896,6 +2902,7 @@ export default function MailClient({
+   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
+   const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
+     apiFetch, sessionKey: currentUser?.id, currentUserId: currentUser?.id, refreshVersion: authoritativeRevision + activeCollabRevision,
++    membersReadEnabled: secondaryReadsReady,
+     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
+     onCommit: (accountId) => {
+       setCollabRevision(value => value + 1);
+@@ -4355,7 +4362,7 @@ export default function MailClient({
+   useStartupSync({
+     initialDataReady, activeAccountId, initialFoldersLoadedAccountId, accountFolders,
+     activeFolderId, initialSyncStatusRef, readInitialSyncSessionStatus,
+-    writeInitialSyncSessionStatus, syncAccountRef
++    writeInitialSyncSessionStatus, syncAccountRef, secondaryReadsReady
+   });
+ 
+   // CalDAV periodic sync
+diff --git a/app/components/mailclient/useMessageData.ts b/app/components/mailclient/useMessageData.ts
+index b9ac08f0..5dda604b 100644
+--- a/app/components/mailclient/useMessageData.ts
++++ b/app/components/mailclient/useMessageData.ts
+@@ -45,6 +45,8 @@ export type UseMessageDataParams = {
+   setCollapsedGroups: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+   setCollapsedThreads: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+   currentKeyRef: React.MutableRefObject<string>;
++  // Called when a first page settled (shown or failed) for the given mailbox.
++  onFirstPageSettled?: (accountId: string) => void;
+ };
+ 
+ export function useMessageData({
+@@ -71,7 +73,8 @@ export function useMessageData({
+   relatedContext,
+   setCollapsedGroups,
+   setCollapsedThreads,
+-  currentKeyRef
++  currentKeyRef,
++  onFirstPageSettled
+ }: UseMessageDataParams) {
+   const [authoritativeRevision, setAuthoritativeRevision] = useState(0);
+   const [messages, setMessages] = useState<Message[]>([]);
+@@ -368,6 +371,7 @@ export function useMessageData({
+             setGroupMeta(nextMeta);
+             setCollapsedGroups((prev) => mergeCollapsedGroupsWithMeta(prev, nextMeta));
+             setCollapsedThreads((prev) => mergeCollapsedThreadsWithMessages(prev, items));
++            onFirstPageSettled?.(activeAccountId);
+           }
+           setMessageListError(null);
+         } else {
+@@ -375,6 +379,7 @@ export function useMessageData({
+           const errorMessage = await readErrorMessage(messagesRes);
+           reportError(errorMessage);
+           setMessageListError(errorMessage || "Failed to load messages.");
++          if (messagesPage === 1) onFirstPageSettled?.(activeAccountId);
+         }
+       } catch {
+         if (load.controller.signal.aborted) return;
+@@ -382,6 +387,7 @@ export function useMessageData({
+         lastRequestRef.current = null;
+         reportError("Failed to load messages.");
+         setMessageListError("Failed to load messages.");
++        if (messagesPage === 1) onFirstPageSettled?.(activeAccountId);
+       } finally {
+         // Only the current load owns the flag; a superseded one was released on abort.
+         if (inFlightLoadRef.current === load) {
+diff --git a/app/components/mailclient/useRecipientAliases.ts b/app/components/mailclient/useRecipientAliases.ts
+index 392f296f..1217daec 100644
+--- a/app/components/mailclient/useRecipientAliases.ts
++++ b/app/components/mailclient/useRecipientAliases.ts
+@@ -9,9 +9,11 @@ type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
+ type UseRecipientAliasesOptions = {
+   activeAccountId: string;
+   apiFetch: ApiFetch;
++  // False until the mailbox's first list page settled (useSecondaryAccountReads).
++  readsEnabled?: boolean;
+ };
+ 
+-export function useRecipientAliases({ activeAccountId, apiFetch }: UseRecipientAliasesOptions) {
++export function useRecipientAliases({ activeAccountId, apiFetch, readsEnabled = true }: UseRecipientAliasesOptions) {
+   const resource = useMemo(
+     () => getRecipientAliasesResource(apiFetch, activeAccountId),
+     [apiFetch, activeAccountId]
+@@ -25,10 +27,10 @@ export function useRecipientAliases({ activeAccountId, apiFetch }: UseRecipientA
+   );
+ 
+   useEffect(() => {
+-    if (!activeAccountId) return;
++    if (!activeAccountId || !readsEnabled) return;
+     resource.invalidate();
+     return deferUntilIdle(() => { void resource.load(); });
+-  }, [activeAccountId, resource]);
++  }, [activeAccountId, readsEnabled, resource]);
+ 
+   return {
+     recipientAliases,
+diff --git a/app/components/mailclient/useReminderNotifications.ts b/app/components/mailclient/useReminderNotifications.ts
+index 59740a3a..ff615ab8 100644
+--- a/app/components/mailclient/useReminderNotifications.ts
++++ b/app/components/mailclient/useReminderNotifications.ts
+@@ -39,6 +39,9 @@ export type UseReminderNotificationsParams = {
+   clientId: string | null;
+   buildVersionLabel: string;
+   apiFetch: ApiFetch;
++  // False until the mailbox's first list page settled (useSecondaryAccountReads);
++  // the reminder and upcoming-event reads for a newly active mailbox wait for it.
++  readsEnabled?: boolean;
+ };
+ 
+ export function useReminderNotifications({
+@@ -46,7 +49,8 @@ export function useReminderNotifications({
+   accounts,
+   clientId,
+   buildVersionLabel,
+-  apiFetch
++  apiFetch,
++  readsEnabled = true
+ }: UseReminderNotificationsParams) {
+   const [pendingCalendarReminders, setPendingCalendarReminders] = useState<CalendarReminder[]>([]);
+   const [upcomingCalendarEvents, setUpcomingCalendarEvents] = useState<CalendarEvent[]>([]);
+@@ -421,7 +425,7 @@ export function useReminderNotifications({
+ 
+   // Calendar reminder refresh on custom event and on mount
+   useEffect(() => {
+-    if (typeof window === "undefined") return;
++    if (typeof window === "undefined" || !readsEnabled) return;
+     let active = true;
+     const run = () => {
+       if (!active) return;
+@@ -436,7 +440,7 @@ export function useReminderNotifications({
+       active = false;
+       window.removeEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+     };
+-  }, [refreshPendingCalendarReminders]);
++  }, [readsEnabled, refreshPendingCalendarReminders]);
+ 
+   // Calendar reminder periodic refresh
+   useEffect(() => {
+@@ -455,7 +459,7 @@ export function useReminderNotifications({
+   // Upcoming calendar events refresh on mount, on dispatch, and on interval
+   // matching the reminder refresh cadence.
+   useEffect(() => {
+-    if (typeof window === "undefined") return;
++    if (typeof window === "undefined" || !readsEnabled) return;
+     let active = true;
+     const run = () => {
+       if (!active) return;
+@@ -474,7 +478,7 @@ export function useReminderNotifications({
+       window.removeEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+       window.clearInterval(interval);
+     };
+-  }, [refreshUpcomingCalendarEvents]);
++  }, [readsEnabled, refreshUpcomingCalendarEvents]);
+ 
+   // Process due calendar reminders
+   useEffect(() => {
+diff --git a/app/components/mailclient/useSearchState.ts b/app/components/mailclient/useSearchState.ts
+index 09a698f2..988e4219 100644
+--- a/app/components/mailclient/useSearchState.ts
++++ b/app/components/mailclient/useSearchState.ts
+@@ -83,6 +83,8 @@ type UseSearchStateOptions = {
+   virtualDefaultExcludedFolderIdsKey: string;
+   apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
+   syncCompletionVersion?: number;
++  // False until the mailbox's first list page settled (useSecondaryAccountReads).
++  secondaryReadsReady?: boolean;
+ };
+ 
+ export type SearchState = {
+@@ -130,7 +132,8 @@ export function useSearchState(options: UseSearchStateOptions) {
+     relatedQueryId,
+     virtualDefaultExcludedFolderIdsKey,
+     apiFetch,
+-    syncCompletionVersion
++    syncCompletionVersion,
++    secondaryReadsReady = true
+   } = options;
+ 
+   const trimmedQuery = query.trim();
+@@ -204,7 +207,7 @@ export function useSearchState(options: UseSearchStateOptions) {
+ 
+   // Fetch virtual folder counts
+   useEffect(() => {
+-    if (!activeAccountId) return;
++    if (!activeAccountId || !secondaryReadsReady) return;
+     const controller = new AbortController();
+     const timer = window.setTimeout(() => {
+       const fetchCount = async (badges: string, excludedFolderIdsKey: string) => {
+@@ -241,7 +244,7 @@ export function useSearchState(options: UseSearchStateOptions) {
+       window.clearTimeout(timer);
+       controller.abort();
+     };
+-  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, folderCountsKey]);
++  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, folderCountsKey, secondaryReadsReady]);
+ 
+   // Auto-clear virtual folder when conditions change
+   useEffect(() => {
+diff --git a/app/components/mailclient/useStartupSync.ts b/app/components/mailclient/useStartupSync.ts
+index 4e3196bc..3361e20e 100644
+--- a/app/components/mailclient/useStartupSync.ts
++++ b/app/components/mailclient/useStartupSync.ts
+@@ -18,11 +18,13 @@ type StartupSyncParams = {
+   readInitialSyncSessionStatus: (accountId: string) => SyncStatus;
+   writeInitialSyncSessionStatus: (accountId: string, status: SyncStatus) => void;
+   syncAccountRef: ReturnType<typeof useSyncController>["syncAccountRef"];
++  // False until the mailbox's first list page settled (useSecondaryAccountReads).
++  secondaryReadsReady?: boolean;
+ };
+ 
+ export function useStartupSync({ initialDataReady, activeAccountId, initialFoldersLoadedAccountId,
+   accountFolders, activeFolderId, initialSyncStatusRef, readInitialSyncSessionStatus,
+-  writeInitialSyncSessionStatus, syncAccountRef }: StartupSyncParams) {
++  writeInitialSyncSessionStatus, syncAccountRef, secondaryReadsReady = true }: StartupSyncParams) {
+   useEffect(() => {
+     if (!initialDataReady || !activeAccountId) return;
+     if (initialFoldersLoadedAccountId !== activeAccountId) return;
+@@ -35,6 +37,9 @@ export function useStartupSync({ initialDataReady, activeAccountId, initialFolde
+     // sibling effect that runs in the same flush), causing refreshMailboxData() to be
+     // skipped after sync completes and the user sees stale mail.
+     if (hasAccountFolders && !isAccountFolder(activeAccountId, activeFolderId, accountFolders)) return;
++    // A mailbox with folders shows its first list page before the sync starts; one
++    // without folders has nothing to show and syncs at once.
++    if (hasAccountFolders && !secondaryReadsReady) return;
+ 
+     const syncStatus =
+       initialSyncStatusRef.current[activeAccountId] ?? readInitialSyncSessionStatus(activeAccountId);
+@@ -99,7 +104,8 @@ export function useStartupSync({ initialDataReady, activeAccountId, initialFolde
+     readInitialSyncSessionStatus,
+     writeInitialSyncSessionStatus,
+     initialSyncStatusRef,
+-    syncAccountRef
++    syncAccountRef,
++    secondaryReadsReady
+   ]);
+ 
+ }
+diff --git a/app/components/mailclient/useSyncController.ts b/app/components/mailclient/useSyncController.ts
+index 71b183b0..21ca5405 100644
+--- a/app/components/mailclient/useSyncController.ts
++++ b/app/components/mailclient/useSyncController.ts
+@@ -128,6 +128,9 @@ export type UseSyncControllerParams = {
+   confirmFullSyncStart: (state: FullSyncConfirmState) => Promise<boolean>;
+   inboxFolder: Folder | null;
+   currentKeyRef: React.MutableRefObject<string>;
++  // False until the mailbox's first list page settled (useSecondaryAccountReads);
++  // the folder consistency check waits for it.
++  secondaryReadsReady?: boolean;
+ };
+ 
+ export function useSyncController({
+@@ -155,7 +158,8 @@ export function useSyncController({
+   updateMessagesWithCurrentResultPrune,
+   confirmFullSyncStart,
+   inboxFolder,
+-  currentKeyRef
++  currentKeyRef,
++  secondaryReadsReady = true
+ }: UseSyncControllerParams) {
+   const tn = useTranslations("Notifications");
+   // Assign during render: async callbacks from the previous account can run before effects.
+@@ -801,7 +805,7 @@ export function useSyncController({
+   }, [activeAccountId, activeFolderId]);
+ 
+   useEffect(() => {
+-    if (authState !== "ok") return;
++    if (authState !== "ok" || !secondaryReadsReady) return;
+     if (searchScope !== "folder") return;
+     if (!isAccountFolder(activeAccountId, activeFolderId, accountFolders) || activeVirtualFolderId) return;
+     if (syncStateRef.current.isSyncing || syncStateRef.current.syncingFolders.has(activeFolderId)) {
+@@ -898,6 +902,7 @@ export function useSyncController({
+     accountFolders,
+     authState,
+     searchScope,
++    secondaryReadsReady,
+     checkFolderConsistency,
+     executeFolderSyncDecision,
+     notifyMailServerUnreachable,
+diff --git a/app/components/mailclient/useTopics.ts b/app/components/mailclient/useTopics.ts
+index 20ea3073..485ecd6f 100644
+--- a/app/components/mailclient/useTopics.ts
++++ b/app/components/mailclient/useTopics.ts
+@@ -10,6 +10,8 @@ type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
+ type UseTopicsOptions = {
+   activeAccountId: string;
+   apiFetch: ApiFetch;
++  // False until the mailbox's first list page settled (useSecondaryAccountReads).
++  readsEnabled?: boolean;
+ };
+ 
+ type TopicStatsResponse = {
+@@ -22,7 +24,7 @@ type TopicStatsResponse = {
+ 
+ const NO_TOPICS: Topic[] = [];
+ 
+-export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
++export function useTopics({ activeAccountId, apiFetch, readsEnabled = true }: UseTopicsOptions) {
+   // Keyed by mailbox: one mailbox's topics are never shown under another.
+   const [storedTopics, setStoredTopics] = useState({ accountId: "", topics: NO_TOPICS });
+   const [topicStats, setTopicStats] = useState({
+@@ -57,7 +59,7 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
+   }, [fetchTopicMessageCounts]);
+ 
+   useEffect(() => {
+-    if (!activeAccountId) return;
++    if (!activeAccountId || !readsEnabled) return;
+     let cancelled = false;
+     apiFetch(buildAccountTopicsPath(activeAccountId))
+       .then((res) => res.json())
+@@ -82,7 +84,7 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
+       cancelStats();
+       statsVersionRef.current += 1;
+     };
+-  }, [activeAccountId, apiFetch, fetchTopicMessageCounts]);
++  }, [activeAccountId, apiFetch, fetchTopicMessageCounts, readsEnabled]);
+ 
+   const allTopics = activeAccountId && storedTopics.accountId === activeAccountId ? storedTopics.topics : NO_TOPICS;
+   const topicMessageCountById = activeAccountId && topicStats.accountId === activeAccountId
+diff --git a/app/hooks/useThreadCollab.ts b/app/hooks/useThreadCollab.ts
+index 6c740ccd..0cdab1b4 100644
+--- a/app/hooks/useThreadCollab.ts
++++ b/app/hooks/useThreadCollab.ts
+@@ -76,6 +76,8 @@ type Options = {
+   onReadDenied?: (accountId: string) => void;
+   sessionKey?: string;
+   currentUserId?: string | null;
++  // False while the standalone members read must wait (the mailbox's first list page).
++  membersReadEnabled?: boolean;
+ };
+ const defaultFetch: ApiFetch = (...args) => fetch(...args);
+ 
+@@ -89,6 +91,7 @@ export function useThreadCollab(
+   const onCommit = useRef(options.onCommit);
+   onCommit.current = options.onCommit;
+   const sessionKey = options.sessionKey;
++  const membersReadEnabled = options.membersReadEnabled ?? true;
+   const onReadDenied = useRef(options.onReadDenied);
+   onReadDenied.current = options.onReadDenied;
+   const sessionRef = useRef(sessionKey);
+@@ -153,7 +156,7 @@ export function useThreadCollab(
+   useEffect(() => {
+     // Complete thread reads already carry membership. The standalone channel
+     // is needed only when the mailbox has no selected thread.
+-    if (!accountId || threadId) return;
++    if (!accountId || threadId || !membersReadEnabled) return;
+     const sequence = ++loadSequence.current;
+     const controller = new AbortController();
+     void apiFetch(`/api/accounts/${encodeURIComponent(accountId)}/members`, {
+@@ -168,7 +171,7 @@ export function useThreadCollab(
+       })
+       .catch(() => {});
+     return () => controller.abort();
+-  }, [accountId, threadId, memberScope, apiFetch, acceptMembers]);
++  }, [accountId, threadId, memberScope, membersReadEnabled, apiFetch, acceptMembers]);
+   const reload = useCallback(async () => {
+     if (!accountId || !threadId) return;
+     const owner = ++snapshotSequence.current;
+
+# New file app/components/mailclient/useSecondaryAccountReads.ts (prototype):
+# "use client";
+# 
+# import { useCallback, useEffect, useState } from "react";
+# 
+# // Upper bound for the wait when no first page settles (no folder to list, auth
+# // still pending). Matches deferUntilIdle's timeout for other secondary reads.
+# export const SECONDARY_READS_MAX_DELAY_MS = 1500;
+# 
+# export function useSecondaryAccountReads(activeAccountId: string) {
+#   const [settledAccountId, setSettledAccountId] = useState("");
+#   // Without an active mailbox nothing is deferred (hooks clear their state as before).
+#   const ready = !activeAccountId || settledAccountId === activeAccountId;
+#   useEffect(() => {
+#     if (ready) return;
+#     const timer = window.setTimeout(() => setSettledAccountId(activeAccountId), SECONDARY_READS_MAX_DELAY_MS);
+#     return () => window.clearTimeout(timer);
+#   }, [activeAccountId, ready]);
+#   const markFirstPageSettled = useCallback((accountId: string) => { setSettledAccountId(accountId); }, []);
+#   return { secondaryReadsReady: ready, markFirstPageSettled };
+# }

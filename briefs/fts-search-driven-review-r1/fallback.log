@@ -1,0 +1,41 @@
+== dropped
+{"label":"threads needle","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":3.7,"drivenMs":1.5,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"messages needle","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":1.6,"drivenMs":0.7,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"messages needle grouped sender","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":0.7,"drivenMs":0.8,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads two tokens body+subject","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":0.8,"drivenMs":0.6,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads invoice (attachment+fts)","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":0.6,"drivenMs":0.7,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"messages attachments-only fields","same":true,"legacy":"ok total=131","driven":"ok total=131","legacyMs":60.9,"drivenMs":18.1,"legacyLines":0,"drivenLines":0,"reasons":[]}
+{"label":"messages id fragment","same":true,"legacy":"ok total=832","driven":"ok total=832","legacyMs":26.4,"drivenMs":20,"legacyLines":0,"drivenLines":0,"reasons":[]}
+{"label":"threads empty scope in:nonexist","same":true,"legacy":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","driven":"SQLiteError:SQLITE_ERROR:no such table: message_fts_v3","legacyMs":1,"drivenMs":0.8,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+== malformed
+{"label":"threads needle","same":true,"legacy":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","driven":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","legacyMs":7.1,"drivenMs":2.5,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+{"label":"messages needle","same":true,"legacy":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","driven":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","legacyMs":2,"drivenMs":1.1,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+{"label":"messages needle grouped sender","same":true,"legacy":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","driven":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","legacyMs":1,"drivenMs":1.2,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+{"label":"threads two tokens body+subject","same":true,"legacy":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","driven":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","legacyMs":0.9,"drivenMs":0.9,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+{"label":"threads invoice (attachment+fts)","same":true,"legacy":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","driven":"SQLiteError:SQLITE_CORRUPT:database disk image is malformed","legacyMs":0.9,"drivenMs":0.9,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+{"label":"messages attachments-only fields","same":true,"legacy":"ok total=131","driven":"ok total=131","legacyMs":58.6,"drivenMs":18.3,"legacyLines":0,"drivenLines":0,"reasons":[]}
+{"label":"messages id fragment","same":true,"legacy":"ok total=832","driven":"ok total=832","legacyMs":25.5,"drivenMs":18.9,"legacyLines":0,"drivenLines":0,"reasons":[]}
+{"label":"threads empty scope in:nonexist","same":true,"legacy":"ok total=0","driven":"ok total=0","legacyMs":3.3,"drivenMs":2.9,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_CORRUPT"]}
+== keywords
+{"label":"threads NOT","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"NOT\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"NOT\"","legacyMs":3.8,"drivenMs":1.5,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads thread-scoped NOT","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"NOT\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"NOT\"","legacyMs":1,"drivenMs":0.9,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads needle AND","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"AND\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"AND\"","legacyMs":2.8,"drivenMs":3.8,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads thread-scoped needle AND","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"AND\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"AND\"","legacyMs":2,"drivenMs":3.8,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads OR needle","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","legacyMs":0.9,"drivenMs":1,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads thread-scoped OR needle","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","legacyMs":1.8,"drivenMs":4.7,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads needle OR quokka","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","legacyMs":2.1,"drivenMs":3.3,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+{"label":"threads thread-scoped needle OR quokka","same":true,"legacy":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","driven":"SQLiteError:SQLITE_ERROR:fts5: syntax error near \"OR\"","legacyMs":1.9,"drivenMs":3.6,"legacyLines":0,"drivenLines":1,"reasons":["fts_error/SQLITE_ERROR"]}
+== busy
+{"label":"threads needle (BUSY injected)","same":true,"legacy":"ok total=411","driven":"ok total=411","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+{"label":"messages needle (BUSY injected)","same":true,"legacy":"ok total=411","driven":"ok total=411","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+{"label":"messages needle grouped sender (BUSY injected)","same":true,"legacy":"ok total=411","driven":"ok total=411","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+{"label":"threads two tokens body+subject (BUSY injected)","same":true,"legacy":"ok total=20","driven":"ok total=20","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+{"label":"threads invoice (attachment+fts) (BUSY injected)","same":true,"legacy":"ok total=4842","driven":"ok total=4842","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+{"label":"messages attachments-only fields (BUSY injected)","same":true,"legacy":"ok total=131","driven":"ok total=131","drivenLines":0,"reasons":[]}
+{"label":"messages id fragment (BUSY injected)","same":true,"legacy":"ok total=832","driven":"ok total=832","drivenLines":0,"reasons":[]}
+{"label":"threads empty scope in:nonexist (BUSY injected)","same":true,"legacy":"ok total=0","driven":"ok total=0","drivenLines":1,"reasons":["fts_error/SQLITE_BUSY"]}
+== storm
+{"label":"unselective synthetic","searches":40,"ok":40,"fallbackLines":40,"reasons":["all_tokens_oversized"],"ms":7498}
+{"label":"cap overcap","searches":40,"ok":40,"fallbackLines":40,"reasons":["all_tokens_oversized"],"ms":4414}
+{"label":"selective needle","searches":40,"ok":40,"fallbackLines":0,"reasons":[],"ms":1163}
+{"label":"dropped FTS concurrent","searches":40,"ok":0,"fallbackLines":40,"reasons":["fts_error"]}

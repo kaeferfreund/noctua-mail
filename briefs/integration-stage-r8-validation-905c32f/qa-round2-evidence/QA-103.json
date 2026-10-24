@@ -1,0 +1,135 @@
+{
+  "results": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 230,
+        "y": 52,
+        "width": 980,
+        "height": 774
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1280,
+      "height": 720,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 150,
+        "y": 44.8125,
+        "width": 980,
+        "height": 619.1875
+      }
+    },
+    {
+      "theme": "light",
+      "width": 834,
+      "height": 1112,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 25.015625,
+        "y": 60.484375,
+        "width": 783.953125,
+        "height": 956.3125
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "height": 780,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 780
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 230,
+        "y": 52,
+        "width": 980,
+        "height": 774
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1280,
+      "height": 720,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 150,
+        "y": 44.8125,
+        "width": 980,
+        "height": 619.1875
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 834,
+      "height": 1112,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 25.015625,
+        "y": 60.484375,
+        "width": 783.953125,
+        "height": 956.3125
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "height": 780,
+      "renders": true,
+      "shell": true,
+      "dialog": {
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 780
+      }
+    }
+  ],
+  "pageErrors": []
+}

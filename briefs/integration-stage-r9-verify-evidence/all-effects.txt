@@ -1,0 +1,10 @@
+== app/components/mailclient/useApiErrorMessage.ts
+  useEffect line 20: [tn]
+== app/components/mailclient/message/CopyToAccountDialog.tsx
+  useEffect line 65: [t]
+== app/components/MailClient.tsx
+  useEffect line 3985: [selectionActions]
+  useEffect line 5137: [refreshFolders]
+  useEffect line 5168: [refreshFolders]
+== app/components/HtmlMessage.tsx
+  useEffect line 485: [t]

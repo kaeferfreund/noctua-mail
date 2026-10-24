@@ -1,0 +1,79 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/HtmlMessage.privacy.dom.test.tsx:
+(pass) reader treats unkeyed legacy sender as unknown and still allows Load once: attacker:trusted@example.test [91.31ms]
+(pass) reader treats unkeyed legacy sender as unknown and still allows Load once: trus(foo)ted@example.test [24.97ms]
+(pass) reader treats unkeyed legacy sender as unknown and still allows Load once:  trusted@example.test [21.96ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: SMTPUTF8 local [46.19ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: SMTPUTF8 with IDN [30.69ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: comment containing an allowed address [31.33ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: trailing comment [27.52ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: group [30.80ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: multiple mailboxes [25.70ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: encoded display name [40.79ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: case and surrounding whitespace [28.04ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: missing closing bracket [8.59ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: missing opening bracket [15.78ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: empty From [9.32ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: comment without a mailbox [9.39ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted display name without a mailbox [8.49ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted display name containing an allowed address [24.72ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted local part containing whitespace [23.77ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted local part with a trailing comment [22.69ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted local part containing an angle-bracket address [25.58ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: named quoted local part containing an angle-bracket address [23.32ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: unicode IDN [21.29ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: A-label IDN [19.49ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted local part retaining internal whitespace [28.11ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: quoted local part retaining escaped characters [21.17ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: legacy unescaped display name [6.18ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: legacy unquoted local part [6.31ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: nested angles [5.73ms]
+(pass) reader rejects unrelated sender permissions and saves/reads the mailbox: trailing text after mailbox [5.97ms]
+(pass) notice, load once, message change and persisted sender choice [7340.97ms]
+(pass) a failed preference save stays blocked and exposes a retry message [35.39ms]
+(pass) sender permission reads and writes the real mailbox rather than quoted display-name text [21.27ms]
+(pass) opt-in never reinserts sender stylesheets or remote CSS [33.14ms]
+(pass) links open on primary click and middle auxclick, never right auxclick or contextmenu [17.54ms]
+(pass) fragment links scroll inside the mail document and missing targets never navigate [17.19ms]
+
+app/components/HtmlMessage.memo.dom.test.tsx:
+(pass) HtmlMessage sanitize memo > sanitizes again only when the html input changes [12.06ms]
+
+app/components/mailclient/message/ReviewCorrections.dom.test.tsx:
+(pass) attachment removal action: de application/pdf is a complete message [67.05ms]
+(pass) attachment removal action: de image/png is a complete message [42.03ms]
+(pass) attachment removal action: en application/pdf is a complete message [35.90ms]
+(pass) attachment removal action: en image/png is a complete message [19.11ms]
+(pass) 320 px German reader uses Neu for Recent and spaces the priority value beside long badges [59.13ms]
+(pass) German full-sync action and cancel remain separate actionable buttons [30.60ms]
+(pass) German display option percentages use locale spacing in the chip and action names [90.87ms]
+(pass) German suggestion formulas separate colon labels and localize fractional thread scores [70.20ms]
+
+app/components/mailclient/message/ThreadView.isolation.dom.test.tsx:
+A2 collapse: 1 card renders
+A2 tab: 1 card renders
+A2 zoom: 1 card renders
+A2 font: 1 card renders
+A2 pending: 1 card renders
+A2 loading: 1 card renders
+A2 translation: 1 card renders
+A2 collaboration: 1 card renders
+A2 callback and mailbox/role change: 200 card renders
+(pass) 200-message thread isolates card state and sibling collaboration; callbacks stay current [2261.59ms]
+(pass) orchestrator keeps sibling cards idle through real collapse, tab, font, zoom and translation actions [515.08ms]
+(pass) memoized cards observe new callback permissions, translations and remote-content decisions [133.00ms]
+(pass) reply lookup changes update only the referencing card and select the current target [34.70ms]
+
+app/components/mailclient/message/MessageDisplayOptionsMenu.dom.test.tsx:
+(pass) MessageDisplayOptionsMenu > offers only the message's formats and switches through the radio group [52.74ms]
+(pass) MessageDisplayOptionsMenu > ignores picking the format that is already shown [35.37ms]
+(pass) MessageDisplayOptionsMenu > steps text size and zoom while keeping the menu open [41.90ms]
+(pass) MessageDisplayOptionsMenu > hides zoom outside HTML and both scales for Source [125.49ms]
+(pass) MessageDisplayOptionsMenu > names a non-default presentation on the trigger and its chip [17.18ms]
+(pass) MessageDisplayOptionsMenu > renders the shadcn menu parts on mobile [53.64ms]
+
+ 54 pass
+ 0 fail
+ 216 expect() calls
+Ran 54 tests across 5 files. [12.46s]

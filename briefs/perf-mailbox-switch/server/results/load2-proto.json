@@ -1,0 +1,245 @@
+{
+ "root": "/home/monkey/code/noctua-mail/wt-spike-switch-server/.tmp/proto",
+ "phaseMs": 60000,
+ "imapProbe": {
+  "cold": {
+   "ms": 19.14341599999898,
+   "status": 200,
+   "body": "{\"ok\":true,\"folderId\":\"syn-sync-a:INBOX\",\"mailboxPath\":\"INBOX\",\"needsRepair\":true,\"recommendedMode\":\"repair\",\"reasons\":[\"count-mismatch\"],\"local\":{\"count\":42,\"h"
+  },
+  "warm": {
+   "n": 30,
+   "p50": 5.002206000004662,
+   "p90": 5.931014000001596,
+   "p99": 26.25688299999456,
+   "max": 26.25688299999456
+  },
+  "coldRepeat": {
+   "n": 5,
+   "p50": 8.153234999997949,
+   "p90": 12.130191999996896,
+   "p99": 12.130191999996896,
+   "max": 12.130191999996896
+  }
+ },
+ "results": [
+  {
+   "phase": "all",
+   "loadStart": [
+    10.5,
+    14.75,
+    14.94
+   ],
+   "loadEnd": [
+    10.23,
+    13.98,
+    14.67
+   ],
+   "switches": 257,
+   "criticalPath": {
+    "n": 257,
+    "p50": 73.01567299998715,
+    "p90": 207.97551800000656,
+    "p99": 523.1663450000051,
+    "max": 1842.2384309999907
+   },
+   "steps": {
+    "switch": {
+     "n": 257,
+     "p50": 10.634337999996205,
+     "p90": 148.66881100001046,
+     "p99": 457.1262960000022,
+     "max": 1805.857535999996,
+     "retries": 72,
+     "retryOps": {
+      "setActiveAccountId": 72
+     },
+     "retryDelayMs": 11891,
+     "statuses": {
+      "200": 257,
+      "thrown": 1
+     }
+    },
+    "me": {
+     "n": 257,
+     "p50": 6.219097000001057,
+     "p90": 13.184361999999965,
+     "p99": 62.89418000000296,
+     "max": 97.73082199999772,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 257
+     }
+    },
+    "folders": {
+     "n": 257,
+     "p50": 3.434311000004527,
+     "p90": 27.109410000004573,
+     "p99": 54.30822099999932,
+     "max": 71.66442100000859,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 257
+     }
+    },
+    "threads": {
+     "n": 257,
+     "p50": 25.564315000010538,
+     "p90": 57.86269399999583,
+     "p99": 87.94461100000626,
+     "max": 126.94797100000142,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 257
+     }
+    }
+   },
+   "children": {
+    "auth": {
+     "kinds": {
+      "session": {
+       "attempts": 1033,
+       "busy": 232
+      },
+      "member": {
+       "attempts": 114,
+       "busy": 34
+      }
+     }
+    },
+    "sync-syn-sync-a": {
+     "completed": 420,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "releaseSyncWorker": 101,
+      "queueSyncWorker": 90,
+      "reserveSyncWorker": 4
+     },
+     "exhausted": []
+    },
+    "sync-syn-sync-b": {
+     "completed": 489,
+     "failed": 0,
+     "errors": [],
+     "retries": {
+      "initializeMasterSchema": 1,
+      "queueSyncWorker": 105,
+      "releaseSyncWorker": 82,
+      "reserveSyncWorker": 5
+     },
+     "exhausted": []
+    },
+    "second": {
+     "requests": 1909,
+     "errors": 1,
+     "firstErrors": [
+      "SQLiteError: database is locked\n    at all (unknown)\n    at executeQuery (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)\n    at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)\n    at provideConnection (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)\n    at async executeQuery (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)\n    at async execute (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)\n    at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)\n    at async <anonymous> (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)\n    at async update (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)"
+     ],
+     "statuses": {
+      "200": 1909
+     },
+     "requestMs": {
+      "n": 1909,
+      "p50": 7.772231999995711,
+      "p90": 52.64736499999708,
+      "p99": 153.4407349999965,
+      "max": 844.6149910000022
+     },
+     "retries": {
+      "setActiveAccountId": 95
+     }
+    }
+   }
+  },
+  {
+   "phase": "quiet-2",
+   "loadStart": [
+    10.23,
+    13.98,
+    14.67
+   ],
+   "loadEnd": [
+    13.86,
+    14.4,
+    14.78
+   ],
+   "switches": 394,
+   "criticalPath": {
+    "n": 394,
+    "p50": 42.69023100001505,
+    "p90": 83.95624800003134,
+    "p99": 145.62001300003612,
+    "max": 239.6535140000342
+   },
+   "steps": {
+    "switch": {
+     "n": 395,
+     "p50": 7.14862500000163,
+     "p90": 17.48812100000214,
+     "p99": 65.21319700000458,
+     "max": 152.69367800001055,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 395
+     }
+    },
+    "me": {
+     "n": 395,
+     "p50": 6.217136999999639,
+     "p90": 11.822669000015594,
+     "p99": 21.730719000013778,
+     "max": 57.59476700000232,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 395
+     }
+    },
+    "folders": {
+     "n": 395,
+     "p50": 2.572703999991063,
+     "p90": 5.576411000016378,
+     "p99": 10.282333999988623,
+     "max": 29.20870700001251,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 395
+     }
+    },
+    "threads": {
+     "n": 394,
+     "p50": 24.137781000012183,
+     "p90": 58.076256000000285,
+     "p99": 79.72077600000193,
+     "max": 125.01398400000471,
+     "retries": 0,
+     "retryOps": {},
+     "retryDelayMs": 0,
+     "statuses": {
+      "200": 394
+     }
+    }
+   },
+   "children": {}
+  }
+ ],
+ "thrown": [
+  {
+   "step": "switch",
+   "phase": "all",
+   "stack": "SQLiteError: database is locked\n    at all (unknown)\n    at executeQuery (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/bun-sqlite-dialect-DoOVo4ja.mjs:62:72)\n    at <anonymous> (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-executor/query-executor-base.js:39:41)\n    at provideConnection (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/driver/default-connection-provider.js:10:26)\n    at async executeQuery (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-executor/query-executor-base.js:38:39)\n    at async execute (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-builder/update-query-builder.js:455:51)\n    at async executeTakeFirst (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/kysely/dist/query-builder/update-query-builder.js:467:37)\n    at async <anonymous> (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/index.mjs:362:41)\n    at async update (/home/monkey/code/noctua-mail/wt-spike-switch-server/node_modules/@better-auth/kysely-adapter/dist/index.mjs:578:19)"
+  }
+ ]
+}

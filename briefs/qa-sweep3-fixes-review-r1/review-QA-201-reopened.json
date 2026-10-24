@@ -1,0 +1,69 @@
+{
+  "signed": {
+    "beforeCloseSigs": 1,
+    "reopenedSigs": 1,
+    "reopened": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+    "steps": [
+      {
+        "to": "unsigned@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 0
+      },
+      {
+        "to": "team@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 1
+      },
+      {
+        "to": "unsigned@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 1
+      },
+      {
+        "to": "team@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 2
+      }
+    ],
+    "prompts": [
+      "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten.",
+      "Die bearbeitete Signatur behalten und die neue Signatur hinzufügen? Dein bearbeiteter Text bleibt erhalten."
+    ]
+  },
+  "blank": {
+    "beforeCloseSigs": 0,
+    "reopenedSigs": 0,
+    "reopened": "\"\\n\"",
+    "steps": [
+      {
+        "to": "unsigned@example.test",
+        "sigs": 0,
+        "value": "\"\\n\"",
+        "prompts": 0
+      },
+      {
+        "to": "team@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 0
+      },
+      {
+        "to": "unsigned@example.test",
+        "sigs": 0,
+        "value": "\"\\n\"",
+        "prompts": 0
+      },
+      {
+        "to": "team@example.test",
+        "sigs": 1,
+        "value": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "prompts": 0
+      }
+    ],
+    "prompts": []
+  }
+}

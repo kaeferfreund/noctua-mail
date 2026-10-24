@@ -1,0 +1,6 @@
+import {ESLint} from 'eslint';import fs from 'node:fs';import path from 'node:path';import {execFileSync} from 'node:child_process';import assert from 'node:assert/strict';
+const paths=fs.readFileSync('.tmp/lint.log','utf8').split('\n').filter(s=>s.startsWith(process.cwd()+'/')&&/\.[cm]?[jt]sx?$/.test(s.trim())).map(s=>s.trim());assert(paths.length>0);
+const eslint=new ESLint();const now=await eslint.lintFiles(paths);const before=[];
+for(const filePath of paths){const relative=path.relative(process.cwd(),filePath);const text=execFileSync('git',['show','9424150:'+relative],{encoding:'utf8'});before.push(...await eslint.lintText(text,{filePath}));}
+const normalize=results=>results.flatMap(r=>r.messages.map(m=>({file:path.relative(process.cwd(),r.filePath),rule:m.ruleId,severity:m.severity,message:m.message}))).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+assert.deepEqual(normalize(now),normalize(before));const messages=normalize(now);const result={errors:messages.filter(m=>m.severity===2).length,warnings:messages.filter(m=>m.severity===1).length,same_diagnostics_as_9424150:true,new_diagnostics:0};assert.equal(result.errors,1);assert.equal(result.warnings,25);fs.writeFileSync('.tmp/lint-comparison.json',JSON.stringify({result,diagnostics:messages},null,2));console.log(JSON.stringify(result,null,2));

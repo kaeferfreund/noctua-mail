@@ -1,0 +1,90 @@
+imap-latency-50b warm-first small->large #0: highlight 137.8 folders 229.5 firstRows 633.9 settled 1735 reqs 38 lt 9/1139
+imap-latency-50b warm large->small #1: highlight 130.3 folders 243.6 firstRows 377 settled 794.2 reqs 29 lt 2/150
+imap-latency-50b warm small->large #2: highlight 128.5 folders 206.8 firstRows 541 settled 1010.3 reqs 21 lt 7/756
+imap-latency-50b warm large->small #3: highlight 129.1 folders 265.6 firstRows 433.4 settled 813 reqs 29 lt 3/212
+imap-latency-50b warm small->large #4: highlight 127.9 folders 220.6 firstRows 656.5 settled 1310.9 reqs 21 lt 6/962
+imap-latency-50b warm large->small #5: highlight 140 folders 290.7 firstRows 449.1 settled 813 reqs 21 lt 3/200
+imap-latency-50b warm small->large #6: highlight 165.2 folders 245.3 firstRows 645.2 settled 1074.9 reqs 21 lt 6/770
+imap-latency-50b warm large->small #7: highlight 149.6 folders 338.3 firstRows 508.8 settled 874.5 reqs 21 lt 3/240
+imap-latency-50b warm small->large #8: highlight 114.5 folders 183.2 firstRows 514.6 settled 921.7 reqs 21 lt 6/651
+imap-latency-50b warm large->small #9: highlight 134.3 folders 252.5 firstRows 387.4 settled 791.6 reqs 21 lt 3/193
+imap-latency-50b warm small->large #10: highlight 167 folders 250 firstRows 598.3 settled 1069.7 reqs 21 lt 6/766
+imap-latency-50b warm large->small #11: highlight 182.2 folders 292.7 firstRows 408 settled 828.3 reqs 29 lt 4/274
+imap-latency-50b warm small->large #12: highlight 218.7 folders 313.9 firstRows 966.7 settled 1401.6 reqs 21 lt 7/1089
+imap-latency-50b warm large->small #13: highlight 165.9 folders 297.1 firstRows 459 settled 849.2 reqs 21 lt 4/313
+imap-latency-50b warm small->large #14: highlight 237.9 folders 354.1 firstRows 767.4 settled 1276.5 reqs 21 lt 7/921
+imap-latency-50b warm large->small #15: highlight 193.8 folders 321.5 firstRows 495 settled 928 reqs 21 lt 4/294
+imap-latency-50b warm small->large #16: highlight 151.3 folders 256.6 firstRows 628.2 settled 1042.8 reqs 21 lt 7/777
+imap-latency-50b warm large->small #17: highlight 135.8 folders 255.8 firstRows 386.3 settled 828.9 reqs 21 lt 4/272
+imap-latency-50b warm small->large #18: highlight 172.5 folders 265.7 firstRows 672.5 settled 1259.9 reqs 21 lt 7/833
+imap-latency-50b warm large->small #19: highlight 133.3 folders 389 firstRows 656.5 settled 1080.1 reqs 25 lt 5/468
+imap-latency-50b warm small->large #20: highlight 276.6 folders 348.2 firstRows 973.8 settled 1477.4 reqs 21 lt 7/994
+{
+ "warm-first:small->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 137.8,
+   "p90": 137.8
+  },
+  "folders": {
+   "p50": 229.5,
+   "p90": 229.5
+  },
+  "firstRows": {
+   "p50": 633.9,
+   "p90": 633.9
+  },
+  "settled": {
+   "p50": 1735,
+   "p90": 1735
+  },
+  "requests": 38,
+  "longTaskMs": 1139,
+  "timeouts": 0
+ },
+ "warm:large->small": {
+  "n": 10,
+  "highlight": {
+   "p50": 137.9,
+   "p90": 182.2
+  },
+  "folders": {
+   "p50": 291.7,
+   "p90": 338.3
+  },
+  "firstRows": {
+   "p50": 441.25,
+   "p90": 508.8
+  },
+  "settled": {
+   "p50": 828.5999999999999,
+   "p90": 928
+  },
+  "requests": 21,
+  "longTaskMs": 256,
+  "timeouts": 0
+ },
+ "warm:small->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 166.1,
+   "p90": 237.9
+  },
+  "folders": {
+   "p50": 253.3,
+   "p90": 348.2
+  },
+  "firstRows": {
+   "p50": 650.85,
+   "p90": 966.7
+  },
+  "settled": {
+   "p50": 1167.4,
+   "p90": 1401.6
+  },
+  "requests": 21,
+  "longTaskMs": 805,
+  "timeouts": 0
+ }
+}
+wrote /tmp/spike-switch-e2e/results/imap-latency-50b.json

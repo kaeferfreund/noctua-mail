@@ -1,0 +1,36 @@
+| series | group | n | A click→switch done | B gap→me | C /auth/me | D gap me→folders | E folders | F gap folders→threads | G threads (server+dl) | H threads→first rows | first rows | highlight | old-acct threads bytes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| cold | cold small→large | 10 | 12 | 2 | 14 | 87 | 11 | 101 | 134 | 357 | **751** | 163 | 45643 |
+| cold | cold large→small | 10 | 21 | 5 | 19 | 112 | 115 | 79 | 27 | 246 | **719** | 222 | 860931 |
+| cold | cold medium→large | 10 | 14 | 2 | 13 | 77 | 36 | 77 | 113 | 320 | **690** | 143 | 867880 |
+| cold | cold large→medium | 10 | 14 | 3 | 14 | 88 | 84 | 69 | 82 | 402 | **811** | 162 | 860931 |
+| cold | cold small→folders | 10 | 19 | 4 | 24 | 106 | 11 | 224 | 41 | 640 | **1202** | 240 | 45643 |
+| cold | cold folders→large | 10 | 11 | 2 | 11 | 284 | 8 | 95 | 114 | 264 | **805** | 350 | 348520 |
+| warm | warm large→small | 10 | 11 | 3 | 14 | 64 | 87 | 44 | 16 | 146 | **392** | 122 | 860931 |
+| warm | warm small→large | 10 | 10 | 2 | 10 | 79 | 8 | 83 | 115 | 249 | **569** | 144 | 45643 |
+| warm | warm large→medium | 10 | 15 | 5 | 20 | 93 | 103 | 52 | 87 | 309 | **740** | 195 | 860931 |
+| warm | warm medium→large | 10 | 19 | 6 | 24 | 101 | 50 | 90 | 154 | 315 | **741** | 185 | 867880 |
+| warm | warm folders→small | 10 | 12 | 3 | 11 | 266 | 7 | 86 | 16 | 134 | **542** | 331 | 348520 |
+| warm | warm small→folders | 10 | 22 | 4 | 12 | 69 | 8 | 166 | 39 | 385 | **735** | 153 | 45643 |
+| warm | warm large→folders | 10 | 10 | 2 | 10 | 66 | 83 | 118 | 33 | 412 | **735** | 115 | 860931 |
+| warm | warm folders→large | 10 | 9 | 2 | 10 | 248 | 7 | 84 | 111 | 239 | **718** | 306 | 348520 |
+| baseline-r2 | warm large→small | 10 | 9 | 2 | 11 | 61 | 86 | 40 | 16 | 133 | **370** | 115 | 860926 |
+| baseline-r2 | warm small→large | 10 | 11 | 2 | 11 | 60 | 7 | 75 | 108 | 218 | **497** | 115 | 45643 |
+| baseline-r2 | warm large→medium | 10 | 9 | 2 | 10 | 65 | 85 | 40 | 63 | 239 | **525** | 119 | 860926 |
+| baseline-r2 | warm medium→large | 10 | 9 | 2 | 10 | 63 | 35 | 58 | 110 | 220 | **519** | 115 | 867878 |
+| contention-watcher | warm large→small | 10 | 9 | 2 | 10 | 64 | 88 | 44 | 16 | 140 | **377** | 118 | 854521 |
+| contention-watcher | warm small→large | 10 | 10 | 2 | 12 | 79 | 8 | 80 | 116 | 238 | **553** | 138 | 49052 |
+| contention-watcher | warm large→medium | 10 | 11 | 3 | 15 | 69 | 97 | 52 | 68 | 280 | **596** | 136 | 841725 |
+| contention-watcher | warm medium→large | 10 | 11 | 4 | 14 | 76 | 59 | 55 | 127 | 249 | **589** | 142 | 848569 |
+| contention-second-tab | warm large→small | 10 | 12 | 3 | 16 | 84 | 94 | 56 | 21 | 159 | **464** | 149 | 837858 |
+| contention-second-tab | warm small→large | 10 | 12 | 3 | 14 | 90 | 10 | 91 | 133 | 262 | **648** | 160 | 58201 |
+| contention-second-tab | warm large→medium | 10 | 9 | 2 | 11 | 65 | 82 | 47 | 63 | 242 | **534** | 118 | 837858 |
+| contention-second-tab | warm medium→large | 10 | 10 | 2 | 10 | 65 | 34 | 60 | 110 | 221 | **533** | 119 | 844690 |
+| imap-latency-50 | warm large→small | 10 | 18 | 3 | 23 | 83 | 113 | 61 | 28 | 150 | **509** | 157 | 860926 |
+| imap-latency-50 | warm small→large | 10 | 19 | 3 | 21 | 75 | 10 | 104 | 151 | 296 | **699** | 170 | 45643 |
+| imap-latency-50 | warm folders→small | 10 | 16 | 5 | 18 | 212 | 9 | 98 | 18 | 129 | **563** | 316 | 348520 |
+| imap-latency-50 | warm small→folders | 10 | 14 | 3 | 18 | 66 | 9 | 162 | 41 | 358 | **696** | 146 | 45643 |
+| imap-latency-50b | warm large→small | 10 | 14 | 3 | 14 | 72 | 97 | 51 | 18 | 146 | **441** | 138 | 860926 |
+| imap-latency-50b | warm small→large | 10 | 17 | 3 | 15 | 77 | 12 | 90 | 137 | 283 | **651** | 166 | 45643 |
+| baseline-r3-lat0 | warm large→small | 10 | 19 | 2 | 20 | 61 | 88 | 42 | 22 | 134 | **401** | 140 | 860926 |
+| baseline-r3-lat0 | warm small→large | 10 | 27 | 2 | 17 | 64 | 8 | 76 | 115 | 236 | **578** | 145 | 45643 |

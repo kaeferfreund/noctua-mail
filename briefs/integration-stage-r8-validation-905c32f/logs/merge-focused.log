@@ -1,0 +1,71 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/i18n/format.test.ts:
+(pass) uses explicit German/English dates and 24-hour Berlin time [11.71ms]
+(pass) Berlin handles both repeated hours across autumn DST and the spring jump [0.37ms]
+(pass) formatter caches separate locale, zone and options; date overrides survive [2.22ms]
+(pass) both explicitly imported catalogs have identical semantic keys and translate [3.79ms]
+
+lib/i18n/layout.test.ts:
+(pass) root SSR uses the resolved locale consistently: {} [199.94ms]
+(pass) root SSR uses the resolved locale consistently: {"acceptLanguage":"en-US,en;q=0.8"} [121.97ms]
+(pass) root SSR uses the resolved locale consistently: {"cookie":"en","acceptLanguage":"de"} [127.20ms]
+(pass) root SSR uses the resolved locale consistently: {"uiLocale":"de","cookie":"en","acceptLanguage":"en"} [126.02ms]
+
+lib/i18n/catalogs.test.ts:
+(pass) message catalogs > both locales have identical leaf keys and valid ICU messages [17.52ms]
+(pass) message catalogs > complete count messages resolve German grammar and keep user text opaque [3.17ms]
+(pass) responsive list styling never treats accessible copy as control identity [2.12ms]
+(pass) reviewed German reader copy follows the binding terminology and complete messages [3.45ms]
+(pass) message catalogs > has identical German and English message keys [3.32ms]
+(pass) message catalogs > de contains valid ICU messages [4.01ms]
+(pass) message catalogs > en contains valid ICU messages [3.11ms]
+
+lib/i18n/resolveLocale.test.ts:
+(pass) locale resolution > prefers a validated personal preference over device and header [0.09ms]
+(pass) locale resolution > automatic/null uses device, then Accept-Language, then German [0.36ms]
+(pass) locale resolution > invalid preferences/cookies cannot become locale names or import paths [0.10ms]
+(pass) locale resolution > parses de-AT as de [0.03ms]
+(pass) locale resolution > parses en-US as en
+(pass) locale resolution > parses fr, en-GB;q=0.8, de;q=0.2 as en [0.13ms]
+(pass) locale resolution > parses de;q=0.2,en;q=0.9 as en [0.01ms]
+(pass) locale resolution > parses en;q=0.2,de;q=0.9 as de
+(pass) locale resolution > parses en;q=0,de;q=0.1 as de
+(pass) locale resolution > parses de;q=0,en;q=0.5 as en
+(pass) locale resolution > parses en;q=0.8,de;q=0.8 as en
+(pass) locale resolution > parses de;q=0.8,en;q=0.8 as de
+(pass) locale resolution > parses DE-at;q=0.7,EN-us;q=0.9 as en
+(pass) locale resolution > parses *,fr as de
+(pass) locale resolution > parses en;q=garbage,de;q=0.8 as de
+(pass) locale resolution > parses en;q=1.2 as de
+(pass) locale resolution > parses en;q=-1 as de [0.03ms]
+(pass) locale resolution > parses en;q=0.000 as de
+(pass) locale resolution > parses en-;q=1 as de
+(pass) locale resolution > parses en ; q=1.0, de;q=0.5 as en [0.01ms]
+(pass) locale resolution > parses en	;	q=1.0, de;q=0.5 as en [0.01ms]
+(pass) locale resolution > parses  	EN-us 	; 	q 	= 	0.9 	, de;q=0.5 as en [0.02ms]
+(pass) locale resolution > parses * ; q=1.0, en ; q=0.8, de;q=0.5 as en [0.02ms]
+(pass) locale resolution > parses *	;	Q = 1.0 as de
+(pass) locale resolution > parses en ; Q = 1.0, de;q=0.5 as en [0.03ms]
+(pass) locale resolution > parses en ; q = nope, de;q=0.5 as de [0.01ms]
+(pass) locale resolution > parses en ; q = 0.1234, de;q=0.1 as de [0.02ms]
+(pass) locale resolution > parses en ; q=1=bad, de;q=0.5 as de [0.05ms]
+(pass) locale resolution > parses en ; q=1;q=0.5, de;q=0.5 as de [0.01ms]
+(pass) locale resolution > parses en ; invalid, de;q=0.5 as de [0.01ms]
+(pass) locale resolution > parses en ; q=1;, de;q=0.5 as de [0.03ms]
+
+lib/i18n/listReaderFormatting.test.ts:
+(pass) list and reader formats use the resolved locale and Berlin, preserving explicit date order [3.36ms]
+(pass) calendar days and stable group identities survive Berlin midnight and both DST transitions [1.92ms]
+(pass) SQLite week buckets display their actual Berlin start, including W00 and year edges [3.03ms]
+
+lib/i18n/authMessages.test.ts:
+(pass) localized authentication presentation > retains English copy and error priority for stable auth codes [6.98ms]
+(pass) localized authentication presentation > keeps password validation behavior and relocalizes the same stored error [0.34ms]
+(pass) localized authentication presentation > uses named ICU parameters for rate limits without changing the error code [0.31ms]
+(pass) localized authentication presentation > localizes known admin codes and preserves unknown upstream diagnostics [0.29ms]
+
+ 53 pass
+ 0 fail
+ 3831 expect() calls
+Ran 53 tests across 6 files. [693.00ms]

@@ -1,0 +1,119 @@
+diff -ru base/lib/auth.ts proto/lib/auth.ts
+--- base/lib/auth.ts	2026-10-23 15:09:05.000000000 +0000
++++ proto/lib/auth.ts	2026-10-23 15:30:45.658994439 +0000
+@@ -118,7 +118,12 @@
+       return { mailboxState: "none", accountId: null, accounts: [] };
+     }
+     const selected = accounts.find(a => a.id === session.activeAccountId) ?? accounts[0];
+-    const updated = await setActiveAccountId(await getAuth(), session.sessionToken, selected.id);
++    // PROTO(spike-switch) variant (c): write only if the selection changes or updatedAt is older than 5 min;
++    // otherwise a liveness read (session exists, unexpired) replaces RETURNING.
++    const live = selected.id === session.activeAccountId ? (await getDb()).prepare(
++      `SELECT updatedAt FROM auth_session WHERE token=? AND julianday(expiresAt)>julianday('now')`).get(session.sessionToken) as { updatedAt: string } | undefined : undefined;
++    const fresh = !!live && Date.now() - new Date(live.updatedAt).getTime() < 5 * 60_000;
++    const updated = fresh ? true : await setActiveAccountId(await getAuth(), session.sessionToken, selected.id);
+     const liveIds = await listAccessibleAccountIdsForUser(session.userId);
+     if (updated && liveIds.includes(selected.id) && await getAccountById(selected.id)) {
+       session.activeAccountId = selected.id;
+diff -ru base/lib/db/messages/query.ts proto/lib/db/messages/query.ts
+--- base/lib/db/messages/query.ts	2026-10-23 15:09:05.000000000 +0000
++++ proto/lib/db/messages/query.ts	2026-10-23 15:30:45.658661956 +0000
+@@ -2499,7 +2499,7 @@
+             .prepare(
+               `
+               SELECT COUNT(*) as count
+-              FROM messages m
++              FROM messages m INDEXED BY idx_messages_account_thread_date
+               WHERE ${where}
+                 AND m.threadId IN (${threadIdsForBaseCount.map(() => "?").join(",")})
+             `
+@@ -2578,10 +2578,10 @@
+               ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
+               EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
+                 as hasInlineAttachments
+-            FROM messages m
++            FROM messages m INDEXED BY idx_messages_account_thread_date
+             WHERE ${threadMessageWhere}
+               AND m.threadId IN (${threadIds.map(() => "?").join(",")})
+-            ORDER BY m.dateValue DESC
++            ORDER BY m.dateValue DESC, m.rowid ASC
+           `
+           )
+           .all(...threadMessageArgs, ...threadIds) as any[])
+diff -ru base/lib/i18n/format.ts proto/lib/i18n/format.ts
+--- base/lib/i18n/format.ts	2026-10-23 15:09:05.000000000 +0000
++++ proto/lib/i18n/format.ts	2026-10-23 15:30:29.995143515 +0000
+@@ -35,7 +35,21 @@
+ }
+ 
+ /** Calendar-day ordinal in the explicit display zone; subtraction stays correct across DST. */
++const displayDayMemo = new Map<string, number>();
+ export function displayDayNumber(value: Date | number, zone = timeZone) {
++  const ms = typeof value === "number" ? value : value.getTime();
++  if (Number.isFinite(ms)) {
++    const k = zone + ":" + Math.floor(ms / 60_000);
++    const hit = displayDayMemo.get(k);
++    if (hit !== undefined) return hit;
++    const computed = displayDayNumberUncached(ms, zone);
++    if (displayDayMemo.size > 50_000) displayDayMemo.clear();
++    displayDayMemo.set(k, computed);
++    return computed;
++  }
++  return displayDayNumberUncached(value, zone);
++}
++function displayDayNumberUncached(value: Date | number, zone: string) {
+   const parts = cached(dates, `display-day:${zone}`, () => new Intl.DateTimeFormat("en-CA", {
+     year: "numeric", month: "2-digit", day: "2-digit", timeZone: zone
+   })).formatToParts(value);
+diff -ru base/lib/topics/suggestions.ts proto/lib/topics/suggestions.ts
+--- base/lib/topics/suggestions.ts	2026-10-23 15:09:05.000000000 +0000
++++ proto/lib/topics/suggestions.ts	2026-10-23 15:30:29.994942553 +0000
+@@ -108,13 +108,30 @@
+   ];
+ }
+ 
++// PROTO(spike-switch): per-batch memo; same pure decision as before.
++type IgnoreMemo = { ownAddresses: string[]; decisions: Map<string, boolean> };
++const ignoreMemos = new WeakMap<object, IgnoreMemo>();
+ function shouldIgnoreTopicSuggestionSignal(
+   entry: Pick<TopicSignalEntry, "type" | "value">,
+   options?: {
+     accountEmail?: OwnAddressInput;
+   }
+ ) {
+-  const ownAddresses = ownAddressList(options?.accountEmail);
++  const memo = options ? ignoreMemos.get(options) : undefined;
++  if (memo) {
++    const k = entry.type + "\u0000" + entry.value;
++    const hit = memo.decisions.get(k);
++    if (hit !== undefined) return hit;
++    const decision = shouldIgnoreTopicSuggestionSignalUncached(entry, memo.ownAddresses);
++    memo.decisions.set(k, decision);
++    return decision;
++  }
++  return shouldIgnoreTopicSuggestionSignalUncached(entry, ownAddressList(options?.accountEmail));
++}
++function shouldIgnoreTopicSuggestionSignalUncached(
++  entry: Pick<TopicSignalEntry, "type" | "value">,
++  ownAddresses: string[]
++) {
+   const value = entry.value.trim();
+   if (!value) return true;
+ 
+@@ -186,6 +203,7 @@
+   normalizedThreadIds.forEach((threadId) => {
+     result.set(threadId, topicSuggestionSignalsFromEntries([], threadId));
+   });
++  if (options) ignoreMemos.set(options, { ownAddresses: ownAddressList(options.accountEmail), decisions: new Map() });
+ 
+   const placeholders = normalizedThreadIds.map(() => "?").join(",");
+   const rows = db
+@@ -684,6 +702,8 @@
+   if (normalizedThreadIds.length === 0) return new Map();
+ 
+   return withAccountDb(accountId, (db) => {
++    // PROTO(spike-switch): no topics in this mailbox -> no suggestion can match (result map stays empty).
++    if (!db.prepare(`SELECT 1 FROM topics WHERE accountId = ? LIMIT 1`).get(accountId)) return new Map<string, Topic[]>();
+     const signalsByThreadId = getTopicSuggestionSignalsForThreadsFromDb(
+       db,
+       accountId,

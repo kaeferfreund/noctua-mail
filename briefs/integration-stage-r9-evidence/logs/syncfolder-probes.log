@@ -1,0 +1,63 @@
+bun test v1.4.4 (38afee6c8)
+
+r9-probes/r1-review-notice.dom.test.tsx:
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+REVIEW_NOTICE de [{"type":"warning","title":"Vollständige Synchronisierung abgebrochen","description":"Die vollständige Synchronisierung wurde vor dem Start abgebrochen, weil du ein anderes Postfach ausgewählt hast.","durationMs":10000}] []
+[noctua][sync] sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: null,
+  recategorizeFolder: false,
+  backfillUidCount: 0,
+}
+[noctua][sync] full sync requested {
+  triggerId: null,
+  accountId: "synthetic-a",
+  folderId: "synthetic-a:INBOX",
+  mode: "full",
+  fullSync: true,
+  reason: "Full folder sync requested without an explicit reason.",
+}
+REVIEW_NOTICE en [{"type":"warning","title":"Full sync cancelled","description":"Full sync was cancelled before starting because you selected another mailbox.","durationMs":10000}] []
+
+r9-probes/edge-repair.dom.test.tsx:
+EDGE_I {"total":0,"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":1}
+EDGE_I {"total":2,"actions":["recompute:first-example-test"],"gets":1}
+EDGE_II {"reset":false,"lateOldResolve":false,"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1"]}
+EDGE_II {"reset":false,"lateOldResolve":true,"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1"]}
+EDGE_II {"reset":true,"lateOldResolve":false,"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1"]}
+EDGE_II {"reset":true,"lateOldResolve":true,"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1"]}
+EDGE_IIB {"actions":["recompute:second-example-test"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/second-example-test/messages?folderId=second-example-test%3AINBOX&pageSize=1"]}
+EDGE_III {"actions":["recompute:first-example-test","sync:first-example-test:first-example-test:Archive"],"gets":["/api/accounts/first-example-test/messages?folderId=first-example-test%3AINBOX&pageSize=1","/api/accounts/first-example-test/messages?folderId=first-example-test%3AArchive&pageSize=1"],"set":["first-example-test:INBOX","first-example-test:Archive"]}
+EDGE_IIIB {"actions":["sync:first-example-test:first-example-test:INBOX"],"gets":2}
+
+r9-probes/r1-review-repair.dom.test.tsx:
+REVIEW_REPAIR {"total":0,"refresh":false,"actions":["sync"]}
+REVIEW_REPAIR {"total":0,"refresh":true,"actions":["sync"]}
+REVIEW_REPAIR {"total":2,"refresh":false,"actions":["recompute"]}
+REVIEW_REPAIR {"total":2,"refresh":true,"actions":["recompute"]}
+
+ 16 pass
+ 0 fail
+ 53 expect() calls
+Ran 16 tests across 3 files. [341.00ms]

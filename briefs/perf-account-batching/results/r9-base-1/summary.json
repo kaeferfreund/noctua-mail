@@ -1,0 +1,328 @@
+{
+  "r9-base-1": {
+    "saves": 568,
+    "failures": 0,
+    "errors": [],
+    "watcherJobs": 27,
+    "startLoad": [
+      10.87,
+      12.07,
+      13.55
+    ],
+    "endLoad": [
+      12.84,
+      12.36,
+      13.55
+    ],
+    "pragmas": {
+      "master": {
+        "timeout": 0
+      },
+      "shard": {
+        "timeout": 15000
+      }
+    },
+    "duration": 60000,
+    "draftLatencyMs": {
+      "n": 568,
+      "p50": 56.754,
+      "p95": 298.44,
+      "p99": 478.745,
+      "max": 3476.579,
+      "total": 59959.812
+    },
+    "endpoints": {
+      "me": {
+        "n": 455,
+        "p50": 16.145,
+        "p95": 352.572,
+        "p99": 869.853,
+        "max": 3213.125,
+        "total": 38838.489,
+        "statuses": {
+          "200": 455
+        },
+        "errors": 2
+      },
+      "summary": {
+        "n": 960,
+        "p50": 18.822,
+        "p95": 40.798,
+        "p99": 107.777,
+        "max": 625.265,
+        "total": 22618.158,
+        "statuses": {
+          "200": 960
+        },
+        "errors": 0
+      },
+      "sseScopedRead": {
+        "n": 494,
+        "p50": 3.265,
+        "p95": 11.062,
+        "p99": 19.203,
+        "max": 48.616,
+        "total": 2347.61,
+        "events": {
+          "mailbox-summary": 478,
+          "heartbeat": 4
+        },
+        "closed": false
+      }
+    },
+    "auth": {
+      "attempts": 689,
+      "busy": 244,
+      "kinds": {
+        "session": {
+          "attempts": 689,
+          "busy": 244
+        },
+        "role": {
+          "attempts": 196,
+          "busy": 78
+        },
+        "member": {
+          "attempts": 49,
+          "busy": 22
+        },
+        "revoke": {
+          "attempts": 49,
+          "busy": 18
+        }
+      }
+    },
+    "syncLoops": [
+      {
+        "completed": 84,
+        "failed": 1,
+        "errors": 1
+      },
+      {
+        "completed": 25,
+        "failed": 1,
+        "errors": 2
+      }
+    ],
+    "timings": {
+      "exhausted.acquireMailboxScheduler": {
+        "n": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 1
+      },
+      "exhausted.initializeMasterSchema": {
+        "n": 3,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 3
+      },
+      "exhausted.queueSyncWorker": {
+        "n": 2,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 2
+      },
+      "exhausted.releaseSyncWorker": {
+        "n": 2,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 2
+      },
+      "exhausted.reserveSyncWorker": {
+        "n": 1,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 1
+      },
+      "exhausted.setActiveAccountId": {
+        "n": 2,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 2
+      },
+      "guard.assertMs": {
+        "n": 569,
+        "p50": 0.075,
+        "p95": 0.139,
+        "p99": 0.178,
+        "max": 0.501,
+        "total": 48.799
+      },
+      "guard.commits": {
+        "n": 569,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 569
+      },
+      "guard.dmlAttempts": {
+        "n": 569,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 569
+      },
+      "guard.masterAcquireMs": {
+        "n": 569,
+        "p50": 0.012,
+        "p95": 0.024,
+        "p99": 0.037,
+        "max": 0.086,
+        "total": 7.394
+      },
+      "guard.masterHoldMs": {
+        "n": 569,
+        "p50": 0.955,
+        "p95": 3.937,
+        "p99": 15.444,
+        "max": 281.478,
+        "total": 1382.396
+      },
+      "master.acquireFailureMs": {
+        "n": 306,
+        "p50": 0.026,
+        "p95": 0.038,
+        "p99": 0.063,
+        "max": 0.103,
+        "total": 8.373
+      },
+      "master.acquireMs": {
+        "n": 1661,
+        "p50": 0.01,
+        "p95": 0.039,
+        "p99": 0.095,
+        "max": 0.961,
+        "total": 28.293
+      },
+      "master.holdMs": {
+        "n": 1661,
+        "p50": 0.976,
+        "p95": 16.889,
+        "p99": 128.51,
+        "max": 797.459,
+        "total": 11613.961
+      },
+      "retry.acquireMailboxScheduler": {
+        "n": 22,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 22
+      },
+      "retry.bindSyncWorkerProcess": {
+        "n": 3,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 3
+      },
+      "retry.heartbeatSyncWorkers": {
+        "n": 9,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 9
+      },
+      "retry.initializeMasterSchema": {
+        "n": 35,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 35
+      },
+      "retry.queueSyncWorker": {
+        "n": 120,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 120
+      },
+      "retry.releaseSyncWorker": {
+        "n": 78,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 78
+      },
+      "retry.reserveSyncWorker": {
+        "n": 174,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 174
+      },
+      "retry.setActiveAccountId": {
+        "n": 133,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 133
+      },
+      "retry.upsertMessages": {
+        "n": 306,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 306
+      },
+      "shard.acquireMs": {
+        "n": 1656,
+        "p50": 0.015,
+        "p95": 0.029,
+        "p99": 1.613,
+        "max": 429.573,
+        "total": 1222.734
+      },
+      "shard.ftsDeleteMs": {
+        "n": 1260,
+        "p50": 0.034,
+        "p95": 0.081,
+        "p99": 0.116,
+        "max": 3.841,
+        "total": 43.4
+      },
+      "shard.ftsInsertMs": {
+        "n": 691,
+        "p50": 0.02,
+        "p95": 0.068,
+        "p99": 0.09,
+        "max": 0.21,
+        "total": 17.112
+      },
+      "shard.holdMs": {
+        "n": 1656,
+        "p50": 0.115,
+        "p95": 3.047,
+        "p99": 13.746,
+        "max": 281.445,
+        "total": 1946.613
+      }
+    },
+    "busyRetries": 880,
+    "retryExhaustions": 11
+  }
+}

@@ -1,0 +1,161 @@
+import {test,expect,type Page} from '@playwright/test';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {totpFromUri} from '/home/monkey/code/noctua-mail/wt-integration-dryrun/tests/helpers/totp';
+const seed=JSON.parse(readFileSync('compose-seed.json','utf8'));
+const results:any[]=existsSync('extra-measurements.json')?JSON.parse(readFileSync('extra-measurements.json','utf8')):[];
+const mailbox='/api/accounts/qa-shared';
+const longName='Synthetic Long Display Name NNNNNNNNNNNN';
+const longEmail='a'.repeat(47)+'@example.test';
+const headers=(page:Page)=>({origin:new URL(page.url()).origin});
+let last=0;
+async function signIn(page:Page,base='http://localhost:3799') {
+ const wait=last+13000-Date.now();if(wait>0)await new Promise(r=>setTimeout(r,wait));last=Date.now();
+ await page.context().setExtraHTTPHeaders({'x-forwarded-for':base.endsWith('3799')?'192.0.2.81':'192.0.2.82'});
+ await page.goto(base);
+ for(const [path,data] of [['/api/ba/sign-in/email',{email:seed.email,password:seed.password}],['/api/ba/two-factor/verify-totp',{code:totpFromUri(seed.totpURI)}],['/api/auth/switch-account',{accountId:seed.accountId}]] as const) {
+  const code=await page.evaluate(async({path,data})=>(await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)})).status,{path,data});expect(code).toBe(200);
+ }
+ await page.reload();await expect(page.getByRole('button',{name:'Toggle sidebar',exact:true})).toBeVisible();
+}
+async function pref(page:Page,data:any) {expect((await page.request.put(mailbox+'/prefs',{headers:headers(page),data})).status()).toBe(200);}
+async function locale(page:Page,uiLocale:string){expect((await page.request.put('/api/auth/preferences',{headers:headers(page),data:{uiLocale}})).status()).toBe(200);}
+async function identity(page:Page,email:string,displayName:string) {
+ const all=(await (await page.request.get(mailbox+'/identities')).json()).identities;
+ const old=all.find((x:any)=>x.email===email);
+ const r=old?await page.request.patch(mailbox+'/identities/'+old.id,{headers:headers(page),data:{displayName,enabled:true}}):await page.request.post(mailbox+'/identities',{headers:headers(page),data:{email,displayName}});
+ expect(r.status()).toBe(old?200:201);return (await r.json()).identity;
+}
+async function open(page:Page,sender:any,subject:string,mobile=true) {
+ await pref(page,{defaultIdentityId:sender?.id??null,signatureOverride:''});
+ await page.goto(new URL('/',page.url()).href);
+ if(mobile)await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();
+ await page.getByRole('button',{name:'New mail',exact:true}).click();
+ if(!mobile)await page.getByRole('button',{name:'Open in modal',exact:true}).click();
+ if(mobile&&new URL(page.url()).port==='3887')await expect(page.locator('[data-lexical-editor=true]')).toHaveCount(1);else await expect(page.locator('[data-lexical-editor=true]')).toBeVisible();
+ const saved=page.waitForResponse(r=>r.url().endsWith('/drafts/save')&&r.request().postDataJSON().subject===subject);
+ await page.getByLabel('Subject:',{exact:true}).fill(subject);expect((await saved).status()).toBe(200);
+ await expect(page.getByText(/Draft saved/)).toBeVisible();
+}
+async function appearance(page:Page,theme:string) {await page.emulateMedia({colorScheme:theme as any});await page.evaluate(theme=>{document.documentElement.classList.remove('light','dark');document.documentElement.classList.add(theme);document.documentElement.style.colorScheme=theme;document.querySelectorAll('.radix-themes').forEach(e=>{e.classList.remove('light','dark');e.classList.add(theme)});},theme);}
+async function measure(page:Page,tag:any) {
+ const data=await page.evaluate(()=>{
+  const q=(s:string)=>document.querySelector(s) as HTMLElement;
+  const rect=(e:Element)=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}};
+  const target=(e:HTMLElement)=>{const r=rect(e);return{...r,hit:e.contains(document.elementFromPoint(r.x+r.w/2,r.y+r.h/2)),fits:r.x>=0&&r.y>=0&&r.right<=innerWidth&&r.bottom<=innerHeight}};
+  const from=q('button[id$="-from"]'),editor=q('[data-lexical-editor=true]'),sub=q('[class*=composeSubtitle]'),header=q('[class*=composeHeaderText]').parentElement!;
+  const close=[...document.querySelectorAll('button')].find(e=>['Close composer','Nachrichtenfenster schließen'].includes(e.getAttribute('aria-label')!))!;
+  const cancel=[...document.querySelectorAll('button')].find(e=>e.textContent?.trim()==='Cancel')!;
+  const body=q('[class*=composeBody]'),grid=body.querySelector('[class*=composeGrid]') as HTMLElement;
+  const r=editor.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);
+  const scrolls=[];
+  for(let p=editor.parentElement;p;p=p.parentElement){const s=getComputedStyle(p),b=p.getBoundingClientRect();if(['auto','scroll','hidden','clip'].includes(s.overflowY)){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}if(p.scrollHeight>p.clientHeight)scrolls.push({cls:p.className,overflow:s.overflowY,client:p.clientHeight,scroll:p.scrollHeight,top:p.scrollTop,rect:rect(p)});}
+  return{width:innerWidth,height:innerHeight,header:rect(header),from:{...target(from),title:from.title,text:from.textContent,hidden:!!from.closest('[aria-hidden=true],[hidden]'),arrowHit:from.contains(document.elementFromPoint(from.getBoundingClientRect().right-12,from.getBoundingClientRect().top+from.offsetHeight/2))},subtitle:{...rect(sub),text:sub.textContent,title:sub.title,hidden:!!sub.closest('[aria-hidden=true],[hidden]')},close:target(close),cancel:target(cancel),editor:{...target(editor),visibleHeight:Math.max(0,bottom-top)},body:rect(body),grid:{...rect(grid),client:grid.clientHeight,scroll:grid.scrollHeight,top:grid.scrollTop},scrolls};
+ });
+ results.push({...tag,...data});writeFileSync('extra-measurements.json',JSON.stringify(results,null,2));return data;
+}
+async function dropdown(page:Page) {
+ await page.locator('button[id$="-from"]').click();const menu=page.getByRole('listbox');await expect(menu).toBeVisible();const b=(await menu.boundingBox())!;expect(b.x).toBeGreaterThanOrEqual(16);expect(b.x+b.width).toBeLessThanOrEqual(page.viewportSize()!.width-16);expect(b.y).toBeGreaterThanOrEqual(0);expect(b.y+b.height).toBeLessThanOrEqual(page.viewportSize()!.height);await page.keyboard.press('Escape');return b;
+}
+async function scrollProbe(page:Page,tag:any) {
+ const grid=page.locator('[class*=composeBody] > [class*=composeGrid]');
+ const to=page.getByLabel('To:',{exact:true}),subject=page.getByLabel('Subject:',{exact:true});
+ // Real wheel input in the metadata region, down then back up.
+ const b=(await grid.boundingBox())!;await page.mouse.move(b.x+b.width/2,b.y+Math.max(1,b.height/2));await page.mouse.wheel(0,1000);await page.waitForTimeout(150);
+ const down=await grid.evaluate(e=>({top:e.scrollTop,client:e.clientHeight,scroll:e.scrollHeight}));
+ await subject.evaluate(e=>e.scrollIntoView({block:'nearest'}));const subjectBox=await subject.boundingBox();const subjectHit=await subject.evaluate(e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});
+ await page.mouse.move(b.x+b.width/2,b.y+Math.max(1,b.height/2));await page.mouse.wheel(0,-1000);await page.waitForTimeout(150);
+ const up=await grid.evaluate(e=>({top:e.scrollTop}));
+ await to.evaluate(e=>e.scrollIntoView({block:'nearest'}));const toHit=await to.evaluate(e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});if(toHit){await to.fill('recipient@example.test');await expect(to).toHaveValue('recipient@example.test');}
+ results.push({...tag,scrollProbe:{down,up,subjectBox,subjectHit,toHit,toBox:await to.boundingBox()}});writeFileSync('extra-measurements.json',JSON.stringify(results,null,2));
+}
+for(const loc of ['de','en'])test('adversarial '+loc,async({page})=>{
+ await page.setViewportSize({width:320,height:844});await signIn(page);await locale(page,loc);
+ const rtl=await identity(page,'c'.repeat(47)+'@example.test','مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀');
+ await open(page,rtl,'Synthetic r4 RTL '+loc);
+ for(const theme of ['light','dark'])for(const width of [320,360,390]){
+  await page.setViewportSize({width,height:844});await appearance(page,theme);const d=await measure(page,{loc,state:'RTL emoji',theme});
+  expect(d.editor.h).toBeGreaterThanOrEqual(120);expect(d.editor.visibleHeight).toBeGreaterThanOrEqual(120);expect(d.editor.hit).toBe(true);expect(d.close.fits&&d.cancel.fits&&d.from.arrowHit).toBe(true);await dropdown(page);
+  await page.locator('[data-lexical-editor=true]').click();await page.keyboard.type(' Synthetic RTL body.');
+ }
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ const sender=await identity(page,longEmail,longName);await page.setViewportSize({width:320,height:844});await open(page,sender,'Synthetic r4 keyboard '+loc);
+ for(const state of ['enabled','unavailable']) {
+  if(state==='unavailable') {
+   await page.getByRole('button',{name:'Cancel',exact:true}).click();expect((await page.request.patch(mailbox+'/identities/'+sender.id,{headers:headers(page),data:{enabled:false}})).status()).toBe(200);
+   await page.goto('/');await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();await page.getByRole('button',{name:/Drafts/}).first().click();await page.getByText('Synthetic r4 keyboard '+loc,{exact:true}).first().click();await page.getByRole('button',{name:'Edit draft',exact:true}).click();
+  }
+  await scrollProbe(page,{loc,state:'844 '+state});
+  for(const theme of ['light','dark']) {
+   await page.setViewportSize({width:320,height:500});await appearance(page,theme);
+   await measure(page,{loc,state:'keyboard '+state,theme,phase:'initial'});
+   await page.screenshot({path:`keyboard-${loc}-${state}-${theme}.png`});
+   await scrollProbe(page,{loc,state:'keyboard '+state,theme});
+   const ed=page.locator('[data-lexical-editor=true]');await ed.evaluate(e=>e.scrollIntoView({block:'nearest'}));
+   const after=await measure(page,{loc,state:'keyboard '+state,theme,phase:'after editor scroll'});
+   // Record before assertions so a failure retains the complete geometry.
+   if(after.editor.visibleHeight>0&&after.editor.hit){await ed.click({timeout:5000});await page.keyboard.type(' Synthetic keyboard body.');await expect(ed).toContainText('Synthetic keyboard body.');}
+   results.push({loc,state:'keyboard '+state,theme,usable:after.editor.visibleHeight>0&&after.editor.hit});writeFileSync('extra-measurements.json',JSON.stringify(results,null,2));
+  }
+  await page.setViewportSize({width:320,height:844});
+ }
+ await locale(page,'en');await pref(page,{defaultIdentityId:null,signatureOverride:null});
+});
+test('desktop baseline comparison',async({browser})=>{
+ for(const port of (process.env.REVIEW_PORTS??'3887,3799').split(',').map(Number)) {
+  const context=await browser.newContext({baseURL:`http://localhost:${port}`,viewport:{width:1024,height:844}});const page=await context.newPage();await signIn(page,`http://localhost:${port}`);
+  const sender=await identity(page,longEmail,longName);
+  for(const loc of ['de','en'])for(const kind of ['short','long'])for(const width of [1024,1440]) {
+   await locale(page,loc);await page.setViewportSize({width,height:844});await open(page,kind==='long'?sender:null,'Synthetic desktop control',false);
+   for(const theme of ['light','dark']) {
+    await appearance(page,theme);await page.evaluate(()=>document.fonts.ready);await page.getByLabel('Subject:',{exact:true}).blur();
+    const header=page.locator('[class*=composeHeaderText]').locator('..');const from=page.locator('button[id$="-from"]');
+    await header.screenshot({path:`desktop-${port}-${loc}-${kind}-${width}-${theme}-header.png`,animations:'disabled'});
+    await from.screenshot({path:`desktop-${port}-${loc}-${kind}-${width}-${theme}-from.png`,animations:'disabled'});
+    results.push({desktop:true,port,loc,kind,width,theme,header:await header.boundingBox(),from:await from.boundingBox(),subtitle:await page.locator('[class*=composeSubtitle]').boundingBox()});writeFileSync('extra-measurements.json',JSON.stringify(results,null,2));
+   }
+   await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  }
+  await context.close();
+ }
+});
+test('keyboard detail',async({browser})=>{
+ for(const port of (process.env.REVIEW_PORTS??'3887,3799').split(',').map(Number)) {
+  const context=await browser.newContext({baseURL:`http://localhost:${port}`,viewport:{width:320,height:844}});const page=await context.newPage();await signIn(page,`http://localhost:${port}`);
+  for(const loc of ['de','en']) {
+   await locale(page,loc);const sender=await identity(page,longEmail,longName);const subject=`Synthetic keyboard detail ${port} ${loc}`;
+   await open(page,sender,subject);
+   for(const state of ['enabled','unavailable']) {
+    if(state==='unavailable') {
+     await page.getByRole('button',{name:'Cancel',exact:true}).click();expect((await page.request.patch(mailbox+'/identities/'+sender.id,{headers:headers(page),data:{enabled:false}})).status()).toBe(200);
+     await page.goto('/');await page.getByRole('button',{name:'Toggle sidebar',exact:true}).click();await page.getByRole('button',{name:/Drafts/}).first().click();await page.getByText(subject,{exact:true}).first().click();await page.getByRole('button',{name:'Edit draft',exact:true}).click();await expect(page.getByLabel('Subject:',{exact:true})).toHaveValue(subject);await expect(page.locator('[class*=composeHeaderText]')).toBeVisible();
+    }
+    for(const theme of ['light','dark']) {
+     await page.setViewportSize({width:320,height:844});await appearance(page,theme);
+     // Start with an actually focused editable, then simulate the keyboard.
+     const ed=page.locator('[data-lexical-editor=true]');
+     if(port===3799) {
+      await page.evaluate(()=>{for(const el of document.querySelectorAll('[class*=composeBody],[class*=composeGrid]'))el.scrollTop=0;});
+      await measure(page,{detail:true,port,loc,state,theme,phase:'clean full height'});
+      await scrollProbe(page,{detail:true,port,loc,state:'full height '+state,theme});
+      await ed.click();await page.keyboard.type(' Synthetic before keyboard.');
+     }
+     await page.setViewportSize({width:320,height:500});
+     await measure(page,{detail:true,port,loc,state,theme,phase:'natural keyboard focus'});
+     await page.evaluate(()=>{for(const el of document.querySelectorAll('[class*=composeBody],[class*=composeGrid],[class*=composeMessageField],[class*=composeEditor]'))el.scrollTop=0;});
+     const initial=await measure(page,{detail:true,port,loc,state,theme,phase:'clean keyboard'});
+     // Wheel at a real visible portion of the composer, rather than at a
+     // zero-height metadata region; test whether overflow reaches the input.
+     await page.mouse.move(155,250);await page.mouse.wheel(0,1000);await page.waitForTimeout(200);
+     const wheel=await measure(page,{detail:true,port,loc,state,theme,phase:'after actual wheel'});
+     await page.screenshot({path:`keyboard-detail-${port}-${loc}-${state}-${theme}.png`});
+     await scrollProbe(page,{detail:true,port,loc,state,theme});
+     results.push({detail:true,port,loc,state,theme,wheelRestoresEditor:wheel.editor.visibleHeight>=120&&wheel.editor.hit});writeFileSync('extra-measurements.json',JSON.stringify(results,null,2));
+     if(port===3799){expect.soft(wheel.editor.visibleHeight,`${loc}/${state}/${theme}: visible editor after wheel`).toBeGreaterThanOrEqual(120);expect.soft(wheel.grid.h,`${loc}/${state}/${theme}: metadata scroll viewport`).toBeGreaterThan(0);expect.soft(wheel.from.hit,`${loc}/${state}/${theme}: From hittable`).toBe(true);}
+     await page.setViewportSize({width:320,height:844});
+    }
+   }
+   await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  }
+  await locale(page,'en');await pref(page,{defaultIdentityId:null,signatureOverride:null});await context.close();
+ }
+});

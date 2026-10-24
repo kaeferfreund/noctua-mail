@@ -1,0 +1,50 @@
+{
+ "base_4547815": {
+  "errors": 0,
+  "warnings": 181
+ },
+ "head": {
+  "errors": 0,
+  "warnings": 181
+ },
+ "new_vs_base": [
+  [
+   "app/components/MailClient.tsx",
+   "react-hooks/refs",
+   1,
+   "Error: Cannot access refs during render"
+  ],
+  [
+   "app/components/mailclient/composition/ComposeOrchestrator.tsx",
+   "react-hooks/preserve-manual-memoization",
+   1,
+   "Compilation Skipped: Existing memoization could not be preserved"
+  ],
+  [
+   "app/components/mailclient/useSyncController.ts",
+   "react-hooks/refs",
+   1,
+   "Error: Cannot access refs during render"
+  ]
+ ],
+ "gone_vs_base": [
+  [
+   "app/components/MailClient.tsx",
+   "react-hooks/exhaustive-deps",
+   1,
+   "React Hook useEffect has a missing dependency: 'syncAccountRef'. Either include it or remove the dependency array."
+  ],
+  [
+   "app/components/MailClient.tsx",
+   "react-hooks/exhaustive-deps",
+   1,
+   "React Hook useEffect has missing dependencies: 'autoRepairAttemptedFolderIdsRef', 'recomputeThreadsRef', and 'syncFolderWithBackgroundRef'. Either include them or remove the dependency array."
+  ],
+  [
+   "app/components/MailClient.tsx",
+   "react-hooks/immutability",
+   1,
+   "Error: Cannot access variable before it is declared"
+  ]
+ ]
+}

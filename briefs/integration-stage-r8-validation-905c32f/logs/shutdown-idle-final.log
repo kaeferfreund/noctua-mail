@@ -1,0 +1,37 @@
+Ready on http://127.0.0.1:3799
+[2026-10-23 07:33:55.053 +00:00] [startup] opened storage {
+[2026-10-23 07:33:55.053 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data',
+[2026-10-23 07:33:55.053 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data/db/main.db'
+[2026-10-23 07:33:55.053 +00:00] }
+[2026-10-23 07:33:55.120 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 07:33:55.575 +00:00] [startup] opened storage {
+[2026-10-23 07:33:55.575 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data',
+[2026-10-23 07:33:55.575 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data/db/main.db'
+[2026-10-23 07:33:55.575 +00:00] }
+[2026-10-23 07:33:55.577 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 07:33:55.643 +00:00] [shutdown] starting {
+[2026-10-23 07:33:55.643 +00:00]   signal: 'SIGTERM',
+[2026-10-23 07:33:55.643 +00:00]   hooks: [
+[2026-10-23 07:33:55.643 +00:00]     'http:stop',
+[2026-10-23 07:33:55.643 +00:00]     'http:drain',
+[2026-10-23 07:33:55.643 +00:00]     'background:stop',
+[2026-10-23 07:33:55.643 +00:00]     'background:drain',
+[2026-10-23 07:33:55.643 +00:00]     'auth-streams:drain',
+[2026-10-23 07:33:55.643 +00:00]     'auth-streams',
+[2026-10-23 07:33:55.643 +00:00]     'admission:2148934:b9bb5961-2838-4454-8639-513d33e41701:stop',
+[2026-10-23 07:33:55.643 +00:00]     'admission:2148934:b9bb5961-2838-4454-8639-513d33e41701:drain',
+[2026-10-23 07:33:55.643 +00:00]     'db:close',
+[2026-10-23 07:33:55.643 +00:00]     'auth-streams:drain',
+[2026-10-23 07:33:55.643 +00:00]     'auth-streams',
+[2026-10-23 07:33:55.643 +00:00]     'background:stop',
+[2026-10-23 07:33:55.643 +00:00]     'background:drain',
+[2026-10-23 07:33:55.643 +00:00]     'admission:2148934:23379741-7b42-450f-ae2c-6b292a1dd87c:stop',
+[2026-10-23 07:33:55.643 +00:00]     'admission:2148934:23379741-7b42-450f-ae2c-6b292a1dd87c:drain',
+[2026-10-23 07:33:55.643 +00:00]     'db:close'
+[2026-10-23 07:33:55.643 +00:00]   ]
+[2026-10-23 07:33:55.643 +00:00] }
+[2026-10-23 07:33:55.645 +00:00] [shutdown] HTTP requests { active: 0 }
+[2026-10-23 07:33:55.646 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:33:55.646 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:33:55.695 +00:00] [shutdown] complete {}
+{"pid":2148934,"port":3799,"dataDir":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data","exitCode":0,"signal":null,"durationMs":80,"forced":false}

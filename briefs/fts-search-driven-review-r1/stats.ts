@@ -1,0 +1,12 @@
+import { Database } from "bun:sqlite";
+import { readdirSync } from "node:fs";
+const dir = process.argv[2];
+const db = new Database(dir, { readonly: true });
+const q = (s: string, ...a: any[]) => db.prepare(s).all(...a);
+console.log(q("SELECT accountId, COUNT(*) n, SUM(deleted) del, COUNT(DISTINCT threadId) th, COUNT(DISTINCT dateValue) dates FROM messages GROUP BY accountId"));
+console.log(q("SELECT accountId, COUNT(*) n FROM message_fts_v3 GROUP BY accountId"));
+console.log(q("SELECT accountId, COUNT(*) n FROM attachments GROUP BY accountId"));
+console.log(q("SELECT accountId, COUNT(*) n FROM threads GROUP BY accountId"));
+for (const t of ["needle*", "nearcap*", "overcap*", "synthetic*", "quokka*", "banana*"]) console.log(t, q("SELECT accountId, COUNT(*) n FROM message_fts_v3 WHERE message_fts_v3 MATCH ? GROUP BY accountId", t));
+console.log(q("SELECT COUNT(*) n FROM thread_collab_state"));
+console.log(q("SELECT COUNT(*) FROM (SELECT accountId, latestReceivedDateValue FROM threads GROUP BY 1,2 HAVING COUNT(*)>1)"));

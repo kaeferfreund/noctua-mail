@@ -1,0 +1,7582 @@
+[
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 360,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 336,
+      "h": 95,
+      "right": 348,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 240,
+      "h": 36,
+      "right": 348,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 256,
+      "h": 40,
+      "right": 280,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 292,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 336,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 275,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 348,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 310,
+      "h": 135,
+      "right": 335,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 336,
+      "h": 588,
+      "right": 348,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 336,
+      "h": 124,
+      "right": 348,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 390,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 366,
+      "h": 95,
+      "right": 378,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 270,
+      "h": 36,
+      "right": 378,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 286,
+      "h": 40,
+      "right": 310,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 322,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 366,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 305,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 378,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 439,
+      "w": 340,
+      "h": 229,
+      "right": 365,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 229
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 366,
+      "h": 588,
+      "right": 378,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 366,
+      "h": 124,
+      "right": 378,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 360,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 336,
+      "h": 95,
+      "right": 348,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 240,
+      "h": 36,
+      "right": 348,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 256,
+      "h": 40,
+      "right": 280,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 292,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 336,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 275,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 348,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 310,
+      "h": 135,
+      "right": 335,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 336,
+      "h": 588,
+      "right": 348,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 336,
+      "h": 124,
+      "right": 348,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 390,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 366,
+      "h": 95,
+      "right": 378,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 270,
+      "h": 36,
+      "right": 378,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 286,
+      "h": 40,
+      "right": 310,
+      "bottom": 94,
+      "text": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "Von مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 322,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 366,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 305,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 378,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 439,
+      "w": 340,
+      "h": 229,
+      "right": 365,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 229
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 366,
+      "h": 588,
+      "right": 378,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 366,
+      "h": 124,
+      "right": 378,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "de",
+    "state": "844 enabled",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 773,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 817,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 653,
+      "hit": false,
+      "fits": false,
+      "visibleHeight": 0
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 680
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 0,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "usable": true
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "usable": true
+  },
+  {
+    "loc": "de",
+    "state": "844 unavailable",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 139,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 232,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 853,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 897,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 613,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 733,
+      "hit": false,
+      "fits": false,
+      "visibleHeight": 0
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 760
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 327,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 0,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 204,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 280,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 252,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "usable": true
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 204,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 280,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 252,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "de",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "usable": true
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 360,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 336,
+      "h": 95,
+      "right": 348,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 240,
+      "h": 36,
+      "right": 348,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 256,
+      "h": 40,
+      "right": 280,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 292,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 336,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 275,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 348,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 310,
+      "h": 135,
+      "right": 335,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 336,
+      "h": 588,
+      "right": 348,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 336,
+      "h": 124,
+      "right": 348,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "light",
+    "width": 390,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 366,
+      "h": 95,
+      "right": 378,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 270,
+      "h": 36,
+      "right": 378,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 286,
+      "h": 40,
+      "right": 310,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 322,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 366,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 305,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 378,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 439,
+      "w": 340,
+      "h": 229,
+      "right": 365,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 229
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 366,
+      "h": 588,
+      "right": 378,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 366,
+      "h": 124,
+      "right": 378,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 360,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 336,
+      "h": 95,
+      "right": 348,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 240,
+      "h": 36,
+      "right": 348,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 256,
+      "h": 40,
+      "right": 280,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 292,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 336,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 275,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 348,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 310,
+      "h": 135,
+      "right": 335,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 336,
+      "h": 588,
+      "right": 348,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 336,
+      "h": 124,
+      "right": 348,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "RTL emoji",
+    "theme": "dark",
+    "width": 390,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 366,
+      "h": 95,
+      "right": 378,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 270,
+      "h": 36,
+      "right": 378,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "text": "مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 286,
+      "h": 40,
+      "right": 310,
+      "bottom": 94,
+      "text": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "title": "From مرحبًا 🦉🚀 Synthetic אבג مرحبًا 🦉🚀 <ccccccccccccccccccccccccccccccccccccccccccccccc@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 322,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 366,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 305,
+      "y": 736,
+      "w": 73,
+      "h": 44,
+      "right": 378,
+      "bottom": 780,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 439,
+      "w": 340,
+      "h": 229,
+      "right": 365,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 229
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 366,
+      "h": 588,
+      "right": 378,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 366,
+      "h": 124,
+      "right": 378,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "loc": "en",
+    "state": "844 enabled",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 773,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 817,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 653,
+      "hit": false,
+      "fits": false,
+      "visibleHeight": 0
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 680
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 0,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "light",
+    "usable": true
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard enabled",
+    "theme": "dark",
+    "usable": true
+  },
+  {
+    "loc": "en",
+    "state": "844 unavailable",
+    "scrollProbe": {
+      "down": {
+        "top": 49,
+        "client": 139,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 231,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 837,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 881,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 597,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 717,
+      "hit": false,
+      "fits": false,
+      "visibleHeight": 0
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 744
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 311,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 0,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 188,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 264,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 236,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "light",
+    "usable": true
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "phase": "initial",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 188,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 264,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 236,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "phase": "after editor scroll",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "loc": "en",
+    "state": "keyboard unavailable",
+    "theme": "dark",
+    "usable": true
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "short",
+    "width": 1024,
+    "theme": "light",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "short",
+    "width": 1024,
+    "theme": "dark",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "short",
+    "width": 1440,
+    "theme": "light",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "short",
+    "width": 1440,
+    "theme": "dark",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "long",
+    "width": 1024,
+    "theme": "light",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "long",
+    "width": 1024,
+    "theme": "dark",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "long",
+    "width": 1440,
+    "theme": "light",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "de",
+    "kind": "long",
+    "width": 1440,
+    "theme": "dark",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "short",
+    "width": 1024,
+    "theme": "light",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "short",
+    "width": 1024,
+    "theme": "dark",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "short",
+    "width": 1440,
+    "theme": "light",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "short",
+    "width": 1440,
+    "theme": "dark",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 36
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "long",
+    "width": 1024,
+    "theme": "light",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "long",
+    "width": 1024,
+    "theme": "dark",
+    "header": {
+      "x": 57.6015625,
+      "y": 95.3046875,
+      "width": 908.796875,
+      "height": 67
+    },
+    "from": {
+      "x": 153.6015625,
+      "y": 178.3046875,
+      "width": 812.796875,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 57.6015625,
+      "y": 125.3046875,
+      "width": 808.796875,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "long",
+    "width": 1440,
+    "theme": "light",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "desktop": true,
+    "port": 3799,
+    "loc": "en",
+    "kind": "long",
+    "width": 1440,
+    "theme": "dark",
+    "header": {
+      "x": 262,
+      "y": 95.3046875,
+      "width": 916,
+      "height": 67
+    },
+    "from": {
+      "x": 358,
+      "y": 178.3046875,
+      "width": 820,
+      "height": 40
+    },
+    "subtitle": {
+      "x": 262,
+      "y": 125.3046875,
+      "width": 816,
+      "height": 20
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "full height enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -222,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 329,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "light",
+    "wheelRestoresEditor": true
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "full height enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -222,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 329,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "enabled",
+    "theme": "dark",
+    "wheelRestoresEditor": true
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 548,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 139,
+      "right": 308,
+      "bottom": 262,
+      "client": 139,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "full height unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 65,
+        "client": 139,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 231,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": false,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -302,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 409,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 204,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 280,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 252,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "light",
+    "wheelRestoresEditor": false
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 548,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 139,
+      "right": 308,
+      "bottom": 262,
+      "client": 139,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "full height unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 65,
+        "client": 139,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 231,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -138,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 245,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — nicht verfügbar",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "Von Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": false,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -302,
+      "w": 296,
+      "h": 653,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 204,
+      "right": 308,
+      "bottom": 311,
+      "client": 204,
+      "scroll": 204,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 790,
+        "top": 409,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 204,
+        "scroll": 204
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 280,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 252,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "de",
+    "state": "unavailable",
+    "theme": "dark",
+    "wheelRestoresEditor": false
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "full height enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -222,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 329,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "light",
+    "wheelRestoresEditor": true
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 533,
+      "w": 270,
+      "h": 135,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 135
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 247,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "full height enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 216,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -58,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 165,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -222,
+      "w": 296,
+      "h": 573,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 124,
+      "right": 308,
+      "bottom": 231,
+      "client": 124,
+      "scroll": 124,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 710,
+        "top": 329,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 124,
+        "scroll": 124
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 200,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 172,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "enabled",
+    "theme": "dark",
+    "wheelRestoresEditor": true
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 548,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 139,
+      "right": 308,
+      "bottom": 262,
+      "client": 139,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "full height unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 49,
+        "client": 139,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 231,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": false,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -286,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 393,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 188,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 264,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 236,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "light",
+    "wheelRestoresEditor": false
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "clean full height",
+    "width": 320,
+    "height": 844,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 123,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 159,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 788,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 832,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 548,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 668,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 588,
+      "right": 308,
+      "bottom": 695
+    },
+    "grid": {
+      "x": 12,
+      "y": 123,
+      "w": 296,
+      "h": 139,
+      "right": 308,
+      "bottom": 262,
+      "client": 139,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": []
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "full height unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 49,
+        "client": 139,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 231,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 232,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "natural keyboard focus",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "clean keyboard",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 608,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 652,
+      "hit": false,
+      "fits": false
+    },
+    "editor": {
+      "x": 25,
+      "y": 368,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 488,
+      "hit": true,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -122,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 515
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 229,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "phase": "after actual wheel",
+    "width": 320,
+    "height": 500,
+    "header": {
+      "x": 12,
+      "y": 12,
+      "w": 296,
+      "h": 95,
+      "right": 308,
+      "bottom": 107
+    },
+    "from": {
+      "x": 108,
+      "y": 107,
+      "w": 200,
+      "h": 36,
+      "right": 308,
+      "bottom": 143,
+      "hit": true,
+      "fits": true,
+      "title": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "text": "Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test> — unavailable",
+      "hidden": false,
+      "arrowHit": true
+    },
+    "subtitle": {
+      "x": 24,
+      "y": 54,
+      "w": 216,
+      "h": 40,
+      "right": 240,
+      "bottom": 94,
+      "text": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "title": "From Synthetic Long Display Name NNNNNNNNNNNN <aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.test>",
+      "hidden": false
+    },
+    "close": {
+      "x": 252,
+      "y": 37,
+      "w": 44,
+      "h": 44,
+      "right": 296,
+      "bottom": 81,
+      "hit": true,
+      "fits": true
+    },
+    "cancel": {
+      "x": 167,
+      "y": 444,
+      "w": 73,
+      "h": 44,
+      "right": 240,
+      "bottom": 488,
+      "hit": true,
+      "fits": true
+    },
+    "editor": {
+      "x": 25,
+      "y": 204,
+      "w": 270,
+      "h": 120,
+      "right": 295,
+      "bottom": 324,
+      "hit": false,
+      "fits": true,
+      "visibleHeight": 120
+    },
+    "body": {
+      "x": 12,
+      "y": -286,
+      "w": 296,
+      "h": 637,
+      "right": 308,
+      "bottom": 351
+    },
+    "grid": {
+      "x": 12,
+      "y": 107,
+      "w": 296,
+      "h": 188,
+      "right": 308,
+      "bottom": 295,
+      "client": 188,
+      "scroll": 188,
+      "top": 0
+    },
+    "scrolls": [
+      {
+        "cls": "_1ecwAq_composeScrollArea",
+        "overflow": "auto",
+        "client": 381,
+        "scroll": 774,
+        "top": 393,
+        "rect": {
+          "x": 12,
+          "y": 107,
+          "w": 296,
+          "h": 381,
+          "right": 308,
+          "bottom": 488
+        }
+      }
+    ]
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "scrollProbe": {
+      "down": {
+        "top": 0,
+        "client": 188,
+        "scroll": 188
+      },
+      "up": {
+        "top": 0
+      },
+      "subjectBox": {
+        "x": 109,
+        "y": 264,
+        "width": 198,
+        "height": 30
+      },
+      "subjectHit": true,
+      "toHit": true,
+      "toBox": {
+        "x": 109,
+        "y": 236,
+        "width": 71.546875,
+        "height": 30
+      }
+    }
+  },
+  {
+    "detail": true,
+    "port": 3799,
+    "loc": "en",
+    "state": "unavailable",
+    "theme": "dark",
+    "wheelRestoresEditor": false
+  }
+]

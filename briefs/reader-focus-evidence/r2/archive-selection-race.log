@@ -1,0 +1,17 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/messagelist/MessageListOrchestrator.dom.test.tsx:
+(pass) QA-012 uses the search empty state in folder scope, including a virtual folder [77.89ms]
+(pass) QA-012 uses the search empty state in all scope, including a virtual folder [20.23ms]
+(pass) QA-012 preserves ordinary folder, syncing, related search, and failure states [27.43ms]
+(pass) archive continuation: next [8.72ms]
+(pass) archive continuation: previous [4.36ms]
+(pass) archive continuation: end [4.55ms]
+(pass) archive continuation: failed [3.56ms]
+(pass) archive completion uses the current reader: target [6.56ms]
+(pass) archive completion uses the current reader: other [6.19ms]
+
+ 9 pass
+ 0 fail
+ 20 expect() calls
+Ran 9 tests across 1 file. [628.00ms]

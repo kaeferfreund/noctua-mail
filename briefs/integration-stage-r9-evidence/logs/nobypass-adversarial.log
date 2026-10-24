@@ -1,0 +1,1236 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/reviewerR5.test.ts: (run #1)
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4xZ1RC",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4xZ1RC/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 5,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 11,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 17,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 26,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 37,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 49,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 61,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 73,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 84,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 96,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 110,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 121,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 134,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 145,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 157,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 171,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 142,
+  elapsedMs: 2,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic COMMIT BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertMessages",
+  retries: 1,
+  elapsedMs: 149,
+}
+
+lib/reviewerR5.test.ts: (run #2)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 4,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 9,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 5,
+  elapsedMs: 15,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 25,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 36,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 48,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 60,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 71,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 84,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 97,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 6,
+  elapsedMs: 109,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 10,
+  elapsedMs: 119,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 133,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 6,
+  elapsedMs: 146,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 10,
+  elapsedMs: 163,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 185,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 105,
+  elapsedMs: 2,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic COMMIT BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertMessages",
+  retries: 1,
+  elapsedMs: 112,
+}
+
+lib/reviewerR5.test.ts: (run #3)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 3,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 8,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 13,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 21,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 33,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 47,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 59,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 72,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 83,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 94,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 106,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 117,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 127,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 138,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 150,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 169,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 144,
+  elapsedMs: 2,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic COMMIT BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertMessages",
+  retries: 1,
+  elapsedMs: 149,
+}
+
+lib/reviewerR5.test.ts: (run #4)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 4,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 8,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 13,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 21,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 31,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 48,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 60,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 73,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 84,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 94,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 105,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 116,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 133,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 146,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 157,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 178,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 120,
+  elapsedMs: 6,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic COMMIT BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertMessages",
+  retries: 1,
+  elapsedMs: 132,
+}
+
+lib/reviewerR5.test.ts: (run #5)
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 1,
+  elapsedMs: 3,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 2,
+  attempts: 21,
+  delayMs: 2,
+  elapsedMs: 15,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 3,
+  attempts: 21,
+  delayMs: 4,
+  elapsedMs: 20,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 4,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 28,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 5,
+  attempts: 21,
+  delayMs: 10,
+  elapsedMs: 39,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 6,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 52,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 7,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 65,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 8,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 76,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 9,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 88,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 10,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 100,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 11,
+  attempts: 21,
+  delayMs: 9,
+  elapsedMs: 113,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 12,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 126,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 13,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 136,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 14,
+  attempts: 21,
+  delayMs: 8,
+  elapsedMs: 146,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 15,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 158,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 16,
+  attempts: 21,
+  delayMs: 7,
+  elapsedMs: 180,
+  phase: "handshake",
+  policy: "short",
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] retry {
+  operation: "upsertMessages",
+  attempt: 1,
+  attempts: 21,
+  delayMs: 128,
+  elapsedMs: 1,
+  phase: "write",
+  policy: "coarse",
+  error: {
+    name: "Error",
+    message: "Synthetic COMMIT BUSY",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "upsertMessages",
+  retries: 1,
+  elapsedMs: 141,
+}
+
+ 40 pass
+ 0 fail
+ 235 expect() calls
+Ran 40 tests across 1 file. [17.15s]

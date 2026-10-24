@@ -1,0 +1,16 @@
+import { connect } from "node:net";
+const port = 3870, origin = `http://127.0.0.1:${port}`;
+async function probe(method: string, path: string, chunks: string) {
+  const started = Date.now();
+  return await new Promise<string>(resolve => {
+    const socket = connect(port, "127.0.0.1");
+    let raw = "";
+    const stop = setTimeout(() => { socket.destroy(); resolve(`no response after ${Date.now() - started} ms`); }, 30000);
+    socket.on("close", () => { clearTimeout(stop); resolve(`closed after ${Date.now() - started} ms; got ${JSON.stringify(raw.slice(0, 60))}`); });
+    socket.on("data", d => { raw += d.toString("latin1"); if (raw.includes("\r\n\r\n")) { clearTimeout(stop); socket.destroy(); resolve(`${raw.split("\r\n")[0]} after ${Date.now() - started} ms`); } });
+    socket.write(`${method} ${path} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nOrigin: ${origin}\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n${chunks}`);
+  });
+}
+for (const [m, p] of [["POST", "/api/accounts/synthetic/threads/recompute"], ["DELETE", "/api/accounts/synthetic/mcp-tokens/synthetic"], ["POST", "/api/auth/logout"]]) {
+  for (const [label, chunks] of [["one chunk then stall", "3\r\nabc\r\n"], ["no chunk, stall", ""]]) console.log(`${m} ${p} [${label}] -> ${await probe(m, p, chunks)}`);
+}

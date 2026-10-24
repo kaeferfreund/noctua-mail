@@ -1,0 +1,10 @@
+b02665ff87924fb9335b56d30d8545cbe526aee0
+100644 5e195d878a9ab530f29adf2cb20af5aef22f9615 1	app/components/mailclient/lazyAdmin.dom.test.tsx
+100644 42e323105575684c3558051c42fe22da710ff000 2	app/components/mailclient/lazyAdmin.dom.test.tsx
+100644 4dec13aa7a57c851a477bcbec8203788be6b9bbe 3	app/components/mailclient/lazyAdmin.dom.test.tsx
+
+Auto-merging app/components/MailClient.tsx
+Auto-merging app/components/mailclient/lazyAdmin.dom.test.tsx
+CONFLICT (content): Merge conflict in app/components/mailclient/lazyAdmin.dom.test.tsx
+Auto-merging messages/de.json
+Auto-merging messages/en.json

@@ -1,0 +1,157 @@
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/start-server.sh	2026-10-23 16:08:39.530258537 +0000
++++ .tmp/e2e/h/start-server.sh	2026-10-23 16:14:11.152317218 +0000
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ # usage: start-server.sh <logname>  -> prints PID of bun server
+-. /tmp/spike-switch-e2e/env.sh
+-cd /home/monkey/code/noctua-mail/wt-spike-switch-e2e/.next/standalone
+-PORT=3905 HOSTNAME=127.0.0.1 nohup nice -n 10 bun --bun server.js > /tmp/spike-switch-e2e/server-$1.log 2>&1 &
++. /home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/env.sh
++cd /home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/standalone-${2:?variant}
++PORT=3917 HOSTNAME=127.0.0.1 nohup nice -n 10 bun --bun server.js > /home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/server-$1.log 2>&1 &
+ echo $!
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/common.mjs	2026-10-23 16:08:39.535828908 +0000
++++ .tmp/e2e/h/common.mjs	2026-10-23 16:13:12.726630894 +0000
+@@ -2,11 +2,11 @@
+ import { createRequire } from "node:module";
+ import { createHmac } from "node:crypto";
+ import { readFileSync, existsSync } from "node:fs";
+-const require = createRequire("/home/monkey/code/noctua-mail/wt-spike-switch-e2e/package.json");
++const require = createRequire("/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/package.json");
+ export const { chromium } = require("playwright");
+-export const BASE = process.env.SPIKE_BASE ?? "http://127.0.0.1:3905";
+-export const SEED = process.env.SPIKE_SEED ?? "/tmp/spike-switch-e2e/seed.json";
+-export const STATE = process.env.SPIKE_STATE ?? "/tmp/spike-switch-e2e/storage-state.json";
++export const BASE = process.env.SPIKE_BASE ?? "http://127.0.0.1:3917";
++export const SEED = process.env.SPIKE_SEED ?? "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/seed.json";
++export const STATE = process.env.SPIKE_STATE ?? "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/storage-state.json";
+ function base32Decode(input) {
+   const a = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = 0, value = 0; const out = [];
+   for (const c of input.replace(/=+$/, "").toUpperCase()) { value = (value << 5) | a.indexOf(c); bits += 5; if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xff); bits -= 8; } }
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/env.sh	2026-10-23 16:08:39.550258721 +0000
++++ .tmp/e2e/h/env.sh	2026-10-23 16:13:12.726784576 +0000
+@@ -1,8 +1,8 @@
+ # Process-only env: worktree .env.local + synthetic Better Auth settings (no file in the worktree edited).
+ set -a
+-. /home/monkey/code/noctua-mail/wt-spike-switch-e2e/.env.local
++. /home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.env.local
+ BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?export a throwaway synthetic secret, e.g. $(openssl rand -hex 32)}
+-BETTER_AUTH_URL=http://127.0.0.1:3905
++BETTER_AUTH_URL=http://127.0.0.1:3917
+ PASSKEY_RP_ID=127.0.0.1
+ BETTER_AUTH_TELEMETRY=0
+ NOCTUA_TRUSTED_ORIGINS=
+@@ -10,5 +10,5 @@
+ NOCTUA_DESKTOP_MODE=false
+ NOCTUA_MAILBOX_WATCHER=${NOCTUA_MAILBOX_WATCHER:-1}
+ APP_ENV_LABEL=SPIKE
+-TMPDIR=/tmp/spike-switch-e2e/tmp
++TMPDIR=/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/tmp
+ set +a
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/fixture.ts	2026-10-23 16:08:39.523230192 +0000
++++ .tmp/e2e/h/fixture.ts	2026-10-23 16:13:12.726979658 +0000
+@@ -1,8 +1,8 @@
+ /**
+  * Spike A multi-mailbox synthetic IMAP fixture. Reuses the repo's dev-fixture server/store/message
+  * builder unchanged; one IMAP listener per mailbox (the fixture server is single-user).
+- * Ports 3906-3909 only. Synthetic example.test data only.
+- * Contention mode: while /tmp/spike-switch-e2e/inject.flag exists, every INJECT_MS one new INBOX
++ * Ports 3918-3794 only. Synthetic example.test data only.
++ * Contention mode: while /home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/inject.flag exists, every INJECT_MS one new INBOX
+  * message is appended to every mailbox (EXISTS -> watcher/IDLE -> background sync).
+  */
+ import { existsSync, writeFileSync, readFileSync } from "node:fs";
+@@ -22,19 +22,19 @@
+ }
+ // SPIKE_UIDV (harness-only): reuse the UIDVALIDITY values the app already cached so a restart needs no resync.
+ const UIDV: Record<string, Record<string, number>> = process.env.SPIKE_UIDV ? JSON.parse(readFileSync(process.env.SPIKE_UIDV, "utf8")) : {};
+-const WT = "/home/monkey/code/noctua-mail/wt-spike-switch-e2e";
++const WT = "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch";
+ const { startImapServer } = await import(`${WT}/scripts/dev-fixture/imap-server.ts`);
+ const { MailStore } = await import(`${WT}/scripts/dev-fixture/store.ts`);
+ const { makeMessage } = await import(`${WT}/scripts/dev-fixture/seed.ts`);
+ 
+ type Spec = { key: string; port: number; inbox: number; sent: number; archive: number; extraFolders: number; perExtra: number };
+ export const MAILBOXES: Spec[] = [
+-  { key: "small", port: 3906, inbox: 40, sent: 10, archive: 0, extraFolders: 0, perExtra: 0 },
+-  { key: "medium", port: 3907, inbox: 1800, sent: 200, archive: 0, extraFolders: 0, perExtra: 0 },
+-  { key: "large", port: 3908, inbox: 9000, sent: 800, archive: 200, extraFolders: 0, perExtra: 0 },
+-  { key: "folders", port: 3909, inbox: 300, sent: 50, archive: 0, extraFolders: 40, perExtra: 25 },
++  { key: "small", port: 3918, inbox: 40, sent: 10, archive: 0, extraFolders: 0, perExtra: 0 },
++  { key: "medium", port: 3919, inbox: 1800, sent: 200, archive: 0, extraFolders: 0, perExtra: 0 },
++  { key: "large", port: 3793, inbox: 9000, sent: 800, archive: 200, extraFolders: 0, perExtra: 0 },
++  { key: "folders", port: 3794, inbox: 300, sent: 50, archive: 0, extraFolders: 40, perExtra: 25 },
+ ];
+-const INJECT_FLAG = "/tmp/spike-switch-e2e/inject.flag";
++const INJECT_FLAG = "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/inject.flag";
+ const INJECT_MS = Number(process.env.INJECT_MS ?? 10000);
+ const senders = ["Mira Beispiel", "Kai Muster", "Lena Probe", "Jonas Test", "Ina Demo", "Paul Platzhalter", "Rita Fiktiv", "Ole Synth"];
+ const topics = ["Terminanfrage", "Rechnung", "Rückfrage Befund", "Lieferung", "Angebot", "Urlaubsvertretung", "Laborauftrag", "Newsletter"];
+@@ -66,7 +66,7 @@
+ const now = Date.now();
+ const t0 = performance.now();
+ for (const spec of MAILBOXES) {
+-  const store = new MailStore(`spike-${spec.key}`, new Date(now), "/tmp/spike-switch-e2e/fixture-uidvalidity.sqlite");
++  const store = new MailStore(`spike-${spec.key}`, new Date(now), "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/fixture-uidvalidity.sqlite");
+   store.boxes.clear();
+   const origCreate = store.create.bind(store);
+   store.create = (path: string, special?: string) => { const box = origCreate(path, special); const v = UIDV[spec.key]?.[path]; if (v) box.uidValidity = v; return box; };
+@@ -88,7 +88,7 @@
+   console.log(`fixture ${spec.key}: 127.0.0.1:${server.port} user=${user} folders=${store.boxes.size} messages=${total}`);
+ }
+ console.log(`fixture ready in ${Math.round(performance.now() - t0)} ms pid=${process.pid}`);
+-writeFileSync("/tmp/spike-switch-e2e/fixture.ready", String(process.pid));
++writeFileSync("/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/fixture.ready", String(process.pid));
+ let injected = 0;
+ setInterval(() => {
+   if (!existsSync(INJECT_FLAG)) return;
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/seed.ts	2026-10-23 16:08:48.864695592 +0000
++++ .tmp/e2e/h/seed.ts	2026-10-23 16:13:12.728068868 +0000
+@@ -1,6 +1,6 @@
+ /** Seeds one synthetic admin user (password + TOTP) and 4 synthetic mailboxes (manager membership). App must be stopped. */
+-const WT = "/home/monkey/code/noctua-mail/wt-spike-switch-e2e";
+-if (process.env.NOCTUA_DATA_DIR !== "/home/monkey/code/noctua-mail/data/noctua-data-spike-switch-e2e") throw new Error("wrong data dir");
++const WT = "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch";
++if (process.env.NOCTUA_DATA_DIR !== "/home/monkey/code/noctua-mail/data/noctua-data-perf-mailbox-switch") throw new Error("wrong data dir");
+ const { getAuth } = await import(`${WT}/lib/betterAuth.ts`);
+ const { getDb, closeAllDbConnections } = await import(`${WT}/lib/db/connection.ts`);
+ const { persistAccountRow } = await import(`${WT}/lib/db/rowParsers.ts`);
+@@ -21,7 +21,7 @@
+ if (seed.method !== "totp") throw Error("totp missing");
+ const verified = await auth.api.verifyTOTP({ headers: headers(), body: { code: totpFromUri(seed.totpURI) }, returnHeaders: true }); absorb(verified.headers);
+ await auth.api.signOut({ headers: headers() });
+-const boxes = [["small", 3906, "Kleine Praxis"], ["medium", 3907, "Mittlere Praxis"], ["large", 3908, "Grosse Praxis"], ["folders", 3909, "Viele Ordner"]] as const;
++const boxes = [["small", 3918, "Kleine Praxis"], ["medium", 3919, "Mittlere Praxis"], ["large", 3793, "Grosse Praxis"], ["folders", 3794, "Viele Ordner"]] as const;
+ for (const [key, port, name] of boxes) {
+   const account = { id: `spike-${key}`, email: `${key}@example.test`, name, avatar: "", ownerUserId: result.user.id,
+     imap: { host: "127.0.0.1", port, secure: false, user: `${key}@example.test`, password: "synthetic-imap" },
+@@ -29,6 +29,6 @@
+   persistAccountRow(db, account);
+   insertUserAccountLinkRow(db, result.user.id, account.id, "manager");
+ }
+-await Bun.write("/tmp/spike-switch-e2e/seed.json", JSON.stringify({ email, password, totpURI: seed.totpURI, id: result.user.id, accounts: boxes.map(b => `spike-${b[0]}`) }));
++await Bun.write("/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/seed.json", JSON.stringify({ email, password, totpURI: seed.totpURI, id: result.user.id, accounts: boxes.map(b => `spike-${b[0]}`) }));
+ closeAllDbConnections();
+ console.log("seeded", result.user.id);
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/prime.mjs	2026-10-23 16:08:39.536258592 +0000
++++ .tmp/e2e/h/prime.mjs	2026-10-23 16:13:12.727469102 +0000
+@@ -26,6 +26,6 @@
+   folders[key] = { folders: f.length, messages: f.reduce((a, b) => a + (b.count ?? 0), 0) };
+ }
+ console.log(folders);
+-mkdirSync("/tmp/spike-switch-e2e/results", { recursive: true });
+-writeFileSync("/tmp/spike-switch-e2e/results/prime-sync.json", JSON.stringify({ at: new Date().toISOString(), perFolderFullSync: out, folders }, null, 1));
++mkdirSync("/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/results", { recursive: true });
++writeFileSync("/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/results/prime-sync.json", JSON.stringify({ at: new Date().toISOString(), perFolderFullSync: out, folders }, null, 1));
+ await browser.close();
+--- /home/monkey/code/noctua-mail/briefs/perf-mailbox-switch/e2e/harness/measure.mjs	2026-10-23 16:08:39.535866348 +0000
++++ .tmp/e2e/h/measure.mjs	2026-10-23 16:13:12.727163059 +0000
+@@ -10,7 +10,7 @@
+ const { values: args } = parseArgs({ options: {
+   series: { type: "string", default: "adhoc" }, mode: { type: "string", default: "warm" },
+   pairs: { type: "string", default: "small:large" }, reps: { type: "string", default: "10" },
+-  "second-tab": { type: "boolean", default: false }, out: { type: "string", default: "/tmp/spike-switch-e2e/results" },
++  "second-tab": { type: "boolean", default: false }, out: { type: "string", default: "/home/monkey/code/noctua-mail/wt-perf-mailbox-switch/.tmp/e2e/results" },
+   "settle-ms": { type: "string", default: "500" }, "timeout-ms": { type: "string", default: "30000" },
+ } });
+ const REPS = Number(args.reps), SETTLE = Number(args["settle-ms"]), TIMEOUT = Number(args["timeout-ms"]);

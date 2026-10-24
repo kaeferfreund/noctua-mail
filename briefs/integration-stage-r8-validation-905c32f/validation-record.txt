@@ -1,0 +1,551 @@
+fix(integration): record round 8 validation and deployment handoff
+
+Resumed clean integration/stage at 9386f4eb5a701fc5df721ccac633b33bf13c0bab after the two approved merges. Read the round-8 and round-7 briefs, round-7 validation record and retained round-6 handoff. Fetched origin and verified all six included branch tips against their full pins. The first frozen install had populated 16 packages from input 2's changed lock; that was accepted as clarified by the owner. The lock itself was never regenerated or changed by installation. Final frozen install reports no changes and bun.lock exactly equals input 2.
+
+Before each remaining merge, ran git merge-tree --write-tree HEAD <full pin>. Inputs 5, 6 and 9 were conflict-free and their committed trees exactly match the previews. Input 7 preserved the six documented conflict files plus the additional QA unread reconciliation overlap. Merge order was exactly 5, 6, 7, 9; inputs 3/4 are included by input 2, and 8/10 remain dropped. No pushes or PRs.
+
+Pinned inputs:
+{
+  "fix/launcher-log-redaction": "3766c927dcc6932223c33b321524e154c22d1c5d",
+  "chore/deps-nodemailer-mcp": "3fe0562ada13f4df517b4885fc7dd2bfb285e73d",
+  "fix/qa-round2": "bdcdd3a562f3401e5b69dd96649120712c28e64d",
+  "feat/i18n-strings": "e9705524e7bd7ea93cd72eb04d5dad36b199b830",
+  "feat/i18n-strings-b": "46d629ea200567ace7d44137cbb01c853f42315a",
+  "perf/fts-identity-v3": "36be02371b88a6a5a0576dcf4592122a763abb6e"
+}
+First-parent round-8 commits before this record:
+[
+  {
+    "sha": "84d5457b282660e0f60ef61e8f4f58073027e201",
+    "subject": "Merge fix/launcher-log-redaction 3766c92 into integration/stage (round 8)"
+  },
+  {
+    "sha": "9386f4eb5a701fc5df721ccac633b33bf13c0bab",
+    "subject": "Merge chore/deps-nodemailer-mcp 3fe0562 into integration/stage (round 8)"
+  },
+  {
+    "sha": "939dcc064b10f298dc6ceb42b3a0992a6088af95",
+    "subject": "Merge fix/qa-round2 bdcdd3a into integration/stage (round 8)"
+  },
+  {
+    "sha": "b558a0598610653264c9e8b4090bd9700ec0aeb8",
+    "subject": "Merge feat/i18n-strings e970552 into integration/stage (round 8)"
+  },
+  {
+    "sha": "f28c16bc5a9b91f759a4fea051fdd7dac7a78851",
+    "subject": "Merge feat/i18n-strings-b 46d629e into integration/stage (round 8)"
+  },
+  {
+    "sha": "7865096b31fc1107f4d8938422179063470e507e",
+    "subject": "Merge perf/fts-identity-v3 36be023 into integration/stage (round 8)"
+  },
+  {
+    "sha": "42310d831697020952c343b4888804cb5820cbbd",
+    "subject": "fix(integration): provide locale context to round 2 QA DOM regressions"
+  },
+  {
+    "sha": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+    "subject": "fix(integration): adapt production acceptance fixtures for round 8"
+  }
+]
+Conflicts and resolutions per input:
+{
+  "1": [],
+  "2": [],
+  "5": [],
+  "6": [],
+  "7": [
+    {
+      "files": [
+        "messages/de.json",
+        "messages/en.json"
+      ],
+      "resolution": "Union namespace/key sets in existing order; keep slice 2a shared copy and slice 2b reviewed List/Reader/Notifications copy."
+    },
+    {
+      "files": [
+        "lib/i18n/catalogs.test.ts"
+      ],
+      "resolution": "One shape-validating leaf walker, strict ICU/parity checks and every case from both slices."
+    },
+    {
+      "files": [
+        "app/components/shell/Shell.dom.test.tsx"
+      ],
+      "resolution": "Shared render/I18nTestProvider import and slice 2a provider-wrapped SSR/hydration test."
+    },
+    {
+      "files": [
+        "app/components/shell/ShellHeader.tsx",
+        "app/components/shell/ShellSidebar.tsx"
+      ],
+      "resolution": "Translated accessible labels plus slice 2b stable data-shell-action attributes."
+    },
+    {
+      "files": [
+        "app/components/mailclient/useMessageMutations.ts"
+      ],
+      "resolution": "Additional overlap with input 5: preserve useEffect/useRef folder refresh generation and useTranslations notifications together."
+    }
+  ],
+  "9": []
+}
+Integration corrections:
+- Input 5's new unread-mutation and breakpoint DOM suites lacked locale context after inputs 6/7. Reused the existing I18nTestProvider render helper in a separate fix commit. Initial focused run: 21 pass / 8 fail; corrected focused run: 29 pass / 0 fail / 164 assertions. Catalog integration: 53 pass / 0 fail / 3831 assertions. Full CI and stress passed after this correction.
+- The existing production QA runner did not supply input 5's 300-message/110-unread fixture, compose seed/outbox or control URL. Added the optional reviewed fixture using existing seed helpers and assigned sockets. Each of the five unmodified specs runs on fresh storage so SMTP and flag mutations cannot contaminate the unread baseline. All 11 passed, none skipped. The translated HtmlMessage privacy entrypoint now uses the existing application I18nProvider; all 177 privacy assertions passed.
+- Temporary helper corrections, all recorded in the timed history: a fixture generator initially named a nonexistent FTS column; lint comparison initially parsed a code-location excerpt as a path; an added standalone probe incorrectly demanded a manifest for the bundled MCP SDK; the legacy migration oracle initially treated subject:needle as app syntax instead of passing fields=[subject]; and a watcher seeding parent retained the auth lifetime lock. Corrected the helpers, recreated disposable copies and reran them. The watcher seed now exits in a separate process before server startup. Existing suite assertions, deadlines and retry budgets were never changed. No host-load rerun was needed.
+- Removed only two stale ignored non-target optional directories, @img/sharp-linuxmusl-arm64 0.34.5 and @img/sharp-libvips-linuxmusl-arm64 1.2.4, as in the dependency handoff. Frozen install still reported no changes. Rebuilt fresh standalone and repeated native/runtime, worker, locale, gzip and shutdown checks. Native ARM64/glibc output is sharp 0.35.5 and libvips package 1.3.4 / runtime 8.18.7. No nodemailer 8 exists in the lock, node_modules or standalone; mailparser-private nodemailer 10.2.0 is retained.
+- Final application source is identical to that validated by full CI/stress and auth/browser QA. Later tracked corrections concern only acceptance fixtures. The final rebuild is at the final source head below; cleanup did not change JS bundle bytes.
+
+Validated source head: 905c32fb4fdcee7047eca146272ef873a6a639f9
+Frozen bun.lock SHA-256: 8d774d14a506cff89e1a22f447f29af4e12e6b664720b5cdcac6f5df7ce039fa
+
+Environment: Bun 1.4.4, Next 16.2.4; all heavy commands sequential at nice -n 15. TMPDIR is worktree-local .tmp. Runtime stores, account IDs, mail and keys are synthetic. App/standalone servers use only 3798/3799; protocol fixtures bind OS-assigned loopback sockets. Browser platform override ubuntu24.04-arm64. No other worktree or live datastore was edited/opened by these probes.
+
+Verbatim gate result excerpts:
+
+deps-paths: {"name": "deps-paths", "command": ["nice", "-n", "15", "bun", "test", "--timeout", "20000", "app/api/mcp", "lib/mail", "lib/drafts.test.ts"], "exit_code": 0, "duration_seconds": 29.176}
+ 282 pass
+ 0 fail
+ 858 expect() calls
+Ran 282 tests across 28 files. [28.38s]
+
+install-final: {"name": "install-final", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.043}
+[0.04ms] ".env.local"
+bun install v1.4.4 (38afee6c8)
+
+Checked 1087 installs across 1096 packages (no changes) [36.00ms]
+
+typecheck-complete: {"name": "typecheck-complete", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.461}
+$ bun check
+✓ No type errors in 1,195 files [401.95ms]
+
+ci: {"name": "ci", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 0, "duration_seconds": 503.652}
+ 2804 pass
+ 0 fail
+ 15275 expect() calls
+Ran 2804 tests across 304 files. [431.36s]
+ 462 pass
+ 0 fail
+ 2679 expect() calls
+Ran 462 tests across 58 files. [67.61s]
+
+stress: {"name": "stress", "command": ["nice", "-n", "15", "timeout", "2400", "bun", "run", "test:stress"], "exit_code": 0, "duration_seconds": 1219.049}
+ 8412 pass
+ 0 fail
+ 45825 expect() calls
+Ran 8412 tests across 304 files. [1211.97s]
+
+lint: {"name": "lint", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 1, "duration_seconds": 48.862}
+$ eslint .
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/AttachmentsList.tsx
+  240:7  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/MailClient.tsx
+  1308:6  warning  React Hook useMemo has a missing dependency: 'folders'. Either include it or remove the dependency array                                                                                               react-hooks/exhaustive-deps
+  1308:7  warning  React Hook useMemo has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked                                                                 react-hooks/exhaustive-deps
+  1792:5  warning  React Hook useMemo has a missing dependency: 'isDraftsFolder'. Either include it or remove the dependency array                                                                                        react-hooks/exhaustive-deps
+  2132:6  warning  React Hook useCallback has a missing dependency: 'setAllTopics'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  2168:6  warning  React Hook useCallback has a missing dependency: 'setMessages'. Either include it or remove the dependency array                                                                                       react-hooks/exhaustive-deps
+  2514:5  warning  React Hook useCallback has missing dependencies: 'setLoadingSource', 'setMessageContentLoading', 'setThreadRelatedMessages', and 'sourceFetchRef'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  2562:5  warning  React Hook useCallback has missing dependencies: 'localDeleteReconcileByFolderRef' and 'localDeleteReconcileByUidRef'. Either include them or remove the dependency array                              react-hooks/exhaustive-deps
+  2969:6  warning  React Hook useMemo has a missing dependency: 'checkIsThreadExcludedFolder'. Either include it or remove the dependency array                                                                           react-hooks/exhaustive-deps
+  3347:5  warning  React Hook useCallback has a missing dependency: 'syncFolderWithBackgroundRef'. Either include it or remove the dependency array                                                                       react-hooks/exhaustive-deps
+  4144:6  warning  React Hook useEffect has a missing dependency: 'autoHydrationAttemptAtRef'. Either include it or remove the dependency array                                                                           react-hooks/exhaustive-deps
+  4166:6  warning  React Hook useEffect has a missing dependency: 'setSearchScope'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  4170:6  warning  React Hook useEffect has a missing dependency: 'syncStateRef'. Either include it or remove the dependency array                                                                                        react-hooks/exhaustive-deps
+  4209:6  warning  React Hook useEffect has a missing dependency: 'swRegistrationRef'. Either include it or remove the dependency array                                                                                   react-hooks/exhaustive-deps
+  4236:6  warning  React Hook useEffect has missing dependencies: 'setSearchScope' and 'switchAccount'. Either include them or remove the dependency array                                                                react-hooks/exhaustive-deps
+  4296:6  warning  React Hook useEffect has missing dependencies: 'clearNotificationDeepLink' and 'jumpToMessageId'. Either include them or remove the dependency array                                                   react-hooks/exhaustive-deps
+  4403:6  warning  React Hook useEffect has a missing dependency: 'syncAccountRef'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  4446:6  warning  React Hook useEffect has a missing dependency: 'currentAccount?.caldav'. Either include it or remove the dependency array                                                                              react-hooks/exhaustive-deps
+  4738:6  warning  React Hook useEffect has missing dependencies: 'apiFetch', 'checkIsThreadExcludedFolder', 'setThreadContentLoading', and 'threadContentByIdRef'. Either include them or remove the dependency array    react-hooks/exhaustive-deps
+  4812:6  warning  React Hook useEffect has missing dependencies: 'clearNotificationDeepLink' and 'jumpToMessageId'. Either include them or remove the dependency array                                                   react-hooks/exhaustive-deps
+  4887:6  warning  React Hook useEffect has a missing dependency: 'setMessagesPage'. Either include it or remove the dependency array                                                                                     react-hooks/exhaustive-deps
+  5346:6  warning  React Hook useEffect has missing dependencies: 'autoRepairAttemptedFolderIdsRef', 'recomputeThreadsRef', and 'syncFolderWithBackgroundRef'. Either include them or remove the dependency array         react-hooks/exhaustive-deps
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/calendar/useCalendarConflicts.ts
+  58:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/calendar/useCalendarConflicts.ts:58:5
+  56 |     // Drop the previous account's conflicts immediately on switch so the banner
+  57 |     // can't show the wrong account's data while the new fetch is in flight.
+> 58 |     setConflicts([]);
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  59 |     void refresh();
+  60 |     const handler = () => void refresh();
+  61 |     window.addEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handler);  react-hooks/set-state-in-effect
+  64:18  warning  The ref value 'requestRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'requestRef.current' to a variable inside the effect, and use that variable in the cleanup function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/lexical/ImageNode.tsx
+  387:7  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts
+  238:6  warning  React Hook useCallback has a missing dependency: 'viewMessage'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 26 problems (1 error, 25 warnings)
+
+error: script "lint" exited with code 1
+
+lint-baseline-comparison: {"name": "lint-baseline-comparison", "command": ["nice", "-n", "15", "node", ".tmp/lint-compare.mjs"], "exit_code": 0, "duration_seconds": 6.047}
+{
+  "errors": 1,
+  "warnings": 25,
+  "same_diagnostics_as_9424150": true,
+  "new_diagnostics": 0
+}
+
+build-final: {"name": "build-final", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 61.318}
+▲ Next.js 16.2.4 (Turbopack)
+✓ Compiled successfully in 18.8s
+  Finished TypeScript in 39.0s ...
+  Generating static pages using 11 workers (0/31) ...
+  Generating static pages using 11 workers (7/31) 
+  Generating static pages using 11 workers (15/31) 
+  Generating static pages using 11 workers (23/31) 
+✓ Generating static pages using 11 workers (31/31) in 350ms
+
+standalone-packages-final: {"name": "standalone-packages-final", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 0, "duration_seconds": 0.317}
+{
+  "nativePackages": [
+    {
+      "name": "sharp-libvips-linux-arm64",
+      "version": "1.3.4"
+    },
+    {
+      "name": "sharp-linux-arm64",
+      "version": "0.35.5"
+    }
+  ],
+  "versions": {
+    "sharp": "0.35.5",
+    "imapflow": "2.9.1",
+    "nodemailer": "10.2.1",
+    "@modelcontextprotocol/sdk": "1.32.1"
+  },
+  "sharpVips": "8.18.7",
+  "noctua_server_mjs_bytes": 136298,
+  "rewritten_server_js_require_count": 1,
+  "nodemailerManifests": [
+    {
+      "path": "node_modules/nodemailer/package.json",
+      "version": "10.2.1"
+    },
+    {
+      "path": "node_modules/mailparser/node_modules/nodemailer/package.json",
+      "version": "10.2.0"
+    },
+    {
+      "path": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.next/standalone/node_modules/nodemailer/package.json",
+      "version": "10.2.1"
+    },
+    {
+      "path": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.next/standalone/node_modules/mailparser/node_modules/nodemailer/package.json",
+      "version": "10.2.0"
+    }
+  ]
+}
+
+standalone-workers-final: {"name": "standalone-workers-final", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.055}
+[standalone-worker-check] Verified worker runtime files in .next/standalone.
+
+auth-browser: {"name": "auth-browser", "command": ["nice", "-n", "15", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", "run", "test:auth-browser"], "exit_code": 0, "duration_seconds": 477.351}
+  20 passed (7.6m)
+
+html-privacy: {"name": "html-privacy", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.browser.toml", "--timeout", "120000", "./tests/browser/htmlPrivacy.test.ts"], "exit_code": 0, "duration_seconds": 60.143}
+ 1 pass
+ 0 fail
+ 177 expect() calls
+Ran 1 test across 1 file. [60.10s]
+
+qa-all: {"name": "qa-all", "command": ["nice", "-n", "15", "python3", ".tmp/qa-all.py"], "exit_code": 0, "duration_seconds": 203.45}
+QA_SPEC qa-compose.spec.ts
+  4 passed (46.9s)
+QA_SPEC qa-shell.spec.ts
+  4 passed (19.3s)
+QA_SPEC qa-admin-breakpoint.spec.ts
+  1 passed (18.4s)
+QA_SPEC qa-translation.spec.ts
+  1 passed (38.6s)
+QA_SPEC qa-unread-count.spec.ts
+  1 passed (29.6s)
+
+smoke: {"name": "smoke", "command": ["nice", "-n", "15", "env", "AUTH_SMOKE_PORT=3799", "bun", "scripts/smokeTeamAuth.ts"], "exit_code": 0, "duration_seconds": 16.325}
+PASS migration CLI twice: stable IDs, chosen hashes, old MCP removed, no secret output
+PASS canonical proxy headers: Secure cookies, foreign origin/raw paths/old cookie rejected, enrollment gate and TOTP activation
+PASS cookie refresh, live MCP, session revoke invalidates MCP, admin ban enforced
+PASS operator handover, mounted reset redirect/redemption/reuse, no auto-session, MFA preserved
+PASS second startup/schema empty; isolated master/auth/shard/key restore preserves IDs, factor bytes, decryptable mailbox secret and signed MFA session
+PASS startup/request logs contain no known synthetic password, hash, TOTP seed, backup code, session/challenge cookie, MCP token or recovery capability
+SMOKE PASS: compiled Next 16.2.4, Better Auth/passkey 1.7.12, Bun 1.4.4, port 3799, synthetic isolated storage only
+
+security: {"name": "security", "command": ["nice", "-n", "15", "bash", "tests/runTeamAuthSecurityControls.sh"], "exit_code": 0, "duration_seconds": 76.163}
+ 156 pass
+ 0 fail
+ 861 expect() calls
+Ran 156 tests across 5 files. [75.77s]
+
+migration: {"name": "migration", "command": ["nice", "-n", "15", "bun", ".tmp/migration-gate.ts"], "exit_code": 0, "duration_seconds": 24.05}
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+MIGRATION PASS {"kind":"round7","beforeVersion":2,"afterVersion":3,"messages":11000,"accounts":2,"guards":81,"durationMs":987.0301070000005,"searchComparisons":48,"inventory":{"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db","shardVersion":2,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":false,"resyncRequiredForLegacySharedShard":false,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."},"sourceUnchanged":true,"beforeFileBytes":13557760,"afterFileBytes":17133568}
+INVENTORY {"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db","shardVersion":0,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":true,"resyncRequiredForLegacySharedShard":true,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."}
+MIGRATION PASS {"kind":"legacy","beforeVersion":0,"afterVersion":3,"messages":11000,"accounts":2,"guards":81,"durationMs":4304.074644000002,"searchComparisons":24,"inventory":{"shardPath":"/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db","shardVersion":0,"ftsOrphanCount":0,"sharedMessageIdCount":5500,"sharedMessageRowCount":11000,"storedAccountCount":2,"legacyMessageKey":true,"resyncRequiredForLegacySharedShard":true,"note":"Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."},"sourceUnchanged":true,"beforeFileBytes":4927488,"afterFileBytes":15790080}
+MASTER fresh PASS: nullable locale + CHECK; provisioning covering index and one receipt; two actual reopens; synthetic profile and auth epoch preserved
+MASTER older PASS: nullable locale + CHECK; provisioning covering index and one receipt; two actual reopens; synthetic profile and auth epoch preserved
+
+shutdown-idle-final: {"name": "shutdown-idle-final", "command": ["nice", "-n", "15", "env", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3799", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data"], "exit_code": 0, "duration_seconds": 1.269}
+{"pid": 2148934, "port": 3799, "dataDir": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data", "exitCode": 0, "signal": null, "durationMs": 80, "forced": false}
+
+shutdown-watcher-final: {"name": "shutdown-watcher-final", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 0, "duration_seconds": 2.419}
+{"pid": 2149050, "port": 3799, "exitCode": 0, "signal": null, "durationMs": 49, "forced": false, "watcherStateBeforeSignal": "idling"}
+
+i18n-standalone-final: {"name": "i18n-standalone-final", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate.ts"], "exit_code": 0, "duration_seconds": 2.032}
+PASS German header: lang=de; HTML 200; static JS 200
+PASS English header: lang=en; HTML 200; static JS 200
+PASS German cookie overrides English: lang=de; HTML 200; static JS 200
+PASS English cookie overrides German: lang=en; HTML 200; static JS 200
+PASS invalid cookie ignored: lang=en; HTML 200; static JS 200
+I18N STANDALONE PASS: 5 locale cases; catalogs bundled; .next/static + public copied; port 3799; fresh isolated storage
+
+german320: {"name": "german320", "command": ["nice", "-n", "15", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "QA_ROUND2_FIXTURE=1", "bun", ".tmp/qa-standalone.ts", "--config=.tmp/german320.config.ts"], "exit_code": 0, "duration_seconds": 25.136}
+GERMAN 320 PASS: locale de; list and reader screenshots; document width 320
+  1 passed (15.4s)
+
+integration-files-lint-complete: {"name": "integration-files-lint-complete", "command": ["nice", "-n", "15", "bun", "x", "eslint", "scripts/runQaShellBrowserTests.ts", "tests/browser/htmlPrivacyFixture.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"], "exit_code": 0, "duration_seconds": 1.987}
+(no output)
+
+diff-check: {"name": "diff-check", "command": ["nice", "-n", "15", "git", "diff", "--check", "9424150", "HEAD"], "exit_code": 0, "duration_seconds": 0.046}
+(no output)
+
+diff-check-worktree: {"name": "diff-check-worktree", "command": ["nice", "-n", "15", "git", "diff", "--check"], "exit_code": 0, "duration_seconds": 0.008}
+(no output)
+
+QA-101 measured timings (ms): {"settledMs": 1235, "unreadMs": 1437, "newMailMs": 1977, "mutationStatus": 200, "injectionStatus": 200}
+Main-route first-load JS before/after:
+{
+  "method": "Unique root firstLoadChunkPaths, Node node:zlib gzipSync level 6 per asset; retained round-7 build reproduces recorded baseline exactly.",
+  "before": {
+    "sha": "9424150f5aa0a446ed9bc03ed199e6825129467d",
+    "js_assets": 27,
+    "raw_bytes": 2115748,
+    "gzip_bytes": 638891
+  },
+  "after": {
+    "sha": "905c32fb4fdcee7047eca146272ef873a6a639f9",
+    "js_assets": 26,
+    "raw_bytes": 2207028,
+    "gzip_bytes": 664843
+  },
+  "delta_raw_bytes": 91280,
+  "delta_gzip_bytes": 25952,
+  "gzip_increase_percent": 4.062039
+}
+Migration procedure: generated two synthetic 11,000-message/2-account original shards before input 9, using the unchanged round-7 v2 schema and the legacy format-0 SQL fixture. Closed them and copied them (no remaining WAL/SHM siblings). Never migrated originals. Runbook steps 3-5 on each copy: integrity/inventory with zero FTS orphans, timed first getAccountDb, exact schema and 81 guards, bijection/FTS integrity/FKs, scoped selective/common/phrase/subject/from/no-hit and page comparisons, all original message columns plus known/NULL provenance, attachment ownership and retained source/attachment bytes. Old round-7 preparer refuses v3; old marker-only writers and historical views reject DML. Two closes/reopens preserve schema. Three perf indexes exist. Fresh and older masters validate nullable uiLocale+CHECK, covering provisioning index and one receipt with two reopens; profile/auth epoch preserved. Whole configured API durations include runtime probes; fixture sizes/text differ from the review's ~154 MB 11k workload. No power-loss or arbitrary-SQL protection claim.
+
+FTS migration results:
+[
+  {
+    "kind": "round7",
+    "beforeVersion": 2,
+    "afterVersion": 3,
+    "messages": 11000,
+    "accounts": 2,
+    "guards": 81,
+    "durationMs": 987.0301070000005,
+    "searchComparisons": 48,
+    "inventory": {
+      "shardPath": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/round7-copy.db",
+      "shardVersion": 2,
+      "ftsOrphanCount": 0,
+      "sharedMessageIdCount": 5500,
+      "sharedMessageRowCount": 11000,
+      "storedAccountCount": 2,
+      "legacyMessageKey": false,
+      "resyncRequiredForLegacySharedShard": false,
+      "note": "Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."
+    },
+    "sourceUnchanged": true,
+    "beforeFileBytes": 13557760,
+    "afterFileBytes": 17133568
+  },
+  {
+    "kind": "legacy",
+    "beforeVersion": 0,
+    "afterVersion": 3,
+    "messages": 11000,
+    "accounts": 2,
+    "guards": 81,
+    "durationMs": 4304.074644000002,
+    "searchComparisons": 24,
+    "inventory": {
+      "shardPath": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/migration/legacy-copy.db",
+      "shardVersion": 0,
+      "ftsOrphanCount": 0,
+      "sharedMessageIdCount": 5500,
+      "sharedMessageRowCount": 11000,
+      "storedAccountCount": 2,
+      "legacyMessageKey": true,
+      "resyncRequiredForLegacySharedShard": true,
+      "note": "Counts cover surviving rows only. If this file was shared before account keys, resync every mapped account even when the count is zero."
+    },
+    "sourceUnchanged": true,
+    "beforeFileBytes": 4927488,
+    "afterFileBytes": 15790080
+  }
+]
+Shutdown measurements:
+{
+  "idle": {
+    "pid": 2148934,
+    "port": 3799,
+    "dataDir": "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data",
+    "exitCode": 0,
+    "signal": null,
+    "durationMs": 80,
+    "forced": false
+  },
+  "watcher": {
+    "pid": 2149050,
+    "port": 3799,
+    "exitCode": 0,
+    "signal": null,
+    "durationMs": 49,
+    "forced": false,
+    "watcherStateBeforeSignal": "idling"
+  },
+  "idle_over_300_ms": false,
+  "before_optional_cleanup_ms": {
+    "idle": 77,
+    "watcher": 50
+  },
+  "historical_baselines_ms": {
+    "round7_idle": 102,
+    "imapflow2_branch_under_load": 505
+  }
+}
+Complete timed gate history (including helper failures):
+{"name": "deps-paths", "command": ["nice", "-n", "15", "bun", "test", "--timeout", "20000", "app/api/mcp", "lib/mail", "lib/drafts.test.ts"], "exit_code": 0, "duration_seconds": 29.176}
+{"name": "merge-focused", "command": ["nice", "-n", "15", "bun", "test", "--timeout", "20000", "lib/i18n"], "exit_code": 0, "duration_seconds": 0.703}
+{"name": "merge-dom", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.dom.toml", "app/components/shell/Shell.dom.test.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/mailclient/useSearchState.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx", "app/components/account-settings/Field.dom.test.tsx"], "exit_code": 1, "duration_seconds": 3.237}
+{"name": "migration-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/create-migration-fixtures.ts"], "exit_code": 1, "duration_seconds": 0.545}
+{"name": "migration-fixtures-retry", "command": ["nice", "-n", "15", "bun", ".tmp/create-migration-fixtures.ts"], "exit_code": 0, "duration_seconds": 0.735}
+{"name": "merge-dom-fixed", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.dom.toml", "app/components/shell/Shell.dom.test.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/mailclient/useSearchState.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx", "app/components/account-settings/Field.dom.test.tsx"], "exit_code": 0, "duration_seconds": 3.356}
+{"name": "install", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.042}
+{"name": "typecheck", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.624}
+{"name": "ci", "command": ["nice", "-n", "15", "timeout", "1800", "bun", "run", "test:ci"], "exit_code": 0, "duration_seconds": 503.652}
+{"name": "stress", "command": ["nice", "-n", "15", "timeout", "2400", "bun", "run", "test:stress"], "exit_code": 0, "duration_seconds": 1219.049}
+{"name": "lint", "command": ["nice", "-n", "15", "timeout", "600", "bun", "run", "lint"], "exit_code": 1, "duration_seconds": 48.862}
+{"name": "build", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 68.615}
+{"name": "lint-baseline-comparison", "command": ["nice", "-n", "15", "node", ".tmp/lint-compare.mjs"], "exit_code": 1, "duration_seconds": 0.194}
+{"name": "lint-baseline-comparison", "command": ["nice", "-n", "15", "node", ".tmp/lint-compare.mjs"], "exit_code": 0, "duration_seconds": 6.047}
+{"name": "typecheck-final", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.554}
+{"name": "integration-files-lint", "command": ["nice", "-n", "15", "bun", "x", "eslint", "scripts/runQaShellBrowserTests.ts", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"], "exit_code": 0, "duration_seconds": 2.016}
+{"name": "bundle-after", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "42310d831697020952c343b4888804cb5820cbbd", "after"], "exit_code": 0, "duration_seconds": 0.104}
+{"name": "standalone-packages", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 1, "duration_seconds": 0.026}
+{"name": "standalone-packages", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 0, "duration_seconds": 0.45}
+{"name": "standalone-workers", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.056}
+{"name": "auth-browser", "command": ["nice", "-n", "15", "env", "AUTH_BROWSER_USE_BUILD=1", "AUTH_BROWSER_PORT=3799", "bun", "run", "test:auth-browser"], "exit_code": 0, "duration_seconds": 477.351}
+{"name": "html-privacy", "command": ["nice", "-n", "15", "bun", "test", "--config=bunfig.browser.toml", "--timeout", "120000", "./tests/browser/htmlPrivacy.test.ts"], "exit_code": 0, "duration_seconds": 60.143}
+{"name": "qa-all", "command": ["nice", "-n", "15", "python3", ".tmp/qa-all.py"], "exit_code": 0, "duration_seconds": 203.45}
+{"name": "smoke", "command": ["nice", "-n", "15", "env", "AUTH_SMOKE_PORT=3799", "bun", "scripts/smokeTeamAuth.ts"], "exit_code": 0, "duration_seconds": 16.325}
+{"name": "security", "command": ["nice", "-n", "15", "bash", "tests/runTeamAuthSecurityControls.sh"], "exit_code": 0, "duration_seconds": 76.163}
+{"name": "migration-retained-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/add-migration-files.ts"], "exit_code": 0, "duration_seconds": 0.364}
+{"name": "migration", "command": ["nice", "-n", "15", "bun", ".tmp/migration-gate.ts"], "exit_code": 1, "duration_seconds": 18.581}
+{"name": "migration-retained-fixtures", "command": ["nice", "-n", "15", "bun", ".tmp/add-migration-files.ts"], "exit_code": 0, "duration_seconds": 0.427}
+{"name": "migration", "command": ["nice", "-n", "15", "bun", ".tmp/migration-gate.ts"], "exit_code": 0, "duration_seconds": 24.05}
+{"name": "shutdown-idle", "command": ["nice", "-n", "15", "env", "BETTER_AUTH_URL=http://127.0.0.1:3799", "PASSKEY_RP_ID=127.0.0.1", "BETTER_AUTH_SECRET=<synthetic-process-only>", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3799", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-data"], "exit_code": 0, "duration_seconds": 1.319}
+{"name": "shutdown-watcher", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 1, "duration_seconds": 30.942}
+{"name": "shutdown-watcher", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 0, "duration_seconds": 2.438}
+{"name": "i18n-standalone", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate.ts"], "exit_code": 0, "duration_seconds": 2.047}
+{"name": "german320", "command": ["nice", "-n", "15", "env", "QA_SHELL_USE_BUILD=1", "QA_SHELL_PORT=3799", "NOCTUA_MAILBOX_WATCHER=1", "QA_ROUND2_FIXTURE=1", "bun", ".tmp/qa-standalone.ts", "--config=.tmp/german320.config.ts"], "exit_code": 0, "duration_seconds": 25.136}
+{"name": "install-final", "command": ["nice", "-n", "15", "bun", "install", "--frozen-lockfile"], "exit_code": 0, "duration_seconds": 0.043}
+{"name": "build-final", "command": ["nice", "-n", "15", "timeout", "1200", "bun", "run", "build"], "exit_code": 0, "duration_seconds": 61.318}
+{"name": "standalone-packages-final", "command": ["nice", "-n", "15", "bun", ".tmp/standalone-check.ts"], "exit_code": 0, "duration_seconds": 0.317}
+{"name": "standalone-workers-final", "command": ["nice", "-n", "15", "bun", "build-scripts/verifyStandaloneWorkerBuild.ts"], "exit_code": 0, "duration_seconds": 0.055}
+{"name": "typecheck-complete", "command": ["nice", "-n", "15", "bun", "run", "typecheck"], "exit_code": 0, "duration_seconds": 0.461}
+{"name": "integration-files-lint-complete", "command": ["nice", "-n", "15", "bun", "x", "eslint", "scripts/runQaShellBrowserTests.ts", "tests/browser/htmlPrivacyFixture.tsx", "app/components/mailclient/useMessageMutations.dom.test.tsx", "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx"], "exit_code": 0, "duration_seconds": 1.987}
+{"name": "bundle-final", "command": ["nice", "-n", "15", "node", ".tmp/bundle.mjs", "905c32f", "after-final"], "exit_code": 0, "duration_seconds": 0.094}
+{"name": "shutdown-idle-final", "command": ["nice", "-n", "15", "env", "NOCTUA_MAILBOX_WATCHER=", "bun", "scripts/checkGracefulShutdown.ts", "--port", "3799", "--data-dir", "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-idle-final-data"], "exit_code": 0, "duration_seconds": 1.269}
+{"name": "shutdown-watcher-final", "command": ["nice", "-n", "15", "bun", ".tmp/watcher-shutdown.ts"], "exit_code": 0, "duration_seconds": 2.419}
+{"name": "i18n-standalone-final", "command": ["nice", "-n", "15", "bun", ".tmp/locale-gate.ts"], "exit_code": 0, "duration_seconds": 2.032}
+{"name": "diff-check", "command": ["nice", "-n", "15", "git", "diff", "--check", "9424150", "HEAD"], "exit_code": 0, "duration_seconds": 0.046}
+{"name": "diff-check-worktree", "command": ["nice", "-n", "15", "git", "diff", "--check"], "exit_code": 0, "duration_seconds": 0.008}
+Deployment handoff delta; round-7 coordinated handoff otherwise retained:
+{
+  "dependencies": {
+    "sharp_override": "0.35.5",
+    "sharp_libvips": "1.3.4 / 8.18.7",
+    "imapflow": "2.9.1",
+    "nodemailer": "10.2.1",
+    "mcp_sdk": "1.32.1",
+    "tracing_includes": [
+      "/* -> ./node_modules/@img/sharp-libvips-*/lib/**",
+      "/api/accounts/*/sync -> ./node_modules/imapflow/**"
+    ],
+    "standalone_entry": "bun --bun server.js; ship noctua-server.mjs, .next/static and public"
+  },
+  "fts_v3": {
+    "migration": "One-way transaction at first configured open per physical shard; open every mapped account, including cold/inactive shards. Stop all old/new clients first and retain a coordinated verified backup of master/auth, mapped shards with WAL/SHM, sources, attachments and matching private keys.",
+    "planning": "For the reviewed 11,000-message v2 workload, budget 2.0-3.0 seconds per shard for whole open; present smaller synthetic v2 copy measured 987.030 ms and legacy format-0 copy 4304.075 ms including configured API/runtime probes. Allow additional time for pre-v2 composite-key conversion; serially budget every shard and validate representative stopped copies. No larger-shard latency guarantee.",
+    "space": "At least 2 x largest shard file + 56 MB WAL headroom per shard filesystem, plus backup and normal reserve; reviewed process RSS approximately 220 MB. Larger/concurrent migrations need larger allowances.",
+    "verification": "Follow doc/FTS-V3-MIGRATION.md steps 3-5 in order: readonly collision/orphan inventory; timed configured first open; exact schema/81 guards, bijection/FTS/FKs, scoped search/page boundaries, then provenance/privacy. Record orphan decisions. Resync every historically shared account even if current collisions are zero.",
+    "rollback": "Stop writers and restore the complete coordinated snapshot with the matching old binary and keys. No in-place downgrade, version lowering, guard removal, ANALYZE or PRAGMA optimize."
+  },
+  "i18n": {
+    "default": "German (du); German and English catalogs bundled in standalone.",
+    "precedence": [
+      "stored users.uiLocale",
+      "validated noctua-ui-locale cookie",
+      "Accept-Language",
+      "de"
+    ],
+    "verification": "Five standalone locale cases, static assets HTTP 200, German list and reader captured at 320 px without document overflow.",
+    "followups": "Server bucket boundaries versus Europe/Berlin remain the documented doc/I18N.md follow-up, outside round 8."
+  },
+  "required_new_environment_variables": [],
+  "retained_systemd": {
+    "TimeoutStopSec": "10s",
+    "KillSignal": "SIGTERM",
+    "KillMode": "mixed"
+  }
+}
+Dropped inputs:
+[
+  {
+    "input": 8,
+    "branch": "feat/sender-identities-2",
+    "pin": "d5ae17b",
+    "reason": "Deferred to round 9 while fix round 4 is under decisive performance review."
+  },
+  {
+    "input": 10,
+    "branch": "feat/sender-identities-3",
+    "reason": "Deferred to round 9; in fix round 2."
+  }
+]
+No pushes, PRs, deployments, credential changes, rebase, reset, force, stash, branch checkouts or worktree lifecycle operations. No .env.local or real secrets committed. No PRAGMA optimize or ANALYZE. Only owned PID/private process groups stopped; no pattern kills. Runtime probes/fixtures are closed and reserved ports free. Logs, JSON report, exact temporary harnesses and synthetic German 320 px screenshots are retained outside the worktree under ROOT/briefs/integration-stage-r8-validation-905c32f. The worktree-local .tmp is removed after this record commit.
+
+Cleanup audit:
+{
+  "live_worktree_processes": [],
+  "reserved_ports": {
+    "3798": {
+      "ipv4": "free",
+      "ipv6": "free"
+    },
+    "3799": {
+      "ipv4": "free",
+      "ipv6": "free"
+    }
+  }
+}
+The tracked tree is clean. This final commit records validation and deployment handoff only.
+
+Co-Authored-By: Codex gpt-6.1-sol <noreply@openai.com>

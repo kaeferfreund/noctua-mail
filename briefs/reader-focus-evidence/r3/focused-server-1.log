@@ -1,0 +1,16 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/mutationOrigins.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-cBzPB3",
+  dbPath: "/home/monkey/code/noctua-mail/wt-reader-focus/.tmp/mywebmail-test-db-cBzPB3/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+
+app/api/accounts/[accountId]/folders/[folderId]/consistency/route.pendingMoves.test.ts:
+[imap] folder.consistency unavailable account=acc-consistency-unreachable-060c7c8f-9693-424c-9047-d6495351ecff error=Peer certificate is empty for hostname "imap.example.com"
+
+ 168 pass
+ 0 fail
+ 4246 expect() calls
+Ran 168 tests across 9 files. [42.12s]

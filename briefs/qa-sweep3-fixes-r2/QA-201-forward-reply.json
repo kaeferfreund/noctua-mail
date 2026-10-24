@@ -1,0 +1,61 @@
+{
+  "results": {
+    "html-forward-1440": [
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      }
+    ],
+    "html-forward-390": [
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n-------- Forwarded message --------\\n\\nQuoted message\\nEdit\\nUnquote\\nRemove de\""
+      }
+    ],
+    "text-forward-1440": [
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@examp\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@examp\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\n-------- Forwarded message --------\\nFrom: Synthetic Reader <reader@examp\""
+      }
+    ],
+    "text-reply-1440": [
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\nOn 23.10.2026, 18:35, Synthetic Reader <reader@example.test> wrote:\\n> Sy\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\nOn 23.10.2026, 18:35, Synthetic Reader <reader@example.test> wrote:\\n> Sy\""
+      },
+      {
+        "signatureIndex": 0,
+        "start": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\\n\\n\\n\\nOn 23.10.2026, 18:35, Synthetic Reader <reader@example.test> wrote:\\n> Sy\""
+      }
+    ]
+  },
+  "prompts": 0
+}

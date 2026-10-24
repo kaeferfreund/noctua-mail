@@ -1,0 +1,8 @@
+{
+  "fix/launcher-log-redaction": "3766c92",
+  "chore/deps-nodemailer-mcp": "3fe0562",
+  "fix/qa-round2": "bdcdd3a",
+  "feat/i18n-strings": "e970552",
+  "feat/i18n-strings-b": "46d629e",
+  "perf/fts-identity-v3": "36be023"
+}

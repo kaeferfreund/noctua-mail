@@ -1,0 +1,14 @@
+{
+  "de": {
+    "leaves": 1025,
+    "statusLeaves": 57,
+    "duplicateKeys": 0,
+    "allNonStatusI18nViewsMessagesPreserved": true
+  },
+  "en": {
+    "leaves": 1025,
+    "statusLeaves": 57,
+    "duplicateKeys": 0,
+    "allNonStatusI18nViewsMessagesPreserved": true
+  }
+}

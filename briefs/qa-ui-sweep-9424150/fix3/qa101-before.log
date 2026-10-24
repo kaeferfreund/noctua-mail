@@ -1,0 +1,79 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/useMessageMutations.dom.test.tsx:
+54 |     act(() => { pending = h.mutate(message, "seen", true); });
+55 |     if (order === "count-before-mutation") h.stream(109);
+56 |     if (order === "stale-count-before-mutation") h.stream(110);
+57 |     await act(async () => { h.posts[0].resolve(response({ flags: ["\\Seen"] })); await pending; });
+58 |     // This used to be 108 when a 109 stream count beat the POST response.
+59 |     expect(h.count()).toBe(order === "count-before-mutation" ? 109 : 110);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 109
+Received: 108
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:59:23)
+(fail) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [27.91ms]
+54 |     act(() => { pending = h.mutate(message, "seen", true); });
+55 |     if (order === "count-before-mutation") h.stream(109);
+56 |     if (order === "stale-count-before-mutation") h.stream(110);
+57 |     await act(async () => { h.posts[0].resolve(response({ flags: ["\\Seen"] })); await pending; });
+58 |     // This used to be 108 when a 109 stream count beat the POST response.
+59 |     expect(h.count()).toBe(order === "count-before-mutation" ? 109 : 110);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 110
+Received: 109
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:59:23)
+(fail) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [5.23ms]
+54 |     act(() => { pending = h.mutate(message, "seen", true); });
+55 |     if (order === "count-before-mutation") h.stream(109);
+56 |     if (order === "stale-count-before-mutation") h.stream(110);
+57 |     await act(async () => { h.posts[0].resolve(response({ flags: ["\\Seen"] })); await pending; });
+58 |     // This used to be 108 when a 109 stream count beat the POST response.
+59 |     expect(h.count()).toBe(order === "count-before-mutation" ? 109 : 110);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 110
+Received: 109
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:59:23)
+(fail) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [3.68ms]
+54 |     act(() => { pending = h.mutate(message, "seen", true); });
+55 |     if (order === "count-before-mutation") h.stream(109);
+56 |     if (order === "stale-count-before-mutation") h.stream(110);
+57 |     await act(async () => { h.posts[0].resolve(response({ flags: ["\\Seen"] })); await pending; });
+58 |     // This used to be 108 when a 109 stream count beat the POST response.
+59 |     expect(h.count()).toBe(order === "count-before-mutation" ? 109 : 110);
+                           ^
+error: expect(received).toBe(expected)
+
+Expected: 110
+Received: 109
+
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:59:23)
+(fail) QA-101 watcher-off: one read transition settles at 109 without a second decrement [3.24ms]
+77 |   let first!: Promise<void>, second!: Promise<void>;
+78 |   act(() => { first = h.mutate(message, "seen", true); });
+79 |   await act(async () => { h.posts[0].resolve(response({ flags: ["\\Seen"] })); await first; });
+80 |   act(() => { second = h.mutate({ ...message, id: "synthetic-second" }, "answered", true); });
+81 |   await act(async () => { h.posts[1].resolve(response({ flags: ["\\Answered", "\\Seen"] })); await second; });
+82 |   await act(async () => { h.reads[1].resolve(response([{ ...inbox, unreadCount: 108 }])); });
+                                       ^
+TypeError: undefined is not an object (evaluating 'h.reads[1].resolve')
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:82:35)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/react/dist/act-compat.js:47:24)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/react/cjs/react.development.js:814:22)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/node_modules/@testing-library/react/dist/act-compat.js:46:25)
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.dom.test.tsx:82:9)
+(fail) QA-101 discards out-of-order folder reads and reads from a departed account [4.82ms]
+(pass) QA-101 unrelated flags do not fetch folders [3.56ms]
+
+ 1 pass
+ 5 fail
+ 6 expect() calls
+Ran 6 tests across 1 file. [318.00ms]

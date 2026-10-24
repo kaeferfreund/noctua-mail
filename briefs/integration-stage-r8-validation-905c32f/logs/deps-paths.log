@@ -1,0 +1,375 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/mailboxWatcher.gate.test.ts:
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=db, flag=unset [336.82ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=db, flag=true [278.00ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=db, flag=01 [280.98ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=db, flag=1 [360.77ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=both, flag=unset [275.73ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=both, flag=true [272.54ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=both, flag=01 [274.27ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=both, flag=1 [384.86ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=cookie, flag=unset [280.85ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=cookie, flag=true [280.59ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=cookie, flag=01 [275.23ms]
+(pass) watcher gate requires supported team runtime and exact opt-in: storage=cookie, flag=1 [291.70ms]
+
+lib/mailboxWatcher.integration.test.ts:
+WATCHER_FIXTURE independent watcher graphs: one IDLE owner, orderly takeover
+WATCHER_FIXTURE injection ingested in 362ms
+WATCHER_FIXTURE UIDVALIDITY browser-before-repair: OLD=0 NEW=1 reused UID=61 replacement subject/body, watermarks and pending moves cleared
+WATCHER_FIXTURE UIDVALIDITY watcher reset automatically replaced reused UID=61
+WATCHER_FIXTURE UIDVALIDITY direct-new and resumed-full reset re-ingest replacement UID=61
+WATCHER_FIXTURE auth_failed suspended: 0 new authentication attempts over 800ms (minimum reconnect=150ms)
+WATCHER_FIXTURE shared shard: both accounts retain rows, thread indexes and FTS for identical RFC Message-IDs
+WATCHER_FIXTURE PASS bootstrap=60 injected=1 flags=ok expunge=ok periodic-Sent=ok singleton=ok DB-credentials=ok auth-reload=ok add/remove=ok events=ok shutdown=ok
+(pass) watcher ingests local synthetic IMAP mail without a browser and shuts down [16048.14ms]
+
+lib/mailboxSummary.mcp.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-DM50K2",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-DM50K2/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+(pass) list_mailbox_summary reads canonical viewer counts, narrows to token scope and rechecks revocation [148.49ms]
+
+lib/drafts.test.ts:
+(pass) saveDraftForAccount > resolves forward drafts into the existing thread before returning them to the UI [57.49ms]
+(pass) saveDraftForAccount > persists invite draft metadata in the raw draft headers and returned message [40.13ms]
+(pass) saveDraftForAccount > preserves the existing Message-ID when overwriting a saved draft [47.20ms]
+(pass) saveDraftForAccount > stores an appended draft from its RFC822 without fetching it back [69.93ms]
+(pass) saveDraftForAccount calendar attachments > stores forwarded calendar parts with their iTIP method and a usable filename [50.27ms]
+
+lib/mailto.test.ts:
+(pass) parseMailto > parses a bare mailto: with a single recipient [0.24ms]
+(pass) parseMailto > parses multiple comma-separated recipients in the path [0.04ms]
+(pass) parseMailto > decodes percent-encoded recipients [0.02ms]
+(pass) parseMailto > parses subject, cc, bcc, and body from the query string [0.21ms]
+(pass) parseMailto > treats + as space in body and subject [0.05ms]
+(pass) parseMailto > merges path and query to= recipients [0.03ms]
+(pass) parseMailto > decodes newlines in body [0.02ms]
+(pass) parseMailto > is case-insensitive on header names [0.03ms]
+(pass) parseMailto > ignores unknown headers [0.02ms]
+(pass) parseMailto > parses in-reply-to and references [0.05ms]
+(pass) parseMailto > returns blank fields for an empty input [0.02ms]
+(pass) parseMailto > handles mailto: with no recipient (compose blank) [0.05ms]
+(pass) parseMailto > tolerates malformed percent-encoding without throwing [0.10ms]
+(pass) parseMailto > accepts input without the mailto: prefix [0.04ms]
+(pass) parseMailto > preserves + in path recipients (Gmail sub-address) [0.02ms]
+(pass) parseMailto > preserves + in query recipient headers [0.03ms]
+(pass) parseMailto > preserves + in in-reply-to and references [0.04ms]
+
+lib/mailboxSummary.test.ts:
+(pass) canonical summary: two users, three mailboxes, viewer counts include waiting/defaults and assigned closed threads [162.57ms]
+(pass) canonical summary rejects anonymous access; an admin without membership sees an empty list [790.35ms]
+(pass) summary query uses shard indexes, including the additive legacy covering index [30.47ms]
+(pass) Open counts distinct waiting threads across all folders, including assigned, and excludes closed/deleted/history [41.03ms]
+(pass) single-pass summary preserves zero counts and assignee-independent open counts [89.01ms]
+
+lib/mail/sourceOwnership.test.ts:
+(pass) normal ingestion publishes collision sources and attachments only under their final row ids [103.09ms]
+(pass) copied-message ingestion publishes collision sources and attachments only under their final row ids [67.32ms]
+(pass) batched ingestion publishes collision sources and attachments only under their final row ids [225.04ms]
+(pass) a failed batch restores existing files and removes new files and ownership markers [42.58ms]
+
+lib/mail/stripBccHeader.test.ts:
+(pass) stripBccHeader > no-op when there is no Bcc header [0.22ms]
+(pass) stripBccHeader > removes a single-line Bcc header and its terminating CRLF [0.05ms]
+(pass) stripBccHeader > removes Bcc when it's the last header before the blank line [0.03ms]
+(pass) stripBccHeader > removes a Bcc header with folded continuation lines (RFC 5322 folding) [0.04ms]
+(pass) stripBccHeader > case-insensitive header-name match [0.02ms]
+(pass) stripBccHeader > leaves 'Bcc:'-shaped text inside the body alone [0.03ms]
+(pass) stripBccHeader > tolerates LF-only line endings [0.06ms]
+(pass) stripBccHeader > Buffer input → Buffer output (round-trip preserves body bytes exactly) [0.07ms]
+(pass) stripBccHeader > raw with no blank-line separator is treated as all-headers [0.05ms]
+(pass) stripBccHeader > empty input is a no-op [0.02ms]
+(pass) stripBccHeader > multiple Bcc headers are all removed [0.03ms]
+(pass) injectUndisclosedRecipientsToHeader > inserts a To header when neither To nor Cc is present [0.12ms]
+(pass) injectUndisclosedRecipientsToHeader > no-op when a To header already exists [0.02ms]
+(pass) injectUndisclosedRecipientsToHeader > no-op when only a Cc header exists (but no To) [0.03ms]
+(pass) injectUndisclosedRecipientsToHeader > is case-insensitive for the recipient-header check [0.03ms]
+(pass) injectUndisclosedRecipientsToHeader > ignores 'To:'-like text in folded continuation lines [0.02ms]
+(pass) injectUndisclosedRecipientsToHeader > ignores 'To:'-like text in the body [0.03ms]
+(pass) injectUndisclosedRecipientsToHeader > Buffer input → Buffer output, body bytes preserved [0.06ms]
+(pass) stripBccHeader + injectUndisclosedRecipientsToHeader composition > BCC-only draft after strip+inject has a placeholder To and no Bcc [0.09ms]
+(pass) stripBccHeader + injectUndisclosedRecipientsToHeader composition > draft with To+Bcc is unchanged by inject step [0.04ms]
+
+lib/mail/imapError.test.ts:
+(pass) getImapHttpError > maps IMAP authentication failures to 401 [0.21ms]
+(pass) getImapHttpError > maps missing-password errors to 401 [0.04ms]
+(pass) getImapHttpError > leaves unrelated IMAP errors unmapped [0.02ms]
+(pass) markImapConnectFailure / isImapConnectFailure > recognizes tagged errors and returns the same instance [0.08ms]
+(pass) markImapConnectFailure / isImapConnectFailure > does not flag untagged or non-object errors [0.02ms]
+(pass) markImapConnectFailure / isImapConnectFailure > leaves non-extensible errors unmarked instead of throwing [0.05ms]
+(pass) markImapConnectFailure / isImapConnectFailure > keeps the flag out of enumerable/serialized properties [0.03ms]
+
+lib/mail/removeMessageAttachment.test.ts:
+(pass) removeMessageAttachmentEverywhere > appends before deleting, preserves date/flags, then re-syncs and returns fresh attachments [1.80ms]
+(pass) removeMessageAttachmentEverywhere > falls back to a local patch when the server gives no APPENDUID (no re-sync possible) [0.42ms]
+(pass) removeMessageAttachmentEverywhere > falls back to fetching the source from the server when it isn't cached [0.26ms]
+(pass) removeMessageAttachmentEverywhere > rolls back the appended copy when deleting the original fails [0.28ms]
+(pass) removeMessageAttachmentEverywhere > does not delete the original or touch local state when the append fails [0.32ms]
+(pass) removeMessageAttachmentEverywhere > makes no server calls when the attachment isn't present in the source [0.16ms]
+(pass) removeMessageAttachmentEverywhere > rejects when the message lacks IMAP metadata, before reading any source [0.10ms]
+(pass) removeMessageAttachmentEverywhere > rejects an unknown attachment id [0.08ms]
+
+lib/mail/imap.structure.test.ts:
+(pass) extractMessageStructureMetadata > does not classify inline text body parts as attachments [0.20ms]
+(pass) extractMessageStructureMetadata > still keeps real text attachments when they have filenames [0.09ms]
+(pass) extractMessageStructureMetadata > preserves cid values with parentheses from imapflow bodystructure parsing [4.89ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: SMTPUTF8 local [0.17ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: SMTPUTF8 with IDN [0.40ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: comment containing an allowed address [0.42ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: trailing comment [0.17ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: group [0.24ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: multiple mailboxes [0.32ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: encoded display name [0.14ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: case and surrounding whitespace [0.06ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: missing closing bracket [0.03ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: missing opening bracket [0.32ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: empty From [0.05ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: comment without a mailbox [0.06ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted display name without a mailbox [0.23ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted display name containing an allowed address [0.17ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted local part containing whitespace [0.34ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted local part with a trailing comment [0.15ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted local part containing an angle-bracket address [0.07ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: named quoted local part containing an angle-bracket address [0.19ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: unicode IDN [0.12ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: A-label IDN [0.05ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted local part retaining internal whitespace [0.07ms]
+(pass) RFC 5322 ingestion-to-permission identity > stores the sender key at header ingestion: quoted local part retaining escaped characters [0.29ms]
+(pass) RFC 5322 ingestion-to-permission identity > does not grant the account address when the real From header is missing [0.05ms]
+(pass) RFC 5322 ingestion-to-permission identity > header fallback keeps mailboxes with nested comments, quoted commas and escaped quotes [0.64ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: escaped display name from an IMAP envelope, header fallback=false [6.90ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: escaped display name from an IMAP envelope, header fallback=true [4.88ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted local part from an IMAP envelope, header fallback=false [4.14ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted local part from an IMAP envelope, header fallback=true [3.45ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted colon local, header fallback=false [3.08ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted colon local, header fallback=true [3.54ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted comment local, header fallback=false [2.84ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted comment local, header fallback=true [2.54ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted leading space local, header fallback=false [2.58ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: quoted leading space local, header fallback=true [2.12ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: SMTPUTF8 local, header fallback=false [3.03ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: SMTPUTF8 local, header fallback=true [2.44ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: comment comma, header fallback=false [2.57ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: comment comma, header fallback=true [2.46ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: nested escaped comment, header fallback=false [11.73ms]
+(pass) RFC 5322 ingestion-to-permission identity > keeps the actual mailbox and rejects trusted permission: nested escaped comment, header fallback=true [3.49ms]
+(pass) RFC 5322 ingestion-to-permission identity > retains decoded envelope local-part characters and raw header quoting exactly [0.62ms]
+(pass) RFC 5322 ingestion-to-permission identity > never reads a body line as an address header when falling back to raw source [0.33ms]
+(pass) RFC 5322 ingestion-to-permission identity > serializes every envelope address field with shared escaping and local-part quoting [0.44ms]
+
+lib/mail/composePayload.test.ts:
+(pass) parseComposeAttachments > parses data urls into attachment payloads [0.09ms]
+(pass) normalizeCalendarAttachments > adds the iTIP method to a bare text/calendar part and names it [0.21ms]
+(pass) normalizeCalendarAttachments > carries a CANCEL method through [0.07ms]
+(pass) normalizeCalendarAttachments > leaves parts without a METHOD line untouched [0.05ms]
+(pass) normalizeCalendarAttachments > keeps an already parameterised content type [0.08ms]
+(pass) normalizeCalendarAttachments > still fixes a generic filename when the content type is already parameterised [0.06ms]
+(pass) normalizeCalendarAttachments > falls back to invite.ics only for extension-less or generic filenames [0.14ms]
+(pass) normalizeCalendarAttachments > leaves the application/ics twin of a Google invite as the plain copy [0.14ms]
+(pass) normalizeCalendarAttachments > leaves non-calendar attachments and non-VCALENDAR calendar parts untouched [0.13ms]
+(pass) normalizeCalendarAttachments > preserves a declared charset instead of relabelling the bytes as UTF-8 [30.00ms]
+(pass) normalizeCalendarAttachments > omits the charset when none is declared and the bytes are not UTF-8 [0.20ms]
+(pass) normalizeCalendarAttachments > produces a text/calendar part with the method parameter in the built MIME [3.17ms]
+(pass) resolveComposeHtml > renders markdown html on server [13.29ms]
+(pass) resolveComposeHtml > appends supplemental html for markdown compose [2.46ms]
+(pass) resolveComposeHtml > replaces inline data urls with cid urls [0.16ms]
+(pass) resolveComposeText > appends the forwarded header details for markdown sends [0.48ms]
+(pass) resolveComposeText > leaves markdown text alone when the quoted html has no header table [0.06ms]
+(pass) resolveComposeText > passes html and text sends through untouched [0.03ms]
+
+lib/mail/syncMessageSanitizer.sizes.test.ts:
+(pass) sanitizeSyncedMessage size capture > defers file writes until upsert and records the byte length actually written to disk [43.17ms]
+(pass) sanitizeSyncedMessage size capture > leaves the size alone when the sync carried no source [0.39ms]
+
+lib/mail/smtpError.test.ts:
+(pass) getSmtpHttpError > maps connection timeouts to a retryable firewall-aware message [0.22ms]
+(pass) getSmtpHttpError > distinguishes a missing SMTP greeting [0.03ms]
+(pass) getSmtpHttpError > warns that delivery may be uncertain for other SMTP timeouts [0.04ms]
+(pass) getSmtpHttpError > maps non-timeout connection failures without leaking raw errors [0.03ms]
+(pass) getSmtpHttpError > leaves unrelated application errors unmapped [0.04ms]
+(pass) getSmtpHttpError > safely ignores non-string error fields [0.02ms]
+(pass) markSmtpUpstreamFailure / isSmtpUpstreamFailure > tags SMTP transport errors without adding serialized fields [0.08ms]
+(pass) markSmtpUpstreamFailure / isSmtpUpstreamFailure > does not flag unrelated or non-extensible errors [0.06ms]
+(pass) classifies MAIL sender without exposing provider detail [0.07ms]
+(pass) classifies deferred sender at RCPT without exposing provider detail [0.18ms]
+(pass) classifies deferred sender at DATA without exposing provider detail
+(pass) classifies recipient without exposing provider detail [0.05ms]
+(pass) classifies message without exposing provider detail
+(pass) keeps 4xx transient and authentication config drift separate from permanent sender rejection [0.04ms]
+(pass) classifies an actual SMTP 4xx timeout response as temporary rather than a socket timeout [0.02ms]
+(pass) sanitizes tagged EPROTOCOL transport failures [0.05ms]
+(pass) sanitizes tagged EENVELOPE transport failures [0.04ms]
+(pass) sanitizes tagged EMESSAGE transport failures
+(pass) sanitizes tagged ECONNECTION transport failures [0.04ms]
+(pass) sanitizes tagged ESOCKET transport failures
+(pass) sanitizes tagged EDNS transport failures
+(pass) sanitizes tagged EAUTH transport failures
+(pass) sanitizes tagged ETLS transport failures
+(pass) sanitizes tagged ECONNREFUSED transport failures
+(pass) sanitizes tagged EHOSTUNREACH transport failures
+(pass) sanitizes tagged ENETUNREACH transport failures
+(pass) sanitizes tagged ETIMEDOUT transport failures
+(pass) sanitizes tagged ESTREAM transport failures
+(pass) sanitizes tagged EFILEACCESS transport failures
+(pass) sanitizes tagged EURLACCESS transport failures
+(pass) sanitizes tagged EREQUIRETLS transport failures
+(pass) sanitizes tagged ENOAUTH transport failures
+(pass) sanitizes tagged EAI_AGAIN transport failures
+(pass) sanitizes tagged ECONNRESET transport failures
+(pass) sanitizes tagged EFUTURE transport failures [0.02ms]
+(pass) sanitizes tagged unclassified transport failures
+
+lib/mail/sentInvite.test.ts:
+(pass) buildSentInvite > builds REQUEST ICS plus a sent-invite calendar event [1.27ms]
+(pass) buildSentInvite > builds a self-only invite that is immediately accepted locally [0.18ms]
+
+lib/mail/embeddableImage.test.ts:
+(pass) isEmbeddableImage > accepts browser-renderable image types [0.06ms]
+(pass) isEmbeddableImage > is case-insensitive [0.02ms]
+(pass) isEmbeddableImage > rejects non-renderable image/* types [0.04ms]
+(pass) isEmbeddableImage > rejects non-image and empty types [0.02ms]
+
+lib/mail/subjectPrefix.test.ts:
+(pass) stripSubjectMarkers > returns plain subjects unchanged [0.03ms]
+(pass) stripSubjectMarkers > strips a single Re: marker [0.02ms]
+(pass) stripSubjectMarkers > strips stacked mixed-language markers [0.02ms]
+(pass) stripSubjectMarkers > strips markers with counters [0.02ms]
+(pass) stripSubjectMarkers > strips leading markers but not marker-like words in the subject [0.02ms]
+(pass) stripSubjectMarkers > handles empty and nullish input [0.02ms]
+(pass) prefixSubject > adds Re: prefix [0.02ms]
+(pass) prefixSubject > does not double-add Re: prefix [0.01ms]
+(pass) prefixSubject > collapses accumulated reply chains to a single marker [0.02ms]
+(pass) prefixSubject > adds Fwd: prefix [0.01ms]
+(pass) prefixSubject > does not double-add Fwd: prefix [0.01ms]
+(pass) prefixSubject > replaces a reply marker when forwarding [0.01ms]
+(pass) prefixSubject > normalizes lowercase markers [0.01ms]
+(pass) prefixSubject > handles empty subject [0.01ms]
+
+lib/mail/resyncMessage.senderKey.test.ts:
+{"src":"connection","msg":"Established TCP connection","cid":"z4zqjut9ol5v37f9a19j","secure":false,"host":"127.0.0.1","servername":false,"port":44533,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":51682}
+{"event":"imap.socket_connect","accountId":"collab-30cf1039-3077-4a05-ad9d-758850c708ab","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44533,"localAddress":"127.0.0.1","localPort":51682,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":44533,"cid":"z4zqjut9ol5v37f9a19j"}
+{"src":"auth","msg":"User authenticated","cid":"z4zqjut9ol5v37f9a19j","user":"team@example.test"}
+[imap] connect account=collab-30cf1039-3077-4a05-ad9d-758850c708ab 33ms
+[imap] mailboxOpen mailbox=INBOX account=collab-30cf1039-3077-4a05-ad9d-758850c708ab 10ms
+[imap] fetchOne mailbox=INBOX account=collab-30cf1039-3077-4a05-ad9d-758850c708ab 7ms
+[imap] pool-drain account=collab-30cf1039-3077-4a05-ad9d-758850c708ab 2ms
+(pass) real IMAP resync replaces an unkeyed legacy row with the parsed sender key [289.47ms]
+{"event":"imap.socket_close","accountId":"collab-30cf1039-3077-4a05-ad9d-758850c708ab","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":44533,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"src":"connection","msg":"Established TCP connection","cid":"t8l4zyyjn6pmimo4uxbj","secure":false,"host":"127.0.0.1","servername":false,"port":36825,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":39432}
+{"event":"imap.socket_connect","accountId":"collab-e43aac6d-3a58-4078-9409-cb9559d3f851","clientId":null,"mailbox":null,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":36825,"localAddress":"127.0.0.1","localPort":39432,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+{"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":36825,"cid":"t8l4zyyjn6pmimo4uxbj"}
+{"src":"auth","msg":"User authenticated","cid":"t8l4zyyjn6pmimo4uxbj","user":"team@example.test"}
+[imap] connect account=collab-e43aac6d-3a58-4078-9409-cb9559d3f851 4ms
+[imap] mailboxOpen mailbox=Archive account=collab-e43aac6d-3a58-4078-9409-cb9559d3f851 4ms
+[imap] fetchOne mailbox=Archive account=collab-e43aac6d-3a58-4078-9409-cb9559d3f851 2ms
+[imap] pool-drain account=collab-e43aac6d-3a58-4078-9409-cb9559d3f851 1ms
+(pass) collision-variant resync preserves the base source and refreshes only the variant's ownership and sender [190.88ms]
+{"event":"imap.socket_close","accountId":"collab-e43aac6d-3a58-4078-9409-cb9559d3f851","clientId":null,"mailbox":null,"hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":36825,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+
+lib/mail/smtpTimeouts.test.ts:
+(pass) getSmtpTimeoutOptions > uses bounded defaults for every SMTP wait phase [0.10ms]
+(pass) getSmtpTimeoutOptions > accepts positive environment overrides [0.04ms]
+(pass) getSmtpTimeoutOptions > ignores invalid environment overrides [0.03ms]
+
+lib/mail/attachmentFromSource.test.ts:
+(pass) extractAttachmentBufferFromSource > extracts by attachment index from id suffix [3.27ms]
+(pass) extractAttachmentBufferFromSource > falls back to metadata matching when index is out of range [2.10ms]
+(pass) extractAttachmentBufferFromSource > can extract inline parts by cid [1.73ms]
+(pass) extractAttachmentBufferFromSource > prefers cid metadata over index when ids are shifted [1.43ms]
+(pass) extractAttachmentBufferFromSource > returns null when no attachment can be matched [1.56ms]
+(pass) extractAttachmentBufferFromSource > uses the attachment index when duplicate filenames share the same content type [2.76ms]
+(pass) extractAttachmentBufferFromSource > prefers source attachment cid metadata over mismatched imap cid metadata [0.25ms]
+(pass) extractIcsSourceFromEmailSource > decodes a quoted-printable text/calendar inline part [2.33ms]
+(pass) extractIcsSourceFromEmailSource > decodes a base64 application/ics attachment [1.30ms]
+(pass) extractIcsSourceFromEmailSource > returns the input unchanged when it already starts with BEGIN:VCALENDAR [0.09ms]
+(pass) extractIcsSourceFromEmailSource > returns null for an email with no calendar attachment [0.56ms]
+
+lib/mail/imapClientOptions.test.ts:
+(pass) buildImapFlowOptions TLS identity logging > logs an empty peer certificate separately from missing SAN/CN [0.51ms]
+(pass) buildImapFlowOptions TLS identity logging > logs certificate details when names are missing on a populated peer certificate [0.11ms]
+(pass) buildImapFlowOptions TLS identity logging > logs SAN verification failures from tls.checkServerIdentity [1.43ms]
+(pass) buildImapFlowOptions TLS identity logging > logs socket diagnostics with client errors [0.43ms]
+(pass) buildImapFlowOptions TLS identity logging > logs socket connect diagnostics from the shared client binding [0.61ms]
+(pass) buildImapFlowOptions TLS identity logging > retries connect with a fresh client and logs recovery [1.78ms]
+(pass) buildImapFlowOptions TLS identity logging > retries with exponential backoff between attempts [31.02ms]
+(pass) buildImapFlowOptions TLS identity logging > does not open the breaker for non-retryable auth errors [0.73ms]
+(pass) buildImapFlowOptions TLS identity logging > resets failure state on successful connect after prior retryable failures [0.71ms]
+(pass) buildImapFlowOptions TLS identity logging > classifies errors as retryable using structured fields like code [1.44ms]
+(pass) buildImapFlowOptions TLS identity logging > skipBreaker bypasses the fast-fail even when breaker is open [0.59ms]
+(pass) buildImapFlowOptions TLS identity logging > fast-fail error message does not leak the underlying error detail [0.73ms]
+(pass) buildImapFlowOptions TLS identity logging > uses a circuit-breaker key that tolerates colons in host (IPv6) [0.41ms]
+(pass) buildImapFlowOptions TLS identity logging > treats breakerThreshold=0 as disabled (never opens) [0.74ms]
+(pass) buildImapFlowOptions TLS identity logging > fast-fails after the breaker opens for repeated connect failures [0.52ms]
+
+app/api/mcp/route.test.ts:
+(pass) /api/mcp > HTTP rejects cookie, legacy bearer and absent authentication [1.02ms]
+(pass) /api/mcp > handles initialize, tools/list, search, and flag/unflag flows [1018.93ms]
+(pass) /api/mcp > creates new, reply, and forward drafts via MCP [699.37ms]
+(pass) /api/mcp > returns a clear error for ambiguous topic selectors [625.93ms]
+(pass) HTTP MCP immediately enforces viewer downgrade, mailbox binding, stale generation and creator ban [746.57ms]
+
+lib/mail/categorization/linearModel.test.ts:
+(pass) categorization linear model > extracts list/unsubscribe feature signals from folded list headers [0.21ms]
+(pass) categorization linear model > extracts strong list bundle features from explicit list headers [0.20ms]
+(pass) categorization linear model > online training increases score for selected category [0.69ms]
+(pass) categorization linear model > does not derive keyword features from body text [0.10ms]
+(pass) categorization linear model > does not include synthetic bias feature in extracted features [0.04ms]
+(pass) categorization linear model > keeps list-mail newsletter confidence resilient after one notification feedback event [0.51ms]
+
+lib/mail/categorization/classifier.test.ts:
+(pass) categorization classifier linear-only behavior > does not classify without a trained or weighted model [0.37ms]
+(pass) categorization classifier linear-only behavior > classifies newsletter when linear model weights favor newsletter features [0.22ms]
+(pass) categorization classifier linear-only behavior > uses model scores consistently over heuristic-looking message structure [0.21ms]
+(pass) categorization classifier seeded baseline model > classifies list mail as newsletter with seeded model [0.46ms]
+(pass) categorization classifier seeded baseline model > keeps threaded list newsletters categorized when strong list bundle is present [0.29ms]
+(pass) categorization classifier seeded baseline model > strongly suppresses reply-thread messages [0.23ms]
+(pass) categorization classifier seeded baseline model > classifies invoice mails as transactional with seeded model [0.33ms]
+(pass) categorization classifier seeded baseline model > skips categorization for sent/trash/spam folders [0.12ms]
+(pass) categorization classifier seeded baseline model > skips categorization for messages sent by account owner [0.15ms]
+(pass) parseMailForCategorization > keeps cid image references for multipart/related html [1.57ms]
+
+lib/mail/mime/removeAttachmentPart.test.ts:
+(pass) removeAttachmentPartFromRawMessage > removes a named attachment and keeps the body and sibling attachment [1.39ms]
+(pass) removeAttachmentPartFromRawMessage > removes an inline image by content-id, keeping the html part and pdf [1.67ms]
+(pass) removeAttachmentPartFromRawMessage > selects the right sibling by positional index when names collide [1.31ms]
+(pass) removeAttachmentPartFromRawMessage > aligns the positional index with the parser when a bare non-text part precedes the target [0.26ms]
+(pass) removeAttachmentPartFromRawMessage > returns removed=false and the untouched buffer when the target is absent [0.16ms]
+(pass) removeAttachmentPartFromRawMessage > leaves a non-multipart message unchanged [0.06ms]
+(pass) removeAttachmentPartFromRawMessage > handles bare-LF sources [1.08ms]
+
+lib/mail/imap/idle.test.ts:
+(pass) shared watcher/SSE IDLE loop closes and rejects a server's tagged NO without spinning [8.02ms]
+
+lib/mail/imap/parser.delivery.test.ts:
+(pass) delivery metadata > unfolds repeated headers, normalizes, dedupes and keeps field order [0.19ms]
+(pass) delivery metadata > distinguishes missing fetch from absent/malformed headers, caps at 32 [0.55ms]
+(pass) delivery metadata > parses bounded draft marker only in outer headers [0.08ms]
+
+lib/mail/imap/connectionPool.test.ts:
+(pass) acquirePooledImapClient > empty pool → creates a fresh connection [0.26ms]
+(pass) acquirePooledImapClient > release then acquire same account → reuses cached connection [0.18ms]
+(pass) acquirePooledImapClient > different accounts don't share cached connections [0.12ms]
+(pass) releasePooledImapClient > evict: true → logs out without caching [0.11ms]
+(pass) releasePooledImapClient > slot already occupied → second release logs out the loser [0.11ms]
+(pass) releasePooledImapClient > cached connection emitting 'error' auto-evicts [0.19ms]
+(pass) releasePooledImapClient > cached connection emitting 'close' auto-evicts [0.16ms]
+(pass) releasePooledImapClient > error listener is removed on acquire (no phantom eviction of already-reused client) [0.14ms]
+(pass) connection-age tracking (MAX_CONNECTION_AGE_MS cap) > connectedAt is set on fresh connect and preserved across reuse [2.24ms]
+(pass) connection-age tracking (MAX_CONNECTION_AGE_MS cap) > connectedAt is dropped when the client is evicted [0.12ms]
+(pass) withPooledImapClient > success path → client returns to pool [0.15ms]
+(pass) withPooledImapClient > thrown error path → client is evicted, not returned to pool [0.25ms]
+(pass) withPooledImapClient > sequential success calls reuse the cached connection [0.22ms]
+(pass) withPooledImapClient > concurrent calls don't serialize — each gets its own client [0.24ms]
+(pass) drainImapConnectionPool > logs out and clears every pooled entry, awaiting the logout [0.18ms]
+(pass) drainImapConnectionPool > empty pool → resolves without error [0.10ms]
+(pass) drainImapConnectionPool > drained connection no longer auto-evicts on close (listener detached) [0.22ms]
+
+ 282 pass
+ 0 fail
+ 858 expect() calls
+Ran 282 tests across 28 files. [28.38s]

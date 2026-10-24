@@ -1,0 +1,6 @@
+(fail) special failing <b> & "q" 'a' [0.29ms]
+ 0 pass
+ 1 fail
+(fail) special failing <b> & "q" 'a' [305.98ms]
+ 3 pass
+ 1 fail

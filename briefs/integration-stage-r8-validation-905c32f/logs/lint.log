@@ -1,0 +1,56 @@
+$ eslint .
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/AttachmentsList.tsx
+  240:7  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/MailClient.tsx
+  1308:6  warning  React Hook useMemo has a missing dependency: 'folders'. Either include it or remove the dependency array                                                                                               react-hooks/exhaustive-deps
+  1308:7  warning  React Hook useMemo has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked                                                                 react-hooks/exhaustive-deps
+  1792:5  warning  React Hook useMemo has a missing dependency: 'isDraftsFolder'. Either include it or remove the dependency array                                                                                        react-hooks/exhaustive-deps
+  2132:6  warning  React Hook useCallback has a missing dependency: 'setAllTopics'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  2168:6  warning  React Hook useCallback has a missing dependency: 'setMessages'. Either include it or remove the dependency array                                                                                       react-hooks/exhaustive-deps
+  2514:5  warning  React Hook useCallback has missing dependencies: 'setLoadingSource', 'setMessageContentLoading', 'setThreadRelatedMessages', and 'sourceFetchRef'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  2562:5  warning  React Hook useCallback has missing dependencies: 'localDeleteReconcileByFolderRef' and 'localDeleteReconcileByUidRef'. Either include them or remove the dependency array                              react-hooks/exhaustive-deps
+  2969:6  warning  React Hook useMemo has a missing dependency: 'checkIsThreadExcludedFolder'. Either include it or remove the dependency array                                                                           react-hooks/exhaustive-deps
+  3347:5  warning  React Hook useCallback has a missing dependency: 'syncFolderWithBackgroundRef'. Either include it or remove the dependency array                                                                       react-hooks/exhaustive-deps
+  4144:6  warning  React Hook useEffect has a missing dependency: 'autoHydrationAttemptAtRef'. Either include it or remove the dependency array                                                                           react-hooks/exhaustive-deps
+  4166:6  warning  React Hook useEffect has a missing dependency: 'setSearchScope'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  4170:6  warning  React Hook useEffect has a missing dependency: 'syncStateRef'. Either include it or remove the dependency array                                                                                        react-hooks/exhaustive-deps
+  4209:6  warning  React Hook useEffect has a missing dependency: 'swRegistrationRef'. Either include it or remove the dependency array                                                                                   react-hooks/exhaustive-deps
+  4236:6  warning  React Hook useEffect has missing dependencies: 'setSearchScope' and 'switchAccount'. Either include them or remove the dependency array                                                                react-hooks/exhaustive-deps
+  4296:6  warning  React Hook useEffect has missing dependencies: 'clearNotificationDeepLink' and 'jumpToMessageId'. Either include them or remove the dependency array                                                   react-hooks/exhaustive-deps
+  4403:6  warning  React Hook useEffect has a missing dependency: 'syncAccountRef'. Either include it or remove the dependency array                                                                                      react-hooks/exhaustive-deps
+  4446:6  warning  React Hook useEffect has a missing dependency: 'currentAccount?.caldav'. Either include it or remove the dependency array                                                                              react-hooks/exhaustive-deps
+  4738:6  warning  React Hook useEffect has missing dependencies: 'apiFetch', 'checkIsThreadExcludedFolder', 'setThreadContentLoading', and 'threadContentByIdRef'. Either include them or remove the dependency array    react-hooks/exhaustive-deps
+  4812:6  warning  React Hook useEffect has missing dependencies: 'clearNotificationDeepLink' and 'jumpToMessageId'. Either include them or remove the dependency array                                                   react-hooks/exhaustive-deps
+  4887:6  warning  React Hook useEffect has a missing dependency: 'setMessagesPage'. Either include it or remove the dependency array                                                                                     react-hooks/exhaustive-deps
+  5346:6  warning  React Hook useEffect has missing dependencies: 'autoRepairAttemptedFolderIdsRef', 'recomputeThreadsRef', and 'syncFolderWithBackgroundRef'. Either include them or remove the dependency array         react-hooks/exhaustive-deps
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/calendar/useCalendarConflicts.ts
+  58:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/calendar/useCalendarConflicts.ts:58:5
+  56 |     // Drop the previous account's conflicts immediately on switch so the banner
+  57 |     // can't show the wrong account's data while the new fetch is in flight.
+> 58 |     setConflicts([]);
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  59 |     void refresh();
+  60 |     const handler = () => void refresh();
+  61 |     window.addEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handler);  react-hooks/set-state-in-effect
+  64:18  warning  The ref value 'requestRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'requestRef.current' to a variable inside the effect, and use that variable in the cleanup function                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/lexical/ImageNode.tsx
+  387:7  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts
+  238:6  warning  React Hook useCallback has a missing dependency: 'viewMessage'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 26 problems (1 error, 25 warnings)
+
+error: script "lint" exited with code 1

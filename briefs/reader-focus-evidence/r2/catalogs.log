@@ -1,0 +1,15 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/i18n/catalogs.test.ts:
+(pass) message catalogs > both locales have identical leaf keys and valid ICU messages [28.02ms]
+(pass) message catalogs > complete count messages resolve German grammar and keep user text opaque [6.74ms]
+(pass) responsive list styling never treats accessible copy as control identity [0.63ms]
+(pass) reviewed German reader copy follows the binding terminology and complete messages [0.50ms]
+(pass) message catalogs > has identical German and English message keys [2.39ms]
+(pass) message catalogs > de contains valid ICU messages [6.98ms]
+(pass) message catalogs > en contains valid ICU messages [3.39ms]
+
+ 7 pass
+ 0 fail
+ 3542 expect() calls
+Ran 7 tests across 1 file. [80.00ms]

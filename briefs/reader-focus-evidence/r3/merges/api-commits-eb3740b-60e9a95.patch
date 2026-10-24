@@ -1,0 +1,596 @@
+diff --git a/app/api/_helpers/readAuthJson.ts b/app/api/_helpers/readAuthJson.ts
+index 14e9da8..aaaffcb 100644
+--- a/app/api/_helpers/readAuthJson.ts
++++ b/app/api/_helpers/readAuthJson.ts
+@@ -3,9 +3,18 @@ import { NextResponse } from "next/server";
+ /** Small self-service auth payloads, including their JSON whitespace, are capped in bytes. */
+ export const AUTH_JSON_BODY_LIMIT = 16 * 1024;
+ 
+-/** Preserve JSON parse errors for each caller's existing error handling. */
+-export async function readAuthJson(request: Request): Promise<unknown> {
+-  const bytes = new Uint8Array(AUTH_JSON_BODY_LIMIT);
++/**
++ * Read at most `limit` body bytes. Returns null once the body is known to exceed
++ * the limit (a larger declared Content-Length, or the first chunk that would
++ * overflow) after cancelling the stream, so a reject path never pulls the rest.
++ */
++export async function readBoundedBody(request: Request, limit: number): Promise<Uint8Array | null> {
++  const declared = Number(request.headers.get("content-length") ?? 0);
++  if (Number.isFinite(declared) && declared > limit) {
++    await request.body?.cancel().catch(() => {});
++    return null;
++  }
++  const bytes = new Uint8Array(limit);
+   let length = 0;
+   const reader = request.body?.getReader();
+   if (reader) {
+@@ -13,12 +22,10 @@ export async function readAuthJson(request: Request): Promise<unknown> {
+       while (true) {
+         const { done, value } = await reader.read();
+         if (done) break;
+-        if (value.byteLength > AUTH_JSON_BODY_LIMIT - length) {
+-          // Check before copying: never retain an oversized chunk in the JSON buffer.
++        if (value.byteLength > limit - length) {
++          // Check before copying: never retain an oversized chunk in the buffer.
+           await reader.cancel().catch(() => {});
+-          return NextResponse.json({ ok: false, code: "payload_too_large" }, {
+-            status: 413, headers: { "Cache-Control": "no-store" }
+-          });
++          return null;
+         }
+         bytes.set(value, length);
+         length += value.byteLength;
+@@ -27,5 +34,16 @@ export async function readAuthJson(request: Request): Promise<unknown> {
+       reader.releaseLock();
+     }
+   }
+-  return JSON.parse(new TextDecoder().decode(bytes.subarray(0, length)));
++  return bytes.subarray(0, length);
++}
++
++/** Preserve JSON parse errors for each caller's existing error handling. */
++export async function readAuthJson(request: Request): Promise<unknown> {
++  const bytes = await readBoundedBody(request, AUTH_JSON_BODY_LIMIT);
++  if (!bytes) {
++    return NextResponse.json({ ok: false, code: "payload_too_large" }, {
++      status: 413, headers: { "Cache-Control": "no-store" }
++    });
++  }
++  return JSON.parse(new TextDecoder().decode(bytes));
+ }
+diff --git a/app/api/_helpers/requestOrigin.test.ts b/app/api/_helpers/requestOrigin.test.ts
+new file mode 100644
+index 0000000..67a7937
+--- /dev/null
++++ b/app/api/_helpers/requestOrigin.test.ts
+@@ -0,0 +1,96 @@
++import { describe, expect, test } from "bun:test";
++import { requireBodylessSameOrigin, requireMutationSameOrigin } from "./requestOrigin";
++import { POST as logout } from "@/app/api/auth/logout/route";
++import { DELETE as removeUserPasskey } from "@/app/api/admin/users/[userId]/passkeys/[passkeyId]/route";
++import { DELETE as revokeUserSessions } from "@/app/api/admin/users/[userId]/sessions/route";
++
++const origin = "http://localhost:3000";
++const command = (init: RequestInit & { headers?: Record<string, string> } = {}) =>
++  new Request(`${origin}/api/accounts/synthetic/messages/synthetic/delete`,
++    { method: "POST", ...init, headers: { origin, ...init.headers } });
++async function outcome(request: Request) {
++  const response = await requireMutationSameOrigin(request);
++  return response ? { status: response.status, code: (await response.json()).code } : null;
++}
++
++describe("requireMutationSameOrigin", () => {
++  test("an empty body is accepted with or without headers", async () => {
++    // A ReadableStream body matches what Next hands production handlers.
++    const empty = () => new ReadableStream({ start(controller) { controller.close(); } });
++    expect(await outcome(command())).toBeNull();
++    expect(await outcome(command({ method: "DELETE" }))).toBeNull();
++    expect(await outcome(command({ body: empty() }))).toBeNull();
++    expect(await outcome(command({ body: "", headers: { "content-type": "text/plain" } }))).toBeNull();
++  });
++  test("a JSON body stays unread for the handler", async () => {
++    const request = command({ body: '{"folderId":"synthetic"}', headers: { "content-type": "application/json; charset=utf-8" } });
++    expect(await outcome(request)).toBeNull();
++    expect(await request.json()).toEqual({ folderId: "synthetic" });
++  });
++  test("a non-empty body must be JSON and every request must be same-origin", async () => {
++    expect(await outcome(command({ body: "x", headers: { "content-type": "text/plain" } })))
++      .toEqual({ status: 400, code: "json_required" });
++    expect(await outcome(command({ body: "a=1", headers: { "content-type": "application/x-www-form-urlencoded" } })))
++      .toEqual({ status: 400, code: "json_required" });
++    expect(await outcome(new Request(`${origin}/api/synthetic`, { method: "POST", headers: { origin: "https://foreign.example.test" } })))
++      .toEqual({ status: 403, code: "invalid_origin" });
++    expect(await outcome(new Request(`${origin}/api/synthetic`, { method: "POST" })))
++      .toEqual({ status: 403, code: "invalid_origin" });
++  });
++});
++
++const CHUNK = 64 * 1024;
++const LARGE = 16 * 1024 * 1024;
++/** A pull-based 16 MiB body that counts how many chunks a reader actually pulled. */
++function largeBody() {
++  let pulled = 0;
++  let cancelled = false;
++  const body = new ReadableStream<Uint8Array>({
++    pull(controller) {
++      if (pulled * CHUNK >= LARGE) return controller.close();
++      pulled++;
++      controller.enqueue(new Uint8Array(CHUNK).fill(120));
++    },
++    cancel() { cancelled = true; }
++  }, { highWaterMark: 0 });
++  return { body, pulled: () => pulled, cancelled: () => cancelled };
++}
++const largeRequest = (path: string, method: string, body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) =>
++  new Request(`${origin}${path}`, { method, body, headers: { origin, ...headers } });
++
++describe("bodyless guards never buffer a large body", () => {
++  test("a streamed 16 MiB body is rejected after its first chunk and the stream is cancelled", async () => {
++    for (const [guard, code] of [[requireBodylessSameOrigin, "unexpected_body"], [requireMutationSameOrigin, "json_required"]] as const) {
++      const large = largeBody();
++      const response = await guard(largeRequest("/api/synthetic", "POST", large.body, { "content-type": "text/plain" }));
++      expect(response?.status).toBe(400);
++      expect((await response!.json()).code).toBe(code);
++      expect(large.pulled()).toBe(1);
++      expect(large.cancelled()).toBe(true);
++    }
++  });
++  test("a declared 16 MiB Content-Length is rejected without reading the body", async () => {
++    const large = largeBody();
++    const response = await requireBodylessSameOrigin(largeRequest("/api/synthetic", "POST", large.body, { "content-length": String(LARGE) }));
++    expect(response?.status).toBe(400);
++    expect((await response!.json()).code).toBe("unexpected_body");
++    expect(large.pulled()).toBe(0);
++  });
++  test("pre-session logout and admin passkey/session actions reject 16 MiB after one chunk", async () => {
++    const params = { userId: "synthetic-user", passkeyId: "synthetic-passkey" };
++    const routes: Array<[string, (body: ReadableStream<Uint8Array>) => Promise<Response>]> = [
++      ["logout", body => logout(largeRequest("/api/auth/logout", "POST", body))],
++      ["admin passkey removal", body => removeUserPasskey(largeRequest(`/api/admin/users/${params.userId}/passkeys/${params.passkeyId}`, "DELETE", body), { params: Promise.resolve(params) })],
++      ["admin session revoke", body => revokeUserSessions(largeRequest(`/api/admin/users/${params.userId}/sessions`, "DELETE", body), { params: Promise.resolve({ userId: params.userId }) })]
++    ];
++    for (const [name, call] of routes) {
++      const large = largeBody();
++      // No session cookie: these guards run before any session lookup.
++      const response = await call(large.body);
++      expect(response.status, name).toBe(400);
++      expect((await response.json()).code, name).toBe("unexpected_body");
++      expect(large.pulled(), name).toBe(1);
++      expect(large.cancelled(), name).toBe(true);
++    }
++  });
++});
+diff --git a/app/api/_helpers/requestOrigin.ts b/app/api/_helpers/requestOrigin.ts
+index 53782e5..fc96c54 100644
+--- a/app/api/_helpers/requestOrigin.ts
++++ b/app/api/_helpers/requestOrigin.ts
+@@ -1,5 +1,6 @@
+ import { NextResponse } from "next/server";
+ import { readAuthEnv } from "@/lib/betterAuth";
++import { readBoundedBody } from "./readAuthJson";
+ 
+ function requireSameOrigin(request: Request) {
+   const configured = readAuthEnv().baseURL;
+@@ -14,25 +15,44 @@ function requireSameOrigin(request: Request) {
+   return null;
+ }
+ 
++function isJsonRequest(request: Request) {
++  return request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() === "application/json";
++}
++
+ export function requireJsonSameOrigin(request: Request) {
+   const error = requireSameOrigin(request);
+   if (error) return error;
+-  if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
++  if (!isJsonRequest(request)) {
+     return NextResponse.json({ ok: false, code: "json_required" }, { status: 400 });
+   }
+   return null;
+ }
+ 
++/**
++ * Bodyless guards run before the session check on some routes, so emptiness is
++ * decided from the declared length or the first body chunk, never by buffering.
++ */
++async function isEmptyBody(request: Request) {
++  return (await readBoundedBody(request, 0)) !== null;
++}
++
+ export async function requireBodylessSameOrigin(request: Request) {
+   const error = requireSameOrigin(request);
+   if (error) return error;
+-  if ((await request.arrayBuffer()).byteLength !== 0) {
++  if (!(await isEmptyBody(request))) {
+     return NextResponse.json({ ok: false, code: "unexpected_body" }, { status: 400 });
+   }
+   return null;
+ }
+ 
+-/** Bodyless commands accept no payload; commands carrying JSON share the JSON guard. */
+-export function requireMutationSameOrigin(request: Request) {
+-  return request.body === null ? requireSameOrigin(request) : requireJsonSameOrigin(request);
++/**
++ * Commands whose input is optional. A JSON body stays unread for the handler.
++ * Any other request is valid only when empty, whatever its headers: fetch and
++ * Next always expose a body stream, so emptiness is read, not inferred.
++ */
++export async function requireMutationSameOrigin(request: Request) {
++  const error = requireSameOrigin(request);
++  if (error) return error;
++  if (isJsonRequest(request) || await isEmptyBody(request)) return null;
++  return NextResponse.json({ ok: false, code: "json_required" }, { status: 400 });
+ }
+diff --git a/app/api/accounts/[accountId]/calendar/events/[eventId]/route.ts b/app/api/accounts/[accountId]/calendar/events/[eventId]/route.ts
+index de468d7..7e1569b 100644
+--- a/app/api/accounts/[accountId]/calendar/events/[eventId]/route.ts
++++ b/app/api/accounts/[accountId]/calendar/events/[eventId]/route.ts
+@@ -151,7 +151,7 @@ export async function PUT(request: Request, { params }: Params) {
+ }
+ 
+ export async function DELETE(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const { searchParams } = new URL(request.url);
+   const accountId = await getAccountIdFromParams(params);
+   const { eventId: rawEventId } = await params;
+diff --git a/app/api/accounts/[accountId]/calendar/sync/route.ts b/app/api/accounts/[accountId]/calendar/sync/route.ts
+index 9c57903..536f11c 100644
+--- a/app/api/accounts/[accountId]/calendar/sync/route.ts
++++ b/app/api/accounts/[accountId]/calendar/sync/route.ts
+@@ -11,7 +11,7 @@ import { syncCalendarEvents } from "@/lib/caldav/sync";
+ const syncInProgress = new Map<string, boolean>();
+ 
+ export async function POST(request: Request, { params }: AccountRouteParams) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const accountContext = await requireAccountContext(request, accountId, {
+     minRole: "viewer",
+diff --git a/app/api/accounts/[accountId]/categories/model/reset/route.ts b/app/api/accounts/[accountId]/categories/model/reset/route.ts
+index 2b6600c..b036b5c 100644
+--- a/app/api/accounts/[accountId]/categories/model/reset/route.ts
++++ b/app/api/accounts/[accountId]/categories/model/reset/route.ts
+@@ -9,7 +9,7 @@ import {
+ import { resetCategoryLinearModel } from "@/lib/db";
+ 
+ export async function POST(request: Request, { params }: AccountRouteParams) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const access = await requireAccountContext(request, accountId, {
+     minRole: "editor",
+diff --git a/app/api/accounts/[accountId]/categories/recompute/route.ts b/app/api/accounts/[accountId]/categories/recompute/route.ts
+index 53f6503..ae1ea90 100644
+--- a/app/api/accounts/[accountId]/categories/recompute/route.ts
++++ b/app/api/accounts/[accountId]/categories/recompute/route.ts
+@@ -4,7 +4,7 @@ import { handleRecomputeStartRequest } from "@/app/api/_helpers/recomputeJobs";
+ import { startCategoryRecomputeJob } from "@/lib/categoryRecomputeJobs";
+ 
+ export async function POST(request: Request, { params }: AccountRouteParams) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   return handleRecomputeStartRequest(
+     request,
+diff --git a/app/api/accounts/[accountId]/drafts/[draftId]/discard/route.ts b/app/api/accounts/[accountId]/drafts/[draftId]/discard/route.ts
+index 1927c6e..64b31b1 100644
+--- a/app/api/accounts/[accountId]/drafts/[draftId]/discard/route.ts
++++ b/app/api/accounts/[accountId]/drafts/[draftId]/discard/route.ts
+@@ -20,7 +20,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { draftId: rawDraftId } = await params;
+   const draftId = typeof rawDraftId === "string" ? rawDraftId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/drafts/[draftId]/send/route.ts b/app/api/accounts/[accountId]/drafts/[draftId]/send/route.ts
+index adae190..e03f0f3 100644
+--- a/app/api/accounts/[accountId]/drafts/[draftId]/send/route.ts
++++ b/app/api/accounts/[accountId]/drafts/[draftId]/send/route.ts
+@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: Params) {
+   });
+   if (accountContext instanceof NextResponse) return accountContext;
+   return withAuthResponse(accountContext, async () => {
+-    const originError = requireMutationSameOrigin(request);
++    const originError = await requireMutationSameOrigin(request);
+     if (originError) return originError;
+     const { account, accountId: resolvedAccountId, clientId } = accountContext;
+ 
+diff --git a/app/api/accounts/[accountId]/folders/[folderId]/consistency/route.ts b/app/api/accounts/[accountId]/folders/[folderId]/consistency/route.ts
+index 532dc6a..a01de6f 100644
+--- a/app/api/accounts/[accountId]/folders/[folderId]/consistency/route.ts
++++ b/app/api/accounts/[accountId]/folders/[folderId]/consistency/route.ts
+@@ -142,7 +142,7 @@ export async function handleFolderConsistencyRequest(
+ }
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { folderId: rawFolderId } = await params;
+   const folderId = typeof rawFolderId === "string" ? rawFolderId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/folders/[folderId]/delete/route.ts b/app/api/accounts/[accountId]/folders/[folderId]/delete/route.ts
+index d2161e2..4aa1801 100644
+--- a/app/api/accounts/[accountId]/folders/[folderId]/delete/route.ts
++++ b/app/api/accounts/[accountId]/folders/[folderId]/delete/route.ts
+@@ -26,7 +26,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const startedAt = Date.now();
+   const accountId = await getAccountIdFromParams(params);
+   const { folderId: rawFolderId } = await params;
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/archive/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/archive/route.ts
+index 1ca6f76..1abaac9 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/archive/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/archive/route.ts
+@@ -14,7 +14,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts
+index 98604a5..d91872a 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/attachments/[attachmentId]/route.ts
+@@ -174,7 +174,7 @@ function statusForRemovalError(message: string) {
+ }
+ 
+ export async function DELETE(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: messageIdParam, attachmentId: attachmentIdParam } = await params;
+   const messageId = (messageIdParam ?? "").trim();
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/delete/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/delete/route.ts
+index 1bfe9c2..f39d68f 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/delete/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/delete/route.ts
+@@ -12,7 +12,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/not-spam/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/not-spam/route.ts
+index 98fc734..322ef41 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/not-spam/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/not-spam/route.ts
+@@ -22,7 +22,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/resync/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/resync/route.ts
+index 79e71ef..5291489 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/resync/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/resync/route.ts
+@@ -11,7 +11,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/spam/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/spam/route.ts
+index 743f952..33fc911 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/spam/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/spam/route.ts
+@@ -17,7 +17,7 @@ type Params = AccountRouteParams & {
+ };
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.ts b/app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.ts
+index ceeab34..0443171 100644
+--- a/app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.ts
++++ b/app/api/accounts/[accountId]/messages/[messageId]/unsubscribe/route.ts
+@@ -127,7 +127,7 @@ function parseUnsubscribeHeaders(headerString: string): {
+ }
+ 
+ export async function POST(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { messageId: rawMessageId } = await params;
+   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/recipient-aliases/[aliasId]/route.ts b/app/api/accounts/[accountId]/recipient-aliases/[aliasId]/route.ts
+index dc154b6..0ada212 100644
+--- a/app/api/accounts/[accountId]/recipient-aliases/[aliasId]/route.ts
++++ b/app/api/accounts/[accountId]/recipient-aliases/[aliasId]/route.ts
+@@ -63,7 +63,7 @@ export async function PUT(request: Request, { params }: Params) {
+ }
+ 
+ export async function DELETE(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { aliasId: rawAliasId } = await params;
+   const aliasId = typeof rawAliasId === "string" ? rawAliasId.trim() : "";
+diff --git a/app/api/accounts/[accountId]/sync/route.ts b/app/api/accounts/[accountId]/sync/route.ts
+index 5dd6a0b..b0e42af 100644
+--- a/app/api/accounts/[accountId]/sync/route.ts
++++ b/app/api/accounts/[accountId]/sync/route.ts
+@@ -3,7 +3,7 @@ import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_help
+ import { handleSyncStartRequest } from "@/app/api/_helpers/syncJobs";
+ 
+ export async function POST(request: Request, { params }: AccountRouteParams) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   return handleSyncStartRequest(request, { accountId });
+ }
+diff --git a/app/api/accounts/[accountId]/threads/recompute/route.ts b/app/api/accounts/[accountId]/threads/recompute/route.ts
+index a19dd12..2e81c4b 100644
+--- a/app/api/accounts/[accountId]/threads/recompute/route.ts
++++ b/app/api/accounts/[accountId]/threads/recompute/route.ts
+@@ -4,7 +4,7 @@ import { handleRecomputeStartRequest } from "@/app/api/_helpers/recomputeJobs";
+ import { startThreadRecomputeJob } from "@/lib/threadRecomputeJobs";
+ 
+ export async function POST(request: Request, { params }: AccountRouteParams) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   return handleRecomputeStartRequest(
+     request,
+diff --git a/app/api/accounts/[accountId]/topics/[topicId]/route.ts b/app/api/accounts/[accountId]/topics/[topicId]/route.ts
+index 534aeaa..84ae496 100644
+--- a/app/api/accounts/[accountId]/topics/[topicId]/route.ts
++++ b/app/api/accounts/[accountId]/topics/[topicId]/route.ts
+@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: Params) {
+ }
+ 
+ export async function DELETE(request: Request, { params }: Params) {
+-  const originError = requireMutationSameOrigin(request); if (originError) return originError;
++  const originError = await requireMutationSameOrigin(request); if (originError) return originError;
+   const accountId = await getAccountIdFromParams(params);
+   const { topicId: rawTopicId } = await params;
+   const topicId = typeof rawTopicId === "string" ? rawTopicId.trim() : "";
+diff --git a/playwright.qa-bodyless.config.ts b/playwright.qa-bodyless.config.ts
+new file mode 100644
+index 0000000..14017e5
+--- /dev/null
++++ b/playwright.qa-bodyless.config.ts
+@@ -0,0 +1,8 @@
++import { defineConfig } from "@playwright/test";
++import base from "./playwright.qa-shell.config";
++
++// Real-HTTP bodyless command contract; same budgets and serial execution as the QA shell suite.
++export default defineConfig(base, {
++  testMatch: "qa-bodyless-commands.spec.ts",
++  outputDir: ".tmp/qa-bodyless-browser-results"
++});
+diff --git a/tests/browser/ui/qa-bodyless-commands.spec.ts b/tests/browser/ui/qa-bodyless-commands.spec.ts
+new file mode 100644
+index 0000000..c539b05
+--- /dev/null
++++ b/tests/browser/ui/qa-bodyless-commands.spec.ts
+@@ -0,0 +1,106 @@
++import { test, expect, type APIResponse, type Page } from "@playwright/test";
++import { signInQa, recordQa } from "./qaRound2Session";
++
++// Real-HTTP contract for every route guarded by requireMutationSameOrigin: the
++// production client sends these commands without a body, which must succeed,
++// while non-JSON payloads and foreign origins stay rejected by the same guard.
++test.use({ locale: "en-GB" });
++const account = "/api/accounts/qa-shared";
++const id = (value: string) => encodeURIComponent(value);
++type Method = "POST" | "DELETE";
++type Command = { name: string; method: Method; path: string; status: number };
++
++async function call(page: Page, method: Method, path: string, init: { origin?: string; type?: string; data?: string } = {}) {
++  const origin = init.origin ?? new URL(page.url()).origin;
++  const headers: Record<string, string> = { origin };
++  if (init.type) headers["content-type"] = init.type;
++  return page.request.fetch(path, { method, headers, ...(init.data === undefined ? {} : { data: init.data }) });
++}
++async function json(response: APIResponse) {
++  return response.json().catch(() => null);
++}
++async function created(page: Page, path: string, body: unknown) {
++  const response = await call(page, "POST", path, { type: "application/json", data: JSON.stringify(body) });
++  expect(response.status(), `${path} ${await response.text()}`).toBeLessThan(300);
++  return json(response);
++}
++async function waitForJob(page: Page, path: string, jobId: string) {
++  await expect.poll(async () => (await json(await page.request.get(`${path}?jobId=${id(jobId)}`)))?.job?.status ?? "missing",
++    { timeout: 60000 }).toMatch(/^(done|failed)$/);
++}
++
++test("bodyless commands: every guarded route accepts an empty request and keeps rejecting non-JSON bodies", async ({ page }) => {
++  await signInQa(page);
++  await expect(page.locator('[data-message-list-row="true"]').first()).toBeVisible();
++  const list = await json(await page.request.get(`${account}/messages?page=1&pageSize=300&groupBy=date&folderId=${id("qa-shared:INBOX")}`));
++  const inbox: Array<{ id: string; subject: string }> = list.items;
++  const bySubject = (subject: string) => inbox.find(message => message.subject === subject)!.id;
++  const newsletter = bySubject("Praxispost im Oktober");
++  const invoice = bySubject("Rechnung für Handschuhe und Masken");
++  const plain = inbox.filter(message => message.id !== newsletter && message.id !== invoice).map(message => message.id);
++  expect(plain.length).toBeGreaterThanOrEqual(4);
++  const [resyncId, spamId, archiveId, deleteId] = plain;
++  const attachment = (await json(await page.request.get(`${account}/messages/${id(invoice)}`))).message.attachments[0].id as string;
++  const draftBody = (subject: string) => ({ to: "synthetic-recipient@example.test", subject, text: "Synthetic bodyless contract draft." });
++  const sendDraft = (await created(page, `${account}/drafts/save`, draftBody("Bodyless send synthetic"))).draftId as string;
++  const discardDraft = (await created(page, `${account}/drafts/save`, draftBody("Bodyless discard synthetic"))).draftId as string;
++  const folderName = "Bodyless synthetic";
++  await created(page, `${account}/folders/create`, { name: folderName });
++  const alias = (await created(page, `${account}/recipient-aliases`, { name: "Bodyless synthetic alias", recipients: "alias@example.test" })).alias.id as string;
++  const topic = (await created(page, `${account}/topics`, { name: "Bodyless synthetic topic" })).topic.id as string;
++  const event = (await created(page, `${account}/calendar/events`, { summary: "Bodyless synthetic event", startAtMs: Date.now() + 86400000 })).event.id as string;
++
++  const message = (messageId: string, action: string) => `${account}/messages/${id(messageId)}/${action}`;
++  const commands: Command[] = [
++    { name: "message resync", method: "POST", path: message(resyncId, "resync"), status: 200 },
++    { name: "folder consistency", method: "POST", path: `${account}/folders/${id("qa-shared:INBOX")}/consistency`, status: 200 },
++    { name: "account sync", method: "POST", path: `${account}/sync`, status: 202 },
++    { name: "calendar sync", method: "POST", path: `${account}/calendar/sync`, status: 200 },
++    { name: "categories model reset", method: "POST", path: `${account}/categories/model/reset`, status: 200 },
++    { name: "categories recompute", method: "POST", path: `${account}/categories/recompute`, status: 202 },
++    { name: "threads recompute", method: "POST", path: `${account}/threads/recompute`, status: 202 },
++    { name: "unsubscribe", method: "POST", path: message(newsletter, "unsubscribe"), status: 200 },
++    { name: "attachment DELETE", method: "DELETE", path: `${account}/messages/${id(invoice)}/attachments/${id(attachment)}`, status: 200 },
++    { name: "spam", method: "POST", path: message(spamId, "spam"), status: 200 },
++    { name: "not-spam", method: "POST", path: "", status: 200 },
++    { name: "archive", method: "POST", path: message(archiveId, "archive"), status: 200 },
++    { name: "delete to Trash", method: "POST", path: message(deleteId, "delete"), status: 200 },
++    { name: "permanent delete in Trash", method: "POST", path: "", status: 200 },
++    { name: "draft send", method: "POST", path: `${account}/drafts/${id(sendDraft)}/send`, status: 200 },
++    { name: "draft discard", method: "POST", path: `${account}/drafts/${id(discardDraft)}/discard`, status: 200 },
++    { name: "folder delete", method: "POST", path: `${account}/folders/${id(`qa-shared:${folderName}`)}/delete`, status: 200 },
++    { name: "recipient alias DELETE", method: "DELETE", path: `${account}/recipient-aliases/${id(alias)}`, status: 200 },
++    { name: "topic DELETE", method: "DELETE", path: `${account}/topics/${id(topic)}`, status: 200 },
++    { name: "calendar event DELETE", method: "DELETE", path: `${account}/calendar/events/${id(event)}?soft=true`, status: 200 }
++  ];
++  const results: Array<Record<string, unknown>> = [];
++  let previous: Record<string, unknown> | null = null;
++  let trashed = "";
++  for (const command of commands) {
++    // Chained commands continue on the message id the previous move returned.
++    if (command.name === "not-spam") command.path = message(previous!.messageId as string, "not-spam");
++    if (command.name === "permanent delete in Trash") command.path = message(previous!.messageId as string, "delete");
++    const rejected: Record<string, unknown> = {};
++    for (const [variant, init, status, code] of [
++      ["text/plain body", { type: "text/plain", data: "synthetic" }, 400, "json_required"],
++      ["form body", { type: "application/x-www-form-urlencoded", data: "synthetic=1" }, 400, "json_required"],
++      ["foreign origin", { origin: "https://foreign.example.test" }, 403, "invalid_origin"]
++    ] as const) {
++      const response = await call(page, command.method, command.path, init);
++      expect(response.status(), `${command.name}: ${variant}`).toBe(status);
++      expect((await json(response))?.code, `${command.name}: ${variant}`).toBe(code);
++      rejected[variant] = response.status();
++    }
++    const response = await call(page, command.method, command.path);
++    const body = await json(response);
++    expect(response.status(), `${command.name}: bodyless ${JSON.stringify(body)}`).toBe(command.status);
++    expect(body?.ok, `${command.name}: bodyless`).toBe(true);
++    if (body?.jobId) await waitForJob(page, `${command.path}/status`, body.jobId);
++    if (command.name === "delete to Trash") trashed = body.messageId;
++    previous = body;
++    results.push({ route: `${command.method} ${command.path.replace(/\?.*$/, "")}`, name: command.name, bodyless: response.status(), action: body?.action ?? body?.method ?? null, rejected });
++  }
++  // The bodyless permanent delete really removed the message from Trash.
++  expect((await page.request.get(`${account}/messages/${id(trashed)}`)).status()).toBe(404);
++  recordQa("bodyless-command-matrix", results);
++});

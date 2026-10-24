@@ -1,0 +1,206 @@
+{
+  "loadStart": [
+    11.55,
+    11.22,
+    7.8
+  ],
+  "rows": [
+    {
+      "label": "T needle (415 hits)",
+      "equal": true,
+      "legacyP50": 100.69,
+      "legacyP95": 108.97,
+      "drivenP50": 39.36,
+      "drivenP95": 44.27,
+      "deltaP50": -60.9,
+      "legacyColdP50": 103.74,
+      "drivenColdP50": 40.99,
+      "load1": 11.5
+    },
+    {
+      "label": "M needle (415 hits)",
+      "equal": true,
+      "legacyP50": 56.18,
+      "legacyP95": 76.39,
+      "drivenP50": 19.68,
+      "drivenP95": 25.21,
+      "deltaP50": -65,
+      "legacyColdP50": 54.2,
+      "drivenColdP50": 19.92,
+      "load1": 11.5
+    },
+    {
+      "label": "T quokka zebra (2 rare tokens)",
+      "equal": true,
+      "legacyP50": 115.19,
+      "legacyP95": 152.13,
+      "drivenP50": 36.68,
+      "drivenP95": 48.79,
+      "deltaP50": -68.2,
+      "legacyColdP50": 119.09,
+      "drivenColdP50": 36.97,
+      "load1": 11.2
+    },
+    {
+      "label": "T nearcap (1834 hits, under cap)",
+      "equal": true,
+      "legacyP50": 125.96,
+      "legacyP95": 129.58,
+      "drivenP50": 58.49,
+      "drivenP95": 60.93,
+      "deltaP50": -53.6,
+      "legacyColdP50": 124.46,
+      "drivenColdP50": 58.41,
+      "load1": 11.3
+    },
+    {
+      "label": "M nearcap (1834 hits, under cap)",
+      "equal": true,
+      "legacyP50": 63.38,
+      "legacyP95": 65.27,
+      "drivenP50": 28.82,
+      "drivenP95": 31.2,
+      "deltaP50": -54.5,
+      "legacyColdP50": 63,
+      "drivenColdP50": 28.96,
+      "load1": 11.1
+    },
+    {
+      "label": "T nearcap needle (probe/intersection)",
+      "equal": true,
+      "legacyP50": 136.96,
+      "legacyP95": 144.35,
+      "drivenP50": 40.13,
+      "drivenP95": 41.88,
+      "deltaP50": -70.7,
+      "legacyColdP50": 136.2,
+      "drivenColdP50": 41.3,
+      "load1": 11.1
+    },
+    {
+      "label": "T overcap needle (oversized probe)",
+      "equal": true,
+      "legacyP50": 148.76,
+      "legacyP95": 151.35,
+      "drivenP50": 48.24,
+      "drivenP95": 50.86,
+      "deltaP50": -67.6,
+      "legacyColdP50": 152.09,
+      "drivenColdP50": 50.79,
+      "load1": 10.7
+    },
+    {
+      "label": "T overcap (2750, cap fallback)",
+      "equal": true,
+      "legacyP50": 137.26,
+      "legacyP95": 140.15,
+      "drivenP50": 141.54,
+      "drivenP95": 144.06,
+      "deltaP50": 3.1,
+      "legacyColdP50": 137.88,
+      "drivenColdP50": 142.61,
+      "load1": 10.4
+    },
+    {
+      "label": "T synthetic (all, fallback)",
+      "equal": true,
+      "legacyP50": 239.79,
+      "legacyP95": 242.23,
+      "drivenP50": 246.15,
+      "drivenP95": 250.68,
+      "deltaP50": 2.7,
+      "legacyColdP50": 244.07,
+      "drivenColdP50": 251.59,
+      "load1": 10.8
+    },
+    {
+      "label": "T needle inbox grouped sender",
+      "equal": true,
+      "legacyP50": 75.04,
+      "legacyP95": 82.61,
+      "drivenP50": 48.68,
+      "drivenP95": 51.94,
+      "deltaP50": -35.1,
+      "legacyColdP50": 75.85,
+      "drivenColdP50": 50.26,
+      "load1": 10.8
+    },
+    {
+      "label": "T id fragment xyzzy (fields bogus)",
+      "equal": true,
+      "legacyP50": 52.39,
+      "legacyP95": 55.82,
+      "drivenP50": 42.79,
+      "drivenP95": 49.55,
+      "deltaP50": -18.3,
+      "legacyColdP50": 54.31,
+      "drivenColdP50": 44.46,
+      "load1": 10.6
+    },
+    {
+      "label": "T grüße (umlaut)",
+      "equal": true,
+      "legacyP50": 122.26,
+      "legacyP95": 124.07,
+      "drivenP50": 55.46,
+      "drivenP95": 60.02,
+      "deltaP50": -54.6,
+      "legacyColdP50": 123.04,
+      "drivenColdP50": 56.88,
+      "load1": 9.9
+    },
+    {
+      "label": "T default list",
+      "equal": true,
+      "legacyP50": 42.73,
+      "legacyP95": 58.75,
+      "drivenP50": 43.23,
+      "drivenP95": 52.16,
+      "deltaP50": 1.2,
+      "legacyColdP50": 44.16,
+      "drivenColdP50": 44.2,
+      "load1": 9.6
+    },
+    {
+      "label": "T inbox list",
+      "equal": true,
+      "legacyP50": 41.52,
+      "legacyP95": 45.72,
+      "drivenP50": 40.66,
+      "drivenP95": 44.54,
+      "deltaP50": -2.1,
+      "legacyColdP50": 40.6,
+      "drivenColdP50": 41.18,
+      "load1": 9.6
+    },
+    {
+      "label": "M inbox unread",
+      "equal": true,
+      "legacyP50": 5.57,
+      "legacyP95": 8.94,
+      "drivenP50": 5.55,
+      "drivenP95": 6.33,
+      "deltaP50": -0.4,
+      "legacyColdP50": 6.7,
+      "drivenColdP50": 6.66,
+      "load1": 9.6
+    },
+    {
+      "label": "T from:alice only",
+      "equal": true,
+      "legacyP50": 42.02,
+      "legacyP95": 43.94,
+      "drivenP50": 42.99,
+      "drivenP95": 48.55,
+      "deltaP50": 2.3,
+      "legacyColdP50": 44.4,
+      "drivenColdP50": 43.71,
+      "load1": 9.5
+    }
+  ],
+  "loadEnd": [
+    9.51,
+    10.72,
+    7.9
+  ]
+}

@@ -1,0 +1,55 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/syncJobs.test.ts:
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4uucna",
+  dbPath: "/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/mywebmail-test-db-4uucna/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[sync] worker started {"jobId":"16e30260-6e4a-4086-847a-bcb4bab6dcc7","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"7b3fbe9c-c7f1-4f95-a77a-ed7934430018","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Archive","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"eaedda6f-e6f9-49fa-a47d-52965dcfe96d","accountId":"acc-queue-independent-1","folderId":"acc-queue-independent-1:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"4a2d9266-8e9c-4fed-92f9-4eca9a7e1098","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"5cfdfa50-b86e-4f45-82f9-4fd485adfd5b","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"b9254ae5-36ae-40fa-97c2-9e2dbe6382ca","accountId":"acc-queue-join-2","folderId":"acc-queue-join-2:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"938ea3f7-249c-4c62-b58d-6cf51f7a13a7","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"7d3d9a5a-df3f-4561-9f3c-10fe028d705a","accountId":"acc-queue-dedup-3","folderId":"acc-queue-dedup-3:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"01a18fc2-424c-407a-9e58-31b6a2752000","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"0d3ad75e-8953-4841-95ca-f0b28bcff7a9","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"9b7aeff9-a480-4f05-b13b-46d012dc6a4e","accountId":"acc-queue-priority-4","folderId":"acc-queue-priority-4:Archive","mode":"full","pid":2896452}
+[sync] worker started {"jobId":"4f370603-3f4c-4319-8238-eced704a9a51","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"2233193c-b401-4cd5-9e79-380a5e5c8be5","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"31466094-1fc8-4d9f-9f6c-e87e4a0ee953","accountId":"acc-queue-dead-worker-5","folderId":"acc-queue-dead-worker-5:Archive","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"fa02a672-5d5b-4877-a48d-ed0d4980bfa4","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"2dfe62e5-794b-467d-ba06-643501a6dd33","accountId":"acc-queue-client-6","folderId":"acc-queue-client-6:Sent","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"efe6e6a7-30e6-4e52-b29f-cfabdea49732","accountId":"acc-busy-7","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"b509b982-3dbc-42ca-8942-f7f8e7c464bd","accountId":"acc-busy-8","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"e2937172-5102-4b68-aa13-46dcd9ba28e7","accountId":"acc-interactive-11","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"e405627e-1288-490c-ac76-efb8738c79e8","accountId":"acc-watcher-10","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"0fcabd66-1829-4227-82fe-09135a08f5b6","accountId":"acc-sweep-9","mode":"full","pid":2896452}
+[sync] worker started {"jobId":"c756f077-fde5-4ebe-9f44-78c6064a6a86","accountId":"acc-busy-head-12","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"bef0efa2-ab03-46f1-a18c-95a06d8b06d5","accountId":"acc-busy-head-13","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"a5e3c1f0-60a4-4f63-8f56-350872a21637","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:INBOX","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"5144f0f7-00b8-4895-8f73-b324da5cc142","accountId":"acc-queued-head-14","folderId":"acc-queued-head-14:Archive","mode":"full","pid":2896452}
+[sync] worker started {"jobId":"0e61b69f-af82-43c3-88ef-733cdc140ee6","accountId":"acc-busy-cancel-15","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"5ae41848-adad-4b53-a792-44197d1e9581","accountId":"acc-busy-cancel-16","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"10b77784-603c-4571-953a-83c41e0345cb","accountId":"acc-joined-watcher-18","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"874d1a14-a7e0-4276-9505-687f31f97a71","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","pid":2896452}
+[sync] worker failed {"jobId":"874d1a14-a7e0-4276-9505-687f31f97a71","accountId":"acc-watcher-failure-19","folderId":"acc-watcher-failure-19:INBOX","mode":"new","exitCode":1,"error":"Sync worker exited with code 1"}
+[sync] worker started {"jobId":"b0aa5123-3283-40b0-97d0-1e2c8bded17d","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:initial","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"80082bbf-f8d4-452a-a32f-d244e7592b41","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-0","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"5b7a3a45-afe6-4ae1-bfc0-2a6aacfe1772","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-1","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"0728a89a-45e8-466b-b034-d215f0bcb106","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-2","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"97946dc6-df13-4ea1-bb52-a3af58efe68b","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-3","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"c4ab3643-3cd0-494e-b6b6-d4d02c48589d","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-4","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"a1f35639-57a3-46df-aaa0-95d660a87310","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-5","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"f0b4fd03-8186-4ad7-b802-40f9d0c4f6b1","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-6","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"ecc08a35-cc82-4d05-828e-5a263453f7cf","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-7","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"b7b5a29f-7435-497c-be28-8483cb3e4f1a","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:INBOX","mode":"repair","pid":2896452}
+[sync] worker started {"jobId":"5af41f73-ffdd-434b-afe7-e954ebdabdfd","accountId":"acc-bounded-aging-20","folderId":"acc-bounded-aging-20:interactive-8","mode":"new","pid":2896452}
+[sync] worker started {"jobId":"ced12229-dfe4-42fd-ba54-2a16d4a41799","accountId":"acc-folder-guard-21","folderId":"acc-folder-guard-21:INBOX","mode":"new","pid":2896452}
+
+ 99 pass
+ 0 fail
+ 4660 expect() calls
+Ran 99 tests across 10 files. [20.18s]

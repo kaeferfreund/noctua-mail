@@ -1,0 +1,67 @@
+[
+  {
+    "width": 1440,
+    "scheme": "dark",
+    "host": "modal",
+    "field": {
+      "x": 358,
+      "width": 820
+    },
+    "menu": {
+      "x": 358,
+      "width": 560
+    }
+  },
+  {
+    "width": 1440,
+    "scheme": "light",
+    "host": "inline",
+    "field": {
+      "x": 911.640625,
+      "width": 456.359375
+    },
+    "menu": {
+      "x": 912,
+      "width": 456.359375
+    }
+  },
+  {
+    "width": 1280,
+    "scheme": "light",
+    "host": "modal",
+    "field": {
+      "x": 278,
+      "width": 820
+    },
+    "menu": {
+      "x": 278,
+      "width": 560
+    }
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "host": "phone",
+    "field": {
+      "x": 108,
+      "width": 270
+    },
+    "menu": {
+      "x": 16,
+      "width": 358
+    }
+  },
+  {
+    "width": 320,
+    "scheme": "light",
+    "host": "phone",
+    "field": {
+      "x": 108,
+      "width": 200
+    },
+    "menu": {
+      "x": 16,
+      "width": 288
+    }
+  }
+]

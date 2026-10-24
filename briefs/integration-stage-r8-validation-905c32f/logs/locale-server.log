@@ -1,0 +1,46 @@
+Ready on http://127.0.0.1:3799
+[2026-10-23 07:33:58.815 +00:00] [startup] opened storage {
+[2026-10-23 07:33:58.815 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data',
+[2026-10-23 07:33:58.815 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data/db/main.db'
+[2026-10-23 07:33:58.815 +00:00] }
+[2026-10-23 07:33:58.885 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 07:33:59.412 +00:00] [startup] opened storage {
+[2026-10-23 07:33:59.412 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data',
+[2026-10-23 07:33:59.412 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/locale-data/db/main.db'
+[2026-10-23 07:33:59.412 +00:00] }
+[2026-10-23 07:33:59.415 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 07:34:00.206 +00:00] [shutdown] starting {
+[2026-10-23 07:34:00.206 +00:00]   signal: 'SIGTERM',
+[2026-10-23 07:34:00.206 +00:00]   hooks: [
+[2026-10-23 07:34:00.206 +00:00]     'http:stop',
+[2026-10-23 07:34:00.206 +00:00]     'http:drain',
+[2026-10-23 07:34:00.206 +00:00]     'background:stop',
+[2026-10-23 07:34:00.206 +00:00]     'background:drain',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams:drain',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:8a4d2c7f-c99a-4e5e-9f0f-1a16b6b6a904:stop',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:8a4d2c7f-c99a-4e5e-9f0f-1a16b6b6a904:drain',
+[2026-10-23 07:34:00.206 +00:00]     'db:close',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams:drain',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams',
+[2026-10-23 07:34:00.206 +00:00]     'background:stop',
+[2026-10-23 07:34:00.206 +00:00]     'background:drain',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:31920000-d5bb-4b5f-a2b2-2fd2966acd9e:stop',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:31920000-d5bb-4b5f-a2b2-2fd2966acd9e:drain',
+[2026-10-23 07:34:00.206 +00:00]     'background:stop',
+[2026-10-23 07:34:00.206 +00:00]     'background:drain',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams:drain',
+[2026-10-23 07:34:00.206 +00:00]     'auth-streams',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:f6bc5378-1c4b-4a7e-bb89-5577949fc2b0:stop',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:f6bc5378-1c4b-4a7e-bb89-5577949fc2b0:drain',
+[2026-10-23 07:34:00.206 +00:00]     'db:close',
+[2026-10-23 07:34:00.206 +00:00]     'imap-pool',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:c08f2474-07f4-4bab-8971-fb0906378104:stop',
+[2026-10-23 07:34:00.206 +00:00]     'admission:2149089:c08f2474-07f4-4bab-8971-fb0906378104:drain'
+[2026-10-23 07:34:00.206 +00:00]   ]
+[2026-10-23 07:34:00.206 +00:00] }
+[2026-10-23 07:34:00.207 +00:00] [shutdown] HTTP requests { active: 1 }
+[2026-10-23 07:34:00.207 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:34:00.208 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:34:00.208 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:34:00.217 +00:00] [shutdown] complete {}

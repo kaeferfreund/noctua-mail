@@ -1,0 +1,44 @@
+Ready on http://127.0.0.1:3799
+[2026-10-23 07:33:57.193 +00:00] [startup] opened storage {
+[2026-10-23 07:33:57.193 +00:00]   dataDir: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data',
+[2026-10-23 07:33:57.193 +00:00]   dbPath: '/home/monkey/code/noctua-mail/wt-integration-dryrun/.tmp/shutdown-watcher-data/db/main.db'
+[2026-10-23 07:33:57.193 +00:00] }
+[2026-10-23 07:33:57.203 +00:00] [noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+[2026-10-23 07:33:57.417 +00:00] [mailbox-watcher] synthetic-shutdown: starting
+[2026-10-23 07:33:58.069 +00:00] {"src":"connection","msg":"Established TCP connection","cid":"2i9s0ut3sfxy76cpbe9i","secure":false,"host":"127.0.0.1","servername":false,"port":42583,"address":"127.0.0.1","localAddress":"127.0.0.1","localPort":37584}
+[2026-10-23 07:33:58.070 +00:00] {"event":"imap.socket_connect","accountId":"synthetic-shutdown","clientId":null,"mailbox":"INBOX","socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":42583,"localAddress":"127.0.0.1","localPort":37584,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 07:33:58.088 +00:00] {"msg":"Server does not support STARTTLS, continuing over an unencrypted connection","host":"127.0.0.1","port":42583,"cid":"2i9s0ut3sfxy76cpbe9i"}
+[2026-10-23 07:33:58.095 +00:00] {"src":"auth","msg":"User authenticated","cid":"2i9s0ut3sfxy76cpbe9i","user":"demo@monkeydent.test"}
+[2026-10-23 07:33:58.097 +00:00] [imap] imap.connect mailbox=INBOX account=synthetic-shutdown 392ms
+[2026-10-23 07:33:58.107 +00:00] [mailbox-watcher] synthetic-shutdown: idling
+[2026-10-23 07:33:58.128 +00:00] [sync] worker started {"jobId":"3a6fbb22-27ea-4555-a261-9126bd6252af","accountId":"synthetic-shutdown","folderId":"synthetic-shutdown:INBOX","mode":"full","pid":2149081}
+[2026-10-23 07:33:58.130 +00:00] [shutdown] starting {
+[2026-10-23 07:33:58.130 +00:00]   signal: 'SIGTERM',
+[2026-10-23 07:33:58.130 +00:00]   hooks: [
+[2026-10-23 07:33:58.130 +00:00]     'http:stop',
+[2026-10-23 07:33:58.130 +00:00]     'http:drain',
+[2026-10-23 07:33:58.130 +00:00]     'background:stop',
+[2026-10-23 07:33:58.130 +00:00]     'background:drain',
+[2026-10-23 07:33:58.130 +00:00]     'auth-streams:drain',
+[2026-10-23 07:33:58.130 +00:00]     'auth-streams',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:61ff1e56-2d49-4194-b19e-26d6cfa0fdde:stop',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:61ff1e56-2d49-4194-b19e-26d6cfa0fdde:drain',
+[2026-10-23 07:33:58.130 +00:00]     'db:close',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:18faae37-7366-46bf-9856-4bf2b301a6ae:stop',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:18faae37-7366-46bf-9856-4bf2b301a6ae:drain',
+[2026-10-23 07:33:58.130 +00:00]     'imap-pool',
+[2026-10-23 07:33:58.130 +00:00]     'mailbox-watcher',
+[2026-10-23 07:33:58.130 +00:00]     'auth-streams:drain',
+[2026-10-23 07:33:58.130 +00:00]     'auth-streams',
+[2026-10-23 07:33:58.130 +00:00]     'background:stop',
+[2026-10-23 07:33:58.130 +00:00]     'background:drain',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:a2d0a5bd-e865-43fd-89f7-cc92984a55dc:stop',
+[2026-10-23 07:33:58.130 +00:00]     'admission:2149050:a2d0a5bd-e865-43fd-89f7-cc92984a55dc:drain',
+[2026-10-23 07:33:58.130 +00:00]     'imap-pool'
+[2026-10-23 07:33:58.130 +00:00]   ]
+[2026-10-23 07:33:58.130 +00:00] }
+[2026-10-23 07:33:58.130 +00:00] [shutdown] HTTP requests { active: 0 }
+[2026-10-23 07:33:58.131 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:33:58.133 +00:00] [shutdown] auth streams { active: 0 }
+[2026-10-23 07:33:58.136 +00:00] {"event":"imap.socket_close","accountId":"synthetic-shutdown","clientId":null,"mailbox":"INBOX","hadError":false,"socket":{"secureConnection":false,"sessionReused":null,"authorized":null,"authorizationError":null,"remoteAddress":"127.0.0.1","remotePort":42583,"localAddress":null,"localPort":null,"alpnProtocol":null,"cipher":null,"protocol":null,"peerCertificate":{"subject":null,"issuer":null,"subjectAltName":null,"serialNumber":null,"fingerprint":null,"fingerprint256":null,"validFrom":null,"validTo":null},"hasPeerCertificateData":false}}
+[2026-10-23 07:33:58.142 +00:00] [shutdown] complete {}

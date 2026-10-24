@@ -1,0 +1,22 @@
+[
+  {
+    "pid": 2754905,
+    "ppid": 2754903,
+    "command": "node /home/monkey/code/noctua-mail/wt-reader-focus/node_modules/.bin/playwright test --config=playwright.qa-shell.config.ts --config=playwright.qa-round2.config.ts --grep reader focus "
+  },
+  {
+    "pid": 2754903,
+    "ppid": 2754902,
+    "command": "node /home/monkey/code/noctua-mail/wt-reader-focus/node_modules/.bin/playwright test --config=playwright.qa-shell.config.ts --config=playwright.qa-round2.config.ts --grep reader focus "
+  },
+  {
+    "pid": 2754902,
+    "ppid": 2754453,
+    "command": "bun x playwright test --config=playwright.qa-shell.config.ts --config=playwright.qa-round2.config.ts --grep reader focus "
+  },
+  {
+    "pid": 2754453,
+    "ppid": 2754452,
+    "command": "bun .tmp/run-reader-focus-r2.ts --config=playwright.qa-round2.config.ts --grep reader focus "
+  }
+]

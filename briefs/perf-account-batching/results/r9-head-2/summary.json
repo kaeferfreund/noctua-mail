@@ -1,0 +1,272 @@
+{
+  "r9-head-2": {
+    "saves": 1381,
+    "failures": 0,
+    "errors": [],
+    "watcherJobs": 67,
+    "startLoad": [
+      9.13,
+      10.05,
+      11.99
+    ],
+    "endLoad": [
+      10.1,
+      10.19,
+      11.92
+    ],
+    "pragmas": {
+      "master": {
+        "timeout": 0
+      },
+      "shard": {
+        "timeout": 15000
+      }
+    },
+    "duration": 60000,
+    "draftLatencyMs": {
+      "n": 1381,
+      "p50": 36.285,
+      "p95": 97.758,
+      "p99": 136.597,
+      "max": 376.6,
+      "total": 59962.369
+    },
+    "endpoints": {
+      "me": {
+        "n": 1372,
+        "p50": 3.426,
+        "p95": 18.932,
+        "p99": 29.946,
+        "max": 101.587,
+        "total": 9547.947,
+        "statuses": {
+          "200": 1372
+        },
+        "errors": 0
+      },
+      "summary": {
+        "n": 1369,
+        "p50": 14.779,
+        "p95": 23.64,
+        "p99": 35.957,
+        "max": 76.098,
+        "total": 21995.439,
+        "statuses": {
+          "200": 1369
+        },
+        "errors": 0
+      },
+      "sseScopedRead": {
+        "n": 603,
+        "p50": 0.811,
+        "p95": 7.292,
+        "p99": 8.535,
+        "max": 70.917,
+        "total": 1117.833,
+        "events": {
+          "mailbox-summary": 579,
+          "heartbeat": 4
+        },
+        "closed": false
+      }
+    },
+    "auth": {
+      "attempts": 776,
+      "busy": 153,
+      "kinds": {
+        "session": {
+          "attempts": 776,
+          "busy": 153
+        },
+        "role": {
+          "attempts": 222,
+          "busy": 41
+        },
+        "member": {
+          "attempts": 55,
+          "busy": 8
+        },
+        "revoke": {
+          "attempts": 55,
+          "busy": 6
+        }
+      }
+    },
+    "syncLoops": [
+      {
+        "completed": 198,
+        "failed": 0,
+        "errors": 0
+      },
+      {
+        "completed": 161,
+        "failed": 0,
+        "errors": 0
+      }
+    ],
+    "timings": {
+      "guard.assertMs": {
+        "n": 1382,
+        "p50": 0.076,
+        "p95": 0.133,
+        "p99": 0.174,
+        "max": 1.997,
+        "total": 119.563
+      },
+      "guard.commits": {
+        "n": 1382,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 1382
+      },
+      "guard.dmlAttempts": {
+        "n": 1382,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 1382
+      },
+      "guard.masterAcquireMs": {
+        "n": 1382,
+        "p50": 0.012,
+        "p95": 0.024,
+        "p99": 0.044,
+        "max": 0.769,
+        "total": 19.443
+      },
+      "guard.masterHoldMs": {
+        "n": 1382,
+        "p50": 0.947,
+        "p95": 3.303,
+        "p99": 7.316,
+        "max": 29.351,
+        "total": 1819.823
+      },
+      "master.acquireFailureMs": {
+        "n": 302,
+        "p50": 0.028,
+        "p95": 0.041,
+        "p99": 0.052,
+        "max": 0.073,
+        "total": 8.937
+      },
+      "master.acquireMs": {
+        "n": 3575,
+        "p50": 0.01,
+        "p95": 0.038,
+        "p99": 0.09,
+        "max": 2.865,
+        "total": 59.061
+      },
+      "master.holdMs": {
+        "n": 3575,
+        "p50": 1.256,
+        "p95": 8.986,
+        "p99": 15.976,
+        "max": 29.351,
+        "total": 9759.009
+      },
+      "retry.acquireMailboxScheduler": {
+        "n": 7,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 7
+      },
+      "retry.bindSyncWorkerProcess": {
+        "n": 8,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 8
+      },
+      "retry.heartbeatSyncWorkers": {
+        "n": 3,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 3
+      },
+      "retry.initializeMasterSchema": {
+        "n": 26,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 26
+      },
+      "retry.queueSyncWorker": {
+        "n": 115,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 115
+      },
+      "retry.releaseSyncWorker": {
+        "n": 102,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 102
+      },
+      "retry.reserveSyncWorker": {
+        "n": 99,
+        "p50": 1,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 99
+      },
+      "retry.upsertMessages": {
+        "n": 302,
+        "p50": 1.0,
+        "p95": 1,
+        "p99": 1,
+        "max": 1,
+        "total": 302
+      },
+      "shard.acquireMs": {
+        "n": 3627,
+        "p50": 0.014,
+        "p95": 0.035,
+        "p99": 4.361,
+        "max": 36.385,
+        "total": 888.598
+      },
+      "shard.ftsDeleteMs": {
+        "n": 2887,
+        "p50": 0.037,
+        "p95": 0.079,
+        "p99": 0.115,
+        "max": 0.787,
+        "total": 93.698
+      },
+      "shard.ftsInsertMs": {
+        "n": 1505,
+        "p50": 0.02,
+        "p95": 0.065,
+        "p99": 0.09,
+        "max": 0.886,
+        "total": 37.482
+      },
+      "shard.holdMs": {
+        "n": 3627,
+        "p50": 0.136,
+        "p95": 2.788,
+        "p99": 6.456,
+        "max": 29.349,
+        "total": 2587.069
+      }
+    },
+    "busyRetries": 662,
+    "retryExhaustions": 0
+  }
+}

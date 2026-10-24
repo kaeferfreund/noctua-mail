@@ -1,0 +1,10 @@
+95d4915429c17686b4ed4473866a68cc070363c9
+100644 bc816534576e22069621057bb1536847c7e35c0a 1	playwright.qa-round2.config.ts
+100644 d6538e5c8ee97a01aaa66de6d321e56e8d0966b2 2	playwright.qa-round2.config.ts
+100644 b59bc05cf4e00173d38eaa156bd31cd90846ddb9 3	playwright.qa-round2.config.ts
+
+Auto-merging app/components/MailClient.tsx
+Auto-merging messages/de.json
+Auto-merging messages/en.json
+Auto-merging playwright.qa-round2.config.ts
+CONFLICT (content): Merge conflict in playwright.qa-round2.config.ts

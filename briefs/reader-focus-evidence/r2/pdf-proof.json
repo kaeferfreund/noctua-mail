@@ -1,0 +1,10 @@
+{
+  "pages": 1,
+  "sha256": "14a22cd92b9248f1d131e8b37e0a82e482d952b60519449d7a309f5130a96086",
+  "messageBodyPresent": true,
+  "mailSubjectPresent": true,
+  "senderPresent": true,
+  "privateDraftAbsent": true,
+  "collaborationAbsent": true,
+  "extractedText": "QA synthetic 000\nFrom: Synthetic Reader<reader@example.test> Date: 23/10/2026, 13:28\nTo: MonkeyDent Team<demo@monkeydent.test>\nSynthetic QA round two message.\nSRSR"
+}

@@ -1,0 +1,29 @@
+{
+  "placeholder": "Search Inbox",
+  "results": [
+    {
+      "width": 1440,
+      "colorScheme": "light",
+      "text": 88,
+      "available": 171
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "text": 88,
+      "available": 171
+    },
+    {
+      "width": 1440,
+      "colorScheme": "dark",
+      "text": 88,
+      "available": 171
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "text": 88,
+      "available": 171
+    }
+  ]
+}

@@ -310,6 +310,8 @@ RestartSec=10s
 
 Caddy läuft unter eigenem `caddy`-Konto, mit Bind-Capability für 443 und persistentem State unter `/var/lib/caddy` gemäß installierter Unit. Nicht unter dem App-Konto starten. DNS-Zugang bleibt außerhalb der App. Entscheidung für Caddy statt zusätzlichem ACME-Timer: Renewal und Proxy liegen in einem Dienst; DNS-01 benötigt keine öffentliche HTTP-Freigabe. Provider-Syntax/Propagation: [Caddy/netcup](https://github.com/caddy-dns/netcup); Secret-/API-Zuordnung [N].
 
+**Kompression (Pflicht, 2026-10-23):** Die App schickt JSON-Antworten unkomprimiert (Listen-Seite großes Postfach 861 KB → gzip-5 50 KB; erste Zeilen bei 5 Mbit/s 1,6 s → 0,3 s). Im Site-Block `encode` mit expliziter Content-Type-Liste setzen, **nie `text/event-stream`** (SSE `/api/me/events`, `/imap/stream`). Snippet, Risiken und Prüfung: `briefs/switch-ideas/V3-report.md` §1. Go-live-Prüfung: Test-Mail und Collab-Ereignis kommen live durch Caddy an; `curl -sI -H "Accept-Encoding: gzip"` auf eine Listen-Abfrage zeigt `Content-Encoding`. Caddy liefert zugleich HTTP/2 (hebt das 6-Verbindungs-Limit für zwei SSE-Streams pro Tab auf).
+
 **Prüfen:** Provider in installiertem Binary gelistet; beide Secretdateien nur root lesbar; Caddy-Unit-Statepfad und Schreibrechte geprüft. **Rollback:** Vorheriges Caddy-Binary/Drop-in zurück; bestehende Zertifikate behalten.
 
 **Schritt C – `/etc/caddy/Caddyfile`:**

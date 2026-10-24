@@ -1,0 +1,899 @@
+{
+  "status": "complete",
+  "createdAt": "2026-10-23T05:17:10.181733+00:00",
+  "worktree": "/home/monkey/code/noctua-mail/wt-qa-fix3",
+  "branch": "fix/qa-round2",
+  "base": "9424150f5aa0a446ed9bc03ed199e6825129467d",
+  "head": "bdcdd3a562f3401e5b69dd96649120712c28e64d",
+  "baselineReport": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150.md",
+  "fixture": {
+    "runner": "scripts/dev-fixture/run.ts",
+    "app": "http://localhost:3900",
+    "authBrowserPort": 3901,
+    "imapPort": 3902,
+    "smtpPort": 3903,
+    "controlPort": 3904,
+    "syntheticOnly": true,
+    "initialInboxMessages": 300,
+    "initialUnread": 110,
+    "dataDirectoryDuringRun": "/home/monkey/code/noctua-mail/wt-qa-fix3/.tmp/qa-shell-round2/data",
+    "longSubjectTargetDate": "Explicitly one day in the future so the established reader test target is the newest rendered message."
+  },
+  "findings": [
+    {
+      "id": "QA-101",
+      "rootCause": "The successful flag response applied a local unread delta after an authoritative folder:update could already have applied the same seen transition. Focused totals refreshed only after a completed sync.",
+      "fixes": [
+        "/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useMessageMutations.ts:450",
+        "/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/mailclient/useSearchState.ts:210"
+      ],
+      "fix": "Replace post-response deltas with committed folder counts, discard superseded/departed-account reads, and refresh server-derived virtual totals when folder counts change.",
+      "tests": [
+        "app/components/mailclient/useMessageMutations.dom.test.tsx",
+        "app/components/mailclient/useSearchState.dom.test.tsx",
+        "app/components/mailclient/folderStreamUpdates.dom.test.tsx",
+        "tests/browser/ui/qa-unread-count.spec.ts"
+      ],
+      "steps": [
+        "Sign in as synthetic manager at 1440x900 dark; wait for 300 INBOX messages / 110 unread, watcher idling and HTTP 200 IMAP stream.",
+        "Enter QA synthetic 014 in the desktop search input and select its single-message row.",
+        "Message actions -> Mark as read; capture the POST and sample folders API, mailbox summary, mailbox, Inbox, INBOX and Focused counts.",
+        "Continue sampling through ten seconds; Mark as unread; POST one synthetic message to the fixture /inject endpoint."
+      ],
+      "before": {
+        "source": "provided baseline Playwright report",
+        "foldersApi": 109,
+        "summary": 109,
+        "inboxBadge": 108,
+        "folderBadge": 108,
+        "focusedBadge": 110,
+        "wrongCountObservedThroughMs": 10410,
+        "seenTruePosts": 1,
+        "ownRegressionProof": "Original-code count-before-response DOM test produces 108 instead of 109."
+      },
+      "after": {
+        "initial": {
+          "api": 110,
+          "summary": 110,
+          "mailbox": 110,
+          "inbox": 110,
+          "tree": 110,
+          "focused": 110,
+          "total": 300
+        },
+        "streamStatuses": [
+          200,
+          200
+        ],
+        "mutationStatus": 200,
+        "readPosts": [
+          {
+            "flag": "seen",
+            "value": true
+          }
+        ],
+        "settledMs": 1175,
+        "samples": [
+          {
+            "ms": 468,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 110,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 110,
+            "total": 300
+          },
+          {
+            "ms": 605,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 110,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 734,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 110,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 955,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 110,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 1174,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 1280,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 1552,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 1835,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 2108,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 2379,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 2652,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 2924,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 3199,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 3471,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 3742,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 4016,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 4288,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 4559,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 4831,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 5102,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 5372,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 5643,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 5915,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 6187,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 6457,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 6727,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 7002,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 7273,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 7544,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 7817,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 8088,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 8360,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 8636,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 8908,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 9181,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 9453,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 9726,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 10001,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          },
+          {
+            "ms": 10271,
+            "api": 109,
+            "summary": 109,
+            "mailbox": 109,
+            "inbox": 109,
+            "tree": 109,
+            "focused": 109,
+            "total": 300
+          }
+        ],
+        "unread": {
+          "api": 110,
+          "summary": 110,
+          "mailbox": 110,
+          "inbox": 110,
+          "tree": 110,
+          "focused": 110,
+          "total": 300
+        },
+        "unreadMs": 1519,
+        "newMail": {
+          "api": 111,
+          "summary": 111,
+          "mailbox": 111,
+          "inbox": 111,
+          "tree": 111,
+          "focused": 111,
+          "total": 301
+        },
+        "newMailMs": 2014,
+        "injectionStatus": 200
+      },
+      "screenshots": [
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-101-new-111-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-101-read-109-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-101-stable-10s-dark.png"
+      ]
+    },
+    {
+      "id": "QA-102",
+      "rootCause": "SettingsFrame switched between separate Dialog and Sheet component trees at the breakpoint, remounting AdminMailboxes and its locally owned CreateMailbox state.",
+      "fixes": [
+        "/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/shell/SettingsFrame.tsx:15",
+        "/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/shell/MobileFrames.module.css:49"
+      ],
+      "fix": "Use one Dialog/portal tree, with responsive fullscreen CSS, the mobile sheet marker, mobile overlay history and existing focus restoration.",
+      "tests": [
+        "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx",
+        "app/components/shell/SettingsFrame.dom.test.tsx",
+        "app/components/mailclient/lazyAdmin.dom.test.tsx",
+        "tests/browser/ui/qa-admin-breakpoint.spec.ts"
+      ],
+      "steps": [
+        "1440x900 dark: Admin -> Mailboxes -> Create mailbox.",
+        "Type Name Synthetic keyboard mailbox and Email keyboard@example.test with zero-delay keyboard events.",
+        "Resize to 390x844 and back to 1440x900; assert one open child dialog and both exact values at each size.",
+        "Escape dismisses the child and retains Admin. DOM tests additionally start on phone and verify input/dialog identities in both directions."
+      ],
+      "before": {
+        "source": "provided baseline Playwright report",
+        "dialogCountBefore": 1,
+        "dialogCountAfter": 0,
+        "nameAfterReopen": "",
+        "reproductions": 2,
+        "ownRegressionProof": "Both breakpoint-direction DOM regressions fail on the original SettingsFrame."
+      },
+      "after": [
+        {
+          "width": 1440,
+          "height": 900,
+          "dialogs": 1,
+          "name": "Synthetic keyboard mailbox",
+          "email": "keyboard@example.test"
+        },
+        {
+          "width": 390,
+          "height": 844,
+          "dialogs": 1,
+          "name": "Synthetic keyboard mailbox",
+          "email": "keyboard@example.test"
+        },
+        {
+          "width": 1440,
+          "height": 900,
+          "dialogs": 1,
+          "name": "Synthetic keyboard mailbox",
+          "email": "keyboard@example.test"
+        }
+      ],
+      "screenshots": [
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-102-1440-0-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-102-1440-2-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-102-390-1-dark.png"
+      ]
+    },
+    {
+      "id": "QA-103",
+      "rootCause": "Field labelControls used Children.map recursively, converting Flex asChild and Slottable scalar element children into arrays rejected by Radix Slot.",
+      "fixes": [
+        "/home/monkey/code/noctua-mail/wt-qa-fix3/app/components/account-settings/Field.tsx:9"
+      ],
+      "fix": "Preserve scalar/array shape, keys and empty children while cloning only controls and their changed ancestors to associate labels.",
+      "tests": [
+        "app/components/account-settings/Field.dom.test.tsx",
+        "tests/browser/ui/qa-translation.spec.ts"
+      ],
+      "fieldConsumersVerified": [
+        "AccountTabContent",
+        "CalendarTabContent",
+        "SignaturesTabContent",
+        "TranslationTabContent",
+        "AccountReloginDialog"
+      ],
+      "steps": [
+        "Sign in as synthetic manager; User menu -> Settings -> Translation.",
+        "Repeat at 1440x900, 1280x720, 834x1112, 390x844 and 360x780, in light and dark.",
+        "Assert labelled API key / translation switch / target-language controls, intact shell and zero page errors; measure mobile fullscreen bounds."
+      ],
+      "before": {
+        "source": "provided baseline Playwright report",
+        "crashes": 10,
+        "configurations": 10,
+        "error": "Slot failed to slot onto its children. Expected a single React element child or Slottable.",
+        "ownRegressionProof": "The Flex/Slottable DOM regression and Translation-in-frame mount both throw on original Field.tsx."
+      },
+      "after": {
+        "results": [
+          {
+            "theme": "light",
+            "width": 1440,
+            "height": 900,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 230,
+              "y": 52,
+              "width": 980,
+              "height": 774
+            }
+          },
+          {
+            "theme": "light",
+            "width": 1280,
+            "height": 720,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 150,
+              "y": 44.8125,
+              "width": 980,
+              "height": 619.1875
+            }
+          },
+          {
+            "theme": "light",
+            "width": 834,
+            "height": 1112,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 25.015625,
+              "y": 60.484375,
+              "width": 783.953125,
+              "height": 956.3125
+            }
+          },
+          {
+            "theme": "light",
+            "width": 390,
+            "height": 844,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            }
+          },
+          {
+            "theme": "light",
+            "width": 360,
+            "height": 780,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 0,
+              "y": 0,
+              "width": 360,
+              "height": 780
+            }
+          },
+          {
+            "theme": "dark",
+            "width": 1440,
+            "height": 900,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 230,
+              "y": 52,
+              "width": 980,
+              "height": 774
+            }
+          },
+          {
+            "theme": "dark",
+            "width": 1280,
+            "height": 720,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 150,
+              "y": 44.8125,
+              "width": 980,
+              "height": 619.1875
+            }
+          },
+          {
+            "theme": "dark",
+            "width": 834,
+            "height": 1112,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 25.015625,
+              "y": 60.484375,
+              "width": 783.953125,
+              "height": 956.3125
+            }
+          },
+          {
+            "theme": "dark",
+            "width": 390,
+            "height": 844,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            }
+          },
+          {
+            "theme": "dark",
+            "width": 360,
+            "height": 780,
+            "renders": true,
+            "shell": true,
+            "dialog": {
+              "x": 0,
+              "y": 0,
+              "width": 360,
+              "height": 780
+            }
+          }
+        ],
+        "pageErrors": []
+      },
+      "screenshots": [
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-1280-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-1280-light.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-1440-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-1440-light.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-360-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-360-light.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-390-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-390-light.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-834-dark.png",
+        "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3/QA-103-834-light.png"
+      ]
+    }
+  ],
+  "newDisplayStrings": [],
+  "reusedDisplayStrings": [
+    "Failed to refresh folders."
+  ],
+  "gates": {
+    "typecheck": {
+      "command": "bun run typecheck",
+      "exit": 0,
+      "errors": 0,
+      "files": 1181,
+      "reportedMs": 580.3,
+      "wallSeconds": 0.643
+    },
+    "focusedDom": {
+      "command": "nice -n 15 bun test --config=bunfig.dom.toml <seven focused files; see focused logs>",
+      "runs": [
+        {
+          "run": 1,
+          "exit": 0,
+          "seconds": 3.757,
+          "passed": 34,
+          "failed": 0,
+          "assertions": 186
+        },
+        {
+          "run": 2,
+          "exit": 0,
+          "seconds": 3.632,
+          "passed": 34,
+          "failed": 0,
+          "assertions": 186
+        },
+        {
+          "run": 3,
+          "exit": 0,
+          "seconds": 3.685,
+          "passed": 34,
+          "failed": 0,
+          "assertions": 186
+        }
+      ]
+    },
+    "testCi": {
+      "command": "nice -n 15 timeout 1800 bun run test:ci",
+      "exit": 0,
+      "wallSeconds": 531.423,
+      "primary": {
+        "passed": 2754,
+        "failed": 0,
+        "assertions": 11309,
+        "files": 300,
+        "seconds": 461.15
+      },
+      "dom": {
+        "passed": 446,
+        "failed": 0,
+        "assertions": 2643,
+        "files": 54,
+        "seconds": 66.75
+      },
+      "totalPassed": 3200,
+      "totalAssertions": 13952
+    },
+    "lint": {
+      "command": "nice -n 15 timeout 600 bun run lint",
+      "exit": 1,
+      "errors": 1,
+      "warnings": 25,
+      "newErrors": 0,
+      "newWarnings": 0,
+      "existingError": "app/components/calendar/useCalendarConflicts.ts:58 react-hooks/set-state-in-effect",
+      "wallSeconds": 50.935
+    },
+    "build": {
+      "command": "nice -n 15 timeout 1200 bun run build",
+      "exit": 0,
+      "wallSeconds": 61.626,
+      "compileSeconds": 25.9,
+      "typeScriptSeconds": 32.1,
+      "staticPages": 31
+    },
+    "playwright": {
+      "command": "nice -n 15 timeout 1800 bun x playwright test --config=playwright.qa-round2.config.ts",
+      "exit": 0,
+      "passed": 11,
+      "failed": 0,
+      "retries": 0,
+      "workers": 1,
+      "wallSeconds": 150.144,
+      "existingSpecs": [
+        "tests/browser/ui/qa-shell.spec.ts",
+        "tests/browser/compose/qa-compose.spec.ts"
+      ],
+      "newSpecs": [
+        "tests/browser/ui/qa-admin-breakpoint.spec.ts",
+        "tests/browser/ui/qa-translation.spec.ts",
+        "tests/browser/ui/qa-unread-count.spec.ts"
+      ]
+    },
+    "diffCheck": {
+      "command": "git diff 9424150..HEAD --check",
+      "exit": 0
+    }
+  },
+  "earlierAttempts": {
+    "ci": "Initial DOM run caught the missing mobile sheet marker; restored it without changing the existing assertion. Final full CI passed.",
+    "lint": "Moved test handle assignments from render into a layout effect; final focused runs and lint passed within the documented baseline.",
+    "browser": "Initial attempts exposed setup issues: production login rate limiting, fixture target ordering, off-canvas sidebar detection, desktop search/selection locators and the fixture /inject URL. Corrected the setup; the final combined 11-test run passed with existing timeouts, retries and assertions preserved."
+  },
+  "commits": [
+    {
+      "sha": "fc1ea28ba86deea740d1a7926a3ee1357e9a71b8",
+      "subject": "fix(ui): QA-101 reconcile unread counts with committed state",
+      "paths": [
+        "app/components/mailclient/useMessageMutations.dom.test.tsx",
+        "app/components/mailclient/useMessageMutations.ts",
+        "app/components/mailclient/useSearchState.dom.test.tsx",
+        "app/components/mailclient/useSearchState.ts",
+        "playwright.qa-round2.config.ts",
+        "tests/browser/ui/qa-unread-count.spec.ts",
+        "tests/browser/ui/qaRound2Session.ts"
+      ]
+    },
+    {
+      "sha": "eede97dd903ae9067d2adf319e4ce836ac73fa8d",
+      "subject": "fix(ui): QA-103 preserve Field child shape for Radix slots",
+      "paths": [
+        "app/components/account-settings/Field.dom.test.tsx",
+        "app/components/account-settings/Field.tsx",
+        "tests/browser/ui/qa-translation.spec.ts"
+      ]
+    },
+    {
+      "sha": "bdcdd3a562f3401e5b69dd96649120712c28e64d",
+      "subject": "fix(ui): QA-102 preserve nested dialogs across settings breakpoints",
+      "paths": [
+        "app/components/shell/MobileFrames.module.css",
+        "app/components/shell/SettingsFrame.breakpoint.dom.test.tsx",
+        "app/components/shell/SettingsFrame.tsx",
+        "tests/browser/ui/qa-admin-breakpoint.spec.ts"
+      ]
+    }
+  ],
+  "scope": {
+    "protectedSourcePathsChanged": false,
+    "adminOrShellCopyChanged": false,
+    "pushed": false,
+    "pullRequestsCreated": false,
+    "deployed": false
+  },
+  "cleanup": {
+    "worktreeClean": true,
+    "tmpRemoved": true,
+    "ownedServersStopped": true,
+    "ports3900Through3904Free": true,
+    "stoppedAppNodePids": [
+      1718415,
+      1741284,
+      1776549
+    ],
+    "stoppedFixturePids": [
+      1718158,
+      1741160,
+      1776245
+    ]
+  },
+  "evidenceDirectory": "/home/monkey/code/noctua-mail/briefs/qa-ui-sweep-9424150/fix3"
+}

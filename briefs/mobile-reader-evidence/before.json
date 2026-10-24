@@ -1,0 +1,42 @@
+[
+  {
+    "width": 390,
+    "height": 844,
+    "scheme": "dark",
+    "bannerTop": 470,
+    "bodyTop": 551,
+    "horizontalOverflow": false
+  },
+  {
+    "width": 390,
+    "height": 844,
+    "scheme": "light",
+    "bannerTop": 470,
+    "bodyTop": 551,
+    "horizontalOverflow": false
+  },
+  {
+    "width": 360,
+    "height": 740,
+    "scheme": "dark",
+    "bannerTop": 470,
+    "bodyTop": 551,
+    "horizontalOverflow": false
+  },
+  {
+    "width": 360,
+    "height": 740,
+    "scheme": "light",
+    "bannerTop": 470,
+    "bodyTop": 551,
+    "horizontalOverflow": false
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "scheme": "light",
+    "bannerTop": 310,
+    "bodyTop": 355,
+    "horizontalOverflow": false
+  }
+]

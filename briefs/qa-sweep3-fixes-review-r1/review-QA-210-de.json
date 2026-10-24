@@ -1,0 +1,188 @@
+[
+  {
+    "width": 1440,
+    "scheme": "light",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 150,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 1500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "scheme": "dark",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 150,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 1500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "scheme": "dark",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 150,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 1500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "scheme": "light",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 150,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      },
+      {
+        "wait": 1500,
+        "visible": true,
+        "text": 173,
+        "available": 178
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "scheme": "light",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": false
+      },
+      {
+        "wait": 150,
+        "visible": false
+      },
+      {
+        "wait": 500,
+        "visible": false
+      },
+      {
+        "wait": 1500,
+        "visible": false
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "scheme": "dark",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": false
+      },
+      {
+        "wait": 150,
+        "visible": false
+      },
+      {
+        "wait": 500,
+        "visible": false
+      },
+      {
+        "wait": 1500,
+        "visible": false
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "scheme": "dark",
+    "samples": [
+      {
+        "wait": 0,
+        "visible": false
+      },
+      {
+        "wait": 150,
+        "visible": false
+      },
+      {
+        "wait": 500,
+        "visible": false
+      },
+      {
+        "wait": 1500,
+        "visible": false
+      }
+    ]
+  }
+]

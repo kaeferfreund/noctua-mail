@@ -1,0 +1,46 @@
+[startup] opened storage {
+  dataDir: "/home/monkey/code/noctua-mail/wt-perf-account-batching/.tmp/tmp/mywebmail-test-db-BCVTtU",
+  dbPath: "/home/monkey/code/noctua-mail/wt-perf-account-batching/.tmp/tmp/mywebmail-test-db-BCVTtU/db/main.db",
+}
+[noctua] Bootstrap invite ready; retrieve locally with scripts/recoverTeamAuth.ts --bootstrap-invite (personal handover).
+accessible/1                            0 compiles    4 cached    4 execs  0 tx     0.35 ms  {"rows":1}
+summary-lib/1                           4 compiles    6 cached   10 execs  1 tx     0.98 ms  {"rows":1}
+summary-route/1                        11 compiles    8 cached   19 execs  2 tx     3.46 ms  {"status":200,"bytes":271}
+scoped-lib/1                            4 compiles    6 cached   10 execs  1 tx     0.93 ms  {"rows":1}
+scoped-event/1                          4 compiles    8 cached   12 execs  2 tx     2.38 ms  {"delivered":true,"ms":2.380261999999675}
+me/1                                    8 compiles    6 cached   14 execs  0 tx     2.96 ms  {"status":200,"bytes":1156}
+accessible/2                            0 compiles    4 cached    4 execs  0 tx     0.40 ms  {"rows":2}
+summary-lib/2                           8 compiles    8 cached   16 execs  1 tx     1.57 ms  {"rows":2}
+summary-route/2                        15 compiles   10 cached   25 execs  2 tx     4.18 ms  {"status":200,"bytes":513}
+scoped-lib/2                            4 compiles    6 cached   10 execs  1 tx     1.00 ms  {"rows":1}
+scoped-event/2                          4 compiles    8 cached   12 execs  2 tx     2.25 ms  {"delivered":true,"ms":2.263781000000563}
+me/2                                    8 compiles    6 cached   14 execs  0 tx     2.72 ms  {"status":200,"bytes":1865}
+accessible/12                           0 compiles    4 cached    4 execs  0 tx     0.77 ms  {"rows":12}
+summary-lib/12                         48 compiles   28 cached   76 execs  1 tx     6.89 ms  {"rows":12}
+summary-route/12                       55 compiles   30 cached   85 execs  2 tx     9.51 ms  {"status":200,"bytes":2813}
+scoped-lib/12                           4 compiles    6 cached   10 execs  1 tx     0.73 ms  {"rows":1}
+scoped-event/12                         4 compiles    8 cached   12 execs  2 tx     2.14 ms  {"delivered":true,"ms":2.078659000000698}
+me/12                                   8 compiles    6 cached   14 execs  0 tx     2.86 ms  {"status":200,"bytes":8485}
+accessible/12-disabled                  0 compiles    2 cached    2 execs  0 tx     0.29 ms  {"rows":0}
+summary-lib/12-disabled                 0 compiles    2 cached    2 execs  1 tx     0.32 ms  {"rows":0}
+summary-route/12-disabled               3 compiles    0 cached    3 execs  0 tx     1.41 ms  {"status":401,"bytes":37}
+scoped-lib/12-disabled                  0 compiles    2 cached    2 execs  1 tx     0.11 ms  {"rows":0}
+scoped-event/12-disabled                3 compiles    0 cached    3 execs  0 tx     1.55 ms  {"status":"stream-denied"}
+me/12-disabled                          3 compiles    0 cached    3 execs  0 tx     1.31 ms  {"status":401,"bytes":37}
+accessible/12-revoked                   0 compiles    4 cached    4 execs  0 tx     2.99 ms  {"rows":10}
+summary-lib/12-revoked                 55 compiles   26 cached   81 execs  1 tx    11.88 ms  {"rows":10}
+summary-route/12-revoked               62 compiles   28 cached   90 execs  2 tx    14.55 ms  {"status":200,"bytes":2329}
+scoped-lib/12-revoked                   5 compiles    6 cached   11 execs  1 tx     7.14 ms  {"rows":0}
+scoped-event/12-revoked                 5 compiles    6 cached   11 execs  1 tx     5.11 ms  {"delivered":false,"ms":5.540130999999747}
+me/12-revoked                          10 compiles   12 cached   22 execs  0 tx    17.86 ms  {"status":200,"bytes":6780}
+scoped-event/2-foreign-mailbox          0 compiles    1 cached    1 execs  1 tx     1.24 ms  {"delivered":false,"ms":1.3631319999994957}
+scoped-event/11-foreign-mailbox         0 compiles    1 cached    1 execs  1 tx     1.24 ms  {"delivered":false,"ms":1.287612000000081}
+event-fanout/4-streams                 13 compiles   25 cached   38 execs  7 tx     4.23 ms  {"delivered":false,"ms":4.2259589999994205}
+me/12-mfa-restricted                    8 compiles    0 cached    8 execs  0 tx     1.83 ms  {"status":200,"bytes":373}
+summary-route/12-mfa-restricted         7 compiles    0 cached    7 execs  0 tx     1.53 ms  {"status":403,"bytes":70}
+accessible/12-mfa-restricted            0 compiles    4 cached    4 execs  0 tx     0.67 ms  {"rows":11}
+members/syn-acct-00                     1 compiles    1 cached    2 execs  0 tx     0.08 ms  {"rows":1}
+members/syn-acct-05                     1 compiles    1 cached    2 execs  0 tx     0.17 ms  {"rows":11}
+members/syn-acct-06                     1 compiles    1 cached    2 execs  0 tx     0.14 ms  {"rows":11}
+members/syn-acct-01-revoked             1 compiles    1 cached    2 execs  0 tx     3.09 ms  {"rows":5}
+wrote /home/monkey/code/noctua-mail/wt-perf-account-batching/.tmp/sqlcount-db06a72.json

@@ -1,0 +1,106 @@
+{
+  "modal-1440-light": {
+    "rounds": [
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      }
+    ],
+    "prompts": 0
+  },
+  "inline-1440-dark": {
+    "rounds": [
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      }
+    ],
+    "prompts": 0
+  },
+  "phone-390-light": {
+    "rounds": [
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      }
+    ],
+    "prompts": 0
+  },
+  "phone-390-dark": {
+    "rounds": [
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      },
+      {
+        "without": "\"\\n\"",
+        "back": "\"Viele Grüße\\nSynthetic Alex\\nteam@example.test\"",
+        "tab": "html",
+        "sigs": 1,
+        "startsWithSig": true
+      }
+    ],
+    "prompts": 0
+  }
+}

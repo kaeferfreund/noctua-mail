@@ -1,0 +1,22 @@
+# CI + Dependabot for kaeferfreund/noctua-mail
+
+User request 2026-10-23 ~23:20 UTC: set up CI in the repo and Dependabot.
+Worktree ROOT/wt-ci-setup, branch chore/ci-dependabot, base integration/stage bdde6c9 (version 0.2.0-alpha.1). Rules: briefs/_rules-common.md, AGENTS.md in the worktree.
+
+## Context
+- Repo github.com/kaeferfreund/noctua-mail (public fork of paulwellnerbou/noctua-mail; no upstream PRs, fork is standalone). Default branch `main` (becomes the release branch tonight), integration branch `integration/stage`, stable branch `team-inbox`, preview branch `deploy/dev-stage`, feature branches `feat/*`, `fix/*`, `chore/*`, `perf/*`.
+- Existing `.github/workflows/`: build-and-push.yml, deploy-dev.yml, deploy-prod.yml — inherited from upstream; read them, they probably target upstream's registry/hosts and secrets. The fork deploys manually (ops/deploy-dev.sh) and will deploy production per briefs/go-live-runbook.md §3, not via Actions.
+- Toolchain: Bun 1.4.4 (`bun check` = typecheck ~0.5 s), `bun run lint` (eslint, scoped react-hooks overrides, see briefs/lint-react-hooks-cleanup.md), `bun run test:ci` (= `bun test --timeout 20000` + `bun run test:dom`, ~10 min locally; one known bimodal flake: LoginScreen DOM test; slice-3 test "absolute expiry and idle liveness" times out at the default 5 s but passes with the 20 s CI timeout), `bun run build` (generateBuildVersion + next build + bun check + standalone assembly; needs synthetic env, see go-live-runbook §3.1 block: BETTER_AUTH_URL, PASSKEY_RP_ID, IMAP_CREDENTIALS_STORAGE=db, NOCTUA_MAILBOX_WATCHER=0, NOCTUA_DATA_DIR, BETTER_AUTH_SECRET, IMAP_SECRET_KEY — synthetic values only, never real secrets), `bun run test:standalone-workers`, `bun run test:stress`. Tests use only synthetic data and loopback ports; no external mail servers. Check package.json for anything else relevant (playwright?).
+
+## Scope
+1. `.github/workflows/ci.yml`: on push to main, team-inbox, integration/stage, deploy/dev-stage and on pull_request: jobs for typecheck (`bun check`), lint, unit+DOM tests (`test:ci`), build (synthetic env). Use oven-sh/setup-bun pinned to Bun 1.4.4 (match `.bun-version`/`packageManager` if present, else pin explicitly), `bun install --frozen-lockfile`, caching of ~/.bun/install/cache, concurrency cancel-in-progress per ref, timeouts, `permissions: contents: read`. Split test jobs if that keeps wall time reasonable (unit vs DOM). Upload test logs on failure as artifacts. Keep the full matrix out (ubuntu-latest only). If a step cannot work on GitHub runners (e.g. needs sqlite CLI or sharp binaries), install what is needed in the job.
+2. `.github/dependabot.yml`: npm (bun lockfile — check whether Dependabot supports `bun` package-ecosystem on the current GitHub; if yes use it, otherwise document the limitation) weekly, grouped updates (minor+patch in one group; majors individual), target branch `integration/stage`, limit open PRs, plus github-actions ecosystem weekly.
+3. Inherited upstream workflows: do not delete; make them inert on this fork (e.g. `if: github.repository == 'paulwellnerbou/noctua-mail'` at job level or a comment + `workflow_dispatch` only) and explain in the report. If one of them is actually useful for the fork (e.g. container build without push), say so instead of changing it.
+4. Verify YAML with `bunx action-validator` or `actionlint` if available (`bunx` download is fine), otherwise careful manual check. You cannot run Actions here; keep the workflow simple enough to be right the first time. Run locally what the workflow runs: `bun check`, `bun run lint`, and the build with the synthetic env block from the runbook (`NOCTUA_DATA_DIR=<worktree>/.tmp/build-data`), to confirm the commands succeed. Do not run the full test:ci yourself (orchestrator runs it on stage); run `bun test lib/db/schema.master.test.ts` once as a smoke test.
+5. README.md: short "CI" section (badge for ci.yml on main) and a line about Dependabot.
+
+## Out of scope
+No deploy workflows for the fork, no secrets, no release automation, no code changes outside .github/ and README.md.
+
+## Deliverables
+Commits on chore/ci-dependabot (explicit paths; trailer `Co-Authored-By: Codex GPT-6.1 Sol <noreply@openai.com>`). Report briefs/ci-dependabot-report.md: files, decisions (ecosystem name, which upstream workflows neutralised and how), what the orchestrator must do after merge (e.g. enable Dependabot in repo settings, branch protection suggestions), local check results.

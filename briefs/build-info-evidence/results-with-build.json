@@ -1,0 +1,353 @@
+{
+  "de": {
+    "label": "Build 6307539 · 23.10.2026, 17:06",
+    "title": "Commit 6307539b0f0ab265fe9365e2b5672be9b475a7e9, gebaut 2026-10-23T15:06:18Z",
+    "trigger": {
+      "name": "Kalender öffnen",
+      "text": "Kalender",
+      "tabsFromProcesses": 1,
+      "focusOutline": "solid"
+    },
+    "layout": {
+      "800": {
+        "labelBox": {
+          "x": 599,
+          "y": 870.25,
+          "width": 0,
+          "height": 16.5
+        },
+        "collisions": [],
+        "overflow": 21,
+        "barHeight": 28,
+        "metrics": {
+          "bar": {
+            "y": 864,
+            "h": 28,
+            "w": 504
+          },
+          "children": [
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Prozesse\nInaktiv",
+              "x": 304,
+              "w": 96,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section",
+              "text": "E-Mail-Abruf\nInaktiv",
+              "x": 412,
+              "w": 115,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Kalender",
+              "x": 539,
+              "w": 48,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-build",
+              "text": "Build 6307539 · 23.10.2026, 17:06",
+              "x": 599,
+              "w": 0,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Fehler\nKeine",
+              "x": 611,
+              "w": 73,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+              "text": "Bevorstehend\nKeine",
+              "x": 696,
+              "w": 117,
+              "y": 870,
+              "h": 17
+            }
+          ]
+        }
+      },
+      "1024": {
+        "labelBox": {
+          "x": 599,
+          "y": 870.25,
+          "width": 115.46875,
+          "height": 16.5
+        },
+        "collisions": [],
+        "overflow": 0,
+        "barHeight": 28,
+        "metrics": {
+          "bar": {
+            "y": 864,
+            "h": 28,
+            "w": 728
+          },
+          "children": [
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Prozesse\nInaktiv",
+              "x": 304,
+              "w": 96,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section",
+              "text": "E-Mail-Abruf\nInaktiv",
+              "x": 412,
+              "w": 115,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Kalender",
+              "x": 539,
+              "w": 48,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-build",
+              "text": "Build 6307539 · 23.10.2026, 17:06",
+              "x": 599,
+              "w": 115,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Fehler\nKeine",
+              "x": 726,
+              "w": 73,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+              "text": "Bevorstehend\nKeine",
+              "x": 811,
+              "w": 189,
+              "y": 870,
+              "h": 17
+            }
+          ]
+        }
+      },
+      "1280": {
+        "labelBox": {
+          "x": 599,
+          "y": 870.25,
+          "width": 196,
+          "height": 16.5
+        },
+        "collisions": [],
+        "overflow": 0,
+        "barHeight": 28,
+        "metrics": {
+          "bar": {
+            "y": 864,
+            "h": 28,
+            "w": 984
+          },
+          "children": [
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Prozesse\nInaktiv",
+              "x": 304,
+              "w": 96,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section",
+              "text": "E-Mail-Abruf\nInaktiv",
+              "x": 412,
+              "w": 115,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Kalender",
+              "x": 539,
+              "w": 48,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-build",
+              "text": "Build 6307539 · 23.10.2026, 17:06",
+              "x": 599,
+              "w": 196,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Fehler\nKeine",
+              "x": 807,
+              "w": 73,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+              "text": "Bevorstehend\nKeine",
+              "x": 892,
+              "w": 364,
+              "y": 870,
+              "h": 17
+            }
+          ]
+        }
+      },
+      "1440": {
+        "labelBox": {
+          "x": 599,
+          "y": 870.25,
+          "width": 196,
+          "height": 16.5
+        },
+        "collisions": [],
+        "overflow": 0,
+        "barHeight": 28,
+        "metrics": {
+          "bar": {
+            "y": 864,
+            "h": 28,
+            "w": 1144
+          },
+          "children": [
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Prozesse\nInaktiv",
+              "x": 304,
+              "w": 96,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section",
+              "text": "E-Mail-Abruf\nInaktiv",
+              "x": 412,
+              "w": 115,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Kalender",
+              "x": 539,
+              "w": 48,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-build",
+              "text": "Build 6307539 · 23.10.2026, 17:06",
+              "x": 599,
+              "w": 196,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-status-trigger",
+              "text": "Fehler\nKeine",
+              "x": 807,
+              "w": 73,
+              "y": 870,
+              "h": 17
+            },
+            {
+              "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+              "text": "Bevorstehend\nKeine",
+              "x": 956,
+              "w": 460,
+              "y": 870,
+              "h": 17
+            }
+          ]
+        }
+      }
+    }
+  },
+  "en": {
+    "label": "Build 6307539 · 23/10/2026, 17:06",
+    "title": "Commit 6307539b0f0ab265fe9365e2b5672be9b475a7e9, built 2026-10-23T15:06:18Z",
+    "trigger": {
+      "name": "Open calendar",
+      "text": "Calendar",
+      "tabsFromProcesses": 1,
+      "focusOutline": "solid"
+    },
+    "metrics": {
+      "bar": {
+        "y": 864,
+        "h": 28,
+        "w": 1144
+      },
+      "children": [
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Processes\nIdle",
+          "x": 304,
+          "w": 88,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section",
+          "text": "Mail check\nIdle",
+          "x": 404,
+          "w": 88,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Calendar",
+          "x": 504,
+          "w": 48,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-build",
+          "text": "Build 6307539 · 23/10/2026, 17:06",
+          "x": 564,
+          "w": 198,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Exceptions\nNone",
+          "x": 774,
+          "w": 100,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+          "text": "Upcoming\nNone",
+          "x": 956,
+          "w": 460,
+          "y": 870,
+          "h": 17
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# app/components/MailClient.tsx
+locale-bound names (29):
+  tn  <- useTranslations() (line 392)
+  tv  <- useTranslations() (line 393)
+  tshell  <- useTranslations() (line 394)
+  ts  <- useTranslations() (line 395)
+  tl  <- useTranslations() (line 396)
+  locale  <- useLocale() (line 397)
+  refreshFolders  <- useCallback dep tn (line 532)
+  selectedSearchBadgeLabels  <- useMemo dep ts (line 1043)
+  searchFieldsCriteriaLabel  <- useMemo dep ts (line 1073)
+  searchFieldsLabel  <- expr ts (line 1078)
+  searchFieldsSummaryLabel  <- expr tv (line 1079)
+  searchBadgesLabel  <- useMemo dep ts (line 1081)
+  searchScopeSummaryLabel  <- useMemo dep tv (line 1085)
+  searchCriteriaLabel  <- useMemo dep tv (line 1097)
+  searchCriteriaBadges  <- useMemo dep tl (line 1112)
+  relatedNotice  <- useMemo dep tn (line 1132)
+  mailboxTitle  <- useMemo dep locale (line 1900)
+  handleOpenReloginFromException  <- useCallback dep tn (line 1923)
+  handleReloginSuccess  <- useCallback dep tn (line 1939)
+  handleDiscardDraft  <- useCallback dep tn (line 2545)
+  handleSendDraft  <- useCallback dep tn (line 3187)
+  performCopyToAccount  <- useCallback dep tn (line 3571)
+  addTopicToMessages  <- useCallback dep tn (line 3764)
+  selectionActions  <- useMemo dep addTopicToMessages (line 3847)
+  bulkContextMenuActions  <- useMemo dep selectionActions (line 3969)
+  headerSelectionActions  <- useMemo dep selectionActions (line 3977)
+  activeFolderName  <- expr locale (line 4075)
+  virtualFoldersForPane  <- useMemo dep tv (line 5205)
+  inboxView  <- useMemo dep tv (line 5265)
+custom hook params fed with locale-bound values:
+  useSyncController line 829: param refreshFolders <- refreshFolders
+  useAccountController line 1674: param refreshFolders <- refreshFolders
+effects with locale-bound deps:
+  useEffect line 3985: [selectionActions]
+  useEffect line 5137: [refreshFolders]
+  useEffect line 5168: [refreshFolders]

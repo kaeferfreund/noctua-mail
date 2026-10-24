@@ -1,0 +1,6 @@
+(fail) real IMAP resync replaces an unkeyed legacy row with the parsed sender key [363.20ms]
+ 0 pass
+ 1 fail
+(fail) real IMAP resync replaces an unkeyed legacy row with the parsed sender key [702.18ms]
+ 1 pass
+ 1 fail

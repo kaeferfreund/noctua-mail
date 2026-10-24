@@ -1,0 +1,358 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e8]:
+        - generic [ref=e11]: Noctua Mail
+        - generic [ref=e12]:
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - button "New mail" [ref=e15] [cursor=pointer]:
+                - img
+                - text: Compose
+              - button "Check all folders for new mail" [ref=e16] [cursor=pointer]:
+                - img
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - button "Drafts" [ref=e19] [cursor=pointer]:
+                  - img [ref=e20]
+                  - generic [ref=e23]: Drafts
+                - generic: "3"
+          - generic [ref=e24]:
+            - generic [ref=e25]: My mailboxes
+            - button "Add mailbox" [ref=e26] [cursor=pointer]:
+              - img [ref=e27]
+            - list [ref=e31]:
+              - listitem [ref=e32]:
+                - button "QS QA Shared" [ref=e33] [cursor=pointer]:
+                  - generic [ref=e35]: QS
+                  - generic [ref=e36]: QA Shared
+                - generic:
+                  - generic "109 unread":
+                    - img
+                    - text: "109"
+                  - generic "0 assigned to me":
+                    - img
+                    - text: "0"
+                  - generic "274 unassigned open":
+                    - img
+                    - text: "274"
+                  - 'img "Watcher: disabled"'
+          - generic [ref=e37]:
+            - generic [ref=e38]: Views
+            - list [ref=e40]:
+              - listitem [ref=e41]:
+                - button "Inbox" [ref=e42] [cursor=pointer]:
+                  - img [ref=e43]
+                  - generic [ref=e46]: Inbox
+                - generic "109 unread": "109"
+              - listitem [ref=e47]:
+                - button "Assigned to me" [ref=e48] [cursor=pointer]:
+                  - img [ref=e49]
+                  - generic [ref=e52]: Assigned to me
+              - listitem [ref=e53]:
+                - button "Unassigned" [ref=e54] [cursor=pointer]:
+                  - img [ref=e55]
+                  - generic [ref=e58]: Unassigned
+                - generic "274 threads": "274"
+              - listitem [ref=e59]:
+                - button "Open" [ref=e60] [cursor=pointer]:
+                  - img [ref=e61]
+                  - generic [ref=e64]: Open
+                - generic "274 threads": "274"
+              - listitem [ref=e65]:
+                - button "Focused" [ref=e66] [cursor=pointer]:
+                  - img [ref=e67]
+                  - generic [ref=e71]: Focused
+                - generic "113 unread": "Unread: 113"
+              - listitem [ref=e72]:
+                - button "Action Queue" [ref=e73] [cursor=pointer]:
+                  - img [ref=e74]
+                  - generic [ref=e77]: Action Queue
+                - generic "1 to-do": "To-Do: 1"
+              - listitem [ref=e78]:
+                - button "Invite Deck" [ref=e79] [cursor=pointer]:
+                  - img [ref=e80]
+                  - generic [ref=e84]: Invite Deck
+                - generic "1 unread": "1"
+          - generic "Folders" [ref=e85]:
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]: Folders
+                - generic [ref=e89]: 8 total
+              - button "Folder actions" [ref=e91] [cursor=pointer]:
+                - img [ref=e92]
+            - searchbox "Search folders" [ref=e98]
+            - generic [ref=e99]:
+              - button "INBOX 109 unread Folder actions" [ref=e101] [cursor=pointer]:
+                - img [ref=e104]
+                - generic [ref=e108]: INBOX
+                - generic "109 unread" [ref=e109]: "109"
+                - button "Folder actions" [ref=e111]:
+                  - img [ref=e112]
+              - button "Sent" [ref=e117] [cursor=pointer]:
+                - img [ref=e120]
+                - generic [ref=e124]: Sent
+              - button "Drafts 3 unread" [ref=e126] [cursor=pointer]:
+                - img [ref=e129]
+                - generic [ref=e133]: Drafts
+                - generic "3 unread" [ref=e134]: "3"
+              - button "Archive 1 unread" [ref=e136] [cursor=pointer]:
+                - img [ref=e139]
+                - generic [ref=e143]: Archive
+                - generic "1 unread" [ref=e144]: "1"
+              - button "Junk" [ref=e146] [cursor=pointer]:
+                - img [ref=e149]
+                - generic [ref=e154]: Junk
+              - button "Trash" [ref=e156] [cursor=pointer]:
+                - img [ref=e159]
+                - generic [ref=e163]: Trash
+              - generic [ref=e164]:
+                - button "Projekte" [ref=e165] [cursor=pointer]:
+                  - img [ref=e167]
+                  - img [ref=e170]
+                  - generic [ref=e173]: Projekte
+                - button "Website" [ref=e176] [cursor=pointer]:
+                  - img [ref=e179]
+                  - generic [ref=e182]: Website
+        - list [ref=e184]:
+          - listitem [ref=e185]:
+            - button "User menu" [ref=e186] [cursor=pointer]:
+              - generic [ref=e188]: SA
+              - generic [ref=e189]:
+                - generic [ref=e190]: Synthetic Alex
+                - generic [ref=e191]: alex@example.test
+              - img [ref=e192]
+      - generic [ref=e196]:
+        - generic [ref=e197]:
+          - button "Toggle sidebar" [ref=e198] [cursor=pointer]:
+            - img
+            - generic [ref=e199]: Toggle Sidebar
+          - heading "QA Shared / INBOX" [level=1] [ref=e200]
+          - generic [ref=e201]:
+            - generic [ref=e203]:
+              - generic [ref=e204]:
+                - img
+                - textbox "Search messages in INBOX" [ref=e205]
+              - button "Search filters" [ref=e206] [cursor=pointer]:
+                - img
+                - generic [ref=e207]: Filters
+            - button "Check for new mail" [ref=e208] [cursor=pointer]:
+              - img
+            - button "Theme" [ref=e210] [cursor=pointer]:
+              - generic [ref=e211]:
+                - img
+        - generic [ref=e215]:
+          - group "Message reading controls" [ref=e216]:
+            - generic [ref=e217]:
+              - button "Back to messages" [active] [ref=e218]:
+                - img [ref=e219]
+              - generic [ref=e221]:
+                - button "Archive" [ref=e222]:
+                  - img [ref=e223]
+                - button "Mark as Spam" [ref=e226]:
+                  - img [ref=e227]
+                - button "Delete" [ref=e229]:
+                  - img [ref=e230]
+                - button "Move to" [ref=e233]:
+                  - img [ref=e234]
+                - button "Topics" [ref=e237]:
+                  - img [ref=e238]
+                - button "Mark as Done" [ref=e242]:
+                  - img [ref=e243]
+                - button "Message actions" [ref=e246]:
+                  - img [ref=e247]
+              - generic [ref=e251]:
+                - button "Open in new window" [ref=e252]:
+                  - img [ref=e253]
+                - button "Print message" [ref=e257]:
+                  - img [ref=e258]
+                - generic "Message 1 of 265 visible rows" [ref=e262]: 1 / 265
+                - generic [ref=e263]: Message 1 of 265 visible rows
+                - button "Previous message" [disabled] [ref=e264]:
+                  - img [ref=e265]
+                - button "Next message" [ref=e267]:
+                  - img [ref=e268]
+              - button "Show message list" [ref=e270]:
+                - img [ref=e271]
+                - generic [ref=e276]: Show message list
+          - generic [ref=e278]:
+            - generic [ref=e279]:
+              - generic "Kontrolltermin für Familie Beispiel" [ref=e281]
+              - generic [ref=e282]: QA Shared
+              - radiogroup [ref=e283]:
+                - radio "Compact" [checked] [ref=e284]:
+                  - generic [ref=e286]:
+                    - generic [ref=e287]: Compact
+                    - generic [ref=e288]: Compact
+                - radio "Full" [ref=e289]:
+                  - generic [ref=e291]:
+                    - generic [ref=e292]: Full
+                    - generic [ref=e293]: Full
+            - generic "Thread collaboration" [ref=e294]:
+              - generic [ref=e295]:
+                - combobox "Assignee" [ref=e296] [cursor=pointer]:
+                  - generic [ref=e297]: Unassigned
+                  - img
+                - combobox "Thread status" [ref=e298] [cursor=pointer]:
+                  - generic: Open
+                  - img
+                - button "0 internal notes" [ref=e299] [cursor=pointer]: 0 notes
+                - button "Internal note" [ref=e300] [cursor=pointer]
+          - generic [ref=e302]:
+            - article [ref=e304]:
+              - generic [ref=e306]:
+                - generic [ref=e307]:
+                  - generic [ref=e308]:
+                    - button "Collapse message" [expanded] [ref=e309] [cursor=pointer]:
+                      - img [ref=e311]
+                    - generic [ref=e313]:
+                      - button "Unflag message" [ref=e314] [cursor=pointer]:
+                        - img [ref=e315]
+                        - text: Flagged
+                      - button "Mark as Done" [ref=e317] [cursor=pointer]:
+                        - img [ref=e318]
+                        - text: To-Do
+                      - button "Archive" [ref=e321] [cursor=pointer]:
+                        - img [ref=e322]
+                  - generic [ref=e325]:
+                    - generic [ref=e326]:
+                      - button "Reply" [ref=e327]:
+                        - img [ref=e328]
+                      - button "Reply all" [ref=e331]:
+                        - img [ref=e332]
+                      - button "Forward" [ref=e336]:
+                        - img [ref=e337]
+                      - button "Find related" [ref=e340]:
+                        - img [ref=e341]
+                      - button "Delete" [ref=e344]:
+                        - img [ref=e345]
+                    - button "Display options" [ref=e349]:
+                      - img [ref=e350]
+                    - button "Message actions" [ref=e353]:
+                      - img [ref=e354]
+                - generic [ref=e358]:
+                  - generic [ref=e359]:
+                    - generic [ref=e360]:
+                      - generic [ref=e362]: MB
+                      - generic [ref=e363]:
+                        - generic [ref=e364]: "From:"
+                        - generic [ref=e365]:
+                          - button "Address actions for Mira Beispiel <mira.beispiel@example.test>" [ref=e367] [cursor=pointer]:
+                            - generic [ref=e368]: Mira Beispiel
+                            - generic [ref=e369]: <mira.beispiel@example.test>
+                          - button "Copy addresses" [ref=e370]:
+                            - generic [ref=e371]:
+                              - img [ref=e372]
+                              - img [ref=e375]
+                    - generic [ref=e377]:
+                      - generic [ref=e378]: "Date:"
+                      - generic "23/10/2026, 11:02:12" [ref=e379]: 23/10/2026, 11:02
+                  - generic [ref=e380]:
+                    - generic [ref=e381]: "To:"
+                    - generic [ref=e383]:
+                      - button "Address actions for MonkeyDent Team <demo@monkeydent.test>" [ref=e384] [cursor=pointer]:
+                        - generic [ref=e385]: MonkeyDent Team
+                        - generic [ref=e386]: <demo@monkeydent.test>
+                      - button "Copy addresses" [ref=e387]:
+                        - generic [ref=e388]:
+                          - img [ref=e389]
+                          - img [ref=e392]
+                - generic [ref=e400]:
+                  - generic [ref=e401]: Guten Tag MonkeyDent,
+                  - generic [ref=e403]: Wir möchten Kontrolltermine für zwei Personen vereinbaren. Passt Dienstag um 10 Uhr?
+                  - generic [ref=e405]: Viele Grüße
+                  - generic [ref=e406]: Mira Beispiel
+                  - generic [ref=e407]: "[Synthetische Demo-Nachricht]"
+            - button "Mira Beispiel mira.beispiel@example.test INBOX 23/10/2026, 11:13 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut" [ref=e409] [cursor=pointer]:
+              - img [ref=e411]
+              - generic [ref=e413]:
+                - generic [ref=e414]:
+                  - generic "Mira Beispiel <mira.beispiel@example.test>" [ref=e415]:
+                    - generic [ref=e417]: MB
+                    - generic [ref=e418]: Mira Beispiel
+                    - generic [ref=e419]: mira.beispiel@example.test
+                  - button "INBOX" [ref=e422]:
+                    - img [ref=e423]
+                  - generic "23/10/2026, 11:13:40" [ref=e426]: 23/10/2026, 11:13
+                  - button "Message actions" [ref=e428]:
+                    - img [ref=e429]
+                - generic [ref=e434]: Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut
+            - button "Mira Beispiel mira.beispiel@example.test INBOX 23/10/2026, 11:24 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut" [ref=e436] [cursor=pointer]:
+              - img [ref=e438]
+              - generic [ref=e440]:
+                - generic [ref=e441]:
+                  - generic "Mira Beispiel <mira.beispiel@example.test>" [ref=e442]:
+                    - generic [ref=e444]: MB
+                    - generic [ref=e445]: Mira Beispiel
+                    - generic [ref=e446]: mira.beispiel@example.test
+                  - button "INBOX" [ref=e449]:
+                    - img [ref=e450]
+                  - generic "23/10/2026, 11:24:06" [ref=e453]: 23/10/2026, 11:24
+                  - button "Message actions" [ref=e455]:
+                    - img [ref=e456]
+                - generic [ref=e461]: Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut
+            - button "Mira Beispiel mira.beispiel@example.test INBOX 23/10/2026, 11:30 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut" [ref=e463] [cursor=pointer]:
+              - img [ref=e465]
+              - generic [ref=e467]:
+                - generic [ref=e468]:
+                  - generic "Mira Beispiel <mira.beispiel@example.test>" [ref=e469]:
+                    - generic [ref=e471]: MB
+                    - generic [ref=e472]: Mira Beispiel
+                    - generic [ref=e473]: mira.beispiel@example.test
+                  - button "INBOX" [ref=e476]:
+                    - img [ref=e477]
+                  - generic "23/10/2026, 11:30:07" [ref=e480]: 23/10/2026, 11:30
+                  - button "Message actions" [ref=e482]:
+                    - img [ref=e483]
+                - generic [ref=e488]: Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut
+            - button "Mira Beispiel mira.beispiel@example.test INBOX 23/10/2026, 11:43 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut" [ref=e490] [cursor=pointer]:
+              - img [ref=e492]
+              - generic [ref=e494]:
+                - generic [ref=e495]:
+                  - generic "Mira Beispiel <mira.beispiel@example.test>" [ref=e496]:
+                    - generic [ref=e498]: MB
+                    - generic [ref=e499]: Mira Beispiel
+                    - generic [ref=e500]: mira.beispiel@example.test
+                  - button "INBOX" [ref=e503]:
+                    - img [ref=e504]
+                  - generic "23/10/2026, 11:43:06" [ref=e507]: 23/10/2026, 11:43
+                  - button "Message actions" [ref=e509]:
+                    - img [ref=e510]
+                - generic [ref=e515]: Guten Tag, vielen Dank für die Rückmeldung zu „Kontrolltermin für Familie Beispiel“. Der vorgeschlagene Ablauf passt gut
+            - button "Recipients Mira Beispiel Sent 23/10/2026, 11:50 Message actions Hallo, Alex Beispiel hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert. Beste Grüße Alex Beisp" [ref=e517] [cursor=pointer]:
+              - img [ref=e519]
+              - generic [ref=e521]:
+                - generic [ref=e522]:
+                  - generic "Mira Beispiel <mira.beispiel@example.test>" [ref=e523]:
+                    - generic "Recipients" [ref=e524]:
+                      - img [ref=e525]
+                    - generic [ref=e527]: Mira Beispiel
+                  - button "Sent" [ref=e530]:
+                    - img [ref=e531]
+                  - generic "23/10/2026, 11:50:00" [ref=e534]: 23/10/2026, 11:50
+                  - button "Message actions" [ref=e536]:
+                    - img [ref=e537]
+                - generic [ref=e542]: Hallo, Alex Beispiel hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert. Beste Grüße Alex Beisp
+            - region "Internal notes and activity" [ref=e543]:
+              - heading "Notes & activity" [level=3] [ref=e544]
+              - paragraph [ref=e545]: No activity yet.
+              - list
+        - generic [ref=e546]:
+          - button "Processes Idle" [ref=e547] [cursor=pointer]:
+            - generic [ref=e548]: Processes
+            - generic "Idle" [ref=e549]
+          - generic [ref=e550]:
+            - generic [ref=e551]: Mail check
+            - generic "Idle" [ref=e552]
+          - button "Open calendar" [ref=e553] [cursor=pointer]: 23 Oct 2026, 11:11
+          - button "Exceptions None" [ref=e554] [cursor=pointer]:
+            - generic [ref=e555]: Exceptions
+            - generic "None" [ref=e556]
+          - button "Upcoming None" [ref=e557] [cursor=pointer]:
+            - generic [ref=e558]: Upcoming
+            - generic "None" [ref=e559]
+  - alert [ref=e560]
+```

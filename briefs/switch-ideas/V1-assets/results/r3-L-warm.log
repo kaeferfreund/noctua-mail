@@ -1,0 +1,264 @@
+r3-L-warm warm-first small->folders #0: highlight 121 folders 121 firstRows 370.8 settled 1164.3 reqs 30 lt 10/830
+r3-L-warm warm folders->small #1: highlight 60.4 folders 60.4 firstRows 192.4 settled 437.3 reqs 22 lt 1/93
+r3-L-warm warm small->folders #2: highlight 78.9 folders 78.9 firstRows 311 settled 607 reqs 14 lt 5/419
+r3-L-warm warm folders->small #3: highlight 144.9 folders 144.9 firstRows 276.5 settled 600.1 reqs 14 lt 3/230
+r3-L-warm warm small->folders #4: highlight 126.9 folders 126.9 firstRows 438 settled 791.8 reqs 14 lt 5/492
+r3-L-warm warm folders->small #5: highlight 102.9 folders 102.9 firstRows 249.7 settled 655.9 reqs 14 lt 4/278
+r3-L-warm warm small->folders #6: highlight 84.2 folders 84.2 firstRows 311.4 settled 594 reqs 14 lt 5/396
+r3-L-warm warm folders->small #7: highlight 101.7 folders 101.7 firstRows 273.2 settled 522.4 reqs 14 lt 2/147
+r3-L-warm warm small->folders #8: highlight 89.8 folders 89.8 firstRows 308.2 settled 588.5 reqs 14 lt 5/392
+r3-L-warm warm folders->small #9: highlight 161.5 folders 161.5 firstRows 382.2 settled 1154.3 reqs 22 lt 5/540
+r3-L-warm warm small->folders #10: highlight 225.1 folders 225.1 firstRows 686.1 settled 1108.5 reqs 14 lt 6/796
+r3-L-warm warm folders->small #11: highlight 393.4 folders 393.4 firstRows 962.1 settled 1407.4 reqs 14 lt 7/889
+r3-L-warm warm small->folders #12: highlight 117.6 folders 117.6 firstRows 333.3 settled 721.9 reqs 14 lt 7/519
+r3-L-warm warm folders->small #13: highlight 83.4 folders 83.4 firstRows 230.6 settled 376.3 reqs 14 lt 1/75
+r3-L-warm warm small->folders #14: highlight 69.2 folders 69.2 firstRows 300.8 settled 570.4 reqs 14 lt 5/384
+r3-L-warm warm folders->small #15: highlight 53 folders 53 firstRows 165.1 settled 331.1 reqs 14 lt 1/75
+r3-L-warm warm small->folders #16: highlight 68.9 folders 68.9 firstRows 281.4 settled 486.7 reqs 14 lt 4/316
+r3-L-warm warm folders->small #17: highlight 53.4 folders 53.4 firstRows 162.7 settled 305.7 reqs 14 lt 1/73
+r3-L-warm warm small->folders #18: highlight 68.2 folders 68.2 firstRows 293.9 settled 661 reqs 14 lt 5/429
+r3-L-warm warm folders->small #19: highlight 52.4 folders 52.4 firstRows 162.4 settled 332.5 reqs 22 lt 1/72
+r3-L-warm warm small->folders #20: highlight 74.9 folders 74.9 firstRows 307.9 settled 577.6 reqs 14 lt 5/388
+r3-L-warm warm-first large->folders #0: highlight 207.2 folders 207.2 firstRows 479.4 settled 1375.4 reqs 31 lt 11/993
+r3-L-warm warm folders->large #1: highlight 58.3 folders 58.3 firstRows 400.9 settled 752.3 reqs 14 lt 4/532
+r3-L-warm warm large->folders #2: highlight 77.4 folders 77.4 firstRows 320.2 settled 608 reqs 14 lt 5/411
+r3-L-warm warm folders->large #3: highlight 56.6 folders 56.6 firstRows 396.1 settled 734.3 reqs 14 lt 4/506
+r3-L-warm warm large->folders #4: highlight 77.3 folders 77.3 firstRows 324.5 settled 567.8 reqs 14 lt 4/351
+r3-L-warm warm folders->large #5: highlight 58 folders 58 firstRows 399.1 settled 772.8 reqs 22 lt 4/501
+r3-L-warm warm large->folders #6: highlight 76.9 folders 76.9 firstRows 312.6 settled 602.2 reqs 14 lt 5/410
+r3-L-warm warm folders->large #7: highlight 78.4 folders 78.4 firstRows 516 settled 902.3 reqs 14 lt 5/642
+r3-L-warm warm large->folders #8: highlight 135 folders 135 firstRows 392.8 settled 634.6 reqs 14 lt 4/368
+r3-L-warm warm folders->large #9: highlight 85.8 folders 85.8 firstRows 505.1 settled 848.8 reqs 14 lt 5/630
+r3-L-warm warm large->folders #10: highlight 70.8 folders 70.8 firstRows 296.6 settled 576.9 reqs 14 lt 5/389
+r3-L-warm warm folders->large #11: highlight 97.4 folders 97.4 firstRows 508.2 settled 1113.8 reqs 14 lt 6/855
+r3-L-warm warm large->folders #12: highlight 269.5 folders 269.5 firstRows 537.8 settled 790.2 reqs 22 lt 4/496
+r3-L-warm warm folders->large #13: highlight 149.9 folders 149.9 firstRows 635.2 settled 1108.5 reqs 14 lt 5/799
+r3-L-warm warm large->folders #14: highlight 94.4 folders 94.4 firstRows 329.6 settled 596.8 reqs 14 lt 5/393
+r3-L-warm warm folders->large #15: highlight 145.4 folders 145.4 firstRows 959.7 settled 1662.3 reqs 14 lt 6/1253
+r3-L-warm warm large->folders #16: highlight 1300.4 folders 1300.4 firstRows 1524.5 settled 1721 reqs 14 lt 4/319
+r3-L-warm warm folders->large #17: highlight 58 folders 58 firstRows 383.3 settled 704.9 reqs 14 lt 4/487
+r3-L-warm warm large->folders #18: highlight 67.3 folders 67.3 firstRows 294.2 settled 576.9 reqs 14 lt 5/390
+r3-L-warm warm folders->large #19: highlight 55.1 folders 55.1 firstRows 401.6 settled 863.6 reqs 14 lt 4/626
+r3-L-warm warm large->folders #20: highlight 74.2 folders 74.2 firstRows 296 settled 643.7 reqs 22 lt 5/411
+r3-L-warm warm-first small->large #0: highlight 102.2 folders 102.2 firstRows 468.7 settled 1509.2 reqs 30 lt 9/1105
+r3-L-warm warm large->small #1: highlight 54 folders 54 firstRows 227.3 settled 525.2 reqs 22 lt 1/78
+r3-L-warm warm small->large #2: highlight 71 folders 71 firstRows 424 settled 856.8 reqs 14 lt 4/538
+r3-L-warm warm large->small #3: highlight 53.8 folders 53.8 firstRows 172.2 settled 341.3 reqs 14 lt 1/80
+r3-L-warm warm small->large #4: highlight 52.6 folders 52.6 firstRows 376.9 settled 819.9 reqs 14 lt 5/605
+r3-L-warm warm large->small #5: highlight 51.4 folders 51.4 firstRows 170.4 settled 331.9 reqs 14 lt 1/81
+r3-L-warm warm small->large #6: highlight 53.2 folders 53.2 firstRows 379.3 settled 817 reqs 14 lt 5/600
+r3-L-warm warm large->small #7: highlight 80.8 folders 80.8 firstRows 196.9 settled 357.5 reqs 22 lt 1/78
+r3-L-warm warm small->large #8: highlight 54.1 folders 54.1 firstRows 382.8 settled 817 reqs 14 lt 5/603
+r3-L-warm warm large->small #9: highlight 57.7 folders 57.7 firstRows 169 settled 310.3 reqs 14 lt 1/74
+r3-L-warm warm small->large #10: highlight 51.1 folders 51.1 firstRows 370.8 settled 787.1 reqs 14 lt 5/578
+r3-L-warm warm large->small #11: highlight 52.5 folders 52.5 firstRows 166.7 settled 332.8 reqs 14 lt 1/77
+r3-L-warm warm small->large #12: highlight 56.5 folders 56.5 firstRows 373.7 settled 718.8 reqs 14 lt 4/502
+r3-L-warm warm large->small #13: highlight 58 folders 58 firstRows 172.8 settled 338.6 reqs 14 lt 1/75
+r3-L-warm warm small->large #14: highlight 55.5 folders 55.5 firstRows 384.5 settled 850.2 reqs 14 lt 5/625
+r3-L-warm warm large->small #15: highlight 56.2 folders 56.2 firstRows 159.6 settled 409.5 reqs 22 lt 1/77
+r3-L-warm warm small->large #16: highlight 54 folders 54 firstRows 387.2 settled 726.3 reqs 14 lt 4/504
+r3-L-warm warm large->small #17: highlight 51.9 folders 51.9 firstRows 162.8 settled 336.5 reqs 14 lt 1/75
+r3-L-warm warm small->large #18: highlight 55.3 folders 55.3 firstRows 391.6 settled 784.4 reqs 14 lt 4/491
+r3-L-warm warm large->small #19: highlight 50.5 folders 50.5 firstRows 165.8 settled 276.8 reqs 14 lt 1/78
+r3-L-warm warm small->large #20: highlight 51.8 folders 51.8 firstRows 364 settled 688.1 reqs 14 lt 4/481
+{
+ "warm-first:small->folders": {
+  "n": 1,
+  "highlight": {
+   "p50": 121,
+   "p90": 121
+  },
+  "folders": {
+   "p50": 121,
+   "p90": 121
+  },
+  "firstRows": {
+   "p50": 370.8,
+   "p90": 370.8
+  },
+  "settled": {
+   "p50": 1164.3,
+   "p90": 1164.3
+  },
+  "requests": 30,
+  "longTaskMs": 830,
+  "timeouts": 0
+ },
+ "warm:folders->small": {
+  "n": 10,
+  "highlight": {
+   "p50": 92.55000000000001,
+   "p90": 161.5
+  },
+  "folders": {
+   "p50": 92.55000000000001,
+   "p90": 161.5
+  },
+  "firstRows": {
+   "p50": 240.14999999999998,
+   "p90": 382.2
+  },
+  "settled": {
+   "p50": 479.85,
+   "p90": 1154.3
+  },
+  "requests": 14,
+  "longTaskMs": 120,
+  "timeouts": 0
+ },
+ "warm:small->folders": {
+  "n": 10,
+  "highlight": {
+   "p50": 81.55000000000001,
+   "p90": 126.9
+  },
+  "folders": {
+   "p50": 81.55000000000001,
+   "p90": 126.9
+  },
+  "firstRows": {
+   "p50": 309.6,
+   "p90": 438
+  },
+  "settled": {
+   "p50": 600.5,
+   "p90": 791.8
+  },
+  "requests": 14,
+  "longTaskMs": 407.5,
+  "timeouts": 0
+ },
+ "warm-first:large->folders": {
+  "n": 1,
+  "highlight": {
+   "p50": 207.2,
+   "p90": 207.2
+  },
+  "folders": {
+   "p50": 207.2,
+   "p90": 207.2
+  },
+  "firstRows": {
+   "p50": 479.4,
+   "p90": 479.4
+  },
+  "settled": {
+   "p50": 1375.4,
+   "p90": 1375.4
+  },
+  "requests": 31,
+  "longTaskMs": 993,
+  "timeouts": 0
+ },
+ "warm:folders->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 68.35,
+   "p90": 145.4
+  },
+  "folders": {
+   "p50": 68.35,
+   "p90": 145.4
+  },
+  "firstRows": {
+   "p50": 453.35,
+   "p90": 635.2
+  },
+  "settled": {
+   "p50": 856.2,
+   "p90": 1113.8
+  },
+  "requests": 14,
+  "longTaskMs": 628,
+  "timeouts": 0
+ },
+ "warm:large->folders": {
+  "n": 10,
+  "highlight": {
+   "p50": 77.35,
+   "p90": 269.5
+  },
+  "folders": {
+   "p50": 77.35,
+   "p90": 269.5
+  },
+  "firstRows": {
+   "p50": 322.35,
+   "p90": 537.8
+  },
+  "settled": {
+   "p50": 605.1,
+   "p90": 790.2
+  },
+  "requests": 14,
+  "longTaskMs": 391.5,
+  "timeouts": 0
+ },
+ "warm-first:small->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 102.2,
+   "p90": 102.2
+  },
+  "folders": {
+   "p50": 102.2,
+   "p90": 102.2
+  },
+  "firstRows": {
+   "p50": 468.7,
+   "p90": 468.7
+  },
+  "settled": {
+   "p50": 1509.2,
+   "p90": 1509.2
+  },
+  "requests": 30,
+  "longTaskMs": 1105,
+  "timeouts": 0
+ },
+ "warm:large->small": {
+  "n": 10,
+  "highlight": {
+   "p50": 53.9,
+   "p90": 58
+  },
+  "folders": {
+   "p50": 53.9,
+   "p90": 58
+  },
+  "firstRows": {
+   "p50": 169.7,
+   "p90": 196.9
+  },
+  "settled": {
+   "p50": 337.55,
+   "p90": 409.5
+  },
+  "requests": 14,
+  "longTaskMs": 77.5,
+  "timeouts": 0
+ },
+ "warm:small->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 54.05,
+   "p90": 56.5
+  },
+  "folders": {
+   "p50": 54.05,
+   "p90": 56.5
+  },
+  "firstRows": {
+   "p50": 381.05,
+   "p90": 391.6
+  },
+  "settled": {
+   "p50": 802.05,
+   "p90": 850.2
+  },
+  "requests": 14,
+  "longTaskMs": 558,
+  "timeouts": 0
+ }
+}
+wrote ../results/r3-L-warm.json

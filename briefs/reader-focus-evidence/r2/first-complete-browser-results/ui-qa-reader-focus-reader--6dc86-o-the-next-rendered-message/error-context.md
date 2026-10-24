@@ -1,0 +1,350 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e8]:
+        - generic [ref=e11]: Noctua Mail
+        - generic [ref=e12]:
+          - generic [ref=e13]:
+            - generic [ref=e14]:
+              - button "New mail" [ref=e15] [cursor=pointer]:
+                - img
+                - text: Compose
+              - button "Check all folders for new mail" [ref=e16] [cursor=pointer]:
+                - img
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - button "Drafts" [ref=e19] [cursor=pointer]:
+                  - img [ref=e20]
+                  - generic [ref=e23]: Drafts
+                - generic: "3"
+          - generic [ref=e24]:
+            - generic [ref=e25]: My mailboxes
+            - button "Add mailbox" [ref=e26] [cursor=pointer]:
+              - img [ref=e27]
+            - list [ref=e31]:
+              - listitem [ref=e32]:
+                - button "QS QA Shared" [ref=e33] [cursor=pointer]:
+                  - generic [ref=e35]: QS
+                  - generic [ref=e36]: QA Shared
+                - generic:
+                  - generic "110 unread":
+                    - img
+                    - text: "110"
+                  - generic "0 assigned to me":
+                    - img
+                    - text: "0"
+                  - generic "274 unassigned open":
+                    - img
+                    - text: "274"
+                  - 'img "Watcher: disabled"'
+          - generic [ref=e37]:
+            - generic [ref=e38]: Views
+            - list [ref=e40]:
+              - listitem [ref=e41]:
+                - button "Inbox" [ref=e42] [cursor=pointer]:
+                  - img [ref=e43]
+                  - generic [ref=e46]: Inbox
+                - generic "110 unread": "110"
+              - listitem [ref=e47]:
+                - button "Assigned to me" [ref=e48] [cursor=pointer]:
+                  - img [ref=e49]
+                  - generic [ref=e52]: Assigned to me
+              - listitem [ref=e53]:
+                - button "Unassigned" [ref=e54] [cursor=pointer]:
+                  - img [ref=e55]
+                  - generic [ref=e58]: Unassigned
+                - generic "274 threads": "274"
+              - listitem [ref=e59]:
+                - button "Open" [ref=e60] [cursor=pointer]:
+                  - img [ref=e61]
+                  - generic [ref=e64]: Open
+                - generic "274 threads": "274"
+              - listitem [ref=e65]:
+                - button "Focused" [ref=e66] [cursor=pointer]:
+                  - img [ref=e67]
+                  - generic [ref=e71]: Focused
+                - generic "113 unread": "Unread: 113"
+              - listitem [ref=e72]:
+                - button "Action Queue" [ref=e73] [cursor=pointer]:
+                  - img [ref=e74]
+                  - generic [ref=e77]: Action Queue
+                - generic "1 to-do": "To-Do: 1"
+              - listitem [ref=e78]:
+                - button "Invite Deck" [ref=e79] [cursor=pointer]:
+                  - img [ref=e80]
+                  - generic [ref=e84]: Invite Deck
+                - generic "1 unread": "1"
+          - generic "Folders" [ref=e85]:
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]: Folders
+                - generic [ref=e89]: 8 total
+              - button "Folder actions" [ref=e91] [cursor=pointer]:
+                - img [ref=e92]
+            - searchbox "Search folders" [ref=e98]
+            - generic [ref=e99]:
+              - button "INBOX 110 unread Folder actions" [ref=e101] [cursor=pointer]:
+                - img [ref=e104]
+                - generic [ref=e108]: INBOX
+                - generic "110 unread" [ref=e109]: "110"
+                - button "Folder actions" [ref=e111]:
+                  - img [ref=e112]
+              - button "Sent" [ref=e117] [cursor=pointer]:
+                - img [ref=e120]
+                - generic [ref=e124]: Sent
+              - button "Drafts 3 unread" [ref=e126] [cursor=pointer]:
+                - img [ref=e129]
+                - generic [ref=e133]: Drafts
+                - generic "3 unread" [ref=e134]: "3"
+              - button "Archive" [ref=e136] [cursor=pointer]:
+                - img [ref=e139]
+                - generic [ref=e143]: Archive
+              - button "Junk" [ref=e145] [cursor=pointer]:
+                - img [ref=e148]
+                - generic [ref=e153]: Junk
+              - button "Trash" [ref=e155] [cursor=pointer]:
+                - img [ref=e158]
+                - generic [ref=e162]: Trash
+              - generic [ref=e163]:
+                - button "Projekte" [ref=e164] [cursor=pointer]:
+                  - img [ref=e166]
+                  - img [ref=e169]
+                  - generic [ref=e172]: Projekte
+                - button "Website" [ref=e175] [cursor=pointer]:
+                  - img [ref=e178]
+                  - generic [ref=e181]: Website
+        - list [ref=e183]:
+          - listitem [ref=e184]:
+            - button "User menu" [ref=e185] [cursor=pointer]:
+              - generic [ref=e187]: SA
+              - generic [ref=e188]:
+                - generic [ref=e189]: Synthetic Alex
+                - generic [ref=e190]: alex@example.test
+              - img [ref=e191]
+      - generic [ref=e195]:
+        - generic [ref=e196]:
+          - button "Toggle sidebar" [ref=e197] [cursor=pointer]:
+            - img
+            - generic [ref=e198]: Toggle Sidebar
+          - heading "QA Shared / INBOX" [level=1] [ref=e199]
+          - generic [ref=e200]:
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - img
+                - textbox "Search messages in INBOX" [ref=e204]
+              - button "Search filters" [ref=e205] [cursor=pointer]:
+                - img
+                - generic [ref=e206]: Filters
+            - button "Check for new mail" [ref=e207] [cursor=pointer]:
+              - img
+            - button "Theme" [ref=e209] [cursor=pointer]:
+              - generic [ref=e210]:
+                - img
+        - generic [ref=e214]:
+          - group "Message reading controls" [ref=e215]:
+            - generic [ref=e216]:
+              - button "Back to messages" [ref=e217]:
+                - img [ref=e218]
+              - generic [ref=e220]:
+                - button "Archive" [active] [ref=e221]:
+                  - img [ref=e222]
+                - button "Mark as Spam" [ref=e225]:
+                  - img [ref=e226]
+                - button "Delete" [ref=e228]:
+                  - img [ref=e229]
+                - button "Move to" [ref=e232]:
+                  - img [ref=e233]
+                - button "Topics" [ref=e236]:
+                  - img [ref=e237]
+                - button "Mark as Done" [ref=e241]:
+                  - img [ref=e242]
+                - button "Message actions" [ref=e245]:
+                  - img [ref=e246]
+              - generic [ref=e250]:
+                - button "Open in new window" [ref=e251]:
+                  - img [ref=e252]
+                - button "Print message" [ref=e256]:
+                  - img [ref=e257]
+                - generic "Message 0 of 265 visible rows" [ref=e261]: 0 / 265
+                - generic [ref=e262]: Message 0 of 265 visible rows
+                - button "Previous message" [disabled] [ref=e263]:
+                  - img [ref=e264]
+                - button "Next message" [disabled] [ref=e266]:
+                  - img [ref=e267]
+              - button "Show message list" [ref=e269]:
+                - img [ref=e270]
+                - generic [ref=e275]: Show message list
+          - generic [ref=e277]:
+            - generic [ref=e278]:
+              - generic "Praxispost im Oktober" [ref=e280]
+              - generic [ref=e281]: QA Shared
+              - radiogroup [ref=e282]:
+                - radio "Compact" [checked] [ref=e283]:
+                  - generic [ref=e285]:
+                    - generic [ref=e286]: Compact
+                    - generic [ref=e287]: Compact
+                - radio "Full" [ref=e288]:
+                  - generic [ref=e290]:
+                    - generic [ref=e291]: Full
+                    - generic [ref=e292]: Full
+            - generic "Thread collaboration" [ref=e293]:
+              - generic [ref=e294]:
+                - combobox "Assignee" [ref=e295] [cursor=pointer]:
+                  - generic [ref=e296]: Unassigned
+                  - img
+                - combobox "Thread status" [ref=e297] [cursor=pointer]:
+                  - generic: Open
+                  - img
+                - button "0 internal notes" [ref=e298] [cursor=pointer]: 0 notes
+                - button "Internal note" [ref=e299] [cursor=pointer]
+          - generic [ref=e301]:
+            - article [ref=e303]:
+              - generic [ref=e305]:
+                - generic [ref=e306]:
+                  - generic [ref=e307]:
+                    - button "Collapse message" [expanded] [ref=e308] [cursor=pointer]:
+                      - img [ref=e310]
+                    - generic [ref=e312]:
+                      - generic "Seen" [ref=e313]
+                      - generic "Newsletter" [ref=e314]: 📰 Newsletter
+                      - button "Archive" [ref=e316] [cursor=pointer]:
+                        - img [ref=e317]
+                      - generic "Inline images" [ref=e320]:
+                        - img [ref=e321]
+                  - generic [ref=e325]:
+                    - generic [ref=e326]:
+                      - button "Reply" [ref=e327]:
+                        - img [ref=e328]
+                      - button "Reply all" [ref=e331]:
+                        - img [ref=e332]
+                      - button "Forward" [ref=e336]:
+                        - img [ref=e337]
+                      - button "Find related" [ref=e340]:
+                        - img [ref=e341]
+                      - button "Delete" [ref=e344]:
+                        - img [ref=e345]
+                    - button "Display options" [ref=e349]:
+                      - img [ref=e350]
+                    - button "Message actions" [ref=e353]:
+                      - img [ref=e354]
+                - generic [ref=e358]:
+                  - generic [ref=e359]:
+                    - generic [ref=e360]:
+                      - generic [ref=e362]: PM
+                      - generic [ref=e363]:
+                        - generic [ref=e364]: "From:"
+                        - generic [ref=e365]:
+                          - button "Address actions for Praxispost Musterblatt <redaktion@praxispost.example.test>" [ref=e367] [cursor=pointer]:
+                            - generic [ref=e368]: Praxispost Musterblatt
+                            - generic [ref=e369]: <redaktion@praxispost.example.test>
+                          - button "Copy addresses" [ref=e370]:
+                            - generic [ref=e371]:
+                              - img [ref=e372]
+                              - img [ref=e375]
+                    - generic [ref=e377]:
+                      - generic [ref=e378]: "Date:"
+                      - generic "12/10/2026, 11:03:56" [ref=e379]: 12/10/2026, 11:03
+                  - generic [ref=e380]:
+                    - generic [ref=e381]: "To:"
+                    - generic [ref=e383]:
+                      - button "Address actions for MonkeyDent Team <demo@monkeydent.test>" [ref=e384] [cursor=pointer]:
+                        - generic [ref=e385]: MonkeyDent Team
+                        - generic [ref=e386]: <demo@monkeydent.test>
+                      - button "Copy addresses" [ref=e387]:
+                        - generic [ref=e388]:
+                          - img [ref=e389]
+                          - img [ref=e392]
+                - generic [ref=e394]:
+                  - generic [ref=e395]: This message is from a mailing list.
+                  - button "Unsubscribe page" [ref=e396]
+                - generic [ref=e398]:
+                  - iframe [ref=e403]:
+                    - generic [ref=f2e4]:
+                      - heading "MonkeyDent Praxispost" [level=1] [ref=f2e5]
+                      - img "Demo Logo" [ref=f2e6]
+                      - paragraph [ref=f2e7]: Neue Ideen für einen entspannten Praxisalltag.
+                      - paragraph [ref=f2e8]: Alle Inhalte sind synthetisch.
+                  - generic [ref=e404]:
+                    - heading "Images in message" [level=4] [ref=e406]
+                    - generic [ref=e408]:
+                      - generic [ref=e409]:
+                        - img [ref=e411]
+                        - generic [ref=e414]: png
+                      - link "Preview attachment" [ref=e415] [cursor=pointer]:
+                        - /url: /api/accounts/qa-shared/messages/imap-083019d402a42875aeceb162/attachments/att-qa-shared-39-0
+                        - generic [ref=e416]:
+                          - text: demo-logo.png
+                          - generic [ref=e417]: (image/png, 92 B)
+                      - link "Download attachment" [ref=e418] [cursor=pointer]:
+                        - /url: /api/accounts/qa-shared/messages/imap-083019d402a42875aeceb162/attachments/att-qa-shared-39-0?download=1
+                        - img [ref=e419]
+                      - 'button "Remove image: demo-logo.png" [ref=e422] [cursor=pointer]':
+                        - img [ref=e423]
+            - button "Praxispost Musterblatt redaktion@praxispost.example.test INBOX 13/10/2026, 11:14 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Praxispost im Oktober“. Der vorgeschlagene Ablauf passt gut. Bitte kurz b" [ref=e427] [cursor=pointer]:
+              - img [ref=e429]
+              - generic [ref=e431]:
+                - generic [ref=e432]:
+                  - generic "Praxispost Musterblatt <redaktion@praxispost.example.test>" [ref=e433]:
+                    - generic [ref=e435]: PM
+                    - generic [ref=e436]: Praxispost Musterblatt
+                    - generic [ref=e437]: redaktion@praxispost.example.test
+                  - button "INBOX" [ref=e440]:
+                    - img [ref=e441]
+                  - generic "13/10/2026, 11:14:27" [ref=e444]: 13/10/2026, 11:14
+                  - button "Message actions" [ref=e446]:
+                    - img [ref=e447]
+                - generic [ref=e452]: Guten Tag, vielen Dank für die Rückmeldung zu „Praxispost im Oktober“. Der vorgeschlagene Ablauf passt gut. Bitte kurz b
+            - button "Praxispost Musterblatt redaktion@praxispost.example.test INBOX Unflag message 14/10/2026, 11:21 Message actions Guten Tag, vielen Dank für die Rückmeldung zu „Praxispost im Oktober“. Der vorgeschlagene Ablauf passt gut. Bitte kurz b" [ref=e454] [cursor=pointer]:
+              - img [ref=e456]
+              - generic [ref=e458]:
+                - generic [ref=e459]:
+                  - generic "Praxispost Musterblatt <redaktion@praxispost.example.test>" [ref=e460]:
+                    - generic [ref=e462]: PM
+                    - generic [ref=e463]: Praxispost Musterblatt
+                    - generic [ref=e464]: redaktion@praxispost.example.test
+                  - generic [ref=e465]:
+                    - button "INBOX" [ref=e467]:
+                      - img [ref=e468]
+                    - button "Unflag message" [ref=e471]:
+                      - img [ref=e472]
+                  - generic "14/10/2026, 11:21:09" [ref=e474]: 14/10/2026, 11:21
+                  - button "Message actions" [ref=e476]:
+                    - img [ref=e477]
+                - generic [ref=e482]: Guten Tag, vielen Dank für die Rückmeldung zu „Praxispost im Oktober“. Der vorgeschlagene Ablauf passt gut. Bitte kurz b
+            - button "Recipients Praxispost Musterblatt Sent 15/10/2026, 11:30 Message actions Hallo, Toni Muster hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert. Beste Grüße Toni Muster" [ref=e484] [cursor=pointer]:
+              - img [ref=e486]
+              - generic [ref=e488]:
+                - generic [ref=e489]:
+                  - generic "Praxispost Musterblatt <redaktion@praxispost.example.test>" [ref=e490]:
+                    - generic "Recipients" [ref=e491]:
+                      - img [ref=e492]
+                    - generic [ref=e494]: Praxispost Musterblatt
+                  - button "Sent" [ref=e497]:
+                    - img [ref=e498]
+                  - generic "15/10/2026, 11:30:00" [ref=e501]: 15/10/2026, 11:30
+                  - button "Message actions" [ref=e503]:
+                    - img [ref=e504]
+                - generic [ref=e509]: Hallo, Toni Muster hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert. Beste Grüße Toni Muster
+            - region "Internal notes and activity" [ref=e510]:
+              - heading "Notes & activity" [level=3] [ref=e511]
+              - paragraph [ref=e512]: No activity yet.
+              - list
+        - generic [ref=e513]:
+          - button "Processes Idle" [ref=e514] [cursor=pointer]:
+            - generic [ref=e515]: Processes
+            - generic "Idle" [ref=e516]
+          - generic [ref=e517]:
+            - generic [ref=e518]: Mail check
+            - generic "Idle" [ref=e519]
+          - button "Open calendar" [ref=e520] [cursor=pointer]: 23 Oct 2026, 11:10
+          - button "Exceptions None" [ref=e521] [cursor=pointer]:
+            - generic [ref=e522]: Exceptions
+            - generic "None" [ref=e523]
+          - button "Upcoming None" [ref=e524] [cursor=pointer]:
+            - generic [ref=e525]: Upcoming
+            - generic "None" [ref=e526]
+  - alert [ref=e527]
+```

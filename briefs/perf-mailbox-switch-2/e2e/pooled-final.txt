@@ -1,0 +1,8 @@
+base     warm:large->small      n 40 first 198 / 214  settled 392 / 443  longtask 84
+base     warm:small->large      n 40 first 401 / 468  settled 782 / 897  longtask 546
+head     warm:large->small      n 40 first 148 / 218  settled 305 / 443  longtask 54
+head     warm:small->large      n 40 first 181 / 228  settled 384 / 468  longtask 72
+base     cold:small->large      n 16 first 458 / 482  settled 1382 / 1531  longtask 1007
+base     cold:large->small      n 16 first 335 / 423  settled 1195 / 1311  longtask 298
+head     cold:small->large      n 16 first 216 / 228  settled 1031 / 1097  longtask 232
+head     cold:large->small      n 16 first 182 / 244  settled 887 / 936  longtask 165

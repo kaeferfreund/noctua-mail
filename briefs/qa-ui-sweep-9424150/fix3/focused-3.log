@@ -1,0 +1,54 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/account-settings/Field.dom.test.tsx:
+(pass) QA-007 labels all ten Create mailbox inputs and both security selectors [197.85ms]
+(pass) QA-007 labels textarea and wrapped switch consumers and describes hints separately [10.82ms]
+(pass) QA-103 preserves a single child through Flex asChild and Slottable while labelling nested controls [8.52ms]
+(pass) QA-103 mounts Translation in the settings frame with all controls labelled [70.86ms]
+(pass) QA-103 preserves labels for every Calendar and Signatures Field consumer [65.92ms]
+(pass) QA-103 preserves the mailbox credential repair Field labels [25.46ms]
+
+app/components/admin/AdminPanel.dom.test.tsx:
+(pass) AdminPanel > renders target-specific mailbox roles and security summary without an active mailbox [40.28ms]
+(pass) AdminPanel > uses target ownership from the canonical users DTO [23.63ms]
+(pass) AdminPanel > issues an email-bound invite, copies it and shows the code only until dismissed [158.38ms]
+(pass) AdminPanel > requires disable confirmation and maps a 409 last_admin error inline [62.29ms]
+(pass) AdminPanel > verifies out-of-band identity, obtains purpose-bound proof and shows a recovery link once [122.45ms]
+(pass) AdminPanel > shows Retry-After on 429 [50.66ms]
+(pass) AdminPanel > pages equal-timestamp audit entries with the opaque nextCursor [75.78ms]
+(pass) AdminPanel > requires an enabled successor before deleting an owner [60.22ms]
+(pass) AdminPanel > uses an audited Noctua wrapper and fresh proof for Revoke sessions [69.01ms]
+(pass) AdminPanel > uses an audited Noctua wrapper and fresh proof for Reset MFA [87.30ms]
+(pass) AdminPanel > uses an audited Noctua wrapper and fresh proof for Remove passkey [73.52ms]
+(pass) AdminPanel > uses the final password-plus-UV grant for admin recovery [64.39ms]
+(pass) AdminPanel > does not fetch or render for a non-admin [0.58ms]
+
+app/components/mailclient/useMessageMutations.dom.test.tsx:
+(pass) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [6.63ms]
+(pass) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [3.52ms]
+(pass) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [3.55ms]
+(pass) QA-101 watcher-off: one read transition settles at 109 without a second decrement [3.37ms]
+(pass) QA-101 discards out-of-order folder reads and reads from a departed account [2.86ms]
+(pass) QA-101 unrelated flags do not fetch folders [1.38ms]
+
+app/components/mailclient/folderStreamUpdates.dom.test.tsx:
+(pass) QA-006 folder:update reducer renders STATUS counts through initial sync, flags, EXISTS and reload [29.02ms]
+(pass) missing unread counts stay unknown rather than copying total messages [0.09ms]
+
+app/components/mailclient/useSearchState.dom.test.tsx:
+(pass) summary owns all collaboration view counts; search never requests a listThreads message total [415.44ms]
+(pass) QA-101 virtual unread counts follow authoritative folder counts without a full sync [1017.21ms]
+
+app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:
+(pass) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [148.67ms]
+(pass) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [117.27ms]
+
+app/components/shell/SettingsFrame.dom.test.tsx:
+(pass) QA-004/009 layers nested dialogs and closes only the top dialog, restoring each opener [57.83ms]
+(pass) QA-009 preserves the Close button dismissal path and focus [16.56ms]
+(pass) QA-009 restores the persistent menu trigger after its Settings item unmounts [64.69ms]
+
+ 34 pass
+ 0 fail
+ 186 expect() calls
+Ran 34 tests across 7 files. [3.66s]

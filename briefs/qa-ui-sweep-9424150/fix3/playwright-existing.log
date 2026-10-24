@@ -1,0 +1,86 @@
+
+Running 11 tests using 1 worker
+
+(node:1742117) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1742117) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"finding":"QA-001","run":0,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":1,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":2,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":3,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+{"finding":"QA-001","run":4,"subject":"QA keyboard fixture delivery","smtp":"exact match"}
+  ✓   1 tests/browser/compose/qa-compose.spec.ts:31:1 › QA-001 rapid subject remains intact through autosave and SMTP (29.1s)
+{"finding":"QA-002","viewport":{"width":360,"height":780},"send":{"x":288,"y":724,"width":60,"height":44}}
+  ✓   2 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 360px (5.6s)
+{"finding":"QA-002","viewport":{"width":390,"height":844},"send":{"x":318,"y":788,"width":60,"height":44}}
+  ✓   3 tests/browser/compose/qa-compose.spec.ts:65:3 › QA-002 Send stays visible after autosave at 390px (5.6s)
+  ✓   4 tests/browser/compose/qa-compose.spec.ts:90:1 › QA-008 desktop modal contains keyboard focus and restores its opener (3.5s)
+QA-102 [{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":390,"height":844,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"},{"width":1440,"height":900,"dialogs":1,"name":"Synthetic keyboard mailbox","email":"keyboard@example.test"}]
+  ✓   5 tests/browser/ui/qa-admin-breakpoint.spec.ts:4:1 › QA-102 the open Create mailbox dialog keeps typed values across both breakpoint directions (17.4s)
+QA-003 {"post":201,"ttlSeconds":15552000,"secretShownOnce":true,"listRefreshed":true}
+  ✓   6 tests/browser/ui/qa-shell.spec.ts:36:1 › QA-003/009: create a 180-day token, reveal it once, refresh metadata, dismiss Settings (2.9s)
+QA-004/009 {"layers":[9996,9997],"pointerAdd":true,"pointerConfirm":true,"focusRestored":true}
+  ✓   7 tests/browser/ui/qa-shell.spec.ts:58:1 › QA-004/009: pointer-operated members and confirmations stack above Admin; Escape removes one layer (4.3s)
+QA-005 {"colorScheme":"light","width":360,"collapsed":{"header":312,"message":376,"viewport":780},"expanded":{"header":312,"message":376,"viewport":780}}
+QA-005 {"colorScheme":"light","width":390,"collapsed":{"header":320.171875,"message":431.828125,"viewport":844},"expanded":{"header":337.59375,"message":414.40625,"viewport":844}}
+QA-005 {"colorScheme":"dark","width":360,"collapsed":{"header":312,"message":376,"viewport":780},"expanded":{"header":312,"message":376,"viewport":780}}
+QA-005 {"colorScheme":"dark","width":390,"collapsed":{"header":320.171875,"message":431.828125,"viewport":844},"expanded":{"header":337.59375,"message":414.40625,"viewport":844}}
+  ✓   8 tests/browser/ui/qa-shell.spec.ts:96:1 › QA-005: 360px and 390px reader retains 40% of the viewport with long subject and note open (6.8s)
+QA-011 {"name":"/^View:/","width":44,"height":44}
+QA-011 {"name":"/^Sort & group:/","width":44,"height":44}
+QA-011 {"name":"/^Message actions:/","width":44,"height":44}
+QA-011 {"name":"/^Search messages$/","width":44,"height":44}
+QA-011 {"name":"/^Activity and calendar$/","width":44,"height":44}
+  ✓   9 tests/browser/ui/qa-shell.spec.ts:116:1 › QA-011/012/013: 44px phone header actions, reduced-motion sidebar, folder search empty state (2.5s)
+  ✘  10 tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes (2.2m)
+
+
+  1) tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes 
+
+    Test was interrupted.
+
+    Error: locator.click: Test ended.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'User menu', exact: true })[22m
+    [2m    - locator resolved to <button type="button" data-size="lg" id="radix-_r_6_" data-active="false" data-state="closed" aria-haspopup="menu" aria-expanded="false" aria-label="User menu" title="alex@example.test" data-sidebar="menu-button" data-slot="dropdown-menu-trigger" class="peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=ic…>…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - element is outside of the viewport[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - element is outside of the viewport[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    225 × waiting for element to be visible, enabled and stable[22m
+    [2m        - element is visible, enabled and stable[22m
+    [2m        - scrolling into view if needed[22m
+    [2m        - done scrolling[22m
+    [2m        - element is outside of the viewport[22m
+    [2m      - retrying click action[22m
+    [2m        - waiting 500ms[22m
+
+
+       at ui/qaRound2Session.ts:27
+
+      25 |   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
+      26 |   const user = page.getByRole("button", { name: "User menu", exact: true });
+    > 27 |   if (!await user.isVisible()) await page.getByRole("button", { name: "Toggle sidebar", exact: true }).click();
+         |              ^
+      28 |   await user.click();
+      29 |   await page.getByRole("menuitem", { name: item, exact: true }).click();
+      30 | }
+        at openQaMenu (/home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qaRound2Session.ts:27:14)
+        at /home/monkey/code/noctua-mail/wt-qa-fix3/tests/browser/ui/qa-translation.spec.ts:12:7
+
+  1 interrupted
+    tests/browser/ui/qa-translation.spec.ts:4:1 › QA-103 Translation retains the shell in all five viewports and both themes 
+  1 did not run
+  9 passed (3.6m)

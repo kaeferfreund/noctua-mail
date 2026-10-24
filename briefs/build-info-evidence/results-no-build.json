@@ -1,0 +1,168 @@
+{
+  "narrow": {
+    "800": {
+      "barHeight": 28,
+      "overflow": 9,
+      "metrics": {
+        "bar": {
+          "y": 864,
+          "h": 28,
+          "w": 504
+        },
+        "children": [
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Prozesse\nInaktiv",
+            "x": 304,
+            "w": 96,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section",
+            "text": "E-Mail-Abruf\nInaktiv",
+            "x": 412,
+            "w": 115,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Kalender",
+            "x": 539,
+            "w": 48,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Fehler\nKeine",
+            "x": 599,
+            "w": 73,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+            "text": "Bevorstehend\nKeine",
+            "x": 684,
+            "w": 117,
+            "y": 870,
+            "h": 17
+          }
+        ]
+      }
+    },
+    "1024": {
+      "barHeight": 28,
+      "overflow": 0,
+      "metrics": {
+        "bar": {
+          "y": 864,
+          "h": 28,
+          "w": 728
+        },
+        "children": [
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Prozesse\nInaktiv",
+            "x": 304,
+            "w": 96,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section",
+            "text": "E-Mail-Abruf\nInaktiv",
+            "x": 412,
+            "w": 115,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Kalender",
+            "x": 539,
+            "w": 48,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-status-trigger",
+            "text": "Fehler\nKeine",
+            "x": 599,
+            "w": 73,
+            "y": 870,
+            "h": 17
+          },
+          {
+            "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+            "text": "Bevorstehend\nKeine",
+            "x": 684,
+            "w": 316,
+            "y": 870,
+            "h": 17
+          }
+        ]
+      }
+    }
+  },
+  "de": {
+    "trigger": {
+      "name": "Kalender öffnen",
+      "text": "Kalender",
+      "tabsFromProcesses": 1,
+      "focusOutline": "solid"
+    },
+    "barHeight": 28,
+    "metrics": {
+      "bar": {
+        "y": 864,
+        "h": 28,
+        "w": 1144
+      },
+      "children": [
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Prozesse\nInaktiv",
+          "x": 304,
+          "w": 96,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section",
+          "text": "E-Mail-Abruf\nInaktiv",
+          "x": 412,
+          "w": 115,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Kalender",
+          "x": 539,
+          "w": 48,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-status-trigger",
+          "text": "Fehler\nKeine",
+          "x": 599,
+          "w": 73,
+          "y": 870,
+          "h": 17
+        },
+        {
+          "cls": "bottom-section bottom-right bottom-wide bottom-status-trigger",
+          "text": "Bevorstehend\nKeine",
+          "x": 956,
+          "w": 460,
+          "y": 870,
+          "h": 17
+        }
+      ]
+    }
+  }
+}

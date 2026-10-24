@@ -1,0 +1,52 @@
+bun test v1.4.4 (38afee6c8)
+
+lib/ui/readerNavigation.dom.test.tsx:
+(pass) navigation follows rendered group/thread order, omits collapsed sections and deduplicates rows [0.56ms]
+(pass) next loads exactly one page, waits for its rows, continues and walks backwards [49.10ms]
+(pass) a page hidden by collapsed groups loads the following page, then stops at the real end [17.07ms]
+(pass) pending navigation cancels on folder [12.11ms]
+(pass) pending navigation cancels on error [10.22ms]
+(pass) pending navigation cancels on leave [10.20ms]
+(pass) a failed page blocks the unloaded boundary while loaded rows remain navigable [10.60ms]
+
+lib/ui/readerFocus.dom.test.tsx:
+(pass) split/focus round trip keeps the list node, its selection and scroll position [178.17ms]
+(pass) Enter, Shift+Enter, Escape and sidebar navigation; preferred layout survives remount [125.13ms]
+(pass) hint is one line of translated copy, dismissible and seen only once across messages/remount [40.11ms]
+(pass) mobile ignores saved focus and focus entry paths, leaving desktop preference intact [14.14ms]
+(pass) card: real row supports double-click and Enter without activating from child controls [36.71ms]
+(pass) compact: real row supports double-click and Enter without activating from child controls [17.70ms]
+(pass) table: real row supports double-click and Enter without activating from child controls [35.53ms]
+(pass) threads: real row supports double-click and Enter without activating from child controls [13.20ms]
+(pass) every focus entry places focus on Back; exit restores scroll with a virtualized-row fallback [21.26ms]
+
+app/components/mailclient/useMessageMutations.dom.test.tsx:
+(pass) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [9.42ms]
+(pass) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [5.05ms]
+(pass) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [4.51ms]
+(pass) QA-101 watcher-off: one read transition settles at 109 without a second decrement [4.71ms]
+(pass) QA-101 discards out-of-order folder reads and reads from a departed account [5.16ms]
+(pass) QA-101 unrelated flags do not fetch folders [3.12ms]
+
+app/components/mailclient/useMessageDeleteActions.dom.test.tsx:
+(pass) bulk delete with collapsed threads > asks with total/hidden/thread counts and cancels without deleting or clearing selection [35.63ms]
+(pass) bulk delete with collapsed threads > confirms the entire expanded set through the bulk transaction and preserves Undo [3.21ms]
+(pass) bulk delete with collapsed threads > does not ask an extra question when all target messages are selected rows [2.38ms]
+(pass) bulk delete with collapsed threads > asks before permanent bulk deletion in Trash [4.34ms]
+(pass) bulk delete with collapsed threads > retains calendar confirmation for plain rows and can keep the linked items [3.38ms]
+(pass) bulk delete with collapsed threads > includes calendar choices in the thread confirmation and deletes linked items first [2.23ms]
+(pass) bulk delete with collapsed threads > leaves messages and selection untouched if deleting linked items fails [2.75ms]
+
+app/components/mailclient/messagelist/MessageListOrchestrator.dom.test.tsx:
+(pass) QA-012 uses the search empty state in folder scope, including a virtual folder [14.54ms]
+(pass) QA-012 uses the search empty state in all scope, including a virtual folder [11.68ms]
+(pass) QA-012 preserves ordinary folder, syncing, related search, and failure states [18.27ms]
+(pass) archive continuation: next [7.28ms]
+(pass) archive continuation: previous [5.59ms]
+(pass) archive continuation: end [3.10ms]
+(pass) archive continuation: failed [2.30ms]
+
+ 36 pass
+ 0 fail
+ 155 expect() calls
+Ran 36 tests across 5 files. [1200.00ms]

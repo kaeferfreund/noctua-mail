@@ -1,0 +1,177 @@
+contention-watcher warm-first small->large #0: highlight 172.1 folders 269.4 firstRows 655.6 settled 4455.9 reqs 49 lt 17/2132
+contention-watcher warm large->small #1: highlight 122.3 folders 236.7 firstRows 369 settled 508.4 reqs 29 lt 3/197
+contention-watcher warm small->large #2: highlight 121.8 folders 193.6 firstRows 526.9 settled 1002.9 reqs 21 lt 7/764
+contention-watcher warm large->small #3: highlight 120.8 folders 229 firstRows 376.9 settled 491.6 reqs 21 lt 3/192
+contention-watcher warm small->large #4: highlight 148.8 folders 249.6 firstRows 634.1 settled 1863.5 reqs 33 lt 11/1336
+contention-watcher warm large->small #5: highlight 116 folders 243.4 firstRows 377.7 settled 514.5 reqs 29 lt 3/197
+contention-watcher warm small->large #6: highlight 127.6 folders 201 firstRows 520.8 settled 849.3 reqs 21 lt 5/555
+contention-watcher warm large->small #7: highlight 113.2 folders 225.2 firstRows 359.4 settled 488.8 reqs 21 lt 3/189
+contention-watcher warm small->large #8: highlight 165.2 folders 308.8 firstRows 661.8 settled 2290.6 reqs 34 lt 12/1547
+contention-watcher warm large->small #9: highlight 136.6 folders 249.7 firstRows 413 settled 613.1 reqs 29 lt 3/242
+contention-watcher warm small->large #10: highlight 178.1 folders 263.5 firstRows 659.5 settled 1084.5 reqs 29 lt 6/744
+contention-watcher warm large->small #11: highlight 145.7 folders 270.1 firstRows 450.4 settled 1080.6 reqs 27 lt 5/378
+contention-watcher warm small->large #12: highlight 118.4 folders 185.1 firstRows 519.2 settled 1071.9 reqs 25 lt 7/781
+contention-watcher warm large->small #13: highlight 114.1 folders 244.2 firstRows 387.9 settled 483.2 reqs 21 lt 3/199
+contention-watcher warm small->large #14: highlight 119.8 folders 188.7 firstRows 522.5 settled 1019.7 reqs 29 lt 5/640
+contention-watcher warm large->small #15: highlight 115.5 folders 226.4 firstRows 377.1 settled 2824.4 reqs 41 lt 3/217
+contention-watcher warm small->large #16: highlight 204.3 folders 283.4 firstRows 636.3 settled 1126.2 reqs 21 lt 7/879
+contention-watcher warm large->small #17: highlight 116 folders 228 firstRows 354.3 settled 443.4 reqs 21 lt 3/185
+contention-watcher warm small->large #18: highlight 180.6 folders 249.5 firstRows 578.5 settled 1251.3 reqs 21 lt 6/883
+contention-watcher warm large->small #19: highlight 153 folders 328.2 firstRows 473 settled 938.2 reqs 21 lt 3/206
+contention-watcher warm small->large #20: highlight 123.2 folders 193.5 firstRows 520.8 settled 1022.7 reqs 30 lt 5/662
+contention-watcher warm-first medium->large #0: highlight 253.1 folders 332.4 firstRows 696.9 settled 2010.1 reqs 38 lt 9/1154
+contention-watcher warm large->medium #1: highlight 136.9 folders 250.5 firstRows 600.9 settled 823.9 reqs 21 lt 4/499
+contention-watcher warm medium->large #2: highlight 278.2 folders 575.1 firstRows 1101.5 settled 3130.5 reqs 43 lt 14/2237
+contention-watcher warm large->medium #3: highlight 129.3 folders 257.4 firstRows 589.6 settled 813.3 reqs 29 lt 4/457
+contention-watcher warm medium->large #4: highlight 119.8 folders 194.1 firstRows 518.4 settled 964.3 reqs 21 lt 6/673
+contention-watcher warm large->medium #5: highlight 157.4 folders 279.7 firstRows 601.4 settled 3336.8 reqs 35 lt 17/1997
+contention-watcher warm medium->large #6: highlight 115.7 folders 204.8 firstRows 558.5 settled 908.5 reqs 21 lt 6/642
+contention-watcher warm large->medium #7: highlight 122.7 folders 257.2 firstRows 570.3 settled 853.3 reqs 29 lt 3/394
+contention-watcher warm medium->large #8: highlight 119 folders 194.7 firstRows 579.5 settled 1657.5 reqs 25 lt 8/993
+contention-watcher warm large->medium #9: highlight 135 folders 276.6 firstRows 591.9 settled 765.5 reqs 21 lt 4/468
+contention-watcher warm medium->large #10: highlight 144.4 folders 237.6 firstRows 576.1 settled 932.6 reqs 21 lt 6/641
+contention-watcher warm large->medium #11: highlight 119.4 folders 238.2 firstRows 503.4 settled 767.1 reqs 21 lt 5/508
+contention-watcher warm medium->large #12: highlight 139.9 folders 243.9 firstRows 597.8 settled 2617 reqs 35 lt 15/2069
+contention-watcher warm large->medium #13: highlight 116.5 folders 250.3 firstRows 572.5 settled 864.6 reqs 28 lt 4/441
+contention-watcher warm medium->large #14: highlight 181.6 folders 321.4 firstRows 680.2 settled 1263 reqs 21 lt 7/917
+contention-watcher warm large->medium #15: highlight 150.6 folders 433.3 firstRows 1001.6 settled 1910.2 reqs 29 lt 7/1079
+contention-watcher warm medium->large #16: highlight 166.3 folders 295.9 firstRows 791.2 settled 1055.4 reqs 21 lt 5/687
+contention-watcher warm large->medium #17: highlight 217.2 folders 339.1 firstRows 721.6 settled 1026 reqs 22 lt 5/696
+contention-watcher warm medium->large #18: highlight 108.2 folders 184 firstRows 507.1 settled 908.2 reqs 21 lt 4/561
+contention-watcher warm large->medium #19: highlight 323.2 folders 527.7 firstRows 1198.1 settled 1965.5 reqs 21 lt 7/1171
+contention-watcher warm medium->large #20: highlight 205.2 folders 351.9 firstRows 852 settled 1289.6 reqs 27 lt 7/895
+{
+ "warm-first:small->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 172.1,
+   "p90": 172.1
+  },
+  "folders": {
+   "p50": 269.4,
+   "p90": 269.4
+  },
+  "firstRows": {
+   "p50": 655.6,
+   "p90": 655.6
+  },
+  "settled": {
+   "p50": 4455.9,
+   "p90": 4455.9
+  },
+  "requests": 49,
+  "longTaskMs": 2132,
+  "timeouts": 0
+ },
+ "warm:large->small": {
+  "n": 10,
+  "highlight": {
+   "p50": 118.4,
+   "p90": 145.7
+  },
+  "folders": {
+   "p50": 240.05,
+   "p90": 270.1
+  },
+  "firstRows": {
+   "p50": 377.4,
+   "p90": 450.4
+  },
+  "settled": {
+   "p50": 511.45,
+   "p90": 1080.6
+  },
+  "requests": 24,
+  "longTaskMs": 198,
+  "timeouts": 0
+ },
+ "warm:small->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 138.2,
+   "p90": 180.6
+  },
+  "folders": {
+   "p50": 225.25,
+   "p90": 283.4
+  },
+  "firstRows": {
+   "p50": 552.7,
+   "p90": 659.5
+  },
+  "settled": {
+   "p50": 1078.2,
+   "p90": 1863.5
+  },
+  "requests": 27,
+  "longTaskMs": 772.5,
+  "timeouts": 0
+ },
+ "warm-first:medium->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 253.1,
+   "p90": 253.1
+  },
+  "folders": {
+   "p50": 332.4,
+   "p90": 332.4
+  },
+  "firstRows": {
+   "p50": 696.9,
+   "p90": 696.9
+  },
+  "settled": {
+   "p50": 2010.1,
+   "p90": 2010.1
+  },
+  "requests": 38,
+  "longTaskMs": 1154,
+  "timeouts": 0
+ },
+ "warm:large->medium": {
+  "n": 10,
+  "highlight": {
+   "p50": 135.95,
+   "p90": 217.2
+  },
+  "folders": {
+   "p50": 267,
+   "p90": 433.3
+  },
+  "firstRows": {
+   "p50": 596.4,
+   "p90": 1001.6
+  },
+  "settled": {
+   "p50": 858.95,
+   "p90": 1965.5
+  },
+  "requests": 25,
+  "longTaskMs": 503.5,
+  "timeouts": 0
+ },
+ "warm:medium->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 142.15,
+   "p90": 205.2
+  },
+  "folders": {
+   "p50": 240.75,
+   "p90": 351.9
+  },
+  "firstRows": {
+   "p50": 588.65,
+   "p90": 852
+  },
+  "settled": {
+   "p50": 1159.2,
+   "p90": 2617
+  },
+  "requests": 21,
+  "longTaskMs": 791,
+  "timeouts": 0
+ }
+}
+wrote /tmp/spike-switch-e2e/results/contention-watcher.json

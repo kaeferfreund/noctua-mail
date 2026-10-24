@@ -1,0 +1,21 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/mailclient/lazyAdmin.dom.test.tsx:
+(pass) lazy admin surfaces > non-admin stays cold after idle [868.11ms]
+(pass) lazy admin surfaces > cold admin from mailbox gate [830.35ms]
+(pass) lazy admin surfaces > cold mailbox creation from mailbox gate [978.06ms]
+(pass) lazy admin surfaces > cold admin from user menu without a mailbox [893.65ms]
+(pass) lazy admin surfaces > admin idle warm-up [865.47ms]
+(pass) lazy admin surfaces > cancel warm-up on unmount [780.17ms]
+(pass) lazy admin surfaces > cancel warm-up on role change [7018.60ms]
+(pass) lazy admin surfaces > QA-014 desktop to mobile preserves unsent invite [1520.00ms]
+(pass) lazy admin surfaces > QA-014 mobile to desktop preserves unsent invite [1664.02ms]
+
+app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:
+(pass) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [299.73ms]
+(pass) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [142.06ms]
+
+ 11 pass
+ 0 fail
+ 25 expect() calls
+Ran 11 tests across 2 files. [16.33s]

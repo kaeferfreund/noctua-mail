@@ -1,0 +1,159 @@
+bun test v1.4.4 (38afee6c8)
+
+app/components/account-settings/Field.dom.test.tsx:
+(pass) QA-007 labels all ten Create mailbox inputs and both security selectors [185.41ms]
+(pass) QA-007 labels textarea and wrapped switch consumers and describes hints separately [10.42ms]
+(pass) QA-103 preserves a single child through Flex asChild and Slottable while labelling nested controls [8.38ms]
+(pass) QA-103 mounts Translation in the settings frame with all controls labelled [68.06ms]
+(pass) QA-103 preserves labels for every Calendar and Signatures Field consumer [61.39ms]
+(pass) QA-103 preserves the mailbox credential repair Field labels [23.34ms]
+
+app/components/mailclient/useMessageMutations.dom.test.tsx:
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [5.56ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [1.00ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [1.00ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 watcher-off: one read transition settles at 109 without a second decrement [0.98ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 discards out-of-order folder reads and reads from a departed account [1.24ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at useMessageMutations (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.ts:88:14)
+      at Harness (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/mailclient/useMessageMutations.dom.test.tsx:24:21)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+(fail) QA-101 unrelated flags do not fetch folders [0.93ms]
+
+app/components/mailclient/useSearchState.dom.test.tsx:
+(pass) summary owns all collaboration view counts; search never requests a listThreads message total [406.66ms]
+(pass) QA-101 virtual unread counts follow authoritative folder counts without a full sync [1020.58ms]
+
+app/components/shell/Shell.dom.test.tsx:
+(pass) shell sidebar > shows mailbox creation only when admin=false [42.66ms]
+(pass) shell sidebar > shows mailbox creation only when admin=true [23.13ms]
+(pass) shell sidebar > sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable [33.37ms]
+(pass) shell sidebar > renders domain headings only for sections with more than six mailboxes [36.06ms]
+(pass) shell sidebar > keeps the thread JSON and thread cache developer tools reachable from the user menu [123.31ms]
+(pass) theme menu > selects light, dark and system through next-themes [155.86ms]
+(pass) shell header > puts the list toolbar right after the title, inside a header container [16.04ms]
+(pass) shell header > renders mailbox and folder as one heading with a quiet separator [10.19ms]
+(pass) Radix components in shadcn portals > resolves the kept component's --space-2 inside a Sheet [202.79ms]
+(pass) resizable shell panes > keeps the list viewport and reader mounted when the calendar opens and closes [25.09ms]
+(pass) shell landmarks > keeps a single main landmark when SidebarInset sits inside the root main [2.19ms]
+(pass) sidebar editable target guard > leaves native text fields and nested contenteditable targets to their own shortcuts [4.43ms]
+(pass) saved shell hydration > hydrates a saved pane layout and theme without attribute or tree mismatches [30.03ms]
+
+app/components/shell/SettingsFrame.breakpoint.dom.test.tsx:
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at AdminMailboxes (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/admin/AdminMailboxes.tsx:56:13)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+      at performWorkOnRoot (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:16583:35)
+(fail) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [9.41ms]
+1 | import{useFormatter as r,useTranslations as t}from"use-intl";function o(r,t){return(...r)=>{try{return t(...r)}catch{throw new Error(void 0)}}}const n=o(0,t),e=o(0,r);export{e as useFormatter,n as useTranslations};
+                                                                                                                                   ^
+Error: 
+      at <anonymous> (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/next-intl/dist/esm/production/react-client/index.js:1:128)
+      at AdminMailboxes (/home/monkey/code/noctua-mail/wt-integration-dryrun/app/components/admin/AdminMailboxes.tsx:56:13)
+      at react_stack_bottom_frame (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:25904:20)
+      at renderWithHooks (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:7662:22)
+      at updateFunctionComponent (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:10166:19)
+      at runWithFiberInDEV (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at performUnitOfWork (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17641:22)
+      at workLoopSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+      at performWorkOnRoot (/home/monkey/code/noctua-mail/wt-integration-dryrun/node_modules/react-dom/cjs/react-dom-client.development.js:16583:35)
+(fail) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [6.80ms]
+
+8 tests failed:
+(fail) QA-101 count-before-mutation: one read transition settles at 109 without a second decrement [5.56ms]
+(fail) QA-101 count-after-mutation: one read transition settles at 109 without a second decrement [1.00ms]
+(fail) QA-101 stale-count-before-mutation: one read transition settles at 109 without a second decrement [1.00ms]
+(fail) QA-101 watcher-off: one read transition settles at 109 without a second decrement [0.98ms]
+(fail) QA-101 discards out-of-order folder reads and reads from a departed account [1.24ms]
+(fail) QA-101 unrelated flags do not fetch folders [0.93ms]
+(fail) QA-102 preserves the open mailbox dialog and typed values desktop → phone → desktop [9.41ms]
+(fail) QA-102 preserves the open mailbox dialog and typed values phone → desktop → phone [6.80ms]
+
+ 21 pass
+ 8 fail
+ 112 expect() calls
+Ran 29 tests across 5 files. [3.21s]

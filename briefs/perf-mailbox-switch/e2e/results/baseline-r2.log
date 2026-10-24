@@ -1,0 +1,177 @@
+baseline-r2 warm-first small->large #0: highlight 146.8 folders 338.6 firstRows 725 settled 1625 reqs 37 lt 9/1038
+baseline-r2 warm large->small #1: highlight 126.3 folders 241 firstRows 384.7 settled 472.3 reqs 21 lt 3/194
+baseline-r2 warm small->large #2: highlight 128.4 folders 199.6 firstRows 508.6 settled 846.5 reqs 21 lt 6/608
+baseline-r2 warm large->small #3: highlight 156.1 folders 243.9 firstRows 370.7 settled 571.6 reqs 21 lt 4/243
+baseline-r2 warm small->large #4: highlight 111.3 folders 178.1 firstRows 492.9 settled 823.8 reqs 21 lt 5/549
+baseline-r2 warm large->small #5: highlight 136.5 folders 244.6 firstRows 387.4 settled 486.8 reqs 21 lt 2/160
+baseline-r2 warm small->large #6: highlight 115.5 folders 189.7 firstRows 500.5 settled 835 reqs 21 lt 5/553
+baseline-r2 warm large->small #7: highlight 489.7 folders 703.8 firstRows 825.1 settled 911.2 reqs 25 lt 2/127
+baseline-r2 warm small->large #8: highlight 365.1 folders 431.3 firstRows 834.6 settled 1207.7 reqs 29 lt 5/566
+baseline-r2 warm large->small #9: highlight 108.6 folders 221.1 firstRows 349.7 settled 498.9 reqs 29 lt 2/123
+baseline-r2 warm small->large #10: highlight 112.8 folders 184.3 firstRows 486.3 settled 807.5 reqs 21 lt 5/533
+baseline-r2 warm large->small #11: highlight 110 folders 225.3 firstRows 362.9 settled 448.7 reqs 21 lt 3/180
+baseline-r2 warm small->large #12: highlight 115.9 folders 185.4 firstRows 501.9 settled 830.9 reqs 21 lt 5/551
+baseline-r2 warm large->small #13: highlight 110.4 folders 219.9 firstRows 370.2 settled 453.9 reqs 21 lt 1/82
+baseline-r2 warm small->large #14: highlight 112.3 folders 180.3 firstRows 483.2 settled 805 reqs 21 lt 5/531
+baseline-r2 warm large->small #15: highlight 110.4 folders 220.6 firstRows 355.4 settled 495.3 reqs 29 lt 2/137
+baseline-r2 warm small->large #16: highlight 108 folders 174 firstRows 481.5 settled 806.9 reqs 21 lt 4/492
+baseline-r2 warm large->small #17: highlight 106.6 folders 249.6 firstRows 377.4 settled 460.4 reqs 21 lt 2/127
+baseline-r2 warm small->large #18: highlight 135.4 folders 199.8 firstRows 509.7 settled 837 reqs 21 lt 4/495
+baseline-r2 warm large->small #19: highlight 120.3 folders 239.2 firstRows 353 settled 516.8 reqs 29 lt 3/187
+baseline-r2 warm small->large #20: highlight 114.2 folders 179.4 firstRows 491 settled 851.9 reqs 29 lt 4/494
+baseline-r2 warm-first medium->large #0: highlight 131.1 folders 219.5 firstRows 612.9 settled 1349.1 reqs 37 lt 8/943
+baseline-r2 warm large->medium #1: highlight 128.7 folders 233.6 firstRows 657.3 settled 1072.7 reqs 21 lt 5/761
+baseline-r2 warm medium->large #2: highlight 120.2 folders 210.7 firstRows 525.2 settled 866.6 reqs 21 lt 6/627
+baseline-r2 warm large->medium #3: highlight 110.3 folders 221.1 firstRows 497.8 settled 771.2 reqs 21 lt 4/464
+baseline-r2 warm medium->large #4: highlight 116.1 folders 193 firstRows 512.5 settled 894 reqs 21 lt 5/603
+baseline-r2 warm large->medium #5: highlight 164.8 folders 294.1 firstRows 591.9 settled 813.7 reqs 29 lt 4/464
+baseline-r2 warm medium->large #6: highlight 118 folders 192.9 firstRows 516 settled 837.6 reqs 21 lt 6/604
+baseline-r2 warm large->medium #7: highlight 120.8 folders 229.9 firstRows 499.3 settled 659.1 reqs 21 lt 3/355
+baseline-r2 warm medium->large #8: highlight 296.3 folders 374.7 firstRows 685.3 settled 1012.9 reqs 21 lt 5/549
+baseline-r2 warm large->medium #9: highlight 128.5 folders 238.4 firstRows 539 settled 792.6 reqs 21 lt 4/474
+baseline-r2 warm medium->large #10: highlight 112.6 folders 180.9 firstRows 491.5 settled 821.2 reqs 21 lt 5/544
+baseline-r2 warm large->medium #11: highlight 117.2 folders 234.9 firstRows 513.8 settled 730.1 reqs 29 lt 3/370
+baseline-r2 warm medium->large #12: highlight 105.9 folders 217.7 firstRows 650.3 settled 960.8 reqs 21 lt 3/556
+baseline-r2 warm large->medium #13: highlight 108.3 folders 231.7 firstRows 530.2 settled 706.3 reqs 21 lt 4/420
+baseline-r2 warm medium->large #14: highlight 113.2 folders 204.3 firstRows 512.4 settled 837.8 reqs 21 lt 5/542
+baseline-r2 warm large->medium #15: highlight 121.1 folders 242.3 firstRows 539 settled 815.1 reqs 21 lt 5/543
+baseline-r2 warm medium->large #16: highlight 136.4 folders 229.7 firstRows 557.9 settled 1108.4 reqs 21 lt 6/823
+baseline-r2 warm large->medium #17: highlight 113.4 folders 227.2 firstRows 520.3 settled 686.3 reqs 21 lt 4/419
+baseline-r2 warm medium->large #18: highlight 111.3 folders 188.9 firstRows 500.7 settled 828.8 reqs 21 lt 5/545
+baseline-r2 warm large->medium #19: highlight 114.4 folders 222.1 firstRows 503.9 settled 815.8 reqs 29 lt 3/402
+baseline-r2 warm medium->large #20: highlight 114.4 folders 196.2 firstRows 521.3 settled 849.1 reqs 21 lt 5/564
+{
+ "warm-first:small->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 146.8,
+   "p90": 146.8
+  },
+  "folders": {
+   "p50": 338.6,
+   "p90": 338.6
+  },
+  "firstRows": {
+   "p50": 725,
+   "p90": 725
+  },
+  "settled": {
+   "p50": 1625,
+   "p90": 1625
+  },
+  "requests": 37,
+  "longTaskMs": 1038,
+  "timeouts": 0
+ },
+ "warm:large->small": {
+  "n": 10,
+  "highlight": {
+   "p50": 115.35,
+   "p90": 156.1
+  },
+  "folders": {
+   "p50": 240.1,
+   "p90": 249.6
+  },
+  "firstRows": {
+   "p50": 370.45,
+   "p90": 387.4
+  },
+  "settled": {
+   "p50": 491.05,
+   "p90": 571.6
+  },
+  "requests": 21,
+  "longTaskMs": 148.5,
+  "timeouts": 0
+ },
+ "warm:small->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 114.85,
+   "p90": 135.4
+  },
+  "folders": {
+   "p50": 184.85000000000002,
+   "p90": 199.8
+  },
+  "firstRows": {
+   "p50": 496.7,
+   "p90": 509.7
+  },
+  "settled": {
+   "p50": 832.95,
+   "p90": 851.9
+  },
+  "requests": 21,
+  "longTaskMs": 541,
+  "timeouts": 0
+ },
+ "warm-first:medium->large": {
+  "n": 1,
+  "highlight": {
+   "p50": 131.1,
+   "p90": 131.1
+  },
+  "folders": {
+   "p50": 219.5,
+   "p90": 219.5
+  },
+  "firstRows": {
+   "p50": 612.9,
+   "p90": 612.9
+  },
+  "settled": {
+   "p50": 1349.1,
+   "p90": 1349.1
+  },
+  "requests": 37,
+  "longTaskMs": 943,
+  "timeouts": 0
+ },
+ "warm:large->medium": {
+  "n": 10,
+  "highlight": {
+   "p50": 119,
+   "p90": 128.7
+  },
+  "folders": {
+   "p50": 232.64999999999998,
+   "p90": 242.3
+  },
+  "firstRows": {
+   "p50": 525.25,
+   "p90": 591.9
+  },
+  "settled": {
+   "p50": 781.9000000000001,
+   "p90": 815.8
+  },
+  "requests": 21,
+  "longTaskMs": 442,
+  "timeouts": 0
+ },
+ "warm:medium->large": {
+  "n": 10,
+  "highlight": {
+   "p50": 115.25,
+   "p90": 136.4
+  },
+  "folders": {
+   "p50": 200.25,
+   "p90": 229.7
+  },
+  "firstRows": {
+   "p50": 518.65,
+   "p90": 650.3
+  },
+  "settled": {
+   "p50": 857.85,
+   "p90": 1012.9
+  },
+  "requests": 21,
+  "longTaskMs": 560,
+  "timeouts": 0
+ }
+}
+wrote /tmp/spike-switch-e2e/results/baseline-r2.json

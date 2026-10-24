@@ -1,0 +1,158 @@
+{
+  "bootShownAtWave": 3,
+  "switch A->B#1": {
+    "listShownAtWave": 2,
+    "totalRequests": 24,
+    "byWave": {
+      "0": [
+        "POST /api/auth/switch-account",
+        "GET /api/accounts/account-b/folders"
+      ],
+      "1": [
+        "GET /api/accounts/account-b/identities",
+        "GET /api/accounts/account-b/prefs",
+        "GET /api/auth/me",
+        "GET /api/accounts/account-b/topics",
+        "GET /api/accounts/account-b/calendar/events?startMs=1792771325064&endMs=1795190525064",
+        "POST /api/accounts/account-b/folders/account-b%3AINBOX/consistency",
+        "GET /api/accounts/account-b/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-b%3AINBOX",
+        "GET /api/accounts/account-b/members",
+        "GET /api/accounts/account-b/reminders",
+        "POST /api/accounts/account-b/sync",
+        "GET /api/accounts/account-b/topics/stats [idle]",
+        "GET /api/accounts/account-b/recipient-aliases",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash"
+      ],
+      "2": [
+        "GET /api/accounts/account-b/sync/status?jobId=job-account-b"
+      ],
+      "3": [
+        "GET /api/accounts/account-b/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-b%3AINBOX",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash"
+      ]
+    },
+    "staleOldMailbox": [],
+    "streams": [
+      "1: /api/accounts/account-b/imap/stream?activeFolderId=account-b%3AINBOX"
+    ],
+    "commits": 9,
+    "probes": [
+      "wave 0: counts=[1 unread,1 unread,1 unread,7 unread,7 unread,1 unread] active=A rows=account-a topics=account-a",
+      "wave 1: counts=[1 unread,1 unread,1 unread,7 unread,7 unread,1 unread] active=B rows=- topics=account-a",
+      "wave 2: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b",
+      "wave 3: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b",
+      "wave 4: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b",
+      "wave 4: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b"
+    ]
+  },
+  "switch B->A#n": {
+    "listShownAtWave": 2,
+    "totalRequests": 16,
+    "byWave": {
+      "0": [
+        "POST /api/auth/switch-account",
+        "GET /api/accounts/account-a/folders"
+      ],
+      "1": [
+        "GET /api/accounts/account-a/identities",
+        "GET /api/accounts/account-a/prefs",
+        "GET /api/auth/me",
+        "GET /api/accounts/account-a/topics",
+        "GET /api/accounts/account-a/calendar/events?startMs=1792771328173&endMs=1795190528173",
+        "POST /api/accounts/account-a/folders/account-a%3AINBOX/consistency",
+        "GET /api/accounts/account-a/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-a%3AINBOX",
+        "GET /api/accounts/account-a/members",
+        "GET /api/accounts/account-a/topics/stats [idle]",
+        "GET /api/accounts/account-a/recipient-aliases",
+        "GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+        "GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+        "GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+        "GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash"
+      ]
+    },
+    "staleOldMailbox": [],
+    "streams": [
+      "1: /api/accounts/account-a/imap/stream?activeFolderId=account-a%3AINBOX"
+    ],
+    "commits": 7,
+    "probes": [
+      "wave 0: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b",
+      "wave 1: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=A rows=- topics=account-b",
+      "wave 2: counts=[1 unread,1 unread,1 unread,7 unread,7 unread,1 unread] active=A rows=account-a topics=account-a"
+    ]
+  },
+  "switch A->B#n": {
+    "listShownAtWave": 2,
+    "totalRequests": 16,
+    "byWave": {
+      "0": [
+        "POST /api/auth/switch-account",
+        "GET /api/accounts/account-b/folders"
+      ],
+      "1": [
+        "GET /api/accounts/account-b/identities",
+        "GET /api/accounts/account-b/prefs",
+        "GET /api/auth/me",
+        "GET /api/accounts/account-b/topics",
+        "GET /api/accounts/account-b/calendar/events?startMs=1792771329920&endMs=1795190529920",
+        "POST /api/accounts/account-b/folders/account-b%3AINBOX/consistency",
+        "GET /api/accounts/account-b/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-b%3AINBOX",
+        "GET /api/accounts/account-b/members",
+        "GET /api/accounts/account-b/topics/stats [idle]",
+        "GET /api/accounts/account-b/recipient-aliases",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash",
+        "GET /api/accounts/account-b/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-b%3ASent%2Caccount-b%3ATrash"
+      ]
+    },
+    "staleOldMailbox": [],
+    "streams": [
+      "1: /api/accounts/account-b/imap/stream?activeFolderId=account-b%3AINBOX"
+    ],
+    "commits": 7,
+    "probes": [
+      "wave 0: counts=[1 unread,1 unread,1 unread,7 unread,7 unread,1 unread] active=A rows=account-a topics=account-a",
+      "wave 1: counts=[1 unread,1 unread,1 unread,7 unread,7 unread,1 unread] active=B rows=- topics=account-a",
+      "wave 2: counts=[1 unread,1 unread,1 unread,3 unread,3 unread,1 unread] active=B rows=account-b topics=account-b"
+    ]
+  },
+  "bootRequests": [
+    "0: GET /api/auth/me",
+    "0: GET /api/version",
+    "0: GET /api/auth/me",
+    "1: GET /api/accounts/account-a/folders",
+    "1: GET /api/accounts/account-a/topics",
+    "1: GET /api/accounts/account-a/calendar/events?startMs=1792771321666&endMs=1795190521666",
+    "1: GET /api/accounts/account-a/members",
+    "1: GET /api/me/events",
+    "1: GET /api/accounts/account-a/reminders",
+    "1: GET /api/me/mailboxes/summary",
+    "1: GET /api/accounts/account-a/topics/stats [idle]",
+    "1: GET /api/accounts/account-a/recipient-aliases",
+    "1: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=",
+    "1: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=",
+    "1: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=",
+    "1: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=",
+    "2: POST /api/accounts/account-a/folders/account-a%3AINBOX/consistency",
+    "2: GET /api/accounts/account-a/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-a%3AINBOX",
+    "2: POST /api/accounts/account-a/sync",
+    "2: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "2: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "2: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "2: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "3: GET /api/accounts/account-a/sync/status?jobId=job-account-a",
+    "4: GET /api/accounts/account-a/threads?page=1&pageSize=300&groupBy=date&threadDateSource=latestReceivedDateValue&folderId=account-a%3AINBOX",
+    "4: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=focused&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "4: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=todo&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "4: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash",
+    "4: GET /api/accounts/account-a/messages?page=1&pageSize=1&groupBy=date&searchScope=all&badges=calendar%2Cunread&excludeFolderIds=account-a%3ASent%2Caccount-a%3ATrash"
+  ],
+  "bootCommits": 16
+}

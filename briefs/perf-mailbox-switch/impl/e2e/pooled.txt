@@ -1,0 +1,26 @@
+loads (1-min before -> after):
+  base [('r1-base-cold', '6.62', '4.85'), ('r1-base-warm', '6.35', '6.62'), ('r4-base-cold', '3.46', '5.68'), ('r4-base-warm', '3.92', '3.46')]
+  head [('r2-head-cold', '2.87', '3.51'), ('r2-head-warm', '3.82', '2.87'), ('r3-head-cold', '5.22', '4.03'), ('r3-head-warm', '4.66', '5.22')]
+pair                     var    n highlight p50  first rows p50/p90  settled p50/p90  req  me  old longtask
+cold:small->large        base  10           154       587/652          1462/1628       37   2    3     1046
+cold:small->large        head  10            72       427/468          1547/1739       30   0    0     1124
+cold:large->small        base  10           129       429/440          1190/1216       38   2    3      239
+cold:large->small        head  10            71       214/224          1054/1094       31   0    0      184
+cold:small->folders      base  10           156       758/805          1558/1733       37   2    3     1222
+cold:small->folders      head  10           162       543/559          1438/1546       30   0    0     1176
+warm:large->small        base  10           118       396/420           510/559        21   2    3      198
+warm:large->small        head  10            63       191/206           370/437        14   0    0       86
+warm:small->large        base  10           122       523/550           865/903        21   2    3      578
+warm:small->large        head  10            61       403/410           746/803        14   0    0      522
+warm:large->medium       base  10           119       527/546           716/809        21   2    3      384
+warm:large->medium       head  10            62       355/522           733/1057       14   0    0      534
+warm:medium->large       base  10           112       516/521           874/947        21   2    3      583
+warm:medium->large       head  10            65       401/427           770/869        14   0    0      528
+warm:folders->small      base  10           295       486/510           694/760        21   2    3      256
+warm:folders->small      head  10            64       194/281           399/508        14   0    0       91
+warm:small->folders      base  10           124       638/674          1007/1051       21   2    3      691
+warm:small->folders      head  10           137       479/522           848/915        14   0    0      604
+warm:large->folders      base  10           115       718/745           852/920        21   2    3      535
+warm:large->folders      head  10           133       471/498           814/898        14   0    0      605
+warm:folders->large      base  10           308       725/855          1154/1278       21   2    3      756
+warm:folders->large      head  10            63       396/427           757/850        14   0    0      526

@@ -1,0 +1,31 @@
+  elapsedMs: 123,
+}
+[db-write-retry] exhausted {
+  operation: "setActiveAccountId",
+  retries: 4,
+  attempts: 5,
+  elapsedMs: 1950,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",
+--
+  elapsedMs: 101,
+}
+[db-write-retry] exhausted {
+  operation: "setActiveAccountId",
+  retries: 4,
+  attempts: 5,
+  elapsedMs: 1987,
+  error: {
+    name: "SQLiteError",
+    message: "database is locked",
+    code: "SQLITE_BUSY",
+  },
+}
+[db-write-retry] success {
+  operation: "setActiveAccountId",

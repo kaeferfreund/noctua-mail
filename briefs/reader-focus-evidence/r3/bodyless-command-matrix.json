@@ -1,0 +1,227 @@
+[
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-77d110a2c0394d2f1adcca1e/resync",
+    "name": "message resync",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/folders/qa-shared%3AINBOX/consistency",
+    "name": "folder consistency",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/sync",
+    "name": "account sync",
+    "bodyless": 202,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/calendar/sync",
+    "name": "calendar sync",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/categories/model/reset",
+    "name": "categories model reset",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/categories/recompute",
+    "name": "categories recompute",
+    "bodyless": 202,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/threads/recompute",
+    "name": "threads recompute",
+    "bodyless": 202,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-083019d402a42875aeceb162/unsubscribe",
+    "name": "unsubscribe",
+    "bodyless": 200,
+    "action": "mailto",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "DELETE /api/accounts/qa-shared/messages/imap-7e9e71ba230fb2a6ef1735c8/attachments/att-qa-shared-50-0",
+    "name": "attachment DELETE",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-e1efdd49dcd7ee53daa37f75/spam",
+    "name": "spam",
+    "bodyless": 200,
+    "action": "moved",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-e1efdd49dcd7ee53daa37f75/not-spam",
+    "name": "not-spam",
+    "bodyless": 200,
+    "action": "moved",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-6a7e740af4c4646b4fd76fc4/archive",
+    "name": "archive",
+    "bodyless": 200,
+    "action": "moved",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-41d8070d6fcf762cc349167f/delete",
+    "name": "delete to Trash",
+    "bodyless": 200,
+    "action": "moved",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/messages/imap-41d8070d6fcf762cc349167f/delete",
+    "name": "permanent delete in Trash",
+    "bodyless": 200,
+    "action": "deleted",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/drafts/imap-a022de41ea41064859fa22e6/send",
+    "name": "draft send",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/drafts/imap-5badbbe63335532bfac25e7d/discard",
+    "name": "draft discard",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "POST /api/accounts/qa-shared/folders/qa-shared%3ABodyless%20synthetic/delete",
+    "name": "folder delete",
+    "bodyless": 200,
+    "action": "moved",
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "DELETE /api/accounts/qa-shared/recipient-aliases/bodyless-synthetic-alias-76128c63",
+    "name": "recipient alias DELETE",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "DELETE /api/accounts/qa-shared/topics/bodyless-synthetic-topic-95a0c0b7",
+    "name": "topic DELETE",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "DELETE /api/accounts/qa-shared/calendar/events/cal-15a72c98-9b71-47e4-8adb-1aa15720234f",
+    "name": "calendar event DELETE",
+    "bodyless": 200,
+    "action": null,
+    "rejected": {
+      "text/plain body": 400,
+      "form body": 400,
+      "foreign origin": 403
+    }
+  },
+  {
+    "route": "DELETE /api/accounts/qa-shared/calendar/events/:eventId?soft=true (in-page client fetch)",
+    "name": "calendar event DELETE, client request",
+    "bodyless": 200
+  }
+]
