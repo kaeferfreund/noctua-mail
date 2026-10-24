@@ -38,8 +38,8 @@ export const DEFAULT_SEARCH_BADGES: SearchBadgesState = {
 };
 
 export type VirtualFolderDefinition = {
-  id: "virtual:focused" | "virtual:action-queue" | "virtual:invite-deck" | "virtual:assigned-to-me" | "virtual:unassigned" | "virtual:open";
-  messageKey: "focused" | "actionQueue" | "inviteDeck" | "assignedToMe" | "unassigned" | "open";
+  id: "virtual:focused" | "virtual:action-queue" | "virtual:invite-deck" | "virtual:assigned-to-me" | "virtual:unassigned" | "virtual:open" | "virtual:suspicious";
+  messageKey: "focused" | "actionQueue" | "inviteDeck" | "assignedToMe" | "unassigned" | "open" | "suspicious";
   queryBadges: readonly string[];
 };
 
@@ -62,7 +62,8 @@ export const VIRTUAL_FOLDERS: readonly VirtualFolderDefinition[] = [
   ...COLLAB_FOLDERS,
   { id: "virtual:focused", messageKey: "focused", queryBadges: ["focused"] },
   { id: "virtual:action-queue", messageKey: "actionQueue", queryBadges: ["attention"] },
-  { id: "virtual:invite-deck", messageKey: "inviteDeck", queryBadges: ["calendar"] }
+  { id: "virtual:invite-deck", messageKey: "inviteDeck", queryBadges: ["calendar"] },
+  { id: "virtual:suspicious", messageKey: "suspicious", queryBadges: ["suspicious"] }
 ];
 
 type UseSearchStateOptions = {
@@ -94,6 +95,7 @@ export type SearchState = {
   actionQueueTodoCount: number | null;
   inviteDeckTotalCount: number | null;
   inviteDeckUnreadCount: number | null;
+  suspiciousUnreadCount: number | null;
   activeVirtualFolder: (VirtualFolderDefinition & ReturnType<typeof getVirtualFolderLabels>) | null;
 };
 
@@ -112,8 +114,9 @@ type VirtualFolderCounts = {
   todo: number | null;
   inviteTotal: number | null;
   inviteUnread: number | null;
+  suspiciousUnread: number | null;
 };
-const NO_VIRTUAL_COUNTS: VirtualFolderCounts = { accountId: "", focused: null, todo: null, inviteTotal: null, inviteUnread: null };
+const NO_VIRTUAL_COUNTS: VirtualFolderCounts = { accountId: "", focused: null, todo: null, inviteTotal: null, inviteUnread: null, suspiciousUnread: null };
 
 export function useSearchState(options: UseSearchStateOptions) {
   const t = useTranslations("Views");
@@ -225,11 +228,12 @@ export function useSearchState(options: UseSearchStateOptions) {
         fetchCount("focused", virtualDefaultExcludedFolderIdsKey),
         fetchCount("todo", virtualDefaultExcludedFolderIdsKey),
         fetchCount("calendar", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey)
+        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey),
+        fetchCount("suspicious,unread", virtualDefaultExcludedFolderIdsKey)
       ])
-        .then(([focused, todo, inviteTotal, inviteUnread]) => {
+        .then(([focused, todo, inviteTotal, inviteUnread, suspiciousUnread]) => {
           if (controller.signal.aborted) return;
-          setVirtualCounts({ accountId: activeAccountId, focused, todo, inviteTotal, inviteUnread });
+          setVirtualCounts({ accountId: activeAccountId, focused, todo, inviteTotal, inviteUnread, suspiciousUnread });
         })
         .catch(() => {
           if (controller.signal.aborted) return;
@@ -267,6 +271,7 @@ export function useSearchState(options: UseSearchStateOptions) {
     actionQueueTodoCount: countsForActive.todo,
     inviteDeckTotalCount: countsForActive.inviteTotal,
     inviteDeckUnreadCount: countsForActive.inviteUnread,
+    suspiciousUnreadCount: countsForActive.suspiciousUnread,
     activeVirtualFolder
   };
 

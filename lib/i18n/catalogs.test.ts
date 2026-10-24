@@ -99,7 +99,7 @@ test("admin self-grant copy is explicit in both locales and uses German mailbox 
 
 test("views use reviewed German copy, independent of admin invitations and protocol IDs", () => {
   expect(Object.values(de.Views).filter(value => typeof value === "object").map(view => view.name)).toEqual([
-    "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Posteingang"
+    "Ungelesen & unbeantwortet", "Markiert & Aufgaben", "Kalendereinladungen", "Mir zugewiesen", "Nicht zugewiesen", "Offen", "Posteingang", "Verdächtig"
   ]);
   const t = getTranslator("de");
   expect(t("Views.actionQueue.description")).toContain("erledigte Aufgaben");

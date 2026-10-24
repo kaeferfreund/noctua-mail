@@ -14,6 +14,7 @@ import SenderIcon from "../SenderIcon";
 import { CALENDAR_INVITE_FLAG, hasMessageFlag } from "@/lib/messageFlags";
 import badgeStyles from "../message/MessageBadge.module.css";
 import CategoryBadge from "../CategoryBadge";
+import SpamBadge from "../SpamBadge";
 import FlagBadge from "../message/FlagBadge";
 import MessageBadge from "../message/MessageBadge";
 import TopicBadge from "../TopicBadge";
@@ -413,6 +414,7 @@ export default function MessageThreadList({
                     : message.category && (
                         <CategoryBadge category={message.category as any} showText={false} />
                       )}
+                  <SpamBadge message={message} />
                   {(threadBadgeUnion.threadHasFlagged || message.flagged) && (
                     <FlagBadge
                       onClick={() =>
