@@ -186,6 +186,25 @@ Benachrichtigungen aktiv”.
   valid `mailto:` or `https:` contact or Apple rejects the pushes (403).
 - Every push must show a notification (see above).
 
+### Hinweis für alle Nutzer: App heißt jetzt „Mail“ (Release vom 24.10.2026)
+
+Mit diesem Release heißt die App „Mail“ und hat ein neues Icon (weißer
+Umschlag auf Orange). iPhone und iPad übernehmen Name und Icon nur beim
+Hinzufügen zum Home-Bildschirm. Deshalb einmal:
+
+1. Die alte App auf dem Home-Bildschirm löschen.
+2. In Safari die Adresse öffnen → Teilen → „Zum Home-Bildschirm“.
+3. Die neue App öffnen, neu anmelden und unter Einstellungen →
+   Mitteilungen die Benachrichtigungen wieder einschalten.
+
+Das alte Push-Abo verschwindet von selbst (der Apple-Dienst meldet es beim
+nächsten Versand als ungültig, der Server löscht es). Auf Android und am
+Desktop (Chrome, Edge) aktualisieren sich Name und Icon automatisch, meist
+innerhalb eines Tages; wer es sofort sehen will, installiert die App ebenso
+neu und schaltet die Benachrichtigungen wieder ein. Authenticator-Einträge
+heißen bei neuen Einrichtungen „Mail“, bestehende Einträge („Noctua“)
+funktionieren unverändert weiter.
+
 ## Privacy and limits
 
 - Notification texts (sender, subject) pass through the browser vendor's push

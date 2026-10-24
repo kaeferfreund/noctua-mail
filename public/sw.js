@@ -2,6 +2,13 @@ const REMINDER_SYNC_TAG = "noctua-reminders";
 const REMINDER_META_CACHE = "noctua-reminder-meta-v1";
 const REMINDER_META_URL = "/__noctua/reminder-meta";
 
+// Icon files keep their names and are cached for a day, so the URLs carry the
+// art version. Must equal APP_ICON_VERSION in lib/appBranding.ts
+// (serviceWorker.test.ts checks it).
+const APP_ICON_VERSION = "2";
+const NOTIFICATION_ICON = `/icons/icon-192.png?v=${APP_ICON_VERSION}`;
+const NOTIFICATION_BADGE_ICON = `/icons/icon-96-mono.png?v=${APP_ICON_VERSION}`;
+
 // Same codec as lib/navigation/deepLinks.ts; kept standalone for this classic
 // (unbundled) worker. deepLinks.test.ts checks the worker against the serializer.
 function encodeDeepLinkId(id, prefix) {
@@ -162,8 +169,8 @@ async function processReminderNotifications(source) {
       await self.registration.showNotification(`Reminder: ${reminder.eventTitle}`, {
         body: bodyParts.join(" · "),
         tag: `calendar-reminder-${reminder.id}`,
-        icon: "/icon.png",
-        badge: "/favicon.png",
+        icon: NOTIFICATION_ICON,
+        badge: NOTIFICATION_BADGE_ICON,
         data: { url: targetUrl }
       });
       delivered[reminder.id] = reminder.triggerAtMs;
@@ -273,8 +280,6 @@ self.addEventListener("notificationclick", (event) => {
 // Web Push (payload contract: briefs/web-push/_contract.md, produced by
 // lib/push on the server). Malformed payloads are dropped without a
 // notification.
-const PUSH_ICON = "/icons/icon-192.png";
-const PUSH_BADGE_ICON = "/icons/icon-96-mono.png";
 const PUSH_SUBSCRIPTIONS_URL = "/api/push/subscriptions";
 
 function readPushPayload(data) {
@@ -310,9 +315,9 @@ function pushBadgeCount(payload) {
 
 function pushNotification(payload) {
   const url = samePushUrl(payload.url);
-  const common = { icon: PUSH_ICON, badge: PUSH_BADGE_ICON, data: { url } };
+  const common = { icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE_ICON, data: { url } };
   if (payload.type === "test") {
-    return { title: "Noctua: Benachrichtigungen aktiv", options: { ...common, tag: "noctua:test" } };
+    return { title: "Mail: Benachrichtigungen aktiv", options: { ...common, tag: "noctua:test" } };
   }
   if (payload.type !== "new-mail") return null;
   const accountId = nonEmptyString(payload.accountId);

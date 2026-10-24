@@ -65,9 +65,44 @@ installed apps on iOS 16.4+, Chromium desktop and some Android launchers.
 - `appleWebApp` metadata in `app/layout.tsx` marks the app as home-screen
   capable with the opaque `default` status bar. A translucent status bar or
   `viewport-fit=cover` would need safe-area insets throughout the shell first.
-- The touch icon (`app/apple-icon.tsx`) uses opaque, full-bleed art
-  (`public/icons/apple-touch-180.png`) because iOS paints transparency black.
-  `build-scripts/generate_push_icons.sh` regenerates it and the monochrome
-  notification badge `public/icons/icon-96-mono.png` from `base.svg`.
+- The touch icon (`/icons/apple-touch`, linked from `app/layout.tsx`) uses
+  opaque, full-bleed art (`public/icons/apple-touch-180.png`) because iOS
+  paints transparency black.
+- iOS copies the app name and icon when the app is added to the home screen
+  and never updates them. After a rename or new icon everyone has to remove
+  the app, add it again and re-enable notifications (user note in
+  doc/PUSH-NOTIFICATIONS.md, "iOS notes").
 - Safari may revoke a subscription after pushes that show no notification, so
   the server should keep badge-only pushes rare.
+
+## App name and icon
+
+- The product name shown to users is `BASE_APP_TITLE` in
+  `lib/appBranding.ts` ("Mail"); `APP_ENV_LABEL` appends a suffix such as
+  "Mail (Dev)". It feeds the manifest, `<title>`, the iOS home-screen title,
+  the sidebar, the TOTP issuer and the passkey RP name. The Docker image sets
+  the same name in `deploy-scripts/container-entrypoint.sh`. Manifest and
+  layout are built statically: a rename needs a rebuild.
+- `public/icons/base.svg` is the only icon source. Keep its viewBox
+  (`-100 -100 1800 1800`) and the 1600 px rounded background: the sidebar
+  logo route (`app/icons/logo.svg`) draws the environment ribbon in that
+  coordinate system. The ids `iconBackground`, `envelope`,
+  `envelopeFlapLine` and the mask `envelopeFlapCut` are used for the
+  monochrome badge.
+- Regenerate all raster icons with one command from the repository root
+  (needs `rsvg-convert` from librsvg):
+
+  ```sh
+  bash build-scripts/generate_icons.sh
+  ```
+
+  It writes `public/icons/icon-{16…512}.png`, `public/favicon.png`,
+  `public/icons/apple-touch-180.png` (opaque, full bleed) and
+  `public/icons/icon-96-mono.png` (white envelope for Android notification
+  badges).
+- Icon file names stay the same and are cached for a day, so every reference
+  carries `?v=<APP_ICON_VERSION>` (`versionedIconUrl` in
+  `lib/appBranding.ts`: manifest icons, page icon, touch icon, sidebar logo,
+  notification icons). After changing the art, bump `APP_ICON_VERSION` there
+  and in `public/sw.js` (`lib/push/serviceWorker.test.ts` fails if they
+  differ).

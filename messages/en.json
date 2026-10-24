@@ -481,7 +481,7 @@
     }
   },
   "Pwa": {
-    "description": "Modern webmail client prototype"
+    "description": "Webmail for personal and shared mailboxes"
   },
   "Shell": {
     "theme": {
@@ -767,7 +767,7 @@
     },
     "login": {
       "signupTitle": "Create your account",
-      "title": "Sign in to Noctua",
+      "title": "Sign in to Mail",
       "signupHelp": "Use the invite your admin gave you. Choose a separate app password.",
       "help": "Your personal identity gives you access to your mailboxes.",
       "created": "Your account was created. Sign in to set up your authenticator.",
@@ -808,7 +808,7 @@
       "restart": "Restart setup with fresh proof",
       "passkeyHelp": "You can also add a passkey using your device PIN, fingerprint or face.",
       "addPasskey": "Add a passkey",
-      "continue": "Continue to Noctua",
+      "continue": "Continue to Mail",
       "defaultPasskeyName": "My passkey"
     },
     "gate": {
