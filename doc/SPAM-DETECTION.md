@@ -116,8 +116,9 @@ authentication and holds only while a mail matches the sender's pattern.
 per account and sender address): number of mails, first/last mail, last "Als
 Spam", mails in Junk folders, how many passed SPF or DKIM aligned with the From
 domain, DKIM domains, a histogram of To+Cc counts, how often the mailbox was
-addressed directly, Reply-To domains, link root domains (at most 150, then
-"overflow"), masked links, attachment types, German/English by stop words,
+addressed directly, Reply-To domains, link root domains (at most 150: the 100
+most frequent plus the 50 most recently seen, so a flood of one-off domains
+never switches the "new link domain" rule off), masked links, attachment types, German/English by stop words,
 subject prefixes (`[tag]`, text before `:` or the first word, digits as `#`),
 lexicon categories, List-Id/List-Unsubscribe/Auto-Submitted and Message-ID
 domains. Rows of Sent, Drafts and Trash never count; Junk rows only count as
@@ -130,6 +131,18 @@ domain is aligned when it is the organisational domain of the From domain or a
 subdomain of it; `getRootDomain` knows multi-label public suffixes
 (`lib/publicSuffixes.ts`: co.uk, com.au …), so `attacker.co.uk` is not aligned
 with `bank.co.uk`. No Authentication-Results counts as not aligned.
+
+**Receiving server** (`receivingAuthenticationResults` in `input.ts`, shared
+with the allowlist): only `Authentication-Results` blocks above the second
+`Received` line whose authserv-id belongs to the receiving server count. That
+is the exact list in `NOCTUA_SPAM_AUTHSERV_ID`, or else the organisational
+domain of the host after "by" in the top-most `Received` line (written by our
+server, never by the sender). A block the sender inserted under another id —
+for example when the receiving server adds none — is ignored. A forged block
+under our server's own id still counts when the server writes none; a
+provider whose authserv-id lies outside the Received host's domain needs the
+setting. Mails without any `Received` line (local append) keep the top-most
+block.
 
 **Time**: first and last mail are arrival times — the date of the top-most
 `Received` header, which the receiving server stamps (the sender can only add
@@ -152,10 +165,10 @@ mail to the model):
 
 | Rule | Fires when |
 |---|---|
-| Recipients | To+Cc > max(5, 3 × the sender's 95th percentile); mailbox only in Bcc although ≥ 90 % of the history addressed it directly; ≥ 3 different outside recipient circles from the sender within an hour |
+| Recipients | To+Cc > max(5, 3 × the sender's 95th percentile); mailbox only in Bcc although ≥ 90 % of the history addressed it directly; ≥ 3 different outside recipient circles from the sender arriving within an hour (the 20 rows of the sender stored closest to the mail; arrival = Received stamp, else check time, else `dateValue`) |
 | Reply-To | first Reply-To (other than From) of this sender; a new root domain other than the From domain |
 | Authentication | no aligned SPF/DKIM pass on this mail; SPF fail/softfail; no Authentication-Results; DKIM domain new or missing although ≥ 50 % of the history was signed |
-| Links | IP links (loopback/private excluded); new shortener or file-share domains; any new link root domain (unless the profile overflowed); link text naming another domain when < 20 % of the history does |
+| Links | IP links (loopback/private excluded); new shortener or file-share domains; any link root domain not in the profile's bounded set; link text naming another domain when < 20 % of the history does |
 | Attachments | html/zip/rar/7z/iso/img/lnk/js/vbs/macro Office/svg/executables always; PDF when < 5 % of the history had attachments or with payment words in the subject |
 | Content | credential/payment/urgency words the sender uses in < 20 % of its mail; changed bank details always; language switch against ≥ 90 % of ≥ 10 recognised mails; subject outside the fixed prefixes (top 3 cover ≥ 90 %) |
 | Service marks | List-Id/Auto-Submitted missing although ≥ 95 % had them; Message-ID domain new although one domain covers ≥ 95 % |
@@ -164,7 +177,9 @@ mail to the model):
 The model gets one hint line: `Vertrauter Absender (23 Mails seit 2026-03,
 DKIM github.com); Abweichung: …`, explained in the cached rule catalogue, and
 the stricter threshold 0.9. Static rules keep their precedence: a static allow
-or a safe deny decides before the profile.
+or a safe deny decides before the profile, and a rule hint that is not weak
+("Hinweis", "Starker Hinweis") turns a skip into an anomaly ("passt zu einer
+Spam-Regel").
 
 **Skip**: `spamVerdict = "ham"`, `spamReasons = ["trusted:profile (23 Mails seit
 2026-03, DKIM github.com)"]`. **Canary**: 2 % of the skips (FNV-1a hash of the
@@ -173,11 +188,24 @@ with `trusted:canary (…)`. When the model does not say ham the server logs
 `[spam] canary mismatch` (account, message id, verdict, confidence; no content).
 
 **Learning and revocation**: each saved check with the result ham adds the mail
-to the mailbox's profile (spam and unsure results never do) (once per message, as `spamCheckedAt` is set once). "Als
-Spam" by a user (`POST …/messages/:id/spam`) sets the profile's `lastUserSpamAt`
-(a household-wide revocation through the merge) and resets the sender's INBOX
-rows of the last 7 days in every mailbox that were skipped as trusted; they are
-queued for a new check. Moves by `scripts/spam-apply.ts` do not revoke.
+to the mailbox's profile (spam and unsure results never do). A profile
+remembers short keys of its latest 256 counted mails, so a mail checked again
+(after a revocation) or already folded by the backfill is not counted twice.
+"Als Spam" by a user (`POST …/messages/:id/spam` or a move into Junk) sets the
+profile's `lastUserSpamAt` (a household-wide revocation through the merge),
+counts the mail into the sender's junk share once, and resets the sender's
+INBOX rows in every mailbox that were skipped as trusted and checked in the
+last 7 days (sender matched like the profile key: case, display name, IDN);
+they are queued for a new check. The classifier's auto-move to Junk counts the
+mail into the junk share of a sender that already has a profile. Moves by
+`scripts/spam-apply.ts` do not revoke.
+
+`lastUserSpamAt` is final: "Kein Spam" (button or a move out of Junk) for the
+same sender does not reset it, in no mailbox, and neither does a backfill
+(stored times survive). This is deliberate — one "Als Spam" means the sender's
+mail is never skipped as trusted again; the "Kein Spam" decision itself still
+acts as described under the hard allowlist. Undoing it needs a manual change
+of the `spam_sender_profiles` rows.
 
 **Admin**: Verwaltung → Spam-Erkennung shows one read-only line "Vertraute
 Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
@@ -189,10 +217,13 @@ Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
 each source for the header block and attachment names; about 40 s for 87,000
 rows on the dev data). Stored "Als Spam" decisions (`spam_examples`, label
 spam) become `lastUserSpamAt`, so they revoke trust household-wide like new ones.
-`--data <dir> [--out profiles.json]` is the default dry run: read-only
-(`immutable=1`), it prints the plan per account. `--data <dir> --write` replaces
-each account's profiles over the app's DB layer in one transaction, keeping
-stored "Als Spam" times. The data dir always comes from `--data` (never from
+`--data <dir> [--account <id>] [--out profiles.json]` is the default dry run:
+read-only (`immutable=1`), it prints the plan per account (with `--account`
+only that account is built). `--data <dir> --write` replaces each account's
+profiles over the app's DB layer in one transaction, keeping stored "Als Spam"
+times and junk counted live while it was building. Mail stored while it builds
+is read in a catch-up pass (rows after the last rowid it read) before the
+write, so the profile does not lose mail learned in the meantime. The data dir always comes from `--data` (never from
 `NOCTUA_DATA_DIR`/.env.local), `--help` prints the usage, unknown options are
 errors, and shards without the spam schema are refused (the deployed app
 creates it under the runbook). Run it once with `--write` after the deploy of
@@ -273,6 +304,7 @@ afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
 | `NOCTUA_SPAM_THRESHOLD` | env, admin setting overrides | `0.85` (0.5–1) |
 | `NOCTUA_SPAM_ENABLED` | env, admin setting overrides | off |
 | `NOCTUA_SPAM_RULES_FILE` | env | `<data dir>/spam-static-rules.json` |
+| `NOCTUA_SPAM_AUTHSERV_ID` | env, comma-separated | unset: the organisation of the top-most `Received` "by" host |
 | on/off, auto-move, own threshold | per mailbox (admin) | on / off / global |
 
 Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`).

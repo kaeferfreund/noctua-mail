@@ -457,6 +457,7 @@ export type SenderTrust = { trusted: true } | { trusted: false; reason: string }
 /** Concept §3.2: history, authentication and no "Als Spam" — the per-mail anomalies are checked separately. */
 export function evaluateSenderTrust(profile: SenderProfile | null, now = Date.now()): SenderTrust {
   if (!profile || profile.count === 0) return { trusted: false, reason: "unbekannter Absender" };
+  // Final on purpose: a later "Kein Spam" never resets lastUserSpamAt (doc/SPAM-DETECTION.md, Trusted senders).
   if (profile.lastUserSpamAt !== null) return { trusted: false, reason: "vom Nutzer als Spam markiert" };
   if (now - profile.lastSeenAt > TRUST_DECAY_MS) return { trusted: false, reason: "lange keine Mail" };
   if (profile.count < TRUST_MIN_MAILS) return { trusted: false, reason: "zu wenige Mails" };
