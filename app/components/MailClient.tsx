@@ -5698,6 +5698,7 @@ export default function MailClient({
       {manageOpen && editingAccount && (
         <UrlHistoryContext.Provider value={true}><AccountSettingsModal
           editingAccount={editingAccount}
+          accounts={accounts}
           isOpen={manageOpen}
           manageTab={manageTab}
           isExistingAccount={isExistingAccount}
