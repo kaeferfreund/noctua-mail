@@ -35,3 +35,14 @@ for (const locale of ["de", "en"] as const) test(`folder tree localizes flags an
   page.rerender(tree("unusual protocol"));
   expect(row("synthetic-inbox")).toBeTruthy();
 });
+
+test("QA-213: the Drafts row shows the draft total like the pinned Drafts entry; other folders show unread", () => {
+  const drafts: Folder = { id: "synthetic-drafts", accountId: "synthetic", name: "Drafts", specialUse: "\\Drafts", count: 12, unreadCount: 3 };
+  const tree = [folders[0], drafts];
+  const state = { rootFolders: tree, folderTree: new Map<string, Folder[]>(), folderById: new Map(tree.map(folder => [folder.id, folder])), folderQuery: "", searchScope: "folder" as const, activeFolderId: "", collapsedFolders: {}, syncingFolders: new Set<string>(), deletingFolderIds: new Set<string>(), draggingMessageIds: new Set<string>(), dragOverFolderId: null };
+  const actions = { setActiveFolderId: () => {}, setSearchScope: () => {}, clearSearch: () => {}, setCollapsedFolders: () => {}, setDragOverFolderId: () => {}, handleMoveMessages: () => {}, handleCreateSubfolder: () => {}, handleRenameFolderItem: () => {}, handleDeleteFolderItem: () => {}, syncAccount: () => {}, folderSpecialIcon: () => null };
+  const page = render(<I18nTestProvider locale="de"><Theme><FolderTree state={state} actions={actions} /></Theme></I18nTestProvider>);
+  expect(page.getByLabelText("12 Entwürfe").textContent).toBe("12");
+  expect(page.queryByText("3")).toBeNull();
+  expect(page.getByLabelText("2 ungelesen").textContent).toBe("2");
+});
