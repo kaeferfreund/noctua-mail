@@ -6,7 +6,8 @@ import {
   formatAccountMediumDateTime,
   formatAccountShortTime,
   formatAccountTimestampLabel,
-  formatAccountUpcomingDateLabel
+  formatAccountUpcomingDateLabel,
+  getMessageDateDisplay
 } from "./dateFormatting";
 
 // A stable timestamp (2026-04-15 15:45:00 local). We use getTime() from a
@@ -113,6 +114,61 @@ describe("dateFormatting helpers", () => {
     const laterMs = new Date(2026, 3, 20, 10, 0, 0).getTime();
 
     expect(formatAccountUpcomingDateLabel(laterMs, "ymd", nowMs)).toBe("2026-04-20");
+  });
+
+  describe("getMessageDateDisplay relative day labels", () => {
+    // The UI path formats in the explicit display zone (Europe/Berlin), so the
+    // instants are given in UTC: 2026-12-31 is CET (UTC+1), 2026-10-25 ends DST.
+    const relativeDays = (nowMs: number) => ({ labels: { today: "Heute", yesterday: "Gestern" }, nowMs });
+    const berlin = (year: number, month: number, day: number, hour: number, minute: number, offsetHours = 1) =>
+      Date.UTC(year, month - 1, day, hour - offsetHours, minute);
+
+    test("today and yesterday replace the date, older days keep it", () => {
+      const nowMs = berlin(2026, 12, 31, 23, 59);
+      const text = (ms: number) => getMessageDateDisplay(ms, "", "locale", "de", relativeDays(nowMs)).text;
+
+      expect(text(berlin(2026, 12, 31, 0, 1))).toBe("Heute, 00:01");
+      expect(text(berlin(2026, 12, 30, 23, 59))).toBe("Gestern, 23:59");
+      expect(text(berlin(2026, 12, 30, 0, 0))).toBe("Gestern, 00:00");
+      expect(text(berlin(2026, 12, 29, 23, 59))).toBe("29.12.2026, 23:59");
+    });
+
+    test("uses display-zone day boundaries across the year boundary", () => {
+      // 00:01 Berlin on 1 January is still 31 December in UTC.
+      const nowMs = berlin(2027, 1, 1, 0, 1);
+      const text = (ms: number) => getMessageDateDisplay(ms, "", "locale", "de", relativeDays(nowMs)).text;
+
+      expect(text(berlin(2027, 1, 1, 0, 0))).toBe("Heute, 00:00");
+      expect(text(berlin(2026, 12, 31, 23, 59))).toBe("Gestern, 23:59");
+      expect(text(berlin(2026, 12, 31, 0, 0))).toBe("Gestern, 00:00");
+      expect(text(berlin(2026, 12, 30, 23, 59))).toBe("30.12.2026, 23:59");
+    });
+
+    test("counts calendar days across the end of daylight saving time", () => {
+      const nowMs = berlin(2026, 10, 26, 0, 30);
+      const text = getMessageDateDisplay(berlin(2026, 10, 25, 0, 30, 2), "", "locale", "de", relativeDays(nowMs)).text;
+
+      expect(text).toBe("Gestern, 00:30");
+    });
+
+    test("tooltip keeps the full date and account presets keep their time style", () => {
+      const nowMs = berlin(2026, 4, 15, 18, 0, 2);
+      const messageMs = berlin(2026, 4, 15, 15, 45, 2);
+
+      expect(getMessageDateDisplay(messageMs, "", "locale", "de", relativeDays(nowMs))).toEqual({
+        text: "Heute, 15:45",
+        tooltip: "15.04.2026, 15:45:00"
+      });
+      expect(getMessageDateDisplay(messageMs, "", "mdy", "en", relativeDays(nowMs)).text).toBe("Heute, 03:45 PM");
+      expect(getMessageDateDisplay(messageMs, "", "ymd", "en", relativeDays(nowMs)).text).toBe("Heute, 15:45");
+    });
+
+    test("without relative labels and for future dates the absolute date stays", () => {
+      const nowMs = berlin(2026, 4, 15, 18, 0, 2);
+
+      expect(getMessageDateDisplay(berlin(2026, 4, 15, 15, 45, 2), "", "locale", "de").text).toBe("15.04.2026, 15:45");
+      expect(getMessageDateDisplay(berlin(2026, 4, 16, 9, 0, 2), "", "locale", "de", relativeDays(nowMs)).text).toBe("16.04.2026, 09:00");
+    });
   });
 
   test("formatAccountShortTime returns a non-empty label", () => {
