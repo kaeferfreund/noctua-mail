@@ -1,8 +1,8 @@
-import { createHash } from "crypto";
 import type { Database } from "bun:sqlite";
-import { getMessageSource } from "../../storage";
+import { getMessageSource, messageSourceSha256 } from "../../storage";
 import { withDbWriteRetry } from "../../dbWriteRetry";
-import { parseHeaderMap, resolveMessageSenderKey } from "../../mail/imap/parser";
+import { getHeaderValue, normalizeEnvelopeHeaderId, parseHeaderMap, resolveMessageSenderKey } from "../../mail/imap/parser";
+import { extractUnambiguousPrimaryEmail } from "../../senderIdentity";
 
 /** Backfill only on opening a message, using its retained wire From header. */
 export async function backfillMessageSenderKey(
@@ -14,7 +14,7 @@ export async function backfillMessageSenderKey(
   // A matching filename alone does not establish ownership for legacy files.
   // Require the digest recorded with this final row id by the fixed writer.
   const source = await getMessageSource(row.accountId, row.id, { exact: true });
-  if (!source || createHash("sha256").update(source).digest("hex") !== row.sourceSha256) return;
+  if (!source || messageSourceSha256(source) !== row.sourceSha256) return;
   const key = resolveMessageSenderKey(undefined, parseHeaderMap(Buffer.from(source)));
   if (!key) return;
   await withDbWriteRetry("backfillMessageSenderKey", async () => {
@@ -26,4 +26,29 @@ export async function backfillMessageSenderKey(
       .get(row.accountId, row.id) as { senderKey: string | null } | null;
     row.senderKey = stored?.senderKey ?? null;
   });
+}
+
+export type LegacySourceSkipReason = "size" | "message-id" | "no-sender-key" | "sender";
+
+/**
+ * Ownership check for a source retained under a row's exact final id before
+ * the writer recorded `sourceSha256` (scripts/backfill-sender-keys.ts).
+ * The legacy writer could publish another copy with the same Message-ID under
+ * this id, so the file must match the row on every field that copy would
+ * change: byte size (recorded from the row's own source at ingestion),
+ * Message-ID, and the From mailbox shown in the row. Anything else is skipped.
+ */
+export function checkLegacySourceOwnership(
+  row: { messageId: string | null; fromAddr: string; sizeBytes: number | null },
+  source: string
+): { senderKey: string; sourceSha256: string } | { skip: LegacySourceSkipReason } {
+  if (Buffer.byteLength(source) !== row.sizeBytes) return { skip: "size" };
+  const headers = parseHeaderMap(Buffer.from(source));
+  const messageId = normalizeEnvelopeHeaderId(getHeaderValue(headers, "message-id"));
+  if (!messageId || messageId !== row.messageId) return { skip: "message-id" };
+  // The same derivation as ingestion without an envelope and as the lazy backfill above.
+  const senderKey = resolveMessageSenderKey(undefined, headers);
+  if (!senderKey) return { skip: "no-sender-key" };
+  if (senderKey !== extractUnambiguousPrimaryEmail(row.fromAddr)) return { skip: "sender" };
+  return { senderKey, sourceSha256: messageSourceSha256(source) };
 }
