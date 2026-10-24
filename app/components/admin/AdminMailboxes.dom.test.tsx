@@ -61,4 +61,12 @@ describe("admin mailbox explicit self-grant", () => {
     fireEvent.click(page.getByRole("button", { name: "Manage members" }));
     expect(await page.findByRole("dialog", { name: "Members of shared@example.test" })).toBeTruthy();
   });
+  it("renders the portalled members editor inside a Radix theme so its table card resolves the theme tokens", async () => {
+    const { page } = harness(); await page.findByText("Synthetic Shared");
+    fireEvent.click(page.getByRole("button", { name: "Manage members" }));
+    const dialog = await page.findByRole("dialog", { name: "Members of shared@example.test" });
+    const theme = dialog.querySelector("[data-members-table]")?.closest(".radix-themes");
+    expect(theme).toBeTruthy();
+    expect(dialog.contains(theme!)).toBe(true);
+  });
 });
