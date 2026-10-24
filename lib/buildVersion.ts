@@ -129,10 +129,13 @@ export type RunningBuild = {
  * written next to the compiled app, so the label, the display and the
  * /api/version answer always describe the code that is running, also in
  * Docker images whose build arguments are not set at runtime. The runtime
- * environment is used only when the artifact carries no identity (next dev,
- * builds from before the artifact recorded the commit).
+ * environment is used only when the artifact carries no identity (builds from
+ * before the artifact recorded the commit) and under `next dev`, which compiles
+ * the sources live: an artifact left by an earlier `bun run build` describes
+ * that build, not the running code.
  */
-export const resolveRunningBuild = (file: Partial<BuildVersionPayload> | null, env: EnvMap = process.env): RunningBuild => {
+export const resolveRunningBuild = (artifact: Partial<BuildVersionPayload> | null, env: EnvMap = process.env): RunningBuild => {
+  const file = env.NODE_ENV === "development" ? null : artifact;
   const hash = readBuildHash(typeof file?.hash === "string" ? file.hash : "");
   if (hash) {
     return {

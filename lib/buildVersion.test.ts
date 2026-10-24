@@ -111,4 +111,13 @@ describe("running build", () => {
     // An older artifact without a hash still supplies its label.
     expect(resolveRunningBuild({ ok: true, buildVersionLabel: "old-label" }, {}).label).toBe("old-label");
   });
+
+  it("ignores an artifact from an earlier production build under next dev", () => {
+    const stale = createBuildVersionPayload({ NOCTUA_BUILD_HASH: "1111111aaaa", NOCTUA_BUILD_TIME: "2026-10-20T08:00:00Z" });
+    const dev = { ...env, NODE_ENV: "development" };
+    expect(resolveRunningBuild(stale, dev)).toEqual({ label: getBuildVersionLabel(env), info: getBuildInfo(env) });
+    expect(resolveRunningBuild(stale, { NODE_ENV: "development" })).toEqual({ label: "", info: null });
+    // The production server keeps the artifact first.
+    expect(resolveRunningBuild(stale, { ...env, NODE_ENV: "production" }).info?.hash).toBe("1111111aaaa");
+  });
 });
