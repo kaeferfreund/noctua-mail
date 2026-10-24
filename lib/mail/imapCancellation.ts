@@ -8,6 +8,11 @@ export class PostSendTimeoutError extends Error {
 // Request-local cancellation also reaches nested flag mutations and connection setup.
 const cancellation = new AsyncLocalStorage<AbortSignal>();
 export function throwIfImapCancelled() { cancellation.getStore()?.throwIfAborted(); }
+/** True when the request-local cancellation fired because the post-send deadline expired. */
+export function isImapDeadlineCancelled() {
+  const signal = cancellation.getStore();
+  return Boolean(signal?.aborted && signal.reason instanceof PostSendTimeoutError);
+}
 
 export function bindImapCancellation(client: ImapFlow) {
   const signal = cancellation.getStore();

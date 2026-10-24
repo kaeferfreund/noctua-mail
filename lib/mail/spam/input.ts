@@ -101,22 +101,49 @@ function addressText(value: ParsedSpamSource["to"] | ParsedSpamSource["cc"]) {
 
 export type HeaderLine = { key: string; value: string };
 
+/** Comma-separated authserv-ids of the receiving server; when set, only these exact ids count. */
+export const SPAM_AUTHSERV_ID_ENV = "NOCTUA_SPAM_AUTHSERV_ID";
+
+export function configuredAuthservIds(env: Record<string, string | undefined> = process.env) {
+  return (env[SPAM_AUTHSERV_ID_ENV] ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+}
+
+const authservId = (value: string) =>
+  value.split(";")[0].replace(/\([^()]*\)/g, " ").trim().split(/\s+/)[0]?.toLowerCase().replace(/\.$/, "") ?? "";
+
+/** The host after "by" in a Received value: the server that stamped it. */
+function receivedByHost(value: string) {
+  return value.replace(/\([^()]*\)/g, " ").match(/(?:^|\s)by\s+([a-z0-9.-]+)/i)?.[1].toLowerCase().replace(/\.$/, "") ?? null;
+}
+
 /**
- * Only the receiving server's verdicts count: the top-most Authentication-Results
- * block (all headers with the first one's authserv-id) and the first occurrence of
- * each X-Spam-* header. Copies further down come from earlier hops or the sender.
+ * The receiving server's Authentication-Results (RFC 8601 §5), shared by the
+ * allowlist and the trusted-sender profiles: only blocks above the second
+ * Received line whose authserv-id belongs to the receiving server count; of
+ * those, the top-most id's block. The receiving server is the configured
+ * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host that stamped
+ * the top-most Received line, which no sender can write: an id matches when it
+ * is that host, its first label (Netcup writes `by mxf9a0.netcup.net` and
+ * `Authentication-Results: mxf9a0;`) or in its registrable domain. A block the sender inserted under another id (no A-R of our server)
+ * is ignored. A mail without any Received line never passed an MX (local
+ * append); there the top-most block counts as before.
  */
-function topAuthenticationResults(lines: HeaderLine[]) {
+export function receivingAuthenticationResults(lines: HeaderLine[], configured: readonly string[] = configuredAuthservIds()) {
   // Our receiving server writes its Received line and its Authentication-Results
   // next to each other at the top. Anything below the second Received line was
   // written by an earlier hop or by the sender, so a forged block that copies the
   // authserv-id of our server is ignored there (verify-r2 R1).
   const receivedIndexes = lines.flatMap((line, index) => (line.key === "received" ? [index] : []));
   const limit = receivedIndexes.length >= 2 ? receivedIndexes[1] : lines.length;
-  const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit);
-  const servId = (value: string) => value.split(";")[0].trim().toLowerCase();
-  const first = results[0] ? servId(results[0].value) : "";
-  return results.filter((line) => servId(line.value) === first).map((line) => line.value);
+  const byHost = receivedIndexes.length ? receivedByHost(lines[receivedIndexes[0]].value) : null;
+  const receiver = byHost ? getRootDomain(byHost) ?? byHost : null;
+  const isReceiver = (id: string) => byHost !== null
+    && (id === byHost || id === byHost.split(".")[0] || (getRootDomain(id) ?? id) === receiver);
+  const pinned = (id: string) => (configured.length ? configured.includes(id)
+    : byHost === null ? receivedIndexes.length === 0 : isReceiver(id));
+  const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit && pinned(authservId(line.value)));
+  const first = results[0] ? authservId(results[0].value) : "";
+  return results.filter((line) => authservId(line.value) === first).map((line) => line.value);
 }
 
 function topSpamHeaders(lines: HeaderLine[]) {
@@ -156,7 +183,7 @@ function headerFields(lines: HeaderLine[]) {
     listId: header("list-id"),
     listUnsubscribe: header("list-unsubscribe"),
     autoSubmitted: header("auto-submitted"),
-    authenticationResults: topAuthenticationResults(capped),
+    authenticationResults: receivingAuthenticationResults(lines).map((value) => value.slice(0, HEADER_VALUE_LIMIT)),
     spamHeaders: topSpamHeaders(capped),
     receivedAt: topReceivedAt(lines)
   };

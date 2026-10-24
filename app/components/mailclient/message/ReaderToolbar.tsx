@@ -7,7 +7,7 @@ import type { ReaderLayout } from "@/lib/ui/readerFocus";
 import styles from "./ReaderToolbar.module.css";
 
 type Props = {
-  layout: ReaderLayout; showHint: boolean; dismissHint: () => void; toggleLayout: () => void; back: () => void;
+  layout: ReaderLayout; toggleLayout: () => void; back: () => void;
   archive: () => void; spam: () => void; inSpam: boolean; remove: () => void; move: () => void; topics: () => void;
   done: () => void; isDone: boolean; busy: boolean; renderMenu: () => ReactNode; openWindow: () => void;
   position: number; total: number; hasMore: boolean; previous: () => void; next: () => void;
@@ -21,7 +21,9 @@ export default function ReaderToolbar(props: Props) {
   const focus = props.layout === "focus";
   const action = (label: string, icon: ReactNode, onClick: () => void, disabled = props.busy, shortcut?: string) =>
     <TooltipIconButton size="2" variant="ghost" color="gray" tooltip={shortcut ? `${label} (${shortcut})` : label} aria-label={label} aria-keyshortcuts={shortcut} onClick={onClick} disabled={disabled}>{icon}</TooltipIconButton>;
-  return <div className={styles.root} role="group" aria-label={t("focus.toolbarLabel")} data-reader-toolbar="" data-focus={focus}>
+  // The split reader has no actions of its own: MessageViewOrchestrator places this
+  // group (Expand only) in the thread header's subject row instead of a row of its own.
+  return <div className={focus ? styles.root : styles.inline} role="group" aria-label={t("focus.toolbarLabel")} data-reader-toolbar="" data-focus={focus}>
     <div className={styles.row}>
       {focus ? <>
         {action(t("backMessages"), <ArrowLeft size={18} />, props.back, false, "Escape")}
@@ -43,13 +45,18 @@ export default function ReaderToolbar(props: Props) {
           {action(t("focus.next"), <ChevronRight size={18} />, props.next, !props.canNext || props.navigating, "j")}
         </div>
       </> : null}
-      <TooltipIconButton size="2" variant="ghost" color="gray" className={styles.expand} aria-label={t(focus ? "focus.showList" : "focus.expand")} tooltip={`${t(focus ? "focus.showList" : "focus.expand")} (Shift+Enter)`} aria-keyshortcuts="Shift+Enter" onClick={props.toggleLayout}>
+      <TooltipIconButton size="2" variant="ghost" color="gray" aria-label={t(focus ? "focus.showList" : "focus.expand")} tooltip={`${t(focus ? "focus.showList" : "focus.expand")} (Shift+Enter)`} aria-keyshortcuts="Shift+Enter" onClick={props.toggleLayout}>
         {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
       </TooltipIconButton>
     </div>
-    {!focus && props.showHint ? <div className={styles.hint}>
-      <span title={t("focus.hint")}>{t("focus.hint")}</span>
-      {action(t("focus.dismissHint"), <X size={12} />, props.dismissHint, false)}
-    </div> : null}
+  </div>;
+}
+
+/** One-time split-layout tip, shown under the thread subject. */
+export function ReaderFocusHint({ dismiss }: { dismiss: () => void }) {
+  const t = useTranslations("Reader");
+  return <div className={styles.hint} data-reader-hint="">
+    <span title={t("focus.hint")}>{t("focus.hint")}</span>
+    <TooltipIconButton size="2" variant="ghost" color="gray" tooltip={t("focus.dismissHint")} aria-label={t("focus.dismissHint")} onClick={dismiss}><X size={12} /></TooltipIconButton>
   </div>;
 }
