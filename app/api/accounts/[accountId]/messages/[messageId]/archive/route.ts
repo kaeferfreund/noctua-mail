@@ -8,6 +8,7 @@ import {
   resolveSpecialFolderAndMailbox
 } from "@/app/api/_helpers/message/routeHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { learnFromMessageMove } from "@/lib/mail/spam/moveLearning";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -21,7 +22,7 @@ export async function POST(request: Request, { params }: Params) {
   const context = await requireImapMessageMutationContext(request, { accountId, messageId });
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
-    const { accountId: resolvedAccountId, account, clientId, message } = context;
+    const { accountId: resolvedAccountId, account, clientId, message, userId } = context;
 
     const { folder: archiveFolder, mailbox: archiveMailbox } = await resolveSpecialFolderAndMailbox(
       resolvedAccountId,
@@ -30,6 +31,7 @@ export async function POST(request: Request, { params }: Params) {
     );
     const archiveMailboxPath = archiveMailbox ?? "Archive";
     const currentMailbox = message.mailboxPath;
+    const destinationFolderId = archiveFolder?.id ?? message.folderId;
 
     const { relocated } = await moveAndRelocateMessageWithFiles({
       account,
@@ -39,15 +41,21 @@ export async function POST(request: Request, { params }: Params) {
       clientId,
       accountId: resolvedAccountId,
       previousId: message.id,
-      destinationFolderId: archiveFolder?.id ?? message.folderId
+      destinationFolderId
     });
+    const nextId = relocated?.nextId ?? message.id;
+    // Archiving out of Junk is a "Kein Spam" decision (moveLearning.ts); any other archive move teaches nothing.
+    await learnFromMessageMove(
+      { accountId: resolvedAccountId, messageId: nextId, sourceFolderId: message.folderId, destinationFolderId, userId },
+      { message: { ...message, id: nextId } }
+    );
     return NextResponse.json({
       ok: true,
       action: "moved",
       archiveFolderId: archiveFolder?.id ?? null,
       archiveMailbox: archiveMailboxPath,
       previousMessageId: relocated?.previousId ?? message.id,
-      messageId: relocated?.nextId ?? message.id
+      messageId: nextId
     });
   });
 }

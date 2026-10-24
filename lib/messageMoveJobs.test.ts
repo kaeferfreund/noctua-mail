@@ -199,4 +199,34 @@ describe("message move jobs", () => {
       21
     );
   });
+
+  test("records a spam decision after a successful move into Junk, nothing after a failed one", async () => {
+    const { saveFoldersForAccount, upsertMessages, listSpamExampleCandidates } = actualDb;
+    const inbox = { id: `${account.id}:INBOX`, accountId: account.id, name: "INBOX", count: 0, specialUse: "\\Inbox" };
+    const junk = { id: `${account.id}:Junk`, accountId: account.id, name: "Junk", count: 0, specialUse: "\\Junk" };
+    await saveFoldersForAccount(account.id, [inbox, junk]);
+    const message = (id: string, uid: number) => ({
+      id, accountId: account.id, folderId: inbox.id, threadId: id, messageId: `<${id}@example.test>`,
+      subject: `Angebot ${id}`, from: `Shop <${id}@shop.example.test>`, to: account.email, preview: "", body: "Text",
+      date: new Date(Date.UTC(2026, 9, 24, 12, uid)).toISOString(), dateValue: Date.UTC(2026, 9, 24, 12, uid),
+      mailboxPath: "INBOX", imapUid: uid
+    });
+    await upsertMessages(account.id, inbox.id, [message("m-learn-ok", 30), message("m-learn-fail", 31)], true, { recomputeThreads: false });
+    const task = (messageId: string, sourceUid: number) => ({
+      accountId: account.id, messageId, sourceFolderId: inbox.id, sourceMailboxPath: "INBOX", sourceUid,
+      destinationFolderId: junk.id, destinationMailboxPath: "Junk", userId: "user-1"
+    });
+
+    moveImapMessages.mockResolvedValueOnce(new Map([[30, 130]]));
+    enqueueMessageMoveJobs([task("m-learn-ok", 30)]);
+    await waitForMessageMoveJobsIdle(account.id);
+    moveImapMessages.mockRejectedValueOnce(new Error("move failed"));
+    enqueueMessageMoveJobs([task("m-learn-fail", 31)]);
+    await waitForMessageMoveJobsIdle(account.id);
+
+    expect(moveImapMessages).toHaveBeenCalledTimes(2);
+    const examples = await listSpamExampleCandidates(account.id, { senderEmail: null, senderDomain: "shop.example.test" });
+    expect(examples.map((example) => ({ subject: example.subject, label: example.label })))
+      .toEqual([{ subject: "Angebot m-learn-ok", label: "spam" }]);
+  });
 });
