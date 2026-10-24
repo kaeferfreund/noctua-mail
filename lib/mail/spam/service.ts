@@ -23,6 +23,7 @@ import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJo
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
 import { loadStaticRules } from "./staticRules";
 import type { SpamVerdict } from "./types";
+import { addSpamUsage, EMPTY_SPAM_USAGE, spamCacheHitRate, spamUsageLogFields, type SpamTokenUsage } from "./usage";
 
 /**
  * Wiring between sync and the classifier (doc/SPAM-DETECTION.md). After every
@@ -41,6 +42,8 @@ type SpamServiceState = {
   logFailure: ReturnType<typeof createSpamFailureLogger>;
   claims: ReturnType<typeof createSpamClaims>;
   identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets> };
+  /** Model token usage per account since that account's last sweep summary. */
+  usage: Map<string, SpamTokenUsage>;
 };
 
 const runtime = globalThis as typeof globalThis & { __noctuaSpamService?: SpamServiceState };
@@ -49,6 +52,7 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
   return {
     logFailure,
     claims: createSpamClaims(PROCESSED_TTL_MS, PROCESSED_LIMIT),
+    usage: new Map(),
     queue: createSpamQueue({
       check: (job) => checkMessage(job),
       onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", { error: String(error) })
@@ -66,7 +70,28 @@ async function sweep(accountId: string) {
   if (!inbox) return;
   // Oldest first, so a backlog is worked off before it leaves the window.
   const ids = await listUncheckedSpamMessageIds(accountId, inbox.id, Date.now() - SWEEP_WINDOW_MS, SWEEP_LIMIT * 4);
-  state.queue.enqueue(pickSweepJobs(accountId, ids, state.queue, state.claims, SWEEP_LIMIT));
+  const jobs = pickSweepJobs(accountId, ids, state.queue, state.claims, SWEEP_LIMIT);
+  state.queue.enqueue(jobs);
+  if (jobs.length) void logSweepSummary(accountId, jobs.length);
+}
+
+/** One line per sweep that queued work, once the queue has drained: the account's model token usage. */
+async function logSweepSummary(accountId: string, messages: number) {
+  await state.queue.onIdle();
+  const usage = state.usage.get(accountId) ?? EMPTY_SPAM_USAGE;
+  state.usage.delete(accountId);
+  console.info("[spam] sweep done", {
+    accountId,
+    messages,
+    modelCalls: usage.calls,
+    ...spamUsageLogFields(usage),
+    cacheHitRate: Number(spamCacheHitRate(usage).toFixed(3))
+  });
+}
+
+function recordUsage(accountId: string, usage: SpamTokenUsage) {
+  console.debug("[spam] model call", { accountId, ...spamUsageLogFields(usage) });
+  state.usage.set(accountId, addSpamUsage(state.usage.get(accountId) ?? EMPTY_SPAM_USAGE, usage));
 }
 
 async function householdIdentity() {
@@ -107,7 +132,8 @@ async function checkMessage(job: SpamCheckJob) {
     staticRules: await loadStaticRules(),
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
     model: getSpamLanguageModel(config),
-    providerOptions: getSpamProviderOptions(config)
+    providerOptions: getSpamProviderOptions(config),
+    onUsage: (usage) => recordUsage(job.accountId, usage)
   });
   if (!decision) {
     state.logFailure(job.accountId, "model unavailable; messages stay unchecked", { reason: spamModelUnavailableReason(config) });
