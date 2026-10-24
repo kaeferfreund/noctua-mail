@@ -1,12 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
+import FullCalendar, {
+  type CalendarOptions,
+  type CalendarRef,
+  type EventClickInfo,
+  type EventDisplayInfo,
+  type MountInfo,
+  type DatesSetInfo,
+  type EventInput
+} from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/react/daygrid";
+import timeGridPlugin from "@fullcalendar/react/timegrid";
+import interactionPlugin from "@fullcalendar/react/interaction";
 import rrulePlugin from "@fullcalendar/rrule";
-import type { EventClickArg, EventMountArg, DatesSetArg, EventInput } from "@fullcalendar/core";
+import classicTheme from "@fullcalendar/react/themes/classic";
+import "@fullcalendar/react/skeleton.css";
+import "@fullcalendar/react/themes/classic/theme.css";
+import "@fullcalendar/react/themes/classic/palette.css";
 import { formatCalendarEventRange } from "@/lib/calendar";
 import type { AccountDateFormat, CalendarEvent } from "@/lib/data";
 import type { CalendarReminder } from "@/lib/data";
@@ -29,6 +40,29 @@ import {
 import { removeDateLabelsFromTabOrder } from "./calendarFocus";
 import "./fullcalendar-theme.css";
 
+// v7 exposes styling hooks instead of stable DOM class names. Keep Noctua's
+// theme and mobile frame selectors attached through those public hooks.
+const calendarClasses: CalendarOptions = {
+  className: "fc",
+  toolbarClass: "fc-toolbar",
+  headerToolbarClass: "fc-header-toolbar",
+  toolbarSectionClass: "fc-toolbar-chunk",
+  toolbarTitleClass: "fc-toolbar-title",
+  buttonClass: ({ name, isSelected }) =>
+    `fc-button fc-button-primary fc-${name}-button${isSelected ? " fc-button-active" : ""}`,
+  viewClass: ({ view }) => `fc-view-harness fc-${view.type}-view`,
+  dayHeaderClass: "fc-col-header-cell",
+  dayHeaderInnerClass: "fc-col-header-cell-cushion",
+  dayCellClass: ({ isToday }) => `fc-daygrid-day${isToday ? " fc-day-today" : ""}`,
+  dayCellTopInnerClass: "fc-daygrid-day-number",
+  eventClass: "fc-event",
+  eventInnerClass: "fc-event-main",
+  eventTitleClass: "fc-event-title",
+  eventTimeClass: "fc-event-time",
+  columnEventClass: ({ isShort }) => isShort ? "fc-timegrid-event-short" : "",
+  nowIndicatorLineClass: "fc-timegrid-now-indicator-line"
+};
+
 export type CalendarViewHandle = {
   goToDate: (date: Date) => void;
   goToToday: () => void;
@@ -46,7 +80,7 @@ type Props = {
   onDateClick?: (date: Date, allDay: boolean) => void;
   /** Opens the new-event dialog (wired to the toolbar "＋ Event" button). */
   onCreateEvent?: () => void;
-  calendarRef?: React.RefObject<FullCalendar | null>;
+  calendarRef?: React.RefObject<CalendarRef | null>;
 };
 
 function calendarEventToFcEvent(
@@ -71,10 +105,10 @@ function calendarEventToFcEvent(
     start: new Date(displayStartAtMs),
     end: fcEnd,
     allDay: ev.allDay,
-    classNames: [
+    className: [
       `fc-event-${ev.sourceType}`,
       ...(ev.myPartstat ? [`fc-event-partstat-${ev.myPartstat.toLowerCase().replace(/-/g, "")}`] : [])
-    ],
+    ].join(" "),
     extendedProps: { kind: "event", data: ev, displayStartAtMs, displayEndAtMs }
   };
 }
@@ -87,7 +121,7 @@ function reminderToFcEvent(r: CalendarReminder): EventInput {
     start: new Date(startMs),
     end: r.eventEndAtMs ? new Date(startMs + (r.eventEndAtMs - r.eventStartAtMs)) : undefined,
     allDay: false,
-    classNames: ["fc-event-reminder"],
+    className: "fc-event-reminder",
     extendedProps: { kind: "reminder", data: r }
   };
 }
@@ -117,7 +151,7 @@ function getSavedDate(): Date | undefined {
   return undefined;
 }
 
-function buildEventHoverTitle(arg: EventMountArg, dateFormat?: AccountDateFormat) {
+function buildEventHoverTitle(arg: MountInfo<EventDisplayInfo>, dateFormat?: AccountDateFormat) {
   const props = arg.event.extendedProps as {
     kind: "event" | "reminder";
     data: CalendarEvent | CalendarReminder;
@@ -167,8 +201,8 @@ export default function CalendarView({
   calendarRef: externalRef
 }: Props) {
   const dateFormat = useAccountDateFormat();
-  const internalRef = useRef<FullCalendar>(null);
-  const calendarRef = (externalRef ?? internalRef) as React.RefObject<FullCalendar>;
+  const internalRef = useRef<CalendarRef>(null);
+  const calendarRef = (externalRef ?? internalRef) as React.RefObject<CalendarRef>;
   const [fullCalendarEvents, setFullCalendarEvents] = useState<EventInput[]>([]);
   const fetchRangeRef = useRef<{ startMs: number; endMs: number } | null>(null);
   const fetchRequestIdRef = useRef(0);
@@ -231,7 +265,7 @@ export default function CalendarView({
   );
 
   const handleDatesSet = useCallback(
-    (arg: DatesSetArg) => {
+    (arg: DatesSetInfo) => {
       if (!compact) {
         try {
           localStorage.setItem(CALENDAR_VIEW_KEY, arg.view.type);
@@ -251,7 +285,7 @@ export default function CalendarView({
   );
 
   const handleEventClick = useCallback(
-    (arg: EventClickArg) => {
+    (arg: EventClickInfo) => {
       const props = arg.event.extendedProps as {
         kind: "event" | "reminder";
         data: CalendarEvent | CalendarReminder;
@@ -270,7 +304,7 @@ export default function CalendarView({
   );
 
   const handleEventDidMount = useCallback(
-    (arg: EventMountArg) => {
+    (arg: MountInfo<EventDisplayInfo>) => {
       arg.el.title = buildEventHoverTitle(arg, dateFormat);
     },
     [dateFormat]
@@ -336,7 +370,8 @@ export default function CalendarView({
       <div className="fc-compact">
         <FullCalendar
           ref={calendarRef}
-          plugins={[dayGridPlugin, rrulePlugin]}
+          {...calendarClasses}
+          plugins={[dayGridPlugin, rrulePlugin, classicTheme]}
           initialView="dayGridMonth"
           headerToolbar={false}
           firstDay={firstDay}
@@ -362,7 +397,8 @@ export default function CalendarView({
     <div ref={nowFractionRef} className="fc-now-scope" style={{ display: "contents" }}>
       <FullCalendar
         ref={calendarRef}
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin]}
+        {...calendarClasses}
+        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin, classicTheme]}
         initialView={initialView}
         initialDate={initialDate}
         views={{
@@ -372,7 +408,7 @@ export default function CalendarView({
             eventMinHeight: 10
           }
         }}
-        customButtons={
+        buttons={
           onCreateEvent
             ? {
                 addEvent: {
@@ -380,7 +416,12 @@ export default function CalendarView({
                   // a create affordance and `hint` supplies the title/aria-label.
                   text: "＋ Event",
                   hint: "New event",
-                  click: () => onCreateEvent()
+                  click: (event) => {
+                    // v7 also tries CalendarApi.addEvent after the callback.
+                    // This button opens our dialog before an event exists.
+                    event.preventDefault();
+                    onCreateEvent();
+                  }
                 }
               }
             : undefined

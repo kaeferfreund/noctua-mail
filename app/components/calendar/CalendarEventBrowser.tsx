@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type FullCalendar from "@fullcalendar/react";
+import type { CalendarRef } from "@fullcalendar/react";
 import type { CalendarEvent, CalendarReminder } from "@/lib/data";
 import dynamic from "next/dynamic";
 import { buildAccountCalendarEventPath } from "@/lib/accountApiPaths";
@@ -39,7 +39,7 @@ const CalendarView = dynamic(() => import("./CalendarView"), { ssr: false });
 type Props = {
   accountId: string;
   firstDay?: 0 | 1;
-  calendarRef?: React.RefObject<FullCalendar | null>;
+  calendarRef?: React.RefObject<CalendarRef | null>;
   onOpenMessage?: (messageId: string) => void;
   onFindRelatedByInviteUid?: (uid: string) => void;
 };
@@ -51,7 +51,7 @@ export default function CalendarEventBrowser({
   onOpenMessage,
   onFindRelatedByInviteUid
 }: Props) {
-  const internalCalendarRef = useRef<FullCalendar>(null);
+  const internalCalendarRef = useRef<CalendarRef>(null);
   const calendarRef = externalCalendarRef ?? internalCalendarRef;
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | CalendarReminder | null>(null);
   const [selectedKind, setSelectedKind] = useState<"event" | "reminder" | null>(null);
