@@ -693,6 +693,27 @@ describe("switch to a mailbox visited earlier", () => {
     expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
   });
 
+  it("A -> B (cached) -> A in the same tick ends on A, shown and persisted", async () => {
+    const server = { selected: "account-a", accounts };
+    const h = await bootedWithCache(server);
+    h.cache.writeFolders("account-a", foldersOf("account-a"));
+    h.cache.writeFolders("account-b", foldersOf("account-b"));
+    // One callback, no render in between: the second call sees the closure of A.
+    const switchAccount = h.result.current.switchAccount;
+    let toB!: Promise<void>;
+    let toA!: Promise<void>;
+    act(() => { toB = switchAccount("account-b"); toA = switchAccount("account-a"); });
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    await h.release("switch-account", () => json({ ok: true }));
+    await h.release("switch-account", () => json({ ok: true }));
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    await h.release("/account-a/folders", () => json(foldersOf("account-a")));
+    await act(async () => { await Promise.all([toB, toA]); });
+    expect(server.selected).toBe("account-a");
+    expect(h.result.current.activeAccountId).toBe("account-a");
+    expect(h.result.current.activeFolderId).toBe("account-a:INBOX");
+  });
+
   for (const status of [403, 500]) {
     it(`a ${status} on the switch replaces the cached view with the server's${status === 403 ? " and drops the mailbox's cache" : ""}`, async () => {
       const server = { selected: "account-a", accounts };
