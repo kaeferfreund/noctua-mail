@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, mock, spyOn } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useDeepLinks, type DeepLinkTransaction } from "./useDeepLinks";
 import { emptyDeepLink, parseDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import type { MessageResolution } from "@/lib/navigation/resolveMessage";
@@ -276,4 +276,28 @@ it("finishes a link once when the mailbox on screen is revoked too, and leaves t
   expect(notice).toHaveBeenCalledWith("forbidden");
   expect(onForbidden).toHaveBeenCalledTimes(1);
   expect(page.getByTestId("state").textContent).toContain('"messageId":""');
+});
+it("leaves the switching phase only in a render that carries the switch's commit", async () => {
+  // Chromium: a render of mailbox A commits, the switch response arrives before that
+  // render's passive effects are flushed, and the switch commits B and resolves. The
+  // late effect still sees A and must not read it as the controller's fallback.
+  window.history.replaceState(null, "", "/?a=~b");
+  function LateEffectHarness() {
+    const [state, setState] = useState<DeepLinkState>({ ...emptyDeepLink(), accountId: "a", folderId: "a:INBOX" });
+    const [tick, setTick] = useState(0);
+    const respond = useRef<() => void>(() => {});
+    useLayoutEffect(() => { if (tick === 1) respond.current(); }, [tick]);
+    useDeepLinks({ ready: true, state, messages: [], accountIds: ["a", "b"],
+      switchAccount: id => new Promise<void>(resolve => {
+        respond.current = () => { void Promise.resolve().then(() => { setState(old => ({ ...old, accountId: id })); resolve(); }); };
+        setTimeout(() => setTick(1), 0);
+      }),
+      applyPlace: target => { const applied = { ...target, folderId: target.folderId || `${target.accountId}:INBOX`, messageId: "" }; setState(applied); return applied; },
+      resolveMessage: async () => ({ status: "missing" }), openMessage: () => {}, notice: () => {} });
+    return <output data-testid="state">{JSON.stringify(state)}</output>;
+  }
+  const page = render(<LateEffectHarness />); await settled();
+  expect(new URLSearchParams(window.location.search).get("a")).toBe("~b");
+  expect(new URLSearchParams(window.location.search).get("f")).toBe("INBOX");
+  expect(page.getByTestId("state").textContent).toContain('"folderId":"b:INBOX"');
 });

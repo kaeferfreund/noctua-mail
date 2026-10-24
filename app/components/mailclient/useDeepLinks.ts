@@ -42,6 +42,10 @@ export function useDeepLinks(options: Options) {
   const initialized = useRef(false);
   const [, refresh] = useState(0);
   const update = useCallback(() => refresh(value => value + 1), []);
+  // The transaction whose mailbox switch has finished. State rather than a phase write:
+  // an effect of a render committed before the switch's own updates can still run after
+  // the switch resolved, and must not read that render's mailbox as the switch's result.
+  const [switched, setSwitched] = useState<Pending | null>(null);
   const request = useCallback((target: DeepLinkState, origin: Pending["origin"] = "link", historyMode: "push" | "replace" = "replace", keepShell = false) => {
     pending.current?.controller.abort();
     pending.current?.done();
@@ -112,6 +116,10 @@ export function useDeepLinks(options: Options) {
       return;
     }
     const current = () => pending.current === work && !work.controller.signal.aborted;
+    if (work.phase === "switching") {
+      if (switched !== work) return;
+      work.phase = "account";
+    }
     if (work.phase === "requested") {
       const authorized = authorizeDeepLink(work.target, options.accountIds, options.state.accountId);
       work.target = authorized.state;
@@ -121,9 +129,7 @@ export function useDeepLinks(options: Options) {
       work.phase = "switching";
       // Even reselecting the currently visible mailbox cancels an older in-flight switch.
       void options.switchAccount(work.target.accountId).then(() => {
-        if (!current()) return;
-        work.phase = "account";
-        update();
+        if (current()) setSwitched(work);
       });
     } else if (work.phase === "account") {
       if (options.state.accountId !== work.target.accountId) {
