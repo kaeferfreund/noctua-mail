@@ -2,6 +2,15 @@
 
 Quick reference for deploying Noctua Mail in any environment.
 
+For this fork, household deployment is coordinated outside the Git checkout by
+`/home/user/code/noctua-mail/ops/deploy-dev.sh` (preview assembly) and
+`/home/user/code/noctua-mail/briefs/go-live-runbook.md` (production cut-over plan).
+Those workspace resources are not shipped in a fresh clone. The preview script's
+worktree default is older; the current stage procedure supplies `NOCTUA_DEPLOY_WT`
+explicitly.
+The production plan selects standalone Bun/systemd; Docker below is an alternative.
+Recheck dated host observations in the plan before using it.
+
 ## Prerequisites
 
 ### Runtime
@@ -21,8 +30,8 @@ No native desktop mode, sealed-cookie credentials or SMTP recovery delivery is s
 ```sh
 BETTER_AUTH_URL=https://mail.example.org
 PASSKEY_RP_ID=mail.example.org
-BETTER_AUTH_SECRET=<independent-random-secret-at-least-32-characters>
-IMAP_SECRET_KEY=<retain-existing-independent-encryption-key>
+BETTER_AUTH_SECRET="<independent-random-secret-at-least-32-characters>"
+IMAP_SECRET_KEY="<retain-existing-independent-encryption-key>"
 IMAP_CREDENTIALS_STORAGE=db
 BETTER_AUTH_TELEMETRY=0
 NOCTUA_DATA_DIR=/srv/noctua/data
@@ -85,7 +94,7 @@ the default only after measuring.
 docker build -t noctua-mail .
 ```
 
-Worker subprocesses are started by API routes and execute TypeScript entrypoints from `./scripts` at runtime. In `output: 'standalone'` builds, those files must be included explicitly by Next's trace configuration in [next.config.ts](next.config.ts). Do not rely on incidental file tracing to pull them into `.next/standalone`.
+Worker subprocesses are started by API routes and execute TypeScript entrypoints from `./scripts` at runtime. In `output: 'standalone'` builds, those files must be included explicitly by Next's trace configuration in [next.config.ts](../next.config.ts). Do not rely on incidental file tracing to pull them into `.next/standalone`.
 
 **Verify Docker worker packaging:**
 ```bash
@@ -138,7 +147,10 @@ export IMAP_SECRET_KEY="your_key_here"
 export NOCTUA_DATA_DIR="/path/to/data/"
 export HOSTNAME=127.0.0.1
 export PORT=3654
-bun --bun .next/standalone/server.js
+ENV_FILE=.env.local bun --bun build-scripts/generateRuntimeConfig.ts
+cp -R .next/static .next/standalone/.next/static
+cp -R public .next/standalone/public
+(cd .next/standalone && bun --bun server.js)
 ```
 
 ## Graceful standalone shutdown
@@ -424,7 +436,7 @@ For the one-way shard upgrade, follow the stopped backup, verification and resto
 
 ```bash
 # Stop application (recommended for consistency)
-tar czf noctua-backup-$(date +%Y%m%d).tar.gz /path/to/noctua/data/
+tar czf noctua-backup-$(date +%Y%m%d).tar.gz -C /path/to/noctua/data .
 ```
 
 ### Database-Only Backup (minimal, excludes cache)
@@ -443,7 +455,7 @@ tar czf noctua-db-backup-$(date +%Y%m%d).tar.gz \
 ```bash
 # Stop application
 # Extract backup
-tar xzf noctua-backup-20260211.tar.gz -C /path/to/noctua/data/
+tar xzf /path/to/noctua-backup-YYYYMMDD.tar.gz -C /path/to/noctua/data/
 # Start application
 ```
 
@@ -585,7 +597,7 @@ For a manual proof with fixed ports, set the test-only `NOCTUA_TEST_IMAP_PORT` a
 ## Migration and recovery
 
 Stop the service, make a consistent master/shard/key backup, and follow the explicit identity
-manifest and two-run procedure in [AUTHENTICATION.md](AUTHENTICATION.md#slice-6-contract-changes).
+manifest and two-run procedure in [AUTHENTICATION.md](AUTHENTICATION.md#offline-migration-and-bootstrap-runbook).
 Recovery links are handed over personally and printed once only in a private operator terminal.
 No SMTP delivery is configured. The local synthetic restore smoke covers auth IDs/factors and a
 shard/key snapshot; application-wide restore acceptance stays Stage 4 in TEAM-INBOX.md §11.
