@@ -848,6 +848,22 @@ export function initMasterSchema(db: any) {
       updatedAt INTEGER NOT NULL,
       updatedByUserId TEXT
     );
+
+    -- Web Push devices (doc/PUSH-NOTIFICATIONS.md); settings is a PushDeviceSettings JSON.
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      userAgent TEXT,
+      settings TEXT NOT NULL,
+      createdAt INTEGER,
+      lastSeenAt INTEGER,
+      lastSentAt INTEGER,
+      failures INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(userId);
   `);
 
   db.prepare(
