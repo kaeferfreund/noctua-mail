@@ -63,6 +63,23 @@ describe("buildSpamInput", () => {
     expect(input.maskedLinkDomains).toEqual([]);
   });
 
+  test("a forged Authentication-Results block below the second Received line is ignored even with our authserv-id", async () => {
+    const forged = [
+      "Received: from sender.example.test (sender.example.test [192.0.2.10]) by mx.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+      "Authentication-Results: mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none",
+      "Received: from laptop (unknown [192.0.2.11]) by sender.example.test with ESMTP id 2; Sat, 24 Oct 2026 09:59:00 +0000",
+      "Authentication-Results: mx.example.test; dkim=pass header.d=victim.example.test; spf=pass smtp.mailfrom=victim.example.test",
+      "From: Victim <ceo@victim.example.test>",
+      "To: anna@example.test",
+      "Subject: Dringend",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Bitte sofort ueberweisen."
+    ].join("\r\n");
+    const input = buildSpamInput(await simpleParser(forged));
+    expect(input.authenticationResults).toEqual(["mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none"]);
+  });
+
   test("the row fallback takes the server verdicts from a raw header block", () => {
     const headers = source.slice(0, source.indexOf("\r\n\r\n")) + "\r\nAuto-Submitted: auto-generated";
     const input = buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", cc: "bob@example.test", subject: "S",

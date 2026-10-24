@@ -47,3 +47,21 @@ export function openSpamDataDir(dataDir: string) {
     }
   };
 }
+
+/**
+ * Every shard of the accounts to write must live inside the given data dir.
+ * main.db stores absolute shard paths, so a copied data dir would otherwise
+ * route writes into the original shards (verify-r2 R2).
+ */
+export function assertShardsInsideDataDir(accounts: { id: string; dbPath?: string | null }[], dataDir: string) {
+  const path = require("node:path") as typeof import("node:path");
+  const root = path.resolve(dataDir) + path.sep;
+  const outside = accounts.filter((account) => {
+    if (!account.dbPath) return false;
+    const resolved = path.resolve(dataDir, account.dbPath);
+    return !resolved.startsWith(root);
+  });
+  if (outside.length) {
+    throw new Error(`Refusing to write: shard paths outside ${dataDir}: ${outside.map((account) => `${account.id} → ${account.dbPath}`).join(", ")}`);
+  }
+}
