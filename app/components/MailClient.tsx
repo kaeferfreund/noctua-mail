@@ -1658,7 +1658,7 @@ export default function MailClient({
 
   // useAccountController: manages account/folder CRUD and initial data load
   const {
-    mailboxState, security: authSecurity, bootstrapError, logout,
+    mailboxState, security: authSecurity, bootstrapError, foldersUnavailableAccountId, logout,
     loadInitialData,
     switchAccount,
     saveAccount,
@@ -4862,7 +4862,8 @@ export default function MailClient({
     calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
   };
   const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
-    ready: authState === "ok" && initialDataReady && initialFoldersLoadedAccountId === activeAccountId,
+    ready: authState === "ok" && initialDataReady &&
+      (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
     state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
     applyPlace: requested => {
       const targetView = requested.query.trim() || requested.badges.length ? null : requested.view;
