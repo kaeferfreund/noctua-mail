@@ -527,7 +527,9 @@ export type AdminAuditAction =
   | "account.update"
   | "member.grant"
   | "member.update"
-  | "member.revoke";
+  | "member.revoke"
+  | "domain_icon.upload"
+  | "domain_icon.reset";
 
 export type AdminAuditEntry = {
   id: string;

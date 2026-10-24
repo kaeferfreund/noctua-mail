@@ -463,3 +463,10 @@ export {
   saveSpamSettings,
   saveSpamVerdict
 } from "./db/spam";
+export {
+  type DomainIconRow,
+  deleteDomainIconRow,
+  getDomainIconRow,
+  listDomainIconRows,
+  saveDomainIconRow
+} from "./db/domainIcons";

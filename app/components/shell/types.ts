@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Account } from "@/lib/data";
+import { mailboxGroupDomain } from "@/lib/senderIdentity";
 
 /**
  * Membership fields that feat/team-auth adds to `Account` (design §5.3:
@@ -102,7 +103,7 @@ export function groupMailboxes(accounts: readonly ShellAccount[]): Array<{
   if (accounts.length < MAILBOX_GROUPING_MIN) return [{ domain: null, accounts: [...accounts] }];
   const groups = new Map<string | null, ShellAccount[]>();
   for (const account of accounts) {
-    const domain = account.email.trim().split("@")[1]?.toLowerCase() || null;
+    const domain = mailboxGroupDomain(account.email);
     const group = groups.get(domain) ?? [];
     group.push(account);
     groups.set(domain, group);
