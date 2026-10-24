@@ -175,6 +175,9 @@ describe("compact header status", () => {
 // phone frame relies on. Real 320/360/390 px geometry, 44px targets, grid
 // height and hit testing run in tests/browser/ui/qa-status-indicator.spec.ts.
 const phoneControls = ["addEvent", "today", "prev", "next", "dayGridMonth", "timeGridWeek", "timeGridDay"];
+// Heading levels in document order; FullCalendar's toolbar title is a role=heading.
+const headingLevels = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6, [role=heading]")]
+  .map(heading => Number(heading.getAttribute("aria-level") ?? heading.tagName.slice(1)));
 describe("phone calendar frame", () => {
   const calendarFetch = () => spyOn(globalThis, "fetch").mockImplementation(Object.assign(
     async () => new Response(JSON.stringify({ ok: true, items: [], conflicts: [] }), { headers: { "Content-Type": "application/json" } }),
@@ -204,6 +207,8 @@ describe("phone calendar frame", () => {
       await waitFor(() => expect(frame.querySelectorAll(".fc-daygrid-day-number").length).toBeGreaterThan(0));
       expect(frame.querySelectorAll("a:not([href]):not([tabindex])").length).toBe(0);
       expect(within(sheet).getByRole("button", { name: "Kalender-Seitenleiste einblenden" })).toBeTruthy();
+      // The month title nests under the Sheet's h2 instead of being a second h2.
+      expect(headingLevels(sheet)).toEqual([2, 3]);
     } finally { network.mockRestore(); }
   });
   it("keeps the bounded popover frame on desktop", async () => {
@@ -213,6 +218,9 @@ describe("phone calendar frame", () => {
       const popover = await view.findByRole("dialog");
       expect(popover.getAttribute("data-slot")).toBe("popover-content");
       expect(popover.querySelector<HTMLElement>("[data-calendar-frame]")!.dataset.calendarFrame).toBe("popover");
+      // h2 popover title, h3 per section, then the month title under "Demnächst".
+      await waitFor(() => expect(popover.querySelector(".fc-toolbar-title")).toBeTruthy(), { timeout: 10000 });
+      expect(headingLevels(popover)).toEqual([2, 3, 3, 3, 3, 4]);
     } finally { network.mockRestore(); }
   });
   it("wraps the toolbar, keeps 44px targets and a bounded grid in the phone CSS", () => {

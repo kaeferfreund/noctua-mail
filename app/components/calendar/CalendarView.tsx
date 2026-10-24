@@ -72,6 +72,8 @@ type Props = {
   accountId: string;
   compact?: boolean;
   firstDay?: 0 | 1;
+  /** Level of the toolbar title heading; FullCalendar defaults to 2. */
+  headingLevel?: number;
   onEventClick?: (
     event: CalendarEvent | CalendarReminder,
     kind: "event" | "reminder",
@@ -195,6 +197,7 @@ export default function CalendarView({
   accountId,
   compact = false,
   firstDay = 1,
+  headingLevel,
   onEventClick,
   onDateClick,
   onCreateEvent,
@@ -445,6 +448,7 @@ export default function CalendarView({
           right: "dayGridMonth,timeGridWeek,timeGridDay"
         }}
         firstDay={firstDay}
+        headingLevel={headingLevel}
         events={fullCalendarEvents}
         eventDidMount={handleEventDidMount}
         nowIndicator
