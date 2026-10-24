@@ -47,4 +47,16 @@ describe("spam allowlist", () => {
     expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async () => true, latestDecision: async () => "spam" })))
       .toBeNull();
   });
+
+  test("correspondents and \"Kein Spam\" senders need authentication for the sender when the server reports any", async () => {
+    const known = context({ isCorrespondent: async () => true });
+    const decided = context({ latestDecision: async () => "ham" });
+    const forged = ["mxe.example.test; spf=pass smtp.mailfrom=bounce@attacker.example; dkim=pass header.d=attacker.example"];
+    expect(await matchSpamAllowlist(from("Partner <partner@example.test>", forged), known)).toBeNull();
+    expect(await matchSpamAllowlist(from("news@example.test", forged), decided)).toBeNull();
+    expect(await matchSpamAllowlist(from("partner@example.test", ["mxe.example.test; spf=fail smtp.mailfrom=partner@example.test"]), known)).toBeNull();
+    expect(await matchSpamAllowlist(from("partner@example.test"), known)).toBe("correspondent");
+    // Without any Authentication-Results there is nothing to judge.
+    expect(await matchSpamAllowlist(from("partner@example.test", []), known)).toBe("correspondent");
+  });
 });
