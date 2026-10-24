@@ -217,6 +217,26 @@ Examples live in the shard table `spam_examples` (sender, root domain, subject,
 280-character unquoted snippet, label, source, user, time). The latest decision
 per sender and subject replaces older ones; at most 2,000 per account are kept.
 
+### Lernen beim Verschieben
+
+Folder moves teach the same way as the buttons (`lib/mail/spam/moveLearning.ts`,
+`learnFromMessageMove`): a move whose destination is the account's Junk folder
+(`findJunkFolder` / `isSpamFolder`, so `INBOX.Spam` and the like count too)
+stores a spam example with source `move-junk` and revokes the sender's trust
+like "Als Spam"; a move out of Junk to a folder that is neither Junk nor Trash
+stores a ham example with source `move-from-junk` and clears the "Verdächtig"
+mark like "Kein Spam". Junk → Trash and moves between two non-Junk folders
+record nothing. The helper runs once per message after the IMAP move and the
+local relocation succeeded — in the move queue behind `POST …/messages/move`
+(move dialog, drag & drop, keyboard, whole-thread and bulk moves, undo) and in
+the archive route — with the acting user; a rolled-back move teaches nothing.
+Roles follow the move routes (editor+), so viewers cannot teach by moving.
+System moves never pass through it: the classifier's auto-move, the move of
+`scripts/spam-apply.ts` and sync relocations store their own example or none,
+and the explicit spam/not-spam routes keep their own recording — each message
+gets one example per decision. A repeated call for the same move replaces the
+sender+subject entry instead of adding one.
+
 ## Storage and migration
 
 Additive, following the `senderKey` pattern (doc/HTML-MAIL-PRIVACY.md):
@@ -330,6 +350,7 @@ bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua
 bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data
 ```
 
-Wrongly moved mail must be moved back with „Kein Spam“ in Noctua, not with
-another mail client or by drag and drop: only „Kein Spam“ stores the ham example
+Wrongly moved mail must be moved back in Noctua — with „Kein Spam“ or by moving
+it out of Junk (move dialog, drag and drop; see "Lernen beim Verschieben") —
+not with another mail client: only moves made in Noctua store the ham example
 the filter learns from.
