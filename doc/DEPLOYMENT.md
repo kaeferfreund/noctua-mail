@@ -2,14 +2,9 @@
 
 Quick reference for deploying Noctua Mail in any environment.
 
-For this fork, household deployment is coordinated outside the Git checkout by
-`/home/user/code/noctua-mail/ops/deploy-dev.sh` (preview assembly) and
-`/home/user/code/noctua-mail/briefs/go-live-runbook.md` (production cut-over plan).
-Those workspace resources are not shipped in a fresh clone. The preview script's
-worktree default is older; the current stage procedure supplies `NOCTUA_DEPLOY_WT`
-explicitly.
-The production plan selects standalone Bun/systemd; Docker below is an alternative.
-Recheck dated host observations in the plan before using it.
+Household preview and production deployments are driven by operator scripts and
+runbooks kept outside the repository, in an `ops/` workspace next to the checkout.
+The repository itself ships only the generic deployment guide below.
 
 ## Prerequisites
 

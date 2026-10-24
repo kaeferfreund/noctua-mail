@@ -297,13 +297,10 @@ cache files can require explicit resync; do not assume every read repairs them.
 Follow [FTS-V3-MIGRATION.md](doc/FTS-V3-MIGRATION.md) for format upgrades and rollback.
 
 [DEPLOYMENT.md](doc/DEPLOYMENT.md) covers standalone packaging, reverse proxy,
-shutdown, watcher sizing and recovery. The household deployment uses one Bun
-server behind a TLS proxy. Deployment orchestration is maintained outside this
-Git checkout in `/home/user/code/noctua-mail/ops/deploy-dev.sh`, with the
-production cut-over plan in
-`/home/user/code/noctua-mail/briefs/go-live-runbook.md`. These are workspace
-operator resources, not scripts shipped by a fresh clone; the plan's dated host
-observations must be rechecked before release.
+shutdown, watcher sizing and recovery. Household preview and production
+deployments are driven by operator scripts and runbooks kept outside the
+repository, in an `ops/` workspace next to the checkout. The repository itself
+ships only the generic deployment guide linked above.
 
 ## Documentation index
 
