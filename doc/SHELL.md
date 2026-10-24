@@ -173,6 +173,13 @@ zone, full commit and ISO time in the tooltip) sits as a footer line at the
 bottom of the desktop status popover and as a label at the end of the phone
 status menu; without build data it renders nothing. The sidebar brand shows
 the same `BuildInfo` label, so both places read short commit plus Berlin time.
+The identity comes from the build artifact: `generateBuildVersion.ts` records
+`NOCTUA_BUILD_HASH`/`NOCTUA_BUILD_TIME` (or the Dockerfile's `NEXT_PUBLIC_BUILD_*`)
+as `hash`/`builtAt` in `public/build-version.json`, and the page and
+`/api/version` read it once per process (`getRunningBuild`). A Docker image
+therefore shows its build without runtime variables, and a runtime environment
+that describes another build cannot pair a new label with old code. Runtime
+variables are read only when the artifact has no commit (`next dev`).
 
 Every phone status Sheet (Hintergrundaufgaben, Posteingangsprüfung, Demnächst,
 Fehler, Kalender) starts with the same visible title row, `StatusSheetTitle`:
