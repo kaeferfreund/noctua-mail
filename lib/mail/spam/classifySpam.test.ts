@@ -4,7 +4,11 @@ import { tmpdir } from "os";
 import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { MockLanguageModelV4 } from "ai/test";
-import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, shouldMarkAsSpam, spamVerdictSchema } from "./classifySpam";
+import { APICallError, RetryError } from "ai";
+import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, isRetryableSpamError, shouldMarkAsSpam, SPAM_MAX_OUTPUT_TOKENS,
+  SpamOutputTruncatedError, spamVerdictSchema } from "./classifySpam";
+import { getSpamProviderOptions } from "./provider";
+import { resolveSpamConfig } from "./config";
 import { createSpamQueue } from "./queue";
 import { EMPTY_STATIC_RULES, loadStaticRules, parseStaticRules } from "./staticRules";
 import { isTrustCanary } from "./senderProfile";
@@ -63,6 +67,41 @@ describe("classifySpam", () => {
   test("invalid model output is an error, never a verdict", async () => {
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 7, reasons: [] }));
     await expect(classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model })).rejects.toThrow();
+  });
+
+  test("bounds the schema cannot carry to the model are applied after parsing", async () => {
+    const long = "x".repeat(200);
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.9, reasons: [" a ", "", long, "b", "c", "d", "e", "f"] }));
+    const decision = await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model });
+    expect(decision?.reasons).toEqual(["a", "x".repeat(160), "b", "c", "d"]);
+    expect(spamVerdictSchema.safeParse(decision).success).toBe(true);
+  });
+
+  test("thinking is off and the output budget leaves room; a cut-off answer is a retryable error", async () => {
+    expect(getSpamProviderOptions(resolveSpamConfig(null, {}))).toEqual({ anthropic: { effort: "low", thinking: { type: "disabled" } } });
+    const model = mockSpamModel(answer({ verdict: "ham", confidence: 0.8, reasons: [] }));
+    await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model });
+    expect(model.doGenerateCalls[0].maxOutputTokens).toBe(SPAM_MAX_OUTPUT_TOKENS);
+    const truncated = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [{ type: "text", text: "{\"verdict\":\"spam\",\"confid" }],
+        finishReason: { unified: "length", raw: "max_tokens" },
+        usage: { inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 4096, text: 4096, reasoning: undefined } },
+        warnings: []
+      })
+    });
+    const error = await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model: truncated }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(SpamOutputTruncatedError);
+    expect(isRetryableSpamError(error)).toBe(true);
+  });
+
+  test("only provider rejections of the request itself are not retried", () => {
+    const apiError = (statusCode: number) => new APICallError({ message: "synthetic", url: "https://api.example.test", requestBodyValues: {}, statusCode });
+    for (const status of [400, 401, 403, 404]) expect(isRetryableSpamError(apiError(status))).toBe(false);
+    for (const status of [408, 429, 500, 529]) expect(isRetryableSpamError(apiError(status))).toBe(true);
+    expect(isRetryableSpamError(new RetryError({ message: "x", reason: "maxRetriesExceeded", errors: [apiError(401)] }))).toBe(false);
+    expect(isRetryableSpamError(new Error("network down"))).toBe(true);
+    expect(isRetryableSpamError(new DOMException("timed out", "TimeoutError"))).toBe(true);
   });
 
   test("allowlist and static rules short-circuit before the model", async () => {

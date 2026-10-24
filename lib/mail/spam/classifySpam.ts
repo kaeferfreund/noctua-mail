@@ -1,4 +1,4 @@
-import { generateText, Output, type LanguageModel, type SystemModelMessage } from "ai";
+import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, type LanguageModel, type SystemModelMessage } from "ai";
 import { z } from "zod";
 import { matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
 import { assessSenderTrust, type SpamTrustContext } from "./anomaly";
@@ -8,11 +8,37 @@ import { SPAM_SYSTEM_CACHE_OPTIONS, type SpamModelProviderOptions } from "./prov
 import type { SpamDecision, SpamExample, SpamInput } from "./types";
 import { spamUsageFromSdk, type SpamTokenUsage } from "./usage";
 
+export const SPAM_MAX_REASONS = 5;
+export const SPAM_REASON_MAX_LENGTH = 160;
+
+/** A model verdict as stored: every bound holds. */
 export const spamVerdictSchema = z.object({
   verdict: z.enum(["spam", "ham", "unsure"]).describe("spam, ham (kein Spam) oder unsure"),
   confidence: z.number().min(0).max(1).describe("Sicherheit des Urteils zwischen 0 und 1"),
-  reasons: z.array(z.string().min(1).max(160)).max(5).describe("höchstens 5 kurze Begründungen auf Deutsch")
+  reasons: z.array(z.string().min(1).max(SPAM_REASON_MAX_LENGTH)).max(SPAM_MAX_REASONS).describe("höchstens 5 kurze Begründungen auf Deutsch")
 });
+
+/**
+ * What the model is asked for. The Anthropic provider strips minimum/maximum,
+ * maxLength and maxItems from the schema it sends, so the model never sees
+ * them; boundSpamOutput applies them after parsing instead.
+ */
+const spamModelOutputSchema = z.object({
+  verdict: spamVerdictSchema.shape.verdict,
+  confidence: z.number().describe("Sicherheit des Urteils zwischen 0 und 1"),
+  reasons: z.array(z.string()).describe("höchstens 5 kurze Begründungen auf Deutsch")
+});
+
+/**
+ * Reasons are trimmed, empty ones dropped, each cut to SPAM_REASON_MAX_LENGTH
+ * and at most SPAM_MAX_REASONS kept. A confidence outside 0–1 is not guessed
+ * at: it throws, like any other invalid output (a failed attempt).
+ */
+export function boundSpamOutput(output: z.infer<typeof spamModelOutputSchema>) {
+  const reasons = output.reasons.map((reason) => reason.trim()).filter(Boolean)
+    .map((reason) => reason.slice(0, SPAM_REASON_MAX_LENGTH).trim()).slice(0, SPAM_MAX_REASONS);
+  return spamVerdictSchema.parse({ ...output, reasons });
+}
 
 export const SPAM_SYSTEM_PROMPT = `Du prüfst eingehende E-Mails für die Postfächer eines Haushalts (privat und geschäftlich) auf Spam.
 
@@ -29,6 +55,37 @@ Regeln:
 
 /** Model call limit; a timeout is a failed attempt and goes through the queue's retries. */
 export const SPAM_MODEL_TIMEOUT_MS = 30_000;
+
+/**
+ * Output budget of one call. Thinking is switched off for the call
+ * (getSpamProviderOptions); a model that cannot switch it off still thinks
+ * within this budget, so it leaves room for the verdict after the thinking.
+ */
+export const SPAM_MAX_OUTPUT_TOKENS = 4096;
+
+/** The model ran out of output tokens before the verdict was complete; a later attempt may fit. */
+export class SpamOutputTruncatedError extends Error {
+  constructor() {
+    super("Spam model output was cut off at the token limit");
+    this.name = "SpamOutputTruncatedError";
+  }
+}
+
+/**
+ * Errors another attempt cannot fix: the provider rejected the request itself
+ * (bad key, unknown model id, invalid request — APICallError says so per status).
+ * Rate limits, overload, timeouts, network errors and invalid or truncated
+ * output may succeed later.
+ */
+export function isRetryableSpamError(error: unknown): boolean {
+  if (RetryError.isInstance(error)) return isRetryableSpamError(error.lastError);
+  if (APICallError.isInstance(error)) return error.isRetryable;
+  return true;
+}
+
+function rethrowTruncated(error: unknown): never {
+  throw NoObjectGeneratedError.isInstance(error) && error.finishReason === "length" ? new SpamOutputTruncatedError() : error;
+}
 
 /**
  * Mail-derived text must not close or open the <email>/<beispiele> blocks:
@@ -218,15 +275,15 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
     model: params.model,
     system: spamSystemMessage(params.staticRules),
     prompt: buildSpamPrompt(input, await params.getExamples(), hints),
-    output: Output.object({ schema: spamVerdictSchema }),
+    output: Output.object({ schema: spamModelOutputSchema }),
     providerOptions: params.providerOptions,
-    maxOutputTokens: 2048,
+    maxOutputTokens: SPAM_MAX_OUTPUT_TOKENS,
     // The queue owns retries (at most two); the SDK must not add its own.
     maxRetries: 0,
     abortSignal
-  }), abortSignal);
+  }), abortSignal).catch(rethrowTruncated);
   params.onUsage?.(spamUsageFromSdk(usage));
-  const decision: SpamDecision = { ...output, reasons: output.reasons.map((reason) => reason.trim()).filter(Boolean), source: "model" };
+  const decision: SpamDecision = { ...boundSpamOutput(output), source: "model" };
   if (skip && trust) {
     return { ...decision, reasons: [`trusted:canary (Stichprobe, ${trust.summary})`, ...decision.reasons],
       minThreshold: TRUSTED_SPAM_THRESHOLD, trust: { kind: "canary", mismatch: decision.verdict !== "ham" } };
