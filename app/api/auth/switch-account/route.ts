@@ -1,8 +1,7 @@
 import { readAuthJson } from "@/app/api/_helpers/readAuthJson";
 import { NextResponse } from "next/server";
-import { compareAndSetActiveAccountId, getAuth, setActiveAccountId } from "@/lib/betterAuth";
-import { getDb } from "@/lib/db/connection";
-import { requireActiveUserSession, requireAccountAccessOr403, withAuthResponse } from "@/lib/auth";
+import { getAuth, setActiveAccountId } from "@/lib/betterAuth";
+import { clearActiveAccountIdIfStill, requireActiveUserSession, requireAccountAccessOr403, withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 
 export async function POST(request: Request) {
@@ -23,7 +22,7 @@ export async function POST(request: Request) {
     const stillAllowed = await requireAccountAccessOr403(session, accountId);
     if (stillAllowed instanceof NextResponse) {
       // Undo only this request's write: a switch another tab committed meanwhile passed its own check and stays.
-      await compareAndSetActiveAccountId(await getDb(), session.sessionToken, accountId, null);
+      await clearActiveAccountIdIfStill(session, accountId);
       return stillAllowed;
     }
     return NextResponse.json({ok:true,accountId});
