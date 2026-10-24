@@ -15,6 +15,21 @@ function leaves(value: Record<string, unknown>, prefix = ""): Record<string, str
   }));
 }
 
+test("German progress labels for saving and sending use one passive form", () => {
+  const progress = Object.entries(leaves(de)).filter(([path]) => /\.(saving|sending)$/.test(path));
+  expect(progress.length).toBeGreaterThan(3);
+  for (const [path, text] of progress) {
+    expect(`${path}: ${text}`).toMatch(path.endsWith(".saving") ? /: (.+ )?[Ww]ird gespeichert …$/ : /: (.+ )?[Ww]ird gesendet …$/);
+  }
+});
+
+test("QA-214: German mailbox copy says Postfach; Konto only means the personal or a provider account", () => {
+  // doc/I18N.md: Mailbox = Postfach. These keys refer to the personal login or the DeepL account.
+  const personal = /^(Auth\.|Shell\.account$|Settings\.translation\.apiKeyHint$)/;
+  const konto = Object.entries(leaves(de)).filter(([path, text]) => /Kont(o|en)/.test(text) && !personal.test(path));
+  expect(konto).toEqual([]);
+});
+
 describe("message catalogs", () => {
   test("both locales have identical leaf keys and valid ICU messages", () => {
     const de = leaves(catalogs.de), en = leaves(catalogs.en);
