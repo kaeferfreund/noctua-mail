@@ -1,30 +1,24 @@
 import {test,expect} from "bun:test";
-import {readFileSync} from "node:fs";
 import {createAuthenticatedTestSession} from "./testAuthHarness";
 import {requireActiveUserSession} from "./auth";
 import {assertStreamAuthorized} from "./authStreams";
+import {createStreamEventSender} from "@/app/api/accounts/[accountId]/imap/stream/streamEventSender";
 
-// Execute the route's real closure against the real checker/DB, with only its transport replaced.
-// The closure is sliced from the route source and transpiled because `send` captures route-local state. A direct
-// test needs `send` extracted from imap/stream/route.ts into an importable factory; until then a change to the
-// slice markers fails the two index assertions below instead of silently testing nothing.
+// Execute the stream route's real sender against the real checker/DB, with only its transport replaced.
 test("generation commit between stream check and enqueue prevents sensitive delivery",async()=>{
   const f=await createAuthenticatedTestSession();
   const identity=await requireActiveUserSession(new Request("http://localhost:3000",{headers:f.jar.headers()}));
   if(identity instanceof Response)throw new Error("Missing fixture");
-  const route=readFileSync(new URL("../app/api/accounts/[accountId]/imap/stream/route.ts",import.meta.url),"utf8");
-  const begin=route.indexOf("        const send = async"),end=route.indexOf("\n\n        type Session",begin);
-  expect(begin).toBeGreaterThan(0);expect(end).toBeGreaterThan(begin);
-  const wrapper="function sendFactory(assertStreamAuthorized,identity,stopped,controller,encoder,getImapHttpError,mailboxFailureDto,accountId,accountContext,authStream){"+route.slice(begin,end)+";return send;}";
-  const compiled=new Bun.Transpiler({loader:"ts",target:"bun"}).transformSync(wrapper);
-  const createSend=new Function(compiled+"\nreturn sendFactory;")();
-  let delivered=0;
-  const send=createSend(assertStreamAuthorized,identity,false,{enqueue:()=>{delivered++;}},new TextEncoder(),()=>null,()=>null,"synthetic",{role:"viewer"},{close:()=>{}});
+  let delivered=0,closed=0;
+  const send=createStreamEventSender({identity,accountId:"synthetic",role:"viewer",controller:{enqueue:()=>{delivered++;}},
+    isStopped:()=>false,close:()=>{closed++;}});
+  await send("message",{subject:"Synthetic envelope"});
+  expect(delivered).toBe(1);
+  // `send` suspends before its check: the revocation commits after the stream opened and before this event is enqueued.
   const pending=send("message",{subject:"Synthetic envelope"});
-  await Promise.resolve();
   f.master.transaction(()=>f.master.prepare("UPDATE auth_security_state SET generation=generation+1 WHERE userId=?").run(f.user.id)).immediate();
-  const before=delivered;
   await pending;
-  expect(delivered).toBe(before);
+  expect(delivered).toBe(1);
+  expect(closed).toBe(1);
   await expect(assertStreamAuthorized(identity)).rejects.toThrow("revoked");
 });
