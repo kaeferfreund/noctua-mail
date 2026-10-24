@@ -2,6 +2,7 @@ import { isUiLocale, type UiLocalePreference } from "../i18n/config";
 import type { AccountRole, User, UserAccountLink } from "../data";
 import { isAccountRole } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
+import { resolveAccountRoleRow } from "./accountAccess";
 import { getDb } from "./connection";
 import { deleteMcpTokenAccountRows, deleteMcpTokenRowsForUser } from "./mcpTokens";
 import {
@@ -221,8 +222,11 @@ export async function getUserAccountRole(
   return row ? mapUserAccountLinkRow(row).role : null;
 }
 
-/** Revokes a membership. Returns true when a link was removed. */
-/** Same MCP token cleanup as a membership revoke (`changeAccountMember`), so re-adding the link never re-enables a token. */
+/**
+ * Revokes a membership. Returns true when a link was removed. Same MCP token cleanup as a membership revoke
+ * (`changeAccountMember`), so re-adding the link never re-enables a token; an owner keeps the mailbox through
+ * ownership, so their tokens stay untouched (`changeAccountMember` refuses owners).
+ */
 export async function removeUserAccountLink(userId: string, accountId: string) {
   return withDbWriteRetry("removeUserAccountLink", async () => {
     const db = await getDb();
@@ -231,7 +235,7 @@ export async function removeUserAccountLink(userId: string, accountId: string) {
         .prepare(`DELETE FROM user_accounts WHERE userId = ? AND accountId = ?`)
         .run(userId, accountId);
       const removed = changedRows(result) > 0;
-      if (removed) deleteMcpTokenAccountRows(db, accountId, userId);
+      if (removed && resolveAccountRoleRow(db, userId, accountId) == null) deleteMcpTokenAccountRows(db, accountId, userId);
       return removed;
     }).immediate();
   });
