@@ -13,7 +13,8 @@
  * messages and a seeded random 1,000 INBOX messages are used. With
  * ANTHROPIC_API_KEY set the model is called (costs money); without it only the
  * allowlist and static rules run and the rest is reported as undecided. Output
- * names messages by subject and sender only. --out writes every evaluated item
+ * names messages by subject and sender only, plus the model's token usage, the
+ * prompt-cache hit rate and a cost estimate (prices: SPAM_MODEL_PRICES in config). --out writes every evaluated item
  * with its decision as JSON (input for scripts/spam-apply.ts).
  */
 import { Database, constants } from "bun:sqlite";
@@ -24,12 +25,13 @@ import type { Folder } from "../lib/data";
 import { sentToAddressInDb } from "../lib/db/sentRecipients";
 import { buildOwnIdentitySets, type SpamAllowlistContext } from "../lib/mail/spam/allowlist";
 import { classifySpam, shouldMarkAsSpam } from "../lib/mail/spam/classifySpam";
-import { isValidThreshold, resolveSpamConfig } from "../lib/mail/spam/config";
+import { isValidThreshold, resolveSpamConfig, SPAM_MODEL_PRICES } from "../lib/mail/spam/config";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
 import { loadStaticRules, serverFlaggedSpam, staticRulesPath } from "../lib/mail/spam/staticRules";
 import type { SpamEvalRecord } from "../lib/mail/spam/apply";
 import type { SpamDecision, SpamInput } from "../lib/mail/spam/types";
+import { addSpamUsage, EMPTY_SPAM_USAGE, estimateSpamCostUsd, spamCacheHitRate } from "../lib/mail/spam/usage";
 import { findInboxFolder, findSentFolder, isSpamFolder } from "../lib/specialFolders";
 
 type Item = { accountId: string; id: string; label: "spam" | "ham"; serverSpamFlag?: boolean };
@@ -118,6 +120,7 @@ const selected = limit <= 0 ? items
   : stratified ? [...byLabel("spam", Math.ceil(limit / 2)), ...byLabel("ham", Math.floor(limit / 2))]
   : items.slice(0, limit);
 const rules = await loadStaticRules(rulesPath);
+let usage = EMPTY_SPAM_USAGE;
 
 async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<string, unknown> } | null> {
   const { db } = shard(item.accountId);
@@ -147,7 +150,8 @@ async function evaluate(item: Item): Promise<Outcome | null> {
     mailboxPath: typeof row.mailboxPath === "string" ? row.mailboxPath : null, serverFlag: item.serverSpamFlag ?? serverFlaggedSpam(input)
   };
   try {
-    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model, providerOptions: getSpamProviderOptions(config) });
+    const decision = await classifySpam({ input, allowlist, staticRules: rules, getExamples: async () => [], model,
+      providerOptions: getSpamProviderOptions(config), onUsage: (call) => { usage = addSpamUsage(usage, call); } });
     return { ...base, decision, marked: shouldMarkAsSpam(decision, threshold) };
   } catch (error) {
     return { ...base, decision: null, marked: false, error: String(error) };
@@ -198,6 +202,15 @@ console.log(`Spam passed by allowlist/allow rules: ${allowlistedSpam.length}`);
 allowlistedSpam.slice(0, 30).forEach((outcome) => console.log(`${line(outcome)} [${outcome.decision?.source}: ${outcome.decision?.reasons.join("; ")}]`));
 const errors = outcomes.filter((outcome) => outcome.error);
 if (errors.length) console.log(`Errors: ${errors.length} (first: ${errors[0].error})`);
+if (usage.calls) {
+  console.log(`Model usage: ${usage.calls} calls, input ${usage.inputTokens} tokens (uncached ${usage.noCacheTokens}, `
+    + `cache read ${usage.cacheReadTokens}, cache write ${usage.cacheWriteTokens}), output ${usage.outputTokens} tokens`);
+  console.log(`Cache hit rate: ${pct(spamCacheHitRate(usage))} of input tokens read from cache; ${usage.cacheHits} of ${usage.calls} calls read the cache`);
+  const price = SPAM_MODEL_PRICES[config.model];
+  console.log(price
+    ? `Estimated cost: $${estimateSpamCostUsd(usage, price).toFixed(4)} (${config.model} list prices, cache writes at the 1 h TTL)`
+    : `Estimated cost: no price for ${config.model} in SPAM_MODEL_PRICES`);
+}
 
 if (outPath) {
   // Same mapping as the stored verdict: "spam" only when marked, a spam verdict below the threshold is "unsure".
