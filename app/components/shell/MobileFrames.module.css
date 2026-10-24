@@ -56,8 +56,13 @@
 /* The visible label sizes the row instead of overflowing an absolute layer. */
 .settingsTabs :global(.rt-TabsTriggerInner) { position: static; }
 .settingsTabs :global(.rt-TabsTriggerInnerHidden) { display: none; }
-/* German compounds in the narrow phone column hyphenate where the browser has a dictionary. */
-.settingsBody :global(.rt-TabsContent) { min-width: 0; hyphens: auto; }
+.settingsBody :global(.rt-TabsContent) { min-width: 0; }
+/* German compounds in UI labels and headings hyphenate in the narrow phone
+   column where the browser has a dictionary; a single word wider than the
+   column still breaks instead of pushing the panel sideways. User text
+   (names, addresses, signatures) keeps its words. */
+.settingsBody :global(.rt-TabsContent :is(label, legend, th, .rt-Heading, .rt-Text.rt-r-weight-medium)) { hyphens: auto; }
+.settingsBody :global(.rt-TabsContent :is(label, legend, .rt-Heading, .rt-Text.rt-r-weight-medium)) { overflow-wrap: anywhere; }
 /* Long action labels wrap inside their button instead of running past the
    phone viewport; single-line buttons keep their height. */
 .settingsBody :global(.rt-TabsContent .rt-Button),

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { useLatestRef } from "@/app/hooks/useLatestRef";
 import { getExceptionAccountId } from "./utils/clientHelpers";
 
 type ApiErrorMessageParams = {
@@ -15,9 +16,9 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
   const tn = useTranslations("Notifications");
   // Keep the resolver's identity locale-independent: the mount bootstrap effect
   // depends on it, and a UI language switch must not re-bootstrap the mailbox
-  // (that unmounts the open composer). The latest translator is read at call time.
-  const tnRef = useRef(tn);
-  useEffect(() => { tnRef.current = tn; }, [tn]);
+  // (that unmounts the open composer). The latest committed translator is read at
+  // call time; the ref is written in the commit, so no await sees the old language.
+  const tnRef = useLatestRef(tn);
   return useCallback(async (res: Response) => {
     const responsePath = (() => {
       if (!res.url) return null;
@@ -80,5 +81,5 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       // ignore
     }
     return withRequestPath(`Request failed (${res.status})`);
-  }, [setAuthState, setReloginAccountId, setReloginDescription]);
+  }, [setAuthState, setReloginAccountId, setReloginDescription, tnRef]);
 }

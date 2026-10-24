@@ -6,7 +6,7 @@ import { Theme } from "@radix-ui/themes";
 import type { Account, SenderIdentity } from "@/lib/data";
 import IdentitiesTabContent from "./tabs/IdentitiesTabContent";
 import SignaturesTabContent from "./tabs/SignaturesTabContent";
-import SenderPreferences from "./tabs/SenderPreferences";
+import PreferencesTabContent from "./tabs/PreferencesTabContent";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
 afterEach(cleanup);
 const account = { id: "a", email: "primary@example.test", accessRole: "manager", settings: { signatures: [{ id: "shared", name: "Shared template", body: "{{user.name}}\n{{identity.email}}" }], defaultSignatureId: "shared" } } as Account;
@@ -58,7 +58,7 @@ describe("sender identity settings", () => {
     await waitFor(() => expect(writes).toHaveLength(5)); expect(writes[4].body).toEqual({ enabled: true });
     expect(writes.every(write => !write.url.endsWith("/settings"))).toBe(true);
   });
-  test("personal From and signature override save sparse prefs, preview escaped name, explicit none and inheritance", async () => {
+  test("QA-216: personal From and signature override save with the tab's single save as sparse prefs, preview escaped name, explicit none and inheritance", async () => {
     const writes: unknown[] = [];
     let prefs: Record<string, unknown> = {};
     const apiFetch: AdminFetch = async (url, init) => {
@@ -68,7 +68,7 @@ describe("sender identity settings", () => {
       }
       return response(String(url).endsWith("/identities") ? { identities } : String(url).endsWith("/prefs") ? { prefs } : { user: { name: "Synthetic <Jo>", email: "jo@example.test" }, accounts: [account] });
     };
-    const view = render(<Theme><SenderPreferences editingAccount={{ ...account, accessRole: "viewer" }} apiFetch={apiFetch} /></Theme>);
+    const view = render(<Theme><PreferencesTabContent editingAccount={{ ...account, accessRole: "viewer" }} apiFetch={apiFetch} onClose={() => {}} senderPreferences /></Theme>);
     await view.findByText(/Synthetic <Jo>\s+primary@example.test/);
     expect(view.container.querySelector("jo")).toBeNull();
     expect(view.queryByRole("option", { name: /disabled@example.test/ })).toBeNull();
@@ -76,15 +76,19 @@ describe("sender identity settings", () => {
     fireEvent.change(view.getByLabelText("Personal signature", { exact: true }), { target: { value: "custom" } });
     fireEvent.change(view.getByLabelText("Personal signature text"), { target: { value: "Regards {{user.name}} / {{identity.email}}" } });
     expect(view.getByText("Regards Synthetic <Jo> / alias@example.test")).toBeTruthy();
-    fireEvent.click(view.getByRole("button", { name: "Save sender preferences" })); await view.findByText("Sender preferences saved.");
-    expect(writes[0]).toEqual({ defaultIdentityId: "alias", signatureOverride: "Regards {{user.name}} / {{identity.email}}" });
+    // One save path for the whole tab: sender and other preferences go out in one sparse PUT.
+    expect(view.getAllByRole("button", { name: /save/i }).map(button => button.textContent)).toEqual(["Save preferences"]);
+    fireEvent.change(view.getByLabelText("Show sender icons"), { target: { value: "false" } });
+    fireEvent.click(view.getByRole("button", { name: "Save preferences" })); await view.findByText("Preferences saved.");
+    expect(writes[0]).toEqual({ appearance: { senderIcons: false }, defaultIdentityId: "alias", signatureOverride: "Regards {{user.name}} / {{identity.email}}" });
+    expect((view.getByLabelText("Default From") as HTMLSelectElement).value).toBe("alias");
     fireEvent.change(view.getByLabelText("Personal signature text"), { target: { value: "" } });
-    fireEvent.click(view.getByRole("button", { name: "Save sender preferences" }));
+    fireEvent.click(view.getByRole("button", { name: "Save preferences" }));
     await waitFor(() => expect(writes).toHaveLength(2)); expect(writes[1]).toEqual({ signatureOverride: "" });
-    await waitFor(() => expect((view.getByRole("button", { name: "Save sender preferences" }) as HTMLButtonElement).disabled).toBe(true));
+    await waitFor(() => expect((view.getByRole("button", { name: "Save preferences" }) as HTMLButtonElement).disabled).toBe(true));
     fireEvent.change(view.getByLabelText("Default From"), { target: { value: "inherit" } });
     fireEvent.change(view.getByLabelText("Personal signature", { exact: true }), { target: { value: "inherit" } });
-    fireEvent.click(view.getByRole("button", { name: "Save sender preferences" }));
+    fireEvent.click(view.getByRole("button", { name: "Save preferences" }));
     await waitFor(() => expect(writes).toHaveLength(3)); expect(writes[2]).toEqual({ defaultIdentityId: null, signatureOverride: null });
     expect(account.settings?.defaultSignatureId).toBe("shared");
   });

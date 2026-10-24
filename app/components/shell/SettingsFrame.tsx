@@ -19,7 +19,13 @@ export default function SettingsFrame({ open, onClose, children }: { open: boole
   // In particular, nested admin dialogs own unsaved state below this frame.
   useMobileOverlayHistory(isMobile && open, onClose);
   return <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-    <Dialog.Content {...focusProps} data-slot={isMobile ? "sheet-content" : undefined} className={`account-settings-modal ${isMobile ? mobileStyles.settingsFullscreen : ""}`} size="4" width="94vw" maxWidth="980px" aria-describedby={undefined}
+    <Dialog.Content {...focusProps} onOpenAutoFocus={(event) => {
+      focusProps.onOpenAutoFocus();
+      // Start on the selected tab, not on the first tabbable element (the
+      // tooltip close button): its focus tooltip would swallow the first Escape.
+      const tab = (event.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+      if (tab) { event.preventDefault(); tab.focus(); }
+    }} data-slot={isMobile ? "sheet-content" : undefined} className={`account-settings-modal ${isMobile ? mobileStyles.settingsFullscreen : ""}`} size="4" width="94vw" maxWidth="980px" aria-describedby={undefined}
       onInteractOutside={(event) => event.preventDefault()}
       style={{ height: isMobile ? "100dvh" : "min(86dvh, 900px)", overflow: "hidden" }}>
       <DialogLayerContext.Provider value={DIALOG_LAYERS.settings}><div className={isMobile ? mobileStyles.settingsBody : undefined} style={{ height: "100%", minHeight: 0 }}>{children}</div></DialogLayerContext.Provider>

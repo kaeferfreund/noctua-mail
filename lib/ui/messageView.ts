@@ -61,6 +61,14 @@ export function hasMeaningfulHtmlText(html?: string) {
   return /[\p{L}\p{N}]/u.test(textOnly);
 }
 
+const SYSTEM_FLAG_LABELS = {
+  "\\seen": "Reader.flags.seen",
+  "\\answered": "Reader.flags.answered",
+  "\\flagged": "Reader.flags.flagged",
+  "\\deleted": "Reader.flags.deleted",
+  "\\draft": "Reader.flags.draft"
+} as const;
+
 export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): ImapFlagBadge[] {
   const t = getTranslator(locale);
   const rawFlags =
@@ -105,9 +113,11 @@ export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): Im
               ? t("Reader.flags.done")
               : lower === "\\recent"
                 ? t("Reader.flags.new")
-                : flag.startsWith("\\")
-                  ? flag.slice(1)
-                  : flag;
+                : lower in SYSTEM_FLAG_LABELS
+                  ? t(SYSTEM_FLAG_LABELS[lower as keyof typeof SYSTEM_FLAG_LABELS])
+                  : flag.startsWith("\\")
+                    ? flag.slice(1)
+                    : flag;
       let kind = "custom";
       if (lower === "\\seen") kind = "seen";
       if (lower === "\\answered") kind = "answered";

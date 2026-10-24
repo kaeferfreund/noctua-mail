@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
+  getImapFlagBadges,
   hasHtmlContent,
   hasMeaningfulHtmlText,
   hasTextContent,
   needsMessageContentHydration
 } from "./messageView";
+import type { Message } from "@/lib/data";
 
 describe("hasMeaningfulHtmlText", () => {
   it("returns true for regular html content", () => {
@@ -71,5 +73,14 @@ describe("message content hydration state", () => {
   it("detects non-empty text bodies", () => {
     expect(hasTextContent("Hello")).toBe(true);
     expect(hasTextContent("")).toBe(false);
+  });
+});
+
+describe("getImapFlagBadges", () => {
+  const message = { id: "m1", flags: ["\\Seen", "\\Answered", "\\Deleted", "\\Draft", "$Custom"] } as unknown as Message;
+  it("QA-215: labels IMAP system flags in the UI language and keeps custom keywords", () => {
+    expect(getImapFlagBadges(message, "de").map(({ kind, label }) => `${kind}:${label}`))
+      .toEqual(["seen:Gelesen", "answered:Beantwortet", "deleted:Gelöscht", "draft:Entwurf", "custom:$Custom"]);
+    expect(getImapFlagBadges(message, "en").map(({ label }) => label)).toEqual(["Seen", "Answered", "Deleted", "Draft", "$Custom"]);
   });
 });
