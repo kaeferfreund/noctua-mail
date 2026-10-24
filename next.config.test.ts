@@ -42,3 +42,30 @@ describe("next.config headers", () => {
     expect(headers.some((entry) => entry.source === "/icons/:path*")).toBe(false);
   });
 });
+
+describe("next.config request logging", () => {
+  test("keeps every reset-password spelling out of the incoming request log", async () => {
+    const config = (await import("./next.config")).default;
+    const logging = config.logging as { incomingRequests: { ignore: RegExp[] } };
+    const ignored = (url: string) => logging.incomingRequests.ignore.some((pattern) => pattern.test(url));
+
+    for (const url of [
+      "/reset-password?token=synthetic-token",
+      "/reset-password",
+      "/api/ba/reset-password/synthetic-token?callbackURL=%2Freset-password",
+      // Non-canonical spellings from the security recheck (F2).
+      "/reset-password/?token=synthetic-token",
+      "/RESET-PASSWORD?token=synthetic-token",
+      "/reset-password;a?token=synthetic-token",
+      "/%72eset-password?token=synthetic-token",
+      "/reset%2Dpassword?token=synthetic-token",
+      "/reset-password%3Ftoken=synthetic-token",
+      "/api/ba//reset-password/synthetic-token",
+      "/api/ba/Reset-Password/synthetic-token"
+    ]) expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: true });
+
+    for (const url of ["/", "/api/ba/sign-in/email", "/api/ba/request-password-reset", "/settings/password"]) {
+      expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: false });
+    }
+  });
+});
