@@ -354,3 +354,31 @@ Wrongly moved mail must be moved back in Noctua — with „Kein Spam“ or by m
 it out of Junk (move dialog, drag and drop; see "Lernen beim Verschieben") —
 not with another mail client: only moves made in Noctua store the ham example
 the filter learns from.
+
+### Vom Mailserver markierte Mails (`X-Spam-Flag: YES`)
+
+`scripts/spam-apply.ts --server-flagged` selects the INBOX mails whose source
+carries the receiving server's `X-Spam-Flag: YES` (the top-most header, as the
+classifier reads it; only the first 64 KB of each INBOX source are read) and
+moves them to Junk through the same code path. It is conservative
+(`lib/mail/spam/serverFlagBackfill.ts`): a mail stays in the INBOX when its
+sender is on a household domain, has a „Kein Spam“ example (address or root
+domain) or a static allow rule, or was written to from any household Sent
+folder, or sent at least two unflagged INBOX mails; when it is flagged,
+answered, replied to, `$NotJunk`, has a
+collaboration assignment, status, note or topic; when the classifier already
+judged it or will (last three days); or when the mailbox has no Junk folder.
+
+```sh
+# 1. Dry run on an online .backup copy (refused on a live dir), list with every decision (mode 600)
+bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out /tmp/flagged.json
+# 2. Review /tmp/flagged.json; delete entries that must stay in the INBOX
+# 3. Move only reviewed "move" entries the live data still selects (resumable)
+bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only /tmp/flagged.json --out /tmp/applied.json
+```
+
+The spam examples get the source `server-flag-backfill` and the mail's arrival
+time, so they do not crowd the users' recent decisions out of the prompt; the
+sender's trust is not revoked. „Kein Spam“ undoes a move. `scripts/spam-settings.ts
+--data <dir> --mailbox <email> [--threshold 0.8 --write --actor <admin email>]`
+shows or sets a mailbox's own threshold through the admin UI's helper.
