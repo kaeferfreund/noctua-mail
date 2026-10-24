@@ -3,7 +3,7 @@ import { z } from "zod";
 import { matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
 import { assessSenderTrust, type SpamTrustContext } from "./anomaly";
 import { isTrustCanary, TRUSTED_SPAM_THRESHOLD } from "./senderProfile";
-import { applyStaticRules, isBuiltinRule, type StaticRule, type StaticRuleType, type StaticRules } from "./staticRules";
+import { applyStaticRules, isBuiltinRule, isWeakRuleHint, type StaticRule, type StaticRuleType, type StaticRules } from "./staticRules";
 import { SPAM_SYSTEM_CACHE_OPTIONS, type SpamModelProviderOptions } from "./provider";
 import type { SpamDecision, SpamExample, SpamInput } from "./types";
 import { spamUsageFromSdk, type SpamTokenUsage } from "./usage";
@@ -244,7 +244,8 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal) {
  * A trusted sender without anomalies is ham without a model call, except for
  * the canary sample, which the model checks without any trust hint. A trusted
  * sender with anomalies goes to the model with the deviations as a hint and
- * the stricter TRUSTED_SPAM_THRESHOLD.
+ * the stricter TRUSTED_SPAM_THRESHOLD; a static rule hint that is not weak
+ * counts as such an anomaly.
  */
 export async function classifySpam(params: ClassifySpamParams): Promise<SpamDecision | null> {
   const { input } = params;
@@ -259,7 +260,11 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
   if (rules.decision === "deny") {
     return { verdict: "spam", confidence: 1, reasons: ["Absender oder Muster laut Regel eindeutig Spam"], source: "static-deny" };
   }
-  const trust = params.trust && !userSaidSpam ? await assessSenderTrust(input, params.trust) : null;
+  const assessed = params.trust && !userSaidSpam ? await assessSenderTrust(input, params.trust) : null;
+  // A static rule hint that is not weak vetoes the skip: the model decides, as for an anomaly.
+  const trust = assessed?.kind === "skip" && rules.hints.some((hint) => !isWeakRuleHint(hint))
+    ? { ...assessed, kind: "anomaly" as const, anomalies: [RULE_HINT_ANOMALY] }
+    : assessed;
   const skip: SpamDecision | null = trust?.kind === "skip"
     ? { verdict: "ham", confidence: 1, reasons: [`trusted:profile (${trust.summary})`], source: "trusted:profile", trust: { kind: "skip" } }
     : null;
@@ -291,6 +296,9 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
   if (trust?.kind === "anomaly") return { ...decision, minThreshold: TRUSTED_SPAM_THRESHOLD, trust: { kind: "anomaly", anomalies: trust.anomalies } };
   return decision;
 }
+
+/** Anomaly of a trusted sender's mail that matches a spam rule (the rule hints are listed in the prompt). */
+const RULE_HINT_ANOMALY = "passt zu einer Spam-Regel (siehe Hinweise)";
 
 const ALLOWLIST_REASONS = {
   "own-address": "Absender ist ein eigenes Postfach",

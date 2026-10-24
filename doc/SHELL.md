@@ -179,7 +179,9 @@ as `hash`/`builtAt` in `public/build-version.json`, and the page and
 `/api/version` read it once per process (`getRunningBuild`). A Docker image
 therefore shows its build without runtime variables, and a runtime environment
 that describes another build cannot pair a new label with old code. Runtime
-variables are read only when the artifact has no commit (`next dev`).
+variables are read only when the artifact has no commit and always under
+`next dev` (`NODE_ENV=development`), so a file left by a local `bun run build`
+never labels the live dev server.
 
 Every phone status Sheet (Hintergrundaufgaben, Posteingangsprüfung, Demnächst,
 Fehler, Kalender) starts with the same visible title row, `StatusSheetTitle`:
@@ -323,8 +325,8 @@ These rehearsals do not merge or modify the reader/sender branches.
 
 ## Round 2 calendar validation
 
-The composite calendar reuses the floating calendar's flex/min-height body in
-a bounded frame; mobile fills its Sheet. The status popover is at 9990, the
+The composite calendar sits in a flex/min-height body (`BottomStatusBar.module.css`
+`.calendarBody`) in a bounded frame; mobile fills its Sheet. The status popover is at 9990, the
 mobile Sheet at 9994, event dialogs at 9995, and their pickers at 9998.
 EventDialog now reuses `useDialogFocusRestore` and explicitly focuses its title
 on opening; creation/editing returns focus to the calendar action.

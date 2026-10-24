@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { setAppBadge, unreadBadgeCount } from "./badge";
+import { DEFAULT_PUSH_DEVICE_SETTINGS } from "./types";
 
 function badgingNavigator(options: { clear?: boolean; reject?: boolean } = {}) {
   const calls: Array<number | "cleared"> = [];
@@ -33,7 +34,15 @@ describe("app badge", () => {
   });
 
   it("sums synced unread inbox counts", () => {
-    expect(unreadBadgeCount([{ unread: 2 }, { unread: null }, { unread: 5 }])).toBe(7);
+    expect(unreadBadgeCount([{ accountId: "a", unread: 2 }, { accountId: "b", unread: null }, { accountId: "c", unread: 5 }])).toBe(7);
     expect(unreadBadgeCount([])).toBe(0);
+  });
+
+  it("follows this device's push settings like the server's badge", () => {
+    const mailboxes = [{ accountId: "synthetic-team", unread: 2 }, { accountId: "synthetic-own", unread: 5 }];
+    expect(unreadBadgeCount(mailboxes, DEFAULT_PUSH_DEVICE_SETTINGS)).toBe(7);
+    expect(unreadBadgeCount(mailboxes, { ...DEFAULT_PUSH_DEVICE_SETTINGS, accountIds: ["synthetic-own"] })).toBe(5);
+    expect(unreadBadgeCount(mailboxes, { ...DEFAULT_PUSH_DEVICE_SETTINGS, accountIds: [] })).toBe(0);
+    expect(unreadBadgeCount(mailboxes, { ...DEFAULT_PUSH_DEVICE_SETTINGS, badge: false })).toBe(0);
   });
 });

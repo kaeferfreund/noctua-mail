@@ -63,6 +63,10 @@
    (names, addresses, signatures) keeps its words. */
 .settingsBody :global(.rt-TabsContent :is(label, legend, th, .rt-Heading, .rt-Text.rt-r-weight-medium)) { hyphens: auto; }
 .settingsBody :global(.rt-TabsContent :is(label, legend, .rt-Heading, .rt-Text.rt-r-weight-medium)) { overflow-wrap: anywhere; }
+/* User data inside a label ([data-user-text]: names, addresses) is neither
+   hyphenated nor broken at an arbitrary letter; it breaks inside a word only
+   when that word alone is wider than the line, and may shrink as a flex item. */
+.settingsBody :global(.rt-TabsContent [data-user-text]) { min-width: 0; hyphens: manual; overflow-wrap: break-word; }
 /* Long action labels wrap inside their button instead of running past the
    phone viewport; single-line buttons keep their height. */
 .settingsBody :global(.rt-TabsContent .rt-Button),
@@ -73,6 +77,15 @@
   padding-block: 4px;
   white-space: normal;
 }
+/* Phone density matches the sidebar rows: text fields (Radix and shadcn),
+   Radix selects and regular buttons reach the 44px of the native controls (max-md:min-h-11),
+   and native selects use the 14px body text instead of the UA's 13.33px. */
+.settingsBody :global(.rt-TabsContent .rt-TextFieldRoot) { --text-field-height: 44px; }
+.settingsBody :global(.rt-TabsContent .rt-SelectTrigger) { --select-trigger-height: 44px; }
+.settingsBody :global(.rt-TabsContent [data-slot="input"]) { min-height: 44px; }
+.settingsBody :global(.rt-TabsContent .rt-Button:not(.rt-r-size-1)),
+.settingsBody :global(.rt-TabsContent [data-slot="button"]:not([data-size^="icon"])) { min-height: 44px; }
+.settingsBody :global(.rt-TabsContent select) { font-size: var(--font-size-2); }
 /* Callout text may also break inside a word where no dictionary is available. */
 .settingsBody :global(.rt-TabsContent .rt-CalloutText) { min-width: 0; overflow-wrap: anywhere; }
 .indicators { display: flex; align-items: center; }

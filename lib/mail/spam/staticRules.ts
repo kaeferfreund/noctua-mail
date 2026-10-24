@@ -186,12 +186,16 @@ function allows(rule: StaticRule, input: SpamInput, rules: StaticRules) {
   return rule.requireAuth ? senderAuthPassed(input, domain) : senderAuthAllowsEntry(input, domain);
 }
 
+const WEAK_HINT_LABEL = "Schwacher Hinweis";
+/** A hint of a rule seen at least as often in good mail as in spam (describe). */
+export const isWeakRuleHint = (hint: string) => hint.startsWith(`${WEAK_HINT_LABEL}:`);
+
 function describe(rule: StaticRule) {
   const spam = rule.spamHits ?? 0;
   const ham = rule.hamHits ?? 0;
   const counted = rule.spamHits !== undefined || rule.hamHits !== undefined;
   // Rules seen at least as often in good mail as in spam are weak signals.
-  const label = counted && ham >= spam ? "Schwacher Hinweis" : "Hinweis";
+  const label = counted && ham >= spam ? WEAK_HINT_LABEL : "Hinweis";
   const what = isBuiltinRule(rule) ? rule.note ?? rule.value : `${rule.type} „${rule.value}“${rule.note ? ` (${rule.note})` : ""}`;
   return `${label}: ${what}${counted ? ` – bisher ${spam}× Spam, ${ham}× kein Spam` : ""}`;
 }

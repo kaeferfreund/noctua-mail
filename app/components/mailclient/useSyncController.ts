@@ -12,6 +12,7 @@ import {
   buildAccountApiPath,
   buildAccountFolderConsistencyPath,
   buildAccountImapPollPath,
+  buildAccountImapStreamFolderPath,
   buildAccountImapStreamPath,
   buildAccountSyncNewCandidatesPath
 } from "@/lib/accountApiPaths";
@@ -79,6 +80,11 @@ const MAIL_SERVER_UNREACHABLE_NOTICE = {
 // Retries fire from several places (manual sync, poll timer); during a longer
 // outage they would otherwise re-push the same warning on every attempt.
 const MAIL_SERVER_UNREACHABLE_NOTICE_THROTTLE_MS = 60_000;
+
+// Names one stream for its folder switches; the server also binds it to the session.
+// getRandomValues, unlike randomUUID, also exists outside secure contexts.
+const createStreamKey = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 export type UseSyncControllerParams = {
   activeAccountId: string;
@@ -223,6 +229,17 @@ export function useSyncController({
   useEffect(() => {
     inboxFolderRef.current = inboxFolder ?? null;
   }, [inboxFolder]);
+
+  const activeFolderIdRef = useRef(activeFolderId);
+  const accountFoldersRef = useRef(accountFolders);
+  // Set by the stream effect: moves the open stream to the current folder.
+  const switchStreamFolderRef = useRef<(() => void) | null>(null);
+  // Declared before the stream effect, so a rebuilt stream starts on the current folder.
+  useEffect(() => {
+    activeFolderIdRef.current = activeFolderId;
+    accountFoldersRef.current = accountFolders;
+    switchStreamFolderRef.current?.();
+  }, [activeFolderId, accountFolders]);
 
   useEffect(() => {
     if (!activeAccountId) return;
@@ -1073,7 +1090,7 @@ export function useSyncController({
         else uidsByFolder.set(folderId, [item.uid]);
       }
       const foldersToSync = prioritizeFolderIds(Array.from(uidsByFolder.keys()), [
-        activeFolderId,
+        activeFolderIdRef.current,
         fallbackFolderId
       ]);
       if (foldersToSync.length === 0) return;
@@ -1197,6 +1214,37 @@ export function useSyncController({
       }
     };
 
+    // The stream stays bound to the account. A folder switch only moves the
+    // server's active folder session, so the INBOX IDLE connection survives.
+    let streamControl: {
+      source: EventSource; key: string; folderId: string | null; open: boolean; seq: number;
+    } | null = null;
+    const streamFolderId = () => {
+      const folderId = activeFolderIdRef.current;
+      return isAccountFolder(activeAccountId, folderId, accountFoldersRef.current) ? folderId : null;
+    };
+    const switchStreamFolder = () => {
+      const control = streamControl;
+      if (disposed || !control?.open || streamSourceRef.current !== control.source ||
+          currentAccountIdRef.current !== activeAccountId) return;
+      const folderId = streamFolderId();
+      if (folderId === control.folderId) return;
+      control.folderId = folderId;
+      control.seq += 1;
+      void apiFetch(buildAccountImapStreamFolderPath(activeAccountId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ streamKey: control.key, folderId, seq: control.seq })
+      }).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }).catch(() => {
+        // The server no longer knows this stream: open a new one on the current folder.
+        if (!disposed && streamSourceRef.current === control.source &&
+            document.visibilityState === "visible") startStream();
+      });
+    };
+    switchStreamFolderRef.current = switchStreamFolder;
+
     const requestFolderReconcileSync = (
       folderId?: string,
       mode: "repair" | "full" = "repair"
@@ -1245,17 +1293,23 @@ export function useSyncController({
         return;
       }
       const params = new URLSearchParams();
-      if (isAccountFolder(activeAccountId, activeFolderId, accountFolders)) {
-        params.set("activeFolderId", activeFolderId);
-      }
+      const folderId = streamFolderId();
+      if (folderId) params.set("activeFolderId", folderId);
+      const key = createStreamKey();
+      params.set("streamKey", key);
       const source = new EventSource(buildAccountImapStreamPath(activeAccountId, params));
       streamSourceRef.current = source;
+      const control = { source, key, folderId, open: false, seq: 0 };
+      streamControl = control;
 
       source.addEventListener("open", () => {
         if (!disposed) setMailCheckStatus(prev => ({ accountId: activeAccountId, running: false,
           lastCheckedAt: prev.accountId === activeAccountId ? prev.lastCheckedAt : null, nextCheckAt: null }));
         setMailCheckMode("idle");
         setStreamMode("stream");
+        // The stream is registered now; catch up with switches made while it opened.
+        control.open = true;
+        switchStreamFolder();
       });
       source.addEventListener("folder:update", (event) => {
         try {
@@ -1336,7 +1390,7 @@ export function useSyncController({
             uid?: number;
             reconciled?: boolean;
           };
-          const fId = data.folderId ?? activeFolderId;
+          const fId = data.folderId ?? activeFolderIdRef.current;
           if (data.uid && fId) {
             setMessages((prev) =>
               prev.filter((msg) => !(msg.folderId === fId && msg.imapUid === data.uid))
@@ -1382,8 +1436,8 @@ export function useSyncController({
       // A planned stream end can reconnect immediately without starting polling.
       source.addEventListener("reconnect", () => {
         if (disposed || streamSourceRef.current !== source) return;
-        if (document.visibilityState === "visible") startStream();
-        else stopStream();
+        // Hidden: the same path as `visibilitychange`, in case that event was missed.
+        handleVisibility();
       });
     };
 
@@ -1406,6 +1460,7 @@ export function useSyncController({
 
     return () => {
       disposed = true;
+      if (switchStreamFolderRef.current === switchStreamFolder) switchStreamFolderRef.current = null;
       if (streamReconnectTimer) {
         window.clearTimeout(streamReconnectTimer);
         streamReconnectTimer = null;
@@ -1419,7 +1474,7 @@ export function useSyncController({
     // Other values used inside (apiFetch, reportError, callbacks, etc.) are accessed via stable
     // refs or useCallback wrappers and should not re-trigger a full stream/poll reconnect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAccountId, activeFolderId, authState, inboxMailboxPath, inboxFolder?.id]);
+  }, [activeAccountId, authState, inboxMailboxPath, inboxFolder?.id]);
 
   // Seed the new-mail notification dedup ring with externally-known keys
   // (e.g. RFC 5322 Message-IDs of messages we're about to restore via undo,

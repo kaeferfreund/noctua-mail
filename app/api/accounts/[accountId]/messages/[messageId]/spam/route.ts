@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: Params) {
     await recordSpamDecision({ accountId: resolvedAccountId, message, label: "spam", source: "mark-spam", userId });
     // The sender loses trusted-sender status in every mailbox; loaded lazily like the sync hook (AI SDK).
     await import("@/lib/mail/spam/service")
-      .then(({ revokeSenderTrust }) => revokeSenderTrust(resolvedAccountId, message.from))
+      .then(({ revokeSenderTrust }) => revokeSenderTrust(resolvedAccountId, message.from, message.id))
       .catch((error) => console.warn("[spam] failed to revoke sender trust", { accountId: resolvedAccountId, error: String(error) }));
     return NextResponse.json({ ok: true, action: "moved", ...moved });
   });

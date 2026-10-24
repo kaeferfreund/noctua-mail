@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import FullCalendar, {
   type CalendarOptions,
   type CalendarRef,
@@ -16,6 +16,7 @@ import timeGridPlugin from "@fullcalendar/react/timegrid";
 import interactionPlugin from "@fullcalendar/react/interaction";
 import rrulePlugin from "@fullcalendar/rrule";
 import classicTheme from "@fullcalendar/react/themes/classic";
+import deLocale from "@fullcalendar/react/locales/de";
 import "@fullcalendar/react/skeleton.css";
 import "@fullcalendar/react/themes/classic/theme.css";
 import "@fullcalendar/react/themes/classic/palette.css";
@@ -204,10 +205,14 @@ export default function CalendarView({
   calendarRef: externalRef
 }: Props) {
   const dateFormat = useAccountDateFormat();
+  // Title, column headers, "all-day" and the hour axis come from FullCalendar's
+  // locale; English is built in.
+  const fullCalendarLocale = useLocale() === "de" ? deLocale : "en";
   const t = useTranslations("Calendar.toolbar");
+  const tGrid = useTranslations("Calendar.grid");
   // FullCalendar's own English texts and hint templates, replaced from the
   // catalog. Hints get the unit/view code so each locale can inflect.
-  const toolbarText = useMemo<CalendarOptions>(() => ({
+  const calendarText = useMemo<CalendarOptions>(() => ({
     todayText: t("today"),
     monthText: t("month"),
     weekTextLong: t("week"),
@@ -216,8 +221,10 @@ export default function CalendarView({
     prevHint: (_text: string, unit: string) => t("prevHint", { unit }),
     nextHint: (_text: string, unit: string) => t("nextHint", { unit }),
     viewHint: (_text: string, view: string) => t("viewHint", { view }),
-    viewChangeHint: t("viewChangeHint")
-  }), [t]);
+    viewChangeHint: t("viewChangeHint"),
+    // FullCalendar 7's label for the timed lane; its German locale lacks it.
+    timedText: tGrid("timed")
+  }), [t, tGrid]);
   const internalRef = useRef<CalendarRef>(null);
   const calendarRef = (externalRef ?? internalRef) as React.RefObject<CalendarRef>;
   const [fullCalendarEvents, setFullCalendarEvents] = useState<EventInput[]>([]);
@@ -391,6 +398,7 @@ export default function CalendarView({
           plugins={[dayGridPlugin, rrulePlugin, classicTheme]}
           initialView="dayGridMonth"
           headerToolbar={false}
+          locale={fullCalendarLocale}
           firstDay={firstDay}
           events={fullCalendarEvents}
           eventDidMount={handleEventDidMount}
@@ -413,7 +421,7 @@ export default function CalendarView({
       <FullCalendar
         ref={calendarRef}
         {...calendarClasses}
-        {...toolbarText}
+        {...calendarText}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, rrulePlugin, classicTheme]}
         initialView={initialView}
         initialDate={initialDate}
@@ -447,6 +455,7 @@ export default function CalendarView({
           center: "prev title next",
           right: "dayGridMonth,timeGridWeek,timeGridDay"
         }}
+        locale={fullCalendarLocale}
         firstDay={firstDay}
         headingLevel={headingLevel}
         events={fullCalendarEvents}

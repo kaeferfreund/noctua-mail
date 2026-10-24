@@ -53,6 +53,16 @@ describe("mobile kept component frames", () => {
     fireEvent.click(item);
     expect(reads).toBe(1);
   });
+  it("offers Delete right after the compose actions in the phone menu", async () => {
+    const deleted: string[] = [];
+    const page = render(<Theme><MessageMenu {...menuProps()} handleDeleteMessage={target => { deleted.push(target.id); }} /></Theme>);
+    fireEvent.keyDown(page.getByRole("button", { name: "Message actions" }), { key: "Enter" });
+    const item = await page.findByRole("menuitem", { name: "Delete" });
+    expect(item.getAttribute("data-slot")).toBe("dropdown-menu-item");
+    expect(page.getAllByRole("menuitem").map(entry => entry.textContent).indexOf("Delete")).toBe(4);
+    fireEvent.click(item);
+    expect(deleted).toEqual(["synthetic-message"]);
+  });
   it("keeps the existing Move to submenu working inside the shadcn root", async () => {
     const page = render(<Theme><MessageMenu {...menuProps()} /></Theme>);
     fireEvent.keyDown(page.getByRole("button", { name: "Message actions" }), { key: "Enter" });
