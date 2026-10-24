@@ -124,9 +124,22 @@ describe("shell sidebar", () => {
     expect(view.getByText("b.example.test")).toBeTruthy();
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[title$='@a.example.test']")];
     expect(rows.map((row) => row.title)).toEqual(["box6@a.example.test", "box4@a.example.test", "box2@a.example.test", "box0@a.example.test"]);
+    // Grouped rows sit in a guided container, indented to the heading's text.
+    for (const row of rows) {
+      expect(row.closest("[data-sidebar=menu]")?.hasAttribute("data-domain-group")).toBe(true);
+      expect(row.className).toContain("pl-8");
+    }
+    expect(view.getByText("a.example.test").parentElement!.className).toContain("font-medium");
     view.unmount();
     const short = renderSidebar(accounts.slice(0, 6), () => {});
     expect(short.queryByText("a.example.test")).toBeNull();
+    // Ungrouped rows keep the plain layout: no guide, no indent.
+    const plainRows = [...short.container.querySelectorAll<HTMLButtonElement>("button[title$='.example.test']")];
+    expect(plainRows).toHaveLength(6);
+    for (const row of plainRows) {
+      expect(row.closest("[data-sidebar=menu]")?.hasAttribute("data-domain-group")).toBe(false);
+      expect(row.className).not.toContain("pl-8");
+    }
   });
 
   it("keeps the thread JSON and thread cache developer tools reachable from the user menu", async () => {
