@@ -5,6 +5,9 @@ import {requireActiveUserSession} from "./auth";
 import {assertStreamAuthorized} from "./authStreams";
 
 // Execute the route's real closure against the real checker/DB, with only its transport replaced.
+// The closure is sliced from the route source and transpiled because `send` captures route-local state. A direct
+// test needs `send` extracted from imap/stream/route.ts into an importable factory; until then a change to the
+// slice markers fails the two index assertions below instead of silently testing nothing.
 test("generation commit between stream check and enqueue prevents sensitive delivery",async()=>{
   const f=await createAuthenticatedTestSession();
   const identity=await requireActiveUserSession(new Request("http://localhost:3000",{headers:f.jar.headers()}));
