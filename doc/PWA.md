@@ -41,8 +41,8 @@ the browser without installing.
 ## Service worker behaviour (`public/sw.js`)
 
 - `push`: `new-mail` shows one notification per mailbox (tag `mail:<accountId>`,
-  newer pushes replace older ones and alert again), title = mailbox name
-  (`· n neue` when collapsed), body = sender and optionally subject. `test`
+  newer pushes replace older ones and alert again), sender first (layout in
+  doc/PUSH-NOTIFICATIONS.md, “Notification layout”). `test`
   shows “Noctua: Benachrichtigungen aktiv”. A numeric `badge` sets the app icon
   badge; `badge` pushes only do that. Malformed payloads show nothing. Link
   targets outside the app origin are replaced with `/`.
