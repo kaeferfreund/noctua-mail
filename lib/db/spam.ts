@@ -9,6 +9,7 @@ import {
   type SenderProfile,
   type SenderProfileRow
 } from "../mail/spam/senderProfile";
+import { recordAdminAuditRow } from "./adminAudit";
 import { getAccountDb, getDb } from "./connection";
 import { messageAuthorEmailSql } from "./ownAddressSql";
 import { sentToAddressInDb } from "./sentRecipients";
@@ -216,18 +217,39 @@ export async function countSpamTrustDecisions(accountId: string): Promise<SpamTr
   return { trustedSkips: row.trustedSkips, canaryChecks: row.canaryChecks, canaryMismatches: row.canaryMismatches };
 }
 
-export async function getSpamSettings(scope: string): Promise<unknown> {
-  const db = await getDb();
+function readSpamSettingsRow(db: any, scope: string): unknown {
   const row = db.prepare(`SELECT settings FROM spam_settings WHERE scope = ?`).get(scope) as { settings?: string } | undefined;
   if (!row?.settings) return null;
   try { return JSON.parse(row.settings); } catch { return null; }
 }
 
-export async function saveSpamSettings(scope: string, settings: object, userId: string) {
+export async function getSpamSettings(scope: string): Promise<unknown> {
+  return readSpamSettingsRow(await getDb(), scope);
+}
+
+export type SpamSettingsAudit = { actorUserId: string; targetAccountId: string | null };
+
+/**
+ * Writes one settings row. `replacesScope`: an older key of the same settings,
+ * read as the previous value and removed. `audit`: an admin-log entry with the
+ * previous and the new settings, written in the same transaction.
+ */
+export async function saveSpamSettings(scope: string, settings: object, userId: string,
+  options: { replacesScope?: string; audit?: SpamSettingsAudit } = {}) {
   return withDbWriteRetry("saveSpamSettings", async () => {
     const db = await getDb();
-    db.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, ?, ?)
-      ON CONFLICT(scope) DO UPDATE SET settings = excluded.settings, updatedAt = excluded.updatedAt, updatedByUserId = excluded.updatedByUserId`)
-      .run(scope, JSON.stringify(settings), Date.now(), userId);
+    db.transaction(() => {
+      const before = readSpamSettingsRow(db, scope) ?? (options.replacesScope ? readSpamSettingsRow(db, options.replacesScope) : null);
+      db.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, ?, ?)
+        ON CONFLICT(scope) DO UPDATE SET settings = excluded.settings, updatedAt = excluded.updatedAt, updatedByUserId = excluded.updatedByUserId`)
+        .run(scope, JSON.stringify(settings), Date.now(), userId);
+      if (options.replacesScope && options.replacesScope !== scope) {
+        db.prepare(`DELETE FROM spam_settings WHERE scope = ?`).run(options.replacesScope);
+      }
+      if (options.audit) {
+        recordAdminAuditRow(db, { actorUserId: options.audit.actorUserId, action: "spam_settings.update",
+          targetAccountId: options.audit.targetAccountId, payload: { before: before ?? {}, after: settings } });
+      }
+    }).immediate();
   });
 }

@@ -10,6 +10,15 @@ import {
 import { spamModelUnavailableReason } from "./provider";
 
 const GLOBAL_SCOPE = "global";
+const MAILBOX_SCOPE_PREFIX = "account:";
+
+/** Mailbox rows are keyed `account:<id>`, so no account id can address the global row. */
+export const mailboxSpamScope = (accountId: string) => `${MAILBOX_SCOPE_PREFIX}${accountId}`;
+
+/** Rows written before the prefix used the bare account id; never "global" or an id that looks prefixed. */
+function legacyMailboxScope(accountId: string) {
+  return accountId === GLOBAL_SCOPE || accountId.startsWith(MAILBOX_SCOPE_PREFIX) ? undefined : accountId;
+}
 
 function lenient<T>(parse: (input: unknown) => T, stored: unknown): T | null {
   if (!stored) return null;
@@ -25,19 +34,22 @@ export async function loadSpamConfig(): Promise<SpamConfig> {
 }
 
 export async function loadMailboxSpamSettings(accountId: string): Promise<SpamMailboxSettings> {
-  return lenient(parseSpamMailboxSettings, await getSpamSettings(accountId)) ?? {};
+  const legacy = legacyMailboxScope(accountId);
+  const stored = await getSpamSettings(mailboxSpamScope(accountId)) ?? (legacy ? await getSpamSettings(legacy) : null);
+  return lenient(parseSpamMailboxSettings, stored) ?? {};
 }
 
-/** Throws SpamSettingsError on invalid input. */
+/** Throws SpamSettingsError on invalid input. Every save is written to the admin log with the previous settings. */
 export async function saveSpamAdminSettings(input: unknown, userId: string) {
   const settings = parseSpamAdminSettings(input);
-  await saveSpamSettings(GLOBAL_SCOPE, settings, userId);
+  await saveSpamSettings(GLOBAL_SCOPE, settings, userId, { audit: { actorUserId: userId, targetAccountId: null } });
   return settings;
 }
 
 export async function saveMailboxSpamSettings(accountId: string, input: unknown, userId: string) {
   const settings = parseSpamMailboxSettings(input);
-  await saveSpamSettings(accountId, settings, userId);
+  await saveSpamSettings(mailboxSpamScope(accountId), settings, userId,
+    { replacesScope: legacyMailboxScope(accountId), audit: { actorUserId: userId, targetAccountId: accountId } });
   return settings;
 }
 
