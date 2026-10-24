@@ -1,35 +1,46 @@
+import type { LanguageModel } from "ai";
 import { simpleParser } from "mailparser";
 import {
   getAccountById,
   getAccounts,
   getFolders,
-  getLatestSpamDecision,
+  getLatestSpamDecisionRow,
   getMessageById,
   getSenderProfile,
   hasSentToAddress,
   listSenderMailsNear,
-  listUncheckedSpamMessageIds,
+  listUncheckedSpamMessages,
   markSenderProfileUserSpam,
   recordSenderProfileJunk,
   recordSenderProfileMail,
+  recordSpamCheckFailure,
   resetTrustedSpamChecks,
   saveSpamVerdict
 } from "@/lib/db";
 import type { Message } from "@/lib/data";
+import { resolveAccountRole, roleAtLeast } from "@/lib/accountAccess";
 import { parseAddressEmails } from "@/lib/ownAddresses";
 import { getSourcesDir } from "@/lib/runtimePaths";
-import { getMessageSource } from "@/lib/storage";
+import { getMessageSourceBuffer } from "@/lib/storage";
 import { findInboxFolder, findSentFolder } from "@/lib/specialFolders";
 import { moveMessageToJunk } from "@/app/api/_helpers/message/junkMove";
-import { buildOwnIdentitySets, type SpamAllowlistContext } from "./allowlist";
+import { allowlistDecision, buildOwnIdentitySets, type SpamAllowlistContext } from "./allowlist";
 import type { SpamTrustContext } from "./anomaly";
-import { classifySpam, shouldMarkAsSpam } from "./classifySpam";
-import { isSpamDetectionOn, resolveMailboxThreshold } from "./config";
+import { classifySpam, isRetryableSpamError, shouldMarkAsSpam } from "./classifySpam";
+import { isSpamDetectionOn, resolveMailboxThreshold, type SpamConfig } from "./config";
 import { findSpamExamples } from "./examples";
 import { buildSpamInput, buildSpamInputFromMessage } from "./input";
 import { readSourceHeads, storedMailArrival } from "./profileBuild";
 import { getSpamLanguageModel, getSpamProviderOptions, spamModelUnavailableReason } from "./provider";
-import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
+import {
+  createSpamClaims,
+  createSpamFailureLogger,
+  createSpamQueue,
+  pickSweepJobs,
+  spamErrorLogFields,
+  SPAM_MAX_ATTEMPTS,
+  type SpamCheckJob
+} from "./queue";
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
 import { mergeSenderProfiles, recipientCircleOf, senderMailFacts, spamSenderKey, type SenderProfile } from "./senderProfile";
 import { loadStaticRules } from "./staticRules";
@@ -40,7 +51,8 @@ import { addSpamUsage, EMPTY_SPAM_USAGE, spamCacheHitRate, spamUsageLogFields, t
  * Wiring between sync and the classifier (doc/SPAM-DETECTION.md). After every
  * successful sync job the account's INBOX is swept for unchecked messages of
  * the last days; each one is queued once per process and classified in the
- * background, so IMAP sync never waits for the model.
+ * background, so IMAP sync never waits for the model. Failed attempts are
+ * stored on the message row, so the attempt limit also holds across restarts.
  */
 const SWEEP_WINDOW_MS = 3 * 24 * 60 * 60_000;
 const SWEEP_LIMIT = 50;
@@ -52,6 +64,24 @@ const BURST_CANDIDATES = 20;
 /** "Als Spam" on a sender re-checks its trusted skips of this many days. */
 const REVOKE_WINDOW_MS = 7 * 24 * 60 * 60_000;
 
+/** What the service reaches outside the database; tests replace them (no model API, no IMAP). */
+export type SpamServiceDeps = {
+  languageModel: (config: SpamConfig) => LanguageModel | null;
+  /** The raw source bytes: the parser decodes each part by its MIME charset. */
+  readSource: (accountId: string, messageId: string) => Promise<Buffer | null>;
+  moveToJunk: typeof moveMessageToJunk;
+  accountRole: typeof resolveAccountRole;
+  sleep: (ms: number) => Promise<void>;
+};
+
+const DEFAULT_DEPS: SpamServiceDeps = {
+  languageModel: getSpamLanguageModel,
+  readSource: getMessageSourceBuffer,
+  moveToJunk: moveMessageToJunk,
+  accountRole: resolveAccountRole,
+  sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+};
+
 type SpamServiceState = {
   queue: ReturnType<typeof createSpamQueue>;
   logFailure: ReturnType<typeof createSpamFailureLogger>;
@@ -59,6 +89,7 @@ type SpamServiceState = {
   identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets>; accountIds: string[] };
   /** Model token usage per account since that account's last sweep summary. */
   usage: Map<string, SpamTokenUsage>;
+  deps?: SpamServiceDeps;
 };
 
 const runtime = globalThis as typeof globalThis & { __noctuaSpamService?: SpamServiceState };
@@ -70,22 +101,40 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
     usage: new Map(),
     queue: createSpamQueue({
       check: (job) => checkMessage(job),
-      onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", { error: String(error) })
+      isRetryable: isRetryableSpamError,
+      onAttemptFailed: (job, failedAttempts) => recordSpamCheckFailure(job.accountId, job.messageId, failedAttempts),
+      onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", spamErrorLogFields(error)),
+      sleep: (ms) => deps().sleep(ms)
     })
   };
 })();
 
-export function scheduleSpamSweep(accountId: string) {
-  void sweep(accountId).catch((error) => state.logFailure(accountId, "sweep failed", { error: String(error) }));
+const deps = () => state.deps ?? DEFAULT_DEPS;
+
+/** Tests: replaces outside dependencies until the returned function restores them. */
+export function replaceSpamServiceDeps(overrides: Partial<SpamServiceDeps>) {
+  const previous = state.deps;
+  state.deps = { ...deps(), ...overrides };
+  return () => { state.deps = previous; };
 }
 
-async function sweep(accountId: string) {
+/** Resolves once every queued check has finished. */
+export function spamChecksIdle() {
+  return state.queue.onIdle();
+}
+
+export function scheduleSpamSweep(accountId: string) {
+  void runSpamSweep(accountId).catch((error) => state.logFailure(accountId, "sweep failed", { error: String(error) }));
+}
+
+/** One sweep of the account's INBOX; the checks it queues run in the background (spamChecksIdle). */
+export async function runSpamSweep(accountId: string) {
   if (!isSpamDetectionOn(await loadSpamConfig(), await loadMailboxSpamSettings(accountId))) return;
   const inbox = findInboxFolder(await getFolders(accountId), accountId);
   if (!inbox) return;
   // Oldest first, so a backlog is worked off before it leaves the window.
-  const ids = await listUncheckedSpamMessageIds(accountId, inbox.id, Date.now() - SWEEP_WINDOW_MS, SWEEP_LIMIT * 4);
-  const jobs = pickSweepJobs(accountId, ids, state.queue, state.claims, SWEEP_LIMIT);
+  const candidates = await listUncheckedSpamMessages(accountId, inbox.id, Date.now() - SWEEP_WINDOW_MS, SWEEP_LIMIT * 4, SPAM_MAX_ATTEMPTS);
+  const jobs = pickSweepJobs(accountId, candidates, state.queue, state.claims, SWEEP_LIMIT);
   state.queue.enqueue(jobs);
   if (jobs.length) void logSweepSummary(accountId, jobs.length);
 }
@@ -129,7 +178,7 @@ async function loadHouseholdSenderProfile(senderKey: string, now: number) {
 }
 
 async function loadSpamInput(accountId: string, message: Message) {
-  const source = await getMessageSource(accountId, message.id).catch(() => null);
+  const source = await deps().readSource(accountId, message.id).catch(() => null);
   if (source) {
     try { return buildSpamInput(await simpleParser(source)); } catch { /* fall back to the stored row */ }
   }
@@ -151,7 +200,8 @@ async function checkMessage(job: SpamCheckJob) {
   const allowlist: SpamAllowlistContext = {
     ...identity,
     isCorrespondent: async (email) => sentFolder ? hasSentToAddress(job.accountId, sentFolder.id, email) : false,
-    latestDecision: (email) => getLatestSpamDecision(job.accountId, email)
+    latestDecision: async (email) => allowlistDecision(await getLatestSpamDecisionRow(job.accountId, email),
+      async (userId) => roleAtLeast(await deps().accountRole(userId, job.accountId), "manager"))
   };
   const trust: SpamTrustContext = {
     ownAddresses: identity.ownAddresses,
@@ -164,7 +214,7 @@ async function checkMessage(job: SpamCheckJob) {
     allowlist,
     staticRules: await loadStaticRules(),
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
-    model: getSpamLanguageModel(config),
+    model: deps().languageModel(config),
     providerOptions: getSpamProviderOptions(config),
     onUsage: (usage) => recordUsage(job.accountId, usage),
     trust
@@ -231,7 +281,7 @@ async function autoMoveToJunk(accountId: string, message: Message) {
   try {
     const account = await getAccountById(accountId);
     if (!account) return;
-    await moveMessageToJunk({ account, accountId, message: { ...message, imapUid: message.imapUid, mailboxPath: message.mailboxPath } });
+    await deps().moveToJunk({ account, accountId, message: { ...message, imapUid: message.imapUid, mailboxPath: message.mailboxPath } });
   } catch (error) {
     // The mark stays; the move is not retried (the user can still use "Als Spam").
     state.logFailure(accountId, "auto-move to Junk failed", { error: String(error) });

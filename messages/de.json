@@ -476,6 +476,7 @@
       "autoMove": "Verdächtige Nachrichten automatisch in den Spam-Ordner verschieben",
       "threshold": "Eigene Schwelle (leer = {threshold, number} aus der Verwaltung)",
       "thresholdHelp": "Zwischen 0,5 und 1. Höher bedeutet weniger Markierungen.",
+      "thresholdInvalid": "Bitte eine Zahl zwischen 0,5 und 1 eingeben oder das Feld leer lassen.",
       "save": "Speichern",
       "saved": "Gespeichert.",
       "loading": "Lädt …",

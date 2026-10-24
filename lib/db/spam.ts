@@ -15,6 +15,7 @@ import {
   type SenderProfile,
   type SenderProfileRow
 } from "../mail/spam/senderProfile";
+import { recordAdminAuditRow } from "./adminAudit";
 import { getAccountDb, getDb } from "./connection";
 import { sentToAddressInDb } from "./sentRecipients";
 
@@ -37,21 +38,48 @@ export async function saveSpamVerdict(accountId: string, messageId: string, verd
 }
 
 /**
- * Unchecked rows of a folder newer than `sinceDateValue`, oldest first. Every
- * checked row has `spamCheckedAt`, so after the first sweep this only returns
- * mail that arrived since (served by idx_messages_account_folder_date).
+ * An unchecked row keeps the failed attempts of earlier runs in spamReasons
+ * (`["failed:<n>"]`) until a verdict replaces it; hydration ignores reasons
+ * without a verdict.
  */
-export async function listUncheckedSpamMessageIds(accountId: string, folderId: string, sinceDateValue: number, limit: number) {
+const FAILED_ATTEMPTS_SQL = `CASE WHEN spamReasons LIKE '["failed:%' THEN CAST(substr(spamReasons, 10) AS INTEGER) ELSE 0 END`;
+
+/**
+ * Unchecked rows of a folder newer than `sinceDateValue`, oldest first, with
+ * fewer than `maxAttempts` failed attempts. Every checked row has
+ * `spamCheckedAt`, so after the first sweep this only returns mail that
+ * arrived since (served by idx_messages_account_folder_date).
+ */
+export async function listUncheckedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number, maxAttempts: number) {
   const db = await getAccountDb(accountId);
-  const rows = db.prepare(`SELECT id FROM messages
+  return db.prepare(`SELECT id, ${FAILED_ATTEMPTS_SQL} AS failedAttempts FROM messages
     WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND spamCheckedAt IS NULL AND COALESCE(deleted, 0) = 0
-    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as Array<{ id: string }>;
-  return rows.map((row) => row.id);
+      AND ${FAILED_ATTEMPTS_SQL} < ?
+    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, maxAttempts, limit) as Array<{ id: string; failedAttempts: number }>;
+}
+
+/** Stores the failed attempts of a row that is still unchecked (a verdict written meanwhile is kept). */
+export async function recordSpamCheckFailure(accountId: string, messageId: string, failedAttempts: number) {
+  return withDbWriteRetry("recordSpamCheckFailure", async () => {
+    const db = await getAccountDb(accountId);
+    db.prepare(`UPDATE messages SET spamReasons = ? WHERE accountId = ? AND id = ? AND spamCheckedAt IS NULL AND spamVerdict IS NULL`)
+      .run(JSON.stringify([`failed:${failedAttempts}`]), accountId, messageId);
+  });
 }
 
 export type NewSpamExample = SpamExample & { messageId: string | null; source: string; decidedByUserId: string | null };
 
-/** The latest decision per sender and subject wins; old examples are pruned per account. */
+/**
+ * A sender's latest decision when it is "Kein Spam": it carries the sender's
+ * allowlist entry (getLatestSpamDecision), so the rolling cap never prunes it.
+ */
+const SENDER_HAM_SQL = `e.label = 'ham' AND e.senderEmail IS NOT NULL AND NOT EXISTS (SELECT 1 FROM spam_examples newer
+  WHERE newer.accountId = e.accountId AND newer.senderEmail = e.senderEmail AND newer.createdAt > e.createdAt)`;
+
+/**
+ * The latest decision per sender and subject wins; old examples are pruned per
+ * account to the newest EXAMPLES_PER_ACCOUNT, apart from senders' latest "Kein Spam".
+ */
 export async function saveSpamExample(accountId: string, example: NewSpamExample) {
   return withDbWriteRetry("saveSpamExample", async () => {
     const db = await getAccountDb(accountId);
@@ -64,7 +92,7 @@ export async function saveSpamExample(accountId: string, example: NewSpamExample
         .run(randomUUID(), accountId, example.messageId, example.senderEmail, example.senderDomain, example.subject,
           example.snippet, example.label, example.source, example.decidedByUserId, example.createdAt);
       db.prepare(`DELETE FROM spam_examples WHERE accountId = ? AND id IN (
-        SELECT id FROM spam_examples WHERE accountId = ? ORDER BY createdAt DESC LIMIT -1 OFFSET ?)`)
+        SELECT id FROM spam_examples e WHERE e.accountId = ? AND NOT (${SENDER_HAM_SQL}) ORDER BY e.createdAt DESC LIMIT -1 OFFSET ?)`)
         .run(accountId, accountId, EXAMPLES_PER_ACCOUNT);
     }).immediate();
   });
@@ -95,10 +123,15 @@ export async function listSpamExampleCandidates(accountId: string, target: { sen
 }
 
 export async function getLatestSpamDecision(accountId: string, senderEmail: string): Promise<SpamLabel | null> {
+  return (await getLatestSpamDecisionRow(accountId, senderEmail))?.label ?? null;
+}
+
+/** The sender's latest decision and who made it (null for a move without a session). */
+export async function getLatestSpamDecisionRow(accountId: string, senderEmail: string): Promise<{ label: SpamLabel; decidedByUserId: string | null } | null> {
   const db = await getAccountDb(accountId);
-  const row = db.prepare(`SELECT label FROM spam_examples WHERE accountId = ? AND senderEmail = ? ORDER BY createdAt DESC LIMIT 1`)
-    .get(accountId, senderEmail) as { label?: string } | undefined;
-  return row?.label === "spam" || row?.label === "ham" ? row.label : null;
+  const row = db.prepare(`SELECT label, decidedByUserId FROM spam_examples WHERE accountId = ? AND senderEmail = ? ORDER BY createdAt DESC LIMIT 1`)
+    .get(accountId, senderEmail) as { label?: string; decidedByUserId?: string | null } | undefined;
+  return row?.label === "spam" || row?.label === "ham" ? { label: row.label, decidedByUserId: row.decidedByUserId ?? null } : null;
 }
 
 /** Whether the mailbox has written to `email` (exact To/Cc/Bcc entry of a Sent-folder message). */
@@ -315,18 +348,39 @@ export async function countSpamTrustDecisions(accountId: string): Promise<SpamTr
   return { trustedSkips: row.trustedSkips, canaryChecks: row.canaryChecks, canaryMismatches: row.canaryMismatches };
 }
 
-export async function getSpamSettings(scope: string): Promise<unknown> {
-  const db = await getDb();
+function readSpamSettingsRow(db: any, scope: string): unknown {
   const row = db.prepare(`SELECT settings FROM spam_settings WHERE scope = ?`).get(scope) as { settings?: string } | undefined;
   if (!row?.settings) return null;
   try { return JSON.parse(row.settings); } catch { return null; }
 }
 
-export async function saveSpamSettings(scope: string, settings: object, userId: string) {
+export async function getSpamSettings(scope: string): Promise<unknown> {
+  return readSpamSettingsRow(await getDb(), scope);
+}
+
+export type SpamSettingsAudit = { actorUserId: string; targetAccountId: string | null };
+
+/**
+ * Writes one settings row. `replacesScope`: an older key of the same settings,
+ * read as the previous value and removed. `audit`: an admin-log entry with the
+ * previous and the new settings, written in the same transaction.
+ */
+export async function saveSpamSettings(scope: string, settings: object, userId: string,
+  options: { replacesScope?: string; audit?: SpamSettingsAudit } = {}) {
   return withDbWriteRetry("saveSpamSettings", async () => {
     const db = await getDb();
-    db.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, ?, ?)
-      ON CONFLICT(scope) DO UPDATE SET settings = excluded.settings, updatedAt = excluded.updatedAt, updatedByUserId = excluded.updatedByUserId`)
-      .run(scope, JSON.stringify(settings), Date.now(), userId);
+    db.transaction(() => {
+      const before = readSpamSettingsRow(db, scope) ?? (options.replacesScope ? readSpamSettingsRow(db, options.replacesScope) : null);
+      db.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, ?, ?)
+        ON CONFLICT(scope) DO UPDATE SET settings = excluded.settings, updatedAt = excluded.updatedAt, updatedByUserId = excluded.updatedByUserId`)
+        .run(scope, JSON.stringify(settings), Date.now(), userId);
+      if (options.replacesScope && options.replacesScope !== scope) {
+        db.prepare(`DELETE FROM spam_settings WHERE scope = ?`).run(options.replacesScope);
+      }
+      if (options.audit) {
+        recordAdminAuditRow(db, { actorUserId: options.audit.actorUserId, action: "spam_settings.update",
+          targetAccountId: options.audit.targetAccountId, payload: { before: before ?? {}, after: settings } });
+      }
+    }).immediate();
   });
 }

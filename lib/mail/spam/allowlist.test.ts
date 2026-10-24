@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildOwnIdentitySets, matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
+import { allowlistDecision, buildOwnIdentitySets, matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
 import { buildSpamInputFromMessage } from "./input";
 
 const sets = buildOwnIdentitySets(["Office@Household.example.test", "owner@gmail.com", "not-an-address"]);
@@ -27,6 +27,18 @@ describe("spam allowlist", () => {
       .toBe("own-address");
   });
 
+  test("only the authenticated identity counts: HELO, selectors, other properties and comments never do", async () => {
+    const own = (result: string) => matchSpamAllowlist(from("office@household.example.test", [`mxe.example.test; ${result}`]), context());
+    expect(await own("spf=pass smtp.mailfrom=bounce@attacker.example smtp.helo=household.example.test")).toBeNull();
+    expect(await own("spf=pass smtp.helo=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example header.s=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example policy.d=household.example.test")).toBeNull();
+    expect(await own("spf=pass (household.example.test) smtp.mailfrom=x@attacker.example x.y=household.example.test")).toBeNull();
+    expect(await own("dkim=pass header.d=attacker.example (header.d=household.example.test)")).toBeNull();
+    expect(await own("spf=pass smtp.mailfrom=bounce@mail.household.example.test smtp.helo=out.attacker.example")).toBe("own-address");
+    expect(await own("dkim=pass header.i=@household.example.test")).toBe("own-address");
+  });
+
   test("correspondents and explicit decisions", async () => {
     expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async (email) => email === "partner@example.test" })))
       .toBe("correspondent");
@@ -34,5 +46,27 @@ describe("spam allowlist", () => {
     // A later "Als Spam" outranks having written to the sender.
     expect(await matchSpamAllowlist(from("partner@example.test"), context({ isCorrespondent: async () => true, latestDecision: async () => "spam" })))
       .toBeNull();
+  });
+
+  test("correspondents and \"Kein Spam\" senders need authentication for the sender when the server reports any", async () => {
+    const known = context({ isCorrespondent: async () => true });
+    const decided = context({ latestDecision: async () => "ham" });
+    const forged = ["mxe.example.test; spf=pass smtp.mailfrom=bounce@attacker.example; dkim=pass header.d=attacker.example"];
+    expect(await matchSpamAllowlist(from("Partner <partner@example.test>", forged), known)).toBeNull();
+    expect(await matchSpamAllowlist(from("news@example.test", forged), decided)).toBeNull();
+    expect(await matchSpamAllowlist(from("partner@example.test", ["mxe.example.test; spf=fail smtp.mailfrom=partner@example.test"]), known)).toBeNull();
+    expect(await matchSpamAllowlist(from("partner@example.test"), known)).toBe("correspondent");
+    // Without any Authentication-Results there is nothing to judge.
+    expect(await matchSpamAllowlist(from("partner@example.test", []), known)).toBe("correspondent");
+  });
+
+  test("\"Kein Spam\" allowlists only when its author may manage the mailbox; \"Als Spam\" always counts", async () => {
+    const managers = new Set(["manager"]);
+    const mayAllow = async (userId: string) => managers.has(userId);
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: "manager" }, mayAllow)).toBe("ham");
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: "editor" }, mayAllow)).toBeNull();
+    expect(await allowlistDecision({ label: "ham", decidedByUserId: null }, mayAllow)).toBeNull();
+    expect(await allowlistDecision({ label: "spam", decidedByUserId: "editor" }, mayAllow)).toBe("spam");
+    expect(await allowlistDecision(null, mayAllow)).toBeNull();
   });
 });

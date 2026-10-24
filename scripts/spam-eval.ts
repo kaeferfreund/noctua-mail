@@ -5,8 +5,8 @@
  *     [--rules static-rules.json] [--limit 200 [--stratified]] [--concurrency 4] [--threshold 0.85]
  *     [--out eval-result.json] [--trust-profiles [profiles.json]]
  *
- * --limit N takes the first N items (the sample lists spam first); with
- * --stratified it takes N/2 spam and N/2 ham instead.
+ * --limit N takes a seeded random sample of N items, so spam and ham keep their
+ * share of the full sample; with --stratified it takes N/2 spam and N/2 ham.
  *
  * Labels: messages in Junk/Spam folders are spam, INBOX messages are ham. With
  * --sample the labeled items come from that file; without it all Junk/Spam
@@ -34,7 +34,7 @@ import type { SpamAllowlistContext } from "../lib/mail/spam/allowlist";
 import type { SpamTrustContext } from "../lib/mail/spam/anomaly";
 import { classifySpam, shouldMarkAsSpam } from "../lib/mail/spam/classifySpam";
 import { isValidThreshold, resolveSpamConfig, SPAM_MODEL_PRICES } from "../lib/mail/spam/config";
-import { openSpamDataDir } from "../lib/mail/spam/evalData";
+import { openSpamDataDir, seededShuffle, selectEvalItems } from "../lib/mail/spam/evalData";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
 import { loadHouseholdProfiles, type HouseholdProfiles } from "../lib/mail/spam/profileFile";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
@@ -74,20 +74,10 @@ const trustProfiles = process.argv.includes("--trust-profiles");
 const trustFile = optionalArg("trust-profiles");
 if (trustFile && !path.relative(dataDir, path.resolve(trustFile)).startsWith("..")) throw new Error("--trust-profiles <file> must not point into the data dir");
 
-// immutable=1 (evalData.ts): never take locks or touch the -wal/-shm files of a live data dir.
+// mode=ro (evalData.ts): reads a live data dir's WAL, never writes or checkpoints it.
 const data = openSpamDataDir(dataDir);
 const { accounts, own } = data;
 const shard = (accountId: string) => data.shard(accountId);
-
-/** Deterministic PRNG for the fallback sample (mulberry32). */
-function random(seed: number) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function sampleFromDb(): Item[] {
   const spam: Item[] = [];
@@ -102,21 +92,13 @@ function sampleFromDb(): Item[] {
       else if (row.folderId === inboxId) inbox.push({ accountId: account.id, id: row.id, label: "ham" });
     }
   }
-  const next = random(42);
-  for (let index = inbox.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(next() * (index + 1));
-    [inbox[index], inbox[swap]] = [inbox[swap], inbox[index]];
-  }
-  return [...spam, ...inbox.slice(0, 1000)];
+  return [...spam, ...seededShuffle(inbox, 42).slice(0, 1000)];
 }
 
 const items: Item[] = samplePath && existsSync(samplePath)
   ? (JSON.parse(readFileSync(samplePath, "utf8")) as { items: Item[] }).items
   : sampleFromDb();
-const byLabel = (label: Item["label"], count: number) => items.filter((item) => item.label === label).slice(0, count);
-const selected = limit <= 0 ? items
-  : stratified ? [...byLabel("spam", Math.ceil(limit / 2)), ...byLabel("ham", Math.floor(limit / 2))]
-  : items.slice(0, limit);
+const selected = selectEvalItems(items, limit, stratified);
 const rules = await loadStaticRules(rulesPath);
 let usage = EMPTY_SPAM_USAGE;
 let household: HouseholdProfiles | null = null;

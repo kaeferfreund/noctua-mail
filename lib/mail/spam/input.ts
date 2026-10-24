@@ -6,17 +6,34 @@ import type { SpamInput } from "./types";
 
 export const SPAM_TEXT_LIMIT = 4096;
 const HEADER_VALUE_LIMIT = 600;
+/**
+ * X-Spam-Status lists the server's test names after the score; static rules
+ * match tests anywhere in that list, so it keeps far more than other headers.
+ */
+const SPAM_STATUS_VALUE_LIMIT = 4000;
 const MAX_SPAM_HEADERS = 12;
 const MAX_LINK_DOMAINS = 30;
 const MAX_ATTACHMENTS = 10;
 
-/** Drops "> " lines and everything from the first reply attribution / forward marker. */
-export function stripQuotedText(text: string) {
+/**
+ * Own text the classifier always sees: a reply attribution or forward marker
+ * before this many characters does not cut, so a fake attribution line at the
+ * top cannot hide the body from the model.
+ */
+export const SPAM_OWN_TEXT_MIN = 1024;
+
+/**
+ * Drops "> " lines and everything from the first reply attribution / forward
+ * marker that follows at least `keepAtLeast` characters of kept text.
+ */
+export function stripQuotedText(text: string, keepAtLeast = 0) {
   const kept: string[] = [];
+  let length = 0;
   for (const line of text.split(/\r?\n/)) {
     if (/^\s*>/.test(line)) continue;
-    if (isQuoteBoundaryText(line)) break;
+    if (length >= keepAtLeast && isQuoteBoundaryText(line)) break;
     kept.push(line.trimEnd());
+    length += line.trim().length;
   }
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -68,7 +85,7 @@ export function extractMaskedLinkDomains(html: string | null | undefined) {
 }
 
 function capText(text: string) {
-  return stripQuotedText(text).replace(/[ \t]+/g, " ").slice(0, SPAM_TEXT_LIMIT);
+  return stripQuotedText(text, SPAM_OWN_TEXT_MIN).replace(/[ \t]+/g, " ").slice(0, SPAM_TEXT_LIMIT);
 }
 
 function firstMailbox(from: string) {
@@ -177,7 +194,10 @@ export function topReceivedAt(lines: HeaderLine[]) {
 
 /** The header-derived fields of SpamInput; `lines` hold the full unfolded values. */
 function headerFields(lines: HeaderLine[]) {
-  const capped = lines.map((line) => ({ key: line.key, value: line.value.slice(0, HEADER_VALUE_LIMIT) }));
+  const capped = lines.map((line) => ({
+    key: line.key,
+    value: line.value.slice(0, line.key === "x-spam-status" ? SPAM_STATUS_VALUE_LIMIT : HEADER_VALUE_LIMIT)
+  }));
   const header = (key: string) => capped.find((line) => line.key === key)?.value ?? null;
   return {
     listId: header("list-id"),
