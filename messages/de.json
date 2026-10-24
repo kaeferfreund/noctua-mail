@@ -1675,7 +1675,7 @@
       "cancel": "Abbrechen",
       "send": "Senden",
       "sending": "Wird gesendet …",
-      "loadingAttachments": "Lädt Anhänge …",
+      "loadingAttachments": "Anhänge werden geladen …",
       "attachmentsFailedTitle": "Lade die fehlgeschlagenen Anhänge erneut oder entferne sie.",
       "close": "Schließen"
     },
