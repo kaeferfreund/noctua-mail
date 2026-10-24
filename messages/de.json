@@ -1559,10 +1559,10 @@
     "actions": {
       "discardDraft": "Verwerfen",
       "saveDraft": "Speichern",
-      "saving": "Speichert …",
+      "saving": "Wird gespeichert …",
       "cancel": "Abbrechen",
       "send": "Senden",
-      "sending": "Sendet …",
+      "sending": "Wird gesendet …",
       "loadingAttachments": "Lädt Anhänge …",
       "attachmentsFailedTitle": "Lade die fehlgeschlagenen Anhänge erneut oder entferne sie.",
       "close": "Schließen"
