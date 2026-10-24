@@ -122,7 +122,8 @@
       "translation": "Translation",
       "recipient-aliases": "Recipient Aliases",
       "mcp": "MCP",
-      "members": "Members"
+      "members": "Members",
+      "spam": "Spam detection"
     },
     "accountTitle": "Account settings",
     "close": "Close",
@@ -421,6 +422,18 @@
         "uncategorized": "uncategorized",
         "none": "none"
       }
+    },
+    "spam": {
+      "heading": "Spam detection for this mailbox",
+      "help": "New inbox messages are checked once. Suspicious messages are marked; moving them to Junk is optional.",
+      "globalOff": "Spam detection is switched off in the administration.",
+      "autoMove": "Move suspicious messages to the Junk folder automatically",
+      "threshold": "Own threshold (empty = {threshold, number} from the administration)",
+      "thresholdHelp": "Between 0.5 and 1. Higher means fewer marks.",
+      "save": "Save",
+      "saved": "Saved.",
+      "loading": "Loading …",
+      "failed": "The settings could not be loaded or saved."
     }
   },
   "Pwa": {
@@ -919,7 +932,8 @@
       "users": "Users",
       "mailboxes": "Mailboxes",
       "invites": "Invites",
-      "audit": "Audit"
+      "audit": "Audit",
+      "spam": "Spam detection"
     },
     "loading": "Loading…",
     "cancel": "Cancel",
@@ -1051,6 +1065,18 @@
       "loggedOut": "Your session expired. Sign in again.",
       "request": "Request failed. Please try again.",
       "rateLimited": "Too many attempts. Please try again later."
+    },
+    "spam": {
+      "heading": "Spam detection",
+      "help": "A language model checks every new inbox message once and learns from the \"Mark as spam\" and \"Not spam\" decisions. Moving to the Junk folder can be enabled per mailbox.",
+      "enabled": "Spam detection enabled",
+      "provider": "Provider: {provider}",
+      "model": "Model",
+      "threshold": "Threshold (0.5–1)",
+      "thresholdHelp": "A message is marked only for \"spam\" with at least this confidence.",
+      "unavailable": "Model not usable ({reason}). Until then only the allowlist and fixed rules apply.",
+      "save": "Save",
+      "saved": "Saved."
     }
   },
   "List": {
@@ -1193,7 +1219,6 @@
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "linkCopyFailed": "Could not copy link",
-
     "focus": {
       "expand": "Expand reading view",
       "showList": "Show message list",
@@ -1455,6 +1480,13 @@
       "newsletter": "Newsletter",
       "notification": "Notification",
       "transactional": "Transactional"
+    },
+    "spam": {
+      "badge": "Suspicious",
+      "title": "Marked as suspicious by the spam detection",
+      "titleWithReasons": "Suspicious: {reasons}",
+      "notSuspicious": "Not spam",
+      "notSuspiciousTitle": "Remove the mark and remember as not spam"
     }
   },
   "Notifications": {
@@ -1529,7 +1561,9 @@
     "flagFailed": "Failed to update message flag.",
     "keywordFailed": "Failed to update message keyword.",
     "categoryFailed": "Failed to update category.",
-    "todoFailed": "Failed to update To-Do flag."
+    "todoFailed": "Failed to update To-Do flag.",
+    "markedNotSuspicious": "Suspicious mark removed.",
+    "notSuspiciousFailed": "The suspicious mark could not be removed."
   },
   "Compose": {
     "sender": {
@@ -1745,7 +1779,12 @@
     "allFieldsScope": "in all fields",
     "fieldsScope": "in fields {fields}",
     "filterCriteria": "filter {badges}",
-    "queryCriteria": "\"{query}\""
+    "queryCriteria": "\"{query}\"",
+    "suspicious": {
+      "name": "Suspicious",
+      "description": "Messages the spam detection marked as suspicious.",
+      "badgeLabel": "Suspicious"
+    }
   },
   "EventSchedule": {
     "start": "Start",

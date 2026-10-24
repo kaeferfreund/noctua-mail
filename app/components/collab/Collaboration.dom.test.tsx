@@ -391,10 +391,10 @@ it("collaboration sidebar definitions activate their server badge filter; summar
     expect(view.getByTestId("scope").textContent).toBe("all:");
   }
   // All collaboration counts come from the canonical summary, leaving only
-  // the four existing non-collaboration view counts.
-  await waitFor(() => expect(requests.length).toBe(4));
+  // the five non-collaboration view counts.
+  await waitFor(() => expect(requests.length).toBe(5));
   expect(requests.map(request => [request.get("badges"), request.get("excludeFolderIds")]).sort()).toEqual([
-    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"]
+    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"], ["suspicious,unread", "trash"]
   ].sort());
 });
 
