@@ -95,6 +95,9 @@ describe("push API", () => {
     expect(again).toEqual({ ok: true, id: created.id, settings });
     const stored = user.master.prepare("SELECT p256dh, userAgent FROM push_subscriptions WHERE id = ?").get(created.id);
     expect(stored).toEqual({ p256dh: Buffer.alloc(65, 7).toString("base64url"), userAgent: "Synthetic Phone" });
+    // A re-POST without settings (the tab's sync) keeps the stored ones.
+    expect(await (await subscribe(request("/subscriptions", "POST", user.cookie, { subscription: device, userAgent: "Synthetic Phone" }))).json()).toEqual({ ok: true, id: created.id, settings });
+    expect(JSON.parse((user.master.prepare("SELECT settings FROM push_subscriptions WHERE id = ?").get(created.id) as { settings: string }).settings)).toEqual(settings);
 
     const listResponse = await listSubscriptions(request("/subscriptions", "GET", user.cookie));
     const listText = await listResponse.text();
