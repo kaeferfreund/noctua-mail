@@ -70,7 +70,7 @@ export default function IdentitiesTabContent({ editingAccount, apiFetch = fetch 
         <Field label={senderMessages.replyTo} hint={senderMessages.replyToHelp}><input type="email" className={nativeControlClass} value={form.replyTo} onChange={event => setForm({ ...form, replyTo: event.target.value })} /></Field>
         <Field label={senderMessages.signatureTemplate}><select className={nativeControlClass} value={form.signatureId} onChange={event => setForm({ ...form, signatureId: event.target.value })}><option value="">{senderMessages.identitySignatureDefault}</option>{editingAccount.settings?.signatures?.map(signature => <option key={signature.id} value={signature.id}>{signature.name}</option>)}</select></Field>
         <label><input type="checkbox" checked={form.enabled} disabled={identities.some(identity => identity.id === editing && identity.isDefault)} onChange={event => setForm({ ...form, enabled: event.target.checked })} /> {senderMessages.enabled}</label>
-        <div className="flex gap-2"><Button type="submit">{busy ? senderMessages.saving : senderMessages.saveIdentity}</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>{senderMessages.cancel}</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="submit">{busy ? senderMessages.saving : senderMessages.saveIdentity}</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>{senderMessages.cancel}</Button></div>
       </fieldset>
     </form>}
   </div>;
