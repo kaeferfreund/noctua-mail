@@ -12,9 +12,9 @@ beforeEach(() => { (window as unknown as { happyDOM: { setURL: (url: string) => 
 const restores: Array<() => void> = [];
 afterEach(() => { cleanup(); restores.splice(0).forEach(fn => fn()); window.history.replaceState(null, "", "/"); });
 const message = { id: "imap-one", accountId: "a", folderId: "a:INBOX" } as Message;
-function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {}, onTransaction }: {
+function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {}, onTransaction, accountIds = ["a", "b"], onForbidden }: {
   switcher?: (id: string) => Promise<void>; resolver?: (account: string, id: string, signal: AbortSignal) => Promise<Message | null>;
-  deferFolder?: boolean;
+  deferFolder?: boolean; accountIds?: string[]; onForbidden?: () => void;
   resolution?: () => Promise<MessageResolution>; expired?: () => void;
   notice?: (kind: string) => void; onTransaction?: (event: DeepLinkTransaction) => void;
 }) {
@@ -24,7 +24,7 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
   const [ready, setReady] = useState(true);
   const [overlay, setOverlay] = useState(false);
   useMobileOverlayHistory(overlay, () => setOverlay(false));
-  const { navigateAccount, navigateMessage } = useDeepLinks({ ready, state, messages, accountIds: ["a", "b"],
+  const { navigateAccount, navigateMessage } = useDeepLinks({ ready, state, messages, accountIds, onForbidden,
     switchAccount: async id => { const epoch = ++version.current; await switcher?.(id); if (epoch === version.current) setState(old => ({ ...old, accountId: id })); },
     applyPlace: target => { const applied = { ...target, folderId: target.folderId || `${target.accountId}:INBOX`, messageId: "" }; if (deferFolder) { setState({ ...applied, folderId: "" }); setTimeout(() => setState(applied), 0); } else setState(applied); return applied; },
     onUnauthenticated: () => { setReady(false); expired?.(); },
@@ -36,6 +36,8 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
     <button onClick={() => setState(old => ({ ...old, messageId: "imap-two" }))}>Next message</button>
     <button onClick={() => { setMessages(old => old.filter(item => item.id !== state.messageId)); setState(old => ({ ...old, messageId: "imap-two" })); }}>Remove message</button>
     <button onClick={() => navigateMessage("imap-one", "b")}>Notification</button>
+    <button onClick={() => setState(old => ({ ...old, panel: "reminder", calendar: true }))}>Open panels</button>
+    <button onClick={() => { navigateMessage("imap-one"); setState(old => ({ ...old, panel: null })); }}>Reminder entry</button>
     <button onClick={() => { setState(old => ({ ...old, folderId: `${old.accountId}:Sent` })); setOverlay(false); }}>Folder Sent</button>
     <button onClick={() => setOverlay(true)}>Show overlay</button><output data-testid="overlay">{String(overlay)}</output>
     <button onClick={back}>Back</button><button onClick={() => setReady(value => !value)}>Ready</button>
@@ -186,12 +188,20 @@ it("publishes a folder picked in a sheet after its own Back has settled", async 
   expect(page.getByTestId("state").textContent).toContain('"folderId":"a:Sent"');
 });
 
-it("settles a mailbox picked while its sidebar sheet closes with Back", async () => {
+it("settles a mailbox picked while its sidebar sheet closes with Back, without a duplicate Forward entry", async () => {
   const page = render(<Harness />); await settled();
+  const entries = window.history.length;
   fireEvent.click(page.getByText("Show overlay"));
   fireEvent.click(page.getByText("Mailbox B"));
   await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("b:INBOX"));
   expect(page.getByTestId("state").textContent).toContain('"accountId":"b"');
+  // The sheet's entry was stepped back off and replaced by B: list A, then B.
+  expect(window.history.length).toBe(entries + 1);
+  expect(window.history.state.noctuaMobileOverlay).toBeUndefined();
+  act(() => window.history.back());
+  await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"accountId":"a"'));
+  act(() => window.history.forward());
+  await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"accountId":"b"'));
 });
 
 it.each(["window", "document", "body", "input"] as const)("tracks navigation keys from %s without replacing history for typed input", async target => {
@@ -229,4 +239,41 @@ it("gives each pushed entry its own id, keeps it on replace and reports transact
   fireEvent.click(page.getByText("Notification"));
   await waitFor(() => expect(events.at(-1)).toEqual({ phase: "settled", origin: "link", messageId: "imap-one" }));
   expect(events[0]).toEqual({ phase: "start", origin: "link", messageId: "imap-one" });
+});
+
+it("keeps the calendar sidebar for a message opened from a reminder, while the reminder popover closes itself", async () => {
+  const page = render(<Harness />); await settled();
+  fireEvent.click(page.getByText("Open panels"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).calendar).toBe(true));
+  fireEvent.click(page.getByText("Reminder entry"));
+  await waitFor(() => expect(parseDeepLink(window.location.search).messageId).toBe("imap-one"));
+  const state = JSON.parse(page.getByTestId("state").textContent ?? "{}") as DeepLinkState;
+  expect(state.calendar).toBe(true);
+  expect(state.panel).toBeNull();
+});
+it("arrow keys scroll and never make a later selection change replace history", async () => {
+  const page = render(<Harness />); await settled();
+  fireEvent.click(page.getByText("Message"));
+  const pushes = spyOn(window.history, "pushState"); restores.push(() => pushes.mockRestore());
+  fireEvent.keyDown(document.body, { key: "ArrowDown" });
+  fireEvent.click(page.getByText("Next message"));
+  expect(parseDeepLink(window.location.search).messageId).toBe("imap-two");
+  expect(pushes).toHaveBeenCalledTimes(1);
+});
+it("finishes a link once when the mailbox on screen is revoked too, and leaves the selection to the bootstrap", async () => {
+  let finishMessage: (value: Message) => void = () => {};
+  const notice = mock(() => {}); const onForbidden = mock(() => {});
+  const page = render(<Harness notice={notice} onForbidden={onForbidden}
+    resolver={() => new Promise<Message>(resolve => { finishMessage = resolve; })} />); await settled();
+  await pop("/?a=~b&m=~imap-one");
+  await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"accountId":"b"'));
+  // An access refresh revokes both the destination and the mailbox on screen.
+  page.rerender(<Harness notice={notice} onForbidden={onForbidden} accountIds={[]}
+    resolver={() => new Promise<Message>(resolve => { finishMessage = resolve; })} />);
+  for (let i = 0; i < 5; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
+  await act(async () => { finishMessage(message); });
+  expect(notice).toHaveBeenCalledTimes(1);
+  expect(notice).toHaveBeenCalledWith("forbidden");
+  expect(onForbidden).toHaveBeenCalledTimes(1);
+  expect(page.getByTestId("state").textContent).toContain('"messageId":""');
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from "react";
 import { buildAccountTopicStatsPath, buildAccountTopicsPath } from "@/lib/accountApiPaths";
 import { deferUntilIdle } from "./deferUntilIdle";
 import type { Topic } from "@/lib/data";
@@ -87,8 +87,13 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
   const allTopics = activeAccountId && storedTopics.accountId === activeAccountId ? storedTopics.topics : NO_TOPICS;
   const topicMessageCountById = activeAccountId && topicStats.accountId === activeAccountId
     ? topicStats.counts : new Map<string, number>();
-  // Updates apply to the active mailbox's topics.
+  const shownAccountIdRef = useRef(activeAccountId);
+  useLayoutEffect(() => { shownAccountIdRef.current = activeAccountId; }, [activeAccountId]);
+  // Updates apply to the active mailbox's topics. A setter captured before a switch
+  // (e.g. a topic created in A whose POST settles after the switch to B) belongs to
+  // its own mailbox, which re-reads its topics on the next visit.
   const setAllTopics = useCallback((action: SetStateAction<Topic[]>) => {
+    if (activeAccountId !== shownAccountIdRef.current) return;
     setStoredTopics(prev => {
       const current = prev.accountId === activeAccountId ? prev.topics : NO_TOPICS;
       return { accountId: activeAccountId, topics: typeof action === "function" ? action(current) : action };
