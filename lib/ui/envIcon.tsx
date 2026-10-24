@@ -8,8 +8,8 @@ const BADGE_FG = "#ffffff";
 
 // Base art is the committed, un-badged PNG set produced by generate_icons.sh.
 // In the standalone build `public/` is copied next to the server (process.cwd()).
-function baseIconPath(baseSize: number) {
-  return join(process.cwd(), "public", "icons", `icon-${baseSize}.png`);
+function baseIconPath(baseFile: string) {
+  return join(process.cwd(), "public", "icons", baseFile);
 }
 
 // The environment label is provided per-deployment at runtime (set by the
@@ -36,11 +36,12 @@ function pngResponse(bytes: Buffer | Uint8Array): Response {
  */
 export async function renderEnvIcon(opts: {
   size: number;
-  baseSize?: number;
+  /** File in public/icons to use instead of the `icon-<size>.png` base art. */
+  baseFile?: string;
 }): Promise<Response> {
   const { size } = opts;
-  const baseSize = opts.baseSize ?? size;
-  const base = await readFile(baseIconPath(baseSize));
+  const baseFile = opts.baseFile ?? `icon-${size}.png`;
+  const base = await readFile(baseIconPath(baseFile));
   const label = getEnvLabel();
 
   if (!label) {

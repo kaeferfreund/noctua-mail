@@ -235,13 +235,20 @@ self.addEventListener("periodicsync", (event) => {
   event.waitUntil(processReminderNotifications("periodic"));
 });
 
+// The main mail window handles "noctua:notification-open"; detached message or
+// compose windows of the same origin are only a fallback.
+function isMainWindow(client) {
+  return new URL(client.url).pathname === "/";
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = event.notification?.data?.url || "/";
   const target = new URL(targetUrl, self.location.origin);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
-      for (const client of clients) {
+      const ordered = [...clients].sort((a, b) => Number(isMainWindow(b)) - Number(isMainWindow(a)));
+      for (const client of ordered) {
         const clientUrl = new URL(client.url);
         if (clientUrl.origin !== target.origin) continue;
         if ("focus" in client) {
@@ -261,4 +268,140 @@ self.addEventListener("notificationclick", (event) => {
       return undefined;
     })
   );
+});
+
+// Web Push (payload contract: briefs/web-push/_contract.md, produced by
+// lib/push on the server). Malformed payloads are dropped without a
+// notification.
+const PUSH_ICON = "/icons/icon-192.png";
+const PUSH_BADGE_ICON = "/icons/icon-96-mono.png";
+const PUSH_SUBSCRIPTIONS_URL = "/api/push/subscriptions";
+
+function readPushPayload(data) {
+  if (!data || typeof data.json !== "function") return null;
+  try {
+    const payload = data.json();
+    return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+function nonEmptyString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+// Notification targets stay inside the app, whatever the payload says.
+function samePushUrl(value) {
+  if (typeof value !== "string") return "/";
+  try {
+    const url = new URL(value, self.location.origin);
+    return url.origin === self.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
+function pushBadgeCount(payload) {
+  return typeof payload.badge === "number" && Number.isFinite(payload.badge) && payload.badge >= 0
+    ? Math.floor(payload.badge)
+    : null;
+}
+
+function pushNotification(payload) {
+  const url = samePushUrl(payload.url);
+  const common = { icon: PUSH_ICON, badge: PUSH_BADGE_ICON, data: { url } };
+  if (payload.type === "test") {
+    return { title: "Noctua: Benachrichtigungen aktiv", options: { ...common, tag: "noctua:test" } };
+  }
+  if (payload.type !== "new-mail") return null;
+  const accountId = nonEmptyString(payload.accountId);
+  const from = nonEmptyString(payload.from);
+  if (!accountId || !from) return null;
+  const count = Number.isInteger(payload.count) && payload.count > 1 ? payload.count : 1;
+  const subject = nonEmptyString(payload.subject);
+  const accountName = nonEmptyString(payload.accountName) ?? "Noctua";
+  return {
+    title: count > 1 ? `${accountName} · ${count} neue` : accountName,
+    options: {
+      ...common,
+      body: subject ? `${from} — ${subject}` : from,
+      tag: `mail:${accountId}`,
+      renotify: true
+    }
+  };
+}
+
+async function applyAppBadge(count) {
+  const nav = self.navigator;
+  if (!nav || typeof nav.setAppBadge !== "function") return;
+  try {
+    if (count > 0) await nav.setAppBadge(count);
+    else if (typeof nav.clearAppBadge === "function") await nav.clearAppBadge();
+    else await nav.setAppBadge(0);
+  } catch {
+    // Badging is best effort.
+  }
+}
+
+async function handlePush(payload) {
+  const badge = pushBadgeCount(payload);
+  const notification = pushNotification(payload);
+  await Promise.all([
+    badge === null ? undefined : applyAppBadge(badge),
+    notification ? self.registration.showNotification(notification.title, notification.options) : undefined
+  ]);
+}
+
+self.addEventListener("push", (event) => {
+  const payload = readPushPayload(event.data);
+  if (!payload) return;
+  event.waitUntil(handlePush(payload));
+});
+
+async function sendSubscriptionRequest(method, body) {
+  return fetch(PUSH_SUBSCRIPTIONS_URL, {
+    method,
+    credentials: "include",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+}
+
+async function readVapidPublicKey() {
+  const response = await fetch("/api/push/vapid-public-key", { credentials: "include", cache: "no-store" });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  return nonEmptyString(payload?.publicKey);
+}
+
+// The browser rotated or dropped the subscription: subscribe again with the
+// key the old one used (the server's key as a fallback) and register it.
+async function renewPushSubscription(oldSubscription, newSubscription) {
+  try {
+    let subscription = newSubscription;
+    if (!subscription) {
+      const key = oldSubscription?.options?.applicationServerKey ?? (await readVapidPublicKey());
+      if (!key) return;
+      subscription = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: key
+      });
+    }
+    const response = await sendSubscriptionRequest("POST", {
+      subscription: subscription.toJSON(),
+      userAgent: self.navigator?.userAgent
+    });
+    const oldEndpoint = oldSubscription?.endpoint;
+    if (response.ok && oldEndpoint && oldEndpoint !== subscription.endpoint) {
+      await sendSubscriptionRequest("DELETE", { endpoint: oldEndpoint });
+    }
+  } catch {
+    // Signed out or offline: the settings page subscribes again on next use.
+  }
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(renewPushSubscription(event.oldSubscription ?? null, event.newSubscription ?? null));
 });
