@@ -4,8 +4,8 @@ import type { Folder } from "@/lib/data";
 import { parseAddressEmails } from "@/lib/ownAddresses";
 import { findInboxFolder, isDraftsFolder, isSentFolder, isSpamFolder, isTrashFolder } from "@/lib/specialFolders";
 import type { RecentSenderMail } from "./anomaly";
-import { buildSpamInputFromMessage } from "./input";
-import { emptySenderProfile, foldSenderMail, senderMailFacts, spamSenderKey, type SenderMailFacts, type SenderProfile } from "./senderProfile";
+import { buildSpamInputFromMessage, parseHeaderBlock, topReceivedAt } from "./input";
+import { emptySenderProfile, foldSenderMail, senderMailFacts, spamArrivalTime, spamSenderKey, type SenderMailFacts, type SenderProfile } from "./senderProfile";
 
 /**
  * Builds the sender profiles of one account shard from its stored rows in one
@@ -83,6 +83,14 @@ export async function readSourceHeads(sourcesDir: string, accountId: string, ids
   return heads;
 }
 
+/**
+ * Arrival of a stored row (burst rule): the Received stamp of its source head,
+ * else the time it was checked, else its dateValue (rows without either).
+ */
+export function storedMailArrival(row: { dateValue: number; spamCheckedAt?: number | null }, head: SourceHead | undefined) {
+  return spamArrivalTime({ receivedAt: head ? topReceivedAt(parseHeaderBlock(head.headers)) : null }, row.spamCheckedAt ?? row.dateValue);
+}
+
 type ProfileRow = {
   id: string; folderId: string; dateValue: number; fromAddr: string | null; toAddr: string | null; ccAddr: string | null;
   replyToAddr: string | null; subject: string | null; messageId: string | null; listId: string | null; listUnsubscribe: string | null;
@@ -153,7 +161,7 @@ export async function buildAccountSenderProfiles(params: {
     const list = mails.get(mail.senderKey);
     if (list) list.push(mail); else mails.set(mail.senderKey, [mail]);
     if (row.folderId === inboxId) {
-      const entry = { id: row.id, date: row.dateValue, circle: mail.circle };
+      const entry = { id: row.id, date: mail.date, circle: mail.circle };
       const inbox = inboxMails.get(mail.senderKey);
       if (inbox) inbox.push(entry); else inboxMails.set(mail.senderKey, [entry]);
     }

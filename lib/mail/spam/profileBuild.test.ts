@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import type { Folder } from "@/lib/data";
-import { buildAccountSenderProfiles, parseSourceHead } from "./profileBuild";
+import { buildAccountSenderProfiles, parseSourceHead, storedMailArrival } from "./profileBuild";
 import { evaluateSenderTrust } from "./senderProfile";
 
 const DAY = 24 * 60 * 60_000;
@@ -58,6 +58,17 @@ describe("profile build", () => {
     }
   });
 
+  test("stored arrival for the burst rule: Received stamp, else check time, else dateValue — never in the future", () => {
+    const received = Date.UTC(2026, 5, 1, 10);
+    const stamped = parseSourceHead(`Received: by mx.example.test; ${new Date(received).toUTCString()}\r\n${head(1)}`);
+    const backdated = { dateValue: received - 30 * DAY, spamCheckedAt: received + 60_000 };
+    expect(storedMailArrival(backdated, stamped)).toBe(received);
+    expect(storedMailArrival(backdated, parseSourceHead(head(1)))).toBe(received + 60_000);
+    expect(storedMailArrival(backdated, undefined)).toBe(received + 60_000);
+    expect(storedMailArrival({ dateValue: received, spamCheckedAt: null }, undefined)).toBe(received);
+    expect(storedMailArrival({ dateValue: Date.now() + 30 * DAY }, undefined)).toBeLessThanOrEqual(Date.now());
+  });
+
   test("arrival from the Received stamp, not the backdated dateValue; stored \"Als Spam\" decisions become lastUserSpamAt", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "spam-profile-build-"));
     const db = new Database(":memory:");
@@ -86,6 +97,8 @@ describe("profile build", () => {
       expect(fresh).toMatchObject({ count: 25, authAligned: 25, firstSeenAt: day, lastSeenAt: day + 24 * 60_000, lastUserSpamAt: null });
       expect(evaluateSenderTrust(fresh!, day + DAY)).toMatchObject({ trusted: false, reason: "zu kurze Historie" });
       expect(built.mails.get("fresh@new.example.test")?.map((mail) => mail.id)).toEqual(Array.from({ length: 25 }, (_, index) => `m${index}`));
+      // The burst rule of the eval compares arrivals too.
+      expect(built.inboxMails.get("fresh@new.example.test")?.map((mail) => mail.date)).toEqual(Array.from({ length: 25 }, (_, index) => day + index * 60_000));
       expect(built.profiles.get("notify@service.example.test")).toMatchObject({ count: 1, lastUserSpamAt: day + DAY });
       expect(built.profiles.get("only-junk@example.invalid")).toMatchObject({ count: 0, lastUserSpamAt: day });
       expect(Object.fromEntries(built.userSpam)).toEqual({ "notify@service.example.test": day + DAY, "only-junk@example.invalid": day });

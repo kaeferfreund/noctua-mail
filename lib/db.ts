@@ -452,7 +452,7 @@ export {
   getSenderProfile,
   getSpamSettings,
   hasSentToAddress,
-  listSenderMailsAround,
+  listSenderMailsNear,
   listSpamExampleCandidates,
   listUncheckedSpamMessageIds,
   markSenderProfileUserSpam,

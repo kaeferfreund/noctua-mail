@@ -7,7 +7,7 @@ import {
   getMessageById,
   getSenderProfile,
   hasSentToAddress,
-  listSenderMailsAround,
+  listSenderMailsNear,
   listUncheckedSpamMessageIds,
   markSenderProfileUserSpam,
   recordSenderProfileMail,
@@ -16,15 +16,17 @@ import {
 } from "@/lib/db";
 import type { Message } from "@/lib/data";
 import { parseAddressEmails } from "@/lib/ownAddresses";
+import { getSourcesDir } from "@/lib/runtimePaths";
 import { getMessageSource } from "@/lib/storage";
 import { findInboxFolder, findSentFolder } from "@/lib/specialFolders";
 import { moveMessageToJunk } from "@/app/api/_helpers/message/junkMove";
 import { buildOwnIdentitySets, type SpamAllowlistContext } from "./allowlist";
-import { BURST_WINDOW_MS, type SpamTrustContext } from "./anomaly";
+import type { SpamTrustContext } from "./anomaly";
 import { classifySpam, shouldMarkAsSpam } from "./classifySpam";
 import { isSpamDetectionOn, resolveMailboxThreshold } from "./config";
 import { findSpamExamples } from "./examples";
 import { buildSpamInput, buildSpamInputFromMessage } from "./input";
+import { readSourceHeads, storedMailArrival } from "./profileBuild";
 import { getSpamLanguageModel, getSpamProviderOptions, spamModelUnavailableReason } from "./provider";
 import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, type SpamCheckJob } from "./queue";
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
@@ -44,6 +46,8 @@ const SWEEP_LIMIT = 50;
 const PROCESSED_TTL_MS = 24 * 60 * 60_000;
 const PROCESSED_LIMIT = 20_000;
 const IDENTITY_TTL_MS = 10 * 60_000;
+/** Stored mails of the sender nearest to a checked one that the burst rule looks at. */
+const BURST_CANDIDATES = 20;
 /** "Als Spam" on a sender re-checks its trusted skips of this many days. */
 const REVOKE_WINDOW_MS = 7 * 24 * 60 * 60_000;
 
@@ -151,8 +155,7 @@ async function checkMessage(job: SpamCheckJob) {
   const trust: SpamTrustContext = {
     ownAddresses: identity.ownAddresses,
     loadProfile: loadHouseholdSenderProfile,
-    loadRecent: async (senderKey, date) => (await listSenderMailsAround(job.accountId, message.folderId, senderKey, date, BURST_WINDOW_MS, message.id))
-      .map((row) => ({ date: row.dateValue, circle: recipientCircleOf(row.toAddr, row.ccAddr, senderKey, identity.ownAddresses) })),
+    loadRecent: (senderKey) => loadRecentSenderMails(job.accountId, message, senderKey, identity.ownAddresses),
     canaryKey: message.id
   };
   const decision = await classifySpam({
@@ -179,6 +182,13 @@ async function checkMessage(job: SpamCheckJob) {
   // Each message is saved once (spamCheckedAt), so it enters the profile once; only ham teaches the pattern (not spam, not unsure).
   if (saved && verdict === "ham") await learnSenderProfile(job.accountId, input, identity.ownAddresses);
   if (saved && marked && mailbox.autoMove) await autoMoveToJunk(job.accountId, message);
+}
+
+/** The sender's mails stored closest to `message` with their arrival (burst rule; never the sender's Date header). */
+async function loadRecentSenderMails(accountId: string, message: Message, senderKey: string, ownAddresses: ReadonlySet<string>) {
+  const rows = await listSenderMailsNear(accountId, message.folderId, senderKey, message.id, BURST_CANDIDATES);
+  const heads = await readSourceHeads(getSourcesDir(), accountId, rows.filter((row) => row.hasSource).map((row) => row.id));
+  return rows.map((row) => ({ date: storedMailArrival(row, heads.get(row.id)), circle: recipientCircleOf(row.toAddr, row.ccAddr, senderKey, ownAddresses) }));
 }
 
 async function learnSenderProfile(accountId: string, input: Awaited<ReturnType<typeof loadSpamInput>>, ownAddresses: ReadonlySet<string>) {
