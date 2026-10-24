@@ -12,10 +12,10 @@ test("summary owns all collaboration view counts; search never requests a listTh
   const hook = renderHook(({ account, sync }) => useSearchState({ activeAccountId: account, activeFolderId: "", setActiveFolderId: () => {}, accountFolders: [], folderById: new Map(), query: "", setQuery: () => {},
     isRelatedSearch: false, relatedRestoreRef: { current: null }, relatedQueryId: null, virtualDefaultExcludedFolderIdsKey: "synthetic-trash", syncCompletionVersion: sync, apiFetch }), { wrapper: I18nTestProvider, initialProps: { account: "synthetic-a", sync: 0 } });
   await waitFor(() => expect(hook.result.current.state.focusedUnreadCount).toBe(2));
-  expect(calls).toHaveLength(4);
+  expect(calls).toHaveLength(5);
   hook.rerender({ account: "synthetic-b", sync: 1 });
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
-  expect(calls).toHaveLength(8);
+  expect(calls).toHaveLength(10);
   expect(calls.every(url => !url.includes("/threads?") && !url.includes("badges=open") && !url.includes("badges=unassigned") && !url.includes("assigned-to-me"))).toBe(true);
 });
 
@@ -32,11 +32,11 @@ test("QA-101 virtual unread counts follow authoritative folder counts without a 
     hook.rerender({ folders: [{ ...folder, unreadCount: next }] });
     await waitFor(() => expect(hook.result.current.state.focusedUnreadCount).toBe(next));
   }
-  expect(calls).toHaveLength(16);
-  // Re-delivering the same absolute counts should not issue another four reads.
+  expect(calls).toHaveLength(20);
+  // Re-delivering the same absolute counts should not issue another five reads.
   hook.rerender({ folders: [{ ...folder, unreadCount: 111 }] });
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 200)); });
-  expect(calls).toHaveLength(16);
+  expect(calls).toHaveLength(20);
 });
 
 
@@ -65,7 +65,7 @@ test("one mailbox's virtual-folder counts never show under another", async () =>
   };
   const hook = renderHook(({ account }) => useSearchState({ activeAccountId: account, activeFolderId: "", setActiveFolderId: () => {}, accountFolders: [], folderById: new Map(), query: "", setQuery: () => {},
     isRelatedSearch: false, relatedRestoreRef: { current: null }, relatedQueryId: null, virtualDefaultExcludedFolderIdsKey: "", syncCompletionVersion: 0, apiFetch }), { wrapper: I18nTestProvider, initialProps: { account: "synthetic-a" } });
-  await waitFor(() => expect(held).toHaveLength(4));
+  await waitFor(() => expect(held).toHaveLength(5));
   await releaseAll(() => 7);
   await waitFor(() => expect(hook.result.current.state.focusedUnreadCount).toBe(7));
   hook.rerender({ account: "synthetic-b" });
@@ -73,10 +73,22 @@ test("one mailbox's virtual-folder counts never show under another", async () =>
   const counts = () => { const { focusedUnreadCount, actionQueueTodoCount, inviteDeckTotalCount, inviteDeckUnreadCount } = hook.result.current.state;
     return [focusedUnreadCount, actionQueueTodoCount, inviteDeckTotalCount, inviteDeckUnreadCount]; };
   expect(counts()).toEqual([null, null, null, null]);
-  await waitFor(() => expect(held).toHaveLength(4));
+  await waitFor(() => expect(held).toHaveLength(5));
   expect(held.every(item => item.url.startsWith("/api/accounts/synthetic-b/"))).toBe(true);
   await releaseAll(() => 3);
   await waitFor(() => expect(counts()).toEqual([3, 3, 3, 3]));
   hook.rerender({ account: "" });
   expect(counts()).toEqual([null, null, null, null]);
+});
+
+test("the Verdächtig view counts unread suspicious mail and filters by the suspicious badge", async () => {
+  const calls: string[] = [];
+  const apiFetch = async (url: string) => { calls.push(url); return Response.json({ total: url.includes("suspicious") ? 4 : 0 }); };
+  const wrapper = ({ children }: { children: ReactNode }) => <I18nTestProvider locale="de">{children}</I18nTestProvider>;
+  const hook = renderHook(() => useSearchState({ activeAccountId: "synthetic", activeFolderId: "", setActiveFolderId: () => {}, accountFolders: [], folderById: new Map(), query: "", setQuery: () => {},
+    isRelatedSearch: false, relatedRestoreRef: { current: null }, relatedQueryId: null, virtualDefaultExcludedFolderIdsKey: "synthetic-trash", apiFetch }), { wrapper });
+  await waitFor(() => expect(hook.result.current.state.suspiciousUnreadCount).toBe(4));
+  expect(calls.some(url => new URL(url, "http://localhost").searchParams.get("badges") === "suspicious,unread")).toBe(true);
+  act(() => hook.result.current.actions.activateVirtualFolder("virtual:suspicious"));
+  expect(hook.result.current.state.activeVirtualFolder).toMatchObject({ name: "Verdächtig", queryBadges: ["suspicious"] });
 });

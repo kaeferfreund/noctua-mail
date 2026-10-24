@@ -18,6 +18,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
+import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { applyMessageCollabUpdate, applyMessagesCollabUpdates, applyThreadCollabCacheUpdates } from "./mailclient/threadCollabUpdates";
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
@@ -44,6 +45,7 @@ import {
   Target,
   Send,
   Search,
+  ShieldAlert,
   ShieldOff,
   Trash2,
   X
@@ -172,6 +174,7 @@ import {
   buildAccountMessageTopicsPath,
   buildAccountAttachmentPath,
   buildAccountMessageTopicSuggestionsPath,
+  buildAccountMessageActionPath,
   buildAccountMessagesActionPath,
   buildAccountMessageHtmlPath,
   buildAccountMessageSourcePath,
@@ -455,7 +458,7 @@ export default function MailClient({
   const [manageOpen, setManageOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminSection, setAdminSection] = useState<"users" | "mailboxes" | "invites" | "audit">("users");
+  const [adminSection, setAdminSection] = useState<"users" | "mailboxes" | "invites" | "audit" | "spam">("users");
   const [newMailboxOpen, setNewMailboxOpen] = useState(false);
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
@@ -918,6 +921,7 @@ export default function MailClient({
     actionQueueTodoCount,
     inviteDeckTotalCount,
     inviteDeckUnreadCount,
+    suspiciousUnreadCount,
     activeVirtualFolder
   } = searchState;
   const {
@@ -3038,6 +3042,9 @@ export default function MailClient({
         if (badge === "attention" && !(isMessageFlagged(message) || hasTodoFlag(message) || hasDoneFlag(message))) {
           return { keep: false, reason: "badge-attention" };
         }
+        if (badge === "suspicious" && message.spamVerdict !== "spam") {
+          return { keep: false, reason: "badge-suspicious" };
+        }
       }
       return { keep: true };
     },
@@ -3124,6 +3131,23 @@ export default function MailClient({
     ]
   );
   updateMessagesRef.current = updateMessagesWithCurrentResultPrune;
+  // "Kein Spam" on a "Verdächtig" mark: the message stays, the mark goes and becomes an example.
+  const handleMarkNotSuspicious = useCallback(async (message: Message) => {
+    const res = await apiFetch(buildAccountMessageActionPath(message.accountId, message.id, "not-suspicious"), { method: "POST" });
+    if (!res.ok) {
+      reportError(tn("notSuspiciousFailed"));
+      return;
+    }
+    const clearMark = (item: Message): Message => ({ ...item, spamVerdict: "ham", spamConfidence: 1, spamReasons: [] });
+    updateMessagesWithCurrentResultPrune((item) => (item.id === message.id ? clearMark(item) : item), { source: "not-suspicious" });
+    updateThreadCacheWithMessage(clearMark(message));
+    setViewMessage((prev) => (prev?.id === message.id ? clearMark(prev) : prev));
+    pushNotice({ type: "success", title: tn("markedNotSuspicious"), description: getMessageSubjectForNotice(message, tn("noSubject")) });
+  }, [apiFetch, pushNotice, reportError, setViewMessage, tn, updateMessagesWithCurrentResultPrune, updateThreadCacheWithMessage]);
+  const spamCorrection = useMemo(() => ({
+    canCorrect: currentAccount?.accessRole === "manager",
+    markNotSuspicious: handleMarkNotSuspicious
+  }), [currentAccount?.accessRole, handleMarkNotSuspicious]);
   const reconcileSavedDraftInUi = useCallback(
     (savedDraft: Message, previousDraftId: string | null) => {
       const existingDraft =
@@ -5058,13 +5082,15 @@ export default function MailClient({
             ? actionQueueTodoCount
             : folder.id === "virtual:invite-deck"
               ? inviteDeckUnreadCount
-              : null,
+              : folder.id === "virtual:suspicious"
+                ? suspiciousUnreadCount
+                : null,
         countAriaLabel:
           folder.id === "virtual:focused"
             ? tv("unreadCount", { count: focusedUnreadCount ?? 0 })
             : folder.id === "virtual:action-queue"
             ? tv("pendingCount", { count: actionQueueTodoCount ?? 0 })
-            : tv("unreadCount", { count: inviteDeckUnreadCount ?? 0 }),
+            : tv("unreadCount", { count: (folder.id === "virtual:suspicious" ? suspiciousUnreadCount : inviteDeckUnreadCount) ?? 0 }),
         countTitle:
           folder.id === "virtual:invite-deck" &&
           typeof inviteDeckTotalCount === "number" &&
@@ -5082,12 +5108,14 @@ export default function MailClient({
             ? (focusedUnreadCount ?? 0) > 0
             : folder.id === "virtual:action-queue"
               ? (actionQueueTodoCount ?? 0) > 0
-              : (inviteDeckUnreadCount ?? 0) > 0,
+              : ((folder.id === "virtual:suspicious" ? suspiciousUnreadCount : inviteDeckUnreadCount) ?? 0) > 0,
         icon:
           folder.id === "virtual:focused" ? (
             <Target size={13} />
           ) : folder.id === "virtual:action-queue" ? (
             <ListTodo size={13} />
+          ) : folder.id === "virtual:suspicious" ? (
+            <ShieldAlert size={13} />
           ) : (
             <CalendarClock size={13} />
           )
@@ -5099,6 +5127,7 @@ export default function MailClient({
       focusedUnreadCount,
       inviteDeckTotalCount,
       inviteDeckUnreadCount,
+      suspiciousUnreadCount,
       tv
     ]
   );
@@ -5166,6 +5195,7 @@ export default function MailClient({
 
   return (
     <AccountDateFormatProvider value={accountDateFormat}>
+    <SpamCorrectionProvider value={spamCorrection}>
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
       {identityDialogs}
       <AppShell
@@ -5836,6 +5866,7 @@ export default function MailClient({
         onGetRecentFolders={handleGetRecentFolders}
       />
     </CollabRowsContext.Provider>
+    </SpamCorrectionProvider>
     </AccountDateFormatProvider>
   );
 }

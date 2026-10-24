@@ -341,3 +341,13 @@ export function normalizeCategory(value?: string | null): CategoryKey | null {
     ? (normalized as CategoryKey)
     : null;
 }
+
+/** Spam detector columns of a message row (doc/SPAM-DETECTION.md); absent until checked. */
+export function hydrateSpamVerdict(row: { spamVerdict?: string | null; spamConfidence?: number | null; spamReasons?: string | null }) {
+  if (row.spamVerdict !== "spam" && row.spamVerdict !== "ham" && row.spamVerdict !== "unsure") return {};
+  return {
+    spamVerdict: row.spamVerdict,
+    spamConfidence: typeof row.spamConfidence === "number" ? row.spamConfidence : null,
+    spamReasons: parseStringArray(row.spamReasons ?? null)
+  } as const;
+}

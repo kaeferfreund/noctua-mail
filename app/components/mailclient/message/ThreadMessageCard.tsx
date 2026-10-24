@@ -45,6 +45,7 @@ import CalendarEventPreview from "./CalendarEventPreview";
 import { RemoveAttachmentConfirmDialog } from "./AttachmentRemoval";
 import MessageRecipientMetaField from "./MessageRecipientMetaField";
 import CategoryBadge from "../CategoryBadge";
+import SpamBadge, { SpamCorrectionButton } from "../SpamBadge";
 import FlagBadge from "./FlagBadge";
 import MessageBadge from "./MessageBadge";
 import SenderIcon from "../SenderIcon";
@@ -775,6 +776,8 @@ function ThreadMessageCard({
                       </Badge>
                     )
                   )}
+                  <SpamBadge message={message} />
+                  <SpamCorrectionButton message={message} />
                   <FolderBadges
                     folderIds={folderBadgeIds}
                     folderById={folderById}

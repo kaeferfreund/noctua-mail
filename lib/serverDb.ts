@@ -207,3 +207,15 @@ export async function getAccountOwnAddresses(...args: Parameters<ServerDbModule[
 export async function setUserUiLocale(...args: Parameters<ServerDbModule["setUserUiLocale"]>) {
   return (await loadServerDb()).setUserUiLocale(...args);
 }
+
+export async function listSpamExampleCandidates(...args: Parameters<ServerDbModule["listSpamExampleCandidates"]>) {
+  return (await loadServerDb()).listSpamExampleCandidates(...args);
+}
+
+export async function saveSpamExample(...args: Parameters<ServerDbModule["saveSpamExample"]>) {
+  return (await loadServerDb()).saveSpamExample(...args);
+}
+
+export async function saveSpamVerdict(...args: Parameters<ServerDbModule["saveSpamVerdict"]>) {
+  return (await loadServerDb()).saveSpamVerdict(...args);
+}
