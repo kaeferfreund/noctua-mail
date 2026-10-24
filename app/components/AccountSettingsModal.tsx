@@ -23,6 +23,7 @@ import TopicsTabContent from "@/app/components/account-settings/tabs/TopicsTabCo
 import RecipientAliasesTabContent from "@/app/components/account-settings/tabs/RecipientAliasesTabContent";
 import McpTabContent from "@/app/components/account-settings/tabs/McpTabContent";
 import TranslationTabContent from "@/app/components/account-settings/tabs/TranslationTabContent";
+import SpamTabContent from "@/app/components/account-settings/tabs/SpamTabContent";
 import { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 export type ManageTab =
@@ -36,7 +37,8 @@ export type ManageTab =
   | "translation"
   | "mcp"
   | "recipient-aliases"
-  | "members";
+  | "members"
+  | "spam";
 
 function deriveImapSecurity(imap: Account["imap"]): "tls" | "starttls" | "none" {
   if (imap.secure) return "tls";
@@ -151,8 +153,9 @@ export default function AccountSettingsModal({
       { value: "mcp", label: t("tabs.mcp"), disabled: !isExistingAccount }
     ];
     items.push({ value: "members", label: t("tabs.members"), disabled: !isExistingAccount });
+    if (isAdminUser) items.push({ value: "spam", label: t("tabs.spam"), disabled: !isExistingAccount });
     return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
-  }, [initialAccount.accessRole, isExistingAccount, senderMessages.identitiesTitle, t]);
+  }, [initialAccount.accessRole, isAdminUser, isExistingAccount, senderMessages.identitiesTitle, t]);
   const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => tab.value === "preferences" && !tab.disabled)?.value ?? tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;
@@ -363,6 +366,10 @@ export default function AccountSettingsModal({
                 onAliasesChanged={onRecipientAliasesChanged}
                 onClose={onClose}
               />
+            </Tabs.Content>}
+
+            {isAdminUser && isExistingAccount && <Tabs.Content value="spam" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+              <SpamTabContent key={localAccount.id} accountId={localAccount.id} apiFetch={apiFetch} />
             </Tabs.Content>}
 
             {initialAccount.accessRole === "manager" && <Tabs.Content value="members" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>

@@ -20,7 +20,8 @@ import {
   hydrateAttachment,
   parseReferences,
   parseStringArray,
-  safeParseJson
+  safeParseJson,
+  hydrateSpamVerdict
 } from "./_shared";
 
 export async function getMessageById(accountId: string, messageId: string) {
@@ -117,6 +118,7 @@ export async function getMessageById(accountId: string, messageId: string) {
     category: row.category ?? undefined,
     categoryScore: typeof row.categoryScore === "number" ? row.categoryScore : undefined,
     categorySignals: parseStringArray(row.categorySignals),
+    ...hydrateSpamVerdict(row),
     calendarEventUids: calendarInviteData?.calendarEventUids ?? [],
     calendarInviteStates: calendarInviteData?.calendarInviteStates ?? [],
     listUnsubscribe: row.listUnsubscribe ?? undefined

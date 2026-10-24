@@ -185,6 +185,10 @@ export type Message = {
   category?: string | null;
   categoryScore?: number | null;
   categorySignals?: string[];
+  /** Spam detector result; "spam" means the "Verdächtig" mark applies (doc/SPAM-DETECTION.md). */
+  spamVerdict?: "spam" | "ham" | "unsure";
+  spamConfidence?: number | null;
+  spamReasons?: string[];
   calendarEventUids?: string[];
   calendarInviteStates?: MessageCalendarInviteState[];
   listUnsubscribe?: string | null;

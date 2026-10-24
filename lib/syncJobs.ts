@@ -437,6 +437,14 @@ function handleCompletedRunningJob(job: SyncJob) {
   promoteNextQueuedJob(job.payload.accountId, state);
 }
 
+// Spam checks run in this process after the worker has written the mail; the
+// classifier (and the AI SDK) is loaded only when a sync actually completes.
+function scheduleSpamSweepAfterSync(accountId: string) {
+  void import("@/lib/mail/spam/service")
+    .then(({ scheduleSpamSweep }) => scheduleSpamSweep(accountId))
+    .catch((error) => console.warn("[spam] failed to schedule spam checks", { accountId, error: String(error) }));
+}
+
 function spawnSyncWorker(job: SyncJob, clientId?: string) {
   jobClientIds.set(job, clientId);
   job.status = "queued";
@@ -551,6 +559,7 @@ async function launchSyncWorker(job: SyncJob, release: () => Promise<void>, clie
             message: "Sync completed.",
             updatedAt: Date.now()
           });
+          scheduleSpamSweepAfterSync(job.payload.accountId);
         } else {
           const errorMessage = stderrText || `Sync worker exited with code ${exitCode}`;
           markJobFailed(job, errorMessage);

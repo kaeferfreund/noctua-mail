@@ -117,13 +117,16 @@ test("production shard-opening inventory routes every writable shard connection 
   const openers = files.filter(file => /new\s+(?:Database|DatabaseCtor)\s*\(|Database\.open\(/.test(source(file))).sort();
   expect(openers).toEqual([
     "lib/db/connection.ts", "lib/membershipCleanup.ts", "scripts/checkShardMessageCollisions.ts",
-    "scripts/dev-fixture/store.ts", "scripts/verifyAdmissionCleanup.ts"
+    "scripts/dev-fixture/store.ts", "scripts/spam-eval.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
   expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/membershipCleanup.ts"]);
   expect(source("lib/db/connection.ts")).toContain("configureAccountDb(accountDb)");
   expect(source("lib/membershipCleanup.ts")).toContain("configureAccountDb(db, 0)");
   expect(source("scripts/checkShardMessageCollisions.ts")).toContain("{ readonly: true }");
+  // The spam eval reads live data dirs: read-only and immutable (no -wal/-shm access).
+  expect(source("scripts/spam-eval.ts")).toContain("?immutable=1`, flags)");
+  expect(source("scripts/spam-eval.ts")).toContain("SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI");
   // Remaining raw constructors open a synthetic UID store or the master DB.
   expect(source("scripts/dev-fixture/store.ts")).toContain("new Database(this.uidValidityPath)");
   expect(source("scripts/verifyAdmissionCleanup.ts")).toContain("new Database(getMainDbPath())");
@@ -163,15 +166,17 @@ test("all 112 legacy-binary DML sites fail on v3 with FK enforcement disabled", 
   } finally { old.close(); }
 });
 
-test("81 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation", async () => {
+test("84 guards reject missing/wrong v3 markers and both legacy FTS names reject every DML operation", async () => {
   const { db } = await createSharedShardFixture();
   const old: any = new Database(db.prepare("PRAGMA database_list").get().file);
   try {
     old.function("noctua_writer_v2", () => 2);
     const triggers = db.prepare("SELECT name,tbl_name FROM sqlite_master WHERE type='trigger' AND name LIKE 'noctua_writer_v3_%'").all() as { name: string; tbl_name: string }[];
-    expect(triggers).toHaveLength(81);
+    expect(triggers).toHaveLength(84);
     const tables = [...new Set(triggers.map(row => row.tbl_name))];
-    expect(tables).toHaveLength(27);
+    // 27 audited tables plus spam_examples (doc/SPAM-DETECTION.md).
+    expect(tables).toHaveLength(28);
+    expect(tables).toContain("spam_examples");
     for (const table of tables) {
       for (const sql of [`INSERT INTO "${table}" DEFAULT VALUES`, `UPDATE "${table}" SET accountId=accountId WHERE 0`, `DELETE FROM "${table}" WHERE 0`]) {
         expect(() => old.prepare(sql)).toThrow("no such function: noctua_writer_v3");
