@@ -3,7 +3,7 @@
 import { publishLocalePreference } from "@/lib/i18n/localeEvents";
 
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   buildAccountApiPath,
   buildAccountFolderDeletePath,
@@ -138,6 +138,10 @@ export function useAccountController({
   const instanceAdmin = useRef(false);
   const lastIdentity = useRef<string | null>(null);
   const selectedAccount = useRef("");
+  // The mailbox on screen. A cached switch commits synchronously, so a second call
+  // in the same task must compare against that commit, not this render's closure.
+  const shownAccount = useRef(activeAccountId);
+  useLayoutEffect(() => { shownAccount.current = activeAccountId; }, [activeAccountId]);
   // A switch owns the mailbox selection while it runs. A bootstrap that overlaps
   // one still publishes identity and accounts, but leaves selection and folders
   // to the switch; its view of the server is re-checked once the switch settles.
@@ -278,7 +282,7 @@ export function useAccountController({
     async (nextAccountId: string) => {
       const normalizedAccountId = nextAccountId.trim();
       if (!normalizedAccountId) return;
-      const reselect = normalizedAccountId === activeAccountId;
+      const reselect = normalizedAccountId === shownAccount.current;
       if (reselect && switchesInFlight.current === 0) return;
       const version = ++switchVersion.current;
       switchEpoch.current++; switchesInFlight.current++;
@@ -302,6 +306,7 @@ export function useAccountController({
       let committed = false;
       const commitMailboxView = (nextFolders: Folder[]) => {
         selectedAccount.current = normalizedAccountId;
+        shownAccount.current = normalizedAccountId;
         committedSwitch.current = version;
         resetMailboxView();
         setBootstrapError(null);
