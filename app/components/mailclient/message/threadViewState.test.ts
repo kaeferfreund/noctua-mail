@@ -3,6 +3,7 @@ import type { Message } from "@/lib/data";
 import {
   getComposeThreadFocusMessageId,
   getInlineComposePlacement,
+  getReaderExcludedFolderIds,
   getRenderedThreadMessages,
   getVisibleThreadMessages
 } from "./threadViewState";
@@ -198,5 +199,22 @@ describe("getComposeThreadFocusMessageId", () => {
         composeDraftId: "draft-1"
       })
     ).toBeNull();
+  });
+});
+
+describe("getReaderExcludedFolderIds", () => {
+  const accountFolderIds = ["acc:INBOX", "acc:Archive", "acc:Trash", "acc:Spam"];
+  const threadExcludedFolderIds = new Set(["acc:Trash", "acc:Spam"]);
+
+  it("leaves trash and spam out of a conversation read elsewhere", () => {
+    expect(getReaderExcludedFolderIds({
+      activeMessage: { folderId: "acc:INBOX" }, activeFolderId: "acc:INBOX", accountFolderIds, threadExcludedFolderIds
+    })).toEqual(["acc:Trash", "acc:Spam"]);
+  });
+
+  it("limits a conversation read in trash to trash, as the reader shows it", () => {
+    expect(getReaderExcludedFolderIds({
+      activeMessage: { folderId: "acc:Trash" }, activeFolderId: "acc:Trash", accountFolderIds, threadExcludedFolderIds
+    })).toEqual(["acc:INBOX", "acc:Archive", "acc:Spam"]);
   });
 });
