@@ -5,7 +5,7 @@ import type { Database } from "bun:sqlite";
 import { NextResponse } from "next/server";
 import { getAuth, setActiveAccountId } from "./betterAuth";
 import { getDb } from "./db/connection";
-import { getUserById, listAccessibleAccountIdsForUser } from "./serverDb";
+import { getUserById } from "./serverDb";
 import { readAccountSelectionCandidates } from "./db/accounts";
 import { compareDisplayOrder } from "./accountPresentation";
 import type { AccountAccessSnapshot } from "./accountAccess";
@@ -104,10 +104,6 @@ export async function requireAccountAccessOr403(session: ActiveUserSession, acco
   const { resolveAccountRole } = await import("./accountAccess");
   if (await resolveAccountRole(session.userId, accountId.trim())) return true;
   return forwardAuthHeaders(NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 }), session.responseHeaders);
-}
-
-export async function listSessionAccountIds(session: ActiveUserSession) {
-  return new Set(await listAccessibleAccountIdsForUser(session.userId));
 }
 
 /** `access` is this request's access read, taken after the last selection write; never reuse it elsewhere. */
