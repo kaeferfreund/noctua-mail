@@ -181,15 +181,23 @@ const TRUSTED_SKIP_SQL = `spamReasons LIKE '["trusted:profile%'`;
 const TRUST_CANARY_SQL = `spamReasons LIKE '["trusted:canary%'`;
 
 /**
- * Revocation: the sender's INBOX rows since `since` that were skipped as
- * trusted become unchecked again; returns their ids for re-queueing.
+ * A row whose author is `senderKey` (spamSenderKey: IDNA and case normalised,
+ * without display name), also for legacy rows that only carry fromAddr.
+ */
+const SENDER_ROW_SQL = `mailbox_address_in(COALESCE(NULLIF(fromEmail, ''), fromAddr), ?) = 1`;
+const senderRowParam = (senderKey: string) => JSON.stringify([senderKey]);
+
+/**
+ * Revocation: the sender's INBOX rows skipped as trusted since `since` (check
+ * time, not the sender's Date header) become unchecked again; returns their
+ * ids for re-queueing.
  */
 export async function resetTrustedSpamChecks(accountId: string, folderId: string, senderKey: string, since: number) {
   return withDbWriteRetry("resetTrustedSpamChecks", async () => {
     const db = await getAccountDb(accountId);
     const rows = db.prepare(`UPDATE messages SET spamVerdict = NULL, spamConfidence = NULL, spamReasons = NULL, spamCheckedAt = NULL
-      WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND ${TRUSTED_SKIP_SQL} AND ${messageAuthorEmailSql()} = ?
-      RETURNING id`).all(accountId, folderId, since, senderKey) as Array<{ id: string }>;
+      WHERE accountId = ? AND folderId = ? AND spamCheckedAt >= ? AND ${TRUSTED_SKIP_SQL} AND ${SENDER_ROW_SQL}
+      RETURNING id`).all(accountId, folderId, since, senderRowParam(senderKey)) as Array<{ id: string }>;
     return rows.map((row) => row.id);
   });
 }
