@@ -190,7 +190,7 @@ each source for the header block and attachment names; about 40 s for 87,000
 rows on the dev data). Stored "Als Spam" decisions (`spam_examples`, label
 spam) become `lastUserSpamAt`, so they revoke trust household-wide like new ones.
 `--data <dir> [--out profiles.json]` is the default dry run: read-only
-(`immutable=1`), it prints the plan per account. `--data <dir> --write` replaces
+(`mode=ro`), it prints the plan per account. `--data <dir> --write` replaces
 each account's profiles over the app's DB layer in one transaction, keeping
 stored "Als Spam" times. The data dir always comes from `--data` (never from
 `NOCTUA_DATA_DIR`/.env.local), `--help` prints the usage, unknown options are
@@ -291,7 +291,9 @@ and unknown `builtin:*` values are ignored.
 
 ## Evaluation
 
-Read-only (SQLite `immutable=1`), never writes to the data dir:
+Read-only (SQLite `mode=ro`), never writes to the data dir. It reads the WAL
+of a live data dir, so it can run while the service writes; a long run only
+delays the service's WAL checkpoints:
 
 ```sh
 bun scripts/spam-eval.ts --data /path/to/noctua-data \
@@ -300,10 +302,9 @@ bun scripts/spam-eval.ts --data /path/to/noctua-data \
 
 With `ANTHROPIC_API_KEY` set it calls the model for every undecided message
 (~1,300 calls for the full sample; `--limit N` and `--concurrency N` help);
-without it only the allowlist and static rules run. `--limit N` alone takes the
-first N sample items, and the sample lists spam first, so a small limit
-evaluates no ham. For a test run use `--limit 100 --stratified` (N/2 spam and
-N/2 ham). The output lists precision, recall, decision sources, false positives
+without it only the allowlist and static rules run. `--limit N` takes a seeded
+random sample of N items, so spam and ham keep their share of the full sample;
+`--limit 100 --stratified` takes N/2 spam and N/2 ham. The output lists precision, recall, decision sources, false positives
 and spam passed by the allowlist by subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
 is reported separately from plain false positives. The static rules were derived
 from the same corpus, so their precision there is optimistic.
