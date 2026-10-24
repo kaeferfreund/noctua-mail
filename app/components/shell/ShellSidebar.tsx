@@ -41,6 +41,7 @@ import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, p
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
+import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -62,6 +63,8 @@ export type ShellSidebarProps = {
     activeAccountId: string;
     /** Signed-in user; keys the collapsed domain groups on this device. */
     userId?: string | null;
+    /** Versions of admin-uploaded domain icons by group domain. */
+    domainIcons?: DomainIconVersions;
     /** May return the switch promise; the clicked row shows a pending state until it settles. */
     onSwitch: (accountId: string) => void | Promise<unknown>;
     onAdd?: () => void;
@@ -189,13 +192,15 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
 
 /** One favicon per domain group header, through the sender-icon route of
  * the group's first mailbox with sender icons on; nothing while it loads or
- * when the domain has no logo (`fallback=none` answers 404). */
-function DomainIcon({ domain, accounts }: { domain: string; accounts: readonly ShellAccount[] }) {
-  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true);
+ * when the domain has no logo (`fallback=none` answers 404). An uploaded
+ * domain icon (known by its version) replaces the favicon and needs no
+ * external fetch, so it shows even when sender icons are off. */
+function DomainIcon({ domain, accounts, version }: { domain: string; accounts: readonly ShellAccount[]; version?: string }) {
+  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true) ?? (version ? accounts[0] : undefined);
   if (!source) return null;
   return (
     <Avatar className="size-4 rounded-sm after:hidden empty:hidden">
-      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none" })} alt="" className="rounded-sm" />
+      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none", version })} alt="" className="rounded-sm" />
     </Avatar>
   );
 }
@@ -228,8 +233,9 @@ export function MailboxRows({
   pendingAccountId = null,
   onSwitch,
   summaries,
-  userId
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId"> & {
+  userId,
+  domainIcons
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
 }) {
@@ -266,7 +272,7 @@ export function MailboxRows({
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIcons?.[group.domain]} /> : null}
                 </span>
                 <span className="min-w-0 truncate">{group.domain ?? t("mailboxes.other")}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -418,6 +424,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     userId={mailboxes.userId}
+                    domainIcons={mailboxes.domainIcons}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />
@@ -435,6 +442,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     userId={mailboxes.userId}
+                    domainIcons={mailboxes.domainIcons}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />

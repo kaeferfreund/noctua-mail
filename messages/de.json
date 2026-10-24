@@ -977,7 +977,8 @@
       "mailboxes": "Postfächer",
       "invites": "Einladungen",
       "audit": "Protokoll",
-      "spam": "Spam-Erkennung"
+      "spam": "Spam-Erkennung",
+      "domains": "Domain-Symbole"
     },
     "loading": "Wird geladen …",
     "cancel": "Abbrechen",
@@ -1125,6 +1126,30 @@
       "unavailableReasons": {
         "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
         "unsupported-provider": "Anbieter wird nicht unterstützt"
+      }
+    },
+    "domainIcons": {
+      "heading": "Domain-Symbole",
+      "help": "Jede Domain-Gruppe in der Seitenleiste zeigt das Favicon der Domain. Hier kannst du es durch ein eigenes Bild ersetzen: PNG, JPEG, WEBP oder ICO bis 512 KB. Das Bild wird auf 64 × 64 Pixel verkleinert.",
+      "empty": "Noch keine Postfächer mit Domain.",
+      "mailboxes": "{count, plural, =0 {kein Postfach} one {# Postfach} other {# Postfächer}}",
+      "custom": "Eigenes Bild",
+      "favicon": "Favicon",
+      "iconAlt": "Symbol für {domain}",
+      "upload": "Bild hochladen",
+      "uploadFor": "Bild für {domain} hochladen",
+      "reset": "Zurücksetzen",
+      "resetFor": "Bild für {domain} zurücksetzen",
+      "uploaded": "Das Bild für {domain} ist gespeichert.",
+      "resetDone": "{domain} zeigt wieder das Favicon.",
+      "errors": {
+        "too_large": "Das Bild ist größer als 512 KB.",
+        "unsupported_format": "Nur PNG, JPEG, WEBP oder ICO sind erlaubt.",
+        "invalid_image": "Die Datei lässt sich nicht als Bild lesen.",
+        "empty_upload": "Die Datei ist leer.",
+        "unknown_domain": "Zu dieser Domain gibt es kein Postfach mehr.",
+        "invalid_domain": "Diese Domain ist ungültig.",
+        "upload_timeout": "Das Hochladen hat zu lange gedauert. Versuch es noch einmal."
       }
     }
   },

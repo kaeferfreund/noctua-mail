@@ -376,6 +376,22 @@ describe("mailbox avatars and domain icons", () => {
       images.restore();
     }
   });
+
+  it("loads an uploaded domain icon by its version, also when sender icons are off", async () => {
+    const images = stubAvatarImages();
+    try {
+      const quiet = ["a", "b", "c", "d"].map(id => ({ ...account(id, `Brand ${id}`, "brand.example.test"), settings: { appearance: { senderIcons: false } } }) as ShellAccount);
+      const plain = ["e", "f", "g"].map(id => account(id, `Plain ${id}`, "plain.example.test"));
+      const view = renderSidebar([...quiet, ...plain], () => {}, undefined, {}, undefined, "en", null, {}, quiet[0].id,
+        { domainIcons: { "brand.example.test": "abcdef0123456789" } });
+      const brandSrc = `${domainIconSrc(quiet[0], "brand.example.test")}&v=abcdef0123456789`;
+      expect(images.probes.map(probe => probe.src).sort()).toEqual([brandSrc, domainIconSrc(plain[0], "plain.example.test")].sort());
+      await images.settle(brandSrc, true);
+      await waitFor(() => expect(headerOf(view, "brand.example.test").querySelector("img")?.getAttribute("src")).toBe(brandSrc));
+    } finally {
+      images.restore();
+    }
+  });
 });
 
 describe("theme menu", () => {

@@ -16,6 +16,8 @@ import AdminConfirmDialog from "./AdminConfirmDialog";
 import AdminAuditLog from "./AdminAuditLog";
 import AdminMailboxes from "./AdminMailboxes";
 import AdminSpamSettings from "./AdminSpamSettings";
+import AdminDomainIcons from "./AdminDomainIcons";
+import { ADMIN_SECTIONS } from "@/lib/navigation/deepLinks";
 import { adminActionRow, adminHeaderRow } from "./adminLayout";
 import type { AdminUser, AdminInvite } from "./types";
 
@@ -23,7 +25,7 @@ type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery"
 function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
 function securityValue(value: boolean | undefined) { return value === undefined ? "users.unknown" : value ? "users.yes" : "users.no"; }
 
-export type AdminSection = "users" | "mailboxes" | "invites" | "audit" | "spam";
+export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 type NavigationProps = { section?: AdminSection; onSectionChange?: (section: AdminSection) => void };
 
 export default function AdminPanel({ section, onSectionChange, isAdminUser, apiFetch = fetch, client, onClose, currentUserId, onAccessChanged }: NavigationProps & { currentUserId?: string; onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
@@ -95,7 +97,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
   };
   return <SettingsFrame open onClose={() => { if (!busy) onClose(); }}><div className="flex h-full min-h-0 flex-col gap-4">
     <div className={adminHeaderRow}><SettingsTitle>{t("title")}</SettingsTitle><Button variant="outline" disabled={busy} onClick={onClose}>{t("close")}</Button></div>
-    <nav aria-label={t("sections")} className={adminActionRow}>{(["users", "mailboxes", "invites", "audit", "spam"] as const).map(value => <Button key={value} variant={tab === value ? "default" : "outline"} aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
+    <nav aria-label={t("sections")} className={adminActionRow}>{ADMIN_SECTIONS.map(value => <Button key={value} variant={tab === value ? "default" : "outline"} aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
     <div className="min-h-0 flex-1 overflow-auto">
       {Boolean(error) && <p role="alert" className="mb-3 text-destructive">{formatAdminError(error, t, locale)}</p>}
       {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className="font-medium">{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
@@ -121,6 +123,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} currentUserId={currentUserId} onAccessChanged={onAccessChanged} />}
       {tab === "audit" && <AdminAuditLog apiFetch={apiFetch} />}
       {tab === "spam" && <AdminSpamSettings apiFetch={apiFetch} />}
+      {tab === "domains" && <AdminDomainIcons apiFetch={apiFetch} />}
     </div>
     {pending && !reauthOpen && <AdminConfirmDialog title={t(`actionTitles.${pending.type}`)} description={pending.type === "role" ? t("confirmations.role", {email: pending.user.email, role: t(`roles.${pending.role!}`)}) : pending.type === "status" ? t(pending.user.disabled ? "confirmations.enable" : "confirmations.disable", {email: pending.user.email}) : t("confirmations.access", {email: pending.user.email})} busy={busy} error={actionError ? formatAdminError(actionError, t, locale) : undefined}
       disabled={Boolean(((pending.type === "recovery" || pending.type === "mfa-reset") && !verified) || (pending.type === "delete" && isOwner(pending.user) && !owner) || (pending.type === "passkey" && !passkeyId.trim()))}

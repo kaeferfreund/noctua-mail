@@ -15,6 +15,7 @@ import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSen
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
+import { useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
@@ -459,7 +460,7 @@ export default function MailClient({
   const [manageOpen, setManageOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminSection, setAdminSection] = useState<"users" | "mailboxes" | "invites" | "audit" | "spam">("users");
+  const [adminSection, setAdminSection] = useState<NonNullable<DeepLinkState["admin"]>>("users");
   const [newMailboxOpen, setNewMailboxOpen] = useState(false);
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
@@ -2866,6 +2867,11 @@ export default function MailClient({
       queueFilteredSearchRefresh(true);
     }
   });
+  const domainIcons = useDomainIconVersions({
+    sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
+    apiFetch,
+    accounts
+  });
   const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
   // The summary feed is the user-wide unread source; it is empty while it
   // (re)connects, so only a sign-out clears the app icon badge.
@@ -5247,6 +5253,7 @@ export default function MailClient({
             summaries: mailboxSummaries,
             activeAccountId,
             userId: currentUser?.id ?? null,
+            domainIcons,
             // Deep links own mailbox navigation (history + URL); the sidebar shows the
             // clicked row as pending until the returned value settles.
             onSwitch: navigateLinkedAccount,

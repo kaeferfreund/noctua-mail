@@ -17,16 +17,18 @@ type SenderIconProps = {
 
 /** URL of the account's sender-icon route. With `fallback: "none"` the route
  * answers 404 instead of its initials SVG when no logo is found, so callers
- * can keep their own initials. */
+ * can keep their own initials. `version` (of an uploaded domain icon) makes
+ * the browser load a new upload instead of a cached favicon. */
 export function buildSenderIconSrc(
   accountId: string,
-  sender: { from?: string | null; fromEmail?: string | null; fallback?: "none" }
+  sender: { from?: string | null; fromEmail?: string | null; fallback?: "none"; version?: string | null }
 ) {
   const search = new URLSearchParams({
     from: sender.from ?? ""
   });
   if (sender.fromEmail) search.set("fromEmail", sender.fromEmail);
   if (sender.fallback) search.set("fallback", sender.fallback);
+  if (sender.version) search.set("v", sender.version);
   return buildAccountSenderIconPath(accountId, search);
 }
 
