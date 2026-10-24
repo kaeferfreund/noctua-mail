@@ -8,8 +8,10 @@ calls spam with enough confidence gets the "Verdächtig" badge and appears in th
 off by default.
 
 Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
-`allowlist.ts`, `staticRules.ts`, `examples.ts`, `queue.ts`, `config.ts`,
-`settings.ts`, `provider.ts`), storage in `lib/db/spam.ts`.
+`allowlist.ts`, `staticRules.ts`, `senderProfile.ts`, `anomaly.ts`,
+`examples.ts`, `queue.ts`, `config.ts`, `settings.ts`, `provider.ts`; the
+scripts' helpers `evalData.ts`, `profileBuild.ts`, `profileFile.ts`), storage
+in `lib/db/spam.ts`.
 
 ## Pipeline
 
@@ -29,7 +31,8 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
    `X-Spam-*` headers (the receiving server's verdicts), the domains of all
    links, attachment names/types and the plain text without quoted replies,
    capped at 4,096 characters. No raw HTML. Without a stored source the message
-   row is used.
+   row is used. For the sender profile only (never in the prompt): Cc,
+   Message-ID, Auto-Submitted and links whose text names another domain.
 4. **Hard allowlist** (`allowlist.ts`, never spam): enrolled mailbox and
    identity addresses and the household's own domains (free-mail domains
    excluded) — only when SPF or DKIM passed for that domain, because forged
@@ -44,7 +47,12 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
    `builtin:*` features and the server's `X-Spam-Flag: YES` are passed to the
    model as hints. `name` entries never allow; a known display name from an
    unknown address is a weak hint only.
-6. **Model** (`classifySpam.ts`): `generateText` with `Output.object` (the AI
+6. **Trusted sender** (`senderProfile.ts`, `anomaly.ts`, section below):
+   a sender with enough authenticated history in the household skips the
+   model (`trusted:profile`) unless the mail deviates from its pattern; then
+   it goes to the model with the deviations as a hint and threshold 0.9. A
+   user's latest "Als Spam" for the sender skips this step.
+7. **Model** (`classifySpam.ts`): `generateText` with `Output.object` (the AI
    SDK 7 replacement of `generateObject`) and a Zod schema
    `{ verdict: "spam" | "ham" | "unsure", confidence: 0–1, reasons: string[] (≤ 5, German) }`,
    Anthropic `effort: "low"`, no SDK retries, 30 s timeout per call (a timeout
@@ -53,11 +61,13 @@ Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
    The prompt contains the 16 nearest user decisions (same sender address >
    same root domain > subject similarity > most recent, at least three of each
    label when available).
-7. **Store.** `spamVerdict = "spam"` only when the model said spam with
-   `confidence ≥ threshold` (default 0.85; per mailbox override); a spam verdict
-   below the threshold is stored as `"unsure"`. Automatic results never
-   overwrite a row that is already checked, so a user correction always wins.
-8. **Auto-move** (optional per mailbox): marked messages are moved with the same
+8. **Store.** `spamVerdict = "spam"` only when the model said spam with
+   `confidence ≥ threshold` (default 0.85; per mailbox override; at least 0.9
+   for trusted senders); a spam verdict below the threshold is stored as
+   `"unsure"`. Automatic results never overwrite a row that is already
+   checked, so a user correction always wins. Every saved non-spam result
+   adds the mail to its sender's profile.
+9. **Auto-move** (optional per mailbox): marked messages are moved with the same
    code path as "Als Spam" (`app/api/_helpers/message/junkMove.ts`).
 
 Failures (no key, 429, network, timeout, invalid model output) are retried at
@@ -95,6 +105,79 @@ between calls; zero for both means it is below the model's minimum. The first
 calls of an eval run with `--concurrency` > 1 all write, because none of them can
 read an entry that is not written yet.
 
+## Trusted senders
+
+Concept: briefs/spam/trusted-sender-concept.md (user decisions of 2026-10-24:
+20 mails / 30 days / 2 % canary, no curated service list, household-wide
+profiles). Trust belongs to one sender address, is earned by history, needs
+authentication and holds only while a mail matches the sender's pattern.
+
+**Profile** (`senderProfile.ts`, shard table `spam_sender_profiles`, one row
+per account and sender address): number of mails, first/last mail, last "Als
+Spam", mails in Junk folders, how many passed SPF or DKIM aligned with the From
+domain (relaxed: same root domain; no Authentication-Results counts as not
+aligned), DKIM domains, a histogram of To+Cc counts, how often the mailbox was
+addressed directly, Reply-To domains, link root domains (at most 150, then
+"overflow"), masked links, attachment types, German/English by stop words,
+subject prefixes (`[tag]`, text before `:` or the first word, digits as `#`),
+lexicon categories, List-Id/List-Unsubscribe/Auto-Submitted and Message-ID
+domains. Rows of Sent, Drafts and Trash never count; Junk rows only count as
+junk. A mail after more than 180 days of silence starts the history over.
+
+**Household view**: the profiles of the same address in all mailboxes are
+merged (counts and patterns add up, earliest first mail, latest "Als Spam";
+mailboxes silent for 180 days contribute only their "Als Spam").
+
+**Trusted** when the merged profile has at least 20 mails over at least 30
+days, at least 95 % aligned authentication, no "Als Spam" ever, a mail within
+the last 180 days and at most 5 % of its mail in Junk folders.
+
+**Anomaly gate** (`anomaly.ts`, one pure function per rule; any hit sends the
+mail to the model):
+
+| Rule | Fires when |
+|---|---|
+| Recipients | To+Cc > max(5, 3 × the sender's 95th percentile); mailbox only in Bcc although ≥ 90 % of the history addressed it directly; ≥ 3 different outside recipient circles from the sender within an hour |
+| Reply-To | first Reply-To (other than From) of this sender; a new root domain other than the From domain |
+| Authentication | no aligned SPF/DKIM pass on this mail; SPF fail/softfail; no Authentication-Results; DKIM domain new or missing although ≥ 50 % of the history was signed |
+| Links | IP links (loopback/private excluded); new shortener or file-share domains; any new link root domain (unless the profile overflowed); link text naming another domain when < 20 % of the history does |
+| Attachments | html/zip/rar/7z/iso/img/lnk/js/vbs/macro Office/svg/executables always; PDF when < 5 % of the history had attachments or with payment words in the subject |
+| Content | credential/payment/urgency words the sender uses in < 20 % of its mail; changed bank details always; language switch against ≥ 90 % of ≥ 10 recognised mails; subject outside the fixed prefixes (top 3 cover ≥ 90 %) |
+| Service marks | List-Id/Auto-Submitted missing although ≥ 95 % had them; Message-ID domain new although one domain covers ≥ 95 % |
+| Server verdict | `X-Spam-Flag: YES` or SpamAssassin score ≥ 3 |
+
+The model gets one hint line: `Vertrauter Absender (23 Mails seit 2026-03,
+DKIM github.com); Abweichung: …`, explained in the cached rule catalogue, and
+the stricter threshold 0.9. Static rules keep their precedence: a static allow
+or a safe deny decides before the profile.
+
+**Skip**: `spamVerdict = "ham"`, `spamReasons = ["trusted:profile (23 Mails seit
+2026-03, DKIM github.com)"]`. **Canary**: 2 % of the skips (FNV-1a hash of the
+message id) still go to the model, without any trust hint; their reasons start
+with `trusted:canary (…)`. When the model does not say ham the server logs
+`[spam] canary mismatch` (account, message id, verdict, confidence; no content).
+
+**Learning and revocation**: each saved non-spam check adds the mail to the
+mailbox's profile (once per message, as `spamCheckedAt` is set once). "Als
+Spam" by a user (`POST …/messages/:id/spam`) sets the profile's `lastUserSpamAt`
+(a household-wide revocation through the merge) and resets the sender's INBOX
+rows of the last 7 days in every mailbox that were skipped as trusted; they are
+queued for a new check. Moves by `scripts/spam-apply.ts` do not revoke.
+
+**Admin**: Verwaltung → Spam-Erkennung shows one read-only line "Vertraute
+Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
+(totals; per mailbox in the tooltip and in `GET /api/admin/spam-settings` →
+`trust`), counted from the stored `spamReasons`.
+
+**Backfill**: existing rows enter the profiles once with
+`scripts/spam-profiles-backfill.ts` (one pass per shard, only the first 64 KB of
+each source for the header block and attachment names; about 40 s for 87,000
+rows on the dev data). `--data <dir> --dry-run [--out profiles.json]` is
+read-only (`immutable=1`); the real run reads over the app's DB layer and
+replaces each account's profiles in one transaction, keeping stored "Als Spam"
+times. Run it once after the deploy of this build. Without the backfill only
+mail checked from then on builds profiles, and nobody is trusted for weeks.
+
 ## Learning from decisions
 
 - "Als Spam" (`POST …/messages/:id/spam`, editor+) stores a spam example.
@@ -114,11 +197,13 @@ Additive, following the `senderKey` pattern (doc/HTML-MAIL-PRIVACY.md):
 - account shard `messages`: nullable `spamVerdict TEXT`, `spamConfidence REAL`,
   `spamReasons TEXT` (JSON array), `spamCheckedAt INTEGER`, plus the partial
   index `idx_messages_account_spam (accountId, spamVerdict) WHERE spamVerdict IS NOT NULL`;
-- account shard table `spam_examples` with three indexes. It is account-scoped,
-  so it gets the v3 writer guards; on an existing v3 shard the table and its
-  guards are created in one immediate transaction (`ensureSpamRuntimeSchema` in
-  `lib/db/schema.ts`). `PRAGMA user_version` and the shard v2 key/guard contract
-  are unchanged; the guard inventory grows from 27 to 28 tables;
+- account shard tables `spam_examples` (three indexes) and
+  `spam_sender_profiles` (primary key accountId + senderKey). Both are
+  account-scoped, so they get the v3 writer guards; on an existing v3 shard
+  missing tables and their guards are created in one immediate transaction
+  (`ensureSpamRuntimeSchema` in `lib/db/schema.ts`). `PRAGMA user_version` and
+  the shard v2 key/guard contract are unchanged; the guard inventory grows from
+  27 to 29 tables (87 triggers);
 - master table `spam_settings (scope, settings, updatedAt, updatedByUserId)`:
   scope `global` or an account id.
 
@@ -129,7 +214,7 @@ three days at the first sweep is checked.
 doc/FTS-V3-MIGRATION.md §1–2 (stop all database clients, create and verify a
 complete stopped backup) before the first start of this build, and verify
 afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
-`spam_examples` table. Rollback is the stopped-snapshot restore of §6.
+`spam_examples` and `spam_sender_profiles` tables. Rollback is the stopped-snapshot restore of §6.
 
 ## Configuration
 
@@ -175,6 +260,19 @@ N/2 ham). The output lists precision, recall, decision sources, false positives
 and spam passed by the allowlist by subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
 is reported separately from plain false positives. The static rules were derived
 from the same corpus, so their precision there is optimistic.
+
+`--trust-profiles [profiles.json]` builds the household sender profiles from
+the data dir first (read-only, about 40 s for 87,000 rows; with a file it is
+read from there when it exists, otherwise built and written there) and applies
+trusted senders with the anomaly gate before the model. Trust is judged as of
+each mail's own date, as the server would have at its arrival; the profiles
+cover the whole history, including mail newer than the evaluated one. The
+output adds a line with trusted skips, canary checks and mismatches, trusted
+mails with anomalies, the anomaly rules that fired and which of those mails
+were marked. Each skip is written to `--out` with `source: "trusted:profile"`
+and `decision: "ham"`. The scripts open `<data>/db/accounts/<id>.db` first;
+the absolute `dbPath` in `main.db` is used only when that file is missing
+(a copied data dir keeps the original's paths).
 
 `--out <file.json>` additionally writes every evaluated item (`accountId`, `id`,
 `label`, `decision` spam/ham/unsure, `source`, `confidence`, `subject`,
