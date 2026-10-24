@@ -105,7 +105,7 @@ const items: Item[] = samplePath && existsSync(samplePath)
   ? (JSON.parse(readFileSync(samplePath, "utf8")) as { items: Item[] }).items
   : sampleFromDb();
 const selected = limit > 0 ? items.slice(0, limit) : items;
-const rules = loadStaticRules(rulesPath);
+const rules = await loadStaticRules(rulesPath);
 
 async function loadInput(item: Item): Promise<{ input: SpamInput; row: Record<string, unknown> } | null> {
   const { db } = shard(item.accountId);

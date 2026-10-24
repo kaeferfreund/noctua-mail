@@ -74,15 +74,15 @@ describe("static rules", () => {
     ]);
   });
 
-  test("a missing or invalid file means no static rules", () => {
+  test("a missing or invalid file means no static rules", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "spam-rules-"));
     try {
-      expect(loadStaticRules(path.join(dir, "missing.json"))).toEqual(EMPTY_STATIC_RULES);
+      expect(await loadStaticRules(path.join(dir, "missing.json"))).toEqual(EMPTY_STATIC_RULES);
       const file = path.join(dir, "rules.json");
       writeFileSync(file, "{not json");
-      expect(loadStaticRules(file)).toEqual(EMPTY_STATIC_RULES);
+      expect(await loadStaticRules(file)).toEqual(EMPTY_STATIC_RULES);
       writeFileSync(file, JSON.stringify({ allow: [{ type: "domain", value: "example.test", extra: { nested: true } }] }));
-      expect(loadStaticRules(file).allow).toHaveLength(1);
+      expect((await loadStaticRules(file)).allow).toHaveLength(1);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

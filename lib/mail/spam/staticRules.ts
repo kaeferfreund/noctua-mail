@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import { getDataDir } from "@/lib/runtimePaths";
 import { senderAuthPassed } from "./allowlist";
@@ -70,10 +70,11 @@ export function parseStaticRules(json: unknown): StaticRules {
 
 let cached: { filePath: string; version: string; rules: StaticRules } | null = null;
 
-export function loadStaticRules(filePath = staticRulesPath()): StaticRules {
+export async function loadStaticRules(filePath = staticRulesPath()): Promise<StaticRules> {
   let version: string;
   try {
-    const stat = statSync(filePath);
+    // A runtime path in the data dir, not a build input: keep it out of output tracing.
+    const stat = await fs.stat(/* turbopackIgnore: true */ filePath);
     version = `${stat.mtimeMs}:${stat.size}`;
   } catch {
     return EMPTY_STATIC_RULES;
@@ -81,7 +82,7 @@ export function loadStaticRules(filePath = staticRulesPath()): StaticRules {
   if (cached?.filePath === filePath && cached.version === version) return cached.rules;
   let rules = EMPTY_STATIC_RULES;
   try {
-    rules = parseStaticRules(JSON.parse(readFileSync(filePath, "utf8")));
+    rules = parseStaticRules(JSON.parse(await fs.readFile(/* turbopackIgnore: true */ filePath, "utf8")));
   } catch (error) {
     console.warn("[spam] static rules file is not valid JSON; ignoring it", { filePath, error: String(error) });
   }
