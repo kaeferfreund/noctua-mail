@@ -145,3 +145,36 @@ N/2 ham). The output lists precision, recall, decision sources, false positives
 and spam passed by the allowlist by subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
 is reported separately from plain false positives. The static rules were derived
 from the same corpus, so their precision there is optimistic.
+
+`--out <file.json>` additionally writes every evaluated item (`accountId`, `id`,
+`label`, `decision` spam/ham/unsure, `source`, `confidence`, `subject`,
+`fromEmail`, `mailboxPath`, `serverSpamFlag`) for `scripts/spam-apply.ts`. The
+file names subjects and senders: keep it outside the data dir and the repository.
+
+## Bestehenden Spam aus dem Posteingang in den Spam-Ordner verschieben
+
+`scripts/spam-apply.ts` moves the INBOX messages the eval marked as spam
+(defaults `--label ham --decision spam`) to each account's Junk folder, one
+after another, through the same code path as "Als Spam" (Junk folder
+resolution, `$NotJunk` cleanup on IMAP, move + local relocation, flag cleanup)
+and stores the same spam example. Rows that no longer exist or are no longer in
+the INBOX are skipped. It prints one line per message (subject — sender —
+result) and a summary. Run it on the server from the app directory (Bun loads
+`.env.local`); the real run uses the app's DB layer with its write retries and
+may run while the service is running. Shards without the spam schema are
+refused (deploy the spam build first, see Deploy above).
+
+```sh
+# 1. Eval with output file (read-only)
+bun scripts/spam-eval.ts --data /path/to/noctua-data \
+  --sample briefs/spam/eval-sample.json --rules briefs/spam/static-rules.json \
+  --out /tmp/spam-eval-result.json
+# 2. Preview: databases opened read-only, nothing is moved
+bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data --dry-run
+# 3. Move (optionally one mailbox: --account <accountId>)
+bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data
+```
+
+Wrongly moved mail must be moved back with „Kein Spam“ in Noctua, not with
+another mail client or by drag and drop: only „Kein Spam“ stores the ham example
+the filter learns from.
