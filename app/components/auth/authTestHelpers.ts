@@ -1,7 +1,7 @@
 import { createAuthClient, type Proof, type SecurityInfo } from "@/lib/authClient";
 
 export const proof: Proof = { ok: true, grant: "synthetic-one-use-grant", purpose: "totp.enroll", expiresAt: Date.now() + 300000, ceremonyRequired: false };
-export const setup = { method: "totp", totpURI: "otpauth://totp/Synthetic?secret=JBSWY3DPEHPK3PXP&issuer=Noctua", backupCodes: ["synthetic-code-a", "synthetic-code-b"] };
+export const setup = { method: "totp", totpURI: "otpauth://totp/Synthetic?secret=JBSWY3DPEHPK3PXP&issuer=Mail", backupCodes: ["synthetic-code-a", "synthetic-code-b"] };
 export const securityInfo: SecurityInfo = { ok: true, hasPassword: true, totpEnrolled: true, mfaStateInconsistent: false, enrollmentRequired: false, reauthRequired: false,
   passkeys: [{ id: "synthetic-key", name: "Synthetic key", createdAt: "2026-01-01", deviceType: "singleDevice", backedUp: false }],
   sessions: [{ id: "synthetic-current", current: true, createdAt: "2026-01-01", updatedAt: "2026-01-01" }, { id: "synthetic-other", current: false, createdAt: "2026-01-01", updatedAt: "2026-01-01" }] };

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  APP_ICON_VERSION,
+  BASE_APP_TITLE,
   DEFAULT_APP_TITLE,
   formatAttachmentPageTitle,
   formatCalendarImportPageTitle,
@@ -7,7 +9,8 @@ import {
   formatComposePageTitle,
   formatMailboxPageTitle,
   formatMessageHtmlPageTitle,
-  formatMessagePageTitle
+  formatMessagePageTitle,
+  versionedIconUrl
 } from "./appBranding";
 
 describe("window titles", () => {
@@ -65,7 +68,18 @@ describe("window titles", () => {
         unreadCount: 0
       })
     ).toBe(`Sent — paul@example.com — ${DEFAULT_APP_TITLE}`);
-    expect(formatMailboxPageTitle({ unreadCount: null })).toBe(`Mail — ${DEFAULT_APP_TITLE}`);
+    expect(formatMailboxPageTitle({ unreadCount: null })).toBe(DEFAULT_APP_TITLE);
+  });
+});
+
+describe("product name and icons", () => {
+  it("names the app Mail; the environment label only adds a suffix", () => {
+    expect(BASE_APP_TITLE).toBe("Mail");
+    expect(DEFAULT_APP_TITLE.startsWith(BASE_APP_TITLE)).toBe(true);
+  });
+
+  it("versions icon URLs so cached copies of the old art are not reused", () => {
+    expect(versionedIconUrl("/icons/logo.svg")).toBe(`/icons/logo.svg?v=${APP_ICON_VERSION}`);
   });
 });
 
@@ -76,8 +90,8 @@ describe("environment label on the client", () => {
       __NOCTUA_RUNTIME_CONFIG__: { appEnvironmentLabel: "Local" }
     };
     try {
-      expect(formatMessagePageTitle("Invoice 42")).toBe("Invoice 42 — Noctua Mail (Local)");
-      expect(formatMailboxPageTitle({ folderName: "Inbox" })).toBe("Inbox — Noctua Mail (Local)");
+      expect(formatMessagePageTitle("Invoice 42")).toBe("Invoice 42 — Mail (Local)");
+      expect(formatMailboxPageTitle({ folderName: "Inbox" })).toBe("Inbox — Mail (Local)");
     } finally {
       if (original === undefined) delete (globalThis as Record<string, unknown>).window;
       else (globalThis as Record<string, unknown>).window = original;
@@ -132,19 +146,19 @@ describe("installed app windows", () => {
 
   it("keeps the app name in a browser tab", () => {
     withFakeWindow({ chromium: true, displayMode: null }, () => {
-      expect(formatMailboxPageTitle({ folderName: "INBOX" })).toBe("INBOX — Noctua Mail (DEV)");
+      expect(formatMailboxPageTitle({ folderName: "INBOX" })).toBe("INBOX — Mail (DEV)");
     });
   });
 
   it("keeps the app name in a Safari web app, which adds no prefix of its own", () => {
     withFakeWindow({ chromium: false, displayMode: "standalone" }, () => {
-      expect(formatMailboxPageTitle({ folderName: "INBOX" })).toBe("INBOX — Noctua Mail (DEV)");
+      expect(formatMailboxPageTitle({ folderName: "INBOX" })).toBe("INBOX — Mail (DEV)");
     });
   });
 
   it("still names the app when there is nothing to distinguish", () => {
     withFakeWindow({ chromium: true, displayMode: "standalone" }, () => {
-      expect(formatMessagePageTitle(null)).toBe("Noctua Mail (DEV)");
+      expect(formatMessagePageTitle(null)).toBe("Mail (DEV)");
     });
   });
 });
