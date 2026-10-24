@@ -6,6 +6,11 @@ import type { SpamInput } from "./types";
 
 export const SPAM_TEXT_LIMIT = 4096;
 const HEADER_VALUE_LIMIT = 600;
+/**
+ * X-Spam-Status lists the server's test names after the score; static rules
+ * match tests anywhere in that list, so it keeps far more than other headers.
+ */
+const SPAM_STATUS_VALUE_LIMIT = 4000;
 const MAX_SPAM_HEADERS = 12;
 const MAX_LINK_DOMAINS = 30;
 const MAX_ATTACHMENTS = 10;
@@ -150,7 +155,10 @@ export function topReceivedAt(lines: HeaderLine[]) {
 
 /** The header-derived fields of SpamInput; `lines` hold the full unfolded values. */
 function headerFields(lines: HeaderLine[]) {
-  const capped = lines.map((line) => ({ key: line.key, value: line.value.slice(0, HEADER_VALUE_LIMIT) }));
+  const capped = lines.map((line) => ({
+    key: line.key,
+    value: line.value.slice(0, line.key === "x-spam-status" ? SPAM_STATUS_VALUE_LIMIT : HEADER_VALUE_LIMIT)
+  }));
   const header = (key: string) => capped.find((line) => line.key === key)?.value ?? null;
   return {
     listId: header("list-id"),
