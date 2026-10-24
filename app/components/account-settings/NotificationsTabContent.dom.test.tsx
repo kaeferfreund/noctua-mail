@@ -1,22 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { createHash } from "node:crypto";
+import { act, cleanup, fireEvent, render, renderHook, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Theme } from "@radix-ui/themes";
 import { I18nTestProvider } from "@/lib/i18n/testRender";
 import NotificationsTabContent from "./tabs/NotificationsTabContent";
-import { base64UrlToBytes, describeUserAgent, type PushDevice } from "@/lib/push/client";
+import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
+import { base64UrlToBytes, describeUserAgent, PUSH_DEVICE_CHANGED_EVENT, pushEndpointHashOf, type PushDevice } from "@/lib/push/client";
 import type { PushDeviceSettings } from "@/lib/push/types";
 
 const DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const PUBLIC_KEY = "BAECAwQ"; // base64url of [4, 1, 2, 3, 4]
 const ENDPOINT = "https://push.example.test/send/synthetic-current";
+const ROTATED_ENDPOINT = "https://push.example.test/send/synthetic-rotated";
+const OLD_KEY = new Uint8Array([4, 9, 9, 9, 9]);
+// Same as the server's pushEndpointHash.
+const hashOf = (endpoint: string) => createHash("sha256").update(endpoint).digest("hex").slice(0, 16);
 const defaults: PushDeviceSettings = { accountIds: "all", includeSubject: true, quietHours: null, badge: true };
 const mailboxes = [
   { id: "synthetic-team", name: "Synthetic Team", email: "team@example.test" },
   { id: "synthetic-own", name: "Synthetic Own", email: "own@example.test" }
 ];
-const device = (id: string, userAgent: string, settings = defaults): PushDevice => ({ id, endpointHash: `hash-${id}`, userAgent, settings, createdAt: Date.UTC(2026, 9, 20, 8), lastSeenAt: Date.UTC(2026, 9, 24, 9, 30) });
+const device = (id: string, userAgent: string, settings = defaults): PushDevice => ({ id, endpointHash: id === "synthetic-current" ? hashOf(ENDPOINT) : `hash-${id}`, userAgent, settings, createdAt: Date.UTC(2026, 9, 20, 8), lastSeenAt: Date.UTC(2026, 9, 24, 9, 30) });
 
 // ---- Fake browser push stack -------------------------------------------------
 type FakeSubscription = { endpoint: string; options: { applicationServerKey: ArrayBuffer | null }; unsubscribed: boolean; toJSON: () => unknown; unsubscribe: () => Promise<boolean> };
@@ -24,12 +30,13 @@ const browser = {
   permission: "default" as NotificationPermission,
   nextPermission: "granted" as NotificationPermission,
   subscription: null as FakeSubscription | null,
-  subscribeKeys: [] as number[][]
+  subscribeKeys: [] as number[][],
+  nextEndpoint: ENDPOINT
 };
-function fakeSubscription(key: Uint8Array): FakeSubscription {
+function fakeSubscription(key: Uint8Array, endpoint = ENDPOINT): FakeSubscription {
   const subscription: FakeSubscription = {
-    endpoint: ENDPOINT, options: { applicationServerKey: key.slice().buffer }, unsubscribed: false,
-    toJSON: () => ({ endpoint: ENDPOINT, expirationTime: null, keys: { p256dh: "synthetic-p256dh", auth: "synthetic-auth" } }),
+    endpoint, options: { applicationServerKey: key.slice().buffer }, unsubscribed: false,
+    toJSON: () => ({ endpoint, expirationTime: null, keys: { p256dh: "synthetic-p256dh", auth: "synthetic-auth" } }),
     unsubscribe: async () => { subscription.unsubscribed = true; browser.subscription = null; return true; }
   };
   return subscription;
@@ -39,7 +46,7 @@ const registration = {
     getSubscription: async () => browser.subscription,
     subscribe: async ({ applicationServerKey }: { applicationServerKey: Uint8Array }) => {
       browser.subscribeKeys.push([...applicationServerKey]);
-      browser.subscription = fakeSubscription(applicationServerKey);
+      browser.subscription = fakeSubscription(applicationServerKey, browser.nextEndpoint);
       return browser.subscription;
     }
   }
@@ -93,7 +100,7 @@ function pushApi({ configured = true, devices = [] as PushDevice[], failPut = fa
 const wrapper = ({ children }: { children: ReactNode }) => <I18nTestProvider locale="de"><Theme>{children}</Theme></I18nTestProvider>;
 const mount = (apiFetch: ReturnType<typeof pushApi>["apiFetch"]) => render(<NotificationsTabContent mailboxes={mailboxes} apiFetch={apiFetch} />, { wrapper });
 
-beforeEach(() => { browser.permission = "default"; browser.nextPermission = "granted"; browser.subscription = null; browser.subscribeKeys = []; });
+beforeEach(() => { browser.permission = "default"; browser.nextPermission = "granted"; browser.subscription = null; browser.subscribeKeys = []; browser.nextEndpoint = ENDPOINT; });
 afterEach(() => {
   cleanup();
   for (const [target, key, descriptor] of saved.reverse()) {
@@ -106,6 +113,9 @@ describe("push client helpers", () => {
   it("decodes base64url VAPID keys without padding", () => {
     expect([...base64UrlToBytes(PUBLIC_KEY)]).toEqual([4, 1, 2, 3, 4]);
     expect([...base64UrlToBytes("-_8")]).toEqual([251, 255]);
+  });
+  it("hashes the endpoint like the server", async () => {
+    expect(await pushEndpointHashOf(ENDPOINT)).toBe(hashOf(ENDPOINT));
   });
   it("labels devices from their user agent", () => {
     expect(describeUserAgent(IPHONE_UA)).toBe("Safari · iPhone");
@@ -240,5 +250,124 @@ describe("Notifications settings tab", () => {
     expect(calls.find(call => call.method === "DELETE" && call.url === "/api/push/subscriptions")!.body).toEqual({ endpoint: ENDPOINT });
     expect(subscription.unsubscribed).toBe(true);
     expect(page.getByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }).getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+describe("Notifications settings tab: devices the server no longer knows", () => {
+  it("does not re-register a device removed elsewhere or owned by another user of this browser", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
+    const { apiFetch, calls } = pushApi({ devices: [device("synthetic-phone", IPHONE_UA)] });
+    const page = mount(apiFetch);
+    await page.findByText("Safari · iPhone");
+    const toggle = page.getByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(page.queryByText("Dieses Gerät")).toBeNull();
+    expect(calls.some(call => call.method === "POST")).toBe(false);
+    expect(browser.subscription?.unsubscribed).toBe(false);
+
+    // Switching on is the explicit opt-in: the existing browser subscription is registered.
+    fireEvent.click(toggle);
+    await page.findByText("Dieses Gerät");
+    expect(calls.filter(call => call.method === "POST").map(call => (call.body as { subscription: { endpoint: string } }).subscription.endpoint)).toEqual([ENDPOINT]);
+    expect(browser.subscribeKeys).toEqual([]);
+  });
+});
+
+describe("Notifications settings tab: VAPID key change", () => {
+  it("moves a known device to a subscription with the new key and names the old endpoint", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(OLD_KEY); browser.nextEndpoint = ROTATED_ENDPOINT;
+    const old = browser.subscription;
+    const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA)] });
+    const page = mount(apiFetch);
+    await page.findByText("Dieses Gerät");
+    expect(old.unsubscribed).toBe(true);
+    expect(browser.subscribeKeys).toEqual([[4, 1, 2, 3, 4]]);
+    expect(calls.filter(call => call.method === "POST").map(call => call.body)).toEqual([{
+      subscription: { endpoint: ROTATED_ENDPOINT, expirationTime: null, keys: { p256dh: "synthetic-p256dh", auth: "synthetic-auth" } },
+      userAgent: DESKTOP_UA, previousEndpoint: ENDPOINT
+    }]);
+  });
+
+  it("also names the old endpoint when switching on with a stale subscription", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(OLD_KEY); browser.nextEndpoint = ROTATED_ENDPOINT;
+    const { apiFetch, calls } = pushApi();
+    const page = mount(apiFetch);
+    fireEvent.click(await page.findByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }));
+    await page.findByText("Dieses Gerät");
+    expect(calls.filter(call => call.method === "POST").map(call => (call.body as { previousEndpoint?: string }).previousEndpoint)).toEqual([ENDPOINT]);
+  });
+});
+
+describe("Notifications settings tab: quiet hours", () => {
+  it("keeps quiet hours that start when they end in the form with a hint instead of saving them", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
+    const quietHours = { from: "22:00", to: "07:00", timeZone: "Europe/Berlin" };
+    const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA, { ...defaults, quietHours })] });
+    const page = mount(apiFetch);
+    const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
+    const puts = () => calls.filter(call => call.method === "PUT");
+
+    fireEvent.change(settings.getByLabelText("Bis"), { target: { value: "22:00" } });
+    const hint = await page.findByRole("alert");
+    expect(hint.textContent).toBe("Beginn und Ende der Ruhezeit müssen sich unterscheiden.");
+    expect((settings.getByLabelText("Bis") as HTMLInputElement).value).toBe("22:00");
+    expect(settings.getByLabelText("Von").getAttribute("aria-invalid")).toBe("true");
+    expect(settings.getByLabelText("Bis").getAttribute("aria-describedby")).toBe(hint.id);
+    expect(puts()).toEqual([]);
+
+    fireEvent.change(settings.getByLabelText("Von"), { target: { value: "21:00" } });
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect((puts()[0].body as { settings: PushDeviceSettings }).settings.quietHours).toEqual({ ...quietHours, from: "21:00", to: "22:00" });
+    expect(page.queryByText("Beginn und Ende der Ruhezeit müssen sich unterscheiden.")).toBeNull();
+    expect(settings.getByLabelText("Von").getAttribute("aria-invalid")).toBeNull();
+  });
+});
+
+describe("current device push settings (app badge)", () => {
+  it("loads this browser's device settings and reloads them when the tab changes the device", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
+    let settings: PushDeviceSettings = { ...defaults, accountIds: ["synthetic-own"] };
+    const list = () => [device("synthetic-phone", IPHONE_UA), device("synthetic-current", DESKTOP_UA, settings)];
+    const realFetch = globalThis.fetch;
+    define(globalThis, "fetch", async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe("/api/push/subscriptions");
+      return new Response(JSON.stringify({ ok: true, subscriptions: list() }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    try {
+      const { result, rerender } = renderHook(({ signedIn }) => useCurrentPushDeviceSettings(signedIn), { initialProps: { signedIn: true } });
+      await waitFor(() => expect(result.current).toEqual(settings));
+      settings = { ...settings, badge: false };
+      act(() => { window.dispatchEvent(new Event(PUSH_DEVICE_CHANGED_EVENT)); });
+      await waitFor(() => expect(result.current).toEqual(settings));
+      rerender({ signedIn: false });
+      expect(result.current).toBeNull();
+    } finally {
+      define(globalThis, "fetch", realFetch);
+    }
+  });
+
+  it("is null without a subscription or when the server does not list this browser", async () => {
+    installBrowser(); browser.permission = "granted";
+    const { result } = renderHook(() => useCurrentPushDeviceSettings(true));
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current).toBeNull();
+  });
+
+  it("announces changes to this device from the tab", async () => {
+    installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
+    let announced = 0;
+    const count = () => { announced += 1; };
+    window.addEventListener(PUSH_DEVICE_CHANGED_EVENT, count);
+    try {
+      const page = mount(pushApi({ devices: [device("synthetic-current", DESKTOP_UA), device("synthetic-phone", IPHONE_UA)] }).apiFetch);
+      const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
+      fireEvent.click(settings.getByRole("switch", { name: "Anzahl ungelesener E-Mails am App-Symbol" }));
+      await page.findByText("Gespeichert.");
+      expect(announced).toBe(1);
+      fireEvent.click(page.getByRole("button", { name: "Chrome · Linux entfernen" }));
+      await waitFor(() => expect(announced).toBe(2));
+    } finally {
+      window.removeEventListener(PUSH_DEVICE_CHANGED_EVENT, count);
+    }
   });
 });
