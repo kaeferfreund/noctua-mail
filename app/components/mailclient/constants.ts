@@ -23,5 +23,7 @@ export const SYNC_STATUS_RUNNING_POLL_INTERVAL_MS = 450;
 export const THREAD_CACHE_LIMIT = 50;
 /** Message bodies read on expand, kept apart from the thread header cache. */
 export const MESSAGE_BODY_CACHE_LIMIT = 200;
+/** List pages read to highlight a linked message; the reader opens without them. */
+export const DEEP_LINK_LIST_PAGE_LIMIT = 4;
 export const CALENDAR_REMINDER_REFRESH_INTERVAL_MS = 60 * 1000;
 export const BUILD_VERSION_POLL_INTERVAL_MS = 60 * 1000;

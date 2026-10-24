@@ -100,6 +100,9 @@ export function useMessageData({
   // and only with a byte-identical URL; any other outcome aborts it.
   // The key whose first page is on screen from a successful read; cleared by errors.
   const shownPageKeyRef = useRef<string | null>(null);
+  // The page-1 URL that read was made with. Thread support is part of the URL but not
+  // of the key; rows read in one row format are never cached under the other's URL.
+  const shownPageUrlRef = useRef<string | null>(null);
   const firstPagePrefetchRef = useRef<{
     accountId: string;
     url: string;
@@ -215,6 +218,7 @@ export function useMessageData({
     firstLoadKeyRef.current = messagesKey;
     // Nothing for the new key is on screen from a read yet.
     shownPageKeyRef.current = null;
+    shownPageUrlRef.current = null;
     setGroupMeta(cached?.groupMeta ?? []);
     setMessageListError(null);
     if (cached) {
@@ -235,7 +239,8 @@ export function useMessageData({
   // what a revisit shows. Only a list confirmed by a read for this key is written; an
   // emptied list drops the entry, so a revisit loads as usual.
   useEffect(() => {
-    if (!viewCache || !cacheableView || shownPageKeyRef.current !== messagesKey) return;
+    if (!viewCache || !cacheableView || shownPageKeyRef.current !== messagesKey ||
+      shownPageUrlRef.current !== firstPageUrl) return;
     const firstPage = firstPageSizeRef.current?.key === messagesKey ? firstPageSizeRef.current : null;
     if (messagesPage > 1 && !firstPage) return;
     const pagedFurther = messagesPage > 1 && firstPage !== null;
@@ -250,10 +255,12 @@ export function useMessageData({
   }, [viewCache, cacheableView, messagesKey, firstPageUrl, activeAccountId, messages, groupMeta, hasMoreMessages,
     totalMessages, loadedMessageCount, messagesPage]);
 
-  // The server denied the mailbox: nothing it showed stays on screen or in the cache.
-  const dropDeniedList = (status: number, showsList: boolean) => {
+  // The server denied the list: nothing it showed stays on screen or in the cache. Only
+  // this list's entry is dropped; a signed-out session clears the whole cache and a
+  // revoked mailbox is pruned with the account list.
+  const dropDeniedList = (status: number, showsList: boolean, firstPageUrl: string) => {
     if (status !== 401 && status !== 403) return;
-    viewCache?.dropAccount(activeAccountId);
+    viewCache?.dropList(firstPageUrl);
     if (!showsList) return;
     setMessages([]);
     setGroupMeta([]);
@@ -427,6 +434,7 @@ export function useMessageData({
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (page === 1) {
             shownPageKeyRef.current = requestKey;
+            shownPageUrlRef.current = url;
             firstPageSizeRef.current = {
               key: requestKey,
               itemCount: items.length,
@@ -442,7 +450,7 @@ export function useMessageData({
           setMessageListError(null);
         } else {
           shownPageKeyRef.current = null;
-          dropDeniedList(messagesRes.status, true);
+          dropDeniedList(messagesRes.status, true, buildQueryUrl(1));
           const errorMessage = await readErrorMessage(messagesRes);
           reportError(errorMessage);
           setMessageListError(errorMessage || "Failed to load messages.");
@@ -481,10 +489,11 @@ export function useMessageData({
     const requestKey = messagesKey;
     const requestMutationVersion = messageMutationVersionRef.current;
     try {
-      const messageRes = await apiFetch(buildQueryUrl(1));
+      const requestUrl = buildQueryUrl(1);
+      const messageRes = await apiFetch(requestUrl);
       if (!messageRes.ok) {
         shownPageKeyRef.current = null;
-        dropDeniedList(messageRes.status, currentKeyRef.current === requestKey);
+        dropDeniedList(messageRes.status, currentKeyRef.current === requestKey, requestUrl);
         const message = await readErrorMessage(messageRes);
         reportError(message || "Failed to refresh mailbox data.");
         setMessageListError(message || "Failed to load messages.");
@@ -519,6 +528,7 @@ export function useMessageData({
         return false;
       }
       shownPageKeyRef.current = requestKey;
+      shownPageUrlRef.current = requestUrl;
       firstPageSizeRef.current = {
         key: requestKey,
         itemCount: nextMessages.length,

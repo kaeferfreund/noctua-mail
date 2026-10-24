@@ -66,6 +66,15 @@ export type ThreadPageRequest = Pick<
 const bodyCacheKey = (message: Pick<Message, "accountId" | "id">) =>
   `${message.accountId}:${message.id}`;
 
+const threadKeyOf = (message: Pick<Message, "threadId" | "messageId" | "id">) =>
+  message.threadId ?? message.messageId ?? message.id;
+
+/**
+ * One body read in flight. Reads started by an expanded reader card are aborted when
+ * the reader moves to another conversation; a manual caller (reply, retry) keeps it.
+ */
+type BodyRead = { promise: Promise<Message | null>; controller: AbortController; threadId: string; manual: boolean };
+
 export type UseThreadContentParams = {
   activeAccountId: string;
   apiFetch: ApiFetch;
@@ -114,7 +123,7 @@ export function useThreadContent({
   const autoHydrationAttemptAtRef = useRef<Record<string, number>>({});
   const messageBodyByIdRef = useRef(messageBodyById);
   const messageBodyOrderRef = useRef<string[]>([]);
-  const bodyFetchInFlightRef = useRef<Map<string, Promise<Message | null>>>(new Map());
+  const bodyFetchInFlightRef = useRef<Map<string, BodyRead>>(new Map());
   const threadWindowByIdRef = useRef(threadWindowById);
   const threadReadRef = useRef<{
     key: string;
@@ -157,6 +166,15 @@ export function useThreadContent({
       );
       threadCacheOrderRef.current = result.order;
       return result.next;
+    });
+    // Window state of threads evicted from the cache goes with them.
+    setThreadWindowById((prev) => {
+      const kept = new Set(threadCacheOrderRef.current);
+      const evicted = Object.keys(prev).filter((id) => id !== threadId && !kept.has(id));
+      if (evicted.length === 0) return prev;
+      const next = { ...prev };
+      evicted.forEach((id) => delete next[id]);
+      return next;
     });
   }, []);
 
@@ -491,18 +509,30 @@ export function useThreadContent({
    * only involved when the server reports the content as not stored.
    */
   const loadMessageBody = useCallback(
-    (message: Message): Promise<Message | null> => {
+    (message: Message, options?: { manual?: boolean }): Promise<Message | null> => {
       const key = bodyCacheKey(message);
       const inFlight = bodyFetchInFlightRef.current.get(key);
-      if (inFlight) return inFlight;
+      if (inFlight) {
+        if (options?.manual) inFlight.manual = true;
+        return inFlight.promise;
+      }
       const scopeVersion = scopeVersionRef.current;
-      const isCurrentScope = () => scopeVersionRef.current === scopeVersion;
+      const controller = new AbortController();
+      const isCurrentScope = () => scopeVersionRef.current === scopeVersion && !controller.signal.aborted;
       setMessageContentLoadingState(message.id, true);
       setMessageContentError(message.id, null);
-      const promise = (async () => {
+      const read: BodyRead = {
+        promise: Promise.resolve(null),
+        controller,
+        threadId: threadKeyOf(message),
+        manual: Boolean(options?.manual)
+      };
+      read.promise = (async () => {
         try {
-          const res = await apiFetch(buildAccountMessagePath(message.accountId, message.id), {
-            cache: "no-store"
+          // Topic suggestions come with the conversation window, not with every body.
+          const res = await apiFetch(`${buildAccountMessagePath(message.accountId, message.id)}?suggestions=0`, {
+            cache: "no-store",
+            signal: controller.signal
           });
           if (!isCurrentScope()) return null;
           if (!res.ok) {
@@ -526,12 +556,15 @@ export function useThreadContent({
           if (isCurrentScope()) setMessageContentError(message.id, THREAD_LOAD_FAILURE_MESSAGE);
           return null;
         } finally {
-          bodyFetchInFlightRef.current.delete(key);
-          if (isCurrentScope()) setMessageContentLoadingState(message.id, false);
+          if (bodyFetchInFlightRef.current.get(key) === read) bodyFetchInFlightRef.current.delete(key);
+          // An aborted read released its key; a newer read of the same body owns the flag.
+          if (scopeVersionRef.current === scopeVersion && !bodyFetchInFlightRef.current.has(key)) {
+            setMessageContentLoadingState(message.id, false);
+          }
         }
       })();
-      bodyFetchInFlightRef.current.set(key, promise);
-      return promise;
+      bodyFetchInFlightRef.current.set(key, read);
+      return read.promise;
     },
     [
       apiFetch,
@@ -551,7 +584,7 @@ export function useThreadContent({
     async (message: Message, options?: { manual?: boolean }): Promise<Message | null> => {
       const resolved = resolveKnownMessage(message);
       if (isMessageContentUnloaded(resolved)) {
-        return loadMessageBody(resolved);
+        return loadMessageBody(resolved, { manual: options?.manual });
       }
       if (!needsMessageContentHydration(resolved)) return resolved;
       if (messageContentLoadingRef.current[message.id]) return null;
@@ -652,6 +685,18 @@ export function useThreadContent({
     [activeAccountId, apiFetch, clearThreadContentError, setThreadContentError, upsertThreadCache]
   );
 
+  /**
+   * Abort body reads that expanded reader cards started for other conversations, e.g.
+   * on a fast switch through threads. Manual reads (reply, retry) keep running.
+   */
+  const abortBodyReadsOutside = useCallback((threadId: string | null) => {
+    bodyFetchInFlightRef.current.forEach((read, key) => {
+      if (read.manual || read.threadId === threadId) return;
+      read.controller.abort();
+      bodyFetchInFlightRef.current.delete(key);
+    });
+  }, []);
+
   /** Abort the active conversation read, e.g. when no message is selected any more. */
   const abortThreadContent = useCallback(() => {
     const current = threadReadRef.current;
@@ -746,6 +791,7 @@ export function useThreadContent({
     threadReadRef.current = null;
     threadPageControllersRef.current.forEach((controller) => controller.abort());
     threadPageControllersRef.current.clear();
+    bodyFetchInFlightRef.current.forEach((read) => read.controller.abort());
     bodyFetchInFlightRef.current.clear();
     setThreadContentById({});
     setThreadContentErrorById({});
@@ -809,6 +855,7 @@ export function useThreadContent({
     updateMessageBody,
     loadThreadContent,
     abortThreadContent,
+    abortBodyReadsOutside,
     loadThreadPage
   };
 }

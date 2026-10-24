@@ -53,8 +53,15 @@ function onPop(event: PopStateEvent) {
 /** Selection changes wait for a programmatically dismissed Sheet's Back. */
 export function afterMobileOverlayNavigation(callback: () => void) {
   let cancelled = false;
-  if (returning) deferred.push(() => { if (!cancelled) callback(); });
-  else callback();
+  const run = () => { if (!cancelled) callback(); };
+  if (returning) deferred.push(run);
+  else if (overlays.some((overlay) => overlay.pushed && overlay.id === window.history.state?.noctuaMobileOverlay)) {
+    // A pick inside a Sheet (sidebar → mailbox) runs before the Sheet's cleanup. An
+    // entry written now would sit on the Sheet's own entry and leave a duplicate
+    // Forward entry once the Sheet steps back. Wait for the close, if there is one.
+    const timer = window.setTimeout(() => { if (returning) deferred.push(run); else run(); }, 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  } else callback();
   return () => { cancelled = true; };
 }
 
