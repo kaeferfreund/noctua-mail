@@ -230,10 +230,12 @@
       "primaryMailboxHint": "This mailbox remains the token’s default mailbox.",
       "permissionMode": "Permissions",
       "tokenMailboxes": "Mailboxes: {mailboxes}",
+      "tokenMailboxesHidden": "{count, plural, one {+# more mailbox} other {+# more mailboxes}}",
       "mode": {
         "read": "Read only",
         "drafts": "Read and create drafts (no sending)",
-        "full": "Full access (including sending)"
+        "full": "Full access (including sending)",
+        "invalid": "Invalid (no access)"
       },
       "serverHeading": "MCP server",
       "endpointHint": "Use the MCP endpoint below with an <code>{header}</code> header.",
@@ -267,6 +269,7 @@
       "invalidExpiry": "Choose an expiry between one minute and one year from now.",
       "createFailed": "Failed to create MCP token.",
       "deleteConfirm": "Delete this MCP token?",
+      "deleteConfirmShared": "Delete this MCP token? It is revoked for every covered mailbox, including: {mailboxes}",
       "deleteFailed": "Failed to delete MCP token."
     },
     "calendar": {

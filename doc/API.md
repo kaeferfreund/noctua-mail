@@ -139,7 +139,8 @@ creator from the stored token, never client-supplied identity metadata.
 
 `GET /api/accounts/{accountId}/mcp-tokens` returns `tokens` plus selectable `mailboxes`
 from the creator's accessible own/shared mailboxes. Managers see all tokens covering
-that mailbox; editors see their own. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
+that mailbox; editors see their own. Token rows list only `accountIds` the requester can
+access plus `hiddenMailboxCount` for the others; the primary `accountId` is not returned. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
 `accountIds` must be a nonempty set of current memberships including the route mailbox
 (the primary); omission means primary only. `mode` defaults to `drafts`:
 
@@ -159,9 +160,10 @@ final effect; draft saves explicitly require `drafts`, identity/preferences writ
 The HTTP web send authorization is unchanged.
 
 Sets/modes cannot be edited after creation. A token appears in every covered mailbox's
-MCP tab; deleting it there revokes it everywhere. Deleting a mailbox removes its mapping,
-promotes a remaining mailbox if the primary was deleted, and deletes tokens with no
-mailbox left. Token deletion also removes mapping rows. The master-only
+MCP tab; deleting it there revokes it everywhere (the confirmation names the other covered
+mailboxes, or counts those the user cannot access). Deleting a mailbox removes its mapping,
+promotes the remaining mailbox with the creator's highest live role (ties by ID) if the
+primary was deleted, and deletes tokens with no mailbox left. Token deletion also removes mapping rows. The master-only
 `mcp_token_accounts(tokenId,accountId)` has a composite primary key; no shard changes.
 Existing tokens need no backfill: an empty mapping means primary only and `scopes=NULL`
 means `read` + `drafts`, without `manage` or `send`. Invalid scope JSON grants no permissions.
