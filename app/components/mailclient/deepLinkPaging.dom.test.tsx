@@ -21,6 +21,9 @@ const row = (id: string, subject: string) => ({
 });
 
 let listPages: number[];
+// Every reader scroll (scrollIntoView) since the test started.
+let scrolled: string[];
+const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
 // Page the target row shows up on, if any (manual paging past the deep-link limit).
 let targetPage: number | null;
 // Holds the target page back until the test releases it.
@@ -29,6 +32,8 @@ const originals = { fetch: globalThis.fetch, eventSource: globalThis.EventSource
 
 beforeEach(() => {
   listPages = [];
+  scrolled = [];
+  HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) { scrolled.push(this.outerHTML.slice(0, 80)); };
   targetPage = null;
   targetPageGate = null;
   (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL("http://localhost:4000/?a=~account-a&f=INBOX&m=~far-message");
@@ -64,6 +69,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   globalThis.fetch = originals.fetch;
   globalThis.EventSource = originals.eventSource;
   window.history.replaceState(null, "", "/");
@@ -81,28 +87,28 @@ describe("deep link to a message outside the loaded list", () => {
     expect(view.queryAllByText("Linked synthetic subject").length).toBeGreaterThan(0);
   });
 
+  // The reader scrolls to the opened message once; wait for that, then for its pending scroll to clear.
+  const settleOpeningScroll = async () => {
+    await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+    for (let i = 0; i < 40; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 10)));
+    return scrolled.length;
+  };
+
   it("does not jump back to the target when the user pages further after the limit", async () => {
     targetPage = DEEP_LINK_LIST_PAGE_LIMIT + 1;
     const { default: MailClient } = await import("../MailClient");
     const view = render(<ThemeProvider attribute="class"><Theme><MailClient /></Theme></ThemeProvider>);
     await waitFor(() => expect(listPages).toContain(DEEP_LINK_LIST_PAGE_LIMIT));
     await waitFor(() => expect(view.queryAllByText(`Synthetic row ${DEEP_LINK_LIST_PAGE_LIMIT}`).length).toBeGreaterThan(0));
-    // Let the reader's own open scroll settle before watching for a new one.
+    const opened = await settleOpeningScroll();
+    const pane = view.container.querySelector("aside");
+    expect(pane).not.toBeNull();
+    // The user scrolls to the end of the list and loads the next page, which holds the target.
+    await act(async () => { pane!.dispatchEvent(new Event("scroll")); });
+    await waitFor(() => expect(view.container.querySelector('[data-message-id="far-message"]')).not.toBeNull());
     for (let i = 0; i < 40; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 10)));
-    const scrolled: string[] = [];
-    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) { scrolled.push(this.outerHTML.slice(0, 80)); };
-    try {
-      const pane = view.container.querySelector("aside");
-      expect(pane).not.toBeNull();
-      // The user scrolls to the end of the list and loads the next page, which holds the target.
-      await act(async () => { pane!.dispatchEvent(new Event("scroll")); });
-      await waitFor(() => expect(listPages).toContain(DEEP_LINK_LIST_PAGE_LIMIT + 1));
-      for (let i = 0; i < 40; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 10)));
-      expect(scrolled).toEqual([]);
-    } finally {
-      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
-    }
+    expect(listPages).toContain(DEEP_LINK_LIST_PAGE_LIMIT + 1);
+    expect(scrolled.length).toBe(opened);
   });
 
   it("still brings the target into view when it arrives on the last page the link reads", async () => {
@@ -112,19 +118,10 @@ describe("deep link to a message outside the loaded list", () => {
     const { default: MailClient } = await import("../MailClient");
     const view = render(<ThemeProvider attribute="class"><Theme><MailClient /></Theme></ThemeProvider>);
     await waitFor(() => expect(listPages).toContain(DEEP_LINK_LIST_PAGE_LIMIT));
-    // Let the reader's own open scroll settle before the last page arrives.
-    for (let i = 0; i < 40; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 10)));
-    const scrolled: string[] = [];
-    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) { scrolled.push(this.outerHTML.slice(0, 80)); };
-    try {
-      await act(async () => { release(); });
-      await waitFor(() => expect(view.container.querySelector('[data-message-id="far-message"]')).not.toBeNull());
-      for (let i = 0; i < 40; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 10)));
-      expect(scrolled.length).toBeGreaterThan(0);
-      expect(Math.max(...listPages)).toBe(DEEP_LINK_LIST_PAGE_LIMIT);
-    } finally {
-      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
-    }
+    const opened = await settleOpeningScroll();
+    await act(async () => { release(); });
+    await waitFor(() => expect(view.container.querySelector('[data-message-id="far-message"]')).not.toBeNull());
+    await waitFor(() => expect(scrolled.length).toBeGreaterThan(opened));
+    expect(Math.max(...listPages)).toBe(DEEP_LINK_LIST_PAGE_LIMIT);
   });
 });
