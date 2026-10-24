@@ -61,6 +61,15 @@ describe("isAllowedPushEndpoint", () => {
       "https://fcm.googleapis.com:8443/fcm/send/synthetic",
       "https://user:pass@fcm.googleapis.com/fcm/send/synthetic",
       "https://.googleapis.com/x",
+      // Other Google APIs and hosts beside the push services (backlog push P3-4).
+      "https://storage.googleapis.com/synthetic-bucket/x",
+      "https://www.googleapis.com/x",
+      "https://evil.fcm.googleapis.com/x",
+      "https://push.services.mozilla.com/x",
+      "https://synthetic.push.services.mozilla.com/x",
+      "https://api.push.apple.com/3/device/synthetic",
+      "https://synthetic.web.push.apple.com/x",
+      "https://notify.windows.com/x",
       "not a url",
       `https://fcm.googleapis.com/${"x".repeat(2100)}`
     ]) expect(isAllowedPushEndpoint(endpoint)).toBe(false);

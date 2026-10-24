@@ -358,6 +358,7 @@
       "noDevices": "Noch kein Gerät angemeldet.",
       "currentDevice": "Dieses Gerät",
       "unknownDevice": "Unbekanntes Gerät",
+      "unknownSender": "Unbekannt",
       "lastSeen": "Zuletzt aktiv: {date}",
       "showSettings": "Einstellungen",
       "hideSettings": "Einstellungen ausblenden",
@@ -376,7 +377,8 @@
       "quietHours": "Ruhezeit",
       "quietFrom": "Von",
       "quietTo": "Bis",
-      "quietHelp": "Zeitzone: {zone}"
+      "quietHelp": "Zeitzone: {zone}",
+      "quietSameTime": "Beginn und Ende der Ruhezeit müssen sich unterscheiden."
     },
     "signatures": {
       "listTitle": "Signaturen",

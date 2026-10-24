@@ -250,7 +250,7 @@ function isMainWindow(client) {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification?.data?.url || "/";
+  const targetUrl = samePushUrl(event.notification?.data?.url);
   const target = new URL(targetUrl, self.location.origin);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
@@ -269,7 +269,7 @@ self.addEventListener("notificationclick", (event) => {
         }
         return;
       }
-      if (self.clients.openWindow) {
+      if (self.clients.openWindow && target.origin === self.location.origin) {
         return self.clients.openWindow(targetUrl);
       }
       return undefined;
@@ -296,12 +296,13 @@ function nonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-// Notification targets stay inside the app, whatever the payload says.
+// Notification targets stay inside the app, whatever the payload says. A path
+// starting with "//" would be read as a protocol-relative URL to another host.
 function samePushUrl(value) {
   if (typeof value !== "string") return "/";
   try {
     const url = new URL(value, self.location.origin);
-    return url.origin === self.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
+    return url.origin === self.location.origin && !url.pathname.startsWith("//") ? `${url.pathname}${url.search}${url.hash}` : "/";
   } catch {
     return "/";
   }
@@ -321,8 +322,9 @@ function pushNotification(payload) {
   }
   if (payload.type !== "new-mail") return null;
   const accountId = nonEmptyString(payload.accountId);
-  const from = nonEmptyString(payload.from);
-  if (!accountId || !from) return null;
+  if (!accountId || typeof payload.from !== "string") return null;
+  // Mail without a sender still needs a visible notification (iOS revokes silent pushes).
+  const from = nonEmptyString(payload.from) ?? "Unbekannt";
   const count = Number.isInteger(payload.count) && payload.count > 1 ? payload.count : 1;
   const subject = nonEmptyString(payload.subject);
   const accountName = nonEmptyString(payload.accountName);
