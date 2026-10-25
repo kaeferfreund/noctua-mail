@@ -14,6 +14,7 @@ import { readerShortcut } from "@/lib/ui/readerFocus";
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
+import { readSenderError } from "./mailclient/composition/senderErrors";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
@@ -21,6 +22,7 @@ import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
+import ScheduleSendDialog from "./mailclient/composition/ScheduleSendDialog";
 import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
 import { readScheduledSendConflict } from "./mailclient/scheduledSend/scheduledSendClient";
 import { roleAtLeast } from "@/lib/accountRole";
@@ -477,7 +479,7 @@ export default function MailClient({
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
-  const { messages: senderMessages } = useSenderMessages();
+  const { messages: senderMessages, renderMessage: renderSenderMessage } = useSenderMessages();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
@@ -1975,6 +1977,11 @@ export default function MailClient({
     const data = (await res.json().catch(() => null)) as { message?: Message } | null;
     return data?.message ?? null;
   }, [activeAccountId, apiFetch]);
+  // Send refusals with a sender identity code read in the UI language.
+  const readSendErrorMessage = useCallback(
+    async (res: Response) => renderSenderMessage(await readSenderError(res, readErrorMessage)),
+    [readErrorMessage, renderSenderMessage]
+  );
   const scheduledSend = useScheduledSendControls({
     accountId: activeAccountId || null,
     enabled: roleAtLeast(currentAccount?.accessRole, "editor"),
@@ -1982,6 +1989,7 @@ export default function MailClient({
     apiFetch,
     pushNotice,
     reportError,
+    readErrorMessage: readSendErrorMessage,
     loadDraft: loadDraftForCompose,
     editDraft: (draft) => composeHandleRef.current?.openCompose("edit", draft),
     sendDraft: (draft) => handleSendDraftRef.current(draft)
@@ -2647,11 +2655,13 @@ export default function MailClient({
   }, [activeAccountId, activeTopicSuggestionRankedMessages, threadScopeMessages]);
 
   const activeMessage = useMemo(() => {
-    if (composeOpen && composeMode === "new") return undefined;
+    // A shown new message takes the reader's place. Minimized (selecting a row minimizes
+    // it), it must not hide the message the user just selected.
+    if (composeOpen && composeMode === "new" && composeView !== "minimized") return undefined;
     if (!viewMessage) return undefined;
     if (viewMessage.accountId !== activeAccountId) return undefined;
     return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
-  }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
+  }, [viewMessage, filteredMessages, composeOpen, composeMode, composeView, activeAccountId]);
   // The saved preference applies only while a message is open; every list
   // behaviour (paging, scroll capture, notice anchor) follows the shown layout.
   const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
@@ -3296,7 +3306,7 @@ export default function MailClient({
             reportError(tcompose(conflict === "scheduled_send_sent" ? "schedule.sendConflictSent" : "schedule.sendConflictBusy"));
             return;
           }
-          const errMsg = await readErrorMessage(res);
+          const errMsg = await readSendErrorMessage(res);
           reportError(errMsg || tcompose("notices.draftSendFailed"));
           return;
         }
@@ -3388,6 +3398,7 @@ export default function MailClient({
       findSentFolder,
       pushNotice,
       readErrorMessage,
+      readSendErrorMessage,
       refreshFolders,
       removeDraftFromUi,
       reportError,
@@ -5899,6 +5910,7 @@ export default function MailClient({
         onScheduledSend={scheduledSend.onScheduledSend}
         onScheduledSendConflict={scheduledSend.onScheduledSendConflict}
       />
+      <ScheduleSendDialog {...scheduledSend.scheduleDialog} />
 
       <ThreadJsonModal
         open={showJson}

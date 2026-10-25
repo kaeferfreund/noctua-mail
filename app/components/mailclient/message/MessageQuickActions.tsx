@@ -1,14 +1,16 @@
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { Edit3, Forward, Reply, ReplyAll, Search, Send, Trash2 } from "lucide-react";
+import { Clock, Edit3, Forward, Reply, ReplyAll, Search, Send, Trash2 } from "lucide-react";
 import type { Message } from "@/lib/data";
 import { hasSendableRecipients } from "../utils/messageHelpers";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageQuickAction =
   | "editDraft"
   | "sendDraft"
+  | "scheduleDraft"
   | "reply"
   | "replyAll"
   | "forward"
@@ -43,6 +45,8 @@ export default function MessageQuickActions({
   isTrashFolder
 }: MessageQuickActionsProps) {
   const t = useTranslations("Reader");
+  const tSchedule = useTranslations("Compose.schedule");
+  const scheduleDraft = useDraftScheduleAction(message);
   const allowThreadDeletion = origin !== "thread";
   const buttonSize = origin === "thread" ? "2" : "1";
   const isVisible = (action: MessageQuickAction, defaultValue = true) =>
@@ -80,6 +84,23 @@ export default function MessageQuickActions({
             }}
           >
             <Send size={iconSize} />
+          </TooltipIconButton>
+        ) : null}
+        {isVisible("scheduleDraft") && scheduleDraft ? (
+          <TooltipIconButton
+            size={buttonSize}
+            variant="ghost"
+            color="gray"
+            tooltip={tSchedule("title")}
+            aria-label={tSchedule("title")}
+            data-message-action="schedule"
+            disabled={pendingMessageActions.has(message.id) || !canSendDraft || scheduleDraft.busy}
+            onClick={(event) => {
+              event.stopPropagation();
+              scheduleDraft.open();
+            }}
+          >
+            <Clock size={iconSize} />
           </TooltipIconButton>
         ) : null}
         {isVisible("showRelated") ? (

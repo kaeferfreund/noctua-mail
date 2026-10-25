@@ -70,6 +70,12 @@ export async function releaseDraftScheduleForEdit(apiFetch: ApiFetch, accountId:
   return cancelDraftSchedule(apiFetch, accountId, schedule);
 }
 
+/** The `code` of a refused POST …/drafts/scheduled for a draft that can never be planned, or null. */
+export async function readScheduledSendRefusal(response: Response) {
+  const body = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
+  return body?.code === "scheduled_send_invite" ? body.code : null;
+}
+
 /** The `code` of a 409 from a send route racing the draft's schedule, or null. */
 export async function readScheduledSendConflict(response: Response) {
   const body = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
