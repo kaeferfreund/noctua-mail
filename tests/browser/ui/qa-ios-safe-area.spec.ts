@@ -71,9 +71,9 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
   const login = await anonymous.newPage();
   await simulateInsets(login);
   await login.goto("/");
-  const loginFrame = login.locator('[data-shell]').first();
+  const loginFrame = login.locator("[data-shell]").filter({ has: login.getByRole("button", { name: "Anmelden", exact: true }) }).first();
   await expect(loginFrame).toBeVisible();
-  expect(await loginFrame.evaluate(el => parseFloat(getComputedStyle(el).paddingTop))).toBe(TOP + 16);
+  await expect.poll(() => loginFrame.evaluate(el => getComputedStyle(el).paddingTop)).toBe(`${TOP + 16}px`);
   await login.screenshot({ path: path.join(evidence, "safe-area-390-login-light.png") });
   await anonymous.close();
 
@@ -133,6 +133,8 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     await page.getByRole("menuitem", { name: "Einstellungen", exact: true }).click();
     const settings = page.locator(".account-settings-modal");
     await expect(settings).toBeVisible();
+    // Let the dialog's open animation settle.
+    await expect.poll(() => settings.evaluate(el => Math.round(el.getBoundingClientRect().top))).toBe(0);
     const tabs = await settings.locator('[role="tablist"]').first().evaluate(el => Math.round(el.getBoundingClientRect().top));
     const frame = await settings.evaluate(el => ({ top: Math.round(el.getBoundingClientRect().top), paddingTop: getComputedStyle(el).paddingTop, paddingBottom: getComputedStyle(el).paddingBottom }));
     expect(frame).toMatchObject({ top: 0, paddingTop: `${TOP}px`, paddingBottom: `${BOTTOM}px` });
