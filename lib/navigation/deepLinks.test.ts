@@ -13,6 +13,12 @@ describe("mail URL state", () => {
     expect(parseDeepLink(url.slice(1))).toEqual(state);
     expect(serializeDeepLink(state, "/?a=old&f=old&m=old&s=all&g=sender")).toBe(url);
   });
+  it("never carries a one-time invite code into a new URL but keeps other fragments", () => {
+    const state = { ...emptyDeepLink(), accountId, folderId: `${accountId}:INBOX` };
+    expect(serializeDeepLink(state, "/?a=old#invite=synthetic-code")).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX");
+    expect(serializeDeepLink(state, "/?a=old#invite=synthetic-code&x=1")).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX#x=1");
+    expect(serializeDeepLink(state, "/?a=old#section-2")).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX#section-2");
+  });
   it.each(["abc", "abcdefghijklmnop", "~raw", "imap-4D2EFBB6963D6825053BA2D5", "imap-4d2efbb6963d6825053ba2d5-2", "<rfc+ä@example.test>", " space & / ? # "])("round trips noncanonical IDs without ambiguity: %s", id => {
     const state = { ...emptyDeepLink(), accountId: id, messageId: id };
     const url = serializeDeepLink(state);

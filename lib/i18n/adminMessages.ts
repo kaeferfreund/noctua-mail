@@ -24,7 +24,8 @@ const errorKeys = {
   security_operation_pending: "errors.securityPending",
   admin_operation_failed: "errors.operationFailed",
   user_exists: "errors.userExists",
-  target_verification_required: "errors.verificationRequired"
+  target_verification_required: "errors.verificationRequired",
+  invite_not_issued: "errors.inviteNotIssued"
 } satisfies Record<string, Parameters<Translator>[0]>;
 
 export function formatAdminError(error: unknown, t: Translator, locale: "de" | "en"): string {

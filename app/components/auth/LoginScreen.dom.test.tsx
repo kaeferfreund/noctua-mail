@@ -54,6 +54,17 @@ describe("LoginScreen", () => {
     await view.findByText("Your account was created. Sign in to set up your authenticator.");
     expect(calls.find(call => call.path.endsWith("signup"))?.body).toEqual({ inviteCode: "synthetic-invite", email: "person@example.test", name: "Synthetic Person", password: "synthetic-password" });
   });
+  it("opens the sign-up with the invite code of a scanned link filled in", async () => {
+    const { client, calls } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, security: { enrollmentRequired: true }, loginRequired: true }, { status: 201 }));
+    const view = render(<LoginScreen client={client} inviteCode="synthetic-scanned-code" onAuthenticated={() => {}} />);
+    expect((view.getByLabelText("Invite code") as HTMLInputElement).value).toBe("synthetic-scanned-code");
+    expect((view.getByLabelText("Email") as HTMLInputElement).value).toBe("");
+    fill(view, "Email", "person@example.test"); fill(view, "Name", "Synthetic Person");
+    fill(view, "App password", "synthetic-password"); fill(view, "Confirm app password", "synthetic-password");
+    fireEvent.submit(view.getByLabelText("Email").closest("form")!);
+    await view.findByText("Your account was created. Sign in to set up your authenticator.");
+    expect(calls.find(call => call.path.endsWith("signup"))?.body).toMatchObject({ inviteCode: "synthetic-scanned-code", email: "person@example.test" });
+  });
   it("refreshes me for a setup-only 201 instead of treating signup as mailbox access", async () => {
     let refreshed = 0;
     const { client } = clientFixture(path => path.endsWith("/methods") ? Response.json({ methods: { imap: false } }) : Response.json({ ok: true, userId: "synthetic-user", accountId: null, security: { enrollmentRequired: true }, loginRequired: false }, { status: 201 }));

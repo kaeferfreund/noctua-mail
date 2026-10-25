@@ -9,12 +9,14 @@ import { authClient, isPasskeyCancellation, type NoctuaAuthClient } from "@/lib/
 import { AuthError, AuthField, AuthFrame, useAuthAction } from "./AuthPrimitives";
 import TwoFactorChallenge from "./TwoFactorChallenge";
 
-export default function LoginScreen({ onAuthenticated, client = authClient }: {
+export default function LoginScreen({ onAuthenticated, client = authClient, inviteCode = null }: {
   onAuthenticated: () => void | Promise<void>;
   client?: NoctuaAuthClient;
+  /** From a scanned invite link: opens the sign-up with this code filled in. */
+  inviteCode?: string | null;
 }) {
   const t = useTranslations("Auth");
-  const [screen, setScreen] = useState<"login" | "signup" | "challenge">("login");
+  const [screen, setScreen] = useState<"login" | "signup" | "challenge">(inviteCode ? "signup" : "login");
   const [imapAvailable, setImapAvailable] = useState(false);
   const [method, setMethod] = useState<"password" | "imap">("password");
   const [notice, setNotice] = useState(false);
@@ -69,7 +71,7 @@ export default function LoginScreen({ onAuthenticated, client = authClient }: {
       });
     }}>
       <fieldset disabled={action.disabled} className="space-y-4">
-        {signup && <AuthField name="inviteCode" label={t("inviteCode")} autoComplete="off" required />}
+        {signup && <AuthField name="inviteCode" label={t("inviteCode")} autoComplete="off" defaultValue={inviteCode ?? undefined} required />}
         <AuthField name="email" label={t("email")} type="email" autoComplete={signup ? "email" : "username webauthn"} maxLength={320} required />
         {signup && <AuthField name="name" label={t("name")} autoComplete="name" maxLength={256} required />}
         <AuthField name="password" label={signup || method === "password" ? t("appPassword") : t("login.mailboxPassword")} type="password" autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 10 : undefined} maxLength={signup ? 256 : undefined} required />
