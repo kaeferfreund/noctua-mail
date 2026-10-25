@@ -1,5 +1,6 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useContext, useMemo, useState, type CSSProperties } from "react";
 import { buildAccountSenderIconPath } from "@/lib/accountApiPaths";
+import { DomainIconVersionsContext, domainIconVersionFor } from "@/app/hooks/useDomainIconVersions";
 import { getSenderIconColors, getSenderIdentity } from "@/lib/senderIdentity";
 import styles from "./SenderIcon.module.css";
 
@@ -47,9 +48,12 @@ export default function SenderIcon({
     () => getSenderIdentity({ from, fromEmail }),
     [from, fromEmail]
   );
+  // An uploaded domain icon changes the URL, so a favicon cached for six
+  // hours under the old one is not shown after an upload.
+  const version = domainIconVersionFor(useContext(DomainIconVersionsContext), identity.domain);
   const src = useMemo(
-    () => buildSenderIconSrc(accountId, { from, fromEmail }),
-    [accountId, from, fromEmail]
+    () => buildSenderIconSrc(accountId, { from, fromEmail, version }),
+    [accountId, from, fromEmail, version]
   );
 
   if (!enabled || !accountId) return null;

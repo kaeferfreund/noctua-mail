@@ -15,7 +15,7 @@ import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSen
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
-import { useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
+import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
@@ -5214,6 +5214,7 @@ export default function MailClient({
     <AccountDateFormatProvider value={accountDateFormat}>
     <SpamCorrectionProvider value={spamCorrection}>
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
+    <DomainIconVersionsContext.Provider value={domainIcons}>
       {identityDialogs}
       <AppShell
         onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); setViewMessage(null); }}
@@ -5887,6 +5888,7 @@ export default function MailClient({
         hasOtherAccounts={otherAccounts.length > 0}
         onGetRecentFolders={handleGetRecentFolders}
       />
+    </DomainIconVersionsContext.Provider>
     </CollabRowsContext.Provider>
     </SpamCorrectionProvider>
     </AccountDateFormatProvider>
