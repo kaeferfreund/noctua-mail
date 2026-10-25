@@ -41,7 +41,7 @@ export default function SettingsFrame({ open, onClose, children }: { open: boole
       if (tab) { event.preventDefault(); tab.focus(); }
     }} data-slot={isMobile ? "sheet-content" : "settings-content"} className={`account-settings-modal ${isMobile ? mobileStyles.settingsFullscreen : ""}`} size="4" width="94vw" maxWidth="980px" aria-describedby={undefined}
       onInteractOutside={(event) => event.preventDefault()}
-      style={{ height: isMobile ? "100dvh" : "min(86dvh, 900px)", overflow: "hidden" }}>
+      style={{ height: isMobile ? "var(--app-height)" : "min(86dvh, 900px)", overflow: "hidden" }}>
       <DialogLayerContext.Provider value={DIALOG_LAYERS.settings}><div className={isMobile ? mobileStyles.settingsBody : undefined} style={{ height: "100%", minHeight: 0 }}>{children}</div></DialogLayerContext.Provider>
     </Dialog.Content>
   </Dialog.Root>;

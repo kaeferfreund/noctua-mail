@@ -3,7 +3,7 @@
 .fullscreenSheet {
   inset: 0;
   width: 100dvw;
-  height: 100dvh;
+  height: var(--app-height);
   max-width: none;
   padding: var(--sat) var(--sar) var(--sab) var(--sal);
   gap: 0;
