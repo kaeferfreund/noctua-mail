@@ -1,7 +1,7 @@
 /**
  * iOS/iPadOS home-screen app detection for the small top spacer
  * (--top-spacer in app/globals.css): iOS 26 dims the top edge of a home-screen
- * app's content, so the first header line moves a quarter line down there.
+ * app's content, so the first header line moves 6px down there.
  */
 export type IosStandaloneEnv = {
   userAgent: string;

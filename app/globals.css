@@ -233,9 +233,9 @@
   }
 }
 
-/* A quarter of the 48px header. */
+/* An eighth of the 48px header: enough to clear the dimmed edge. */
 :root[data-ios-standalone] {
-  --top-spacer: 12px;
+  --top-spacer: 6px;
 }
 
 /* z-index ladder for fixed and portalled layers, lowest first. Modules and
