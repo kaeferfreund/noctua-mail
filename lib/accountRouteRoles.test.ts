@@ -39,7 +39,7 @@ describe("complete account route role inventory", () => {
       const role = required === "editor" ? "viewer" : "editor";
       await (await dbModulePromise).setUserAccountRole(fixture.user.id, accountId, role, fixture.user.id);
       const route = await import(`../app/api/accounts/[accountId]/${row.path ? `${row.path}/` : ""}route.ts`);
-      const params = { accountId, messageId: "synthetic-message", folderId: `${accountId}:INBOX`, eventId: "synthetic-event", draftId: "synthetic-draft", topicId: "synthetic-topic", aliasId: "synthetic-alias", tokenId: "synthetic-token", userId: "synthetic-user" };
+      const params = { accountId, messageId: "synthetic-message", folderId: `${accountId}:INBOX`, eventId: "synthetic-event", draftId: "synthetic-draft", scheduleId: "synthetic-schedule", identityId: "synthetic-identity", topicId: "synthetic-topic", aliasId: "synthetic-alias", tokenId: "synthetic-token", userId: "synthetic-user" };
       const payload = { accountId, messageId: params.messageId, messageIds: [params.messageId], folderId: params.folderId,
         destinationAccountId: "synthetic-destination", destinationFolderId: "synthetic-destination:INBOX", targetFolderId: "synthetic-folder",
         flag: "seen", value: true, name: "Synthetic", password: "synthetic", text: "Synthetic", label: "Synthetic", role: "viewer",
