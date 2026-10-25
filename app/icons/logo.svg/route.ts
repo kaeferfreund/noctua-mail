@@ -5,7 +5,7 @@ import { getEnvLabel } from "@/lib/ui/envIcon";
 // Read APP_ENV_LABEL at request time so the ribbon reflects the deployment.
 export const dynamic = "force-dynamic";
 
-// Vector base art (bird on gradient), shipped in public/ so it is available in
+// Vector base art (envelope on the iris gradient), shipped in public/ so it is available in
 // the standalone build. The ribbon is composed in the same coordinate space.
 function baseSvgPath() {
   return join(process.cwd(), "public", "icons", "base.svg");

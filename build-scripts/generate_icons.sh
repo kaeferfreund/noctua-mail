@@ -33,7 +33,7 @@ cp public/icons/icon-32.png public/favicon.png
 
 sed -e "s/$BASE_VIEWBOX/viewBox=\"0 0 1600 1600\" width=\"180\" height=\"180\"/" \
     -e 's/ rx="350" ry="350"//' "$SOURCE" > "$TMP/apple.svg"
-rsvg-convert -w 180 -h 180 -b "#F37335" "$TMP/apple.svg" -o public/icons/apple-touch-180.png
+rsvg-convert -w 180 -h 180 -b "#4643B5" "$TMP/apple.svg" -o public/icons/apple-touch-180.png
 
 # Crop to the envelope, hide the background and the grey flap line, and cut
 # the flap line out of the white envelope instead.
