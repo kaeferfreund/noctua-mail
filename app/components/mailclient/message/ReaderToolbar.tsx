@@ -22,7 +22,7 @@ export default function ReaderToolbar(props: Props) {
   const action = (label: string, icon: ReactNode, onClick: () => void, disabled = props.busy, shortcut?: string) =>
     <TooltipIconButton size="2" variant="ghost" color="gray" tooltip={shortcut ? `${label} (${shortcut})` : label} aria-label={label} aria-keyshortcuts={shortcut} onClick={onClick} disabled={disabled}>{icon}</TooltipIconButton>;
   // The split reader has no actions of its own: MessageViewOrchestrator places this
-  // group (Expand only) in the thread header's subject row instead of a row of its own.
+  // group (Expand only) next to the compact/full toggle in the thread header instead of a row of its own.
   return <div className={focus ? styles.root : styles.inline} role="group" aria-label={t("focus.toolbarLabel")} data-reader-toolbar="" data-focus={focus}>
     <div className={styles.row}>
       {focus ? <>
