@@ -76,7 +76,7 @@
   .mobileHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 8px; border-bottom: 1px solid var(--border); }
   .mobileHeader > button { min-height: 44px; }
   .mobileHeader > :global(.rt-SegmentedControlRoot) { flex-shrink: 0; height: 36px; }
-  .threadView { padding: 8px; }
+  .threadView { padding: 8px 8px calc(8px + var(--sab)); }
   .threadHeader { padding: 8px; max-height: 40dvh; overflow-y: auto; }
   .subjectRow { flex-wrap: wrap; gap: 4px; }
   .subjectText[data-expanded="false"] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }

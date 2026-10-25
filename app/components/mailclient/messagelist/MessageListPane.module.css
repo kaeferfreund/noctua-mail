@@ -157,7 +157,8 @@
 
 @media (width < 768px) {
   /* The list's own pull-to-refresh replaces the browser's overscroll. */
-  .pane { padding: 8px; min-width: 0; overflow-x: hidden; overscroll-behavior-y: contain; }
+  /* The list runs to the bottom edge; its last row scrolls clear of the home indicator. */
+  .pane { padding: 8px 8px calc(8px + var(--sab)); min-width: 0; overflow-x: hidden; overscroll-behavior-y: contain; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]) {
     grid-template-columns: 0 minmax(0, 1fr) auto 44px;
   }
