@@ -11,6 +11,7 @@ import { listSenderIdentityRows } from "./db/senderIdentities";
 import { getOwnAddresses } from "./ownAddresses";
 import { roleAtLeast } from "./accountRole";
 import { withDbWriteRetry } from "./dbWriteRetry";
+import { consumeActionGrant } from "./authPolicy";
 
 export type McpAccountContext = { accountId: string; account: Account; role: AccountRole; tokenRecord: McpTokenMetadata };
 export const hashMcpToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -93,6 +94,10 @@ export async function listMcpTokenAccounts(tokenId: string): Promise<AccountAcce
     assertMcpScope(context.tokenRecord.scopes, "read");
     return readAccountAccess(db, context.tokenRecord.createdByUserId, { scope: context.tokenRecord.accountIds, identities: true }).entries;
   }).deferred();
+}
+/** A token outlives session expiry and revocation, so creating one spends a fresh `mcp.create` grant. */
+export async function consumeMcpCreateGrant(session: ActiveUserSession, grant: string | null) {
+  await consumeActionGrant(await getDb(), grant, session, "mcp.create");
 }
 export async function mintMcpToken(session: ActiveUserSession, accountId: string, label: string, ttlSeconds: number,
   options: { accountIds?: string[]; mode?: McpPermissionMode } = {}) {

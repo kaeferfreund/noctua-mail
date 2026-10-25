@@ -222,3 +222,14 @@ export async function createAuthenticatedTestSession(accountId?: string, role: "
 export async function authenticatedTestCookie(accountId?: string) {
   return (await createAuthenticatedTestSession(accountId)).jar.header();
 }
+
+/** A real single-use reauth grant, proven with the fixture's password and current authenticator code. */
+export async function issueTestReauthGrant(fixture: Awaited<ReturnType<typeof createAuthenticatedTestSession>>, purpose: import("./authPolicy").ReauthPurpose) {
+  const [{ reauthenticate }, { readSessionSecurity }, { createRateLimiter }] = await Promise.all([import("./authSecurity"), import("./db/authPolicy"), import("./rateLimit")]);
+  const headers = fixture.jar.headers({ origin: TEST_BASE_URL, "x-forwarded-for": syntheticRequestIp() });
+  const { totpURI } = await fixture.auth.api.getTOTPURI({ headers, body: { password: "synthetic-password-123" } });
+  const proof = await reauthenticate(fixture.auth, fixture.master, readSessionSecurity(fixture.master, fixture.session.id),
+    new Request(`${TEST_BASE_URL}/api/auth/reauth`, { method: "POST", headers }),
+    { purpose, currentPassword: "synthetic-password-123", totpCode: totpFromUri(totpURI) }, createRateLimiter({ max: 50 }));
+  return proof.grant;
+}

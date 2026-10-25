@@ -5,14 +5,15 @@ import { AuthPolicyError, assertSecurityOperation, enrollmentState, readSessionS
 import { withDbWriteRetry } from "./dbWriteRetry";
 
 export { AuthPolicyError } from "./db/authPolicy";
-export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "passkey.rename", "sessions.revoke", "admin.recovery"] as const;
+export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "passkey.rename", "sessions.revoke", "admin.recovery", "mcp.create"] as const;
 export type ReauthPurpose = typeof REAUTH_PURPOSES[number];
 export const PROOF_MATRIX = {
   "totp.enroll": "password_setup", "totp.replace": "password_factor_or_backup",
   "passkey.enroll": "password_factor_or_uv", "password.set": "imap_factor_or_onboarding",
   "password.change": "password_factor", "backup.regenerate": "password_factor",
   "passkey.remove": "password_factor_or_uv", "passkey.rename": "password_factor_or_uv",
-  "sessions.revoke": "password_factor", "admin.recovery": "admin_password_factor"
+  "sessions.revoke": "password_factor", "admin.recovery": "admin_password_factor",
+  "mcp.create": "password_factor"
 } as const;
 export const GRANT_TTL_MS = 300000;
 export const hashProof = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -52,12 +53,25 @@ export function readReauthGrant(db: Database, token: string | null, source: Sess
   return grant as {tokenHash:string;challengeId:string|null;expiresAt:number};
 }
 
+/** Caller holds an immediate transaction: the grant is spent once, for this live session and generation. */
+function spendReauthGrant(db: Database, token: string | null, source: SessionSecurity, purpose: ReauthPurpose) {
+  readSessionSecurity(db, source.sessionId);
+  const grant = readReauthGrant(db, token, source, purpose);
+  if (db.prepare(`DELETE FROM auth_reauth_grants WHERE tokenHash=? AND state='issued'`).run(grant.tokenHash).changes !== 1) throw new AuthPolicyError("invalid_proof");
+  return grant;
+}
+
 export async function consumeReauthGrant(db: Database, token: string | null, source: SessionSecurity, purpose: ReauthPurpose, op: SecurityOperation) {
   return withDbWriteRetry("consumeReauthGrant", () => db.transaction(() => {
     assertSecurityOperation(db, op);
-    readSessionSecurity(db, source.sessionId);
-    const grant = readReauthGrant(db, token, source, purpose);
-    if (db.prepare(`DELETE FROM auth_reauth_grants WHERE tokenHash=? AND state='issued'`).run(grant.tokenHash).changes !== 1) throw new AuthPolicyError("invalid_proof");
-    return grant;
+    return spendReauthGrant(db, token, source, purpose);
   }).immediate());
+}
+
+/**
+ * For actions that change no credential or security generation (MCP token creation): no security slot,
+ * so the user's other requests and streams keep running. A later generation change still revokes the result.
+ */
+export async function consumeActionGrant(db: Database, token: string | null, source: SessionSecurity, purpose: ReauthPurpose) {
+  return withDbWriteRetry("consumeActionGrant", () => db.transaction(() => spendReauthGrant(db, token, source, purpose)).immediate());
 }
