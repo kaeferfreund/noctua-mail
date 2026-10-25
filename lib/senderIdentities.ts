@@ -8,18 +8,18 @@ import { getDb } from "./db/connection";
 import { listSenderIdentityRows, getIdentitySignatureIds, persistSenderIdentityMutation } from "./db/senderIdentities";
 import { resolveAccountRoleRow } from "./db/accountAccess";
 import { withDbWriteRetry } from "./dbWriteRetry";
-import { normalizeIdentityEmail } from "./ownAddresses";
+import { normalizeIdentityDisplayName, normalizeIdentityEmail } from "./ownAddresses";
 
 const address = z.string().max(254).transform(value => normalizeIdentityEmail(value))
   .refine((value): value is string => value !== null, "Expected one valid email address");
-const text = z.string().max(256).refine(value => !/[\x00-\x1f\x7f]/.test(value));
+const displayName = z.string().max(256).refine(value => !/[\x00-\x1f\x7f]/.test(value)).transform(normalizeIdentityDisplayName);
 const optionalId = z.string().min(1).max(256);
 export const createSenderIdentitySchema = z.object({
-  email: address, displayName: text, replyTo: address.optional(), signatureId: optionalId.optional(),
+  email: address, displayName, replyTo: address.optional(), signatureId: optionalId.optional(),
   isDefault: z.boolean().optional(), enabled: z.boolean().optional()
 }).strict();
 export const updateSenderIdentitySchema = z.object({
-  displayName: text.optional(), replyTo: address.nullable().optional(), signatureId: optionalId.nullable().optional(),
+  displayName: displayName.optional(), replyTo: address.nullable().optional(), signatureId: optionalId.nullable().optional(),
   isDefault: z.boolean().optional(), enabled: z.boolean().optional()
 }).strict();
 export { SenderIdentityError } from "./senderIdentityError";

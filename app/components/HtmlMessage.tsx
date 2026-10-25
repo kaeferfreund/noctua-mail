@@ -22,7 +22,7 @@ import { Button } from "@/app/components/ui/button";
 import { useRemoteContent } from "@/app/hooks/useRemoteContent";
 import { messageHtmlCsp, type RemoteContentMode } from "@/lib/html/remoteContent";
 import styles from "./HtmlMessage.module.css";
-import { APP_FONT_FACE_CSS, APP_FONT_STACK } from "@/lib/ui/fonts";
+import { APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const NOCTUA_EMAIL_CONTENT_CLASS = "noctua-email-content";
 const NOCTUA_EMAIL_VIEWPORT_CLASS = "noctua-email-viewport";
@@ -470,7 +470,6 @@ export function buildPreviewDocument({
     `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(messageHtmlCsp(remoteContent))}">`,
     '<meta name="referrer" content="no-referrer">',
     "<style>",
-    APP_FONT_FACE_CSS,
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
     "html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-size: 100%; }",
     `body { margin: 0; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; background: transparent; ${hostTextColor} font-size: 100%; }`,

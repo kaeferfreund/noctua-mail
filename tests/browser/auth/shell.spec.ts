@@ -307,7 +307,7 @@ test(SCENARIOS.enrollmentMobile, async ({ page, seed }) => {
   await page.getByRole("button", { name: "Einrichtung starten", exact: true }).click();
   const restart = page.getByRole("button", { name: "Einrichtung neu starten", exact: true });
   await expect(restart).toBeVisible();
-  await page.evaluate(async () => { await document.fonts.load("500 14px Inter"); await document.fonts.ready; });
+  await page.evaluate(async () => { await document.fonts.ready; });
   for (const width of [320, 360]) {
     await page.setViewportSize({ width, height: 900 });
     const buttons = await page.locator("[data-shell] button:visible").evaluateAll(elements => elements.map(element => {
