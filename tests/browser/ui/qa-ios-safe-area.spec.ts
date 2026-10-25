@@ -4,9 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { signInQa } from "./qaRound2Session";
 
-// iOS home-screen app under the translucent status bar. Chromium cannot
-// emulate env(safe-area-inset-*), so the second test sets the --sat/--sab
-// tokens (app/globals.css) to notch-sized values on <html>:
+// iOS home-screen app with the opaque status bar: the page starts below the
+// bar (top inset 0) and only the home indicator (bottom inset) pads. Chromium
+// cannot emulate env(safe-area-inset-*), so the tests set the --sat/--sab
+// tokens (app/globals.css) to device values on <html>:
 //   QA_SHELL_PORT=<port> QA_SHELL_SPEC=qa-ios-safe-area.spec.ts \
 //     bun scripts/runQaShellBrowserTests.ts
 // Evidence defaults to the untracked <checkout>/.tmp/ios-safe-area-evidence;
@@ -14,11 +15,12 @@ import { signInQa } from "./qaRound2Session";
 test.use({ locale: "de-DE", hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
 const evidence = path.resolve(process.env.IOS_SAFE_AREA_EVIDENCE_DIR
   ?? path.join(fileURLToPath(new URL("../../../", import.meta.url)), ".tmp", "ios-safe-area-evidence"));
-const TOP = 47;
+// Opaque status bar: no top inset; home indicator: 34 px.
+const TOP = 0;
 const BOTTOM = 34;
 const VIEWPORT = { width: 390, height: 844 };
 
-async function simulateInsets(page: Page) {
+async function simulateInsets(page: Page, top = TOP, bottom = BOTTOM) {
   await page.addInitScript(([top, bottom]) => {
     const apply = () => {
       document.documentElement.style.setProperty("--sat", `${top}px`);
@@ -26,7 +28,7 @@ async function simulateInsets(page: Page) {
     };
     if (document.documentElement) apply();
     document.addEventListener("DOMContentLoaded", apply);
-  }, [TOP, BOTTOM]);
+  }, [top, bottom]);
 }
 
 const topOf = (page: Page, selector: string) => page.locator(selector).first().evaluate(el => {
@@ -45,23 +47,31 @@ async function openSidebar(page: Page) {
   await expect(page.getByRole("dialog", { name: "Seitenleiste", exact: true })).toBeVisible();
 }
 
-test("home-screen meta: translucent status bar, cover viewport, theme colour per scheme", async ({ page }) => {
+test("home-screen meta: opaque status bar, cover viewport, theme colour per scheme", async ({ page }) => {
   await page.setViewportSize(VIEWPORT);
   await page.goto("/");
-  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "black-translucent");
+  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "default");
   await expect(page.locator('meta[name="apple-mobile-web-app-capable"], meta[name="mobile-web-app-capable"]').first()).toHaveAttribute("content", "yes");
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
-  const themeColors = await page.locator('meta[name="theme-color"]').evaluateAll(metas =>
-    metas.map(meta => ({ media: meta.getAttribute("media"), content: meta.getAttribute("content") })));
-  expect(themeColors).toEqual([
-    { media: "(prefers-color-scheme: light)", content: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", content: "#0a0a0a" }
-  ]);
+  // The server renders one theme-color per system scheme (first paint; the
+  // opaque iOS bar takes it) ...
+  const html = await (await page.request.get("/")).text();
+  const served = [...html.matchAll(/<meta[^>]*name="theme-color"[^>]*>/g)].map(match => match[0]);
+  expect(served).toHaveLength(2);
+  expect(served[0]).toContain('media="(prefers-color-scheme: light)"');
+  expect(served[0]).toContain('content="#ffffff"');
+  expect(served[1]).toContain('media="(prefers-color-scheme: dark)"');
+  expect(served[1]).toContain('content="#0a0a0a"');
+  // ... and the client keeps both on the resolved app theme (here: system = dark).
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await expect.poll(() => page.locator('meta[name="theme-color"]').evaluateAll(metas => metas.map(meta => meta.getAttribute("content"))))
+    .toEqual(["#0a0a0a", "#0a0a0a"]);
   // Without insets (desktop, Android, Safari tab) nothing moves and the band has no height.
   expect((await band(page)).height).toBe(0);
 });
 
-test("iPhone with a 47 px status bar: every top bar and frame starts below it", async ({ page, browser }) => {
+test("iPhone with the opaque status bar: frames start at the top, reach the bottom and pad for the home indicator", async ({ page, browser }) => {
   mkdirSync(evidence, { recursive: true });
   await page.setViewportSize(VIEWPORT);
   await simulateInsets(page);
@@ -94,12 +104,12 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     await expect(header).toBeVisible();
     await expect(rows.first()).toBeVisible();
 
+    // Nothing is drawn under the opaque bar: no band. The bar takes theme-color,
+    // which follows the theme chosen in the app (white / dark header colour).
     const statusBand = await band(page);
-    expect(statusBand.height).toBe(TOP);
-    expect(statusBand.zIndex).toBeGreaterThan(9999);
-    // Light: iris behind iOS's white clock; dark: the dark header background.
-    const headerBackground = await page.locator('[data-slot="sidebar-inset"]').evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(statusBand.background).toBe(scheme === "light" ? "rgb(91, 91, 214)" : headerBackground);
+    expect(statusBand.height).toBe(0);
+    await expect.poll(() => page.locator('meta[name="theme-color"]').evaluateAll(metas => metas.map(meta => meta.getAttribute("content"))))
+      .toEqual(scheme === "light" ? ["#ffffff", "#ffffff"] : ["#0a0a0a", "#0a0a0a"]);
     const list = await topOf(page, '[id="list"] aside');
     const shell = await topOf(page, '[data-slot="sidebar-wrapper"]');
     const result: Record<string, unknown> = { scheme, band: statusBand, header: await topOf(page, '[data-slot="shell-header"]'), list, shell };
@@ -172,42 +182,44 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
   console.log("ios-safe-area", JSON.stringify(results));
 });
 
-test("home-screen app (display-mode: standalone): frames take the whole screen height", async ({ page }) => {
-  await page.setViewportSize(VIEWPORT);
-  await simulateInsets(page);
-  await page.goto("/");
-  // Chromium cannot emulate display-mode, so apply the shipped standalone
-  // rules (WebKit bug 301108 workaround) unconditionally and measure.
-  const standaloneRules = await page.evaluate(() => {
-    const texts: string[] = [];
-    for (const sheet of [...document.styleSheets]) {
-      let rules: CSSRuleList;
-      try { rules = sheet.cssRules; } catch { continue; }
-      const walk = (list: CSSRuleList) => {
-        for (const rule of [...list]) {
-          if (rule instanceof CSSMediaRule && rule.conditionText.includes("display-mode: standalone")) {
-            texts.push(...[...rule.cssRules].map(inner => inner.cssText));
-          } else if ("cssRules" in rule && (rule as CSSGroupingRule).cssRules) walk((rule as CSSGroupingRule).cssRules);
-        }
-      };
-      walk(rules);
-    }
-    const style = document.createElement("style");
-    style.textContent = texts.join("\n");
-    document.head.append(style);
-    return texts;
+// Chromium cannot emulate display-mode, so apply the shipped standalone rules
+// unconditionally and measure, for the opaque bar (top inset 0) and for an
+// install from before it (translucent bar, 47 px top inset, WebKit bug 301108).
+for (const top of [TOP, 47]) {
+  test(`home-screen app (display-mode: standalone, top inset ${top} px): frames take the screen height without scrolling`, async ({ page }) => {
+    await page.setViewportSize(VIEWPORT);
+    await simulateInsets(page, top);
+    await page.goto("/");
+    const standaloneRules = await page.evaluate(() => {
+      const texts: string[] = [];
+      for (const sheet of [...document.styleSheets]) {
+        let rules: CSSRuleList;
+        try { rules = sheet.cssRules; } catch { continue; }
+        const walk = (list: CSSRuleList) => {
+          for (const rule of [...list]) {
+            if (rule instanceof CSSMediaRule && rule.conditionText.includes("display-mode: standalone")) {
+              texts.push(...[...rule.cssRules].map(inner => inner.cssText));
+            } else if ("cssRules" in rule && (rule as CSSGroupingRule).cssRules) walk((rule as CSSGroupingRule).cssRules);
+          }
+        };
+        walk(rules);
+      }
+      const style = document.createElement("style");
+      style.textContent = texts.join("\n");
+      document.head.append(style);
+      return texts;
+    });
+    expect(standaloneRules.join(" ")).toMatch(/--app-height: min\(100lvh, calc\(100dvh \+ var\(--sat\)\)\)/);
+    expect(standaloneRules.join(" ")).toMatch(/html \{ min-height: min\(100lvh, calc\(100% \+ var\(--sat\)\)\); \}/);
+    const sizes = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.height = "var(--app-height)";
+      document.body.append(probe);
+      const appHeight = probe.getBoundingClientRect().height;
+      probe.remove();
+      return { appHeight, html: document.documentElement.getBoundingClientRect().height, main: document.querySelector("main")!.getBoundingClientRect().height };
+    });
+    expect(sizes).toEqual({ appHeight: VIEWPORT.height, html: VIEWPORT.height, main: VIEWPORT.height });
+    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBe(VIEWPORT.height);
   });
-  expect(standaloneRules.join(" ")).toContain("--app-height: 100lvh");
-  expect(standaloneRules.join(" ")).toMatch(/html \{ min-height: min\(100lvh, calc\(100% \+ var\(--sat\)\)\); \}/);
-  const sizes = await page.evaluate(() => {
-    const probe = document.createElement("div");
-    probe.style.height = "var(--app-height)";
-    document.body.append(probe);
-    const appHeight = probe.getBoundingClientRect().height;
-    probe.remove();
-    return { appHeight, html: document.documentElement.getBoundingClientRect().height, main: document.querySelector("main")!.getBoundingClientRect().height };
-  });
-  expect(sizes).toEqual({ appHeight: VIEWPORT.height, html: VIEWPORT.height, main: VIEWPORT.height });
-  // The page fills the screen without becoming scrollable.
-  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBe(VIEWPORT.height);
-});
+}
