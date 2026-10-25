@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { formatDate, formatList, formatNumber, formatRelativeTime, formatTime } from "./format";
+import { formatDate, formatList, formatNumber, formatRelativeTime, formatTime, msUntilNextDisplayDay } from "./format";
 import { getMessages, getTranslator } from "./translator";
 
 test("uses explicit German/English dates and 24-hour Berlin time", () => {
@@ -62,4 +62,13 @@ test("sender inventory covers both catalogs, named values and literal signature 
       expect(text).not.toContain("'{{");
     }
   }
+});
+
+test("msUntilNextDisplayDay counts to the next Berlin midnight, also on DST days", () => {
+  expect(msUntilNextDisplayDay(Date.UTC(2026, 9, 24, 21, 59, 30, 250))).toBe(29_750);
+  // 2026-10-25 ends summer time at 03:00; 23:00 CET is still one hour before midnight.
+  expect(msUntilNextDisplayDay(Date.UTC(2026, 9, 25, 22, 0))).toBe(3_600_000);
+  // 2026-03-29 has 23 hours (summer time starts at 02:00), 2026-10-25 has 25.
+  expect(msUntilNextDisplayDay(Date.UTC(2026, 2, 28, 23, 0))).toBe(23 * 3_600_000);
+  expect(msUntilNextDisplayDay(Date.UTC(2026, 9, 24, 22, 0))).toBe(25 * 3_600_000);
 });

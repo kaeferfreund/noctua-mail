@@ -5,7 +5,7 @@ import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Fragment, memo, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, Users } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
@@ -20,7 +20,6 @@ import {
   useSidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -37,10 +36,11 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
-import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
-import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
+import { useCollapsedDomains, type MailboxSection } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
+import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -62,6 +62,8 @@ export type ShellSidebarProps = {
     activeAccountId: string;
     /** Signed-in user; keys the collapsed domain groups on this device. */
     userId?: string | null;
+    /** Versions of admin-uploaded domain icons by group domain. */
+    domainIcons?: DomainIconVersions;
     /** May return the switch promise; the clicked row shows a pending state until it settles. */
     onSwitch: (accountId: string) => void | Promise<unknown>;
     onAdd?: () => void;
@@ -144,6 +146,8 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
   // Only a custom avatar image; the domain icon sits on the group header.
   const avatarSrc = mailboxAvatarUrl(account);
   const watcherLabel = summary ? t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)}) : "";
+  // The live summary carries the current member count; the account list is the fallback.
+  const shared = summary?.shared ?? account.shared === true;
   return (
     <SidebarMenuItem>
       {/* aria-current follows the committed mailbox only; a click shows
@@ -163,7 +167,13 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
             <AvatarImage src={avatarSrc} alt="" />
           </Avatar>
         ) : null}
-        <span>{mailboxLabel(account)}</span>
+        <span className="min-w-0 truncate">{mailboxLabel(account)}</span>
+        {shared ? (
+          <span role="img" data-shared-mailbox="" aria-label={t("mailboxes.sharedMailbox")} title={t("mailboxes.sharedMailbox")}
+            className="flex shrink-0 text-muted-foreground">
+            <Users className="size-3.5!" aria-hidden="true" />
+          </span>
+        ) : null}
       </SidebarMenuButton>
       {summary && (
         <SidebarMenuBadge className="right-1 w-auto min-w-0 gap-1.5 px-0.5 text-2xs max-md:peer-data-[size=default]/menu-button:top-2.5">
@@ -189,13 +199,15 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
 
 /** One favicon per domain group header, through the sender-icon route of
  * the group's first mailbox with sender icons on; nothing while it loads or
- * when the domain has no logo (`fallback=none` answers 404). */
-function DomainIcon({ domain, accounts }: { domain: string; accounts: readonly ShellAccount[] }) {
-  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true);
+ * when the domain has no logo (`fallback=none` answers 404). An uploaded
+ * domain icon (known by its version) replaces the favicon and needs no
+ * external fetch, so it shows even when sender icons are off. */
+function DomainIcon({ domain, accounts, version }: { domain: string; accounts: readonly ShellAccount[]; version?: string }) {
+  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true) ?? (version ? accounts[0] : undefined);
   if (!source) return null;
   return (
     <Avatar className="size-4 rounded-sm after:hidden empty:hidden">
-      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none" })} alt="" className="rounded-sm" />
+      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none", version })} alt="" className="rounded-sm" />
     </Avatar>
   );
 }
@@ -228,17 +240,21 @@ export function MailboxRows({
   pendingAccountId = null,
   onSwitch,
   summaries,
-  userId
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId"> & {
+  userId,
+  section,
+  domainIcons
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
+  /** Keys the collapsed domain groups together with the domain. */
+  section: MailboxSection;
 }) {
   const t = useTranslations("Shell");
   const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
-  const { collapsed, toggle } = useCollapsedDomains(userId);
+  const { collapsed, toggle } = useCollapsedDomains(userId, section);
   // Headings and row lists are siblings: no wrapper per group adds padding
   // or margins of its own; a heading after the first opens with the gap
   // between groups.
@@ -266,9 +282,11 @@ export function MailboxRows({
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIcons?.[group.domain]} /> : null}
                 </span>
-                <span className="min-w-0 truncate">{group.domain ?? t("mailboxes.other")}</span>
+                {/* A long domain ellipsizes before the counters, which never
+                    shrink; the full name stays available as a tooltip. */}
+                <span className="min-w-0 truncate" title={group.domain ?? t("mailboxes.other")} data-domain-name="">{group.domain ?? t("mailboxes.other")}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
                   {isCollapsed ? <DomainCounts accounts={group.accounts} summaryById={summaryById} /> : null}
                   {isCollapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
@@ -338,8 +356,9 @@ export function ViewRow({ view }: { view: ShellView }) {
 }
 
 /**
- * Sidebar of the desktop shell (design §7.2): brand, "My mailboxes" /
- * "Shared mailboxes", "Views", "Topics" and the folder tree.
+ * Sidebar of the desktop shell (design §7.2): brand, one mailbox list (own
+ * and shared mailboxes together, shared ones marked), "Views", "Topics" and
+ * the folder tree.
  */
 export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, notices, onNavigate }: ShellSidebarProps) {
   const t = useTranslations("Shell");
@@ -350,7 +369,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
     action();
   };
   const [topicsCollapsed, setTopicsCollapsed] = useState(false);
-  const { mine, shared } = useMemo(() => partitionMailboxes(mailboxes.accounts), [mailboxes.accounts]);
+  const accounts = useMemo(() => sortMailboxes(mailboxes.accounts), [mailboxes.accounts]);
   // The clicked mailbox row shows a pending state right away; only the latest
   // click's settle clears it, so a superseded switch (A -> B -> A) cannot clear
   // the newer one.
@@ -407,40 +426,34 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               ) : null}
             </SidebarGroup>
             <SidebarGroup className={FLUSH_SECTION_CLASS}>
-              <SidebarGroupLabel>{t("mailboxes.mine")}</SidebarGroupLabel>
-              {mailboxes.onAdd && <SidebarGroupAction title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
-                <Plus />
-              </SidebarGroupAction>}
               <SidebarGroupContent>
-                {mine.length > 0 ? (
+                {accounts.length > 0 ? (
                   <MailboxRows
-                    accounts={mine}
+                    section="mine"
+                    accounts={accounts}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     userId={mailboxes.userId}
+                    domainIcons={mailboxes.domainIcons}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />
                 ) : (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                  <>
+                    <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                    {/* Only without any mailbox; otherwise admins add mailboxes
+                        in Administration > Mailboxes. */}
+                    {mailboxes.onAdd ? (
+                      <SidebarMenu><SidebarMenuItem>
+                        <SidebarMenuButton className={cn(FLUSH_ROW_RING_CLASS, "max-md:h-11")} onClick={closeAfter(mailboxes.onAdd)} data-shell-action="add-mailbox">
+                          <Plus /><span>{t("mailboxes.add")}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem></SidebarMenu>
+                    ) : null}
+                  </>
                 )}
               </SidebarGroupContent>
             </SidebarGroup>
-            {shared.length > 0 ? (
-              <SidebarGroup className={FLUSH_SECTION_CLASS}>
-                <SidebarGroupLabel>{t("mailboxes.shared")}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <MailboxRows
-                    accounts={shared}
-                    summaries={mailboxes.summaries}
-                    activeAccountId={mailboxes.activeAccountId}
-                    userId={mailboxes.userId}
-                    pendingAccountId={pendingAccountId}
-                    onSwitch={switchMailbox}
-                  />
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ) : null}
             {viewRows.length > 0 ? (
               <SidebarGroup className={FLUSH_SECTION_CLASS}>
                 <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>

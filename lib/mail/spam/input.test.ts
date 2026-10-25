@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { simpleParser } from "mailparser";
-import { buildSpamInput, buildSpamInputFromMessage, extractMaskedLinkDomains, SPAM_TEXT_LIMIT, stripQuotedText } from "./input";
+import {
+  buildSpamInput, buildSpamInputFromMessage, configuredAuthservIds, extractMaskedLinkDomains, parseHeaderBlock, receivingAuthenticationResults, SPAM_TEXT_LIMIT,
+  stripQuotedText
+} from "./input";
 
 const source = [
   "Authentication-Results: mx.example.test; spf=pass smtp.mailfrom=example.test;",
@@ -56,8 +59,10 @@ describe("buildSpamInput", () => {
     expect(input.linkDomains).toEqual(expect.arrayContaining(["shop.example.test", "track.example.test"]));
     expect(input.linkDomains).not.toContain("img.example.test");
     expect(input.attachments).toEqual(["katalog.pdf (application/pdf)"]);
-    expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1");
-    expect(input.text).not.toContain("<");
+    // The attribution line follows less than SPAM_OWN_TEXT_MIN of own text: it stays, the quoted lines go.
+    expect(input.text).toBe("Hallo Anna, siehe https://www.shop.example.test/deal?id=1\n\nAm 22.10.2026 um 09:00 schrieb Anna <anna@example.test>:");
+    // No HTML: the plain part is used, never the markup of the HTML part.
+    expect(input.text).not.toMatch(/<\/?(p|a|img)\b/);
     expect(input.cc).toBe("");
     expect(input.autoSubmitted).toBeNull();
     expect(input.maskedLinkDomains).toEqual([]);
@@ -78,6 +83,74 @@ describe("buildSpamInput", () => {
     ].join("\r\n");
     const input = buildSpamInput(await simpleParser(forged));
     expect(input.authenticationResults).toEqual(["mx.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none"]);
+  });
+
+  test("a long X-Spam-Status keeps the tests at the end of its list; other headers stay capped", async () => {
+    const tests = Array.from({ length: 60 }, (_, index) => `SYNTHETIC_TEST_${index}`).concat("RCVD_ILLEGAL_IP").join(",");
+    const status = `Yes, score=9.9 required=5.0 tests=${tests} autolearn=no version=3.4.6`;
+    expect(status.length).toBeGreaterThan(1000);
+    const raw = [`X-Spam-Status: ${status}`, `X-Spam-Report: ${"x".repeat(1000)}`, "From: a@example.test", "To: b@example.test", "Subject: S", "", "Text"].join("\r\n");
+    const input = buildSpamInput(await simpleParser(raw));
+    expect(input.spamHeaders[0]).toBe(`x-spam-status: ${status}`);
+    expect(input.spamHeaders[1].length).toBe("x-spam-report: ".length + 600);
+    expect(buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", headers: raw.slice(0, raw.indexOf("\r\n\r\n")) }).spamHeaders[0])
+      .toContain("RCVD_ILLEGAL_IP");
+  });
+
+  test("authserv-id pinning: without our server's block a sender-inserted block of another id never counts", async () => {
+    const mail = (...authResults: string[]) => [
+      "Received: from sender.example.net (sender.example.net [192.0.2.10]) by mx1.mail.example.test (Postfix) with ESMTPS id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+      ...authResults.map((value) => `Authentication-Results: ${value}`),
+      "From: Victim <ceo@victim.example.test>",
+      "To: anna@example.test",
+      "Subject: Dringend",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Bitte sofort ueberweisen."
+    ].join("\r\n");
+    const forged = "mx.google.example; dkim=pass header.d=victim.example.test; spf=pass smtp.mailfrom=victim.example.test";
+    expect(buildSpamInput(await simpleParser(mail(forged))).authenticationResults).toEqual([]);
+    // Our server's block (same organisation as the Received "by" host) counts; the forged one under it does not.
+    const ours = "mx2.mail.example.test; spf=fail smtp.mailfrom=attacker.example.net; dkim=none";
+    expect(buildSpamInput(await simpleParser(mail(forged, ours))).authenticationResults).toEqual([ours]);
+    const headers = mail(forged, ours).split("\r\n\r\n")[0];
+    expect(buildSpamInputFromMessage({ from: "ceo@victim.example.test", to: "anna@example.test", subject: "S", headers }).authenticationResults).toEqual([ours]);
+  });
+
+  test("authserv-id pinning: MailProvider's bare host label (by mx1.mail.example.com, Authentication-Results: mx1;) is the receiving server", async () => {
+    const ours = "mx1; dkim=pass header.d=shop.example.test; spf=pass smtp.mailfrom=shop.example.test";
+    const mailprovider = [
+      "Received: from mail.shop.example.test (mail.shop.example.test [192.0.2.20]) by mx1.mail.example.com (Postfix) with ESMTPS id 4X1; Sat, 24 Oct 2026 10:00:00 +0000",
+      `Authentication-Results: ${ours}`,
+      "Authentication-Results: mx.forwarder.example.net; dkim=pass header.d=victim.example.test",
+      "From: Shop <news@shop.example.test>",
+      "To: anna@example.test",
+      "Subject: Bestellung",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Ihre Bestellung ist unterwegs."
+    ].join("\r\n");
+    expect(buildSpamInput(await simpleParser(mailprovider)).authenticationResults).toEqual([ours]);
+    const lines = parseHeaderBlock(mailprovider.split("\r\n\r\n")[0]);
+    for (const id of ["MX1.", "mx1.mail.example.com", "mx2.mail.example.com"]) {
+      const block = `Authentication-Results: ${id}; spf=pass smtp.mailfrom=shop.example.test`;
+      expect(receivingAuthenticationResults(parseHeaderBlock(`${mailprovider.split("\r\n")[0]}\r\n${block}`), [])).toHaveLength(1);
+    }
+    // Another bare label or a foreign host never counts.
+    expect(receivingAuthenticationResults(parseHeaderBlock(`${mailprovider.split("\r\n")[0]}\r\nAuthentication-Results: mx2; spf=pass`), [])).toEqual([]);
+    expect(receivingAuthenticationResults(lines.filter((line) => !line.value.startsWith("mx1;")), [])).toEqual([]);
+  });
+
+  test("authserv-id pinning: a configured list wins over the Received host; no Received line keeps the top-most block", () => {
+    const lines = parseHeaderBlock([
+      "Received: from relay.example.net by relay.example.net; Sat, 24 Oct 2026 10:00:00 +0000",
+      "Authentication-Results: relay.example.net; dkim=pass header.d=victim.example.test",
+      "Authentication-Results: auth.provider.example; dkim=none"
+    ].join("\r\n"));
+    expect(receivingAuthenticationResults(lines, [])).toEqual(["relay.example.net; dkim=pass header.d=victim.example.test"]);
+    expect(receivingAuthenticationResults(lines, ["auth.provider.example"])).toEqual(["auth.provider.example; dkim=none"]);
+    expect(configuredAuthservIds({ NOCTUA_SPAM_AUTHSERV_ID: " Auth.Provider.example , mx.example.test" })).toEqual(["auth.provider.example", "mx.example.test"]);
+    expect(receivingAuthenticationResults(lines.slice(1), [])).toEqual(["relay.example.net; dkim=pass header.d=victim.example.test"]);
   });
 
   test("the row fallback takes the server verdicts from a raw header block", () => {
@@ -120,5 +193,14 @@ describe("buildSpamInput", () => {
 
   test("stripQuotedText removes quote lines and the attribution tail", () => {
     expect(stripQuotedText("Neu\n> zitiert\nweiter\nOn Mon, 1 Jan 2026, Bob wrote:\nalt")).toBe("Neu\nweiter");
+  });
+
+  test("a fake attribution line at the top does not hide the body; after enough own text the tail is cut", () => {
+    const body = "On Mon, 1 Jan 2026, Bank wrote:\nIhr Konto wurde gesperrt. Bestätigen Sie Ihre Daten unter https://login.example.invalid";
+    const input = buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", body });
+    expect(input.text).toContain("Ihr Konto wurde gesperrt");
+    const own = "Eigener Text. ".repeat(80);
+    const reply = buildSpamInputFromMessage({ from: "a@example.test", to: "b@example.test", subject: "S", body: `${own}\nOn Mon, 1 Jan 2026, Bob wrote:\nalte Nachricht` });
+    expect(reply.text).toBe(own.trim());
   });
 });

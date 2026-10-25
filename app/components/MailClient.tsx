@@ -5,7 +5,7 @@ import { useStartupSync } from "./mailclient/useStartupSync";
 import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
 import { isAccountFolder } from "@/lib/folderAccount";
 import { findInboxFolder } from "@/lib/specialFolders";
-import ReaderToolbar from "./mailclient/message/ReaderToolbar";
+import ReaderToolbar, { ReaderFocusHint } from "./mailclient/message/ReaderToolbar";
 import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
@@ -15,6 +15,7 @@ import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSen
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
+import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
@@ -88,6 +89,7 @@ import {
   reconcileSavedDraftMessages
 } from "./mailclient/composition/draftListState";
 import { useMessageDragDrop } from "./mailclient/useMessageDragDrop";
+import { getDraftsFolderCount } from "./mailclient/folder/folderBadgePresentation";
 import {
   renderQuickActions as renderQuickActionsHelper,
   renderMessageMenu as renderMessageMenuHelper,
@@ -464,7 +466,7 @@ export default function MailClient({
   const [manageOpen, setManageOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [adminSection, setAdminSection] = useState<"users" | "mailboxes" | "invites" | "audit" | "spam">("users");
+  const [adminSection, setAdminSection] = useState<NonNullable<DeepLinkState["admin"]>>("users");
   const [newMailboxOpen, setNewMailboxOpen] = useState(false);
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
@@ -1385,16 +1387,6 @@ export default function MailClient({
   const threadRelatedCandidatesKey = threadRelatedCandidateIds.join("|");
 
   // Memos that depend on messages (from useMessageData)
-  const messageCountByFolder = useMemo(() => {
-    const map = new Map<string, number>();
-    messages
-      .filter((m) => m.accountId === activeAccountId)
-      .forEach((msg) => {
-        const current = map.get(msg.folderId) ?? 0;
-        map.set(msg.folderId, current + 1);
-      });
-    return map;
-  }, [messages, activeAccountId]);
   const messageByMessageId = useMemo(() => {
     const map = new Map<string, Message>();
     messages.forEach((message) => {
@@ -1726,9 +1718,7 @@ export default function MailClient({
       ) ?? null,
     [folders, activeAccountId]
   );
-  const draftsCount = draftsFolder
-    ? draftsFolder.count ?? messageCountByFolder.get(draftsFolder.id) ?? 0
-    : 0;
+  const draftsCount = draftsFolder ? getDraftsFolderCount(draftsFolder) : 0;
   const listLoading = loadingMessages || refreshingMessages;
   const listBootstrapping =
     authState === "loading" ||
@@ -2904,6 +2894,11 @@ export default function MailClient({
       setCollabRevision(value => value + 1);
       queueFilteredSearchRefresh(true);
     }
+  });
+  const domainIcons = useDomainIconVersions({
+    sessionKey: authState === "ok" && !authSecurity?.enrollmentRequired && !authSecurity?.reauthRequired ? currentUser?.id ?? null : null,
+    apiFetch,
+    accounts
   });
   const activeMailboxSummary = mailboxSummaries.find(mailbox => mailbox.accountId === activeAccountId);
   // The summary feed is the user-wide unread source; it is empty while it
@@ -5261,6 +5256,7 @@ export default function MailClient({
     <SpamCorrectionProvider value={spamCorrection}>
     <ScheduledSendProvider value={scheduledSend.controls}>
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
+    <DomainIconVersionsContext.Provider value={domainIcons}>
       {identityDialogs}
       <AppShell
         onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); setViewMessage(null); }}
@@ -5304,6 +5300,7 @@ export default function MailClient({
             summaries: mailboxSummaries,
             activeAccountId,
             userId: currentUser?.id ?? null,
+            domainIcons,
             // Deep links own mailbox navigation (history + URL); the sidebar shows the
             // clicked row as pending until the returned value settles.
             onSwitch: navigateLinkedAccount,
@@ -5569,8 +5566,6 @@ export default function MailClient({
                 mailboxLabel: readerFocused ? currentAccount?.name || currentAccount?.email : undefined,
                 toolbar: !isMobile && activeMessage ? <ReaderToolbar
                   layout={readerLayout}
-                  showHint={readerHintId === activeMessage.id}
-                  dismissHint={dismissReaderHint}
                   toggleLayout={() => readerLayout === "focus" ? closeReaderFocus() : openReaderFocus(activeMessage)}
                   back={closeReaderFocus}
                   archive={() => { void handleArchiveMessage(activeMessage); }}
@@ -5597,6 +5592,9 @@ export default function MailClient({
                   canNext={readerNavigation.canNext}
                   navigating={readerNavigation.pending || loadingMessages}
                 /> : undefined,
+                toolbarInSubjectRow: !readerFocused,
+                notice: !isMobile && !readerFocused && activeMessage && readerHintId === activeMessage.id
+                  ? <ReaderFocusHint dismiss={dismissReaderHint} /> : undefined,
                 activeMessage: activeMessage ?? null,
                 activeThread,
                 getAssignedThreadTopics,
@@ -5933,6 +5931,7 @@ export default function MailClient({
         hasOtherAccounts={otherAccounts.length > 0}
         onGetRecentFolders={handleGetRecentFolders}
       />
+    </DomainIconVersionsContext.Provider>
     </CollabRowsContext.Provider>
     </ScheduledSendProvider>
     </SpamCorrectionProvider>

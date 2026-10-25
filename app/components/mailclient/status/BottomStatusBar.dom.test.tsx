@@ -7,13 +7,15 @@ import { Theme } from "@radix-ui/themes";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import BottomStatusBar, { type BottomStatusPanel } from "./BottomStatusBar";
 import type { SyncJobProgress } from "../types";
+import { expectFocused } from "@/lib/testDomAssertions";
 
 const noop = () => {};
 const originalWidth = window.innerWidth;
 const dom = window as unknown as { happyDOM: { setURL: (url: string) => void } };
 const originalUrl = window.location.href;
 beforeEach(() => { window.innerWidth = 1280; dom.happyDOM.setURL("http://localhost/"); });
-afterEach(() => { cleanup(); window.innerWidth = originalWidth; dom.happyDOM.setURL(originalUrl); });
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); window.innerWidth = originalWidth; dom.happyDOM.setURL(originalUrl); });
 const job: SyncJobProgress = {
   jobId: "private-job", accountId: "acc-private", folderId: "acc-private:INBOX", mailboxPath: "acc-private:INBOX",
   mode: "full", phase: "fetching", processed: 25, estimatedTotal: 100, percent: 25, updatedAt: 1,
@@ -78,7 +80,7 @@ describe("compact header status", () => {
     expect(within(popover).getByText("Keine anstehenden Termine oder Erinnerungen.")).toBeTruthy();
     fireEvent.keyDown(popover, { key: "Escape" });
     await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(indicator));
+    await waitFor(() => expectFocused(indicator));
   });
   for (const panel of ["process", "exception", "reminder", "mail-check", "calendar", "exceptions", "reminders"] as const) it(`routes external openPanel=${panel}`, async () => {
     const view = render(<Harness initial={panel} />);
@@ -157,7 +159,7 @@ describe("compact header status", () => {
     expect(sheet.getAttribute("data-slot")).toBe("sheet-content");
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(indicator));
+    await waitFor(() => expectFocused(indicator));
   });
   it("gives each phone status Sheet one visible title row before its description", async () => {
     window.innerWidth = 390;

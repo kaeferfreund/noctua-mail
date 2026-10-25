@@ -85,9 +85,22 @@ function OpenMobileSheet() {
 }
 
 describe("shell sidebar", () => {
-  for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
-    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
-    expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
+  for (const admin of [false, true]) it(`offers mailbox creation only in the empty state, only when admin=${admin}`, () => {
+    // With a mailbox there is no add action in the sidebar (Administration has it).
+    const listed = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
+    expect(listed.queryByRole("button", { name: "Add mailbox" })).toBeNull();
+    expect(listed.queryByText("No mailbox yet")).toBeNull();
+    cleanup();
+    const empty = renderSidebar([], () => {}, () => {}, { isAdminUser: admin });
+    expect(empty.getByText("No mailbox yet")).toBeTruthy();
+    const add = empty.queryByRole("button", { name: "Add mailbox" });
+    expect(Boolean(add)).toBe(admin);
+    if (add) {
+      // A labelled row with the plus icon, 44 px on phones.
+      expect(add.textContent).toBe("Add mailbox");
+      expect(add.querySelector("svg")).toBeTruthy();
+      expect(add.className).toContain("max-md:h-11");
+    }
   });
 
   it("labels the brand with the same short commit and Berlin build time as the status popover", () => {
@@ -104,14 +117,26 @@ describe("shell sidebar", () => {
     expect(plain.queryByText(/^Build /)).toBeNull();
   });
 
-  it("sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable", () => {
+  it("lists own and shared mailboxes in one sorted list, switches accounts and keeps full mailbox sync reachable", () => {
     const switched: string[] = [];
     let syncs = 0;
-    const view = renderSidebar([account("z", "Zulu"), account("a", "Alpha"), account("team", "Team", "example.test", true)],
+    const view = renderSidebar([account("z", "Zulu"), account("team", "Team", "example.test", true), account("a", "Alpha")],
       (id) => { switched.push(id); }, () => { syncs++; });
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[aria-current], button[title$='@example.test']")]
       .filter((row) => row.getAttribute("aria-label") !== "User menu");
-    expect(rows.map((row) => row.textContent)).toEqual(["Alpha", "Zulu", "Team"]);
+    expect(rows.map((row) => row.textContent)).toEqual(["Alpha", "Team", "Zulu"]);
+    // One section in one menu: no heading above the list, no second section.
+    expect(new Set(rows.map((row) => row.closest("[data-sidebar=menu]"))).size).toBe(1);
+    expect(view.queryByText("My mailboxes")).toBeNull();
+    expect(view.queryByText("Shared mailboxes")).toBeNull();
+    // Only the shared mailbox carries the marker, after its name.
+    const markers = rows.map((row) => row.querySelector("[data-shared-mailbox]"));
+    expect(markers.map(Boolean)).toEqual([false, true, false]);
+    expect(markers[1]!.getAttribute("role")).toBe("img");
+    expect(markers[1]!.getAttribute("aria-label")).toBe("Shared mailbox");
+    expect(markers[1]!.getAttribute("title")).toBe("Shared mailbox");
+    expect(markers[1]!.previousElementSibling?.textContent).toBe("Team");
+    expect(markers[1]!.previousElementSibling?.className).toContain("truncate");
     fireEvent.click(view.getByRole("button", { name: /Alpha/ }));
     expect(switched).toEqual(["a"]);
     fireEvent.click(view.getByRole("button", { name: "Check all folders for new mail" }));
@@ -120,12 +145,14 @@ describe("shell sidebar", () => {
   });
 
   it("renders domain headings only for sections with more than six mailboxes", () => {
-    const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test"));
+    // A shared mailbox counts towards the list and sits in its domain's group.
+    const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test", i === 2));
     const view = renderSidebar(accounts, () => {});
     expect(view.getByText("a.example.test")).toBeTruthy();
     expect(view.getByText("b.example.test")).toBeTruthy();
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[title$='@a.example.test']")];
     expect(rows.map((row) => row.title)).toEqual(["box6@a.example.test", "box4@a.example.test", "box2@a.example.test", "box0@a.example.test"]);
+    expect(rows.map((row) => Boolean(row.querySelector("[data-shared-mailbox]")))).toEqual([false, false, true, false]);
     // Grouped rows sit in a guided container, indented to the heading's text.
     for (const row of rows) {
       expect(row.closest("[data-sidebar=menu]")?.hasAttribute("data-domain-group")).toBe(true);
@@ -244,7 +271,7 @@ describe("collapsible domain groups", () => {
   it("restores the collapsed groups per user after a remount", () => {
     const first = renderGroups("user-1");
     fireEvent.click(headerOf(first, "brand.example.test"));
-    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["mine:brand.example.test"]');
     first.unmount();
     const again = renderGroups("user-1");
     expect(headerOf(again, "brand.example.test").getAttribute("aria-expanded")).toBe("false");
@@ -266,6 +293,12 @@ describe("collapsible domain groups", () => {
     expect(within(counts as HTMLElement).getByLabelText("7 unread").textContent).toBe("7");
     expect(within(counts as HTMLElement).getByLabelText("3 assigned to me").textContent).toBe("3");
     expect(counts.querySelectorAll("svg")).toHaveLength(2);
+    // The name ellipsizes before the counters; its full text is the title.
+    const name = brandHeader.querySelector<HTMLElement>("[data-domain-name]")!;
+    expect(name.className).toContain("truncate");
+    expect(name.className).toContain("min-w-0");
+    expect(name.title).toBe("brand.example.test");
+    expect(counts.parentElement!.className).toContain("shrink-0");
     // All totals zero: no counters at all.
     expect(plainHeader.querySelector("[data-domain-counts]")).toBeNull();
     expect(plainHeader.textContent).toBe("plain.example.test");
@@ -281,6 +314,21 @@ describe("collapsible domain groups", () => {
     fireEvent.click(brandHeader);
     expect(brandHeader.hasAttribute("data-active")).toBe(false);
     expect(view.getByRole("button", { name: /Brand b/ }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("own and shared mailboxes of one domain share one group and one stored key", () => {
+    const sharedBrand = ["h", "i", "j", "k"].map(id => account(id, `Shared ${id}`, "brand.example.test", true));
+    window.localStorage.setItem("noctua:sidebarDomainsCollapsed:user-1", '["brand.example.test"]');
+    const view = renderSidebar([...brand, ...plain, ...sharedBrand], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
+    const headers = view.getAllByText("brand.example.test", { selector: "span" }).map(span => span.closest("button")!);
+    expect(headers).toHaveLength(1);
+    expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(headers[0]);
+    expect(headers[0].getAttribute("aria-expanded")).toBe("true");
+    // The legacy bare key is split per section on the first toggle; only the list's own entry matters now.
+    const stored = window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1") ?? "[]";
+    expect(stored).not.toContain("mine:brand.example.test");
+    expect(stored).not.toContain('"brand.example.test"');
   });
 
   it("keeps ungrouped sections without a toggle", () => {
@@ -372,6 +420,22 @@ describe("mailbox avatars and domain icons", () => {
       expect(headerOf(view, "plain.example.test").querySelector("[data-slot=avatar]")?.childElementCount).toBe(0);
       expect(headerOf(view, "plain.example.test").textContent).toBe("plain.example.test");
       expect(headerOf(view, "example.test").querySelector("[data-slot=avatar]")).toBeNull();
+    } finally {
+      images.restore();
+    }
+  });
+
+  it("loads an uploaded domain icon by its version, also when sender icons are off", async () => {
+    const images = stubAvatarImages();
+    try {
+      const quiet = ["a", "b", "c", "d"].map(id => ({ ...account(id, `Brand ${id}`, "brand.example.test"), settings: { appearance: { senderIcons: false } } }) as ShellAccount);
+      const plain = ["e", "f", "g"].map(id => account(id, `Plain ${id}`, "plain.example.test"));
+      const view = renderSidebar([...quiet, ...plain], () => {}, undefined, {}, undefined, "en", null, {}, quiet[0].id,
+        { domainIcons: { "brand.example.test": "abcdef0123456789" } });
+      const brandSrc = `${domainIconSrc(quiet[0], "brand.example.test")}&v=abcdef0123456789`;
+      expect(images.probes.map(probe => probe.src).sort()).toEqual([brandSrc, domainIconSrc(plain[0], "plain.example.test")].sort());
+      await images.settle(brandSrc, true);
+      await waitFor(() => expect(headerOf(view, "brand.example.test").querySelector("img")?.getAttribute("src")).toBe(brandSrc));
     } finally {
       images.restore();
     }

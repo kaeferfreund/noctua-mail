@@ -1,7 +1,5 @@
 import { parseAddressEmails } from "../ownAddresses";
 
-const SENT_MATCH_ROWS = 25;
-
 /**
  * Whether a Sent-folder message lists `email` as an exact To/Cc/Bcc entry. Takes
  * any shard handle and never imports the connection layer, so the read-only
@@ -12,9 +10,13 @@ export function sentToAddressInDb(db: any, accountId: string, sentFolderId: stri
   if (!needle) return false;
   const rows = db.prepare(`SELECT toAddr, ccAddr, bccAddr FROM messages
     WHERE accountId = ? AND folderId = ?
-      AND (instr(lower(toAddr), ?) > 0 OR instr(lower(COALESCE(ccAddr, '')), ?) > 0 OR instr(lower(COALESCE(bccAddr, '')), ?) > 0)
-    LIMIT ?`).all(accountId, sentFolderId, needle, needle, needle, SENT_MATCH_ROWS) as Array<{ toAddr: string; ccAddr: string | null; bccAddr: string | null }>;
-  // instr() only narrows; the parsed address list decides (no substring matches).
-  return rows.some((row) => [row.toAddr, row.ccAddr, row.bccAddr]
-    .some((value) => parseAddressEmails(value).some((address) => address.toLowerCase() === needle)));
+      AND (instr(lower(toAddr), ?) > 0 OR instr(lower(COALESCE(ccAddr, '')), ?) > 0 OR instr(lower(COALESCE(bccAddr, '')), ?) > 0)`)
+    .iterate(accountId, sentFolderId, needle, needle, needle) as Iterable<{ toAddr: string; ccAddr: string | null; bccAddr: string | null }>;
+  // instr() only narrows; the parsed address list decides (no substring matches). Rows are
+  // read one at a time until the first exact entry: a short address can have many
+  // substring candidates before it, so no candidate cap may end the search early.
+  for (const row of rows) {
+    if ([row.toAddr, row.ccAddr, row.bccAddr].some((value) => parseAddressEmails(value).some((address) => address.toLowerCase() === needle))) return true;
+  }
+  return false;
 }

@@ -29,6 +29,19 @@ export function requireJsonSameOrigin(request: Request) {
 }
 
 /**
+ * Raw file uploads: same origin and `application/octet-stream`, a type a
+ * cross-site form cannot send without a CORS preflight.
+ */
+export function requireBinarySameOrigin(request: Request) {
+  const error = requireSameOrigin(request);
+  if (error) return error;
+  if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/octet-stream") {
+    return NextResponse.json({ ok: false, code: "binary_required" }, { status: 400 });
+  }
+  return null;
+}
+
+/**
  * Bodyless guards run before the session check on some routes, so emptiness is
  * decided from the declared length or the first body chunk, never by buffering.
  * A body that cannot be read to its end (stalled past the read deadline, or

@@ -95,6 +95,8 @@ async function referenceGetMessageById(accountId: string, messageId: string) {
     inReplyTo: row.inReplyTo ?? undefined,
     references: parseReferences(row.references),
     xForwardedMessageId: row.xForwardedMessageId ?? undefined,
+    xComposeFormat: row.xComposeFormat ?? undefined,
+    quotedHtmlEdited: row.quotedHtmlEdited ? true : false,
     subject: row.subject,
     from: row.fromAddr,
     senderKey: row.senderKey ?? null,

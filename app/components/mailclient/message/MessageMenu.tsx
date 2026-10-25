@@ -47,7 +47,7 @@ import type { RowReadAction } from "../messagelist/selectionActions";
 import styles from "./MessageMenu.module.css";
 import TopicBadge from "../TopicBadge";
 import MoveToSubmenu from "./MoveToSubmenu";
-import TooltipIconButton from "@/app/components/TooltipIconButton";
+import TooltipIconButton, { useQuietMenuFocusReturn } from "@/app/components/TooltipIconButton";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
 
@@ -173,11 +173,11 @@ export default function MessageMenu({
   const t = useTranslations("Reader");
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
+  const quietFocusReturn = useQuietMenuFocusReturn();
   const [copyResult, setCopyResult] = useState<"copied" | "failed" | null>(null);
   const [suggestions, setSuggestions] = useState<Topic[]>([]);
   const rowReadAction = origin === "thread" ? undefined : readAction;
   const seen = rowReadAction?.seen ?? Boolean(message.seen);
-  const showDeleteInMenu = origin !== "table";
   const allowThreadDeletion = origin !== "thread";
   const inSpamFolder = isSpamFolder(message.folderId);
   const canSendDraft = hasSendableRecipients(message);
@@ -264,6 +264,7 @@ export default function MessageMenu({
           className={isMobile ? mobileStyles.messageMore : undefined}
           disabled={pendingMessageActions.has(message.id)}
           onClick={(event) => event.stopPropagation()}
+          onFocus={quietFocusReturn.onTriggerFocus}
         >
           <MoreVertical size={14} />
         </TooltipIconButton>
@@ -271,6 +272,7 @@ export default function MessageMenu({
       <Theme asChild><DropdownMenu.Content
         align="end"
         sideOffset={6}
+        onCloseAutoFocus={quietFocusReturn.onCloseAutoFocus}
         className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
       >
         {[
@@ -315,6 +317,19 @@ export default function MessageMenu({
               ? buildItem("editAsNew", t("editAsNew"), <FileText size={14} />, () =>
                   openCompose("editAsNew", message, true)
                 , isDisabled("editAsNew"))
+              : null
+          ].filter(Boolean),
+          // Own group right below the compose actions, like the primary
+          // delete in the reader toolbar and the row swipe actions.
+          [
+            isVisible("delete")
+              ? buildItem(
+                  "delete",
+                  isTrashFolder(message.folderId) ? t("deletePermanent") : t("delete"),
+                  <Trash2 size={14} />,
+                  () => handleDeleteMessage(message, { allowThreadDeletion }),
+                  isDisabled("delete")
+                )
               : null
           ].filter(Boolean),
           [
@@ -520,15 +535,6 @@ export default function MessageMenu({
                   <ArrowRightLeft size={14} />,
                   () => onMoveToAccount(message),
                   isDisabled("moveToAccount")
-                )
-              : null,
-            showDeleteInMenu && isVisible("delete")
-              ? buildItem(
-                  "delete",
-                  isTrashFolder(message.folderId) ? t("deletePermanent") : t("moveTrash"),
-                  <Trash2 size={14} />,
-                  () => handleDeleteMessage(message, { allowThreadDeletion }),
-                  isDisabled("delete")
                 )
               : null
           ].filter(Boolean),

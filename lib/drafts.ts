@@ -28,6 +28,9 @@ import {
   resolveComposeHtml
 } from "@/lib/mail/composePayload";
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
+import { stripHtmlToText, stripStyleTags } from "@/lib/html";
+import { htmlToMarkdown } from "@/lib/markdownConverters";
+import { normalizeHtmlDerivedText } from "@/app/components/mailclient/composition/composeTextNormalization";
 import { appendImapMessage, deleteImapMessage, syncImapMessage } from "./serverImap";
 import { buildRawMessage, sendRawSmtpMessage } from "./serverSmtp";
 import { appendMessageFlags, hasMessageFlag } from "@/lib/messageFlags";
@@ -150,6 +153,31 @@ function getReplyRecipient(ownAddresses: readonly string[], message: Message) {
   return firstOtherRecipient.trim();
 }
 
+/** text/plain alternative of an HTML body, as compose derives it (composeContentBuilder). */
+export function htmlBodyText(html: string) {
+  const withoutStyles = stripStyleTags(html);
+  try {
+    return normalizeHtmlDerivedText(htmlToMarkdown(withoutStyles));
+  } catch {
+    return normalizeHtmlDerivedText(stripHtmlToText(withoutStyles));
+  }
+}
+
+/**
+ * Body of a draft written by an API client, saved the way compose saves it: the
+ * format follows the richest field, Markdown drafts keep their source as
+ * text/plain (reopening restores it from there) and HTML drafts get a derived
+ * text/plain part unless the client passes one.
+ */
+export function resolveDraftBody(input: { text?: string; markdown?: string; html?: string; composeFormat?: string }) {
+  const composeFormat = input.composeFormat ?? (input.html ? "html" : input.markdown ? "markdown" : "text");
+  const markdown = input.markdown ?? (composeFormat === "markdown" ? input.text : undefined);
+  const text = input.text ??
+    (composeFormat === "markdown" ? (markdown ?? "").replace(/<[^>]+>/g, "").trim()
+      : composeFormat === "html" && input.html ? htmlBodyText(input.html) : "");
+  return { composeFormat, text, markdown, html: input.html };
+}
+
 export async function buildDraftInputForMode(
   account: Account,
   accountId: string,
@@ -167,11 +195,7 @@ export async function buildDraftInputForMode(
       cc: input.cc?.trim() ?? "",
       bcc: input.bcc?.trim() ?? "",
       subject: input.subject?.trim() ?? "",
-      text: input.text ?? "",
-      markdown: input.markdown,
-      html: input.html,
-      composeFormat:
-        input.composeFormat ?? (input.html ? "html" : input.markdown ? "markdown" : "text"),
+      ...resolveDraftBody(input),
       quotedHtmlEdited: input.quotedHtmlEdited,
       invite: input.invite,
       attachments: input.attachments
@@ -202,11 +226,7 @@ export async function buildDraftInputForMode(
       (mode === "reply"
         ? prefixSubject("Re", referenceMessage.subject)
         : prefixSubject("Fwd", referenceMessage.subject)),
-    text: input.text ?? "",
-    markdown: input.markdown,
-    html: input.html,
-    composeFormat:
-      input.composeFormat ?? (input.html ? "html" : input.markdown ? "markdown" : "text"),
+    ...resolveDraftBody(input),
     quotedHtmlEdited: input.quotedHtmlEdited,
     inReplyTo,
     references,

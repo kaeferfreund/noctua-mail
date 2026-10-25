@@ -78,3 +78,8 @@ describe("HTML preview document heights", () => {
     expect(extractBodyContent(output).body).toContain('<p class="a100vh" title="100vh">100vh is a CSS length</p>');
   });
 });
+
+test("the preview document styles alt text that replaces a failed image", () => {
+  const doc = buildPreviewDocument({ html: "<img alt=\"Logo\" src=\"https://images.example.test/logo.png\">", safeHtml: "<img alt=\"Logo\" src=\"https://images.example.test/logo.png\">", darkMode: false, fontScale: 1, zoom: 1, showViewerFrame: false, token: "t", remoteContent: "allow" });
+  expect(doc).toContain(".noctua-image-alt { opacity: 0.7; }");
+});

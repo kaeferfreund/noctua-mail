@@ -39,6 +39,11 @@ test("every registered tool has an explicit scope; registration changes must upd
   expect(() => mcpToolScope("toString")).toThrow("no permission classification");
 });
 
+test("draft edit tools: reading a draft needs read, editing it needs drafts", () => {
+  expect(["list_draft_messages", "get_draft_message", "create_draft_message", "update_draft_message"].map(mcpToolScope))
+    .toEqual(["read", "read", "drafts", "drafts"]);
+});
+
 test("tools/list advertises only the tools the token's stored scopes allow", async () => {
   expect(await listedTools(minted.tokenRecord)).toEqual(toolsFor(["read"]));
   const drafts = await mintMode("drafts");

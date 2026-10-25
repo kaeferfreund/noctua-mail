@@ -849,6 +849,17 @@ export function initMasterSchema(db: any) {
       updatedByUserId TEXT
     );
 
+    -- Admin-uploaded sidebar icons per mail domain (lib/domainIcons.ts). The
+    -- normalised PNG lives at domain-icons/<sha256(domain)>.png in the data dir;
+    -- hash is the sha256 of those bytes (ETag and client cache key).
+    CREATE TABLE IF NOT EXISTS domain_icons (
+      domain TEXT PRIMARY KEY,
+      hash TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      updatedByUserId TEXT
+    );
+
     -- Web Push devices (doc/PUSH-NOTIFICATIONS.md); settings is a PushDeviceSettings JSON.
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id TEXT PRIMARY KEY,

@@ -9,7 +9,8 @@ import type { Account } from "@/lib/data";
 import type { Member } from "@/app/components/admin/types";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
 
-afterEach(cleanup);
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); });
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 const account: Account = { id: "synthetic-account", name: "Synthetic Mailbox", email: "mailbox@example.test", avatar: "", accessRole: "manager", isOwner: false, settings: { signatures: [{ id: "synthetic-signature", name: "Synthetic signature", body: "Regards" }] }, imap: { host: "imap.example.test", port: 993, secure: true, user: "mailbox", password: "" }, smtp: { host: "smtp.example.test", port: 465, secure: true, user: "mailbox", password: "" } };
 const members: Member[] = [

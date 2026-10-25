@@ -61,6 +61,7 @@ mock.module("@/lib/mail/imapStreamRuntime", () => ({
   }
 }));
 const { GET } = await import("./route");
+const { POST: switchFolder } = await import("./folder/route");
 const opened: Array<{ abort: AbortController; response: Response }> = [];
 afterEach(async () => {
   for (const item of opened.splice(0)) item.abort.abort();
@@ -82,9 +83,9 @@ async function fixture() {
   await db.saveFoldersForAccount(id, ["INBOX", "Archive"].map(name => ({ id: `${id}:${name}`, name, count: 0, accountId: id })));
   return { id, db, ...await createAuthenticatedTestSession(id) };
 }
-async function open(f: Awaited<ReturnType<typeof fixture>>, jar = f.jar) {
+async function open(f: Awaited<ReturnType<typeof fixture>>, jar = f.jar, query = "") {
   const abort = new AbortController();
-  const response = await GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream?pollIntervalMs=123456`, { headers: jar.headers(), signal: abort.signal }), { params: Promise.resolve({ accountId: f.id }) });
+  const response = await GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream?pollIntervalMs=123456${query}`, { headers: jar.headers(), signal: abort.signal }), { params: Promise.resolve({ accountId: f.id }) });
   expect(response.status).toBe(200);
   opened.push({ response, abort });
   return { response, abort, reader: response.body!.getReader() };
@@ -92,6 +93,12 @@ async function open(f: Awaited<ReturnType<typeof fixture>>, jar = f.jar) {
 async function initial(stream: Awaited<ReturnType<typeof open>>) {
   expect(new TextDecoder().decode((await stream.reader.read()).value)).toContain("event: folder:update");
   await until(() => [...timers.values()].some(t => t.ms === 123456));
+}
+async function postSwitch(f: Awaited<ReturnType<typeof fixture>>, body: Record<string, unknown>, jar = f.jar) {
+  const response = await switchFolder(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream/folder`, {
+    method: "POST", headers: jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }), body: JSON.stringify(body)
+  }), { params: Promise.resolve({ accountId: f.id }) });
+  return response.status;
 }
 const authError = () => Object.assign(new Error("Synthetic opaque upstream failure"), { authenticationFailed: true, serverResponseCode: "AUTHENTICATIONFAILED" });
 
@@ -178,6 +185,60 @@ describe("production IMAP stream acceptance", () => {
     const reconnect = new TextDecoder().decode((await reconnected.reader.read()).value);
     expect(JSON.parse(reconnect.split("data: ")[1])[0].unseen).toBe(110);
     await until(() => timers.size === 3);
+  });
+
+  test("folder switches keep the INBOX session and reuse recent folder sessions", async () => {
+    const f = await fixture();
+    await f.db.saveFoldersForAccount(f.id, ["INBOX", "Archive", "Sent", "Drafts"].map(name => ({ id: `${f.id}:${name}`, name, count: 0, accountId: f.id })));
+    const streamKey = "synthetic-stream-key-0001";
+    const stream = await open(f, f.jar, `&streamKey=${streamKey}&activeFolderId=${encodeURIComponent(`${f.id}:Archive`)}`);
+    await until(() => clients.length === 2 && timers.size === 3);
+    const [inbox, archive] = clients;
+    const connects = () => clients.reduce((sum, client) => sum + client.connects, 0);
+    const switchTo = async (name: string, seq: number) => {
+      const before = connects();
+      expect(await postSwitch(f, { streamKey, folderId: `${f.id}:${name}`, seq })).toBe(200);
+      await sleep(20);
+      return connects() - before;
+    };
+    // Base behaviour rebuilt the stream: 2 connects (INBOX + folder) per switch, 1 back to INBOX.
+    expect(await switchTo("Sent", 1)).toBe(1);
+    expect(await switchTo("INBOX", 2)).toBe(0);
+    expect(await switchTo("Archive", 3)).toBe(0);
+    expect(await switchTo("Sent", 4)).toBe(0);
+    expect(inbox.closed || archive.closed).toBe(false);
+    // A fourth folder exceeds maxIdleSessions (3): the least recently used non-active folder goes.
+    expect(await switchTo("Drafts", 5)).toBe(1);
+    expect(archive.closed).toBe(true);
+    expect(inbox.closed).toBe(false);
+    // A stale switch arriving late is ignored.
+    expect(await switchTo("Archive", 2)).toBe(0);
+    expect(clients).toHaveLength(4);
+    // A folder created after the stream started is watched as well.
+    await f.db.saveFoldersForAccount(f.id, ["INBOX", "Archive", "Sent", "Drafts", "Projekte"].map(name => ({ id: `${f.id}:${name}`, name, count: 0, accountId: f.id })));
+    expect(await switchTo("Projekte", 6)).toBe(1);
+    expect(inbox.connects).toBe(1);
+    expect(inbox.closed).toBe(false);
+    await stream.reader.cancel();
+    expect(clients.every(c => c.closed && c.logouts === 1)).toBe(true);
+    expect(await postSwitch(f, { streamKey, folderId: `${f.id}:INBOX`, seq: 7 })).toBe(404);
+  });
+
+  test("folder switch is bound to the stream key, session and account", async () => {
+    const f = await fixture(), other = await createAuthenticatedTestSession(f.id);
+    const streamKey = "synthetic-stream-key-0002";
+    await initial(await open(f, f.jar, `&streamKey=${streamKey}`));
+    expect(await postSwitch(f, { streamKey, folderId: `${f.id}:Archive`, seq: 1 }, other.jar)).toBe(404);
+    expect(await postSwitch(f, { streamKey: "synthetic-stream-key-9999", folderId: `${f.id}:Archive`, seq: 1 })).toBe(404);
+    expect(await postSwitch(f, { streamKey, folderId: "other-account:INBOX", seq: 1 })).toBe(400);
+    expect(await postSwitch(f, { streamKey: "short", folderId: `${f.id}:Archive`, seq: 1 })).toBe(400);
+    expect(await postSwitch(f, { streamKey, folderId: `${f.id}:Archive`, seq: -1 })).toBe(400);
+    await sleep(20);
+    expect(clients).toHaveLength(1);
+    expect(await postSwitch(f, { streamKey, folderId: `${f.id}:Archive`, seq: 1 })).toBe(200);
+    await until(() => clients.length === 2);
+    const rejected = await GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream?streamKey=bad%20key`, { headers: f.jar.headers() }), { params: Promise.resolve({ accountId: f.id }) });
+    expect(rejected.status).toBe(400);
   });
 
   test.each(["fetch", "poll", "connect"])("revocation during pending %s blocks the next sensitive enqueue", async (phase: string) => {

@@ -6,17 +6,34 @@ import type { SpamInput } from "./types";
 
 export const SPAM_TEXT_LIMIT = 4096;
 const HEADER_VALUE_LIMIT = 600;
+/**
+ * X-Spam-Status lists the server's test names after the score; static rules
+ * match tests anywhere in that list, so it keeps far more than other headers.
+ */
+const SPAM_STATUS_VALUE_LIMIT = 4000;
 const MAX_SPAM_HEADERS = 12;
 const MAX_LINK_DOMAINS = 30;
 const MAX_ATTACHMENTS = 10;
 
-/** Drops "> " lines and everything from the first reply attribution / forward marker. */
-export function stripQuotedText(text: string) {
+/**
+ * Own text the classifier always sees: a reply attribution or forward marker
+ * before this many characters does not cut, so a fake attribution line at the
+ * top cannot hide the body from the model.
+ */
+export const SPAM_OWN_TEXT_MIN = 1024;
+
+/**
+ * Drops "> " lines and everything from the first reply attribution / forward
+ * marker that follows at least `keepAtLeast` characters of kept text.
+ */
+export function stripQuotedText(text: string, keepAtLeast = 0) {
   const kept: string[] = [];
+  let length = 0;
   for (const line of text.split(/\r?\n/)) {
     if (/^\s*>/.test(line)) continue;
-    if (isQuoteBoundaryText(line)) break;
+    if (length >= keepAtLeast && isQuoteBoundaryText(line)) break;
     kept.push(line.trimEnd());
+    length += line.trim().length;
   }
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -68,7 +85,7 @@ export function extractMaskedLinkDomains(html: string | null | undefined) {
 }
 
 function capText(text: string) {
-  return stripQuotedText(text).replace(/[ \t]+/g, " ").slice(0, SPAM_TEXT_LIMIT);
+  return stripQuotedText(text, SPAM_OWN_TEXT_MIN).replace(/[ \t]+/g, " ").slice(0, SPAM_TEXT_LIMIT);
 }
 
 function firstMailbox(from: string) {
@@ -101,22 +118,49 @@ function addressText(value: ParsedSpamSource["to"] | ParsedSpamSource["cc"]) {
 
 export type HeaderLine = { key: string; value: string };
 
+/** Comma-separated authserv-ids of the receiving server; when set, only these exact ids count. */
+export const SPAM_AUTHSERV_ID_ENV = "NOCTUA_SPAM_AUTHSERV_ID";
+
+export function configuredAuthservIds(env: Record<string, string | undefined> = process.env) {
+  return (env[SPAM_AUTHSERV_ID_ENV] ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+}
+
+const authservId = (value: string) =>
+  value.split(";")[0].replace(/\([^()]*\)/g, " ").trim().split(/\s+/)[0]?.toLowerCase().replace(/\.$/, "") ?? "";
+
+/** The host after "by" in a Received value: the server that stamped it. */
+function receivedByHost(value: string) {
+  return value.replace(/\([^()]*\)/g, " ").match(/(?:^|\s)by\s+([a-z0-9.-]+)/i)?.[1].toLowerCase().replace(/\.$/, "") ?? null;
+}
+
 /**
- * Only the receiving server's verdicts count: the top-most Authentication-Results
- * block (all headers with the first one's authserv-id) and the first occurrence of
- * each X-Spam-* header. Copies further down come from earlier hops or the sender.
+ * The receiving server's Authentication-Results (RFC 8601 §5), shared by the
+ * allowlist and the trusted-sender profiles: only blocks above the second
+ * Received line whose authserv-id belongs to the receiving server count; of
+ * those, the top-most id's block. The receiving server is the configured
+ * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host that stamped
+ * the top-most Received line, which no sender can write: an id matches when it
+ * is that host, its first label (MailProvider writes `by mx1.mail.example.com` and
+ * `Authentication-Results: mx1;`) or in its registrable domain. A block the sender inserted under another id (no A-R of our server)
+ * is ignored. A mail without any Received line never passed an MX (local
+ * append); there the top-most block counts as before.
  */
-function topAuthenticationResults(lines: HeaderLine[]) {
+export function receivingAuthenticationResults(lines: HeaderLine[], configured: readonly string[] = configuredAuthservIds()) {
   // Our receiving server writes its Received line and its Authentication-Results
   // next to each other at the top. Anything below the second Received line was
   // written by an earlier hop or by the sender, so a forged block that copies the
   // authserv-id of our server is ignored there (verify-r2 R1).
   const receivedIndexes = lines.flatMap((line, index) => (line.key === "received" ? [index] : []));
   const limit = receivedIndexes.length >= 2 ? receivedIndexes[1] : lines.length;
-  const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit);
-  const servId = (value: string) => value.split(";")[0].trim().toLowerCase();
-  const first = results[0] ? servId(results[0].value) : "";
-  return results.filter((line) => servId(line.value) === first).map((line) => line.value);
+  const byHost = receivedIndexes.length ? receivedByHost(lines[receivedIndexes[0]].value) : null;
+  const receiver = byHost ? getRootDomain(byHost) ?? byHost : null;
+  const isReceiver = (id: string) => byHost !== null
+    && (id === byHost || id === byHost.split(".")[0] || (getRootDomain(id) ?? id) === receiver);
+  const pinned = (id: string) => (configured.length ? configured.includes(id)
+    : byHost === null ? receivedIndexes.length === 0 : isReceiver(id));
+  const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit && pinned(authservId(line.value)));
+  const first = results[0] ? authservId(results[0].value) : "";
+  return results.filter((line) => authservId(line.value) === first).map((line) => line.value);
 }
 
 function topSpamHeaders(lines: HeaderLine[]) {
@@ -150,13 +194,16 @@ export function topReceivedAt(lines: HeaderLine[]) {
 
 /** The header-derived fields of SpamInput; `lines` hold the full unfolded values. */
 function headerFields(lines: HeaderLine[]) {
-  const capped = lines.map((line) => ({ key: line.key, value: line.value.slice(0, HEADER_VALUE_LIMIT) }));
+  const capped = lines.map((line) => ({
+    key: line.key,
+    value: line.value.slice(0, line.key === "x-spam-status" ? SPAM_STATUS_VALUE_LIMIT : HEADER_VALUE_LIMIT)
+  }));
   const header = (key: string) => capped.find((line) => line.key === key)?.value ?? null;
   return {
     listId: header("list-id"),
     listUnsubscribe: header("list-unsubscribe"),
     autoSubmitted: header("auto-submitted"),
-    authenticationResults: topAuthenticationResults(capped),
+    authenticationResults: receivingAuthenticationResults(lines).map((value) => value.slice(0, HEADER_VALUE_LIMIT)),
     spamHeaders: topSpamHeaders(capped),
     receivedAt: topReceivedAt(lines)
   };

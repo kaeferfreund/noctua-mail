@@ -16,6 +16,7 @@ import { buildThreadTree, flattenThread, getThreadLatestDate } from "@/app/compo
 import type { MessageCardListProps, MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
 import StatusPanelFrame from "./StatusPanelFrame";
 import { MobileStatusFocusContext } from "./MobileStatusFocus";
+import { expectFocused } from "@/lib/testDomAssertions";
 
 const originalWidth = window.innerWidth;
 beforeEach(() => { window.innerWidth = 390; });
@@ -52,6 +53,16 @@ describe("mobile kept component frames", () => {
     expect(item.closest(".radix-themes")).toBeTruthy();
     fireEvent.click(item);
     expect(reads).toBe(1);
+  });
+  it("offers Delete right after the compose actions in the phone menu", async () => {
+    const deleted: string[] = [];
+    const page = render(<Theme><MessageMenu {...menuProps()} handleDeleteMessage={target => { deleted.push(target.id); }} /></Theme>);
+    fireEvent.keyDown(page.getByRole("button", { name: "Message actions" }), { key: "Enter" });
+    const item = await page.findByRole("menuitem", { name: "Delete" });
+    expect(item.getAttribute("data-slot")).toBe("dropdown-menu-item");
+    expect(page.getAllByRole("menuitem").map(entry => entry.textContent).indexOf("Delete")).toBe(4);
+    fireEvent.click(item);
+    expect(deleted).toEqual(["synthetic-message"]);
   });
   it("keeps the existing Move to submenu working inside the shadcn root", async () => {
     const page = render(<Theme><MessageMenu {...menuProps()} /></Theme>);
@@ -237,6 +248,6 @@ describe("status Sheet focus", () => {
     const sheet = await page.findByRole("dialog", { name: "Processes" });
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(indicator));
+    await waitFor(() => expectFocused(indicator));
   });
 });

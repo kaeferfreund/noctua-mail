@@ -203,6 +203,10 @@ export function buildAccountImapStreamPath(
   return appendQuery(buildAccountApiPath(accountId, "/imap/stream"), query);
 }
 
+export function buildAccountImapStreamFolderPath(accountId: string) {
+  return buildAccountApiPath(accountId, "/imap/stream/folder");
+}
+
 export function buildAccountThreadsPath(accountId: string, query?: URLSearchParams | string | null) {
   return appendQuery(buildAccountApiPath(accountId, "/threads"), query);
 }

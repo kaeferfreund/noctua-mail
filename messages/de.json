@@ -476,6 +476,7 @@
       "autoMove": "Verdächtige Nachrichten automatisch in den Spam-Ordner verschieben",
       "threshold": "Eigene Schwelle (leer = {threshold, number} aus der Verwaltung)",
       "thresholdHelp": "Zwischen 0,5 und 1. Höher bedeutet weniger Markierungen.",
+      "thresholdInvalid": "Bitte eine Zahl zwischen 0,5 und 1 eingeben oder das Feld leer lassen.",
       "save": "Speichern",
       "saved": "Gespeichert.",
       "loading": "Lädt …",
@@ -523,8 +524,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Eigene Postfächer",
-      "shared": "Gemeinsame Postfächer",
+      "sharedMailbox": "Geteiltes Postfach",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
       "unreadUnavailable": "Anzahl ungelesener E-Mails nicht verfügbar",
@@ -1028,7 +1028,8 @@
       "mailboxes": "Postfächer",
       "invites": "Einladungen",
       "audit": "Protokoll",
-      "spam": "Spam-Erkennung"
+      "spam": "Spam-Erkennung",
+      "domains": "Domain-Symbole"
     },
     "loading": "Wird geladen …",
     "cancel": "Abbrechen",
@@ -1176,6 +1177,30 @@
       "unavailableReasons": {
         "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
         "unsupported-provider": "Anbieter wird nicht unterstützt"
+      }
+    },
+    "domainIcons": {
+      "heading": "Domain-Symbole",
+      "help": "Jede Domain-Gruppe in der Seitenleiste zeigt das Favicon der Domain. Hier kannst du es durch ein eigenes Bild ersetzen: PNG, JPEG, WEBP oder ICO bis 512 KB. Das Bild wird auf 64 × 64 Pixel verkleinert.",
+      "empty": "Noch keine Postfächer mit Domain.",
+      "mailboxes": "{count, plural, =0 {kein Postfach} one {# Postfach} other {# Postfächer}}",
+      "custom": "Eigenes Bild",
+      "favicon": "Favicon",
+      "iconAlt": "Symbol für {domain}",
+      "upload": "Bild hochladen",
+      "uploadFor": "Bild für {domain} hochladen",
+      "reset": "Zurücksetzen",
+      "resetFor": "Bild für {domain} zurücksetzen",
+      "uploaded": "Das Bild für {domain} ist gespeichert.",
+      "resetDone": "{domain} zeigt wieder das Favicon.",
+      "errors": {
+        "too_large": "Das Bild ist größer als 512 KB.",
+        "unsupported_format": "Nur PNG, JPEG, WEBP oder ICO sind erlaubt.",
+        "invalid_image": "Die Datei lässt sich nicht als Bild lesen.",
+        "empty_upload": "Die Datei ist leer.",
+        "unknown_domain": "Zu dieser Domain gibt es kein Postfach mehr.",
+        "invalid_domain": "Diese Domain ist ungültig.",
+        "upload_timeout": "Das Hochladen hat zu lange gedauert. Versuch es noch einmal."
       }
     }
   },
@@ -1726,7 +1751,7 @@
       "cancel": "Abbrechen",
       "send": "Senden",
       "sending": "Wird gesendet …",
-      "loadingAttachments": "Lädt Anhänge …",
+      "loadingAttachments": "Anhänge werden geladen …",
       "attachmentsFailedTitle": "Lade die fehlgeschlagenen Anhänge erneut oder entferne sie.",
       "close": "Schließen"
     },

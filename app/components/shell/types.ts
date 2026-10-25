@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Account } from "@/lib/data";
+import { mailboxGroupDomain } from "@/lib/senderIdentity";
 
 /**
  * Membership fields that feat/team-auth adds to `Account` (design §5.3:
@@ -52,20 +53,11 @@ export type ShellViews = {
   virtual: ShellView[];
 };
 
-/** Splits the accessible mailboxes into the two sidebar sections. */
-export function partitionMailboxes(accounts: readonly ShellAccount[]): {
-  mine: ShellAccount[];
-  shared: ShellAccount[];
-} {
-  const mine: ShellAccount[] = [];
-  const shared: ShellAccount[] = [];
-  for (const account of accounts) {
-    (account.shared ? shared : mine).push(account);
-  }
-  const byName = (a: ShellAccount, b: ShellAccount) =>
+/** The accessible mailboxes in sidebar order: name, then e-mail and id. */
+export function sortMailboxes(accounts: readonly ShellAccount[]): ShellAccount[] {
+  return [...accounts].sort((a, b) =>
     mailboxLabel(a).localeCompare(mailboxLabel(b), "en", { sensitivity: "base" }) ||
-    a.email.localeCompare(b.email) || a.id.localeCompare(b.id);
-  return { mine: mine.sort(byName), shared: shared.sort(byName) };
+    a.email.localeCompare(b.email) || a.id.localeCompare(b.id));
 }
 
 /** Up to two initials for the mailbox avatar, from the name or the e-mail. */
@@ -102,7 +94,7 @@ export function groupMailboxes(accounts: readonly ShellAccount[]): Array<{
   if (accounts.length < MAILBOX_GROUPING_MIN) return [{ domain: null, accounts: [...accounts] }];
   const groups = new Map<string | null, ShellAccount[]>();
   for (const account of accounts) {
-    const domain = account.email.trim().split("@")[1]?.toLowerCase() || null;
+    const domain = mailboxGroupDomain(account.email);
     const group = groups.get(domain) ?? [];
     group.push(account);
     groups.set(domain, group);

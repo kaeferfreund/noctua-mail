@@ -154,6 +154,12 @@ export type MessageViewOrchestratorHandle = {
 
 export type MessageViewOrchestratorHeaderInputs = {
   toolbar?: React.ReactNode;
+  // Places `toolbar` next to the compact/full toggle (end of the
+  // collaboration row, else of the subject row) instead of in its own row
+  // above the thread header (desktop split layout: only Expand).
+  toolbarInSubjectRow?: boolean;
+  // One line under the subject row (the split layout's one-time tip).
+  notice?: React.ReactNode;
   mailboxLabel?: string;
   collab?: { controller: ThreadCollabController; role?: AccountRole };
   // Used to compute thread topics / fallback thread-subject source and
@@ -720,6 +726,7 @@ function MessageViewOrchestratorImpl(
   const threadViewModeToggle = showThreadViewModeToggle ? (
     <SegmentedControl.Root
       size="1"
+      className={paneStyles.viewModeToggle}
       value={threadViewMode}
       onValueChange={(v) => setThreadViewMode(v as "full" | "compact")}
       style={{ flexShrink: 0 }}
@@ -731,7 +738,7 @@ function MessageViewOrchestratorImpl(
 
   return (
     <MessageViewPane
-      toolbar={header.toolbar}
+      toolbar={header.toolbarInSubjectRow ? null : header.toolbar}
       backActions={isMobile && activeMessage ? threadViewModeToggle : null}
       header={activeMessage ? (() => {
               const rootSubject =
@@ -755,13 +762,22 @@ function MessageViewOrchestratorImpl(
                   topic.name.trim().length > 0
               );
               const explanationThreadId = activeMessage.threadId ?? "";
+              const showCollabBar = Boolean(header.collab && activeMessage.threadId);
+              // Desktop split layout: the compact/full toggle and Expand share the
+              // collaboration row, so the subject can use the full header width.
+              const actionsInCollabBar = showCollabBar && !isMobile && header.toolbarInSubjectRow;
+              const readerActions = <>
+                {isMobile ? null : threadViewModeToggle}
+                {header.toolbarInSubjectRow ? header.toolbar : null}
+              </>;
               return (
                 <Flex direction="column" gap="2" style={{ flex: 1, minWidth: 0 }}>
                   <Flex align="center" gap="3" className={paneStyles.subjectRow}>
                     <ThreadSubject key={rootSubject} subject={rootSubject} />
                     {header.mailboxLabel ? <Badge size="1" color="gray">{header.mailboxLabel}</Badge> : null}
-                    {isMobile ? null : threadViewModeToggle}
+                    {actionsInCollabBar ? null : readerActions}
                   </Flex>
+                  {header.notice}
                   {threadTopics.length > 0 && (
                     <Flex gap="1" wrap="wrap" justify="end">
                       {threadTopics.map((topic) => (
@@ -769,8 +785,9 @@ function MessageViewOrchestratorImpl(
                       ))}
                     </Flex>
                   )}
-                  {header.collab && activeMessage.threadId && <ThreadCollaborationBar
+                  {showCollabBar && header.collab && <ThreadCollaborationBar
                     collab={header.collab.controller} role={header.collab.role}
+                    actions={actionsInCollabBar ? readerActions : undefined}
                     onNote={() => setNoteOpen(value => !value)}
                     onActivity={() => focusThreadActivity(activityRef.current)}
                   />}

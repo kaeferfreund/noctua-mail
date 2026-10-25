@@ -449,20 +449,30 @@ export {
   backfillSenderProfiles,
   countSpamTrustDecisions,
   getLatestSpamDecision,
+  getLatestSpamDecisionRow,
   getSenderProfile,
   getSpamSettings,
   hasSentToAddress,
-  listSenderMailsAround,
+  listSenderMailsNear,
   listSpamExampleCandidates,
-  listUncheckedSpamMessageIds,
+  listUncheckedSpamMessages,
   markSenderProfileUserSpam,
+  recordSenderProfileJunk,
   recordSenderProfileMail,
+  recordSpamCheckFailure,
   replaceSenderProfiles,
   resetTrustedSpamChecks,
   saveSpamExample,
   saveSpamSettings,
   saveSpamVerdict
 } from "./db/spam";
+export {
+  type DomainIconRow,
+  deleteDomainIconRow,
+  getDomainIconRow,
+  listDomainIconRows,
+  saveDomainIconRow
+} from "./db/domainIcons";
 export {
   cancelScheduledSend,
   claimDueScheduledSends,

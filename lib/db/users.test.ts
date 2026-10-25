@@ -139,6 +139,8 @@ describe("mailbox memberships", () => {
   });
 
   test("lists by account and by user, and removes single links", async () => {
+    // removeUserAccountLink resolves the remaining role against auth_user; production migrates it at startup.
+    await getSharedTestAuthHarness();
     const accountId = uniqueAccountId("acc-list");
     const otherAccountId = uniqueAccountId("acc-list-other");
     const [first, second] = [randomUUID(), randomUUID()].sort();
