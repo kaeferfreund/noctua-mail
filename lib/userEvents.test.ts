@@ -173,8 +173,14 @@ test("SSE abort and reader cancellation unsubscribe and cancel pending work; hea
   await read(cancelled); await cancelled.cancel();
   publishMailboxEvent({ accountId: f.accountId, type: "synced" });
   await pause(30); expect(loads).toBe(0);
-  const expired = createUserEventStream(f.request, { ...f.identity, expiresAt: Date.now() + 30 }).getReader();
-  await read(expired); expect(await read(expired)).toBeNull();
+  // The heartbeat reads the live session row: once its sliding expiry has passed, the stream ends.
+  const other = await createAuthenticatedTestSession();
+  const otherIdentity = await requireActiveUserSession(new Request(f.request.url, { headers: other.jar.headers() }));
+  if (otherIdentity instanceof Response) throw new Error("Missing synthetic session");
+  const expired = createUserEventStream(f.request, otherIdentity, { heartbeatMs: 20 }).getReader();
+  await read(expired);
+  other.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now() - 1000).toISOString(), other.session.id);
+  expect(await read(expired)).toBeNull();
 });
 
 test("committed comments, replies and cleanup publish revisions; failed mutations publish nothing", async () => {

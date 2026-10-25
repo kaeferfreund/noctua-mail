@@ -1,7 +1,8 @@
 import { imapLoginAvailable } from "@/lib/imapLoginPolicy";
 import { NextResponse } from "next/server";
 import { getUserById } from "@/lib/serverDb";
-import { ensureActiveAccountId, requireActiveUserSession, withAuthResponse, SESSION_TTL_SECONDS } from "@/lib/auth";
+import { ensureActiveAccountId, requireActiveUserSession, withAuthResponse } from "@/lib/auth";
+import { SESSION_IDLE_TIMEOUT_SECONDS } from "@/lib/betterAuth";
 import { sanitizeAccessEntriesForClient } from "@/lib/accountPresentation";
 
 export async function GET(request: Request) {
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       user: restricted ? { id: user.id, email: user.email, name:user.name, uiLocale: user.uiLocale } : user,
       // The mailbox list is the access read taken after the selection write; no second rebuild.
       accountId: selection.accountId, accounts: selection.access ? sanitizeAccessEntriesForClient(session.userId, selection.access.entries) : [],
-      exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_TTL_SECONDS,
+      exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_IDLE_TIMEOUT_SECONDS,
       mailboxState: selection.mailboxState,
       security: { imapLoginAvailable: imapLoginAvailable(), hasPassword: user.hasPassword,
         enrollmentRequired: session.enrollmentRequired, reauthRequired: session.reauthRequired,

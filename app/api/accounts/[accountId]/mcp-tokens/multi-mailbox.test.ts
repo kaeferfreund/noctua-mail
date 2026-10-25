@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from "bun:test";
 import { dbModulePromise } from "@/lib/testDbHarness";
-import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
+import { createAuthenticatedTestSession, issueTestReauthGrant } from "@/lib/testAuthHarness";
 import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
 import { deleteAccountControlPlane } from "@/lib/serverDb";
 import { GET, POST } from "./route";
@@ -23,8 +23,13 @@ function request(id: string, method = "GET", body?: unknown, actor = fixture) {
   if (body !== undefined) headers.set("content-type", "application/json");
   return new Request(`http://localhost:3000/api/accounts/${id}/mcp-tokens`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
 }
+/** Creation spends a fresh `mcp.create` grant. */
+async function withGrant(input: Request, actor = fixture) {
+  input.headers.set("x-noctua-reauth", await issueTestReauthGrant(actor, "mcp.create"));
+  return input;
+}
 async function create(extra: Record<string, unknown> = {}) {
-  const response = await POST(request(accountId, "POST", { label: "Synthetic multi token", accountIds: [accountId, sharedId], ...extra }), params(accountId));
+  const response = await POST(await withGrant(request(accountId, "POST", { label: "Synthetic multi token", accountIds: [accountId, sharedId], ...extra })), params(accountId));
   expect(response.status).toBe(201);
   return response.json() as Promise<{ tokenRecord: { id: string; accountId: string; accountIds: string[]; scopes: string[] } }>;
 }
@@ -44,7 +49,7 @@ test("creates every mode, lists a token in both mailboxes, editor sees own and m
       expect(JSON.stringify(listed)).not.toContain("tokenHash");
     }
   }
-  const otherToken = await POST(request(sharedId, "POST", { label: "Synthetic other token" }, other), params(sharedId));
+  const otherToken = await POST(await withGrant(request(sharedId, "POST", { label: "Synthetic other token" }, other), other), params(sharedId));
   expect(otherToken.status).toBe(201);
   const otherId = (await otherToken.json()).tokenRecord.id;
   const listed = await (await GET(request(sharedId), params(sharedId))).json();
@@ -72,8 +77,34 @@ test("defaults to drafts and rejects invalid sets/modes or membership without cr
   for (const extra of [{ mode: "send" }, { mode: null }, { accountIds: [] }, { accountIds: [sharedId] }, { accountIds: [accountId, 3] }, { accountIds: "all" }]) {
     expect((await POST(request(accountId, "POST", { label: "Synthetic invalid", ...extra }), params(accountId))).status).toBe(400);
   }
-  expect((await POST(request(accountId, "POST", { label: "Synthetic forbidden", accountIds: [accountId, foreignId] }), params(accountId))).status).toBe(403);
+  expect((await POST(await withGrant(request(accountId, "POST", { label: "Synthetic forbidden", accountIds: [accountId, foreignId] })), params(accountId))).status).toBe(403);
   expect(fixture.master.prepare("SELECT id FROM mcp_tokens WHERE label IN ('Synthetic invalid','Synthetic forbidden') AND createdByUserId=?").all(fixture.user.id)).toEqual([]);
+});
+
+test("creation requires a fresh mcp.create grant: missing, wrong-purpose and reused grants fail; deletion needs none", async () => {
+  const body = { label: "Synthetic proof token" };
+  const created = () => fixture.master.prepare("SELECT id FROM mcp_tokens WHERE label=? AND createdByUserId=?").all(body.label, fixture.user.id);
+  const missing = await POST(request(accountId, "POST", body), params(accountId));
+  expect(missing.status).toBe(403);
+  expect(await missing.json()).toMatchObject({ ok: false, code: "reauth_required" });
+  const wrong = request(accountId, "POST", body);
+  wrong.headers.set("x-noctua-reauth", await issueTestReauthGrant(fixture, "sessions.revoke"));
+  const wrongResponse = await POST(wrong, params(accountId));
+  expect(wrongResponse.status).toBe(403);
+  expect(await wrongResponse.json()).toMatchObject({ ok: false, code: "invalid_proof" });
+  expect(created()).toEqual([]);
+  const grant = await issueTestReauthGrant(fixture, "mcp.create");
+  const valid = request(accountId, "POST", body); valid.headers.set("x-noctua-reauth", grant);
+  const validResponse = await POST(valid, params(accountId));
+  expect(validResponse.status).toBe(201);
+  const tokenId = (await validResponse.json()).tokenRecord.id;
+  const reused = request(accountId, "POST", body); reused.headers.set("x-noctua-reauth", grant);
+  const reusedResponse = await POST(reused, params(accountId));
+  expect(reusedResponse.status).toBe(403);
+  expect(await reusedResponse.json()).toMatchObject({ ok: false, code: "invalid_proof" });
+  expect(created()).toEqual([{ id: tokenId }]);
+  expect((await DELETE(request(accountId, "DELETE"), params(accountId, tokenId))).status).toBe(200);
+  expect(created()).toEqual([]);
 });
 
 test("mailbox cascade preserves a multi token, replaces deleted primary, removes empty and legacy tokens", async () => {

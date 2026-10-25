@@ -9,7 +9,7 @@ test("streams constructed during shutdown leave no subscriptions or fake timers"
     import {registerAuthStream} from './lib/authStreams';
     import './lib/server/shutdown';
     await globalThis[Symbol.for('noctua.shutdown')].coordinator.shutdown('test', {exit:false,close:false});
-    const identity={userId:'synthetic',sessionId:'synthetic',generation:1,authenticatedAt:Date.now(),expiresAt:Date.now()+60000};
+    const identity={userId:'synthetic',sessionId:'synthetic',generation:1,authenticatedAt:Date.now()};
     jest.useFakeTimers();
     let cleanups=0;
     const auth=registerAuthStream(identity,()=>{cleanups++});
