@@ -7,4 +7,4 @@ export type Member = { userId: string; email: string; name: string | null; role:
 export type AdminAccount = Account & { members: Member[] };
 
 export type MemberCandidate = { id: string; name: string | null; email: string };
-export type AdminInvite = { id: string; email: string | null; issuedBy: string | null; createdAt: number; expiresAt: number | null; status: "issued" | "redeemed" | "revoked" | "expired" };
+export type AdminInvite = { id: string; email: string | null; issuedBy: string | null; issuerDeleted?: boolean; createdAt: number; expiresAt: number | null; status: "issued" | "redeemed" | "revoked" | "expired" };

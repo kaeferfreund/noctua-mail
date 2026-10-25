@@ -7,6 +7,8 @@ import { nativeControlBaseClass, nativeControlClass } from "@/app/components/acc
 import { clientFixture, proof } from "@/app/components/auth/authTestHelpers";
 import type { AdminUser } from "./types";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
+import { qrCodePath } from "@/app/components/ui/qr-code";
+import { inviteSignupUrl } from "@/lib/inviteLink";
 
 afterEach(cleanup);
 const user: AdminUser = { id: "synthetic-user", email: "user@example.test", name: "Synthetic User", role: "admin", disabled: false, hasPassword: true, twoFactorEnabled: true, passkeyCount: 2, passkeys: [{ id: "synthetic-key", name: "Synthetic key", createdAt: 1792900000000 }, { id: "synthetic-key-2", name: null, createdAt: null }], accounts: [{ id: "synthetic-mailbox", name: "Support", email: "support@example.test", role: "editor", isOwner: false }] };
@@ -23,6 +25,11 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
   };
   const page = render(<Theme><AdminPanel isAdminUser apiFetch={apiFetch} onClose={() => {}} /></Theme>);
   return { page, calls };
+}
+// The QR code must encode exactly this value (same path as a fresh encoding).
+function expectQr(dialog: ReturnType<typeof within>, value: string) {
+  const qr = dialog.getByRole("img", { name: "QR code" });
+  expect(qr.querySelector("path")?.getAttribute("d")).toBe(qrCodePath(value).d);
 }
 async function openUserAction(page: ReturnType<typeof render>, name: string, dialog: string) {
   await page.findByText("user@example.test");
@@ -52,6 +59,8 @@ describe("AdminPanel", () => {
     fireEvent.click(page.getByRole("button", { name: "Issue targeted invite" }));
     const secret = within(await page.findByRole("dialog", { name: "One-time invite code" }));
     expect(secret.getByText("synthetic-once-code")).toBeTruthy();
+    expectQr(secret, inviteSignupUrl(window.location.origin, "synthetic-once-code"));
+    expect(secret.getByText("Scan with a phone to open the sign-up with this code.")).toBeTruthy();
     const issued = calls.find(call => call.init?.method === "POST" && call.url === "/api/admin/users");
     expect(JSON.parse(String(issued?.init?.body))).toEqual({ name: "Synthetic Invitee", email: "invited@example.test", role: "user" });
     const original = navigator.clipboard;
@@ -63,6 +72,42 @@ describe("AdminPanel", () => {
     expect(page.queryByText("synthetic-once-code")).toBeNull(); expect(page.queryByText("synthetic-history-secret")).toBeNull();
     fireEvent.click(page.getByRole("button", { name: "Users" })); await act(async () => { fireEvent.click(page.getByRole("button", { name: "Invites" })); });
     expect(page.queryByText("synthetic-once-code")).toBeNull();
+  });
+  it("shows the invite issuer by label, cleans up the history after confirmation and revokes an issued invite", async () => {
+    let history = [
+      { id: "synthetic-issued", email: "issued@example.test", issuedBy: "Synthetic Issuer", issuerDeleted: false, status: "issued", expiresAt: 1793000000000, createdAt: 1792900000000 },
+      { id: "synthetic-legacy", email: null, issuedBy: null, issuerDeleted: false, status: "redeemed", expiresAt: null, createdAt: 1792800000000 },
+      { id: "synthetic-orphan", email: "orphan@example.test", issuedBy: null, issuerDeleted: true, status: "expired", expiresAt: 1792700000000, createdAt: 1792600000000 }
+    ];
+    const { page, calls } = harness((url, init) => {
+      if (url === "/api/admin/invites" && init?.method === "DELETE") { history = history.filter(invite => invite.status === "issued"); return response({ ok: true, deleted: 2 }); }
+      if (url.endsWith("/revoke")) { history = history.map(invite => ({ ...invite, status: "revoked" })); return response({ ok: true }); }
+      return url === "/api/admin/invites" ? response({ ok: true, invites: history }) : undefined;
+    });
+    await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Invites" }));
+    expect(await page.findByText(/issued@example.test · issued · Issued by Synthetic Issuer/)).toBeTruthy();
+    expect(page.getByText(/Legacy invite · redeemed · Issued by Operator · No expiry/)).toBeTruthy();
+    expect(page.getByText(/orphan@example.test · expired · Issued by deleted user/)).toBeTruthy();
+    expect(page.getAllByRole("button", { name: /^Revoke invite for/ }).map(button => button.getAttribute("aria-label"))).toEqual(["Revoke invite for issued@example.test"]);
+
+    fireEvent.click(page.getByRole("button", { name: "Clean up history" }));
+    const cleanup = within(await page.findByRole("dialog", { name: "Clean up history" }));
+    expect(cleanup.getByText(/Issued invites that are still valid stay valid/)).toBeTruthy();
+    expect(calls.some(call => call.init?.method === "DELETE")).toBe(false);
+    await act(async () => { fireEvent.click(cleanup.getByRole("button", { name: "Confirm" })); });
+    expect(await page.findByRole("status")).toBeTruthy();
+    expect(page.getByRole("status").textContent).toBe("2 entries deleted.");
+    expect(calls.find(call => call.init?.method === "DELETE")?.url).toBe("/api/admin/invites");
+    await waitFor(() => expect(page.queryByText(/Legacy invite/)).toBeNull());
+    expect(page.getByText(/issued@example.test · issued/)).toBeTruthy();
+
+    fireEvent.click(page.getByRole("button", { name: "Revoke invite for issued@example.test" }));
+    const revoke = within(await page.findByRole("dialog", { name: "Revoke invite" }));
+    expect(revoke.getByText("The code for issued@example.test can no longer be redeemed afterwards.")).toBeTruthy();
+    await act(async () => { fireEvent.click(revoke.getByRole("button", { name: "Confirm" })); });
+    await waitFor(() => expect(page.getByText(/issued@example.test · revoked/)).toBeTruthy());
+    expect(calls.find(call => call.url.endsWith("/revoke"))).toMatchObject({ url: "/api/admin/invites/synthetic-issued/revoke", init: { method: "POST" } });
+    expect(page.queryByRole("button", { name: /^Revoke invite for/ })).toBeNull();
   });
   it("requires disable confirmation and maps a 409 last_admin error inline", async () => {
     const { page, calls } = harness((url, init) => init?.method === "PATCH" ? response({ ok: false, code: "last_admin" }, 409) : undefined);
@@ -85,6 +130,7 @@ describe("AdminPanel", () => {
     fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
     const secret = within(await page.findByRole("dialog", { name: "One-time recovery link" }));
     expect(secret.getByText(/synthetic-reset/)).toBeTruthy();
+    expectQr(secret, "https://mail.example.test/reset?token=synthetic-reset");
     const proof = calls.find(call => call.url === "/api/auth/reauth");
     expect(JSON.parse(String(proof?.init?.body))).toEqual({ purpose: "admin.recovery", currentPassword: "synthetic-password", totpCode: "123456" });
     const recovery = calls.find(call => call.url.endsWith("/recovery"));

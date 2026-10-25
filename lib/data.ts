@@ -506,6 +506,7 @@ export type UserAccountPrefsPatch = SparsePatch<UserAccountPrefs>;
 
 export type AdminAuditAction =
   | "invite.revoke"
+  | "invite.cleanup"
   | "operator.lock_override"
   | "identity.create"
   | "identity.update"

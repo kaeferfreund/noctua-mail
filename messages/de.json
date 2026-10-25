@@ -1099,6 +1099,14 @@
       "noExpiry": "Kein Ablaufdatum",
       "issuedBy": "Erstellt von {name}",
       "expires": "Gültig bis {time}",
+      "deletedIssuer": "gelöschter Benutzer",
+      "cleanup": "Verlauf bereinigen",
+      "cleanupConfirm": "Alle eingelösten, abgelaufenen und widerrufenen Einladungen werden aus dem Verlauf gelöscht. Ausgestellte, noch gültige Einladungen bleiben gültig, ebenso Codes, mit denen gerade eine Registrierung läuft.",
+      "cleaned": "{count, plural, =0 {Keine Einträge zum Bereinigen.} one {# Eintrag gelöscht.} other {# Einträge gelöscht.}}",
+      "revoke": "Widerrufen",
+      "revokeFor": "Einladung für {name} widerrufen",
+      "revokeTitle": "Einladung widerrufen",
+      "revokeConfirm": "Der Code für {name} kann danach nicht mehr eingelöst werden.",
       "status": {
         "issued": "ausgestellt",
         "redeemed": "eingelöst",
@@ -1129,6 +1137,11 @@
       "help": "Wird nur einmal angezeigt. Kopiere den Wert jetzt zur persönlichen Übergabe. Beim Schließen wird er verworfen.",
       "copied": "Kopiert.",
       "copyFailed": "Kopieren fehlgeschlagen. Markiere und kopiere den Wert manuell.",
+      "qrLabel": "QR-Code",
+      "qrHelp": {
+        "invite": "Mit dem Handy scannen, um die Registrierung mit diesem Code zu öffnen.",
+        "recovery": "Mit dem Handy scannen, um den Wiederherstellungslink zu öffnen."
+      },
       "copy": "Kopieren",
       "done": "Fertig"
     },
@@ -1160,7 +1173,8 @@
       "verificationRequired": "Bestätige zuerst persönlich die Identität dieser Person.",
       "loggedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an.",
       "request": "Die Anfrage ist fehlgeschlagen. Versuche es erneut.",
-      "rateLimited": "Zu viele Versuche. Versuche es später erneut."
+      "rateLimited": "Zu viele Versuche. Versuche es später erneut.",
+      "inviteNotIssued": "Die Einladung ist nicht mehr ausgestellt. Der Verlauf wurde inzwischen geändert."
     },
     "spam": {
       "heading": "Spam-Erkennung",
@@ -1691,7 +1705,8 @@
     "categoryFailed": "Kategorie konnte nicht aktualisiert werden.",
     "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden.",
     "markedNotSuspicious": "Markierung „Verdächtig“ entfernt.",
-    "notSuspiciousFailed": "Die Markierung „Verdächtig“ konnte nicht entfernt werden."
+    "notSuspiciousFailed": "Die Markierung „Verdächtig“ konnte nicht entfernt werden.",
+    "inviteWhileSignedIn": "Du bist bereits angemeldet. Der Einladungscode gilt für eine neue Registrierung."
   },
   "Compose": {
     "sender": {
