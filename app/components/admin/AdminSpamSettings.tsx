@@ -7,6 +7,7 @@ import { Input } from "@/app/components/ui/input";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { adminActionRow } from "./adminLayout";
+import AdminSpamRescan from "./AdminSpamRescan";
 
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
@@ -72,5 +73,6 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
     {data?.trust && <p className="max-w-2xl text-sm text-muted-foreground"
       title={data.trust.map((entry) => `${entry.email}: ${t("spam.trustCounters", { skips: entry.trustedSkips, canaries: entry.canaryChecks, mismatches: entry.canaryMismatches })}`).join("\n")}>
       {t("spam.trustCounters", trustTotals(data.trust))}</p>}
+    {data?.trust && data.trust.length > 0 && <AdminSpamRescan apiFetch={apiFetch} mailboxes={data.trust} />}
   </section>;
 }

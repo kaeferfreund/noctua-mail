@@ -6,6 +6,7 @@ import { findInboxFolder, findJunkFolder, isSentFolder } from "@/lib/specialFold
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import type { SpamEvalRecord } from "./apply";
 import type { SpamExampleSource } from "./examples";
+import { sentToAddressInDb } from "../../db/sentRecipients";
 import { buildSpamInputFromMessage } from "./input";
 import { readSourceHeads } from "./profileBuild";
 import { serverSpamScore } from "./senderProfile";
@@ -47,6 +48,7 @@ export type ServerFlagItem = {
   fromEmail: string | null;
   subject: string;
   date: string;
+  dateValue: number;
   score: number | null;
   /** INBOX mails of the same address / root domain without the server flag (review hint: platforms with ham history). */
   senderUnflagged: number;
@@ -63,6 +65,8 @@ export type ServerFlagAccountScan = {
   flagged: number;
   counts: Partial<Record<ServerFlagDecision, number>>;
   items: ServerFlagItem[];
+  /** `isCancelled` stopped the scan between two batches; counts and items are incomplete. */
+  cancelled?: boolean;
 };
 
 /** A shard handle (bun:sqlite Database): the dry run's read-only one or the app's. */
@@ -139,7 +143,25 @@ function repliedMessageIds(db: ScanDb, accountId: string, folders: Folder[], own
   return replied;
 }
 
-/** Every server-flagged INBOX mail of one account with its decision; reads only INBOX source heads. */
+/** Whether any household Sent folder has written to an address (the `isCorrespondent` of ServerFlagHousehold), cached per address. */
+export function createCorrespondentCheck(sentShards: Array<{ db: ScanDb; accountId: string; sentFolderId: string }>) {
+  const cache = new Map<string, boolean>();
+  return (email: string) => {
+    let known = cache.get(email);
+    if (known === undefined) {
+      known = sentShards.some((shard) => sentToAddressInDb(shard.db, shard.accountId, shard.sentFolderId, email));
+      cache.set(email, known);
+    }
+    return known;
+  };
+}
+
+/**
+ * Every server-flagged INBOX mail of one account with its decision; reads only
+ * INBOX source heads. `since` (the admin rescan's range) judges and lists only
+ * flagged mail with a `dateValue` from then on; the sender history still counts
+ * the whole INBOX, so the exclusions stay the same as without it.
+ */
 export async function scanServerFlaggedInbox(params: {
   accountId: string;
   db: ScanDb;
@@ -147,6 +169,10 @@ export async function scanServerFlaggedInbox(params: {
   sourcesDir: string;
   household: ServerFlagHousehold;
   now?: number;
+  since?: number | null;
+  /** After each batch of source heads: INBOX rows read so far and in total. */
+  onProgress?: (read: number, total: number) => void;
+  isCancelled?: () => boolean;
 }): Promise<ServerFlagAccountScan> {
   const { accountId, db, folders, household } = params;
   const now = params.now ?? Date.now();
@@ -176,6 +202,7 @@ export async function scanServerFlaggedInbox(params: {
     domainUnflagged.set(root, (domainUnflagged.get(root) ?? 0) + 1);
   };
   for (let start = 0; start < rows.length; start += HEAD_BATCH) {
+    if (params.isCancelled?.()) return { ...scan, cancelled: true };
     const batch = rows.slice(start, start + HEAD_BATCH);
     const heads = await readSourceHeads(params.sourcesDir, accountId, batch.filter((row) => row.hasSource === 1).map((row) => row.id));
     scan.withSource += heads.size;
@@ -188,11 +215,14 @@ export async function scanServerFlaggedInbox(params: {
       if (head && serverFlaggedSpam(input)) flaggedRows.push({ row, input });
       else countUnflagged(input);
     }
+    params.onProgress?.(Math.min(rows.length, start + batch.length), rows.length);
   }
-  scan.flagged = flaggedRows.length;
+  const since = params.since ?? null;
+  const judged = since === null ? flaggedRows : flaggedRows.filter(({ row }) => row.dateValue >= since);
+  scan.flagged = judged.length;
 
   // Pass 2: the exclusions of every flagged mail.
-  for (const { row, input } of flaggedRows) {
+  for (const { row, input } of judged) {
     const flags = parseFlags(row.flags);
     const email = input.fromEmail;
     const domain = email ? email.slice(email.lastIndexOf("@") + 1) : "";
@@ -220,7 +250,7 @@ export async function scanServerFlaggedInbox(params: {
     const score = serverSpamScore(input.spamHeaders);
     scan.items.push({
       accountId, id: row.id, messageId: row.messageId, from: row.fromAddr ?? "", fromEmail: email,
-      subject: (row.subject ?? "").slice(0, SUBJECT_LIMIT), date: row.date, score: score !== null && Number.isFinite(score) ? score : null,
+      subject: (row.subject ?? "").slice(0, SUBJECT_LIMIT), date: row.date, dateValue: row.dateValue, score: score !== null && Number.isFinite(score) ? score : null,
       senderUnflagged: email ? senderUnflagged.get(email) ?? 0 : 0, domainUnflagged: email ? domainUnflagged.get(rootDomainOf(email)) ?? 0 : 0,
       decision, reasons
     });

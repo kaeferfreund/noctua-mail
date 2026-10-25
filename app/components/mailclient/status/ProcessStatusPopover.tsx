@@ -5,6 +5,7 @@ import type { UiLocale } from "@/lib/i18n/config";
 import { formatDate, formatTime } from "@/lib/i18n/format";
 import type { Account, Folder } from "@/lib/data";
 import type { SyncJobProgress } from "../types";
+import type { SpamRescanActivity } from "@/lib/mail/spam/rescanTypes";
 import { Button } from "@/app/components/ui/button";
 import StatusPanelFrame from "@/app/components/shell/StatusPanelFrame";
 import { BottomStatusTriggerButton } from "./BottomStatusSection";
@@ -22,11 +23,14 @@ type Props = {
   accountFolders: Folder[];
   accounts?: Pick<Account, "id" | "name">[];
   onRetrySync?: (job: SyncJobProgress) => void;
+  /** Admin INBOX rescans (useSpamRescanActivity). */
+  spamRescans?: SpamRescanActivity[];
+  onCancelSpamRescan?: (job: SpamRescanActivity) => void;
 };
 
 export default function ProcessStatusPopover({ embedded, open, onOpenChange, isSyncing,
   isRecomputingThreads, isRecomputingCategories, syncingFolders, syncProgressItems,
-  accountFolders, accounts = [], onRetrySync }: Props) {
+  accountFolders, accounts = [], onRetrySync, spamRescans = [], onCancelSpamRescan }: Props) {
   const t = useTranslations("Shell.status");
   const locale = useLocale() as UiLocale;
   const folders = new Map(accountFolders.map(folder => [folder.id, folder]));
@@ -61,9 +65,15 @@ export default function ProcessStatusPopover({ embedded, open, onOpenChange, isS
         </div> : <p className="text-xs text-muted-foreground">{t("progress", { processed: job.processed, total: job.estimatedTotal ?? job.processed })}</p>}
       </div>)}
       {fallbackFolders.map(folder => <p key={folder.id}>{t("scope", { mailbox: mailboxName(folder.accountId), folder: folder.name })} · {t("phase.starting")}</p>)}
+      {spamRescans.map(job => <div key={job.id} className="space-y-1 break-words">
+        <p className="font-medium">{t("spamRescan.title", { mailbox: job.mailbox })}</p>
+        <p className="text-muted-foreground">{job.phase ? t(`spamRescan.phase.${job.phase}`) : t("phase.starting")}</p>
+        <p className="text-xs text-muted-foreground">{t("spamRescan.progress", { processed: job.processed, total: job.total })}</p>
+        {onCancelSpamRescan ? <Button size="sm" variant="outline" onClick={() => onCancelSpamRescan(job)}>{t("spamRescan.cancel")}</Button> : null}
+      </div>)}
       {isRecomputingThreads ? <p>{t("threads")}</p> : null}
       {isRecomputingCategories ? <p>{t("categories")}</p> : null}
-      {!jobs.length && !fallbackFolders.length && !isRecomputingThreads && !isRecomputingCategories
+      {!jobs.length && !fallbackFolders.length && !spamRescans.length && !isRecomputingThreads && !isRecomputingCategories
         ? <p className="text-muted-foreground">{isSyncing ? t("syncing") : t("process.empty")}</p> : null}
     </div>
   </StatusPanelFrame>;

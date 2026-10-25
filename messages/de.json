@@ -633,7 +633,17 @@
         "repair": "Reparatursynchronisierung"
       },
       "updatedAt": "Zuletzt aktualisiert: {time}",
-      "calendarEvent": "Kalendertermin"
+      "calendarEvent": "Kalendertermin",
+      "spamRescan": {
+        "title": "Spam-Prüfung: {mailbox}",
+        "cancel": "Prüfung abbrechen",
+        "phase": {
+          "server-flag": "Vom Server markierte Mails werden gesucht",
+          "classifier": "Filter-Prüfung mit Modell",
+          "moving": "Ausgewählte Mails werden verschoben"
+        },
+        "progress": "{processed, number} von {total, number}"
+      }
     },
     "topicPicker": {
       "title": "Themen",
@@ -1160,7 +1170,11 @@
       "verificationRequired": "Bestätige zuerst persönlich die Identität dieser Person.",
       "loggedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an.",
       "request": "Die Anfrage ist fehlgeschlagen. Versuche es erneut.",
-      "rateLimited": "Zu viele Versuche. Versuche es später erneut."
+      "rateLimited": "Zu viele Versuche. Versuche es später erneut.",
+      "rescanRunning": "Für dieses Postfach läuft bereits eine Prüfung.",
+      "rescanNotRunning": "Für dieses Postfach läuft keine Prüfung.",
+      "rescanModelUnavailable": "Die Filter-Prüfung ist für dieses Postfach gerade nicht möglich.",
+      "rescanNotMovable": "Diese Prüfung kann nicht mehr verschoben werden. Starte eine neue Prüfung."
     },
     "spam": {
       "heading": "Spam-Erkennung",
@@ -1177,6 +1191,73 @@
       "unavailableReasons": {
         "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
         "unsupported-provider": "Anbieter wird nicht unterstützt"
+      },
+      "rescan": {
+        "heading": "Posteingang jetzt prüfen",
+        "help": "Prüft den vorhandenen Posteingang eines Postfachs: zuerst die Mails, die der Mailserver als Spam gekennzeichnet hat (ohne Modell und mit denselben vorsichtigen Ausnahmen wie das Server-Skript), auf Wunsch zusätzlich die noch ungeprüften Mails mit dem Filter. Verschoben wird erst nach deiner Durchsicht.",
+        "open": "Posteingang jetzt prüfen",
+        "openFor": "Posteingang von {email} prüfen",
+        "close": "Schließen",
+        "period": "Zeitraum",
+        "periods": {
+          "30d": "Letzte 30 Tage",
+          "12m": "Letzte 12 Monate",
+          "all": "Alles"
+        },
+        "inboxCount": "{count, plural, one {# Mail} other {# Mails}} im Posteingang in diesem Zeitraum",
+        "withModel": "Auch Filter-Prüfung mit Modell",
+        "modelCount": "Schickt höchstens {count, plural, one {# Mail} other {# Mails}} an das Modell. Bereits geprüfte Mails werden übersprungen; Absender aus der Allowlist und feste Regeln brauchen kein Modell.",
+        "modelCapped": "{unchecked, number} Mails sind ungeprüft, pro Durchlauf gehen höchstens {max, number} an das Modell. Ein weiterer Durchlauf prüft den Rest.",
+        "modelBlocked": {
+          "detection-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist für dieses Postfach ausgeschaltet.",
+          "missing-key": "Die Filter-Prüfung ist nicht möglich: kein API-Schlüssel (ANTHROPIC_API_KEY).",
+          "unsupported-provider": "Die Filter-Prüfung ist nicht möglich: Anbieter wird nicht unterstützt."
+        },
+        "noJunk": "Dieses Postfach hat keinen Spam-Ordner. Vom Server markierte Mails bleiben deshalb im Posteingang.",
+        "start": "Prüfung starten",
+        "cancel": "Abbrechen",
+        "phase": {
+          "server-flag": "Vom Server markierte Mails werden gesucht",
+          "classifier": "Filter-Prüfung mit Modell",
+          "moving": "Ausgewählte Mails werden verschoben"
+        },
+        "progress": "{processed, number} von {total, number}",
+        "state": {
+          "cancelled": "Die Prüfung wurde abgebrochen. Gefundene Treffer kannst du trotzdem verschieben.",
+          "interrupted": "Die Prüfung wurde durch einen Neustart des Dienstes abgebrochen.",
+          "moveInterrupted": "Das Verschieben wurde durch einen Neustart unterbrochen. Die übrigen Mails kannst du erneut verschieben.",
+          "failed": "Die Prüfung ist fehlgeschlagen. Starte eine neue Prüfung."
+        },
+        "summary": "Prüfung vom {time} ({period}): {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
+        "serverLine": "Vom Server markiert: {flagged, number}, davon {kept, number} im Posteingang behalten (bekannter Absender, beantwortet, markiert oder „Kein Spam“).",
+        "modelLine": "Filter: {checked, number} geprüft, {calls, number} Modellaufrufe, {marked, number} verdächtig.",
+        "modelSkipped": "Filter-Prüfung nicht ausgeführt.",
+        "truncated": "Es gibt mehr Treffer, als die Liste zeigt. Verschiebe diese und starte eine neue Prüfung.",
+        "empty": "Keine Treffer. Es gibt nichts zu verschieben.",
+        "selectAll": "Alle auswählen",
+        "selectNone": "Keine auswählen",
+        "selectItem": "„{subject}“ auswählen",
+        "list": "Treffer",
+        "stage": {
+          "server-flag": "Vom Server markiert",
+          "classifier": "Filter: verdächtig"
+        },
+        "serverScore": "Score {score, number}",
+        "confidence": "Sicherheit {confidence, number, percent}",
+        "moveStatus": {
+          "pending": "Wird verschoben …",
+          "moved": "Verschoben",
+          "gone": "Nicht mehr im Posteingang",
+          "changed": "Geändert, bleibt im Posteingang",
+          "error": "Fehler beim Verschieben"
+        },
+        "move": "Ausgewählte verschieben ({count, number})",
+        "moveHelp": "Verschiebt in den Spam-Ordner wie „Als Spam“. Mit „Kein Spam“ holst du eine Mail zurück.",
+        "moveResult": "{moved, number} verschoben, {gone, number} nicht mehr im Posteingang, {changed, number} geändert und behalten, {errors, number} Fehler.",
+        "again": "Neue Prüfung",
+        "noSubject": "(kein Betreff)",
+        "running": "Prüfung läuft",
+        "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}"
       }
     },
     "domainIcons": {

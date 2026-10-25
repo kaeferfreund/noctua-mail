@@ -227,6 +227,7 @@ import { useMessageData } from "./mailclient/useMessageData";
 import { useMailboxViewCache } from "./mailclient/mailboxViewCache";
 import { useThreadContent } from "./mailclient/useThreadContent";
 import { useSyncController } from "./mailclient/useSyncController";
+import { useSpamRescanActivity } from "./mailclient/useSpamRescanActivity";
 import { registerRecentLocalDraftSave } from "./mailclient/recentLocalDraftSaves";
 import { useTopics } from "./mailclient/useTopics";
 import { useRecipientAliases } from "./mailclient/useRecipientAliases";
@@ -650,6 +651,7 @@ export default function MailClient({
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
+  const spamRescans = useSpamRescanActivity(apiFetch, isAdminUser);
   useEffect(() => deferUntilIdle(() => {
     // Speculative warm-up must not surface an unhandled rejection. A cold open
     // still loads through next/dynamic, including when this request fails.
@@ -5714,6 +5716,8 @@ export default function MailClient({
             mailCheckStatus={mailCheckStatus}
             calendarSidebarOpen={calendarSidebarOpen}
             syncProgressItems={Object.values(syncProgressByJobId).filter(job => job.accountId === activeAccountId)}
+            spamRescans={spamRescans.jobs}
+            onCancelSpamRescan={spamRescans.cancel}
             accountFolders={accountFolders}
             mailCheckMode={mailCheckMode}
             activeAccountId={activeAccountId}

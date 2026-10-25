@@ -456,6 +456,9 @@ export {
   listSenderMailsNear,
   listSpamExampleCandidates,
   listUncheckedSpamMessages,
+  countSpamRescanRows,
+  listMarkedSpamMessages,
+  type MarkedSpamRow,
   markSenderProfileUserSpam,
   recordSenderProfileJunk,
   recordSenderProfileMail,
@@ -466,6 +469,24 @@ export {
   saveSpamSettings,
   saveSpamVerdict
 } from "./db/spam";
+export {
+  SpamRescanBusyError,
+  addSpamRescanItems,
+  beginSpamRescanMove,
+  createSpamRescanJob,
+  finishSpamRescanMove,
+  getLatestSpamRescanJob,
+  getSpamRescanJob,
+  listActiveSpamRescanJobs,
+  listSpamRescanItems,
+  reconcileInterruptedSpamRescans,
+  setSpamRescanItemMoveStatus,
+  updateSpamRescanJob,
+  type NewSpamRescanItem,
+  type SpamRescanJobPatch,
+  type StoredSpamRescanItem,
+  type StoredSpamRescanJob
+} from "./db/spamRescan";
 export {
   type DomainIconRow,
   deleteDomainIconRow,
