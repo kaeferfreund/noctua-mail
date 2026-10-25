@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, partitionMailboxes } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, sortMailboxes } from "./types";
 
 function account(overrides: Partial<Account> & { id: string }): Account {
   return {
@@ -13,24 +13,21 @@ function account(overrides: Partial<Account> & { id: string }): Account {
   };
 }
 
-describe("partitionMailboxes", () => {
-  test("puts accounts without the shared flag under 'My mailboxes'", () => {
-    // `shared` arrives with feat/team-auth; until then every account is personal.
-    const own = account({ id: "a" });
-    const { mine, shared } = partitionMailboxes([own]);
-    expect(mine).toEqual([own]);
-    expect(shared).toEqual([]);
-  });
-
-  test("sorts by name inside each section without mutating the input", () => {
+describe("sortMailboxes", () => {
+  test("keeps own and shared mailboxes in one list sorted by name, without mutating the input", () => {
     const first = { ...account({ id: "first", name: "Zulu" }), shared: true };
     const second = account({ id: "second" });
     const third = { ...account({ id: "third", name: "alpha" }), shared: true };
     const input = [first, second, third];
-    const { mine, shared } = partitionMailboxes(input);
+    expect(sortMailboxes(input).map((item) => item.id)).toEqual(["third", "second", "first"]);
     expect(input.map((item) => item.id)).toEqual(["first", "second", "third"]);
-    expect(mine.map((item) => item.id)).toEqual(["second"]);
-    expect(shared.map((item) => item.id)).toEqual(["third", "first"]);
+  });
+
+  test("breaks name ties by e-mail, then id", () => {
+    const b = account({ id: "b", name: "Team", email: "team@example.com" });
+    const a = account({ id: "a", name: "team", email: "team@example.com" });
+    const other = account({ id: "c", name: "Team", email: "office@example.com" });
+    expect(sortMailboxes([b, a, other]).map((item) => item.id)).toEqual(["c", "a", "b"]);
   });
 });
 

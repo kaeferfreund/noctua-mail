@@ -5,7 +5,7 @@ import styles from "./ShellSidebar.module.css";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Fragment, memo, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Mail, Plus, RefreshCw, SquarePen, UserRound, Users } from "lucide-react";
 import { Theme } from "@radix-ui/themes";
 import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 import type { Topic } from "@/lib/data";
@@ -37,7 +37,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
-import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, partitionMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains, type MailboxSection } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
@@ -144,6 +144,8 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
   // Only a custom avatar image; the domain icon sits on the group header.
   const avatarSrc = mailboxAvatarUrl(account);
   const watcherLabel = summary ? t("mailboxes.watcher", {state: t(`mailboxes.watcherStates.${summary.watcher.state}`)}) : "";
+  // The live summary carries the current member count; the account list is the fallback.
+  const shared = summary?.shared ?? account.shared === true;
   return (
     <SidebarMenuItem>
       {/* aria-current follows the committed mailbox only; a click shows
@@ -163,7 +165,13 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
             <AvatarImage src={avatarSrc} alt="" />
           </Avatar>
         ) : null}
-        <span>{mailboxLabel(account)}</span>
+        <span className="min-w-0 truncate">{mailboxLabel(account)}</span>
+        {shared ? (
+          <span role="img" data-shared-mailbox="" aria-label={t("mailboxes.sharedMailbox")} title={t("mailboxes.sharedMailbox")}
+            className="flex shrink-0 text-muted-foreground">
+            <Users className="size-3.5!" aria-hidden="true" />
+          </span>
+        ) : null}
       </SidebarMenuButton>
       {summary && (
         <SidebarMenuBadge className="right-1 w-auto min-w-0 gap-1.5 px-0.5 text-2xs max-md:peer-data-[size=default]/menu-button:top-2.5">
@@ -343,8 +351,9 @@ export function ViewRow({ view }: { view: ShellView }) {
 }
 
 /**
- * Sidebar of the desktop shell (design §7.2): brand, "My mailboxes" /
- * "Shared mailboxes", "Views", "Topics" and the folder tree.
+ * Sidebar of the desktop shell (design §7.2): brand, one mailbox list (own
+ * and shared mailboxes together, shared ones marked), "Views", "Topics" and
+ * the folder tree.
  */
 export default function ShellSidebar({ brand, mailboxes, views, topics, folders, compose, sync, user, notices, onNavigate }: ShellSidebarProps) {
   const t = useTranslations("Shell");
@@ -355,7 +364,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
     action();
   };
   const [topicsCollapsed, setTopicsCollapsed] = useState(false);
-  const { mine, shared } = useMemo(() => partitionMailboxes(mailboxes.accounts), [mailboxes.accounts]);
+  const accounts = useMemo(() => sortMailboxes(mailboxes.accounts), [mailboxes.accounts]);
   // The clicked mailbox row shows a pending state right away; only the latest
   // click's settle clears it, so a superseded switch (A -> B -> A) cannot clear
   // the newer one.
@@ -412,15 +421,18 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               ) : null}
             </SidebarGroup>
             <SidebarGroup className={FLUSH_SECTION_CLASS}>
-              <SidebarGroupLabel>{t("mailboxes.mine")}</SidebarGroupLabel>
-              {mailboxes.onAdd && <SidebarGroupAction title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
-                <Plus />
-              </SidebarGroupAction>}
+              {/* No section heading: the add action keeps its place at the
+                  right, on a line of its own above the list. */}
+              {mailboxes.onAdd && <div className="flex h-8 items-center justify-end pr-1">
+                <SidebarGroupAction className="relative top-auto right-auto" title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
+                  <Plus />
+                </SidebarGroupAction>
+              </div>}
               <SidebarGroupContent>
-                {mine.length > 0 ? (
+                {accounts.length > 0 ? (
                   <MailboxRows
                     section="mine"
-                    accounts={mine}
+                    accounts={accounts}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     userId={mailboxes.userId}
@@ -432,22 +444,6 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                 )}
               </SidebarGroupContent>
             </SidebarGroup>
-            {shared.length > 0 ? (
-              <SidebarGroup className={FLUSH_SECTION_CLASS}>
-                <SidebarGroupLabel>{t("mailboxes.shared")}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <MailboxRows
-                    section="shared"
-                    accounts={shared}
-                    summaries={mailboxes.summaries}
-                    activeAccountId={mailboxes.activeAccountId}
-                    userId={mailboxes.userId}
-                    pendingAccountId={pendingAccountId}
-                    onSwitch={switchMailbox}
-                  />
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ) : null}
             {viewRows.length > 0 ? (
               <SidebarGroup className={FLUSH_SECTION_CLASS}>
                 <SidebarGroupLabel>{t("views")}</SidebarGroupLabel>

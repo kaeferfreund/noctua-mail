@@ -524,8 +524,7 @@
     },
     "drafts": "Drafts",
     "mailboxes": {
-      "mine": "My mailboxes",
-      "shared": "Shared mailboxes",
+      "sharedMailbox": "Shared mailbox",
       "add": "Add mailbox",
       "none": "No mailbox yet",
       "unreadUnavailable": "Unread count unavailable",
