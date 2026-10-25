@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { useEffect, useRef, useState } from "react";
 import { validatePassword } from "@/lib/i18n/authMessages";
+import { inviteCodeFromFragment } from "@/lib/inviteLink";
 import { Button } from "@/app/components/ui/button";
 import { authClient, isPasskeyCancellation, type NoctuaAuthClient } from "@/lib/authClient";
 import { AuthError, AuthField, AuthFrame, useAuthAction } from "./AuthPrimitives";
@@ -18,11 +19,21 @@ export default function LoginScreen({ onAuthenticated, client = authClient }: {
   const [imapAvailable, setImapAvailable] = useState(false);
   const [method, setMethod] = useState<"password" | "imap">("password");
   const [notice, setNotice] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
   const action = useAuthAction();
   const conditional = useRef<AbortController | null>(null);
   const cancelConditional = async () => {
     conditional.current?.abort(); conditional.current = null; await client.cancelPasskey();
   };
+  useEffect(() => {
+    // A scanned invite link (/#invite=<code>) opens the sign-up with the code filled in.
+    // Read it once after mount and drop it from the address bar and history.
+    const code = inviteCodeFromFragment(window.location.hash);
+    if (!code) return;
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of browser URL state after mount
+    setInviteCode(code); setScreen("signup");
+  }, []);
   useEffect(() => {
     let active = true;
     void client.methods().then(data => { if (active) setImapAvailable(data.methods.imap); }).catch(() => { /* optional method remains hidden */ });
@@ -69,7 +80,7 @@ export default function LoginScreen({ onAuthenticated, client = authClient }: {
       });
     }}>
       <fieldset disabled={action.disabled} className="space-y-4">
-        {signup && <AuthField name="inviteCode" label={t("inviteCode")} autoComplete="off" required />}
+        {signup && <AuthField name="inviteCode" label={t("inviteCode")} autoComplete="off" defaultValue={inviteCode ?? undefined} required />}
         <AuthField name="email" label={t("email")} type="email" autoComplete={signup ? "email" : "username webauthn"} maxLength={320} required />
         {signup && <AuthField name="name" label={t("name")} autoComplete="name" maxLength={256} required />}
         <AuthField name="password" label={signup || method === "password" ? t("appPassword") : t("login.mailboxPassword")} type="password" autoComplete={signup ? "new-password" : "current-password"} minLength={signup ? 10 : undefined} maxLength={signup ? 256 : undefined} required />

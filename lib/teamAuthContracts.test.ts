@@ -154,12 +154,14 @@ test("G5 invite history is metadata only with stable non-redeemable ids and all 
   }
   const response = await invites(request(f,"admin/invites")), history = await response.json();
   expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("no-store");
-  const rows = history.invites.filter((row:{issuedBy:string}) => row.issuedBy === f.user.id);
+  // The issuer is shown by name or email, never by the internal user id.
+  const issuer = f.master.prepare(`SELECT name,email FROM auth_user WHERE id=?`).get(f.user.id) as {name:string|null;email:string};
+  const rows = history.invites.filter((row:{issuedBy:string}) => row.issuedBy === (issuer.name || issuer.email));
   expect(rows.map((row:{status:string}) => row.status).sort()).toEqual(["expired","issued","redeemed","revoked"]);
-  for (const row of rows) expect(Object.keys(row).sort()).toEqual(["id","email","issuedBy","createdAt","expiresAt","status"].sort());
-  for (const code of codes) expect(JSON.stringify(history)).not.toContain(code);
+  for (const row of rows) expect(Object.keys(row).sort()).toEqual(["id","email","issuedBy","issuerDeleted","createdAt","expiresAt","status"].sort());
+  for (const code of [...codes, f.user.id]) expect(JSON.stringify(history)).not.toContain(code);
   const again = await (await invites(request(f,"admin/invites"))).json();
-  expect(again.invites.filter((row:{issuedBy:string}) => row.issuedBy === f.user.id)).toEqual(rows);
+  expect(again.invites.filter((row:{issuedBy:string}) => row.issuedBy === (issuer.name || issuer.email))).toEqual(rows);
   // A history id cannot redeem an invitation through the storage lookup.
   for (const row of rows) expect(f.master.prepare(`SELECT 1 FROM invite_codes WHERE code=?`).get(row.id)).toBeNull();
 });

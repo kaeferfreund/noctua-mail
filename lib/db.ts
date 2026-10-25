@@ -189,7 +189,12 @@ export {
 
 export {
   createInviteCode,
+  deleteSettledInviteCodes,
   getInviteCodes,
+  getInviteHistory,
+  inviteHistoryId,
+  inviteStatus,
+  revokeInviteCode,
   saveInviteCodes
 } from "./db/inviteCodes";
 

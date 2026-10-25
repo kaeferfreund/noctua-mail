@@ -1099,6 +1099,14 @@
       "noExpiry": "No expiry",
       "issuedBy": "Issued by {name}",
       "expires": "Expires {time}",
+      "deletedIssuer": "deleted user",
+      "cleanup": "Clean up history",
+      "cleanupConfirm": "All redeemed, expired and revoked invites are deleted from the history. Issued invites that are still valid stay valid.",
+      "cleaned": "{count, plural, =0 {Nothing to clean up.} one {# entry deleted.} other {# entries deleted.}}",
+      "revoke": "Revoke",
+      "revokeFor": "Revoke invite for {name}",
+      "revokeTitle": "Revoke invite",
+      "revokeConfirm": "The code for {name} can no longer be redeemed afterwards.",
       "status": {
         "issued": "issued",
         "redeemed": "redeemed",
@@ -1129,6 +1137,11 @@
       "help": "Shown once. Copy now for personal handover; closing discards this value.",
       "copied": "Copied.",
       "copyFailed": "Copy failed. Select and copy the value manually.",
+      "qrLabel": "QR code",
+      "qrHelp": {
+        "invite": "Scan with a phone to open the sign-up with this code.",
+        "recovery": "Scan with a phone to open the recovery link."
+      },
       "copy": "Copy",
       "done": "Done"
     },
@@ -1160,7 +1173,8 @@
       "verificationRequired": "Confirm the target's identity in person first.",
       "loggedOut": "Your session expired. Sign in again.",
       "request": "Request failed. Please try again.",
-      "rateLimited": "Too many attempts. Please try again later."
+      "rateLimited": "Too many attempts. Please try again later.",
+      "inviteNotIssued": "This invite is no longer issued. The history has changed in the meantime."
     },
     "spam": {
       "heading": "Spam detection",
