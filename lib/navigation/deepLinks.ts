@@ -1,6 +1,6 @@
 /** Public, version-independent URL state for the single-page mail shell. */
 export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
-export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam"] as const;
+export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam", "domains"] as const;
 export const GROUPS = ["none", "date", "week", "sender", "domain", "year", "folder", "event"] as const;
 export const PANELS = ["process", "exception", "reminder", "calendar", "mail-check"] as const;
 export const VIEWS = ["virtual:focused", "virtual:action-queue", "virtual:invite-deck", "virtual:assigned-to-me", "virtual:unassigned", "virtual:open", "virtual:suspicious"] as const;

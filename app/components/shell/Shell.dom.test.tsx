@@ -85,9 +85,22 @@ function OpenMobileSheet() {
 }
 
 describe("shell sidebar", () => {
-  for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
-    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
-    expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
+  for (const admin of [false, true]) it(`offers mailbox creation only in the empty state, only when admin=${admin}`, () => {
+    // With a mailbox there is no add action in the sidebar (Administration has it).
+    const listed = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
+    expect(listed.queryByRole("button", { name: "Add mailbox" })).toBeNull();
+    expect(listed.queryByText("No mailbox yet")).toBeNull();
+    cleanup();
+    const empty = renderSidebar([], () => {}, () => {}, { isAdminUser: admin });
+    expect(empty.getByText("No mailbox yet")).toBeTruthy();
+    const add = empty.queryByRole("button", { name: "Add mailbox" });
+    expect(Boolean(add)).toBe(admin);
+    if (add) {
+      // A labelled row with the plus icon, 44 px on phones.
+      expect(add.textContent).toBe("Add mailbox");
+      expect(add.querySelector("svg")).toBeTruthy();
+      expect(add.className).toContain("max-md:h-11");
+    }
   });
 
   it("labels the brand with the same short commit and Berlin build time as the status popover", () => {
@@ -407,6 +420,22 @@ describe("mailbox avatars and domain icons", () => {
       expect(headerOf(view, "plain.example.test").querySelector("[data-slot=avatar]")?.childElementCount).toBe(0);
       expect(headerOf(view, "plain.example.test").textContent).toBe("plain.example.test");
       expect(headerOf(view, "example.test").querySelector("[data-slot=avatar]")).toBeNull();
+    } finally {
+      images.restore();
+    }
+  });
+
+  it("loads an uploaded domain icon by its version, also when sender icons are off", async () => {
+    const images = stubAvatarImages();
+    try {
+      const quiet = ["a", "b", "c", "d"].map(id => ({ ...account(id, `Brand ${id}`, "brand.example.test"), settings: { appearance: { senderIcons: false } } }) as ShellAccount);
+      const plain = ["e", "f", "g"].map(id => account(id, `Plain ${id}`, "plain.example.test"));
+      const view = renderSidebar([...quiet, ...plain], () => {}, undefined, {}, undefined, "en", null, {}, quiet[0].id,
+        { domainIcons: { "brand.example.test": "abcdef0123456789" } });
+      const brandSrc = `${domainIconSrc(quiet[0], "brand.example.test")}&v=abcdef0123456789`;
+      expect(images.probes.map(probe => probe.src).sort()).toEqual([brandSrc, domainIconSrc(plain[0], "plain.example.test")].sort());
+      await images.settle(brandSrc, true);
+      await waitFor(() => expect(headerOf(view, "brand.example.test").querySelector("img")?.getAttribute("src")).toBe(brandSrc));
     } finally {
       images.restore();
     }

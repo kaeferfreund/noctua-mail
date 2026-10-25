@@ -20,7 +20,6 @@ import {
   useSidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -41,6 +40,7 @@ import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, s
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains, type MailboxSection } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
+import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -62,6 +62,8 @@ export type ShellSidebarProps = {
     activeAccountId: string;
     /** Signed-in user; keys the collapsed domain groups on this device. */
     userId?: string | null;
+    /** Versions of admin-uploaded domain icons by group domain. */
+    domainIcons?: DomainIconVersions;
     /** May return the switch promise; the clicked row shows a pending state until it settles. */
     onSwitch: (accountId: string) => void | Promise<unknown>;
     onAdd?: () => void;
@@ -197,13 +199,15 @@ const MailboxRow = memo(function MailboxRow({ account, summary, isActive, isPend
 
 /** One favicon per domain group header, through the sender-icon route of
  * the group's first mailbox with sender icons on; nothing while it loads or
- * when the domain has no logo (`fallback=none` answers 404). */
-function DomainIcon({ domain, accounts }: { domain: string; accounts: readonly ShellAccount[] }) {
-  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true);
+ * when the domain has no logo (`fallback=none` answers 404). An uploaded
+ * domain icon (known by its version) replaces the favicon and needs no
+ * external fetch, so it shows even when sender icons are off. */
+function DomainIcon({ domain, accounts, version }: { domain: string; accounts: readonly ShellAccount[]; version?: string }) {
+  const source = accounts.find(account => account.settings?.appearance?.senderIcons ?? true) ?? (version ? accounts[0] : undefined);
   if (!source) return null;
   return (
     <Avatar className="size-4 rounded-sm after:hidden empty:hidden">
-      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none" })} alt="" className="rounded-sm" />
+      <AvatarImage src={buildSenderIconSrc(source.id, { from: domain, fromEmail: source.email, fallback: "none", version })} alt="" className="rounded-sm" />
     </Avatar>
   );
 }
@@ -237,8 +241,9 @@ export function MailboxRows({
   onSwitch,
   summaries,
   userId,
-  section
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId"> & {
+  section,
+  domainIcons
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
   /** Keys the collapsed domain groups together with the domain. */
@@ -277,7 +282,7 @@ export function MailboxRows({
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} /> : null}
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIcons?.[group.domain]} /> : null}
                 </span>
                 {/* A long domain ellipsizes before the counters, which never
                     shrink; the full name stays available as a tooltip. */}
@@ -421,13 +426,6 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               ) : null}
             </SidebarGroup>
             <SidebarGroup className={FLUSH_SECTION_CLASS}>
-              {/* No section heading: the add action keeps its place at the
-                  right, on a line of its own above the list. */}
-              {mailboxes.onAdd && <div className="flex h-8 items-center justify-end pr-1">
-                <SidebarGroupAction className="relative top-auto right-auto" title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
-                  <Plus />
-                </SidebarGroupAction>
-              </div>}
               <SidebarGroupContent>
                 {accounts.length > 0 ? (
                   <MailboxRows
@@ -436,11 +434,23 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
                     userId={mailboxes.userId}
+                    domainIcons={mailboxes.domainIcons}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
                   />
                 ) : (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                  <>
+                    <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                    {/* Only without any mailbox; otherwise admins add mailboxes
+                        in Administration > Mailboxes. */}
+                    {mailboxes.onAdd ? (
+                      <SidebarMenu><SidebarMenuItem>
+                        <SidebarMenuButton className={cn(FLUSH_ROW_RING_CLASS, "max-md:h-11")} onClick={closeAfter(mailboxes.onAdd)} data-shell-action="add-mailbox">
+                          <Plus /><span>{t("mailboxes.add")}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem></SidebarMenu>
+                    ) : null}
+                  </>
                 )}
               </SidebarGroupContent>
             </SidebarGroup>
