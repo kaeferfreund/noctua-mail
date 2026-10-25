@@ -25,12 +25,12 @@
 /* Matches the shadcn SidebarGroupLabel the other sidebar sections use. */
 .panelTitle {
   font-weight: 500;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted-foreground);
 }
 
 .panelMeta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted-foreground);
   margin-left: auto;
 }
@@ -72,7 +72,7 @@
   background: transparent;
   color: var(--sidebar-foreground);
   text-align: left;
-  font-size: 14px;
+  font-size: 15px;
   width: 100%;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   cursor: pointer;
@@ -218,8 +218,7 @@
 }
 
 .menuContent :global(.rt-BaseMenuItem) {
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  font-size: 13px;
 }
 
 .menuContent :global(.rt-BaseMenuItemIndicator) {

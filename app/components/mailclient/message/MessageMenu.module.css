@@ -23,8 +23,7 @@
 }
 
 .menuContent :global(.rt-BaseMenuItem) {
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  font-size: 13px;
 }
 
 .menuContent :global(.rt-BaseMenuContent) {

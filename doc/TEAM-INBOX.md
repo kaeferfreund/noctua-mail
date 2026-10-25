@@ -1418,6 +1418,8 @@ Rules:
   to it. No `next/font` (server builds must stay hermetic). `HtmlMessage.tsx` injects the
   same `@font-face` with the absolute `/fonts/...` URL into the srcdoc and uses the family; the
   compose editor uses the family through the token.
+  Superseded in 2026-10: the app uses the platform UI font stack (`-apple-system, BlinkMacSystemFont,
+  "SF Pro Text", …` in `--font-sans` and `lib/ui/fonts.ts`); Inter and `public/fonts` were removed.
 - `<Theme accentColor="iris" grayColor="gray" panelBackground="solid">` stays in the root layout.
   `<html suppressHydrationWarning>`, `ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem`
   (users without a stored value follow the OS theme); the header menu offers light / dark / system. `darkMode` for the kept renderers comes
