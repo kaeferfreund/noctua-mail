@@ -39,6 +39,7 @@ import {
   pickSweepJobs,
   spamErrorLogFields,
   SPAM_MAX_ATTEMPTS,
+  SPAM_QUEUE_CONCURRENCY,
   type SpamCheckJob
 } from "./queue";
 import { loadMailboxSpamSettings, loadSpamConfig } from "./settings";
@@ -89,6 +90,8 @@ type SpamServiceState = {
   identity?: { loadedAt: number; sets: ReturnType<typeof buildOwnIdentitySets>; accountIds: string[] };
   /** Model token usage per account since that account's last sweep summary. */
   usage: Map<string, SpamTokenUsage>;
+  /** Model token usage per admin rescan job (rescan.ts), kept out of the sweep summaries. */
+  rescanUsage?: Map<string, SpamTokenUsage>;
   deps?: SpamServiceDeps;
 };
 
@@ -110,6 +113,7 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
 })();
 
 const deps = () => state.deps ?? DEFAULT_DEPS;
+const rescanUsage = () => state.rescanUsage ??= new Map();
 
 /** Tests: replaces outside dependencies until the returned function restores them. */
 export function replaceSpamServiceDeps(overrides: Partial<SpamServiceDeps>) {
@@ -153,9 +157,41 @@ async function logSweepSummary(accountId: string, messages: number) {
   });
 }
 
-function recordUsage(accountId: string, usage: SpamTokenUsage) {
-  console.debug("[spam] model call", { accountId, ...spamUsageLogFields(usage) });
-  state.usage.set(accountId, addSpamUsage(state.usage.get(accountId) ?? EMPTY_SPAM_USAGE, usage));
+function recordUsage(job: SpamCheckJob, usage: SpamTokenUsage) {
+  console.debug("[spam] model call", { accountId: job.accountId, ...spamUsageLogFields(usage) });
+  const totals = job.rescanJobId ? rescanUsage() : state.usage;
+  const key = job.rescanJobId ?? job.accountId;
+  totals.set(key, addSpamUsage(totals.get(key) ?? EMPTY_SPAM_USAGE, usage));
+}
+
+/**
+ * Admin rescan (rescan.ts): classifies the given INBOX rows through the
+ * sweep's queue, so its concurrency, retries and attempt limit hold for both.
+ * Only one batch of SPAM_QUEUE_CONCURRENCY jobs is queued at a time: sweeps
+ * queued meanwhile run in between, and a cancel stops after the running
+ * batch. Rows the sweep has queued already are waited for, not checked twice.
+ * Never auto-moves. Resolves with the model usage of this rescan's checks.
+ */
+export async function runRescanSpamChecks(accountId: string, candidates: Array<{ id: string; failedAttempts?: number }>, options: {
+  rescanJobId: string;
+  isCancelled: () => boolean;
+  onProgress: (checked: number, usage: SpamTokenUsage) => void;
+}) {
+  const usage = () => rescanUsage().get(options.rescanJobId) ?? EMPTY_SPAM_USAGE;
+  try {
+    for (let start = 0; start < candidates.length && !options.isCancelled(); start += SPAM_QUEUE_CONCURRENCY) {
+      const jobs: SpamCheckJob[] = candidates.slice(start, start + SPAM_QUEUE_CONCURRENCY).map((candidate) => ({
+        accountId, messageId: candidate.id, failedAttempts: candidate.failedAttempts ?? 0, rescanJobId: options.rescanJobId
+      }));
+      jobs.forEach((job) => state.claims.claim(job));
+      state.queue.enqueue(jobs);
+      await Promise.all(jobs.map((job) => state.queue.settled(job)));
+      options.onProgress(Math.min(candidates.length, start + jobs.length), usage());
+    }
+    return usage();
+  } finally {
+    rescanUsage().delete(options.rescanJobId);
+  }
 }
 
 async function household() {
@@ -216,7 +252,7 @@ async function checkMessage(job: SpamCheckJob) {
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
     model: deps().languageModel(config),
     providerOptions: getSpamProviderOptions(config),
-    onUsage: (usage) => recordUsage(job.accountId, usage),
+    onUsage: (usage) => recordUsage(job, usage),
     trust
   });
   if (!decision) {
@@ -232,7 +268,8 @@ async function checkMessage(job: SpamCheckJob) {
   const saved = await saveSpamVerdict(job.accountId, message.id, { verdict, confidence: decision.confidence, reasons: decision.reasons }, { automatic: true });
   // Each message is saved once (spamCheckedAt), so it enters the profile once; only ham teaches the pattern (not spam, not unsure).
   if (saved && verdict === "ham") await learnSenderProfile(job.accountId, message.id, input, identity.ownAddresses);
-  if (saved && marked && mailbox.autoMove) await autoMoveToJunk(job.accountId, message);
+  // The admin rescan only marks: its results are moved after the admin's review.
+  if (saved && marked && mailbox.autoMove && !job.rescanJobId) await autoMoveToJunk(job.accountId, message);
 }
 
 /** The sender's mails stored closest to `message` with their arrival (burst rule; never the sender's Date header). */

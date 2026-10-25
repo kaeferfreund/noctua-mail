@@ -3,7 +3,7 @@ import { parseReviewedServerFlagItems, planServerFlagApply, serverFlagApplyRecor
 
 const item = (id: string, overrides: Partial<ServerFlagItem> = {}): ServerFlagItem => ({
   accountId: "acc-a", id, messageId: `<${id}@example.test>`, from: `${id}@sender.example.test`, fromEmail: `${id}@sender.example.test`,
-  subject: `Angebot ${id}`, date: "2026-01-01T00:00:00.000Z", score: 7.1, senderUnflagged: 0, domainUnflagged: 0, decision: "move", reasons: [], ...overrides
+  subject: `Angebot ${id}`, date: "2026-01-01T00:00:00.000Z", dateValue: Date.parse("2026-01-01T00:00:00.000Z"), score: 7.1, senderUnflagged: 0, domainUnflagged: 0, decision: "move", reasons: [], ...overrides
 });
 
 describe("server-flag backfill plan", () => {

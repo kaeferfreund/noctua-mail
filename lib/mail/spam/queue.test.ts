@@ -25,6 +25,25 @@ describe("spam queue", () => {
     expect(seen.sort()).toEqual(["a", "b", "c"]);
   });
 
+  test("settled resolves when that job is done, also for a job queued by someone else, and at once for an unknown one", async () => {
+    const done: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const queue = createSpamQueue({
+      check: async ({ messageId }) => { if (messageId === "a") await gate; done.push(messageId); },
+      onFailure: () => { throw new Error("unexpected"); }
+    });
+    queue.enqueue([job("a"), job("b")]);
+    // A second enqueue of "a" (the rescan) is ignored, but it can wait for the sweep's run.
+    queue.enqueue([job("a")]);
+    const settled = queue.settled(job("a")).then(() => [...done]);
+    await queue.settled(job("b"));
+    expect(done).toEqual(["b"]);
+    release();
+    expect(await settled).toEqual(["b", "a"]);
+    await queue.settled(job("unknown"));
+  });
+
   test("retries a failing check at most twice, then reports it once", async () => {
     let attempts = 0;
     const failures: unknown[] = [];

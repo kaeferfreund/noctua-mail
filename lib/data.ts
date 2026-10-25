@@ -530,6 +530,8 @@ export type AdminAuditAction =
   | "member.update"
   | "member.revoke"
   | "spam_settings.update"
+  | "spam_rescan.start"
+  | "spam_rescan.move"
   | "domain_icon.upload"
   | "domain_icon.reset";
 

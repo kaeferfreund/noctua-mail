@@ -415,6 +415,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 See [STORAGE.md](STORAGE.md) for detailed information about which data is stored where.
 For the one-way shard upgrade, follow the stopped backup, verification and restore procedure in [FTS v3 migration](FTS-V3-MIGRATION.md).
+The same stopped backup applies to additive master schema changes, for example the scheduled-send table
+([SCHEDULED-SEND.md](SCHEDULED-SEND.md)) and the admin spam rescan tables `spam_rescan_jobs` and
+`spam_rescan_items` ([SPAM-DETECTION.md](SPAM-DETECTION.md), Storage and migration).
 
 ### What to Backup
 
