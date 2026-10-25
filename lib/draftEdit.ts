@@ -4,7 +4,7 @@ import { getFolders, getMessageById, listSenderIdentities } from "@/lib/serverDb
 import { findDraftsFolder } from "@/lib/specialFolders";
 import { hasMessageFlag } from "@/lib/messageFlags";
 import { hasHtmlContent } from "@/lib/messageContentState";
-import { escapeHtml, extractQuotedHtmlFromDraft } from "@/lib/html";
+import { FORWARDED_MESSAGE_MARKERS, escapeHtml, extractQuotedHtmlFromDraft, isQuoteBoundaryText } from "@/lib/html";
 import { extractComposeInviteDraftFromSource } from "@/lib/composeInviteMetadata";
 import { getMessageSource } from "@/lib/storage";
 import { readStoredAttachmentData } from "@/lib/mail/storedAttachmentData";
@@ -101,6 +101,34 @@ function appendParagraph(existing: string, addition: string) {
   return base ? `${base}\n\n${addition}` : addition;
 }
 
+const FORWARD_MARKER_LINES = new Set<string>(Object.values(FORWARDED_MESSAGE_MARKERS));
+
+/**
+ * Line index where the quoted original of a plain-text reply/forward starts, as
+ * compose writes it (formatQuotedBody): a forward marker line, or the reply
+ * header line directly above the trailing `>` block (or that block itself).
+ * -1 when the text has no quote.
+ */
+function textQuoteStart(lines: string[]) {
+  const forwardMarker = lines.findIndex(line => FORWARD_MARKER_LINES.has(line.trim()));
+  if (forwardMarker !== -1) return forwardMarker;
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1]!.trim()) end -= 1;
+  let start = end;
+  while (start > 0 && lines[start - 1]!.startsWith(">")) start -= 1;
+  if (start === end) return -1;
+  return start > 0 && isQuoteBoundaryText(lines[start - 1]!) ? start - 1 : start;
+}
+
+/** Text-format append: after the authored text, above a quoted original when there is one. */
+function appendTextParagraph(text: string, addition: string) {
+  const lines = text.split(/\r?\n/);
+  const quoteStart = textQuoteStart(lines);
+  if (quoteStart === -1) return appendParagraph(text, addition);
+  const quote = lines.slice(quoteStart).join("\n");
+  return `${appendParagraph(lines.slice(0, quoteStart).join("\n"), addition)}\n\n${quote}`;
+}
+
 function paragraphHtml(text: string) {
   return `<p>${escapeHtml(text).replace(/\r?\n/g, "<br>")}</p>`;
 }
@@ -115,7 +143,7 @@ function storedBody(message: Message, appendBody?: string): DraftBody {
   // Markdown drafts saved without their source in text/plain can only be extended as HTML.
   const composeFormat = storedFormat === "markdown" && !text.trim() && hasHtmlContent(userHtml) ? "html" : storedFormat;
   if (composeFormat === "text") {
-    return { composeFormat, text: appendBody === undefined ? text : appendParagraph(text, appendBody) };
+    return { composeFormat, text: appendBody === undefined ? text : appendTextParagraph(text, appendBody) };
   }
   if (composeFormat === "markdown") {
     // Markdown drafts keep their source in text/plain; the stored HTML is its rendering plus the quote.

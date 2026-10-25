@@ -1043,6 +1043,46 @@ describe("/api/mcp", () => {
     expect(read.result.structuredContent.draft).toMatchObject({ composeFormat: "markdown", markdown: "**Neu**" });
   });
 
+  test("update_draft_message appends to plain-text reply and forward drafts above the quoted original", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-text-quote");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const quote = "Am 25.03.2026, 10:00 schrieb Alice <alice@example.test>:\n> Wann passt es?\n>\n> Grüße";
+    const reply = await callTool(token, "create_draft_message", { mode: "reply", messageId: `${accountId}-msg-1`, text: `Danke!\n\n${quote}` });
+    appendImapMessage.mockResolvedValueOnce(9002);
+    await callTool(token, "update_draft_message", { draftId: reply.result.structuredContent.draftId, appendBody: "Dienstag passt." }, 2);
+    expect(lastBuiltDraftMail?.text).toBe(`Danke!\n\nDienstag passt.\n\n${quote}`);
+
+    const forwarded = "-------- Weitergeleitete Nachricht --------\nVon: Bob <bob@example.test>\nBetreff: Projekt\n\n> Bitte ansehen.";
+    appendImapMessage.mockResolvedValueOnce(9003);
+    const forward = await callTool(token, "create_draft_message", { mode: "forward", messageId: `${accountId}-msg-2`,
+      to: "team@example.test", text: forwarded }, 3);
+    appendImapMessage.mockResolvedValueOnce(9004);
+    await callTool(token, "update_draft_message", { draftId: forward.result.structuredContent.draftId, appendBody: "Zur Info." }, 4);
+    expect(lastBuiltDraftMail?.text).toBe(`Zur Info.\n\n${forwarded}`);
+
+    appendImapMessage.mockResolvedValueOnce(9005);
+    const plain = await callTool(token, "create_draft_message", { to: "draft-target@example.test", text: "Erste Zeile\n> kein Zitat am Ende\nLetzte Zeile" }, 5);
+    appendImapMessage.mockResolvedValueOnce(9006);
+    await callTool(token, "update_draft_message", { draftId: plain.result.structuredContent.draftId, appendBody: "Neu." }, 6);
+    expect(lastBuiltDraftMail?.text).toBe("Erste Zeile\n> kein Zitat am Ende\nLetzte Zeile\n\nNeu.");
+  });
+
+  test("update_draft_message appends to Markdown drafts in their source", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-markdown");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const created = await callTool(token, "create_draft_message", { to: "draft-target@example.test", subject: "MD", markdown: "**Hallo**\n\n- Punkt" });
+    expect(lastBuiltDraftMail?.text).toBe("**Hallo**\n\n- Punkt");
+    appendImapMessage.mockResolvedValueOnce(9002);
+    await callTool(token, "update_draft_message", { draftId: created.result.structuredContent.draftId, appendBody: "Noch ein Satz." }, 2);
+    expect(lastBuiltDraftMail?.text).toBe("**Hallo**\n\n- Punkt\n\nNoch ein Satz.");
+    expect(lastBuiltDraftMail?.html).toContain("<strong>Hallo</strong>");
+    expect(lastBuiltDraftMail?.html).toContain("Noch ein Satz.");
+    const read = await callTool(token, "get_draft_message", { draftId: `${accountId}-draft-9002` }, 3);
+    expect(read.result.structuredContent.draft).toMatchObject({ composeFormat: "markdown", markdown: "**Hallo**\n\n- Punkt\n\nNoch ein Satz." });
+  });
+
   test("draft edit rejects invalid combinations, unknown ids and non-draft messages", async () => {
     const accountId = uniqueAccountId("acc-mcp-draft-errors");
     await seedMailbox(accountId);
