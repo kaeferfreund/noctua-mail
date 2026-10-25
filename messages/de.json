@@ -524,8 +524,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Eigene Postfächer",
-      "shared": "Gemeinsame Postfächer",
+      "sharedMailbox": "Geteiltes Postfach",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
       "unreadUnavailable": "Anzahl ungelesener E-Mails nicht verfügbar",

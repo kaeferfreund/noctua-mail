@@ -104,14 +104,26 @@ describe("shell sidebar", () => {
     expect(plain.queryByText(/^Build /)).toBeNull();
   });
 
-  it("sorts personal and shared mailboxes, switches accounts and keeps full mailbox sync reachable", () => {
+  it("lists own and shared mailboxes in one sorted list, switches accounts and keeps full mailbox sync reachable", () => {
     const switched: string[] = [];
     let syncs = 0;
-    const view = renderSidebar([account("z", "Zulu"), account("a", "Alpha"), account("team", "Team", "example.test", true)],
+    const view = renderSidebar([account("z", "Zulu"), account("team", "Team", "example.test", true), account("a", "Alpha")],
       (id) => { switched.push(id); }, () => { syncs++; });
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[aria-current], button[title$='@example.test']")]
       .filter((row) => row.getAttribute("aria-label") !== "User menu");
-    expect(rows.map((row) => row.textContent)).toEqual(["Alpha", "Zulu", "Team"]);
+    expect(rows.map((row) => row.textContent)).toEqual(["Alpha", "Team", "Zulu"]);
+    // One section in one menu: no heading above the list, no second section.
+    expect(new Set(rows.map((row) => row.closest("[data-sidebar=menu]"))).size).toBe(1);
+    expect(view.queryByText("My mailboxes")).toBeNull();
+    expect(view.queryByText("Shared mailboxes")).toBeNull();
+    // Only the shared mailbox carries the marker, after its name.
+    const markers = rows.map((row) => row.querySelector("[data-shared-mailbox]"));
+    expect(markers.map(Boolean)).toEqual([false, true, false]);
+    expect(markers[1]!.getAttribute("role")).toBe("img");
+    expect(markers[1]!.getAttribute("aria-label")).toBe("Shared mailbox");
+    expect(markers[1]!.getAttribute("title")).toBe("Shared mailbox");
+    expect(markers[1]!.previousElementSibling?.textContent).toBe("Team");
+    expect(markers[1]!.previousElementSibling?.className).toContain("truncate");
     fireEvent.click(view.getByRole("button", { name: /Alpha/ }));
     expect(switched).toEqual(["a"]);
     fireEvent.click(view.getByRole("button", { name: "Check all folders for new mail" }));
@@ -120,12 +132,14 @@ describe("shell sidebar", () => {
   });
 
   it("renders domain headings only for sections with more than six mailboxes", () => {
-    const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test"));
+    // A shared mailbox counts towards the list and sits in its domain's group.
+    const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test", i === 2));
     const view = renderSidebar(accounts, () => {});
     expect(view.getByText("a.example.test")).toBeTruthy();
     expect(view.getByText("b.example.test")).toBeTruthy();
     const rows = [...view.container.querySelectorAll<HTMLButtonElement>("button[title$='@a.example.test']")];
     expect(rows.map((row) => row.title)).toEqual(["box6@a.example.test", "box4@a.example.test", "box2@a.example.test", "box0@a.example.test"]);
+    expect(rows.map((row) => Boolean(row.querySelector("[data-shared-mailbox]")))).toEqual([false, false, true, false]);
     // Grouped rows sit in a guided container, indented to the heading's text.
     for (const row of rows) {
       expect(row.closest("[data-sidebar=menu]")?.hasAttribute("data-domain-group")).toBe(true);
