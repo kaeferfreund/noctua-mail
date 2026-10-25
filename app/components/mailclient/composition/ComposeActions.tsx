@@ -88,8 +88,11 @@ export default function ComposeActions({
               color="blue"
               onClick={handleSaveDraft}
               disabled={busy || draftSaving || !canSaveDraft}
+              aria-busy={draftSaving || undefined}
             >
-              {draftSaving ? t("actions.saving") : t("actions.saveDraft")}
+              {/* The label keeps its width while saving, so the phone action row
+                  does not re-flow; the draft status beside it says "saving". */}
+              {t("actions.saveDraft")}
             </Button>
           </>
         )}

@@ -29,6 +29,7 @@ const NOCTUA_EMAIL_VIEWPORT_CLASS = "noctua-email-viewport";
 const NOCTUA_EMAIL_VIEWPORT_DEFAULT_MARGIN_CLASS = "noctua-email-viewport--default-margin";
 const NOCTUA_QUOTE_COLLAPSE_CLASS = "noctua-quote-collapse";
 const NOCTUA_QUOTE_CONTENT_CLASS = "noctua-quote-collapse-content";
+const NOCTUA_IMAGE_ALT_CLASS = "noctua-image-alt";
 const QUOTE_ANIMATION_MS = 220;
 
 // Stamped on every generated document so an effect run can recognise its own
@@ -374,6 +375,29 @@ function attachQuoteAnimation(details: HTMLDetailsElement, content: HTMLElement,
   };
 }
 
+/**
+ * An image that failed to load (e.g. a remote server answering with
+ * Cross-Origin-Resource-Policy: same-origin) shows its alt text instead of the
+ * browser's broken-image icon, or nothing without alt text. Nothing new is
+ * fetched, so the remote-content gate is unaffected.
+ */
+export function replaceFailedImage(image: HTMLImageElement) {
+  const alt = image.getAttribute("alt")?.trim();
+  if (!alt) {
+    image.remove();
+    return;
+  }
+  const text = image.ownerDocument.createElement("span");
+  text.className = NOCTUA_IMAGE_ALT_CLASS;
+  text.textContent = alt;
+  image.replaceWith(text);
+}
+
+/** Already settled without pixels; decode() tells a broken image from an SVG without intrinsic size. */
+function settledWithoutPixels(image: HTMLImageElement) {
+  return image.complete && image.naturalWidth === 0 && Boolean(image.getAttribute("src")) && typeof image.decode === "function";
+}
+
 export function buildPreviewDocument({
   html,
   safeHtml,
@@ -462,6 +486,7 @@ export function buildPreviewDocument({
     ".email-body { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }",
     `a { color: ${linkColor}; }`,
     "img { max-width: 100%; height: auto; }",
+    `.${NOCTUA_IMAGE_ALT_CLASS} { opacity: 0.7; }`,
     `.${NOCTUA_EMAIL_CONTENT_CLASS} p, .${NOCTUA_EMAIL_CONTENT_CLASS} div, .${NOCTUA_EMAIL_CONTENT_CLASS} span { max-width: 100%; }`,
     `blockquote { border-left: 3px solid ${blockquoteBorder}; margin: 8px 0; padding-left: 12px; }`,
     "pre { white-space: pre-wrap; }",
@@ -660,6 +685,10 @@ function HtmlMessage({
       const handleAssetLoad = () => {
         scheduleHeightUpdate();
       };
+      const handleImageError = (event: Event) => {
+        replaceFailedImage(event.currentTarget as HTMLImageElement);
+        scheduleHeightUpdate();
+      };
 
       doc.addEventListener("mouseover", handleMouseOver);
       doc.addEventListener("mouseout", handleMouseOut);
@@ -668,8 +697,16 @@ function HtmlMessage({
       iframe.addEventListener("mouseleave", handleFrameMouseLeave);
 
       doc.querySelectorAll("img").forEach((image) => {
+        // A failure before the listeners were attached fires no further event.
+        if (settledWithoutPixels(image)) {
+          image.decode().catch(() => {
+            if (!image.isConnected) return;
+            replaceFailedImage(image);
+            scheduleHeightUpdate();
+          });
+        }
         image.addEventListener("load", handleAssetLoad);
-        image.addEventListener("error", handleAssetLoad);
+        image.addEventListener("error", handleImageError);
       });
 
       if (typeof ResizeObserver !== "undefined") {
@@ -695,7 +732,7 @@ function HtmlMessage({
         iframe.removeEventListener("mouseleave", handleFrameMouseLeave);
         doc.querySelectorAll("img").forEach((image) => {
           image.removeEventListener("load", handleAssetLoad);
-          image.removeEventListener("error", handleAssetLoad);
+          image.removeEventListener("error", handleImageError);
         });
       };
     };

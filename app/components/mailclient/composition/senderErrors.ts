@@ -16,22 +16,21 @@ const messages: Record<string, string> = {
 };
 export type SenderMessageAction = "sender" | "recipients" | null;
 const recipientActionMessages = new Set<string>([senderMessages.recipientRejected]);
-// Delivery problems that neither another sender nor other recipients can solve.
-const noActionMessages = new Set<string>([
-  senderMessages.messageRejected,
-  senderMessages.providerTemporary,
-  senderMessages.providerConfiguration,
-  senderMessages.providerConnection,
-  senderMessages.providerFailure,
-  senderMessages.connectionTimeout,
-  senderMessages.greetingTimeout,
-  senderMessages.deliveryUncertain
+// Problems another sender identity can solve. Everything else (delivery or provider
+// failures, generic save/send errors from `readErrorMessage`) gets no field link.
+const senderActionMessages = new Set<string>([
+  senderMessages.identityUnavailable,
+  senderMessages.draftIdentityChanged,
+  senderMessages.senderRejected,
+  senderMessages.chooseEnabledSender,
+  senderMessages.identityLoadFailed
 ]);
-/** Which compose field the inline notice below "From" should point to. */
+/** Which compose field the inline notice below "From" should point to.
+ * Without an error the notice shows sender warnings, which belong to "From". */
 export function senderMessageAction(message: string | null | undefined): SenderMessageAction {
-  if (message && recipientActionMessages.has(message)) return "recipients";
-  if (message && noActionMessages.has(message)) return null;
-  return "sender";
+  if (!message) return "sender";
+  if (recipientActionMessages.has(message)) return "recipients";
+  return senderActionMessages.has(message) ? "sender" : null;
 }
 export async function readSenderError(response: Response, fallback: (response: Response) => Promise<string>) {
   const data = await response.clone().json().catch(() => null) as { code?: string } | null;

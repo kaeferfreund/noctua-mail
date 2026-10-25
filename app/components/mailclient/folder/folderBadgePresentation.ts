@@ -30,6 +30,12 @@ export function getFolderCountTitle(
   return getTranslator(locale)("List.folderCountTitle", { path: folderPath, total: normalizedTotalCount, unread: normalizedUnreadCount });
 }
 
+/** Total drafts shown both in the folder tree and on the pinned "Drafts" entry
+ * (0 until the server reports a count; the loaded page is not a total). */
+export function getDraftsFolderCount(folder: { count?: number | null }): number {
+  return Math.max(0, folder.count ?? 0);
+}
+
 /**
  * The number next to a folder in the tree: unread mail, except for Drafts,
  * where the total is what matters (the same number as the pinned "Drafts"
@@ -38,6 +44,6 @@ export function getFolderCountTitle(
 export function getFolderTreeCount(
   folder: Pick<Folder, "specialUse" | "count" | "unreadCount">
 ): { kind: "unread" | "drafts"; count: number } {
-  if (isDraftsFolderRecord(folder)) return { kind: "drafts", count: Math.max(0, folder.count ?? 0) };
+  if (isDraftsFolderRecord(folder)) return { kind: "drafts", count: getDraftsFolderCount(folder) };
   return { kind: "unread", count: Math.max(0, folder.unreadCount ?? 0) };
 }
