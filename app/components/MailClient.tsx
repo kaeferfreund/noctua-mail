@@ -2647,11 +2647,13 @@ export default function MailClient({
   }, [activeAccountId, activeTopicSuggestionRankedMessages, threadScopeMessages]);
 
   const activeMessage = useMemo(() => {
-    if (composeOpen && composeMode === "new") return undefined;
+    // A shown new message takes the reader's place. Minimized (selecting a row minimizes
+    // it), it must not hide the message the user just selected.
+    if (composeOpen && composeMode === "new" && composeView !== "minimized") return undefined;
     if (!viewMessage) return undefined;
     if (viewMessage.accountId !== activeAccountId) return undefined;
     return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
-  }, [viewMessage, filteredMessages, composeOpen, composeMode, activeAccountId]);
+  }, [viewMessage, filteredMessages, composeOpen, composeMode, composeView, activeAccountId]);
   // The saved preference applies only while a message is open; every list
   // behaviour (paging, scroll capture, notice anchor) follows the shown layout.
   const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
