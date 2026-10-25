@@ -7,7 +7,7 @@ export const BASE_APP_TITLE = "Mail";
  * carries this version to make browsers and notifications fetch the new art.
  * public/sw.js cannot import this module and repeats the value.
  */
-export const APP_ICON_VERSION = "4";
+export const APP_ICON_VERSION = "5";
 
 export function versionedIconUrl(path: string) {
   return `${path}?v=${APP_ICON_VERSION}`;
