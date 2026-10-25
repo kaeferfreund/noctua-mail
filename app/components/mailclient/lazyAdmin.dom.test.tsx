@@ -240,7 +240,7 @@ if (!scenario) {
         await view.findByRole("dialog", { name: "Create mailbox" }, { timeout: 5000 });
         expect(view.queryByRole("status", { name: "Add mailbox" })).toBeNull();
         expect(loaded()).toEqual([false, true, false]);
-        expect(view.getByText("Creates an ownerless mailbox. Grant members after creation.")).toBeTruthy();
+        expect(view.getByText("Creates a mailbox owned by you. Add further members after creation.")).toBeTruthy();
         fireEvent.click(view.getAllByRole("button", { name: "Close" })[0]);
       } else {
         act(() => { fireEvent.click(view.getByRole("button", { name: "Admin" })); });

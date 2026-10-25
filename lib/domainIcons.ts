@@ -110,9 +110,10 @@ export async function domainIconVersions(domains: Iterable<string>): Promise<Map
 
 export type DomainIconEntry = { domain: string; mailboxes: number; version: string | null; updatedAt: number | null };
 
-/** Admin list: every domain of a mailbox address, plus any domain that still
- * has an override after its last mailbox went away (so it can be reset). */
-export async function listDomainIconEntries(accounts: ReadonlyArray<{ email: string }>): Promise<DomainIconEntry[]> {
+/** Admin list: every domain of the given mailboxes (the admin's own), plus any domain that still
+ * has an override after its last mailbox went away (so it can be reset). A domain that only other
+ * mailboxes of `allAccounts` use stays out. */
+export async function listDomainIconEntries(accounts: ReadonlyArray<{ email: string }>, allAccounts: ReadonlyArray<{ email: string }>): Promise<DomainIconEntry[]> {
   const entries = new Map<string, DomainIconEntry>();
   for (const account of accounts) {
     const domain = mailboxDomain(account.email);
@@ -121,9 +122,10 @@ export async function listDomainIconEntries(accounts: ReadonlyArray<{ email: str
     entry.mailboxes += 1;
     entries.set(domain, entry);
   }
+  const used = new Set(allAccounts.map(account => mailboxDomain(account.email)));
   for (const row of await listDomainIconRows()) {
-    const entry = entries.get(row.domain) ?? { domain: row.domain, mailboxes: 0, version: null, updatedAt: null };
-    entries.set(row.domain, { ...entry, version: domainIconVersion(row.hash), updatedAt: row.updatedAt });
+    const entry = entries.get(row.domain) ?? (used.has(row.domain) ? null : { domain: row.domain, mailboxes: 0, version: null, updatedAt: null });
+    if (entry) entries.set(row.domain, { ...entry, version: domainIconVersion(row.hash), updatedAt: row.updatedAt });
   }
   return [...entries.values()].sort((a, b) => a.domain.localeCompare(b.domain, "en"));
 }

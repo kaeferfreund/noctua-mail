@@ -147,14 +147,6 @@ export async function loadSpamRescanState(accountId: string) {
   return { job: job ? publicJob(job) : null, items: job ? (await listSpamRescanItems(job.id)).map(publicItem) : [] };
 }
 
-/**
- * Mailboxes an admin may check: only those they are a member of (owner or any
- * role), never every mailbox of the household (user decision 2026-10-25).
- */
-export async function listSpamRescanMailboxes(userId: string) {
-  return (await listAccessibleAccountsForUser(userId)).map(({ account }) => ({ accountId: account.id, email: account.email }));
-}
-
 /** Running scans and moves of the user's own mailboxes, for the activity panel. */
 export async function listSpamRescanActivity(userId: string): Promise<SpamRescanActivity[]> {
   await reconcile();

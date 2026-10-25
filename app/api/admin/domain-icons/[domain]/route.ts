@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminSessionOr403 } from "../../_auth";
 import { withAuthResponse } from "@/lib/auth";
 import { getAccounts } from "@/lib/serverDb";
+import { listMemberAccounts } from "@/lib/accountAccess";
 import { requireBinarySameOrigin, requireBodylessSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { BodyReadTimeoutError, readBoundedBody } from "@/app/api/_helpers/readAuthJson";
 import { domainIconOverrideResponse, senderIconResponse } from "@/app/api/_helpers/iconResponse";
@@ -30,8 +31,11 @@ function rateLimited(request: Request, userId: string) {
   return actor || ip ? failure(429, "rate_limited", { "Retry-After": "60" }) : null;
 }
 
-async function mailboxesOf(domain: string) {
-  return (await getAccounts()).filter(account => mailboxDomain(account.email) === domain);
+/** The admin's own mailboxes (memberships) at the domain, and whether only other mailboxes use it
+ * (`foreign`: answered like an unknown domain). A domain no mailbox uses has neither. */
+async function domainScope(domain: string, userId: string) {
+  const mailboxes = (await listMemberAccounts(userId)).filter(account => mailboxDomain(account.email) === domain);
+  return { mailboxes, foreign: !mailboxes.length && (await getAccounts()).some(account => mailboxDomain(account.email) === domain) };
 }
 
 /** The icon the sidebar shows for the domain: the upload, else the favicon
@@ -41,9 +45,10 @@ export async function GET(request: Request, { params }: Params) {
   return withAuthResponse(session, async () => {
     const domain = normalizeIconDomain((await params).domain);
     if (!domain) return failure(400, "invalid_domain");
+    const { mailboxes, foreign } = await domainScope(domain, session.userId);
+    if (foreign) return failure(404, "unknown_domain");
     const override = await readDomainIconOverride(domain);
     if (override) return domainIconOverrideResponse(request, override);
-    const mailboxes = await mailboxesOf(domain);
     if (!mailboxes.length) return failure(404, "unknown_domain");
     const source = mailboxes.find(account => account.settings?.appearance?.senderIcons ?? true);
     return senderIconResponse(await resolveSenderIcon({ from: domain, fromEmail: (source ?? mailboxes[0]).email, enabled: Boolean(source) }), true);
@@ -58,7 +63,7 @@ export async function PUT(request: Request, { params }: Params) {
     const limited = rateLimited(request, session.userId); if (limited) return limited;
     const domain = normalizeIconDomain((await params).domain);
     if (!domain) return failure(400, "invalid_domain");
-    if (!(await mailboxesOf(domain)).length) return failure(404, "unknown_domain");
+    if (!(await domainScope(domain, session.userId)).mailboxes.length) return failure(404, "unknown_domain");
     let bytes: Uint8Array | null;
     try {
       bytes = await readBoundedBody(request, DOMAIN_ICON_MAX_BYTES);
@@ -88,6 +93,7 @@ export async function DELETE(request: Request, { params }: Params) {
     const limited = rateLimited(request, session.userId); if (limited) return limited;
     const domain = normalizeIconDomain((await params).domain);
     if (!domain) return failure(400, "invalid_domain");
+    if ((await domainScope(domain, session.userId)).foreign) return failure(404, "unknown_domain");
     const removed = await resetDomainIcon(domain, session.userId);
     return NextResponse.json({ ok: true, domain, removed }, { headers: { "Cache-Control": "no-store" } });
   });

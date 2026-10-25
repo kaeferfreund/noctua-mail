@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { requireAdminSessionOr403 } from "../_auth";
 import { withAuthResponse } from "@/lib/auth";
 import { getAccounts } from "@/lib/serverDb";
+import { listMemberAccounts } from "@/lib/accountAccess";
 import { listDomainIconEntries } from "@/lib/domainIcons";
 
-/** Domains of all mailbox addresses with their uploaded icon, if any. */
+/** Domains of the admin's own mailbox addresses (memberships) with their uploaded icon, if any. */
 export async function GET(request: Request) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () =>
-    NextResponse.json({ ok: true, domains: await listDomainIconEntries(await getAccounts()) }, { headers: { "Cache-Control": "no-store" } }));
+    NextResponse.json({ ok: true, domains: await listDomainIconEntries(await listMemberAccounts(session.userId), await getAccounts()) }, { headers: { "Cache-Control": "no-store" } }));
 }

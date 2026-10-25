@@ -4,6 +4,7 @@ import { getAccounts, getUserAccounts, getUsers } from "@/lib/db";
 import { requireAdminSessionOr403 } from "../_auth";
 import { handleAdminUser } from "../_users";
 import { listAdminUserPasskeys } from "@/lib/serverDb";
+import { listMemberAccountIds } from "@/lib/accountAccess";
 
 export async function POST(request:Request) {return handleAdminUser(request,"invite");}
 
@@ -11,15 +12,15 @@ export async function GET(request: Request) {
   const auth = await requireAdminSessionOr403(request);
   if (auth instanceof NextResponse) return auth;
   return withAuthResponse(auth, async () => {
-
-    const [users, accounts, links, passkeys] = await Promise.all([getUsers(), getAccounts(), getUserAccounts(), listAdminUserPasskeys()]);
+    const [users, accounts, links, passkeys, visible] = await Promise.all([getUsers(), getAccounts(), getUserAccounts(), listAdminUserPasskeys(), listMemberAccountIds(auth.userId)]);
     const passkeysByUser = new Map<string, Array<{id: string; name: string | null; createdAt: number | null}>>();
     for (const { userId, ...passkey } of passkeys) {
       const resources = passkeysByUser.get(userId) ?? [];
       resources.push(passkey);
       passkeysByUser.set(userId, resources);
     }
-    const accountById = new Map(accounts.map(account => [account.id, account]));
+    // Users are global; their mailboxes only as far as the admin is a member of them.
+    const accountById = new Map(accounts.filter(account => visible.has(account.id)).map(account => [account.id, account]));
     const memberships = new Map(links.map(link => [JSON.stringify([link.userId, link.accountId]), link.role]));
     const accountIdsByUserId = new Map<string, Set<string>>();
 

@@ -439,7 +439,7 @@ export function useAccountController({
       return;
     }
     if (isNew) {
-      // Admin creation grants no implicit ownership/membership or mail access.
+      // The creating admin owns the new mailbox; the reload lists it without selecting or syncing it.
       setManageOpen(false); setEditingAccount(null);
       await loadInitialData();
       return;
