@@ -30,9 +30,36 @@ members are granted separately.
 
 `requireActiveUserSession(request)` uses Better Auth's real session plus the Noctua generation/
 assurance sidecar, live enabled profile and both mandatory TOTP records. Restricted setup sessions
-cannot access mail. Cookie refresh/deletion headers are forwarded. Absolute authentication age is
-24 hours, independent of refresh. `/api/auth/me` retains enrollment/none/unselected/selected states.
+cannot access mail. Cookie refresh/deletion headers are forwarded. `/api/auth/me` retains
+enrollment/none/unselected/selected states.
 Active mailbox selection is a UI preference and never authorizes the route's requested mailbox.
+
+### Session lifetime: three days of inactivity
+
+User decision of 2026-10-25: a session stays valid as long as it is used and ends after three days
+without use. There is no absolute lifetime. Better Auth runs with `expiresIn` 259200 s
+(`SESSION_IDLE_TIMEOUT_SECONDS`), `updateAge` 3600 s and the cookie cache disabled. Every guarded
+request reads the session through `getSession`; when the last refresh is more than one hour old it
+moves `auth_session.expiresAt` to now + 3 days and sends a new session cookie with `Max-Age=259200`,
+which `withAuthResponse`/`forwardAuthHeaders` pass through. The effective idle limit is therefore
+between 71 and 72 hours after the last request. After that the row has expired, the guard answers
+401 and the deletion cookie is forwarded.
+
+The session's `expiresAt` is the only lifetime. `auth_session_security.authenticatedAt` still records
+when the factors were last proven and binds stream and MCP checks to that proof, but its age no
+longer ends a session, a stream, a reauth proof or MCP token creation. `/api/auth/me` returns the
+sliding expiry as `exp` and the idle timeout as `ttlSeconds` (259200). Open streams check the live
+session row every 5 seconds, so they follow the sliding expiry instead of a snapshot from the request
+that opened them.
+
+Security consequences: a stolen session cookie stays usable as long as it is used, and up to three
+days after its last use. The controls against that are unchanged: sensitive actions (factor and
+password changes, passkeys, backup codes, session revocation, admin recovery) still need a fresh
+`x-noctua-reauth` grant that lives five minutes and requires the factors again; Better Auth's
+`freshAge` (300 s since session creation) still applies to its own sensitive endpoints; a user can
+revoke single or all other sessions in Security settings; password, factor and login-mailbox changes
+advance the security generation, which ends all other sessions, open streams and MCP tokens; banning
+or disabling a user ends access on the next request.
 
 ## Roles and account DTOs
 
@@ -235,7 +262,7 @@ Missing, expired, mismatched or removed registry entries fail before verificatio
 at finalization. The registry uses `two_factor_imap` as a distinct two-factor kind to preserve the
 first factor's `imap_totp` method without storing a mailbox password. IMAP write-back captures its
 new generation/time after the credential service's revocation. Refresh, password changes, factor
-rotations and UV reauth preserve `authenticatedAt`; only a complete new login restarts the 24h clock.
+rotations and UV reauth preserve `authenticatedAt`; only a complete new login sets a new one.
 
 ### Fresh-proof matrix and requests
 
@@ -283,7 +310,7 @@ reset URLs or full bearer tokens appear in journal/audit metadata.
 | `POST /api/auth/security/password` | `{currentPassword?,newPassword}` → `{ok:true}` + replacement cookie when changed; consumes `password.change` or `password.set`; 10..256 characters; server forces other-session revocation |
 | `POST /api/auth/security/backup-codes` | `{currentPassword?}` → `{ok:true,backupCodes:string[]}` shown once; consumes `backup.regenerate`; advances generation, retains only proved current session and its age |
 | `POST /api/auth/totp/replace` | `{currentPassword?}` → `{ok:true,grant,purpose:"totp.enroll",expiresAt,enrollmentRequired:true}` + rotated restricted cookie; consumes `totp.replace` |
-| `POST /api/auth/security/sessions/revoke` | `{sessionId}` revokes exactly that owned session (including current only when explicitly named); `{all:true}` revokes all **other** sessions, retains the current session/absolute age and advances generation (also revoking MCP); consumes `sessions.revoke` → `{ok:true}`; explicit current-session revocation forwards deletion cookies |
+| `POST /api/auth/security/sessions/revoke` | `{sessionId}` revokes exactly that owned session (including current only when explicitly named); `{all:true}` revokes all **other** sessions, retains the current session and its authentication time and advances generation (also revoking MCP); consumes `sessions.revoke` → `{ok:true}`; explicit current-session revocation forwards deletion cookies |
 | `POST /api/auth/security/passkeys/rename` | `{passkeyId,name}` → `{ok:true}`; consumes `passkey.rename`, checks ownership; trimmed name 1..100 characters, no control characters; no generation/assurance change |
 | `POST /api/auth/security/passkeys/remove` | `{passkeyId}` → `{ok:true}`; consumes `passkey.remove`, checks ownership, revokes other sessions/tokens/challenges |
 | `POST /api/ba/two-factor/enable` | `{password?,method?:"totp"}` + `totp.enroll` header → stock `{method:"totp",totpURI,backupCodes}` once; proof reserved for this seed |

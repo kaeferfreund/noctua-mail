@@ -103,8 +103,8 @@ export async function mintMcpToken(session: ActiveUserSession, accountId: string
     const proof = db.prepare(`SELECT 1 FROM auth_session s JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
       JOIN auth_security_state st ON st.userId=s.userId WHERE s.id=? AND s.userId=? AND ss.assurance='mfa'
       AND ss.generation=st.generation AND st.generation=? AND ss.authenticatedAt=?
-      AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=? AND ss.authenticatedAt>?`)
-      .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now(), Date.now() - 86_400_000);
+      AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=?`)
+      .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now());
     if (!proof || session.assurance !== "mfa" || session.expiresAt <= Date.now() || !roleAtLeast(resolveAccountRoleRow(db, session.userId, accountId), "editor")) throw new Error("MFA session and editor membership required");
     const accountIds = [...new Set(options.accountIds ?? [accountId])];
     if (!accountIds.length || !accountIds.includes(accountId) || accountIds.some(id => !resolveAccountRoleRow(db, session.userId, id))) {

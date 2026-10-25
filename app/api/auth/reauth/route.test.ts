@@ -86,7 +86,7 @@ test("session DTO and revoke-one/all/current enforce ownership, proof, cleanup a
   const bProof=await reauthenticate(f.auth,f.master,readSessionSecurity(f.master,b!.session.id),request(jar.header(),{}),{purpose:"passkey.enroll",currentPassword:"synthetic-password-123",totpCode:totpFromUri(await factor(f))},createRateLimiter({max:50}));
   const opts=await f.auth.handler(new Request("http://localhost:3000/api/ba/passkey/generate-register-options",{headers:jar.headers({"x-noctua-reauth":bProof.grant})}));expect(opts.status).toBe(200);
   let closed=0;
-  const stream=registerAuthStream({...readSessionSecurity(f.master,b!.session.id),expiresAt:Date.now()+60000},()=>{closed++;});
+  const stream=registerAuthStream(readSessionSecurity(f.master,b!.session.id),()=>{closed++;});
   try {
     const g=await fresh(f,"sessions.revoke");
     expect((await revoke(authorized(f.jar.header(),{sessionId:b!.session.id},g.grant))).status).toBe(200);
