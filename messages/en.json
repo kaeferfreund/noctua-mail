@@ -1028,7 +1028,8 @@
       "mailboxes": "Mailboxes",
       "invites": "Invites",
       "audit": "Audit",
-      "spam": "Spam detection"
+      "spam": "Spam detection",
+      "domains": "Domain icons"
     },
     "loading": "Loading…",
     "cancel": "Cancel",
@@ -1176,6 +1177,30 @@
       "unavailableReasons": {
         "missing-key": "no API key (ANTHROPIC_API_KEY)",
         "unsupported-provider": "provider not supported"
+      }
+    },
+    "domainIcons": {
+      "heading": "Domain icons",
+      "help": "Each domain group in the sidebar shows the domain’s favicon. Replace it with your own image here: PNG, JPEG, WEBP or ICO up to 512 KB. The image is scaled to 64 × 64 pixels.",
+      "empty": "No mailboxes with a domain yet.",
+      "mailboxes": "{count, plural, =0 {no mailbox} one {# mailbox} other {# mailboxes}}",
+      "custom": "Custom image",
+      "favicon": "Favicon",
+      "iconAlt": "Icon for {domain}",
+      "upload": "Upload image",
+      "uploadFor": "Upload image for {domain}",
+      "reset": "Reset",
+      "resetFor": "Reset image for {domain}",
+      "uploaded": "The image for {domain} is saved.",
+      "resetDone": "{domain} shows its favicon again.",
+      "errors": {
+        "too_large": "The image is larger than 512 KB.",
+        "unsupported_format": "Only PNG, JPEG, WEBP or ICO are allowed.",
+        "invalid_image": "The file cannot be read as an image.",
+        "empty_upload": "The file is empty.",
+        "unknown_domain": "No mailbox uses this domain any more.",
+        "invalid_domain": "This domain is not valid.",
+        "upload_timeout": "The upload took too long. Please try again."
       }
     }
   },

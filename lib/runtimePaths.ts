@@ -32,6 +32,11 @@ export function getAttachmentMessageDir(accountId: string, messageId: string) {
   return path.join(getAttachmentsAccountDir(accountId), safeSegment(messageId));
 }
 
+/** Admin-uploaded domain icons (lib/domainIcons.ts); file names are hashes, never domains. */
+export function getDomainIconsDir() {
+  return path.join(getDataDir(), "domain-icons");
+}
+
 export function getDbPath() {
   return path.join(getDataDir(), "db", "main.db");
 }
