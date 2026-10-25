@@ -14,6 +14,7 @@ import { withDbWriteRetry } from "./dbWriteRetry";
 import { cleanupUserAccountAccess } from "./membershipCleanup";
 import { revokeAuthStreams } from "./authStreams";
 import { deletePushSubscriptionRowsForUser } from "./push/subscriptions";
+import { resolveAccountRoleRows } from "./db/accountAccess";
 
 type Cleanup=typeof cleanupUserAccountAccess;
 function parseName(value:unknown) {
@@ -167,8 +168,11 @@ export async function removeUserLifecycle(auth:NoctuaAuth,db:Database,source:Ses
     if (body.reassignOwnerTo) {
       try {assertEnabledTarget(db,body.reassignOwnerTo as string);} catch {throw new AuthPolicyError("invalid_owner",400);}
     }
-    if (!body.reassignOwnerTo && db.prepare(`SELECT 1 FROM accounts WHERE ownerUserId=?`).get(userId)) throw new AuthPolicyError("owner_reassignment_required",409);
     const accountIds=(db.prepare(`SELECT DISTINCT a.id FROM accounts a LEFT JOIN user_accounts ua ON ua.accountId=a.id WHERE a.ownerUserId=? OR ua.userId=?`).all(userId,userId) as {id:string}[]).map(row=>row.id);
+    // Admins see only mailboxes they are a member of; never detach or reassign one they cannot see.
+    const visible=resolveAccountRoleRows(db,source.userId,accountIds);
+    if (accountIds.some(id=>!visible.has(id))) throw new AuthPolicyError("foreign_mailbox_membership",409);
+    if (!body.reassignOwnerTo && db.prepare(`SELECT 1 FROM accounts WHERE ownerUserId=?`).get(userId)) throw new AuthPolicyError("owner_reassignment_required",409);
     op.payload=JSON.stringify({reassignOwnerTo:body.reassignOwnerTo,accountIds});
     await withDbWriteRetry("recordDeleteCleanup",()=>db.prepare(`UPDATE admin_lifecycle_operations SET payload=? WHERE id=?`).run(op.payload,op.id));
     await takeLifecycleUserSlot(db,op);

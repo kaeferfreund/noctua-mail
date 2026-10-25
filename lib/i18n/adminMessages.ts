@@ -7,6 +7,7 @@ const errorKeys = {
   self_admin_mutation_forbidden: "errors.selfMutation",
   owner_reassignment_required: "errors.reassignOwner",
   invalid_owner: "errors.invalidOwner",
+  foreign_mailbox_membership: "errors.foreignMailboxes",
   owner_modification_forbidden: "errors.immutableOwner",
   cannot_modify_owner: "errors.immutableOwner",
   self_role_change_forbidden: "errors.selfRole",

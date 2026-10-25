@@ -168,6 +168,14 @@ describe("AdminPanel", () => {
     await waitFor(() => expect(calls.filter(call => call.init?.method === "DELETE")).toHaveLength(1));
     expect(JSON.parse(String(calls.find(call => call.init?.method === "DELETE")?.init?.body))).toEqual({ reassignOwnerTo: "synthetic-successor" });
   });
+  it("explains inline why a user with memberships in mailboxes the admin cannot see is not deleted", async () => {
+    const { page } = harness((url, init) => init?.method === "DELETE" ? response({ ok: false, code: "foreign_mailbox_membership" }, 409) : undefined);
+    await page.findByText("user@example.test");
+    fireEvent.click(page.getByRole("button", { name: "Delete user" }));
+    const dialog = within(await page.findByRole("dialog", { name: "Delete user" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
+    expect((await dialog.findByRole("alert")).textContent).toBe("This user belongs to mailboxes you are not a member of and cannot see. Only an administrator who is a member of all of their mailboxes can delete them.");
+  });
   for (const [button, title, suffix] of [["Revoke sessions", "Revoke sessions", "/sessions"], ["Reset MFA", "Reset MFA", "/mfa-reset"], ["Remove passkey", "Remove passkey", "/passkeys/synthetic-key"]]) {
     it(`uses an audited Noctua wrapper and fresh proof for ${title}`, async () => {
       const { page, calls } = harness();

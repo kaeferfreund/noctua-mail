@@ -1216,9 +1216,11 @@ Manager routes (`requireAccountContext(minRole: "manager")`):
 
 Admin routes (`requireAdminSessionOr403`, override for everything above, same audit):
 
-- `GET /api/admin/accounts` → all accounts (manager view, sanitized) with `members`.
+- `GET /api/admin/accounts` → the admin's member mailboxes (manager view, sanitized) with `members`.
+  Since 2026-10-25 every admin mailbox route is limited to member mailboxes (doc/AUTHENTICATION.md,
+  "Administrators: own mailboxes only").
 - `POST /api/admin/accounts` body: `Account` without id. Verifies IMAP, requires
-  `teamFeaturesSupported()`, `ownerUserId = null`. 201 `{ ok, account }`. Not auto-linked.
+  `teamFeaturesSupported()`, `ownerUserId = <creating admin>`. 201 `{ ok, account }`.
 - `PUT/DELETE /api/admin/accounts/[accountId]/members/[userId]` (same limits except self-rules).
 - `DELETE /api/admin/accounts/[accountId]` → deletes the mailbox (audit `account.delete`).
 

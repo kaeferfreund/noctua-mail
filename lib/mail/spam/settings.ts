@@ -1,4 +1,5 @@
-import { countSpamTrustDecisions, getAccounts, getSpamSettings, saveSpamSettings } from "@/lib/db";
+import type { Account } from "@/lib/data";
+import { countSpamTrustDecisions, getSpamSettings, saveSpamSettings } from "@/lib/db";
 import {
   parseSpamAdminSettings,
   parseSpamMailboxSettings,
@@ -64,9 +65,11 @@ export function describeSpamConfig(config: SpamConfig) {
   };
 }
 
-/** Read-only trusted-sender counters per mailbox for the admin view (derived from stored verdicts). */
-export async function loadSpamTrustCounters() {
-  const accounts = await getAccounts();
+/**
+ * Read-only trusted-sender counters per mailbox for the admin view (derived from stored verdicts),
+ * for the given mailboxes only: the route passes the admin's own.
+ */
+export async function loadSpamTrustCounters(accounts: ReadonlyArray<Pick<Account, "id" | "email">>) {
   return Promise.all(accounts.map(async (account) => ({
     accountId: account.id,
     email: account.email,

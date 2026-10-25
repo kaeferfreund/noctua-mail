@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdminSessionOr403 } from "../../../_auth";
-import { resolveSpamRescanAccount, spamRescanFailure, spamRescanRateLimited } from "../../../_spamRescan";
+import { requireAdminSessionOr403, resolveAdminMemberAccount } from "../../../_auth";
+import { spamRescanFailure, spamRescanRateLimited } from "../../../_spamRescan";
 import { withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import type { AccountRouteParams } from "@/app/api/_helpers/accountContext";
@@ -15,7 +15,7 @@ import { isSpamRescanPeriod } from "@/lib/mail/spam/rescanTypes";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
-    const accountId = await resolveSpamRescanAccount(params, session.userId);
+    const accountId = await resolveAdminMemberAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
     const period = new URL(request.url).searchParams.get("period") ?? "30d";
     if (!isSpamRescanPeriod(period)) return spamRescanFailure(400, "invalid_period");
@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const limited = spamRescanRateLimited(request, session.userId); if (limited) return limited;
-    const accountId = await resolveSpamRescanAccount(params, session.userId);
+    const accountId = await resolveAdminMemberAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
     const body = await request.json().catch(() => null) as { period?: unknown; withModel?: unknown; modelLimit?: unknown } | null;
     if (!isSpamRescanPeriod(body?.period)) return spamRescanFailure(400, "invalid_period");

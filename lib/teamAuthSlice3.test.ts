@@ -260,21 +260,28 @@ test("SMTP verifies the new endpoint before persisting, blank CalDAV secret pres
   expect(changed.caldav?.password).toBe("secret");
 });
 
-test("admin ownerless mailbox creation and override; manager failures carry no repair payload for viewers", async () => {
+test("admin mailbox creation makes the creator owner; admin override only as a member; manager failures carry no repair payload for viewers", async () => {
   const admin = await createAuthenticatedTestSession(undefined, "admin");
   const f = await fixture();
   const { id: _id, ...body } = { ...f.account, email: `admin-mailbox-${crypto.randomUUID()}@example.test` };
   void _id;
   const { caldav: _c, deepl: _d, ...creation } = body; void _c; void _d;
   const account = await createAdminMailbox(admin.user.id, creation, "synthetic", verified);
-  expect(account.ownerUserId).toBeUndefined(); expect(await listAccountMembers(account.id)).toEqual([]);
+  expect(account.ownerUserId).toBe(admin.user.id);
+  expect((await listAccountMembers(account.id)).map(member => [member.userId, member.role, member.isOwner])).toEqual([[admin.user.id, "manager", true]]);
+  expect(await resolveAccountRole(admin.user.id, account.id)).toBe("manager");
+  // Another admin who is not a member cannot manage the mailbox; it looks unknown.
+  const outsider = await createAuthenticatedTestSession(undefined, "admin");
+  await expect(changeAccountMember(account.id, f.user.id, outsider.user.id, "manager", { admin: true })).rejects.toMatchObject({ code: "account_not_found", status: 404 });
   await changeAccountMember(account.id, f.user.id, admin.user.id, "manager", { admin: true });
   expect(await resolveAccountRole(f.user.id, account.id)).toBe("manager");
-  await expect(changeAccountMember(account.id, f.user.id, admin.user.id, "viewer", { admin: true })).rejects.toThrow("last manager");
+  // The owning admin counts as manager and cannot be changed as a member.
+  await changeAccountMember(account.id, f.user.id, admin.user.id, "viewer", { admin: true });
+  await expect(changeAccountMember(account.id, admin.user.id, admin.user.id, "viewer", { admin: true })).rejects.toThrow("owner");
   for (const role of ["viewer", "editor"] as const) {
     const response = await mailboxErrorResponse({ authenticationFailed: true, message: "Synthetic upstream credential detail" }, account.id, role);
     expect(response?.status).toBe(503);
-    const dto = await response!.json(); expect(dto).toMatchObject({ repairAllowed: false, reauthRequired: false, managerContact: [{ email: f.user.email }] });
+    const dto = await response!.json(); expect(dto).toMatchObject({ repairAllowed: false, reauthRequired: false, managerContact: [{ email: admin.user.email }] });
     expect(JSON.stringify(dto)).not.toContain("upstream credential detail");
   }
 });
@@ -352,6 +359,12 @@ test.each(["owner", "admin"])("%s deletion audit failure preserves account, link
   const auth = entry === "owner" ? f : await createAuthenticatedTestSession(undefined, "admin");
   const route = entry === "owner" ? await import("@/app/api/accounts/[accountId]/route") : await import("@/app/api/admin/accounts/[accountId]/route");
   const request = () => new Request(`http://localhost:3000/api/accounts/${f.id}`, { method: "DELETE", headers: auth.jar.headers({ origin: "http://localhost:3000" }) });
+  if (entry === "admin") {
+    // An admin deletes only mailboxes they are a member of; a foreign one is 404 like an unknown one.
+    expect((await route.DELETE(request(), parameters(f.id))).status).toBe(404);
+    expect(await f.db.getAccountById(f.id)).not.toBeNull();
+    await auth.addMembership(auth.user.id, f.id, "viewer");
+  }
   f.master.exec(`CREATE TRIGGER synthetic_delete_audit_failure BEFORE INSERT ON admin_audit WHEN NEW.targetAccountId='${f.id}' BEGIN SELECT RAISE(ABORT,'Synthetic delete audit failure'); END`);
   try {
     await expect(route.DELETE(request(), parameters(f.id))).rejects.toThrow("Synthetic delete audit failure");

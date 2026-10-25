@@ -242,7 +242,8 @@ of the `spam_sender_profiles` rows.
 **Admin**: Verwaltung → Spam-Erkennung shows one read-only line "Vertraute
 Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
 (totals; per mailbox in the tooltip and in `GET /api/admin/spam-settings` →
-`trust`), counted from the stored `spamReasons`.
+`trust`), counted from the stored `spamReasons`. Totals and tooltip cover only
+the mailboxes the admin is a member of.
 
 **Backfill**: existing rows enter the profiles once with
 `scripts/spam-profiles-backfill.ts` (one pass per shard, only the first 64 KB of
@@ -362,10 +363,12 @@ tables. Rollback is the same stopped-snapshot restore.
 | `NOCTUA_SPAM_AUTHSERV_ID` | env, comma-separated | unset: the top-most `Received` "by" host, its first label or its registrable domain |
 | on/off, auto-move, own threshold | per mailbox (admin) | on / off / global |
 
-Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`;
-„Posteingang jetzt prüfen“ below).
+Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`; the
+trusted-sender counters cover only the admin's own mailboxes; „Posteingang jetzt
+prüfen“ below).
 Per mailbox: Postfach-Einstellungen → Spam-Erkennung, visible to admins only
-(`GET/PUT /api/admin/accounts/:accountId/spam-settings`). Another provider (for
+(`GET/PUT /api/admin/accounts/:accountId/spam-settings`, only for mailboxes the
+admin is a member of; 404 otherwise). Another provider (for
 example a local OpenAI-compatible server) is one more case in `provider.ts`.
 
 ## Static rules file

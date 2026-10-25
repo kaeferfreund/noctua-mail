@@ -4,12 +4,13 @@ import { withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, loadSpamTrustCounters, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
-import { listSpamRescanMailboxes } from "@/lib/mail/spam/rescan";
+import { listMemberAccounts } from "@/lib/accountAccess";
 
-/** `rescanMailboxes`: only the admin's own mailboxes offer „Posteingang jetzt prüfen“. */
+/** `trust` and `rescanMailboxes` („Posteingang jetzt prüfen“): the admin's own mailboxes only. */
 async function body(userId: string) {
+  const own = await listMemberAccounts(userId);
   return NextResponse.json({ ok: true, settings: await loadSpamAdminSettings(), effective: describeSpamConfig(await loadSpamConfig()),
-    trust: await loadSpamTrustCounters(), rescanMailboxes: await listSpamRescanMailboxes(userId) });
+    trust: await loadSpamTrustCounters(own), rescanMailboxes: own.map(account => ({ accountId: account.id, email: account.email })) });
 }
 
 export async function GET(request: Request) {

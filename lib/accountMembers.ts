@@ -19,6 +19,8 @@ export async function changeAccountMember(accountId: string, userId: string, act
     const admin = options.admin === true && !!db.prepare(`SELECT u.id FROM auth_user u JOIN users p ON p.id=u.id
       WHERE u.id=? AND p.role='admin' AND NOT (COALESCE(u.banned,0)=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now')))` ).get(actorUserId);
     if (!admin && !roleAtLeast(resolveAccountRoleRow(db, actorUserId, accountId), "manager")) throw new MembershipError("insufficient_role", "Insufficient mailbox role");
+    // Admins manage members only of mailboxes they are a member of; foreign ones look unknown.
+    if (admin && !resolveAccountRoleRow(db, actorUserId, accountId)) throw new MembershipError("account_not_found", "Account not found", 404);
     const account = db.prepare("SELECT ownerUserId FROM accounts WHERE id=?").get(accountId) as { ownerUserId: string | null };
     if (!account) throw new MembershipError("account_not_found", "Account not found", 404);
     if (account.ownerUserId === userId) throw new MembershipError("owner_immutable", "Cannot modify the mailbox owner");
