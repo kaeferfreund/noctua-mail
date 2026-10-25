@@ -1047,18 +1047,14 @@
     },
     "mailboxes": {
       "create": "Postfach erstellen",
-      "help": "Erstellt ein Postfach ohne Eigentümer. Füge nach dem Erstellen Mitglieder hinzu.",
+      "help": "Erstellt ein Postfach mit dir als Eigentümer. Füge nach dem Erstellen weitere Mitglieder hinzu.",
       "refresh": "Postfächer aktualisieren",
       "manageMembers": "Mitglieder verwalten",
       "delete": "Postfach löschen",
       "deleteConfirm": "{email} und die lokalen Daten endgültig löschen?",
       "membersTitle": "Mitglieder von {email}",
       "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
-      "selfGrantTitle": "Dir selbst Zugriff geben?",
-      "selfGrantHelp": "Das gemeinsame Postfach wurde erstellt. Es hat noch keine Mitglieder. Gib dir ausdrücklich Zugriff oder füge später Mitglieder hinzu.",
-      "grantAccess": "Zugriff geben",
-      "later": "Später",
-      "noMembers": "Noch keine Mitglieder – niemand sieht dieses Postfach"
+      "noneVisible": "Hier erscheinen nur Postfächer, in denen du Mitglied bist. Du bist noch in keinem Postfach Mitglied."
     },
     "users": {
       "refresh": "Benutzer aktualisieren",
@@ -1157,6 +1153,7 @@
       "selfMutation": "Du kannst dich nicht selbst herabstufen, deaktivieren oder löschen.",
       "reassignOwner": "Wähle einen aktivierten Benutzer als neuen Eigentümer der Postfächer.",
       "invalidOwner": "Wähle einen anderen aktivierten Eigentümer.",
+      "foreignMailboxes": "Diese Person ist Mitglied in Postfächern, in denen du kein Mitglied bist und die du deshalb nicht siehst. Löschen kann sie nur ein Administrator, der in allen ihren Postfächern Mitglied ist.",
       "immutableOwner": "Der Eigentümer des Postfachs kann nicht geändert werden.",
       "selfRole": "Du kannst deine eigene Rolle nicht ändern.",
       "targetDisabled": "Wähle einen aktivierten Benutzer mit abgeschlossener Einrichtung.",

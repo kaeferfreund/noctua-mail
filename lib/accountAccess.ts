@@ -53,3 +53,14 @@ export async function listAccessibleAccountEmails(userId: string): Promise<strin
 export async function listAccessibleAccountsForUser(userId: string): Promise<AccountAccessEntry[]> {
   return readAccountAccess(await getDb(), userId, { identities: true }).entries;
 }
+/**
+ * The mailboxes the user is a member of (owner or any role), with own addresses. Admin views and
+ * admin routes are limited to these: administrators manage only mailboxes they are a member of.
+ */
+export async function listMemberAccounts(userId: string): Promise<Account[]> {
+  return (await listAccessibleAccountsForUser(userId)).map(entry => entry.account);
+}
+/** Ids of `listMemberAccounts`, without the identity join. */
+export async function listMemberAccountIds(userId: string): Promise<Set<string>> {
+  return new Set(readAccountAccess(await getDb(), userId, { identities: false }).entries.map(entry => entry.account.id));
+}

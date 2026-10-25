@@ -9,7 +9,8 @@ historical snapshots and do not override this contract. Stage 1 integration is n
 
 Design v5 remains authoritative. Every user must complete TOTP enrollment; UV passkeys provide
 convenient later login and backup codes support recovery. Instance administration grants no mailbox
-membership. Sync, recompute, calendar sync and related-thread lookup are viewer capabilities even
+membership, and administrators see and manage only mailboxes they are a member of (see
+"Administrators: own mailboxes only"). Sync, recompute, calendar sync and related-thread lookup are viewer capabilities even
 where their HTTP method is POST.
 
 The shell uses `lib/authClient.ts`, LoginScreen, TwoFactorChallenge, EnrollmentScreen,
@@ -21,8 +22,9 @@ role guards. Admin security actions use `admin.recovery` through the same Reauth
 password plus UV; only the final rotated-session grant goes in `x-noctua-reauth`.
 
 The no-mailbox gate shows “Add a mailbox” only to instance admins, using the existing admin creation
-dialog. Other users see “Ask your admin”. Creation grants no implicit ownership/membership and never
-selects, loads folders or syncs the new mailbox. Admin grants membership separately.
+dialog. Other users see “Ask your admin”. The creating admin becomes the owner, so the new mailbox
+appears in the sidebar after the reload; creation never selects, loads folders or syncs it. Further
+members are granted separately.
 
 ## Sessions and selection
 
@@ -59,8 +61,33 @@ PUT members requires an existing enabled target, a valid viewer/editor/manager r
 owner changes and self-role changes. DELETE permits self-removal but refuses the owner and last
 remaining enabled manager (owner counts). Changes and audit rows share an immediate transaction.
 Admin member routes apply the same owner/last-manager limits, with the documented self-rule override.
-Admin mailbox creation verifies IMAP/SMTP, creates ownerless mailboxes, and never auto-links a user.
-Only owner/admin can delete a mailbox; another manager receives the explicit owner-only 403.
+Admin mailbox creation verifies IMAP/SMTP and makes the creating admin the owner; no other user is
+linked. Only the owner or an admin who is a member can delete a mailbox; another manager receives the
+explicit owner-only 403.
+
+### Administrators: own mailboxes only
+
+User decision of 2026-10-25: an administrator sees and manages only mailboxes they are a member of
+(owner or any role, resolved by `resolveAccountRole` exactly like `requireAccountContext`; the viewer
+role is enough). The admin role itself stays global. Enforcement is server-side in every admin route;
+the admin UI only renders the filtered data.
+
+| Surface | Rule |
+|---|---|
+| `GET /api/admin/accounts` | lists member mailboxes only (`listMemberAccounts`) |
+| `PUT/DELETE /api/admin/accounts/[id]/members/[userId]` | foreign or unknown mailbox → 404 `account_not_found` (checked in the member transaction) |
+| `DELETE /api/admin/accounts/[id]` | foreign or unknown → 404 `account_not_found`; the delete transaction rechecks the membership |
+| `GET/PUT /api/admin/accounts/[id]/spam-settings` | foreign or unknown → 404 `account_not_found` |
+| `GET /api/admin/users` | users stay global; each user's `accounts` only lists the admin's member mailboxes |
+| `DELETE /api/admin/users/[userId]` | 409 `foreign_mailbox_membership` when the target owns or is a member of a mailbox the admin is not a member of, before anything is banned, detached or reassigned |
+| role, status, sessions, MFA, passkeys, recovery, invites | global, unchanged |
+| `GET /api/admin/audit` | hides entries whose `targetAccountId` is not a member mailbox; entries without a mailbox and the admin's own actions stay. Filtered in SQL before the limit, so pages stay full |
+| `GET /api/admin/spam-settings` | global settings unchanged; `trust` counters only for member mailboxes |
+| `GET /api/admin/domain-icons`, `GET/PUT/DELETE /api/admin/domain-icons/[domain]` | domains of member mailboxes; a domain only foreign mailboxes use → 404 `unknown_domain` and not listed. An upload whose domain no mailbox uses any more stays listed and resettable for every admin |
+
+Foreign and unknown mailboxes answer the same 404, so the response does not confirm that a mailbox
+exists. Mail routes, members/candidates for managers, collaboration, the sidebar and MCP are unchanged:
+they already follow the membership.
 
 GET prefs returns `{ok:true,prefs}` for the current user. PUT accepts the sparse preference object
 itself; absent fields stay unchanged and null deletes a field. Unknown/userId keys are rejected.
@@ -104,7 +131,7 @@ admin membership management may use its admin user directory.
 `lib/mailboxCredentials.ts:updateMailboxCredentials(accountId, patch, actor, verification?)` is the
 single repair/write-back service. PUT account, relogin and POST-existing use the shared HTTP handler
 in `app/api/_helpers/mailboxPatch.ts`; the optional IMAP bridge calls the service after its
-strict eligibility/allowlist checks. The public repair routes are active; admin mailbox creation uses the separate ownerless creation contract. Identity/id/e-mail/dbPath cannot be patched.
+strict eligibility/allowlist checks. The public repair routes are active; admin mailbox creation uses the separate creation contract (creator becomes owner). Identity/id/e-mail/dbPath cannot be patched.
 An IMAP/SMTP host, port, secure flag or username change requires a nonblank corresponding password.
 Verification uses the new endpoint before persistence. Blank secrets preserve stored values.
 Concurrent mailbox changes during verification produce 409; no verified stale patch is written.
@@ -424,7 +451,8 @@ accounts by email. Passkey ids are opaque resources accepted by the audited DELE
 WebAuthn credential ids. `name`/`createdAt` can be null. `lastUsedAt` is omitted because pinned
 Better Auth stores none. No public keys, counters, transports or backup metadata are exposed. Each account describes the **target user's**
 membership: owners are manager/isOwner:true even without a link; non-owners use their stored
-membership role and isOwner:false. Unrelated accounts are absent. No connection credentials,
+membership role and isOwner:false. Unrelated accounts and mailboxes the viewing admin is not a member
+of are absent. No connection credentials,
 password hashes, session tokens or viewer-admin role overrides appear in this DTO.
 
 `GET /api/admin/invites` returns exactly:
@@ -459,6 +487,8 @@ one from a timestamp. Timestamps and malformed/oversized cursors return 400
 `{ok:false,code:"invalid_cursor",message:"Invalid audit cursor"}`. A full page returns its last-row
 cursor; shorter/empty pages return null, so a full final page can lead to one empty request.
 This avoids losing equal-timestamp rows. Numeric before survives only in the legacy storage API.
+Entries of mailboxes the admin is not a member of are left out before the limit (own actions and
+entries without a mailbox stay).
 Payload secret keys are recursively removed by the writer; action names remain displayable as stored.
 
 `POST /api/admin/invites` accepts same-origin JSON `{}` (an empty body with the same JSON hygiene
@@ -475,7 +505,8 @@ The 201 response is `{ok:true,invite}`; generic redemption still uses ordinary s
   `auth.api.adminUpdateUser` for the target; `updateUser` remains a self-only library API. Role/status
   use `setRole`, `banUser`, `unbanUser`; disable is permanent. These operations revoke target
   sessions/MCP/challenges; enabling never restores them.
-- `DELETE /api/admin/users/[userId]` JSON `{reassignOwnerTo?:userId}` → `{ok:true}`. An owner needs
+- `DELETE /api/admin/users/[userId]` JSON `{reassignOwnerTo?:userId}` → `{ok:true}`. A target with a
+  mailbox the admin is not a member of is refused first (409 `foreign_mailbox_membership`). An owner needs
   another existing enabled target (400 `invalid_owner` / 409 `owner_reassignment_required`). Ban,
   revoke and persist formerly accessible account IDs before domain/shard cleanup. Memberships,
   prefs and ownership are changed transactionally; `cleanupUserAccountAccess` handles each shard
@@ -496,7 +527,7 @@ The 201 response is `{ok:true,invite}`; generic redemption still uses ordinary s
   `{ok:true}`. Passkey ownership is checked (404 `passkey_not_found`); all old target access is revoked. Successful
   `user.passkey_remove` audit payload contains `{operationId,passkeyId}`.
 
-`GET /api/admin/accounts` (mailboxes):
+`GET /api/admin/accounts` (mailboxes the admin is a member of):
 
 ```ts
 import type { AccountSettings } from "../lib/data";
@@ -840,7 +871,8 @@ Additional entry points: GET /api/accounts lists current viewer-or-better member
 POST /api/accounts existing-id requires manager. listMessagesHandler, syncJobs and recomputeJobs
 all use viewer context. POST /api/calendar/import resolves selection then requires editor on it.
 Admin GET/POST /api/admin/accounts, DELETE /api/admin/accounts/[accountId], and PUT/DELETE
-/api/admin/accounts/[accountId]/members/[userId] require a live MFA admin session.
+/api/admin/accounts/[accountId]/members/[userId] require a live MFA admin session and, except POST,
+membership in the mailbox (404 otherwise).
 
 ## Retired modules and follow-on ownership
 

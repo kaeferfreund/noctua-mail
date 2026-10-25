@@ -4,15 +4,17 @@ import { withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, loadSpamTrustCounters, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
+import { listMemberAccounts } from "@/lib/accountAccess";
 
-async function body() {
+/** `trust`: counters of the admin's own mailboxes only. */
+async function body(userId: string) {
   return NextResponse.json({ ok: true, settings: await loadSpamAdminSettings(), effective: describeSpamConfig(await loadSpamConfig()),
-    trust: await loadSpamTrustCounters() });
+    trust: await loadSpamTrustCounters(await listMemberAccounts(userId)) });
 }
 
 export async function GET(request: Request) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
-  return withAuthResponse(session, body);
+  return withAuthResponse(session, () => body(session.userId));
 }
 
 export async function PUT(request: Request) {
@@ -25,6 +27,6 @@ export async function PUT(request: Request) {
       if (error instanceof SpamSettingsError) return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
       throw error;
     }
-    return body();
+    return body(session.userId);
   });
 }

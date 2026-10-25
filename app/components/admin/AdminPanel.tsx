@@ -30,11 +30,11 @@ function securityValue(value: boolean | undefined) { return value === undefined 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 type NavigationProps = { section?: AdminSection; onSectionChange?: (section: AdminSection) => void };
 
-export default function AdminPanel({ section, onSectionChange, isAdminUser, apiFetch = fetch, client, onClose, currentUserId, onAccessChanged }: NavigationProps & { currentUserId?: string; onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+export default function AdminPanel({ section, onSectionChange, isAdminUser, apiFetch = fetch, client, onClose, onAccessChanged }: NavigationProps & { onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   // Mount only for admins so no hidden panel fetches or secrets survive closing.
-  return isAdminUser ? <AdminPanelContent section={section} onSectionChange={onSectionChange} currentUserId={currentUserId} onAccessChanged={onAccessChanged} apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
+  return isAdminUser ? <AdminPanelContent section={section} onSectionChange={onSectionChange} onAccessChanged={onAccessChanged} apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
 }
-function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose, currentUserId, onAccessChanged }: NavigationProps & { currentUserId?: string; onAccessChanged?: () => Promise<void>; apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose, onAccessChanged }: NavigationProps & { onAccessChanged?: () => Promise<void>; apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   const t = useTranslations("Admin");
   const locale = useLocale();
   const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
@@ -121,7 +121,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
           <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button disabled={busy}>{t("invites.issue")}</Button></form>
         <AdminInviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
-      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} currentUserId={currentUserId} onAccessChanged={onAccessChanged} />}
+      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} onAccessChanged={onAccessChanged} />}
       {tab === "audit" && <AdminAuditLog apiFetch={apiFetch} />}
       {tab === "spam" && <AdminSpamSettings apiFetch={apiFetch} />}
       {tab === "domains" && <AdminDomainIcons apiFetch={apiFetch} />}

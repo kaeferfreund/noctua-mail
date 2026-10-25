@@ -1047,18 +1047,14 @@
     },
     "mailboxes": {
       "create": "Create mailbox",
-      "help": "Creates an ownerless mailbox. Grant members after creation.",
+      "help": "Creates a mailbox owned by you. Add further members after creation.",
       "refresh": "Refresh mailboxes",
       "manageMembers": "Manage members",
       "delete": "Delete mailbox",
       "deleteConfirm": "Permanently delete {email} and its local data?",
       "membersTitle": "Members of {email}",
       "memberCount": "{count, plural, one {# member} other {# members}}",
-      "selfGrantTitle": "Give yourself access?",
-      "selfGrantHelp": "The shared mailbox was created. It has no members yet. Explicitly grant yourself access or add members later.",
-      "grantAccess": "Grant access",
-      "later": "Later",
-      "noMembers": "No members yet – nobody can see this mailbox"
+      "noneVisible": "Only mailboxes you are a member of appear here. You are not a member of any mailbox yet."
     },
     "users": {
       "refresh": "Refresh users",
@@ -1157,6 +1153,7 @@
       "selfMutation": "You cannot demote, disable or delete yourself.",
       "reassignOwner": "Choose an enabled user to take ownership of the mailboxes.",
       "invalidOwner": "Choose another enabled owner.",
+      "foreignMailboxes": "This user belongs to mailboxes you are not a member of and cannot see. Only an administrator who is a member of all of their mailboxes can delete them.",
       "immutableOwner": "The mailbox owner cannot be modified.",
       "selfRole": "You cannot change your own role.",
       "targetDisabled": "Choose an enabled user with completed setup.",

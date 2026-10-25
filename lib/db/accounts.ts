@@ -19,6 +19,7 @@ import {
   resolveAccountDbPathForPersist
 } from "./rowParsers";
 import { deleteUserAccountPrefRowsForAccount } from "./userAccountPrefs";
+import { resolveAccountRoleRow } from "./accountAccess";
 
 // Category-linear-model seeding is lazy-imported because `./categories`
 // pulls in `getAccountById` from this module; a top-level import would
@@ -170,11 +171,12 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
 
     db.transaction(() => {
       if (actorUserId) {
+        // Owner, or an admin who is a member of the mailbox (admins manage only their own mailboxes).
         const allowed = db.prepare(`SELECT 1 FROM accounts a JOIN auth_user u ON u.id=? JOIN users p ON p.id=u.id
           WHERE a.id=? AND (a.ownerUserId=u.id OR p.role='admin')
           AND NOT (COALESCE(u.banned,0)=1 AND (u.banExpires IS NULL OR julianday(u.banExpires)>julianday('now')))`)
           .get(actorUserId, accountId);
-        if (!allowed) throw new AccountDeletionForbiddenError();
+        if (!allowed || !resolveAccountRoleRow(db, actorUserId, accountId)) throw new AccountDeletionForbiddenError();
       }
       db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
       deleteUserAccountPrefRowsForAccount(db, accountId);

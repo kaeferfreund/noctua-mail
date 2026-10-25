@@ -23,6 +23,9 @@ const account: Account = {
 await upsertAccount(account);
 
 const admin = await createAuthenticatedTestSession(undefined, "admin");
+// Admins manage icons only for domains of mailboxes they are a member of.
+await admin.addMembership(admin.user.id, accountId, "viewer");
+const memberAdmin = async () => { const session = await createAuthenticatedTestSession(undefined, "admin"); await session.addMembership(session.user.id, accountId, "viewer"); return session; };
 const manager = await createAuthenticatedTestSession(accountId);
 const viewer = await createAuthenticatedTestSession();
 await viewer.addMembership(viewer.user.id, accountId, "viewer");
@@ -122,7 +125,7 @@ describe("admin domain icon routes", () => {
 
   test("same-origin octet-stream only; the domain must be valid and belong to a mailbox", async () => {
     // Own admin: the earlier tests used up most of the first admin's budget.
-    const cookie = (await createAuthenticatedTestSession(undefined, "admin")).jar.header();
+    const cookie = (await memberAdmin()).jar.header();
     expect((await upload(await logo(), { cookie, headers: { origin: "https://foreign.example.test" } })).status).toBe(403);
     expect((await upload(await logo(), { cookie, headers: { "content-type": "image/svg+xml" } })).status).toBe(400);
     for (const target of ["../../etc/passwd", ".example.test", "a/b.example.test", "EXAMPLE", "a..b.test", "-x.example.test"]) {
@@ -137,8 +140,27 @@ describe("admin domain icon routes", () => {
     expect((await reset(cookie)).status).toBe(200);
   });
 
+  test("an admin who is not a member of a mailbox at the domain gets 404 and does not see it listed; an orphaned upload stays resettable", async () => {
+    const outsider = await createAuthenticatedTestSession(undefined, "admin");
+    const cookie = outsider.jar.header();
+    const before = existsSync(getDomainIconsDir()) ? readdirSync(getDomainIconsDir()).length : 0;
+    for (const response of [await upload(await logo(), { cookie }), await reset(cookie), await preview({}, cookie)]) {
+      expect([response.status, (await response.json()).code]).toEqual([404, "unknown_domain"]);
+    }
+    expect(existsSync(getDomainIconsDir()) ? readdirSync(getDomainIconsDir()).length : 0).toBe(before);
+    const listed = async (session: { jar: { header(): string } }) => (await (await list(new Request(`${ORIGIN}/api/admin/domain-icons`, { headers: { cookie: session.jar.header() } }))).json() as { domains: Array<{ domain: string }> }).domains.map(entry => entry.domain);
+    expect(await listed(outsider)).not.toContain(domain);
+    expect(await listed(admin)).toContain(domain);
+    // A domain no mailbox uses any more: its upload is listed for every admin and can be reset.
+    const orphan = `orphan-${crypto.randomUUID().slice(0, 8)}.example.test`;
+    const { saveDomainIcon } = await import("@/lib/domainIcons");
+    await saveDomainIcon(orphan, await sharp(await logo()).resize(64, 64).png().toBuffer(), admin.user.id);
+    expect(await listed(outsider)).toContain(orphan);
+    expect(await (await reset(cookie, orphan)).json()).toEqual({ ok: true, domain: orphan, removed: true });
+  });
+
   test("rate-limits uploads per admin", async () => {
-    const busy = await createAuthenticatedTestSession(undefined, "admin");
+    const busy = await memberAdmin();
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 11; attempt += 1) statuses.push((await upload(Buffer.from("x"), { cookie: busy.jar.header() })).status);
     expect(statuses.slice(0, 10).every(status => status === 415)).toBe(true);

@@ -5270,8 +5270,8 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
-    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
-    {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
+    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
+    {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </UrlHistoryContext.Provider>;
   if (authState === "unauth") return <LoginScreen inviteCode={inviteCode} onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
