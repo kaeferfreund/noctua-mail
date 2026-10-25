@@ -1005,7 +1005,7 @@ function ComposeOrchestratorImpl(
       }
       const result = await scheduleDraftSend(apiFetch, activeAccountId, saved.draftId, sendAt);
       if (!result.ok) {
-        reportError(result.response ? (await readErrorMessage(result.response)) || t("schedule.failed") : t("schedule.failed"));
+        reportError(result.response ? renderMessage(await readSenderError(result.response, readErrorMessage)) || t("schedule.failed") : t("schedule.failed"));
         return false;
       }
       // Compose closes like after a send; the saved draft stays in Drafts with its schedule.

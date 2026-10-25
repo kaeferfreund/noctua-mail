@@ -14,6 +14,7 @@ import { readerShortcut } from "@/lib/ui/readerFocus";
 import { useDetachedSendWarnings } from "./mailclient/composition/useDetachedSendWarnings";
 
 import { presentDraftSendOutcome, type SendOutcome } from "./mailclient/composition/sendOutcome";
+import { readSenderError } from "./mailclient/composition/senderErrors";
 import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
@@ -477,7 +478,7 @@ export default function MailClient({
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
   const dragImageRef = useRef<HTMLDivElement | null>(null);
-  const { messages: senderMessages } = useSenderMessages();
+  const { messages: senderMessages, renderMessage: renderSenderMessage } = useSenderMessages();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [threadCollabCache, setThreadCollabCache] = useState(new Map<string, Map<string, CollabSummary>>());
@@ -3298,7 +3299,8 @@ export default function MailClient({
             reportError(tcompose(conflict === "scheduled_send_sent" ? "schedule.sendConflictSent" : "schedule.sendConflictBusy"));
             return;
           }
-          const errMsg = await readErrorMessage(res);
+          // Sender identity refusals carry a code with German copy; other errors keep the server text.
+          const errMsg = renderSenderMessage(await readSenderError(res, readErrorMessage));
           reportError(errMsg || tcompose("notices.draftSendFailed"));
           return;
         }
@@ -3392,6 +3394,7 @@ export default function MailClient({
       readErrorMessage,
       refreshFolders,
       removeDraftFromUi,
+      renderSenderMessage,
       reportError,
       setMessages,
       setPendingMessageActions,

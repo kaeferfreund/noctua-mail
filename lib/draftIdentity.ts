@@ -11,6 +11,15 @@ function unavailable(): never {
   throw new SenderIdentityError("identity_unavailable", 409, "The draft sender identity is unavailable. Choose an enabled identity and save it again.");
 }
 
+/**
+ * The From display name as the header carries it. A name equal to the address (default
+ * identities use their address as name) counts as none: the MIME parser drops it from
+ * `"a@example.test" <a@example.test>`, so both sides are compared without it.
+ */
+function fromDisplayName(name: string, email: string) {
+  return normalizeIdentityEmail(name) === email ? "" : name;
+}
+
 /** Inspect outer headers, including duplicates the MIME parser would collapse. */
 export async function validateDraftIdentity(raw: string, draft: Message, identities: readonly SenderIdentity[]) {
   const headerBlock = raw.split(/\r?\n\r?\n/, 1)[0];
@@ -33,7 +42,7 @@ export async function validateDraftIdentity(raw: string, draft: Message, identit
   const marker = markers[0];
   const identity = marker ? candidates.find(item => item.id === marker) : candidates.find(item => item.email === email);
   if (!identity || !identity.enabled) unavailable();
-  if (identity.email !== email || from[0].name !== identity.displayName) changed();
+  if (identity.email !== email || fromDisplayName(from[0].name, email) !== fromDisplayName(identity.displayName, identity.email)) changed();
   if (draft.senderIdentityId !== undefined && draft.senderIdentityId !== marker) changed();
   const metadataFrom = parseAddressEmails(draft.from);
   if (metadataFrom.length !== 1 || metadataFrom[0] !== email) changed();

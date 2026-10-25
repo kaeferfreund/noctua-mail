@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import React from "react";
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
@@ -54,6 +54,10 @@ beforeEach(() => {
       const body = JSON.parse(String(init?.body ?? "{}")) as { threadIds?: string[]; messageIds?: string[] };
       const items = drafts.filter(item => body.threadIds?.includes(item.threadId) || body.messageIds?.includes(item.id));
       return Response.json({ items, window: { anchorId: items[0]?.id ?? null, olderCursor: null, newerCursor: null, total: items.length } });
+    }
+    if (/^\/api\/accounts\/account-a\/drafts\/[^/]+\/send$/.test(path)) {
+      // The server refuses a draft whose sender details no longer match its identity.
+      return Response.json({ ok: false, code: "draft_identity_changed", message: "Open this draft, review From, and save it again." }, { status: 409 });
     }
     if (path === "/api/accounts/account-a/drafts/scheduled") return Response.json({ ok: true, items: [] });
     if (/^\/api\/accounts\/account-a\/(threads|messages)$/.test(path)) {
@@ -110,5 +114,20 @@ describe("drafts in the reader while a new message is open", () => {
     await waitFor(() => expect(view.queryByRole("button", { name: "Restore" })).not.toBeNull());
     expect(view.queryByText("Select a message to view the thread.")).toBeNull();
     await waitFor(() => expect(view.queryAllByText(`${item.subject} body`).length).toBeGreaterThan(0));
+  });
+});
+
+describe("sending a draft whose sender changed", () => {
+  it("shows the translated sender message instead of the server text", async () => {
+    const { default: MailClient } = await import("../MailClient");
+    const view = render(<ThemeProvider attribute="class"><Theme><MailClient /></Theme></ThemeProvider>);
+    const [item] = drafts;
+    await waitFor(() => expect(view.queryAllByText(item.subject).length).toBeGreaterThan(0));
+    await settle();
+    fireEvent.click(view.getAllByRole("button").find(button => button.textContent?.includes(item.subject))!);
+    await waitFor(() => expect(view.queryAllByText(`${item.subject} body`).length).toBeGreaterThan(0));
+    fireEvent.click(within(document.querySelector<HTMLElement>("[data-reader-print]")!).getByRole("button", { name: "Send draft" }));
+    await waitFor(() => expect(view.queryAllByText("The saved sender details changed. Review From and save the draft before sending.").length).toBeGreaterThan(0));
+    expect(view.queryAllByText("Open this draft, review From, and save it again.")).toHaveLength(0);
   });
 });
