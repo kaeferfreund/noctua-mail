@@ -110,7 +110,7 @@ describe("Preferences tab", () => {
     const select = page.getByLabelText("Mark opened messages as read") as HTMLSelectElement;
     await waitFor(() => expect(select.value).toBe("after3s"));
     expect([...select.options].map(option => option.text)).toEqual(["Inherit mailbox default", "Immediately", "After 1 second", "After 3 seconds", "Never (manually)"]);
-    expect(document.getElementById(select.getAttribute("aria-describedby")!)?.textContent).toContain("applies to all members of the mailbox");
+    expect(document.getElementById(select.getAttribute("aria-describedby")!)?.textContent).toContain("applies to all members of the mailbox. Viewers cannot mark messages.");
   });
 });
 

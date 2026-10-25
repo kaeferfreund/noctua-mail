@@ -19,7 +19,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
-import { useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
+import { createAutoReadCoordinator, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
@@ -3492,28 +3492,36 @@ export default function MailClient({
       listHandleRef.current?.handleSetCategory(message, category) ?? Promise.resolve(),
     []
   );
+  // Read/unread actions from the menu, `r`/`u`, swipe and bulk all pass these
+  // wrappers; the coordinator orders them after a running auto-read request.
+  const [autoReadCoordinator] = useState(createAutoReadCoordinator);
   const updateFlagState = useCallback(
     (
       message: Message,
       flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
       value: boolean
-    ) =>
-      listHandleRef.current?.updateFlagState(message, flag, value) ?? Promise.resolve(),
-    []
+    ) => {
+      const run = () => listHandleRef.current?.updateFlagState(message, flag, value) ?? Promise.resolve();
+      return flag === "seen" ? autoReadCoordinator.manualSeen([message], run) : run();
+    },
+    [autoReadCoordinator]
   );
   const updateFlagStateBulk = useCallback(
     (
       messages: Message[],
       flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
       value: boolean
-    ) =>
-      listHandleRef.current?.updateFlagStateBulk(messages, flag, value) ?? Promise.resolve(),
-    []
+    ) => {
+      const run = () => listHandleRef.current?.updateFlagStateBulk(messages, flag, value) ?? Promise.resolve();
+      return flag === "seen" ? autoReadCoordinator.manualSeen(messages, run) : run();
+    },
+    [autoReadCoordinator]
   );
-  const autoMarkReadDelayMs = useAutoMarkReadDelay(activeAccountId, currentAccount?.settings, apiFetch);
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
   const handleAutoMarkRead = useCallback(
-    (message: Message) => { void updateFlagState(message, "seen", true); },
-    [updateFlagState]
+    (message: Message) => autoReadCoordinator.autoRead(message, () =>
+      listHandleRef.current?.updateFlagState(message, "seen", true) ?? Promise.resolve()),
+    [autoReadCoordinator]
   );
   const updateKeywordFlag = useCallback(
     (message: Message, keyword: string, value: boolean) =>
@@ -5659,6 +5667,7 @@ export default function MailClient({
                 onPendingSelectionCollapseConsumed: handlePendingSelectionCollapseConsumed,
                 autoMarkReadDelayMs,
                 onAutoMarkRead: handleAutoMarkRead,
+                manualSeenVersion: autoReadCoordinator.manualSeenVersion,
                 activeAccountId,
                 apiFetch,
                 messageByMessageId,

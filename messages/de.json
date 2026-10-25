@@ -58,7 +58,7 @@
         "newMail": "Benachrichtigungen bei neuen E-Mails"
       },
       "fieldHelp": {
-        "autoMarkRead": "Wann eine geöffnete ungelesene E-Mail als gelesen markiert wird. Standard: nach 1 Sekunde. Der Gelesen-Status gilt für alle Mitglieder des Postfachs."
+        "autoMarkRead": "Wann eine geöffnete ungelesene E-Mail als gelesen markiert wird. Standard: nach 1 Sekunde. Der Gelesen-Status gilt für alle Mitglieder des Postfachs. Leser können nicht markieren."
       },
       "options": {
         "yes": "Ja",

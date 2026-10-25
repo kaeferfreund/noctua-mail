@@ -58,7 +58,7 @@
         "newMail": "New mail notifications"
       },
       "fieldHelp": {
-        "autoMarkRead": "When an opened unread message is marked as read. Default: after 1 second. The read status applies to all members of the mailbox."
+        "autoMarkRead": "When an opened unread message is marked as read. Default: after 1 second. The read status applies to all members of the mailbox. Viewers cannot mark messages."
       },
       "options": {
         "yes": "Yes",

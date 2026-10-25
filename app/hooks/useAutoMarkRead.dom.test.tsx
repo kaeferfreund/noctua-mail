@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, jest } from "bun:test";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { Message } from "@/lib/data";
 import { ACCOUNT_PREFS_CHANGED } from "@/lib/ui/senderSettings";
-import { useAutoMarkRead, useAutoMarkReadDelay } from "./useAutoMarkRead";
+import { createAutoReadCoordinator, useAutoMarkRead, useAutoMarkReadDelay } from "./useAutoMarkRead";
+import type { Account } from "@/lib/data";
 
 const message = (id: string, seen = false) => ({
   id, accountId: "synthetic-account", folderId: "synthetic-account:INBOX", seen,
@@ -17,10 +18,11 @@ function setVisibility(state: "visible" | "hidden") {
 
 function renderAutoRead(initial: { messages: Message[]; delayMs: number | null }) {
   const marked: string[] = [];
+  const coordinator = createAutoReadCoordinator();
   const view = renderHook((props: { messages: Message[]; delayMs: number | null }) =>
-    useAutoMarkRead({ ...props, onMarkRead: target => { marked.push(target.id); } }), { initialProps: initial });
+    useAutoMarkRead({ ...props, manualSeenVersion: coordinator.manualSeenVersion, onMarkRead: target => { marked.push(target.id); } }), { initialProps: initial });
   const advance = (ms: number) => act(() => { jest.advanceTimersByTime(ms); });
-  return { marked, advance, rerender: view.rerender, unmount: view.unmount };
+  return { marked, advance, coordinator, rerender: view.rerender, unmount: view.unmount };
 }
 
 afterEach(() => {
@@ -92,6 +94,20 @@ describe("useAutoMarkRead", () => {
     expect(marked).toEqual([]);
   });
 
+  it("ends the period on a manual read/unread action during the dwell, even without a state change", () => {
+    jest.useFakeTimers();
+    const { marked, advance, coordinator, rerender } = renderAutoRead({ messages: [message("a")], delayMs: 1000 });
+    advance(500);
+    // `u` on an unread message sends seen:false and changes nothing locally.
+    void coordinator.manualSeen([message("a")], async () => {});
+    advance(5000);
+    expect(marked).toEqual([]);
+    rerender({ messages: [], delayMs: 1000 });
+    rerender({ messages: [message("a")], delayMs: 1000 });
+    advance(1000);
+    expect(marked).toEqual(["a"]);
+  });
+
   it("pauses while the page is hidden and restarts the full dwell when it is visible again", () => {
     jest.useFakeTimers();
     const { marked, advance } = renderAutoRead({ messages: [message("a")], delayMs: 1000 });
@@ -115,29 +131,61 @@ describe("useAutoMarkRead", () => {
   });
 });
 
+const editor = (settings: Account["settings"] = {}, accessRole: Account["accessRole"] = "editor") =>
+  ({ id: "synthetic-account", settings, accessRole }) as Pick<Account, "id" | "settings" | "accessRole">;
+
+describe("createAutoReadCoordinator", () => {
+  it("sends a manual read/unread action only after the auto-read request in flight", async () => {
+    const coordinator = createAutoReadCoordinator();
+    const order: string[] = [];
+    let finishAuto: () => void = () => {};
+    coordinator.autoRead(message("a"), () => new Promise<void>(resolve => {
+      order.push("auto sent");
+      finishAuto = () => { order.push("auto done"); resolve(); };
+    }));
+    const manual = coordinator.manualSeen([message("a")], async () => { order.push("manual sent"); });
+    // Other messages do not wait.
+    await coordinator.manualSeen([message("b")], async () => { order.push("other sent"); });
+    expect(order).toEqual(["auto sent", "other sent"]);
+    finishAuto();
+    await manual;
+    expect(order).toEqual(["auto sent", "other sent", "auto done", "manual sent"]);
+    expect(coordinator.manualSeenVersion(message("a"))).toBe(1);
+    expect(coordinator.manualSeenVersion(message("c"))).toBe(0);
+  });
+
+  it("does not hold manual actions behind a failed auto-read request", async () => {
+    const coordinator = createAutoReadCoordinator();
+    coordinator.autoRead(message("a"), () => Promise.reject(new Error("synthetic failure")));
+    let sent = false;
+    await coordinator.manualSeen([message("a")], async () => { sent = true; });
+    expect(sent).toBe(true);
+  });
+});
+
 describe("useAutoMarkReadDelay", () => {
   const prefsFetch = (prefs: unknown) => async () => Response.json({ ok: true, prefs });
 
   it("stays on never until the personal preferences are loaded", async () => {
     let release: (response: Response) => void = () => {};
     const pending = new Promise<Response>(resolve => { release = resolve; });
-    const { result } = renderHook(() => useAutoMarkReadDelay("synthetic-account", undefined, () => pending));
+    const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, () => pending));
     expect(result.current).toBeNull();
     await act(async () => { release(Response.json({ ok: true, prefs: {} })); });
     await waitFor(() => expect(result.current).toBe(1000));
   });
 
   it("resolves default < mailbox setting < personal preference", async () => {
-    const mailbox = renderHook(() => useAutoMarkReadDelay("synthetic-account", { reading: { autoMarkRead: "after3s" } }, prefsFetch({})));
+    const mailbox = renderHook(() => useAutoMarkReadDelay(editor({ reading: { autoMarkRead: "after3s" } }), true, prefsFetch({})));
     await waitFor(() => expect(mailbox.result.current).toBe(3000));
-    const personal = renderHook(() => useAutoMarkReadDelay("synthetic-account", { reading: { autoMarkRead: "after3s" } }, prefsFetch({ reading: { autoMarkRead: "never" } })));
+    const personal = renderHook(() => useAutoMarkReadDelay(editor({ reading: { autoMarkRead: "after3s" } }), true, prefsFetch({ reading: { autoMarkRead: "never" } })));
     await waitFor(() => expect(personal.result.current).toBeNull());
-    const immediate = renderHook(() => useAutoMarkReadDelay("synthetic-account", undefined, prefsFetch({ reading: { autoMarkRead: "immediate" } })));
+    const immediate = renderHook(() => useAutoMarkReadDelay(editor(), true, prefsFetch({ reading: { autoMarkRead: "immediate" } })));
     await waitFor(() => expect(immediate.result.current).toBe(0));
   });
 
   it("follows saved preferences of the same mailbox without a reload", async () => {
-    const { result } = renderHook(() => useAutoMarkReadDelay("synthetic-account", undefined, prefsFetch({})));
+    const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, prefsFetch({})));
     await waitFor(() => expect(result.current).toBe(1000));
     act(() => {
       window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId: "other-account", prefs: { reading: { autoMarkRead: "never" } } } }));
@@ -149,9 +197,45 @@ describe("useAutoMarkReadDelay", () => {
     expect(result.current).toBe(3000);
   });
 
+  it("reads the preferences only once a message is opened, and once per mailbox", async () => {
+    let calls = 0;
+    const apiFetch = async () => { calls++; return Response.json({ ok: true, prefs: {} }); };
+    const view = renderHook(({ opened }: { opened: boolean }) => useAutoMarkReadDelay(editor(), opened, apiFetch), { initialProps: { opened: false } });
+    await act(async () => {});
+    expect(calls).toBe(0);
+    expect(view.result.current).toBeNull();
+    view.rerender({ opened: true });
+    await waitFor(() => expect(view.result.current).toBe(1000));
+    view.rerender({ opened: false });
+    view.rerender({ opened: true });
+    await act(async () => {});
+    expect(calls).toBe(1);
+    expect(view.result.current).toBe(1000);
+  });
+
+  it("is off for viewers, who cannot set \\Seen, and does not load their preferences", async () => {
+    let calls = 0;
+    const { result } = renderHook(() => useAutoMarkReadDelay(editor({}, "viewer"), true, async () => { calls++; return Response.json({ ok: true, prefs: {} }); }));
+    await act(async () => {});
+    expect(result.current).toBeNull();
+    expect(calls).toBe(0);
+  });
+
+  it("keeps a preference saved while the first read was still in flight", async () => {
+    let release: (response: Response) => void = () => {};
+    const pending = new Promise<Response>(resolve => { release = resolve; });
+    const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, () => pending));
+    act(() => {
+      window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId: "synthetic-account", prefs: { reading: { autoMarkRead: "never" } } } }));
+    });
+    await act(async () => { release(Response.json({ ok: true, prefs: { reading: { autoMarkRead: "immediate" } } })); });
+    await act(async () => {});
+    expect(result.current).toBeNull();
+  });
+
   it("stays on never when the preferences cannot be loaded", async () => {
     let calls = 0;
-    const { result } = renderHook(() => useAutoMarkReadDelay("synthetic-account", undefined, async () => { calls++; return new Response("", { status: 500 }); }));
+    const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, async () => { calls++; return new Response("", { status: 500 }); }));
     await waitFor(() => expect(calls).toBe(1));
     await act(async () => {});
     expect(result.current).toBeNull();

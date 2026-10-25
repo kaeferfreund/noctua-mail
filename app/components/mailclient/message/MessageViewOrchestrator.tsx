@@ -214,6 +214,7 @@ export type MessageViewOrchestratorBodyInputs = {
   // through it after the dwell; see `useAutoMarkRead`.
   autoMarkReadDelayMs: number | null;
   onAutoMarkRead: (message: Message) => void;
+  manualSeenVersion?: (message: Message) => number;
   activeAccountId: string;
   // Client-id-injecting fetch wrapper owned by MailClient; used here by
   // the topic-suggestion-explanation loader to hit the per-account
@@ -411,6 +412,7 @@ function MessageViewOrchestratorImpl(
     onPendingSelectionCollapseConsumed,
     autoMarkReadDelayMs,
     onAutoMarkRead,
+    manualSeenVersion,
     activeAccountId,
     apiFetch,
     messageByMessageId,
@@ -732,6 +734,7 @@ function MessageViewOrchestratorImpl(
   useAutoMarkRead({
     messages: autoReadMessages,
     delayMs: autoMarkReadDelayMs,
+    manualSeenVersion,
     onMarkRead: (message) => {
       // Marking read changes the default expansion; keep the cards as shown.
       setCollapsedMessages((prev) => pinThreadCollapseState(renderedThread, prev, activeMessage?.id));
