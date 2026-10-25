@@ -666,7 +666,6 @@ export default function MailClient({
   const messageViewHandleRef = useRef<MessageViewOrchestratorHandle | null>(null);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const isAdminUser = currentUser?.role === "admin";
-  const spamRescans = useSpamRescanActivity(apiFetch, isAdminUser);
   useEffect(() => deferUntilIdle(() => {
     // Speculative warm-up must not surface an unhandled rejection. A cold open
     // still loads through next/dynamic, including when this request fails.
@@ -4922,6 +4921,8 @@ export default function MailClient({
   }, [authState]);
 
   const [openBottomStatusPanel, setOpenBottomStatusPanel] = useState<BottomStatusPanel>(null);
+  // Rescan jobs are read when a status panel opens or the admin UI announces one, never at start-up.
+  const spamRescans = useSpamRescanActivity(apiFetch, isAdminUser, openBottomStatusPanel !== null);
 
   // The linked message the list still has to highlight. `revision` is the list read current when the
   // link last asked for a page (null: none asked yet); the next page is asked for once that read is replaced.
