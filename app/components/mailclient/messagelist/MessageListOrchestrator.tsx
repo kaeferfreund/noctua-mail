@@ -279,6 +279,9 @@ export type MessageListOrchestratorProps = {
   activeVirtualFolderName?: string;
   searchScope: "folder" | "all";
 
+  // Phone only: the sync a pull-to-refresh on the list runs.
+  onPullRefresh?: () => Promise<unknown>;
+
   // Inputs for the internally-owned mutation hooks. See
   // `MessageListOrchestratorMutationInputs` for the note on which
   // fields are temporary until phase 4d.
@@ -305,6 +308,7 @@ export default function MessageListOrchestrator({
   messageListError,
   emptyListSyncing,
   activeVirtualFolderName,
+  onPullRefresh,
   mutationInputs
 }: MessageListOrchestratorProps) {
   const t = useTranslations("List");
@@ -510,7 +514,7 @@ export default function MessageListOrchestrator({
   );
 
   return (
-    <MessageListPane refs={{ listPaneRef: scrollRef }}>
+    <MessageListPane refs={{ listPaneRef: scrollRef }} onPullRefresh={onPullRefresh}>
       <div
         className={`${listPaneStyles.list} ${isCompactView ? listPaneStyles.listCompact : ""}`}
       >

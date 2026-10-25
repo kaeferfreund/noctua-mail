@@ -1976,6 +1976,14 @@ export default function MailClient({
     },
     [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
   );
+  // Phone pull-to-refresh: a "new" sync of the open folder (the whole account in
+  // a virtual view), as after a re-login.
+  const pullRefreshMailbox = useCallback(
+    () => syncAccount(activeFolderId || undefined, "new", {
+      triggerId: `pull-refresh:${activeAccountId}:${Date.now()}`
+    }),
+    [activeAccountId, activeFolderId, syncAccount]
+  );
   const calendarFirstDay: 0 | 1 = currentAccount?.settings?.calendar?.weekStartsOn === "sunday" ? 0 : 1;
   const accountSignatures = currentAccount?.settings?.signatures ?? [];
   const defaultSignatureId = currentAccount?.settings?.defaultSignatureId ?? "";
@@ -5560,6 +5568,7 @@ export default function MailClient({
               filteredMessagesCount={filteredMessages.length}
               messageListError={messageListError}
               emptyListSyncing={emptyListSyncing}
+              onPullRefresh={isMobile ? pullRefreshMailbox : undefined}
               activeVirtualFolderName={activeVirtualFolder?.name}
               searchScope={searchScope}
               mutationInputs={{
