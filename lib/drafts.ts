@@ -125,11 +125,14 @@ export class DraftSaveError extends Error {
 
 export class DraftSendError extends Error {
   readonly status: number;
+  /** Machine-readable reason for clients that translate the refusal. */
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = "DraftSendError";
     this.status = status;
+    this.code = code;
   }
 }
 

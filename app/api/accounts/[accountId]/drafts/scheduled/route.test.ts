@@ -62,7 +62,8 @@ describe("scheduled send routes", () => {
     const invite = encodeComposeInviteHeader({ start: "2026-11-02T09:00", end: "2026-11-02T10:00", allDay: false, location: "Synthetic room" });
     const invitation = await f.seedDraft({}, [`${COMPOSE_INVITE_HEADER}: ${invite}`]);
     const refused = await POST(f.request("POST", { draftId: invitation, sendAt: future }), f.params());
-    expect([refused.status, (await refused.json()).message]).toEqual([409, "Drafts with an event invitation cannot be scheduled."]);
+    const refusedBody = await refused.json();
+    expect([refused.status, refusedBody.code, refusedBody.message]).toEqual([409, "scheduled_send_invite", "Drafts with an event invitation cannot be scheduled."]);
     const noRecipient = await f.seedDraft({ to: "" });
     expect((await POST(f.request("POST", { draftId: noRecipient, sendAt: future }), f.params())).status).toBe(400);
     const [identity] = await f.db.listSenderIdentities(f.accountId);

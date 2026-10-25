@@ -40,7 +40,7 @@ export async function assertSchedulableDraft(accountId: string, draftId: string)
   const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
   if (!draftsFolder || draft.folderId !== draftsFolder.id) throw new DraftSendError(409, "Only drafts in the Drafts folder can be scheduled.");
   // A stored draft carries invitation metadata only; sending it would drop the calendar invitation.
-  if (extractComposeInviteDraftFromSource(rawSource)) throw new DraftSendError(409, "Drafts with an event invitation cannot be scheduled.");
+  if (extractComposeInviteDraftFromSource(rawSource)) throw new DraftSendError(409, "Drafts with an event invitation cannot be scheduled.", "scheduled_send_invite");
   return { draft, identity };
 }
 

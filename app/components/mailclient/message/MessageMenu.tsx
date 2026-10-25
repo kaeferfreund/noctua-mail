@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   CheckSquare,
   Circle,
+  Clock,
   CircleDot,
   Copy,
   Download,
@@ -50,11 +51,13 @@ import MoveToSubmenu from "./MoveToSubmenu";
 import TooltipIconButton, { useQuietMenuFocusReturn } from "@/app/components/TooltipIconButton";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
+import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
   | "editDraft"
   | "sendDraft"
+  | "scheduleDraft"
   | "discardDraft"
   | "reply"
   | "replyAll"
@@ -171,6 +174,8 @@ export default function MessageMenu({
   onOpenChange
 }: MessageMenuProps) {
   const t = useTranslations("Reader");
+  const tSchedule = useTranslations("Compose.schedule");
+  const scheduleDraft = useDraftScheduleAction(message);
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
   const quietFocusReturn = useQuietMenuFocusReturn();
@@ -291,6 +296,15 @@ export default function MessageMenu({
                   <Send size={14} />,
                   () => void onSendDraft(message),
                   !canSendDraft
+                )
+              : null,
+            isDraft && scheduleDraft && isVisible("scheduleDraft")
+              ? buildItem(
+                  "scheduleDraft",
+                  tSchedule("open"),
+                  <Clock size={14} />,
+                  scheduleDraft.open,
+                  !canSendDraft || scheduleDraft.busy
                 )
               : null,
             isDraft && onDiscardDraft && isVisible("discardDraft")

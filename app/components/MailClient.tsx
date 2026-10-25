@@ -22,6 +22,7 @@ import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
+import ScheduleSendDialog from "./mailclient/composition/ScheduleSendDialog";
 import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
 import { readScheduledSendConflict } from "./mailclient/scheduledSend/scheduledSendClient";
 import { roleAtLeast } from "@/lib/accountRole";
@@ -1976,6 +1977,11 @@ export default function MailClient({
     const data = (await res.json().catch(() => null)) as { message?: Message } | null;
     return data?.message ?? null;
   }, [activeAccountId, apiFetch]);
+  // Send refusals with a sender identity code read in the UI language.
+  const readSendErrorMessage = useCallback(
+    async (res: Response) => renderSenderMessage(await readSenderError(res, readErrorMessage)),
+    [readErrorMessage, renderSenderMessage]
+  );
   const scheduledSend = useScheduledSendControls({
     accountId: activeAccountId || null,
     enabled: roleAtLeast(currentAccount?.accessRole, "editor"),
@@ -1983,6 +1989,7 @@ export default function MailClient({
     apiFetch,
     pushNotice,
     reportError,
+    readErrorMessage: readSendErrorMessage,
     loadDraft: loadDraftForCompose,
     editDraft: (draft) => composeHandleRef.current?.openCompose("edit", draft),
     sendDraft: (draft) => handleSendDraftRef.current(draft)
@@ -3299,8 +3306,7 @@ export default function MailClient({
             reportError(tcompose(conflict === "scheduled_send_sent" ? "schedule.sendConflictSent" : "schedule.sendConflictBusy"));
             return;
           }
-          // Sender identity refusals carry a code with German copy; other errors keep the server text.
-          const errMsg = renderSenderMessage(await readSenderError(res, readErrorMessage));
+          const errMsg = await readSendErrorMessage(res);
           reportError(errMsg || tcompose("notices.draftSendFailed"));
           return;
         }
@@ -3392,9 +3398,9 @@ export default function MailClient({
       findSentFolder,
       pushNotice,
       readErrorMessage,
+      readSendErrorMessage,
       refreshFolders,
       removeDraftFromUi,
-      renderSenderMessage,
       reportError,
       setMessages,
       setPendingMessageActions,
@@ -5904,6 +5910,7 @@ export default function MailClient({
         onScheduledSend={scheduledSend.onScheduledSend}
         onScheduledSendConflict={scheduledSend.onScheduledSendConflict}
       />
+      <ScheduleSendDialog {...scheduledSend.scheduleDialog} />
 
       <ThreadJsonModal
         open={showJson}
