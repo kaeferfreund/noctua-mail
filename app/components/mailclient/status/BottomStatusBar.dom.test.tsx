@@ -128,6 +128,20 @@ describe("compact header status", () => {
     expect(within(popover).getByText("Details").tagName).toBe("SUMMARY");
     expect(within(popover).getByText("Wiederholungen: 3 von 10")).toBeTruthy();
   });
+  it("shows a running admin inbox rescan with its phase, progress and cancel, and the busy indicator", async () => {
+    const rescan = { id: "rescan-job", accountId: "acc-other", mailbox: "Praxis", status: "running" as const, phase: "classifier" as const,
+      processed: 12, total: 40, updatedAt: 1 };
+    let cancelled: unknown;
+    const view = render(<Harness initial="process" overrides={{ spamRescans: [rescan], onCancelSpamRescan: value => { cancelled = value; } }} />);
+    const popover = await view.findByRole("dialog");
+    expect(within(popover).getByText("Spam-Prüfung: Praxis")).toBeTruthy();
+    expect(within(popover).getByText("Filter-Prüfung mit Modell")).toBeTruthy();
+    expect(within(popover).getByText("12 von 40")).toBeTruthy();
+    expect(within(popover).queryByText("Keine laufenden Hintergrundaufgaben.")).toBeNull();
+    fireEvent.click(within(popover).getByRole("button", { name: "Prüfung abbrechen" }));
+    expect(cancelled).toEqual(rescan);
+    expect(view.container.ownerDocument.querySelector("[data-status-indicator]")?.getAttribute("data-status-indicator")).toBe("syncing");
+  });
   it("uses a translated fallback for unresolved folders, never mailboxPath", async () => {
     const view = render(<Harness initial="process" overrides={{ accountFolders: [], accounts: [], syncProgressItems: [job] }} />);
     const popover = await view.findByRole("dialog");

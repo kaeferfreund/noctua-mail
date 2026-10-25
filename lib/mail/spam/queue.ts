@@ -10,6 +10,8 @@ export type SpamCheckJob = {
   messageId: string;
   /** Attempts that already failed in earlier runs (persisted on the message row). */
   failedAttempts?: number;
+  /** Admin rescan (rescan.ts): store the verdict only, never auto-move; its model usage is summed under this key. */
+  rescanJobId?: string;
 };
 
 export type SpamQueueOptions = {
@@ -41,6 +43,7 @@ export function createSpamQueue(options: SpamQueueOptions) {
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const pending: SpamCheckJob[] = [];
   const known = new Set<string>();
+  const settledWaiters = new Map<string, Array<() => void>>();
   let active = 0;
   let idleWaiters: Array<() => void> = [];
 
@@ -69,7 +72,11 @@ export function createSpamQueue(options: SpamQueueOptions) {
       active += 1;
       void run(job).finally(() => {
         active -= 1;
-        known.delete(jobKey(job));
+        const key = jobKey(job);
+        known.delete(key);
+        const waiters = settledWaiters.get(key) ?? [];
+        settledWaiters.delete(key);
+        waiters.forEach((resolve) => resolve());
         pump();
       });
     }
@@ -93,6 +100,12 @@ export function createSpamQueue(options: SpamQueueOptions) {
     },
     has(job: SpamCheckJob) {
       return known.has(jobKey(job));
+    },
+    /** Resolves once the queued or running job with this key has finished (at once when none is). */
+    settled(job: SpamCheckJob) {
+      const key = jobKey(job);
+      if (!known.has(key)) return Promise.resolve();
+      return new Promise<void>((resolve) => settledWaiters.set(key, [...settledWaiters.get(key) ?? [], resolve]));
     },
     onIdle() {
       return active === 0 && !pending.length ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve));

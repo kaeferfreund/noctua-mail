@@ -18,8 +18,9 @@ const SNIPPET_LENGTH = 280;
 /**
  * `move-*`: a folder move into / out of Junk (moveLearning.ts), stored with the same payload as the buttons.
  * `server-flag-backfill`: the one-time move of server-flagged INBOX mail (scripts/spam-apply.ts --server-flagged).
+ * `rescan`: the admin's reviewed move after „Posteingang jetzt prüfen“ (rescan.ts).
  */
-export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious" | "move-junk" | "move-from-junk" | "server-flag-backfill";
+export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious" | "move-junk" | "move-from-junk" | "server-flag-backfill" | "rescan";
 export type SpamExampleTarget = { senderEmail: string | null; subject: string };
 
 export function senderParts(from: string | null | undefined) {

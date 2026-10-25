@@ -46,7 +46,7 @@ describe("spam apply", () => {
       log: (line) => lines.push(line)
     });
     expect(moved).toEqual(["m1", "m4"]);
-    expect(counts).toEqual({ moved: 2, "would-move": 0, missing: 1, "not-in-inbox": 1, error: 1 });
+    expect(counts).toEqual({ moved: 2, "would-move": 0, missing: 1, "not-in-inbox": 1, changed: 0, error: 1 });
     expect(lines).toEqual([
       "Betreff m1 — m1@example.test — moved → Junk",
       "Betreff m2 — m2@example.test — missing",
@@ -66,5 +66,20 @@ describe("spam apply", () => {
     });
     expect(calls).toBe(0);
     expect(counts).toMatchObject({ "would-move": 1, "not-in-inbox": 1, moved: 0 });
+  });
+
+  test("changed rows stay, every outcome reaches onResult, and a cancel stops before the next item", async () => {
+    const results: string[] = [];
+    let cancelled = false;
+    const counts = await applySpamItems([record("m1"), record("m2"), record("m3")], {
+      dryRun: false,
+      lookup: async (item) => ({ mailboxPath: "INBOX", changed: item.id === "m1" }),
+      move: async () => { cancelled = true; return "Junk"; },
+      onResult: (item, result) => { results.push(`${item.id}:${result}`); },
+      isCancelled: () => cancelled,
+      log: () => {}
+    });
+    expect(results).toEqual(["m1:changed", "m2:moved"]);
+    expect(counts).toMatchObject({ changed: 1, moved: 1 });
   });
 });

@@ -50,12 +50,36 @@ const FAILED_ATTEMPTS_SQL = `CASE WHEN spamReasons LIKE '["failed:%' THEN CAST(s
  * `spamCheckedAt`, so after the first sweep this only returns mail that
  * arrived since (served by idx_messages_account_folder_date).
  */
-export async function listUncheckedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number, maxAttempts: number) {
+export async function listUncheckedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number, maxAttempts: number,
+  options: { newestFirst?: boolean } = {}) {
   const db = await getAccountDb(accountId);
   return db.prepare(`SELECT id, ${FAILED_ATTEMPTS_SQL} AS failedAttempts FROM messages
     WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND spamCheckedAt IS NULL AND COALESCE(deleted, 0) = 0
       AND ${FAILED_ATTEMPTS_SQL} < ?
-    ORDER BY dateValue ASC LIMIT ?`).all(accountId, folderId, sinceDateValue, maxAttempts, limit) as Array<{ id: string; failedAttempts: number }>;
+    ORDER BY dateValue ${options.newestFirst ? "DESC" : "ASC"} LIMIT ?`).all(accountId, folderId, sinceDateValue, maxAttempts, limit) as Array<{ id: string; failedAttempts: number }>;
+}
+
+/** The admin rescan's counts before its start: rows of the folder in the range and the unchecked ones the sweep would take. */
+export async function countSpamRescanRows(accountId: string, folderId: string, sinceDateValue: number, maxAttempts: number) {
+  const db = await getAccountDb(accountId);
+  const row = db.prepare(`SELECT COUNT(*) AS rows,
+      COALESCE(SUM(CASE WHEN spamCheckedAt IS NULL AND ${FAILED_ATTEMPTS_SQL} < ? THEN 1 ELSE 0 END), 0) AS unchecked
+    FROM messages WHERE accountId = ? AND folderId = ? AND dateValue >= ? AND COALESCE(deleted, 0) = 0`)
+    .get(maxAttempts, accountId, folderId, sinceDateValue) as { rows: number; unchecked: number };
+  return { rows: row.rows, unchecked: row.unchecked };
+}
+
+export type MarkedSpamRow = {
+  id: string; messageId: string | null; fromAddr: string | null; subject: string | null; date: string; dateValue: number;
+  flags: string | null; answered: number | null; flagged: number | null; spamConfidence: number | null; spamReasons: string | null;
+};
+
+/** Rows of the folder in the range with the „Verdächtig“ mark (spamVerdict 'spam'), newest first. */
+export async function listMarkedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number) {
+  const db = await getAccountDb(accountId);
+  return db.prepare(`SELECT id, messageId, fromAddr, subject, date, dateValue, flags, answered, flagged, spamConfidence, spamReasons FROM messages
+    WHERE accountId = ? AND spamVerdict = 'spam' AND folderId = ? AND dateValue >= ? AND COALESCE(deleted, 0) = 0
+    ORDER BY dateValue DESC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as MarkedSpamRow[];
 }
 
 /** Stores the failed attempts of a row that is still unchecked (a verdict written meanwhile is kept). */

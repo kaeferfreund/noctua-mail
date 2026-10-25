@@ -849,6 +849,45 @@ export function initMasterSchema(db: any) {
       updatedByUserId TEXT
     );
 
+    -- Admin rescan of an existing INBOX (doc/SPAM-DETECTION.md, „Posteingang jetzt prüfen“): the latest
+    -- job per mailbox and its preview items. ownerInstance: the server process running it (a row left
+    -- running/moving by another process was interrupted). Nothing in here moves mail by itself.
+    CREATE TABLE IF NOT EXISTS spam_rescan_jobs (
+      id TEXT PRIMARY KEY,
+      accountId TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('running','ready','moving','cancelled','failed')),
+      period TEXT NOT NULL,
+      sinceDateValue INTEGER,
+      withModel INTEGER NOT NULL,
+      modelLimit INTEGER NOT NULL,
+      phase TEXT,
+      processed INTEGER NOT NULL DEFAULT 0,
+      total INTEGER NOT NULL DEFAULT 0,
+      counts TEXT,
+      error TEXT,
+      ownerInstance TEXT NOT NULL,
+      createdByUserId TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      finishedAt INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_spam_rescan_jobs_account ON spam_rescan_jobs(accountId, createdAt DESC);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_spam_rescan_jobs_active ON spam_rescan_jobs(accountId) WHERE status IN ('running','moving');
+    CREATE TABLE IF NOT EXISTS spam_rescan_items (
+      jobId TEXT NOT NULL,
+      messageId TEXT NOT NULL,
+      rfcMessageId TEXT,
+      fromAddr TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      date TEXT NOT NULL,
+      dateValue INTEGER NOT NULL,
+      stage TEXT NOT NULL CHECK(stage IN ('server-flag','classifier')),
+      reasons TEXT,
+      score REAL,
+      moveStatus TEXT CHECK(moveStatus IN ('pending','moved','gone','changed','error')),
+      PRIMARY KEY (jobId, messageId)
+    );
+
     -- Admin-uploaded sidebar icons per mail domain (lib/domainIcons.ts). The
     -- normalised PNG lives at domain-icons/<sha256(domain)>.png in the data dir;
     -- hash is the sha256 of those bytes (ETag and client cache key).
