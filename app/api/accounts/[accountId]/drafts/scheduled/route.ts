@@ -14,13 +14,19 @@ const SCHEDULE_WINDOW_SECONDS = 60;
 /** Per user: planning is cheap to repeat by hand, but each row becomes an SMTP send later. */
 const scheduleAttempts = createRateLimiter({ windowMs: SCHEDULE_WINDOW_SECONDS * 1000, max: 30 });
 
-/** GET /api/accounts/[accountId]/drafts/scheduled — open and failed schedules of the mailbox. */
+/**
+ * GET /api/accounts/[accountId]/drafts/scheduled[?draftId=…] — open, sending and failed schedules
+ * of the mailbox (of every member), or of one draft (read fresh when a draft is opened).
+ */
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, { minRole: SCHEDULED_SEND_MIN_ROLE });
   if (accountContext instanceof NextResponse) return accountContext;
-  return withAuthResponse(accountContext, async () =>
-    okResponse({ scheduledSends: (await listScheduledSends(accountContext.accountId)).map(presentScheduledSend) }));
+  return withAuthResponse(accountContext, async () => {
+    const draftId = new URL(request.url).searchParams.get("draftId")?.trim();
+    if (draftId !== undefined && (!draftId || draftId.length > 256)) return errorResponse("Invalid draftId", 400);
+    return okResponse({ scheduledSends: (await listScheduledSends(accountContext.accountId, draftId)).map(presentScheduledSend) });
+  });
 }
 
 /**

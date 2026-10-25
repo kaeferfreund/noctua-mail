@@ -2,7 +2,7 @@ import type { Account } from "@/lib/data";
 import { DraftSendError, loadSendableDraft, sendDraftForAccount } from "@/lib/drafts";
 import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { SenderIdentityError } from "@/lib/senderIdentityError";
-import { getSmtpHttpError, isSmtpUpstreamFailure } from "@/lib/mail/smtpError";
+import { getSmtpHttpError, isSmtpUpstreamFailure, smtpFailedBeforeData } from "@/lib/mail/smtpError";
 import { findDraftsFolder } from "@/lib/specialFolders";
 import { extractComposeInviteDraftFromSource } from "@/lib/composeInviteMetadata";
 import { getAccountById, getFolders } from "@/lib/serverDb";
@@ -71,17 +71,21 @@ function retryOrFail(row: ScheduledSend, now: number): ScheduledSendOutcome {
     : { status: "queued", reason: "send_failed", nextAttemptAt: now + delay };
 }
 
-/** Permanent problems never retry; only transient upstream/runtime failures do. */
+/** Permanent and possibly-delivered failures never retry; only failures before DATA (or before SMTP) do. */
 export function classifyScheduledSendError(error: unknown, row: ScheduledSend, now: number): ScheduledSendOutcome {
   if (error instanceof OutboundAuthorizationError) return { status: "cancelled", reason: "permission_revoked" };
   if (error instanceof SenderIdentityError) return { status: "cancelled", reason: "identity_unavailable" };
   if (error instanceof DraftSendError) {
     return error.status === 404 ? { status: "cancelled", reason: "draft_missing" } : { status: "failed", reason: "draft_invalid" };
   }
-  const smtp = isSmtpUpstreamFailure(error) ? getSmtpHttpError(error) : null;
-  if (smtp?.status === 422) return { status: "failed", reason: "smtp_rejected" };
-  // The server stopped answering mid-transaction: delivery may have happened, so never resend automatically.
-  if (smtp?.code === "smtp_server_timeout") return { status: "failed", reason: "send_uncertain" };
+  if (isSmtpUpstreamFailure(error)) {
+    // An explicit 5xx rejection (envelope or message) is final, never retried.
+    if (getSmtpHttpError(error)?.status === 422) return { status: "failed", reason: "smtp_rejected" };
+    // Only a failure provably before DATA can be retried; anything later or of unknown phase
+    // (dropped connection, socket timeout, unclassified upstream error) may have been delivered.
+    return smtpFailedBeforeData(error) ? retryOrFail(row, now) : { status: "failed", reason: "send_uncertain" };
+  }
+  // Not an SMTP transport failure: the attempt stopped before SMTP (DB, folders, draft source).
   return retryOrFail(row, now);
 }
 

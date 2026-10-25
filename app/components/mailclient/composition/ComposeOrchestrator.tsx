@@ -50,7 +50,7 @@ import ComposeMessageField from "./ComposeMessageField";
 import ComposeMinimized from "./ComposeMinimized";
 import ComposeModal from "./ComposeModal";
 import ScheduleSendDialog from "./ScheduleSendDialog";
-import { scheduleDraftSend } from "../scheduledSend/scheduledSendClient";
+import { readScheduledSendConflict, scheduleDraftSend } from "../scheduledSend/scheduledSendClient";
 import type { ScheduledSendView } from "@/lib/scheduledSendView";
 import { ComposeContextProvider, type ComposeContextValue } from "./ComposeContext";
 import { getDraftChangeState } from "./draftSaveUtils";
@@ -246,6 +246,8 @@ export type ComposeOrchestratorProps = {
 
   /** A send was planned („Senden planen“); compose has closed, the draft stays. */
   onScheduledSend?: (result: { scheduledSend: ScheduledSendView; subject: string }) => void;
+  /** „Senden“ was refused because the draft's schedule is sending or already sent it. */
+  onScheduledSendConflict?: () => void;
 
   /** Called synchronously before a detached window closes successfully. */
   onDetachedComposeOutcome?: (
@@ -322,6 +324,7 @@ function ComposeOrchestratorImpl(
     onComposeMirrorChange,
     detachedWindow = false,
     onScheduledSend,
+    onScheduledSendConflict,
     onDetachedComposeOutcome
   }: ComposeOrchestratorProps,
   ref: React.ForwardedRef<ComposeOrchestratorHandle>
@@ -1076,10 +1079,11 @@ function ComposeOrchestratorImpl(
         accountFromValue: fromValue
       });
       const sendDraftId = composeDraftIdRef.current;
+      // The draft id lets the server take a planned send of this draft from the job first.
       const res = await apiFetch(buildAccountSmtpSendPath(activeAccountId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(smtpPayload)
+        body: JSON.stringify(sendDraftId ? { ...smtpPayload, draftId: sendDraftId } : smtpPayload)
       });
       if (res.ok) {
         const sendResult = (await res.json().catch(() => null)) as
@@ -1174,9 +1178,17 @@ function ComposeOrchestratorImpl(
         }
         clearRecipientSuggestionCache(activeAccountId);
       } else {
-        const message = await readSenderError(res, readErrorMessage);
-        if (isSendSession()) setSenderError(message);
-        reportError(renderMessage(message));
+        const conflict = res.status === 409 ? await readScheduledSendConflict(res) : null;
+        if (conflict) {
+          // The schedule sends (or already sent) this draft: never a second copy from compose.
+          reportError(t(conflict === "scheduled_send_sent" ? "schedule.sendConflictSent" : "schedule.sendConflictBusy"));
+          onScheduledSendConflict?.();
+          void refreshMailboxData();
+        } else {
+          const message = await readSenderError(res, readErrorMessage);
+          if (isSendSession()) setSenderError(message);
+          reportError(renderMessage(message));
+        }
       }
     } catch (error) {
       if (delivered) {

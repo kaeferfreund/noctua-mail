@@ -479,6 +479,7 @@ export {
   createScheduledSend,
   getScheduledSend,
   listScheduledSends,
+  ScheduledSendAlreadySentError,
   ScheduledSendBusyError
 } from "./db/scheduledSends";
 export type { ScheduledSend, ScheduledSendReason, ScheduledSendStatus } from "./db/scheduledSends";

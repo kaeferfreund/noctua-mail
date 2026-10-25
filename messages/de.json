@@ -1861,6 +1861,8 @@
       "unscheduleFailed": "Die Planung konnte nicht aufgehoben werden.",
       "unscheduled": "Planung aufgehoben.",
       "busy": "Dieser Entwurf wird gerade gesendet.",
+      "sendConflictBusy": "Dieser Entwurf wird gerade durch seine Planung gesendet. Es wurde keine zweite Kopie verschickt.",
+      "sendConflictSent": "Dieser Entwurf wurde bereits durch seine Planung gesendet. Es wurde keine zweite Kopie verschickt.",
       "inviteUnsupported": "Termineinladungen können nicht geplant gesendet werden. Sende die Einladung direkt.",
       "badge": "Geplant · {time}",
       "badgeFailed": "Fehlgeschlagen",
@@ -1873,8 +1875,8 @@
       "reasons": {
         "send_failed": "Der Mailserver war nach mehreren Versuchen nicht erreichbar.",
         "smtp_rejected": "Der Mailserver hat die Nachricht abgelehnt.",
-        "send_uncertain": "Der Mailserver hat nicht geantwortet. Prüfe „Gesendet“, bevor du erneut sendest.",
-        "interrupted": "Das Senden wurde unterbrochen. Prüfe „Gesendet“, bevor du erneut sendest.",
+        "send_uncertain": "Ob die Mail zugestellt wurde, ist unklar. Prüfe den Gesendet-Ordner, bevor du erneut sendest.",
+        "interrupted": "Das Senden wurde unterbrochen. Prüfe den Gesendet-Ordner, bevor du erneut sendest.",
         "draft_invalid": "Der Entwurf ist unvollständig. Öffne und speichere ihn erneut.",
         "unknown": "Unbekannter Fehler."
       }

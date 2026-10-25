@@ -7,7 +7,12 @@ import type { ScheduledSendView } from "@/lib/scheduledSendView";
 import { formatScheduledSendTime } from "@/lib/scheduleSendTime";
 import type { NoticeInput } from "../types";
 import type { ScheduledSendControls } from "./ScheduledSend";
-import { cancelScheduledDraftSend, listScheduledDraftSends } from "./scheduledSendClient";
+import {
+  cancelDraftSchedule,
+  listScheduledDraftSends,
+  releaseDraftScheduleForEdit,
+  type ScheduleReleaseResult
+} from "./scheduledSendClient";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 /** While a schedule is open the list is re-read this often, so a sent draft loses its badge. */
@@ -45,15 +50,23 @@ export function useScheduledSends({ accountId, enabled, apiFetch }: { accountId:
 
   const byDraftId = useMemo(() => new Map(rows.map(row => [row.draftId, row])), [rows]);
 
-  /** Cancels and re-reads; `status` 409 means the schedule is sending right now. */
-  const cancel = useCallback(async (schedule: ScheduledSendView) => {
-    if (!accountId) return { ok: false as const, status: 0 };
-    const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
+  /** Cancels (a 404 only counts as gone after a fresh read of the draft) and re-reads the list. */
+  const cancel = useCallback(async (schedule: ScheduledSendView): Promise<ScheduleReleaseResult> => {
+    if (!accountId) return { ok: false, reason: "failed" };
+    const result = await cancelDraftSchedule(apiFetch, accountId, schedule);
     await refresh();
-    return result.ok || result.status === 404 ? { ok: true as const } : { ok: false as const, status: result.status };
+    return result;
   }, [accountId, apiFetch, refresh]);
 
-  return { byDraftId, refresh, cancel };
+  /** Fresh server read for one draft, then cancel: covers schedules of other tabs and members. */
+  const releaseForEdit = useCallback(async (draftId: string): Promise<ScheduleReleaseResult> => {
+    if (!accountId || !enabled) return { ok: true };
+    const result = await releaseDraftScheduleForEdit(apiFetch, accountId, draftId);
+    await refresh();
+    return result;
+  }, [accountId, apiFetch, enabled, refresh]);
+
+  return { byDraftId, refresh, cancel, releaseForEdit };
 }
 
 /**
@@ -74,11 +87,11 @@ export function useScheduledSendControls(input: {
 }) {
   const t = useTranslations("Compose.schedule");
   const { accountId, enabled, locale, apiFetch, pushNotice, reportError, loadDraft, editDraft, sendDraft } = input;
-  const { byDraftId, refresh, cancel } = useScheduledSends({ accountId, enabled, apiFetch });
+  const { byDraftId, refresh, cancel, releaseForEdit } = useScheduledSends({ accountId, enabled, apiFetch });
 
   const unschedule = useCallback(async (schedule: ScheduledSendView, notify = true) => {
     const result = await cancel(schedule);
-    if (!result.ok) reportError(result.status === 409 ? t("busy") : t("unscheduleFailed"));
+    if (!result.ok) reportError(result.reason === "busy" ? t("busy") : t("unscheduleFailed"));
     else if (notify) pushNotice({ type: "success", title: t("unscheduled") });
     return result.ok;
   }, [cancel, pushNotice, reportError, t]);
@@ -112,11 +125,13 @@ export function useScheduledSendControls(input: {
 
   /** „Bearbeiten hebt die Planung auf“: resolves false when the draft must not open (sending now). */
   const releaseBeforeEdit = useCallback(async (draftId: string) => {
-    const schedule = byDraftId.get(draftId);
-    if (!schedule) return true;
-    if (schedule.status === "sending") { reportError(t("busy")); return false; }
-    return unschedule(schedule, false);
-  }, [byDraftId, reportError, t, unschedule]);
+    const result = await releaseForEdit(draftId);
+    if (!result.ok) reportError(result.reason === "busy" ? t("busy") : t("unscheduleFailed"));
+    return result.ok;
+  }, [releaseForEdit, reportError, t]);
+
+  /** Compose was refused because the schedule is sending or already sent the draft. */
+  const onScheduledSendConflict = useCallback(() => { void refresh(); }, [refresh]);
 
   const controls = useMemo<ScheduledSendControls>(() => ({
     byDraftId,
@@ -124,5 +139,5 @@ export function useScheduledSendControls(input: {
     sendNow: async (message) => { await sendDraft(message); await refresh(); }
   }), [byDraftId, refresh, sendDraft, unschedule]);
 
-  return { controls, refresh, onScheduledSend, onDetachedScheduled, releaseBeforeEdit };
+  return { controls, refresh, onScheduledSend, onDetachedScheduled, releaseBeforeEdit, onScheduledSendConflict };
 }

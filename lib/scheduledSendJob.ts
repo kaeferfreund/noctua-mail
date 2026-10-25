@@ -1,7 +1,7 @@
-import { newLeaseOwner, processExited } from "./db/processLeases";
 import {
   claimDueScheduledSends,
   failInterruptedScheduledSends,
+  processScheduleOwner,
   pruneScheduledSends,
   settleScheduledSend,
   type ScheduledSend
@@ -14,21 +14,15 @@ export const SCHEDULED_SEND_TICK_MS = 15_000;
 const CLAIM_BATCH = 5;
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60_000;
 
-/** A lease owner (`pid:uuid`) is alive while its process exists and it is not an earlier incarnation of this pid. */
-export function leaseOwnerAlive(leaseOwner: string, ownOwner: string) {
-  if (leaseOwner === ownOwner) return true;
-  const pid = Number(leaseOwner.split(":", 1)[0]);
-  if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false;
-  return !processExited(pid);
-}
-
 /**
  * Single in-process scheduler. Exactly-once per row comes from the durable claim
- * (`queued` → `sending` under BEGIN IMMEDIATE, owner recorded) — not from the timer —
- * so a second process sharing the master DB can never send a claimed row again.
+ * (`queued` → `sending` under BEGIN IMMEDIATE, owner and lease start recorded) — not from
+ * the timer — so a second process sharing the master DB can never send a claimed row again.
+ * Leases of dead processes or older than SCHEDULED_SEND_LEASE_MAX_MS become failed/interrupted.
  */
 export class ScheduledSendScheduler {
-  readonly owner = newLeaseOwner();
+  /** The process owner; manual holds of this process (`owner/manual:…`) count as alive too. */
+  readonly owner = processScheduleOwner();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> | null = null;
   private stopped = false;
@@ -57,7 +51,7 @@ export class ScheduledSendScheduler {
 
   private async pass() {
     const now = this.deps.now();
-    const interrupted = await failInterruptedScheduledSends(this.owner, leaseOwner => leaseOwnerAlive(leaseOwner, this.owner), now);
+    const interrupted = await failInterruptedScheduledSends(undefined, now);
     if (interrupted) console.warn("[scheduled-send] interrupted sends marked failed", { count: interrupted });
     await pruneScheduledSends(now - HISTORY_RETENTION_MS);
     while (!this.stopped && !isShuttingDown()) {

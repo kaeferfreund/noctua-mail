@@ -38,6 +38,7 @@ type RenderComposeOptions = {
   detachedWindow?: boolean;
   showComposeInline?: boolean;
   showComposeModal?: boolean;
+  onScheduledSendConflict?: () => void;
 };
 
 function deferred<T>() {
@@ -129,6 +130,7 @@ function renderCompose(options: RenderComposeOptions = {}) {
     refreshMailboxData: options.refreshMailboxData ?? (async () => {}),
     pushNotice: options.onNotice ?? (() => {}),
     onDetachedComposeOutcome: options.onOutcome,
+    onScheduledSendConflict: options.onScheduledSendConflict,
     evictThreadCache: () => {},
     updateFlagState: () => {},
     updateKeywordFlag: options.updateKeywordFlag ?? (() => {}),
@@ -300,6 +302,29 @@ describe("send while a draft save is still in flight", () => {
     expect((sendButton()?.textContent ?? "").trim()).toBe("Send");
     expect((sendButton() as HTMLButtonElement).disabled).toBe(false);
 
+    cleanup();
+  }, 20000);
+
+  it("sends the saved draft id and explains a 409 from its schedule without a second copy", async () => {
+    const errors: string[] = [];
+    let conflicts = 0;
+    const { view, handleRef, draftSaveGate, sendButton, calls } = renderCompose({
+      smtpResponse: () => new Response(JSON.stringify({ ok: false, code: "scheduled_send_sent", message: "This draft was already sent by its schedule." }),
+        { status: 409, headers: { "Content-Type": "application/json" } }),
+      reportError: (message) => errors.push(message),
+      onScheduledSendConflict: () => { conflicts += 1; }
+    });
+    await act(async () => { handleRef.current?.openCompose("new"); });
+    const toField = view.baseElement.querySelector<HTMLInputElement>("#compose-modal-to");
+    await act(async () => { fireEvent.change(toField!, { target: { value: "someone@example.test" } }); });
+    await act(async () => { draftSaveGate.resolve(); });
+    await waitFor(() => expect(calls.some((call) => call.url.includes("/drafts/save"))).toBe(true), { timeout: 5000 });
+    await act(async () => { fireEvent.click(sendButton()!); });
+    await waitFor(() => expect(errors).toEqual(["This draft was already sent by its schedule. No second copy was sent."]), { timeout: 5000 });
+    expect(calls.find((call) => call.url.includes("/smtp/send"))?.body).toMatchObject({ draftId: "draft-1" });
+    expect(conflicts).toBe(1);
+    // No draft cleanup after a refused send.
+    expect(calls.some((call) => call.url.includes("/discard"))).toBe(false);
     cleanup();
   }, 20000);
 });

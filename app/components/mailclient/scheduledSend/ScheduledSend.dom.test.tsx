@@ -69,7 +69,12 @@ describe("ScheduledSendBar", () => {
     expect(sending.queryByRole("button")).toBeNull();
     cleanup();
     const failed = wrap(<ScheduledSendBar message={draft()} />, schedule({ status: "failed", lastError: "interrupted" }));
-    expect(failed.getByRole("alert").textContent).toContain("Das Senden wurde unterbrochen. Prüfe „Gesendet“, bevor du erneut sendest.");
+    expect(failed.getByRole("alert").textContent).toContain("Das Senden wurde unterbrochen. Prüfe den Gesendet-Ordner, bevor du erneut sendest.");
     expect(failed.getByRole("button", { name: "Jetzt senden" })).toBeTruthy();
+    // A failed (e.g. interrupted or uncertain) schedule can always be removed.
+    expect(failed.getByRole("button", { name: "Planung aufheben" })).toBeTruthy();
+    cleanup();
+    const uncertain = wrap(<ScheduledSendBar message={draft()} />, schedule({ status: "failed", lastError: "send_uncertain" }));
+    expect(uncertain.getByRole("alert").textContent).toContain("Prüfe den Gesendet-Ordner");
   });
 });

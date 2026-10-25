@@ -22,6 +22,7 @@ import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from ".
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
 import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
+import { readScheduledSendConflict } from "./mailclient/scheduledSend/scheduledSendClient";
 import { roleAtLeast } from "@/lib/accountRole";
 import { applyMessageCollabUpdate, applyMessagesCollabUpdates, applyThreadCollabCacheUpdates } from "./mailclient/threadCollabUpdates";
 import type { ShellAccount } from "./shell/types";
@@ -1987,10 +1988,12 @@ export default function MailClient({
   });
   const { refresh: refreshScheduledSends, onDetachedScheduled, releaseBeforeEdit: releaseScheduleBeforeEdit } = scheduledSend;
   const activeFolderIsDrafts = isDraftsFolder(activeFolderId);
+  const openedDraftId = viewMessage?.draft ? viewMessage.id : null;
   useEffect(() => {
-    // Another member may have planned a draft since the last read.
-    if (activeFolderIsDrafts) void refreshScheduledSends();
-  }, [activeFolderIsDrafts, refreshScheduledSends]);
+    // Another tab or member may have planned a draft since the last read: re-read when the
+    // Drafts folder or a draft is opened.
+    if (activeFolderIsDrafts || openedDraftId) void refreshScheduledSends();
+  }, [activeFolderIsDrafts, openedDraftId, refreshScheduledSends]);
 
   const openCompose = (
     mode: ComposeMode,
@@ -1998,8 +2001,9 @@ export default function MailClient({
     asNew = false,
     prefill?: ComposeOpenPrefill
   ) => {
-    // „Bearbeiten hebt die Planung auf“: the schedule is cancelled before the draft opens.
-    if (mode === "edit" && !asNew && message && scheduledSend.controls.byDraftId.has(message.id)) {
+    // „Bearbeiten hebt die Planung auf“: the draft's schedule, read fresh from the server (other
+    // tabs and members included), is cancelled before the draft opens.
+    if (mode === "edit" && !asNew && message && isDraftItem(message) && roleAtLeast(currentAccount?.accessRole, "editor")) {
       void releaseScheduleBeforeEdit(message.id).then((released) => {
         if (released) composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
       });
@@ -3287,6 +3291,11 @@ export default function MailClient({
           body: JSON.stringify({})
         });
         if (!res.ok) {
+          const conflict = res.status === 409 ? await readScheduledSendConflict(res) : null;
+          if (conflict) {
+            reportError(tcompose(conflict === "scheduled_send_sent" ? "schedule.sendConflictSent" : "schedule.sendConflictBusy"));
+            return;
+          }
           const errMsg = await readErrorMessage(res);
           reportError(errMsg || tcompose("notices.draftSendFailed"));
           return;
@@ -5888,6 +5897,7 @@ export default function MailClient({
         showComposeMinimized={showComposeMinimized}
         onComposeMirrorChange={setComposeMirror}
         onScheduledSend={scheduledSend.onScheduledSend}
+        onScheduledSendConflict={scheduledSend.onScheduledSendConflict}
       />
 
       <ThreadJsonModal

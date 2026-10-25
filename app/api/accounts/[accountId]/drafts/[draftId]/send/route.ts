@@ -5,7 +5,8 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { requireMutationSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { DraftSendError, releaseScheduleForDraftChange, sendDraftForAccount } from "@/lib/drafts";
+import { DraftSendError, holdScheduleForDraftChange, sendDraftForAccount, type DraftScheduleHold } from "@/lib/drafts";
+import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import {
   getAccountIdFromParams,
   type AccountRouteParams
@@ -44,9 +45,11 @@ export async function POST(request: Request, { params }: Params) {
     if (originError) return originError;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;
 
+    let scheduleHold: DraftScheduleHold | undefined;
     try {
-      // "Jetzt senden" on a planned draft: the manual send replaces the schedule (409 while it is sending).
-      await releaseScheduleForDraftChange(resolvedAccountId, draftId, "sent_now");
+      // "Jetzt senden" on a planned draft: the schedule is held during the send and closed only
+      // after it, restored when the send fails (409 while the job sends it or after it did).
+      scheduleHold = await holdScheduleForDraftChange(resolvedAccountId, draftId, "sent_now");
       const result = await sendDraftForAccount({
         account,
         authorization: { request },
@@ -55,8 +58,12 @@ export async function POST(request: Request, { params }: Params) {
         draftId,
         actor: collabActorFromSession(accountContext.session, accountContext.clientId)
       });
+      await scheduleHold.complete();
       return okResponse(result);
     } catch (error) {
+      await scheduleHold?.abort(error);
+      const conflict = scheduledSendConflictResponse(error);
+      if (conflict) return conflict;
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       if (error instanceof DraftSendError) {

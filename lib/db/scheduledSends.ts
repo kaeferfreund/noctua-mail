@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "./connection";
+import { newLeaseOwner, processExited } from "./processLeases";
 import { withDbWriteRetry } from "../dbWriteRetry";
 
 export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "cancelled";
@@ -21,13 +22,25 @@ export type ScheduledSend = {
   nextAttemptAt: number;
   lastError: ScheduledSendReason | null;
   leaseOwner: string | null;
+  leaseStartedAt: number | null;
   createdAt: number;
   updatedAt: number;
 };
 
+/**
+ * A `sending` lease older than this is interrupted, whoever holds it: SMTP plus the post-send
+ * deadline end well before, and a crashed holder whose pid was reused must not block the draft.
+ */
+export const SCHEDULED_SEND_LEASE_MAX_MS = 10 * 60_000;
+
 /** A row in `sending` blocks every other change to its draft until the claiming send settles. */
 export class ScheduledSendBusyError extends Error {
   constructor() { super("The draft is being sent by its schedule."); this.name = "ScheduledSendBusyError"; }
+}
+
+/** The draft's schedule already sent it; a manual send would be a second copy. */
+export class ScheduledSendAlreadySentError extends Error {
+  constructor() { super("The draft was already sent by its schedule."); this.name = "ScheduledSendAlreadySentError"; }
 }
 
 /** Statuses shown to members: the active schedule and an unresolved failure. */
@@ -35,8 +48,36 @@ const VISIBLE_STATUSES = "('queued','sending','failed')";
 /** Settling a draft (edit, discard, manual send) closes these; `sending` is never touched. */
 const OPEN_STATUSES = "('queued','failed')";
 
+const ownerKey = Symbol.for("noctua.scheduledSendProcessOwner");
+const processHost = globalThis as typeof globalThis & { [ownerKey]?: string };
+/** One `pid:uuid` per server process, shared by every bundle: the job's lease owner and the prefix of manual holds. */
+export function processScheduleOwner() {
+  return processHost[ownerKey] ??= newLeaseOwner();
+}
+
+/** Lease owners: `pid:uuid` (job) or `pid:uuid/manual:uuid` (a manual edit/discard/send of the draft). */
+export function scheduleLeaseOwnerAlive(leaseOwner: string, ownProcess = processScheduleOwner()) {
+  const processPart = leaseOwner.split("/", 1)[0];
+  if (processPart === ownProcess) return true;
+  const pid = Number(processPart.split(":", 1)[0]);
+  // The same pid with another uuid is an earlier incarnation of this process (container restart).
+  if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  return !processExited(pid);
+}
+
 function write<T>(name: string, action: (db: any) => T): Promise<T> {
   return getDb().then(db => withDbWriteRetry(name, () => db.transaction(() => action(db)).immediate()));
+}
+
+/** `sending` → `failed/interrupted` for leases past the age limit (never re-sent: the SMTP outcome is unknown). */
+function expireStaleLeases(db: any, now: number, scope?: { accountId: string; draftId?: string; id?: string }) {
+  const filters = ["status='sending'", "COALESCE(leaseStartedAt,updatedAt)<=?"];
+  const values: unknown[] = [now - SCHEDULED_SEND_LEASE_MAX_MS];
+  if (scope) { filters.push("accountId=?"); values.push(scope.accountId); }
+  if (scope?.draftId) { filters.push("draftId=?"); values.push(scope.draftId); }
+  if (scope?.id) { filters.push("id=?"); values.push(scope.id); }
+  return db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
+    WHERE ${filters.join(" AND ")}`).run(now, ...values).changes as number;
 }
 
 function hasSendingRow(db: any, accountId: string, draftId: string) {
@@ -53,23 +94,26 @@ export function createScheduledSend(input: {
   return write("createScheduledSend", db => {
     input.assertCurrent?.(db);
     const now = input.now ?? Date.now();
+    expireStaleLeases(db, now, { accountId: input.accountId, draftId: input.draftId });
     if (hasSendingRow(db, input.accountId, input.draftId)) throw new ScheduledSendBusyError();
     db.query(`UPDATE scheduled_sends SET status='cancelled',lastError='rescheduled',updatedAt=?
       WHERE accountId=? AND draftId=? AND status IN ${OPEN_STATUSES}`).run(now, input.accountId, input.draftId);
     const row: ScheduledSend = { id: randomUUID(), accountId: input.accountId, userId: input.userId, draftId: input.draftId,
       sendAt: input.sendAt, status: "queued", attempts: 0, nextAttemptAt: input.sendAt, lastError: null, leaseOwner: null,
-      createdAt: now, updatedAt: now };
-    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,createdAt,updatedAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
-      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.createdAt, row.updatedAt);
+      leaseStartedAt: null, createdAt: now, updatedAt: now };
+    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,createdAt,updatedAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
+      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.leaseStartedAt, row.createdAt, row.updatedAt);
     return row;
   });
 }
 
-export async function listScheduledSends(accountId: string): Promise<ScheduledSend[]> {
+/** Open, sending and failed schedules of the mailbox, optionally of one draft only. */
+export async function listScheduledSends(accountId: string, draftId?: string): Promise<ScheduledSend[]> {
   const db = await getDb();
-  return db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`)
-    .all(accountId) as ScheduledSend[];
+  return (draftId
+    ? db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND draftId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId, draftId)
+    : db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId)) as ScheduledSend[];
 }
 
 export async function getScheduledSend(id: string): Promise<ScheduledSend | null> {
@@ -80,6 +124,7 @@ export async function getScheduledSend(id: string): Promise<ScheduledSend | null
 /** Cancels one schedule of the mailbox. `null` when unknown or already settled. */
 export function cancelScheduledSend(accountId: string, id: string, now = Date.now()) {
   return write("cancelScheduledSend", db => {
+    expireStaleLeases(db, now, { accountId, id });
     const row = db.query("SELECT * FROM scheduled_sends WHERE id=? AND accountId=?").get(id, accountId) as ScheduledSend | null;
     if (!row || !["queued", "failed", "sending"].includes(row.status)) return null;
     if (row.status === "sending") throw new ScheduledSendBusyError();
@@ -89,14 +134,44 @@ export function cancelScheduledSend(accountId: string, id: string, now = Date.no
 }
 
 /**
- * Closes the open schedule of a draft before a manual change (edit, discard, send now).
- * Throws `ScheduledSendBusyError` while the scheduled send of that draft is running.
+ * Takes the draft's queued schedule out of the job's reach for a manual change (edit, discard,
+ * send now, compose send): `queued` → `sending` under `owner`. Throws `ScheduledSendBusyError`
+ * while the job sends it and, for sends (`rejectSent`), `ScheduledSendAlreadySentError` once the
+ * schedule sent it.
  */
-export function releaseDraftSchedules(accountId: string, draftId: string, reason: ScheduledSendReason, now = Date.now()) {
-  return write("releaseDraftSchedules", db => {
+export function holdDraftSchedules(accountId: string, draftId: string, owner: string, rejectSent: boolean, now = Date.now()) {
+  return write("holdDraftSchedules", db => {
+    expireStaleLeases(db, now, { accountId, draftId });
     if (hasSendingRow(db, accountId, draftId)) throw new ScheduledSendBusyError();
-    return db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,updatedAt=?
-      WHERE accountId=? AND draftId=? AND status IN ${OPEN_STATUSES}`).run(reason, now, accountId, draftId).changes as number;
+    if (rejectSent && db.query("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(accountId, draftId)) {
+      throw new ScheduledSendAlreadySentError();
+    }
+    return db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,updatedAt=?
+      WHERE accountId=? AND draftId=? AND status='queued'`).run(owner, now, now, accountId, draftId).changes as number;
+  });
+}
+
+/**
+ * Ends a manual hold. `done`: the change happened, the schedule (and an old failure) is closed.
+ * `restore`: it did not happen, the schedule is queued again. `uncertain`: a send may have gone
+ * out, the schedule fails as `send_uncertain` instead of sending a possible second copy.
+ */
+export function finishDraftScheduleHold(accountId: string, draftId: string, owner: string,
+  outcome: { kind: "done"; reason: ScheduledSendReason } | { kind: "restore" } | { kind: "uncertain" }, now = Date.now()) {
+  return write("finishDraftScheduleHold", db => {
+    const held = "accountId=? AND draftId=? AND status='sending' AND leaseOwner=?";
+    if (outcome.kind === "restore") {
+      return db.query(`UPDATE scheduled_sends SET status='queued',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+        .run(now, accountId, draftId, owner).changes as number;
+    }
+    if (outcome.kind === "uncertain") {
+      return db.query(`UPDATE scheduled_sends SET status='failed',lastError='send_uncertain',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+        .run(now, accountId, draftId, owner).changes as number;
+    }
+    const closed = db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+      .run(outcome.reason, now, accountId, draftId, owner).changes as number;
+    return closed + (db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,updatedAt=? WHERE accountId=? AND draftId=? AND status='failed'`)
+      .run(outcome.reason, now, accountId, draftId).changes as number);
   });
 }
 
@@ -107,9 +182,9 @@ export function claimDueScheduledSends(owner: string, now: number, limit: number
       ORDER BY nextAttemptAt, id LIMIT ?`).all(now, limit) as ScheduledSend[];
     const claimed: ScheduledSend[] = [];
     for (const row of due) {
-      const result = db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,attempts=attempts+1,updatedAt=?
-        WHERE id=? AND status='queued'`).run(owner, now, row.id);
-      if (result.changes === 1) claimed.push({ ...row, status: "sending", leaseOwner: owner, attempts: row.attempts + 1, updatedAt: now });
+      const result = db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,attempts=attempts+1,updatedAt=?
+        WHERE id=? AND status='queued'`).run(owner, now, now, row.id);
+      if (result.changes === 1) claimed.push({ ...row, status: "sending", leaseOwner: owner, leaseStartedAt: now, attempts: row.attempts + 1, updatedAt: now });
     }
     return claimed;
   });
@@ -121,7 +196,7 @@ export function settleScheduledSend(id: string, owner: string, outcome:
   { status: "queued"; reason: ScheduledSendReason; nextAttemptAt: number }, now = Date.now()) {
   return write("settleScheduledSend", db => {
     const nextAttemptAt = outcome.status === "queued" ? outcome.nextAttemptAt : null;
-    const result = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,updatedAt=?,
+    const result = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?,
       nextAttemptAt=COALESCE(?,nextAttemptAt) WHERE id=? AND leaseOwner=? AND status='sending'`)
       .run(outcome.status, outcome.reason, now, nextAttemptAt, id, owner);
     return result.changes === 1;
@@ -129,17 +204,16 @@ export function settleScheduledSend(id: string, owner: string, outcome:
 }
 
 /**
- * Rows left in `sending` by a process that no longer exists become `failed/interrupted`.
- * They are never re-sent: the SMTP outcome of an interrupted attempt is unknown.
+ * `sending` rows of a process that no longer exists, or whose lease passed the age limit,
+ * become `failed/interrupted`. They are never re-sent: the SMTP outcome is unknown.
  */
-export function failInterruptedScheduledSends(owner: string, ownerAlive: (leaseOwner: string) => boolean, now = Date.now()) {
+export function failInterruptedScheduledSends(ownerAlive: (leaseOwner: string) => boolean = scheduleLeaseOwnerAlive, now = Date.now()) {
   return write("failInterruptedScheduledSends", db => {
-    const rows = db.query("SELECT id,leaseOwner FROM scheduled_sends WHERE status='sending' AND (leaseOwner IS NULL OR leaseOwner<>?)")
-      .all(owner) as Array<{ id: string; leaseOwner: string | null }>;
-    let failed = 0;
+    let failed = expireStaleLeases(db, now);
+    const rows = db.query("SELECT id,leaseOwner FROM scheduled_sends WHERE status='sending'").all() as Array<{ id: string; leaseOwner: string | null }>;
     for (const row of rows) {
       if (row.leaseOwner && ownerAlive(row.leaseOwner)) continue;
-      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,updatedAt=?
+      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
         WHERE id=? AND status='sending'`).run(now, row.id).changes as number;
     }
     return failed;

@@ -50,7 +50,16 @@ import {
   buildDraftSendEnvelopeRecipients,
   draftHasSendableRecipients
 } from "@/lib/draftSendEnvelope";
-import { releaseDraftSchedules, ScheduledSendBusyError, type ScheduledSendReason } from "./db/scheduledSends";
+import { randomUUID } from "node:crypto";
+import {
+  finishDraftScheduleHold,
+  holdDraftSchedules,
+  processScheduleOwner,
+  ScheduledSendAlreadySentError,
+  ScheduledSendBusyError,
+  type ScheduledSendReason
+} from "./db/scheduledSends";
+import { smtpOutcomeUncertain } from "@/lib/mail/smtpError";
 
 export type DraftAttachmentInput = {
   filename: string;
@@ -126,17 +135,39 @@ export class DraftSendError extends Error {
 
 export type SendDraftResult = SentCopyResult & { identityId: string };
 
-/** Closes the open schedule of a draft before a manual change; 409 while it is being sent. */
-export async function releaseScheduleForDraftChange(
-  accountId: string, draftId: string, reason: ScheduledSendReason,
-  ErrorType: typeof DraftSaveError | typeof DraftSendError = DraftSendError
-) {
-  try {
-    await releaseDraftSchedules(accountId, draftId, reason);
-  } catch (error) {
-    if (error instanceof ScheduledSendBusyError) throw new ErrorType(409, "This draft is being sent by its schedule right now.");
-    throw error;
-  }
+export type DraftScheduleHold = {
+  /** The manual change happened: close the draft's schedule (and an old failure). */
+  complete: () => Promise<void>;
+  /** It did not: queue the schedule again, or fail it as `send_uncertain` if a send may have gone out. */
+  abort: (error: unknown) => Promise<void>;
+};
+
+/**
+ * Takes the draft's queued schedule out of the job's reach for a manual change (edit, discard,
+ * send now, compose send) and settles it afterwards, so a failed change keeps the schedule.
+ * Throws `ScheduledSendBusyError` while the job sends the draft and, for a send (`sent_now`),
+ * `ScheduledSendAlreadySentError` once its schedule sent it. A hold that cannot be finished
+ * expires as `failed/interrupted`.
+ */
+export async function holdScheduleForDraftChange(accountId: string, draftId: string, reason: ScheduledSendReason): Promise<DraftScheduleHold> {
+  const owner = `${processScheduleOwner()}/manual:${randomUUID()}`;
+  await holdDraftSchedules(accountId, draftId, owner, reason === "sent_now");
+  let finished = false;
+  const finish = async (outcome: Parameters<typeof finishDraftScheduleHold>[3]) => {
+    if (finished) return;
+    finished = true;
+    try {
+      await finishDraftScheduleHold(accountId, draftId, owner, outcome);
+    } catch (error) {
+      console.warn("[scheduled-send] manual hold not settled; its lease expires as interrupted", {
+        accountId, draftId, outcome: outcome.kind, error: error instanceof Error ? error.name : typeof error
+      });
+    }
+  };
+  return {
+    complete: () => finish({ kind: "done", reason }),
+    abort: (error) => finish(smtpOutcomeUncertain(error) ? { kind: "uncertain" } : { kind: "restore" })
+  };
 }
 
 function getReplyRecipient(ownAddresses: readonly string[], message: Message) {
@@ -462,12 +493,29 @@ export async function saveDraftForAccount(params: {
   const authorization = await beforeWrite?.();
   const assertCurrent = authorization ? await prepareOutboundAssertion(authorization) : () => {};
   assertCurrent();
-  // Editing a planned draft cancels its schedule; a schedule that is sending right now wins.
-  if (existingDraft) await releaseScheduleForDraftChange(accountId, existingDraft.id, "edited", DraftSaveError);
-  const uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
+  // Editing a planned draft cancels its schedule once the edit is on the server; a schedule
+  // that is sending right now wins (409), and a failed APPEND keeps the schedule.
+  let scheduleHold: DraftScheduleHold | undefined;
+  if (existingDraft) {
+    try {
+      scheduleHold = await holdScheduleForDraftChange(accountId, existingDraft.id, "edited");
+    } catch (error) {
+      if (error instanceof ScheduledSendBusyError || error instanceof ScheduledSendAlreadySentError) throw new DraftSaveError(409, error.message);
+      throw error;
+    }
+  }
+  let uid: number | null | undefined;
+  try {
+    uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
+  } catch (error) {
+    await scheduleHold?.abort(error);
+    throw error;
+  }
   if (!uid) {
+    await scheduleHold?.abort(null);
     throw new DraftSaveError(502, "Failed to save draft to IMAP server");
   }
+  await scheduleHold?.complete();
 
   assertCurrent();
   let draftId: string | null = null;

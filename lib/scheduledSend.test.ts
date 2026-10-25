@@ -5,22 +5,23 @@ import { identityTestAccount } from "./testFixtures/senderIdentities";
 import { getDb } from "./db/connection";
 import { newLeaseOwner } from "./db/processLeases";
 import {
-  cancelScheduledSend, claimDueScheduledSends, createScheduledSend, failInterruptedScheduledSends,
-  getScheduledSend, listScheduledSends, releaseDraftSchedules, ScheduledSendBusyError, settleScheduledSend,
-  type ScheduledSend
+  cancelScheduledSend, claimDueScheduledSends, createScheduledSend, failInterruptedScheduledSends, finishDraftScheduleHold,
+  getScheduledSend, holdDraftSchedules, listScheduledSends, processScheduleOwner, SCHEDULED_SEND_LEASE_MAX_MS,
+  ScheduledSendAlreadySentError, ScheduledSendBusyError, scheduleLeaseOwnerAlive, settleScheduledSend, type ScheduledSend
 } from "./db/scheduledSends";
 import {
   attemptScheduledSend, classifyScheduledSendError, SCHEDULED_SEND_MAX_AHEAD_MS, SCHEDULED_SEND_RETRY_DELAYS_MS,
   validateScheduledSendAt, type ScheduledSendDeps
 } from "./scheduledSend";
-import { leaseOwnerAlive, ScheduledSendScheduler, SCHEDULED_SEND_TICK_MS } from "./scheduledSendJob";
+import { ScheduledSendScheduler, SCHEDULED_SEND_TICK_MS } from "./scheduledSendJob";
 import { DraftSendError } from "./drafts";
 import { authorizeOutbound, OutboundAuthorizationError } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentityError";
-import { markSmtpUpstreamFailure } from "./mail/smtpError";
+import { markSmtpUpstreamFailure, smtpFailedBeforeData, smtpOutcomeUncertain } from "./mail/smtpError";
 import type { Account } from "./data";
 
-const T0 = Date.UTC(2026, 9, 24, 22, 0);
+// Lease ages are checked against the real clock by manual holds: keep test time "now".
+const T0 = Math.floor(Date.now() / 60_000) * 60_000;
 const mailbox = () => `scheduled-${crypto.randomUUID()}`;
 const draft = () => `imap-${crypto.randomUUID()}`;
 
@@ -70,11 +71,58 @@ describe("scheduled_sends store", () => {
     // Only the claiming owner settles; a busy row blocks edits, cancel and rescheduling.
     const other = claimed.leaseOwner === a ? b : a;
     expect(await settleScheduledSend(due.id, other, { status: "sent", reason: null })).toBe(false);
-    await expect(releaseDraftSchedules(accountId, claimed.draftId, "edited")).rejects.toBeInstanceOf(ScheduledSendBusyError);
-    await expect(cancelScheduledSend(accountId, due.id)).rejects.toBeInstanceOf(ScheduledSendBusyError);
+    await expect(holdDraftSchedules(accountId, claimed.draftId, "manual-a", false, T0)).rejects.toBeInstanceOf(ScheduledSendBusyError);
+    await expect(cancelScheduledSend(accountId, due.id, T0)).rejects.toBeInstanceOf(ScheduledSendBusyError);
     await expect(queued(accountId, T0 + 5, claimed.draftId)).rejects.toBeInstanceOf(ScheduledSendBusyError);
     expect(await settleScheduledSend(due.id, claimed.leaseOwner!, { status: "sent", reason: null })).toBe(true);
-    expect(await releaseDraftSchedules(accountId, claimed.draftId, "edited")).toBe(0);
+    // After the schedule sent the draft, an edit holds nothing and a manual send is refused.
+    expect(await holdDraftSchedules(accountId, claimed.draftId, "manual-b", false, T0)).toBe(0);
+    await expect(holdDraftSchedules(accountId, claimed.draftId, "manual-c", true, T0)).rejects.toBeInstanceOf(ScheduledSendAlreadySentError);
+  });
+
+  test("a manual hold keeps the job away and settles: done closes, restore re-queues, uncertain fails", async () => {
+    const accountId = mailbox();
+    for (const [outcome, expected] of [
+      [{ kind: "done", reason: "sent_now" }, { status: "cancelled", lastError: "sent_now" }],
+      [{ kind: "restore" }, { status: "queued", lastError: null, leaseOwner: null }],
+      [{ kind: "uncertain" }, { status: "failed", lastError: "send_uncertain" }]
+    ] as const) {
+      const row = await queued(accountId, T0 - 1);
+      const owner = `${processScheduleOwner()}/manual:${crypto.randomUUID()}`;
+      expect(await holdDraftSchedules(accountId, row.draftId, owner, true, T0)).toBe(1);
+      expect((await claimDueScheduledSends(newLeaseOwner(), T0, 100)).some(item => item.id === row.id)).toBe(false);
+      expect(await failInterruptedScheduledSends(undefined, T0)).toBeGreaterThanOrEqual(0);
+      expect((await getScheduledSend(row.id))?.status).toBe("sending");
+      await finishDraftScheduleHold(accountId, row.draftId, "someone-else", { kind: "restore" }, T0);
+      expect((await getScheduledSend(row.id))?.status).toBe("sending");
+      await finishDraftScheduleHold(accountId, row.draftId, owner, outcome, T0);
+      expect(await getScheduledSend(row.id)).toMatchObject(expected);
+      if (outcome.kind === "restore") await cancelScheduledSend(accountId, row.id, T0);
+    }
+  });
+
+  test("a stale lease (pid reused or holder hung) becomes failed/interrupted and unblocks the draft", async () => {
+    const accountId = mailbox();
+    const row = await queued(accountId, T0 - 1);
+    // A live foreign pid (our parent) holds the lease: younger than the limit it still blocks.
+    const reused = `${process.ppid}:${crypto.randomUUID()}`;
+    await claimDueScheduledSends(reused, T0, 100);
+    expect(scheduleLeaseOwnerAlive(reused)).toBe(true);
+    expect(await failInterruptedScheduledSends(undefined, T0 + SCHEDULED_SEND_LEASE_MAX_MS - 1)).toBeGreaterThanOrEqual(0);
+    expect((await getScheduledSend(row.id))?.status).toBe("sending");
+    await expect(holdDraftSchedules(accountId, row.draftId, "manual", false, T0 + 60_000)).rejects.toBeInstanceOf(ScheduledSendBusyError);
+    // Past the limit any caller expires it — no 409 forever, and it is never re-sent.
+    expect(await holdDraftSchedules(accountId, row.draftId, "manual", false, T0 + SCHEDULED_SEND_LEASE_MAX_MS)).toBe(0);
+    expect(await getScheduledSend(row.id)).toMatchObject({ status: "failed", lastError: "interrupted", leaseOwner: null });
+    expect((await claimDueScheduledSends(newLeaseOwner(), T0 + 3_600_000, 100)).some(item => item.id === row.id)).toBe(false);
+    // The failed row is offered for „Planung aufheben“.
+    expect((await listScheduledSends(accountId)).map(item => item.id)).toEqual([row.id]);
+    expect(await cancelScheduledSend(accountId, row.id, T0)).toMatchObject({ status: "cancelled" });
+
+    const second = await queued(accountId, T0 - 1);
+    await claimDueScheduledSends(reused, T0, 100);
+    expect(await failInterruptedScheduledSends(undefined, T0 + SCHEDULED_SEND_LEASE_MAX_MS)).toBeGreaterThanOrEqual(1);
+    expect(await getScheduledSend(second.id)).toMatchObject({ status: "failed", lastError: "interrupted" });
   });
 
   test("an interrupted claim of a dead process fails and is never re-sent; a live owner keeps it", async () => {
@@ -83,13 +131,14 @@ describe("scheduled_sends store", () => {
     const dead = `999999999:${crypto.randomUUID()}`;
     await claimDueScheduledSends(dead, T0, 100);
     const live = newLeaseOwner();
-    expect(await failInterruptedScheduledSends(live, owner => owner !== dead, T0)).toBeGreaterThanOrEqual(1);
+    expect(await failInterruptedScheduledSends(owner => owner !== dead, T0)).toBeGreaterThanOrEqual(1);
     expect(await getScheduledSend(row.id)).toMatchObject({ status: "failed", lastError: "interrupted", leaseOwner: null });
     expect((await claimDueScheduledSends(live, T0 + 3_600_000, 100)).some(item => item.id === row.id)).toBe(false);
-    // An earlier incarnation of this pid (container restart) is dead; a foreign live pid is not.
-    expect(leaseOwnerAlive(`${process.pid}:${crypto.randomUUID()}`, live)).toBe(false);
-    expect(leaseOwnerAlive(live, live)).toBe(true);
-    expect(leaseOwnerAlive(`999999999:${crypto.randomUUID()}`, live)).toBe(false);
+    // An earlier incarnation of this pid (container restart) is dead; this process and its manual holds are alive.
+    expect(scheduleLeaseOwnerAlive(`${process.pid}:${crypto.randomUUID()}`, live)).toBe(false);
+    expect(scheduleLeaseOwnerAlive(live, live)).toBe(true);
+    expect(scheduleLeaseOwnerAlive(`${live}/manual:${crypto.randomUUID()}`, live)).toBe(true);
+    expect(scheduleLeaseOwnerAlive(`999999999:${crypto.randomUUID()}`, live)).toBe(false);
   });
 });
 
@@ -113,10 +162,40 @@ describe("scheduled send rules", () => {
     expect(SCHEDULED_SEND_RETRY_DELAYS_MS).toEqual([60_000, 300_000, 900_000]);
     const rejected = markSmtpUpstreamFailure(Object.assign(new Error("550 recipient rejected"), { responseCode: 550, code: "EENVELOPE", command: "RCPT TO" }));
     expect(classifyScheduledSendError(rejected, row(1), T0)).toEqual({ status: "failed", reason: "smtp_rejected" });
-    const temporary = markSmtpUpstreamFailure(Object.assign(new Error("451 try later"), { responseCode: 451, code: "EENVELOPE" }));
-    expect(classifyScheduledSendError(temporary, row(1), T0).status).toBe("queued");
-    const stalled = markSmtpUpstreamFailure(Object.assign(new Error("Timeout"), { code: "ETIMEDOUT" }));
-    expect(classifyScheduledSendError(stalled, row(1), T0)).toEqual({ status: "failed", reason: "send_uncertain" });
+    const smtp = (fields: Record<string, unknown>) => markSmtpUpstreamFailure(Object.assign(new Error("synthetic SMTP failure"), fields));
+    // Provably before DATA: retried.
+    for (const before of [
+      smtp({ code: "ETIMEDOUT", timeoutType: "CONNECTION_TIMEOUT", command: "CONN" }),
+      smtp({ code: "ETIMEDOUT", timeoutType: "GREETING_TIMEOUT", command: "CONN" }),
+      smtp({ code: "ESOCKET", originalCode: "ECONNREFUSED", command: "CONN" }),
+      smtp({ code: "EDNS", command: "CONN" }),
+      smtp({ code: "EAUTH", command: "AUTH PLAIN", responseCode: 535 }),
+      smtp({ code: "EENVELOPE", command: "RCPT TO", responseCode: 451 }),
+      smtp({ code: "EENVELOPE", command: "DATA", responseCode: 451 })
+    ]) {
+      expect(smtpFailedBeforeData(before)).toBe(true);
+      expect(smtpOutcomeUncertain(before)).toBe(false);
+      expect(classifyScheduledSendError(before, row(1), T0).status).toBe("queued");
+    }
+    // During/after DATA or of unknown phase: never retried, the user checks Sent.
+    for (const after of [
+      smtp({ code: "ETIMEDOUT", timeoutType: "SOCKET_TIMEOUT", command: "CONN" }),
+      smtp({ code: "ETIMEDOUT" }),
+      smtp({ code: "ECONNECTION", command: "CONN", message: "Connection closed unexpectedly" }),
+      smtp({ code: "ESOCKET", originalCode: "ECONNRESET", command: "CONN" }),
+      smtp({ code: "EMESSAGE", command: "DATA", responseCode: 451 }),
+      smtp({ code: "EPROTOCOL", command: "CONN" }),
+      smtp({})
+    ]) {
+      expect(smtpFailedBeforeData(after)).toBe(false);
+      expect(smtpOutcomeUncertain(after)).toBe(true);
+      expect(classifyScheduledSendError(after, row(1), T0)).toEqual({ status: "failed", reason: "send_uncertain" });
+    }
+    // An explicit 5xx rejection after DATA was not delivered: final, not uncertain.
+    const refused = smtp({ code: "EMESSAGE", command: "DATA", responseCode: 554 });
+    expect(smtpOutcomeUncertain(refused)).toBe(false);
+    expect(classifyScheduledSendError(refused, row(1), T0)).toEqual({ status: "failed", reason: "smtp_rejected" });
+    expect(smtpOutcomeUncertain(new Error("not an SMTP failure"))).toBe(false);
     expect(classifyScheduledSendError(new DraftSendError(404, "gone"), row(1), T0)).toEqual({ status: "cancelled", reason: "draft_missing" });
     expect(classifyScheduledSendError(new DraftSendError(400, "no recipients"), row(1), T0)).toEqual({ status: "failed", reason: "draft_invalid" });
     expect(classifyScheduledSendError(new SenderIdentityError("identity_unavailable", 409, "off"), row(1), T0)).toEqual({ status: "cancelled", reason: "identity_unavailable" });

@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { dbModulePromise } from "@/lib/testDbHarness";
-import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
-import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
-import { buildImapMessageRowId } from "@/lib/messageIds";
+import { createScheduledSendFixture, SCHEDULED_SEND_TEST_ORIGIN } from "@/lib/testFixtures/scheduledSendDrafts";
 import { COMPOSE_INVITE_HEADER, encodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
-import { saveMessageSource } from "@/lib/storage";
 import { claimDueScheduledSends, getScheduledSend } from "@/lib/db";
 import { SCHEDULED_SEND_MAX_AHEAD_MS } from "@/lib/scheduledSend";
 import { GET, POST } from "./route";
@@ -12,37 +8,8 @@ import { POST as cancel } from "./[scheduleId]/cancel/route";
 import { POST as discard } from "../[draftId]/discard/route";
 import { POST as sendNow } from "../[draftId]/send/route";
 
-const ORIGIN = "http://localhost:3000";
-
-async function fixture() {
-  const db = await dbModulePromise;
-  const accountId = `scheduled-route-${crypto.randomUUID()}`;
-  await db.upsertAccount(identityTestAccount(accountId));
-  await db.saveFoldersForAccount(accountId, ["INBOX", "Drafts"].map(name => ({ id: `${accountId}:${name}`, accountId, name, count: 0,
-    specialUse: name === "INBOX" ? "\\Inbox" : "\\Drafts" })));
-  const auth = await createAuthenticatedTestSession(accountId);
-  const [identity] = await db.listSenderIdentities(accountId);
-  const seedDraft = async (overrides: Record<string, unknown> = {}, extraHeaders: string[] = []) => {
-    const messageId = `<synthetic-${crypto.randomUUID()}@example.test>`;
-    const id = buildImapMessageRowId(messageId);
-    const from = `${identity.displayName} <${identity.email}>`;
-    const raw = [`From: ${from}`, "To: recipient@example.test", `Message-ID: ${messageId}`, `X-Noctua-Identity-Id: ${identity.id}`,
-      ...extraHeaders, "Subject: Synthetic planned", "", "Synthetic body"].join("\r\n");
-    // No mailboxPath/imapUid: the discard route then never contacts an IMAP server.
-    await db.upsertMessages(accountId, null, [{ id, messageId, threadId: messageId, accountId, folderId: `${accountId}:Drafts`, from,
-      to: "recipient@example.test", subject: "Synthetic planned", body: "Synthetic body", preview: "", date: new Date().toISOString(),
-      dateValue: Date.now(), flags: ["\\Draft"], senderIdentityId: identity.id, source: raw, ...overrides }]);
-    await saveMessageSource(accountId, id, raw);
-    return id;
-  };
-  const request = (method: string, body?: unknown, headers: Record<string, string> = {}, session = auth) =>
-    new Request(`${ORIGIN}/api/accounts/${accountId}/drafts/scheduled`, {
-      method, headers: session.jar.headers({ origin: ORIGIN, "content-type": "application/json", ...headers }),
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-  const params = (extra: Record<string, string> = {}) => ({ params: Promise.resolve({ accountId, ...extra }) });
-  return { ...auth, db, accountId, seedDraft, request, params };
-}
+const ORIGIN = SCHEDULED_SEND_TEST_ORIGIN;
+const fixture = () => createScheduledSendFixture();
 
 describe("scheduled send routes", () => {
   test("viewer is forbidden; member (editor) and manager schedule, list and cancel", async () => {

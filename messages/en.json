@@ -1861,6 +1861,8 @@
       "unscheduleFailed": "The schedule could not be removed.",
       "unscheduled": "Schedule removed.",
       "busy": "This draft is being sent right now.",
+      "sendConflictBusy": "This draft is being sent by its schedule right now. No second copy was sent.",
+      "sendConflictSent": "This draft was already sent by its schedule. No second copy was sent.",
       "inviteUnsupported": "Event invitations cannot be scheduled. Send the invitation directly.",
       "badge": "Scheduled · {time}",
       "badgeFailed": "Failed",
@@ -1873,8 +1875,8 @@
       "reasons": {
         "send_failed": "The mail server could not be reached after several attempts.",
         "smtp_rejected": "The mail server rejected the message.",
-        "send_uncertain": "The mail server did not respond. Check Sent before sending again.",
-        "interrupted": "Sending was interrupted. Check Sent before sending again.",
+        "send_uncertain": "It is unclear whether the mail was delivered. Check the Sent folder before sending again.",
+        "interrupted": "Sending was interrupted. Check the Sent folder before sending again.",
         "draft_invalid": "The draft is incomplete. Open it and save it again.",
         "unknown": "Unknown error."
       }

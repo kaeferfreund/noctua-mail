@@ -877,7 +877,8 @@ export function initMasterSchema(db: any) {
     CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(userId);
 
     -- Scheduled sends of saved drafts (doc/SCHEDULED-SEND.md). sendAt/nextAttemptAt are UTC epoch ms;
-    -- leaseOwner is the claiming process (pid:uuid) while status='sending'; lastError is a reason code.
+    -- leaseOwner/leaseStartedAt: the claiming process (pid:uuid, a manual hold adds /manual:uuid) while
+    -- status='sending'; leases older than 10 min count as interrupted. lastError is a reason code.
     CREATE TABLE IF NOT EXISTS scheduled_sends (
       id TEXT PRIMARY KEY,
       accountId TEXT NOT NULL,
@@ -889,6 +890,7 @@ export function initMasterSchema(db: any) {
       nextAttemptAt INTEGER NOT NULL,
       lastError TEXT,
       leaseOwner TEXT,
+      leaseStartedAt INTEGER,
       createdAt INTEGER NOT NULL,
       updatedAt INTEGER NOT NULL
     );
