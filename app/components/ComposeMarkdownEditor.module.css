@@ -40,7 +40,7 @@
 .container :global(.w-md-editor-text-pre),
 .container :global(.w-md-editor-text-input) {
   font-family: var(--font-mono) !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   line-height: 22px !important;
   letter-spacing: normal !important;
 }

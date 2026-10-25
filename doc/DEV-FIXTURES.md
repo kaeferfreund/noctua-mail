@@ -29,8 +29,8 @@ Bootstrap codes are no longer printed to startup logs. In Admin create the synth
 - IMAP `127.0.0.1:3789`, SMTP `127.0.0.1:3787`, security **None**.
 - Both usernames `demo@monkeydent.test`, passwords `demo`.
 
-Creation is admin-only and ownerless. Grant the synthetic personal identity manager membership,
-then choose the mailbox. The API derives its ID from email; it grants no access implicitly.
+Creation is admin-only; the creating admin becomes the owner and sees the mailbox in the sidebar.
+Grant other synthetic identities membership in Admin → Mailboxes. The API derives its ID from email.
 
 The HTTP proof now uses an already MFA-authenticated synthetic browser session. Supply its Cookie
 header through the local `NOCTUA_FIXTURE_COOKIE` environment variable (never commit or log it), then:

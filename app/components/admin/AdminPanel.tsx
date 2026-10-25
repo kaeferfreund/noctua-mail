@@ -7,21 +7,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/app/components/ui/dialog";
 import SettingsFrame, { SettingsHeader, settingsNavClass } from "@/app/components/shell/SettingsFrame";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { createAuthClient, type NoctuaAuthClient, type Proof } from "@/lib/authClient";
 import ReauthDialog from "@/app/components/auth/ReauthDialog";
 import AdminConfirmDialog from "./AdminConfirmDialog";
+import AdminSecretDialog, { type AdminSecret } from "./AdminSecretDialog";
 import AdminAuditLog from "./AdminAuditLog";
+import AdminInviteHistory from "./AdminInviteHistory";
 import AdminMailboxes from "./AdminMailboxes";
 import AdminSpamSettings from "./AdminSpamSettings";
 import AdminDomainIcons from "./AdminDomainIcons";
 import AdminUsersTable from "./AdminUsersTable";
 import { ADMIN_SECTIONS } from "@/lib/navigation/deepLinks";
 import { adminActionRow, adminHeaderRow, adminSectionTitle } from "./adminLayout";
-import type { AdminUser, AdminInvite } from "./types";
+import type { AdminUser } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
 function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
@@ -29,11 +30,11 @@ function isOwner(user: AdminUser) { return user.accounts?.some(account => accoun
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 type NavigationProps = { section?: AdminSection; onSectionChange?: (section: AdminSection) => void };
 
-export default function AdminPanel({ section, onSectionChange, isAdminUser, apiFetch = fetch, client, onClose, currentUserId, onAccessChanged }: NavigationProps & { currentUserId?: string; onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+export default function AdminPanel({ section, onSectionChange, isAdminUser, apiFetch = fetch, client, onClose, onAccessChanged }: NavigationProps & { onAccessChanged?: () => Promise<void>; isAdminUser: boolean; apiFetch?: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   // Mount only for admins so no hidden panel fetches or secrets survive closing.
-  return isAdminUser ? <AdminPanelContent section={section} onSectionChange={onSectionChange} currentUserId={currentUserId} onAccessChanged={onAccessChanged} apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
+  return isAdminUser ? <AdminPanelContent section={section} onSectionChange={onSectionChange} onAccessChanged={onAccessChanged} apiFetch={apiFetch} client={client} onClose={onClose} /> : null;
 }
-function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose, currentUserId, onAccessChanged }: NavigationProps & { currentUserId?: string; onAccessChanged?: () => Promise<void>; apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
+function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose, onAccessChanged }: NavigationProps & { onAccessChanged?: () => Promise<void>; apiFetch: AdminFetch; client?: NoctuaAuthClient; onClose: () => void }) {
   const t = useTranslations("Admin");
   const locale = useLocale();
   const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
@@ -50,8 +51,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
   const [reauthOpen, setReauthOpen] = useState(false);
   const [verified, setVerified] = useState(false);
   const [passkeyId, setPasskeyId] = useState("");
-  const [secret, setSecret] = useState<{ kind: "recovery" | "invite"; value: string } | null>(null);
-  const [copied, setCopied] = useState<"copied" | "copyFailed" | null>(null);
+  const [secret, setSecret] = useState<AdminSecret | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [inviteRevision, setInviteRevision] = useState(0);
@@ -79,7 +79,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       if (pending.type === "delete") await adminRequest(apiFetch, base, jsonMutation("DELETE", owner ? { reassignOwnerTo: owner } : {}));
       if (pending.type === "recovery") {
         const result = await adminRequest<{ url: string }>(apiFetch, `${base}/recovery`, jsonMutation("POST", { confirmedTarget: true }, grant));
-        setCopied(null); setSecret({ kind: "recovery", value: result.url });
+        setSecret({ kind: "recovery", value: result.url });
       }
       if (pending.type === "mfa-reset") await adminRequest(apiFetch, `${base}/mfa-reset`, jsonMutation("POST", { confirmedTarget: true }, grant));
       if (pending.type === "sessions") await adminRequest(apiFetch, `${base}/sessions`, jsonMutation("DELETE", undefined, grant));
@@ -92,7 +92,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
     event.preventDefault(); setBusy(true); setError(null);
     try {
       const data = await adminRequest<{ invite: { code: string } }>(apiFetch, "/api/admin/users", jsonMutation("POST", { email, name, role: inviteRole }));
-      setCopied(null); setSecret({ kind: "invite", value: data.invite.code }); setEmail(""); setName(""); setInviteRevision(value => value + 1);
+      setSecret({ kind: "invite", value: data.invite.code }); setEmail(""); setName(""); setInviteRevision(value => value + 1);
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   };
@@ -108,11 +108,9 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       {tab === "invites" && <section className="space-y-4" aria-label={t("tabs.invites")}><div className="space-y-1"><h3 className={adminSectionTitle}>{t("invites.heading")}</h3><p className="text-sm text-muted-foreground">{t("invites.help")}</p></div>
         <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3 text-sm"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
           <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button className="justify-self-start" disabled={busy}>{t("invites.issue")}</Button></form>
-        <div className="rounded-md border p-3 text-sm [&_h3]:mb-1 [&_h3]:text-base [&_h3]:font-semibold">
-        <InviteHistory apiFetch={apiFetch} revision={inviteRevision} />
-        </div>
+        <AdminInviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
-      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} currentUserId={currentUserId} onAccessChanged={onAccessChanged} />}
+      {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} onAccessChanged={onAccessChanged} />}
       {tab === "audit" && <AdminAuditLog apiFetch={apiFetch} />}
       {tab === "spam" && <AdminSpamSettings apiFetch={apiFetch} />}
       {tab === "domains" && <AdminDomainIcons apiFetch={apiFetch} />}
@@ -126,21 +124,6 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
 
     </AdminConfirmDialog>}
     {reauthOpen && pending && <ReauthDialog purpose="admin.recovery" client={auth} onCancel={cancel} onVerified={proof => submit(proof)} />}
-    {secret && <Dialog open onOpenChange={open => { if (!open) { setSecret(null); setCopied(null); } }}><DialogContent aria-describedby={undefined}><DialogTitle>{t(`secret.${secret.kind}`)}</DialogTitle><DialogDescription>{t("secret.help")}</DialogDescription><code className="break-all">{secret.value}</code><Button onClick={() => {
-      void navigator.clipboard.writeText(secret.value).then(() => setCopied("copied")).catch(() => setCopied("copyFailed"));
-    }}>{t("secret.copy")}</Button>{copied && <p role="status">{t(`secret.${copied}`)}</p>}<Button variant="outline" onClick={() => { setSecret(null); setCopied(null); }}>{t("secret.done")}</Button></DialogContent></Dialog>}
+    {secret && <AdminSecretDialog key={secret.value} secret={secret} onClose={() => setSecret(null)} />}
   </div></SettingsFrame>;
-}
-function InviteHistory({ apiFetch, revision }: { apiFetch: AdminFetch; revision: number }) {
-  const t = useTranslations("Admin");
-  const locale = useLocale();
-  const dateTime = (value: number | string) => formatDate(new Date(value), locale, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
-  const [invites, setInvites] = useState<AdminInvite[]>([]);
-  const [error, setError] = useState<unknown>(null);
-  useEffect(() => {
-    let active = true;
-    void adminRequest<{ invites: typeof invites }>(apiFetch, "/api/admin/invites").then(data => { if (active) setInvites(data.invites.map(({ id, email, issuedBy, createdAt, expiresAt, status }) => ({ id, email, issuedBy, createdAt, expiresAt, status }))); }).catch(error => { if (active) setError(error); });
-    return () => { active = false; };
-  }, [apiFetch, revision]);
-  return <div className="space-y-2"><h3 className="font-medium">{t("invites.history")}</h3>{Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}{invites.map(invite => <p key={invite.id} className="text-sm">{invite.email || t("invites.legacy")} · {t(`invites.status.${invite.status}`)} · {t("invites.issuedBy", {name: invite.issuedBy || t("invites.operator")})} · {invite.expiresAt ? t("invites.expires", {time: dateTime(invite.expiresAt)}) : t("invites.noExpiry")}</p>)}</div>;
 }

@@ -10,8 +10,10 @@ off by default.
 Code: `lib/mail/spam/` (`service.ts` wiring, `classifySpam.ts`, `input.ts`,
 `allowlist.ts`, `staticRules.ts`, `senderProfile.ts`, `anomaly.ts`,
 `examples.ts`, `queue.ts`, `config.ts`, `settings.ts`, `provider.ts`; the
-scripts' helpers `evalData.ts`, `profileBuild.ts`, `profileFile.ts`), storage
-in `lib/db/spam.ts`.
+admin rescan `rescan.ts`; the scripts' helpers `evalData.ts`, `profileBuild.ts`,
+`profileFile.ts`, shared with the rescan `serverFlagBackfill.ts`,
+`serverFlagApp.ts`, `apply.ts`, `spamMove.ts`), storage in `lib/db/spam.ts`
+and `lib/db/spamRescan.ts`.
 
 ## Pipeline
 
@@ -240,7 +242,8 @@ of the `spam_sender_profiles` rows.
 **Admin**: Verwaltung → Spam-Erkennung shows one read-only line "Vertraute
 Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
 (totals; per mailbox in the tooltip and in `GET /api/admin/spam-settings` →
-`trust`), counted from the stored `spamReasons`.
+`trust`), counted from the stored `spamReasons`. Totals and tooltip cover only
+the mailboxes the admin is a member of.
 
 **Backfill**: existing rows enter the profiles once with
 `scripts/spam-profiles-backfill.ts` (one pass per shard, only the first 64 KB of
@@ -297,7 +300,7 @@ local relocation succeeded — in the move queue behind `POST …/messages/move`
 the archive route — with the acting user; a rolled-back move teaches nothing.
 Roles follow the move routes (editor+), so viewers cannot teach by moving.
 System moves never pass through it: the classifier's auto-move, the move of
-`scripts/spam-apply.ts` and sync relocations store their own example or none,
+`scripts/spam-apply.ts`, the admin rescan's move and sync relocations store their own example or none,
 and the explicit spam/not-spam routes keep their own recording — each message
 gets one example per decision. A repeated call for the same move replaces the
 sender+subject entry instead of adding one.
@@ -322,14 +325,30 @@ Additive, following the `senderKey` pattern (doc/HTML-MAIL-PRIVACY.md):
   save). Every save writes an admin-log entry `spam_settings.update` with the
   previous and the new settings (target mailbox for per-mailbox saves).
 
-Existing rows start with NULL and are never backfilled; only mail newer than
-three days at the first sweep is checked.
+Existing rows start with NULL and are never backfilled automatically; only
+mail newer than three days at the first sweep is checked. The existing INBOX
+is checked on request with „Posteingang jetzt prüfen“ (below).
 
 **Deploy:** this is a shard schema change. Follow the stopped-backup procedure of
 doc/FTS-V3-MIGRATION.md §1–2 (stop all database clients, create and verify a
 complete stopped backup) before the first start of this build, and verify
 afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
 `spam_examples` and `spam_sender_profiles` tables. Rollback is the stopped-snapshot restore of §6.
+
+**Admin rescan tables** (master, additive, `initMasterSchema`):
+`spam_rescan_jobs` (one row per mailbox: the latest job with status
+`running`/`ready`/`moving`/`cancelled`/`failed`, period, `sinceDateValue`,
+`withModel`, `modelLimit`, phase, progress, counts JSON, `error`
+`interrupted`/`failed`, `ownerInstance`, creator and times; index
+`idx_spam_rescan_jobs_account`, partial unique index
+`idx_spam_rescan_jobs_active (accountId) WHERE status IN ('running','moving')`)
+and `spam_rescan_items` (primary key `jobId, messageId`: row id, RFC
+Message-ID, From, subject, date, stage `server-flag`/`classifier`, reasons,
+score, `moveStatus`). Starting a job deletes the mailbox's previous one;
+deleting a mailbox deletes its rows. No existing table changes, but it is a
+master schema change: deploy this build with the same stopped-backup procedure
+(doc/FTS-V3-MIGRATION.md §1–2) and verify afterwards that `main.db` has both
+tables. Rollback is the same stopped-snapshot restore.
 
 ## Configuration
 
@@ -344,9 +363,12 @@ afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
 | `NOCTUA_SPAM_AUTHSERV_ID` | env, comma-separated | unset: the top-most `Received` "by" host, its first label or its registrable domain |
 | on/off, auto-move, own threshold | per mailbox (admin) | on / off / global |
 
-Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`).
+Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`; the
+trusted-sender counters cover only the admin's own mailboxes; „Posteingang jetzt
+prüfen“ below).
 Per mailbox: Postfach-Einstellungen → Spam-Erkennung, visible to admins only
-(`GET/PUT /api/admin/accounts/:accountId/spam-settings`). Another provider (for
+(`GET/PUT /api/admin/accounts/:accountId/spam-settings`, only for mailboxes the
+admin is a member of; 404 otherwise). Another provider (for
 example a local OpenAI-compatible server) is one more case in `provider.ts`.
 
 ## Static rules file
@@ -455,3 +477,81 @@ time, so they do not crowd the users' recent decisions out of the prompt; the
 sender's trust is not revoked. „Kein Spam“ undoes a move. `scripts/spam-settings.ts
 --data <dir> --mailbox <email> [--threshold 0.8 --write --actor <admin email>]`
 shows or sets a mailbox's own threshold through the admin UI's helper.
+
+## Posteingang jetzt prüfen (Verwaltung)
+
+The same cleanup from the UI, for one mailbox at a time and without server
+access: Verwaltung → Spam-Erkennung → „Posteingang jetzt prüfen“ next to each
+mailbox the admin is a member of (owner or any role, also viewer). Admins see
+neither the mailboxes they are not a member of nor their jobs (list, preview,
+move, status and activity panel); the routes answer 404 for them, the same as
+for an unknown mailbox, so the answer does not confirm that it exists (user
+decision 2026-10-25). Code: `lib/mail/spam/rescan.ts`, UI
+`app/components/admin/AdminSpamRescan.tsx`, progress in the activity panel
+(„Hintergrundaufgaben“).
+
+1. **Zeitraum**: letzte 30 Tage, letzte 12 Monate or alles, by `dateValue` (the
+   sender's Date header, as the sweep's window). Before the start the dialog
+   shows the INBOX mails in the range and, for the model step, how many it
+   sends at most (`GET /api/admin/accounts/:accountId/spam-rescan?period=`).
+2. **Stage A** (no model): the server-flagged INBOX mail of the range with
+   exactly the selection of `scripts/spam-apply.ts --server-flagged`
+   (`scanServerFlaggedInbox`, all exclusions of the section above; the sender
+   history still counts the whole INBOX). Only the first 64 KB of each INBOX
+   source are read; the progress of this phase therefore counts the whole
+   INBOX, and its label says so.
+3. **Stage B** (optional, checkbox „Auch Filter-Prüfung mit Modell“, on by
+   default for 30 Tage, off for 12 Monate and alles): the regular pipeline
+   (allowlist → static rules → trusted senders → model) on the unchecked INBOX
+   rows of the range (`spamCheckedAt IS NULL`, fewer than three failed
+   attempts), newest first, without the mails Stage A already listed. The jobs
+   go through the sweep's queue (concurrency 2, retries, attempt limit, the
+   mailbox's threshold, stored verdicts and the „Verdächtig“ mark), at most two
+   at a time, so sweeps keep running in between; the rescan never auto-moves.
+   Afterwards the INBOX mails of the range marked „Verdächtig“ (now or
+   earlier) are listed, except flagged, answered or `$NotJunk` mail. Stage B
+   needs spam detection on for the mailbox and a usable model.
+4. **Vorschau**: the job moves nothing. It stores per hit the row id, From,
+   subject, date, stage, reasons and score (server score or confidence) in
+   `spam_rescan_items` (at most 5,000 per job). The admin deselects hits and
+   moves the rest with „Ausgewählte verschieben“
+   (`POST …/spam-rescan/move { jobId, ids }`), in the background, one message
+   after another, through the code path of „Als Spam“ (`spamMove.ts`: Junk
+   folder resolution, `$NotJunk` cleanup, move and local relocation, a spam
+   example with source `rescan`, the admin as author, dated at the mail's
+   arrival like the server-flag backfill). The sender's trust is not revoked.
+   Mail that is no longer in the INBOX or is a different mail under the same
+   row id is skipped as „nicht mehr im Posteingang“; mail that was flagged,
+   answered, marked `$NotJunk` or judged other than spam since the scan (for
+   example „Kein Spam“ on its mark) stays as „geändert“. Moved hits are not
+   selected again, so a second move resumes. The result line counts the
+   items of the job by their status (moved, gone, changed, errors), so it
+   covers every move so far and a retried error no longer counts. „Kein Spam“
+   undoes a move.
+
+**Model-call safeguards**: the count is shown before the start; the start
+sends the shown count as `modelLimit` and the job never sends more, never more
+than the unchecked rows counted at the start, and never more than 2,000 per run (`SPAM_RESCAN_MODEL_MAX`; another run continues, checked
+rows are skipped); already checked rows and rows at the attempt limit are never
+sent; the allowlist, static rules and trusted senders decide without the model
+as in the sweep; „Abbrechen“ stops after the running pair. The log line
+`[spam] rescan done` lists the counts and model calls (no senders or subjects).
+
+**Jobs**: one running scan or move per mailbox (409 `rescan_running`); a new
+scan replaces the mailbox's previous result. A shutdown stops a running job
+after the current batch; a job another server process left running (crash,
+restart) reads as „abgebrochen“ (`error: interrupted`), a move as ready again
+with its unprocessed selection cleared — moving is a separate step, so there is
+no half-moved scan. Hits of a cancelled scan can still be moved.
+
+**Routes** (admin session and membership of the mailbox, else 404; same
+origin; start/cancel/move 10 per minute per admin and 30 per IP): `GET|POST /api/admin/accounts/:accountId/spam-rescan`
+(counts and latest job with its list; start `{ period, withModel, modelLimit }`),
+`POST …/spam-rescan/cancel`, `POST …/spam-rescan/move`, and
+`GET /api/admin/spam-rescan` (running jobs of the admin's own mailboxes for the
+activity panel). `GET /api/admin/spam-settings` lists those mailboxes as
+`rescanMailboxes`. A move takes the job over for the running server process
+(`ownerInstance`), so the restart reconciliation never resets it mid-move, also
+when the scan ran before a restart. The admin
+log gets `spam_rescan.start` (job, period, model step, limit, INBOX count) and
+`spam_rescan.move` (job, selected and listed count).

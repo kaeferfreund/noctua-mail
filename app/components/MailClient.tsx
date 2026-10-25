@@ -19,6 +19,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
+import { createAutoReadCoordinator, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
@@ -227,6 +228,7 @@ import { useMessageData } from "./mailclient/useMessageData";
 import { useMailboxViewCache } from "./mailclient/mailboxViewCache";
 import { useThreadContent } from "./mailclient/useThreadContent";
 import { useSyncController } from "./mailclient/useSyncController";
+import { useSpamRescanActivity } from "./mailclient/useSpamRescanActivity";
 import { registerRecentLocalDraftSave } from "./mailclient/recentLocalDraftSaves";
 import { useTopics } from "./mailclient/useTopics";
 import { useRecipientAliases } from "./mailclient/useRecipientAliases";
@@ -420,6 +422,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
 
 const skipReaderRowsSubscription = () => () => {};
 const NO_READER_ROWS: Message[] = [];
@@ -437,6 +440,14 @@ export default function MailClient({
   const locale = useLocale();
   const tcompose = useTranslations("Compose");
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
+  // A scanned invite link: taken from the URL once at start (before any deep-link
+  // history write), prefilled for sign-up, discarded once someone is signed in.
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  useEffect(() => {
+    const code = takeInviteCodeFromLocation();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of browser URL state after mount
+    if (code) setInviteCode(code);
+  }, []);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -584,6 +595,12 @@ export default function MailClient({
   });
 
   const refreshFolders = useFolderRefresh({ activeAccountId, apiFetch, reportError, readErrorMessage, setFolders });
+  useEffect(() => {
+    if (authState !== "ok" || !inviteCode) return;
+    pushNotice({ type: "info", title: tn("inviteWhileSignedIn") });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the invite code is consumed once
+    setInviteCode(null);
+  }, [authState, inviteCode, pushNotice, tn]);
 
   const [groupBy, setGroupBy] = useState<
     "none" | "date" | "week" | "sender" | "domain" | "year" | "folder" | "event"
@@ -1958,6 +1975,14 @@ export default function MailClient({
       }
     },
     [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
+  );
+  // Phone pull-to-refresh: a "new" sync of the open folder (the whole account in
+  // a virtual view), as after a re-login.
+  const pullRefreshMailbox = useCallback(
+    () => syncAccount(activeFolderId || undefined, "new", {
+      triggerId: `pull-refresh:${activeAccountId}:${Date.now()}`
+    }),
+    [activeAccountId, activeFolderId, syncAccount]
   );
   const calendarFirstDay: 0 | 1 = currentAccount?.settings?.calendar?.weekStartsOn === "sunday" ? 0 : 1;
   const accountSignatures = currentAccount?.settings?.signatures ?? [];
@@ -3476,23 +3501,36 @@ export default function MailClient({
       listHandleRef.current?.handleSetCategory(message, category) ?? Promise.resolve(),
     []
   );
+  // Read/unread actions from the menu, `r`/`u`, swipe and bulk all pass these
+  // wrappers; the coordinator orders them after a running auto-read request.
+  const [autoReadCoordinator] = useState(createAutoReadCoordinator);
   const updateFlagState = useCallback(
     (
       message: Message,
       flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
       value: boolean
-    ) =>
-      listHandleRef.current?.updateFlagState(message, flag, value) ?? Promise.resolve(),
-    []
+    ) => {
+      const run = () => listHandleRef.current?.updateFlagState(message, flag, value) ?? Promise.resolve();
+      return flag === "seen" ? autoReadCoordinator.manualSeen([message], run) : run();
+    },
+    [autoReadCoordinator]
   );
   const updateFlagStateBulk = useCallback(
     (
       messages: Message[],
       flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
       value: boolean
-    ) =>
-      listHandleRef.current?.updateFlagStateBulk(messages, flag, value) ?? Promise.resolve(),
-    []
+    ) => {
+      const run = () => listHandleRef.current?.updateFlagStateBulk(messages, flag, value) ?? Promise.resolve();
+      return flag === "seen" ? autoReadCoordinator.manualSeen(messages, run) : run();
+    },
+    [autoReadCoordinator]
+  );
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
+  const handleAutoMarkRead = useCallback(
+    (message: Message) => autoReadCoordinator.autoRead(message, () =>
+      listHandleRef.current?.updateFlagState(message, "seen", true) ?? Promise.resolve()),
+    [autoReadCoordinator]
   );
   const updateKeywordFlag = useCallback(
     (message: Message, keyword: string, value: boolean) =>
@@ -4905,6 +4943,8 @@ export default function MailClient({
   }, [authState]);
 
   const [openBottomStatusPanel, setOpenBottomStatusPanel] = useState<BottomStatusPanel>(null);
+  // Rescan jobs are read when a status panel opens or the admin UI announces one, never at start-up.
+  const spamRescans = useSpamRescanActivity(apiFetch, isAdminUser, openBottomStatusPanel !== null);
 
   // The linked message the list still has to highlight. `revision` is the list read current when the
   // link last asked for a page (null: none asked yet); the next page is asked for once that read is replaced.
@@ -5255,10 +5295,10 @@ export default function MailClient({
         }} />}
       </AuthDialogContent>
     </AuthDialog>
-    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
-    {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
+    {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
+    {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </UrlHistoryContext.Provider>;
-  if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
+  if (authState === "unauth") return <LoginScreen inviteCode={inviteCode} onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
     if (authSecurity?.reauthRequired && !authSecurity.enrollmentRequired) return <AuthFrame title="Sign in again" description="Your session needs fresh verification."><AuthButton onClick={() => { void logout(); }}>Return to sign in</AuthButton></AuthFrame>;
     return <EnrollmentScreen continuation={enrollmentContinuation ?? undefined} onLogout={async () => { if (await logout()) setEnrollmentContinuation(null); }} onComplete={async () => { setEnrollmentContinuation(null); await loadInitialData(); }} />;
@@ -5528,6 +5568,7 @@ export default function MailClient({
               filteredMessagesCount={filteredMessages.length}
               messageListError={messageListError}
               emptyListSyncing={emptyListSyncing}
+              onPullRefresh={isMobile ? pullRefreshMailbox : undefined}
               activeVirtualFolderName={activeVirtualFolder?.name}
               searchScope={searchScope}
               mutationInputs={{
@@ -5636,6 +5677,9 @@ export default function MailClient({
                 composeThreadFocusMessageId,
                 pendingSelectionCollapseMessageId,
                 onPendingSelectionCollapseConsumed: handlePendingSelectionCollapseConsumed,
+                autoMarkReadDelayMs,
+                onAutoMarkRead: handleAutoMarkRead,
+                manualSeenVersion: autoReadCoordinator.manualSeenVersion,
                 activeAccountId,
                 apiFetch,
                 messageByMessageId,
@@ -5714,6 +5758,8 @@ export default function MailClient({
             mailCheckStatus={mailCheckStatus}
             calendarSidebarOpen={calendarSidebarOpen}
             syncProgressItems={Object.values(syncProgressByJobId).filter(job => job.accountId === activeAccountId)}
+            spamRescans={spamRescans.jobs}
+            onCancelSpamRescan={spamRescans.cancel}
             accountFolders={accountFolders}
             mailCheckMode={mailCheckMode}
             activeAccountId={activeAccountId}

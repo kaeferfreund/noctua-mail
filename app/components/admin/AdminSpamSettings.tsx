@@ -7,12 +7,15 @@ import { Input } from "@/app/components/ui/input";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { adminActionRow, adminSectionTitle } from "./adminLayout";
+import AdminSpamRescan from "./AdminSpamRescan";
 
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
   effective: { enabled: boolean; provider: string; model: string; threshold: number; modelUnavailable: "missing-key" | "unsupported-provider" | null };
   /** Read-only trusted-sender counters per mailbox. */
   trust?: Array<{ accountId: string; email: string; trustedSkips: number; canaryChecks: number; canaryMismatches: number }>;
+  /** The admin's own mailboxes (member or owner): only these offer „Posteingang jetzt prüfen“. */
+  rescanMailboxes?: Array<{ accountId: string; email: string }>;
 };
 
 function trustTotals(trust: NonNullable<SpamAdminResponse["trust"]>) {
@@ -62,8 +65,8 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
     {Boolean(error) && <p role="alert" className="text-destructive">{formatAdminError(error, t, locale)}</p>}
     {data && <form onSubmit={(event) => void save(event)} className="grid max-w-lg gap-3">
       <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />{t("spam.enabled")}</label>
-      <p className="text-sm text-muted-foreground">{t("spam.provider", { provider: data.effective.provider })}</p>
-      {data.effective.modelUnavailable && <p className="text-sm font-medium" role="status">{t("spam.unavailable", { reason: t(`spam.unavailableReasons.${data.effective.modelUnavailable}`) })}</p>}
+      <p className="m-0 text-sm text-muted-foreground">{t("spam.provider", { provider: data.effective.provider })}</p>
+      {data.effective.modelUnavailable && <p className="m-0 text-sm font-medium" role="status">{t("spam.unavailable", { reason: t(`spam.unavailableReasons.${data.effective.modelUnavailable}`) })}</p>}
       <label className="grid gap-1">{t("spam.model")}<Input value={model} placeholder={data.effective.model} onChange={(event) => setModel(event.target.value)} /></label>
       <label className="grid gap-1">{t("spam.threshold")}<Input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
         <span className="text-sm text-muted-foreground">{t("spam.thresholdHelp")}</span></label>
@@ -72,5 +75,6 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
     {data?.trust && <p className="max-w-2xl text-sm text-muted-foreground"
       title={data.trust.map((entry) => `${entry.email}: ${t("spam.trustCounters", { skips: entry.trustedSkips, canaries: entry.canaryChecks, mismatches: entry.canaryMismatches })}`).join("\n")}>
       {t("spam.trustCounters", trustTotals(data.trust))}</p>}
+    {data?.rescanMailboxes && <AdminSpamRescan apiFetch={apiFetch} mailboxes={data.rescanMailboxes} />}
   </section>;
 }

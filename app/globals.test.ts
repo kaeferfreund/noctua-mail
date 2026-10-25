@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/postcss";
 import postcss, { type AtRule, type Node, type Root, type Rule } from "postcss";
 import { APP_THEME_COLOR } from "@/lib/ui/theme";
-import { APP_FONT_FACE_CSS, APP_FONT_FAMILY, APP_FONT_SUBSETS } from "@/lib/ui/fonts";
+import { APP_FONT_STACK } from "@/lib/ui/fonts";
 import { DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
 
 // Compiles app/globals.css the way `next build` does (postcss.config.mjs) and
@@ -128,7 +128,8 @@ describe("app/globals.css cascade layers", () => {
         });
       const tokens = layerTokens(root);
       expect(tokens).toEqual({ "--layer-floating": 9990, "--layer-dialog": 9994,
-        "--layer-dialog-overlay": 9995, "--layer-popper": 9998, "--layer-drag-ghost": 9999 });
+        "--layer-dialog-overlay": 9995, "--layer-popper": 9998, "--layer-drag-ghost": 9999,
+        "--layer-status-bar": 10000 });
       // The ladder is strictly ascending, and the JS mirror used for nested
       // dialog arithmetic stays on the same values.
       const order = Object.values(tokens);
@@ -139,6 +140,8 @@ describe("app/globals.css cascade layers", () => {
       expect(zIndexFor(".rt-BaseDialogOverlay")).toEqual([{ layer: "legacy", value: "var(--layer-dialog-overlay)" }]);
       expect(zIndexFor(".rt-PopperContent")).toEqual([{ layer: "legacy", value: "var(--layer-popper)" }]);
       expect(zIndexFor(".drag-ghost")).toEqual([{ layer: "legacy", value: "var(--layer-drag-ghost)" }]);
+      // The band under the iOS status bar covers every other layer.
+      expect(zIndexFor("body::before")).toEqual([{ layer: "legacy", value: "var(--layer-status-bar)" }]);
       // Radix Themes itself is layered below legacy, so the lift wins.
       expect(rulesWithSelector(root, ".rt-BaseDialogOverlay").map(enclosingLayer)).toContain(
         "radix"
@@ -203,7 +206,7 @@ describe("app/globals.css cascade layers", () => {
           themeVars.set(decl.prop, decl.value);
         }
       });
-      expect(themeVars.get("--font-sans")).toStartWith(`"${APP_FONT_FAMILY}"`);
+      expect(themeVars.get("--font-sans")).toBe(APP_FONT_STACK);
       expect(themeVars.get("--radius-sm")).toBe("calc(var(--radius) - 4px)");
       expect(themeVars.get("--radius-md")).toBe("calc(var(--radius) - 2px)");
       expect(themeVars.get("--radius-lg")).toBe("var(--radius)");
@@ -218,36 +221,18 @@ describe("app/globals.css cascade layers", () => {
   );
 
   test(
-    "declares the vendored Inter face that HtmlMessage injects",
+    "uses the platform UI font without loading a webfont",
     async () => {
       const root = await compileGlobals();
-      const faces: Array<Record<string, string>> = [];
+      // Radix Themes brings its own local() faces; the app declares none.
+      const appFaces: string[] = [];
       root.walkAtRules("font-face", (atRule) => {
-        const face: Record<string, string> = {};
-        atRule.walkDecls((decl) => {
-          face[decl.prop] = decl.value;
+        atRule.walkDecls("src", (decl) => {
+          if (/url\(/.test(decl.value)) appFaces.push(decl.value);
         });
-        faces.push(face);
       });
-      // Radix Themes brings its own local() faces; the app declares subsets.
-      const appFaces = faces.filter((face) => face["font-family"] === `"${APP_FONT_FAMILY}"`);
-      expect(appFaces).toHaveLength(APP_FONT_SUBSETS.length);
-      const iframeFaces = postcss.parse(APP_FONT_FACE_CSS);
-      const injectedFaces: Array<Record<string, string>> = [];
-      iframeFaces.walkAtRules("font-face", (atRule) => {
-        const face: Record<string, string> = {};
-        atRule.walkDecls((decl) => { face[decl.prop] = decl.value; });
-        injectedFaces.push(face);
-      });
-      expect(appFaces).toEqual(injectedFaces);
-      for (const [index, { url, unicodeRange }] of APP_FONT_SUBSETS.entries()) {
-        expect(appFaces[index].src).toBe(`url("${url}") format("woff2")`);
-        expect(appFaces[index]["unicode-range"]).toBe(unicodeRange);
-        expect(appFaces[index]["font-weight"]).toBe("100 900");
-        expect(appFaces[index]["font-display"]).toBe("swap");
-        const font = readFileSync(path.join(repoRoot, "public", url));
-        expect(font.subarray(0, 4).toString("latin1")).toBe("wOF2");
-      }
+      expect(appFaces).toEqual([]);
+      expect(APP_FONT_STACK).toStartWith("-apple-system, BlinkMacSystemFont,");
     },
     COMPILE_TIMEOUT_MS
   );
@@ -255,7 +240,7 @@ describe("app/globals.css cascade layers", () => {
 
 describe("app chrome typography", () => {
   test(
-    "routes Radix and native controls through the Inter and mono tokens",
+    "routes Radix and native controls through the sans and mono tokens",
     async () => {
       const root = await compileGlobals();
       const themeVars = new Map<string, string>();
@@ -263,7 +248,11 @@ describe("app chrome typography", () => {
         if (decl.prop.startsWith("--") && enclosingLayer(decl) === "theme") themeVars.set(decl.prop, decl.value);
       });
       expect(themeVars.get("--font-mono")).toStartWith("ui-monospace,");
-      expect(themeVars.get("--text-2xs")).toBe("0.6875rem");
+      // One step above Tailwind's defaults: 12 / 13 / 15 (body) / 17px.
+      expect(themeVars.get("--text-2xs")).toBe("0.75rem");
+      expect(themeVars.get("--text-xs")).toBe("0.8125rem");
+      expect(themeVars.get("--text-sm")).toBe("0.9375rem");
+      expect(themeVars.get("--text-base")).toBe("1.0625rem");
       expect(themeVars.get("--tracking-caps")).toBe("0.06em");
 
       const radix = new Map<string, string>();
@@ -275,6 +264,10 @@ describe("app chrome typography", () => {
       expect(radix.get("--em-font-family")).toBe("var(--font-sans)");
       expect(radix.get("--quote-font-family")).toBe("var(--font-sans)");
       expect(radix.get("--code-font-family")).toBe("var(--font-mono)");
+      // Radix text sizes 1-3 follow the same step as --text-xs/sm/base.
+      expect(radix.get("--font-size-1")).toBe("calc(13px * var(--scaling))");
+      expect(radix.get("--font-size-2")).toBe("calc(15px * var(--scaling))");
+      expect(radix.get("--font-size-3")).toBe("calc(17px * var(--scaling))");
 
       // Tailwind runs without preflight: native controls must inherit the
       // family, and the body must not add tracking that only portalled menus
@@ -315,8 +308,6 @@ describe("app chrome typography", () => {
         ...source.matchAll(/(?:font-family|fontFamily)\s*:\s*["'`]?([^;"'`}\n]+)/g)
       ].map((match) => match[1].trim().replace(/,$/, ""));
       for (const value of values) {
-        // The @font-face family name itself.
-        if (file === path.join("app", "globals.css") && value === APP_FONT_FAMILY) continue;
         if (!allowed.test(value)) offending.push(`${file}: ${value}`);
       }
     }

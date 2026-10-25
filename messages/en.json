@@ -55,7 +55,11 @@
         "senderIcons": "Show sender icons",
         "weekStartsOn": "Week starts on",
         "includeAcrossFolders": "Include threads across folders",
+        "autoMarkRead": "Mark opened messages as read",
         "newMail": "New mail notifications"
+      },
+      "fieldHelp": {
+        "autoMarkRead": "When an opened unread message is marked as read. Default: after 1 second. The read status applies to all members of the mailbox. Viewers cannot mark messages."
       },
       "options": {
         "yes": "Yes",
@@ -66,7 +70,11 @@
         "card": "card",
         "table": "table",
         "compact": "compact",
-        "locale": "System locale"
+        "locale": "System locale",
+        "immediate": "Immediately",
+        "after1s": "After 1 second",
+        "after3s": "After 3 seconds",
+        "never": "Never (manually)"
       }
     },
     "roles": {
@@ -634,7 +642,17 @@
         "repair": "Repair sync"
       },
       "updatedAt": "Last updated: {time}",
-      "calendarEvent": "Calendar event"
+      "calendarEvent": "Calendar event",
+      "spamRescan": {
+        "title": "Spam check: {mailbox}",
+        "cancel": "Cancel check",
+        "phase": {
+          "server-flag": "Reading the inbox (all messages, also outside the period, for known senders)",
+          "classifier": "Filter check with the model",
+          "moving": "Moving the selected messages"
+        },
+        "progress": "{processed, number} of {total, number}"
+      }
     },
     "topicPicker": {
       "title": "Topics",
@@ -1048,18 +1066,14 @@
     },
     "mailboxes": {
       "create": "Create mailbox",
-      "help": "Creates an ownerless mailbox. Grant members after creation.",
+      "help": "Creates a mailbox owned by you. Add further members after creation.",
       "refresh": "Refresh mailboxes",
       "manageMembers": "Manage members",
       "delete": "Delete mailbox",
       "deleteConfirm": "Permanently delete {email} and its local data?",
       "membersTitle": "Members of {email}",
       "memberCount": "{count, plural, one {# member} other {# members}}",
-      "selfGrantTitle": "Give yourself access?",
-      "selfGrantHelp": "The shared mailbox was created. It has no members yet. Explicitly grant yourself access or add members later.",
-      "grantAccess": "Grant access",
-      "later": "Later",
-      "noMembers": "No members yet – nobody can see this mailbox"
+      "noneVisible": "Only mailboxes you are a member of appear here. You are not a member of any mailbox yet."
     },
     "users": {
       "refresh": "Refresh users",
@@ -1106,6 +1120,14 @@
       "noExpiry": "No expiry",
       "issuedBy": "Issued by {name}",
       "expires": "Expires {time}",
+      "deletedIssuer": "deleted user",
+      "cleanup": "Clean up history",
+      "cleanupConfirm": "All redeemed, expired and revoked invites are deleted from the history. Issued invites that are still valid stay valid, as do codes with a sign-up in progress.",
+      "cleaned": "{count, plural, =0 {Nothing to clean up.} one {# entry deleted.} other {# entries deleted.}}",
+      "revoke": "Revoke",
+      "revokeFor": "Revoke invite for {name}",
+      "revokeTitle": "Revoke invite",
+      "revokeConfirm": "The code for {name} can no longer be redeemed afterwards.",
       "status": {
         "issued": "issued",
         "redeemed": "redeemed",
@@ -1136,6 +1158,11 @@
       "help": "Shown once. Copy now for personal handover; closing discards this value.",
       "copied": "Copied.",
       "copyFailed": "Copy failed. Select and copy the value manually.",
+      "qrLabel": "QR code",
+      "qrHelp": {
+        "invite": "Scan with a phone to open the sign-up with this code.",
+        "recovery": "Scan with a phone to open the recovery link."
+      },
       "copy": "Copy",
       "done": "Done"
     },
@@ -1151,6 +1178,7 @@
       "selfMutation": "You cannot demote, disable or delete yourself.",
       "reassignOwner": "Choose an enabled user to take ownership of the mailboxes.",
       "invalidOwner": "Choose another enabled owner.",
+      "foreignMailboxes": "This user belongs to mailboxes you are not a member of and cannot see. Only an administrator who is a member of all of their mailboxes can delete them.",
       "immutableOwner": "The mailbox owner cannot be modified.",
       "selfRole": "You cannot change your own role.",
       "targetDisabled": "Choose an enabled user with completed setup.",
@@ -1167,7 +1195,12 @@
       "verificationRequired": "Confirm the target's identity in person first.",
       "loggedOut": "Your session expired. Sign in again.",
       "request": "Request failed. Please try again.",
-      "rateLimited": "Too many attempts. Please try again later."
+      "rateLimited": "Too many attempts. Please try again later.",
+      "inviteNotIssued": "This invite is no longer issued. The history has changed in the meantime.",
+      "rescanRunning": "A check is already running for this mailbox.",
+      "rescanNotRunning": "No check is running for this mailbox.",
+      "rescanModelUnavailable": "The filter check is not available for this mailbox right now.",
+      "rescanNotMovable": "This check can no longer be moved. Start a new check."
     },
     "spam": {
       "heading": "Spam detection",
@@ -1184,6 +1217,75 @@
       "unavailableReasons": {
         "missing-key": "no API key (ANTHROPIC_API_KEY)",
         "unsupported-provider": "provider not supported"
+      },
+      "rescan": {
+        "heading": "Check inbox now",
+        "help": "Checks a mailbox's existing inbox: first the messages the mail server flagged as spam (without the model, with the same cautious exceptions as the server script), optionally also the unchecked messages with the filter. Nothing is moved before you review the list.",
+        "open": "Check inbox now",
+        "openFor": "Check the inbox of {email}",
+        "close": "Close",
+        "period": "Period",
+        "periods": {
+          "30d": "Last 30 days",
+          "12m": "Last 12 months",
+          "all": "Everything"
+        },
+        "inboxCount": "{count, plural, one {# message} other {# messages}} in the inbox in this period",
+        "withModel": "Also check with the filter model",
+        "modelCount": "Sends at most {count, plural, one {# message} other {# messages}} to the model. Messages checked before are skipped; allowlisted senders and fixed rules need no model.",
+        "modelCapped": "{unchecked, number} messages are unchecked; at most {max, number} go to the model per run. Another run checks the rest.",
+        "modelBlocked": {
+          "detection-off": "The filter check is not available: spam detection is switched off in the administration.",
+          "mailbox-off": "The filter check is not available: spam detection is switched off for this mailbox.",
+          "missing-key": "The filter check is not available: no API key (ANTHROPIC_API_KEY).",
+          "unsupported-provider": "The filter check is not available: unsupported provider."
+        },
+        "noJunk": "This mailbox has no Junk folder. Messages flagged by the server therefore stay in the inbox.",
+        "start": "Start check",
+        "cancel": "Cancel",
+        "phase": {
+          "server-flag": "Reading the inbox (all messages, also outside the period, for known senders)",
+          "classifier": "Filter check with the model",
+          "moving": "Moving the selected messages"
+        },
+        "progress": "{processed, number} of {total, number}",
+        "state": {
+          "cancelled": "The check was cancelled. You can still move the hits found so far.",
+          "interrupted": "The check was stopped by a service restart.",
+          "moveInterrupted": "Moving was interrupted by a restart. You can move the remaining messages again.",
+          "failed": "The check failed. Start a new check."
+        },
+        "summary": "Check of {time} ({period}): {items, plural, =0 {no hits} one {# hit} other {# hits}}",
+        "serverLine": "Flagged by the server: {flagged, number}, {kept, number} of them kept in the inbox as a precaution (e.g. known sender, answered, flagged, younger than 3 days, “Not spam”, already checked).",
+        "modelLine": "Filter: {checked, number} checked, {calls, number} model calls, {marked, number} suspicious.",
+        "modelSkipped": "Filter check not run.",
+        "truncated": "There are more hits than the list shows. Move these and start a new check.",
+        "empty": "No hits. There is nothing to move.",
+        "selectAll": "Select all",
+        "selectNone": "Select none",
+        "selectItem": "Select “{subject}”",
+        "list": "Hits",
+        "stage": {
+          "server-flag": "Flagged by the server",
+          "classifier": "Filter: suspicious"
+        },
+        "serverScore": "Score {score, number}",
+        "confidence": "Confidence {confidence, number, percent}",
+        "moveStatus": {
+          "pending": "Moving …",
+          "moved": "Moved",
+          "gone": "No longer in the inbox",
+          "changed": "Changed, stays in the inbox",
+          "error": "Could not be moved"
+        },
+        "move": "Move selected ({count, number})",
+        "moveHelp": "Moves to the Junk folder like “Mark as spam”. “Not spam” brings a message back.",
+        "moveResult": "{moved, number} moved, {gone, number} no longer in the inbox, {changed, number} changed and kept, {errors, number} errors.",
+        "again": "New check",
+        "noSubject": "(no subject)",
+        "running": "Check running",
+        "latest": "Last check: {items, plural, =0 {no hits} one {# hit} other {# hits}}",
+        "noMailboxes": "You are not a member of any mailbox. Only mailboxes you are a member of can be checked."
       }
     },
     "domainIcons": {
@@ -1249,6 +1351,9 @@
     "clearSearch": "Clear search",
     "loadingMessages": "Loading messages…",
     "syncingMessages": "Syncing messages…",
+    "pullToRefresh": "Pull to refresh",
+    "releaseToRefresh": "Release to refresh",
+    "refreshingMailbox": "Checking mailbox…",
     "noSearchResults": "No messages match this search.",
     "emptyFolder": "No messages in this folder.",
     "loadingMore": "Loading more…",
@@ -1698,7 +1803,8 @@
     "categoryFailed": "Failed to update category.",
     "todoFailed": "Failed to update To-Do flag.",
     "markedNotSuspicious": "Suspicious mark removed.",
-    "notSuspiciousFailed": "The suspicious mark could not be removed."
+    "notSuspiciousFailed": "The suspicious mark could not be removed.",
+    "inviteWhileSignedIn": "You are already signed in. The invite code is for a new sign-up."
   },
   "Compose": {
     "sender": {

@@ -4,7 +4,7 @@ import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { useLocale, useTranslations } from "next-intl";
 import { senderMessages, isSenderMessageId } from "@/lib/senderMessages";
 
-import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, type SenderSettings } from "@/lib/ui/senderSettings";
+import { loadSenderSettings as loadSenderSettingsSnapshot, SENDER_SETTINGS_CHANGED, SENDER_SETTINGS_STORAGE_KEY, ACCOUNT_PREFS_CHANGED, type SenderSettings } from "@/lib/ui/senderSettings";
 import { resolveSignatureTemplate } from "@/lib/signatureTemplates";
 import { readSenderError, senderMessageAction } from "./senderErrors";
 import { getSendWarnings, type SendOutcome } from "./sendOutcome";
@@ -362,8 +362,8 @@ function ComposeOrchestratorImpl(
     // loads its own snapshot before initialization.
     window.addEventListener("storage", storageRefresh);
     window.addEventListener(SENDER_SETTINGS_CHANGED, refresh);
-    window.addEventListener("noctua:account-prefs-changed", refresh);
-    return () => { active = false; window.removeEventListener("storage", storageRefresh); window.removeEventListener(SENDER_SETTINGS_CHANGED, refresh); window.removeEventListener("noctua:account-prefs-changed", refresh); };
+    window.addEventListener(ACCOUNT_PREFS_CHANGED, refresh);
+    return () => { active = false; window.removeEventListener("storage", storageRefresh); window.removeEventListener(SENDER_SETTINGS_CHANGED, refresh); window.removeEventListener(ACCOUNT_PREFS_CHANGED, refresh); };
   }, [activeAccountId, ownerUserId, apiFetch, signatureConfigKey, senderSettingsLoader]);
   // A sender error (and its retry) belongs to the mailbox it was raised for.
   const [senderErrorAccountId, setSenderErrorAccountId] = useState(activeAccountId);

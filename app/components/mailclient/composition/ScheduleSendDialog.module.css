@@ -9,7 +9,7 @@
   gap: 0;
   max-height: 90dvh;
   overflow-y: auto;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--sab);
 }
 
 .sheet > [data-slot="sheet-close"],

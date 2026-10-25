@@ -313,7 +313,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 13px;
   flex-shrink: 1;
   display: inline-flex;
   align-items: center;
@@ -349,7 +349,7 @@
      the date. Clip them at the cell edge instead (clip, not hidden, so the
      cell never becomes a scroll container). */
   overflow-x: clip;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .cellSubjectText {
@@ -363,7 +363,7 @@
 .cellDate {
   min-width: 80px;
   text-align: right;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--gray-11);
   flex-shrink: 0;
 }
@@ -371,7 +371,7 @@
 .cellSize {
   min-width: 68px;
   text-align: right;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--gray-11);
   flex-shrink: 0;
   white-space: nowrap;

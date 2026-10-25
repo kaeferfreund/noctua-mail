@@ -1,6 +1,6 @@
-import { RRule } from "rrule";
 import type { Options as RRuleOptions } from "rrule";
 import type { CalendarEvent } from "@/lib/data";
+import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
 
 type FullCalendarRRuleInput = Partial<RRuleOptions>;
 
@@ -17,12 +17,16 @@ function normalizeRRule(rule: string) {
 }
 
 export function buildFullCalendarRecurringFields(
-  event: Pick<CalendarEvent, "startAtMs" | "endAtMs" | "recurrenceRule" | "excludedDates">
+  event: Pick<CalendarEvent, "startAtMs" | "endAtMs" | "recurrenceRule" | "excludedDates" | "startTimezone">
 ): FullCalendarRecurringFields | null {
   const normalizedRule = event.recurrenceRule ? normalizeRRule(event.recurrenceRule) : null;
   if (!normalizedRule) return null;
 
-  const parsedRule = RRule.parseString(normalizedRule);
+  const { options, timeZone } = buildCalendarRecurrenceOptions(
+    normalizedRule,
+    event.startAtMs,
+    event.startTimezone
+  );
   const durationMs =
     typeof event.endAtMs === "number" && event.endAtMs > event.startAtMs
       ? event.endAtMs - event.startAtMs
@@ -34,8 +38,10 @@ export function buildFullCalendarRecurringFields(
 
   return {
     rrule: {
-      ...parsedRule,
-      dtstart: new Date(event.startAtMs)
+      ...options,
+      // FullCalendar's rrule adapter applies TZID after the wall-clock
+      // DTSTART/UNTIL comparison.
+      tzid: timeZone
     },
     duration: durationMs ? { milliseconds: durationMs } : undefined,
     exdate

@@ -19,7 +19,7 @@
 }
 .navWide:global(.rt-TabsList) {
   gap: 2px;
-  width: 13rem;
+  width: 14rem;
   padding-right: var(--space-3);
   border-right: 1px solid var(--border);
   white-space: normal;

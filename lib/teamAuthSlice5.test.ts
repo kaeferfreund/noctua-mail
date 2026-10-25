@@ -186,6 +186,10 @@ describe("slice 5 lifecycle and recovery",()=>{
   test("complete user deletion requires owner reassignment, survives shard failure, then permits re-invite",async()=>{
     const f=await setup(),actor=await enrolled(f),address=email();
     const target=await provisionUser(f.auth,f.master,input(invite(f),address,mailbox()),verified);
+    // The actor sees none of the target's mailboxes yet: refused before anything is reassigned.
+    await expect(removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{reassignOwnerTo:actor.user.id})).rejects.toMatchObject({code:"foreign_mailbox_membership",status:409});
+    expect(f.master.prepare(`SELECT banned FROM auth_user WHERE id=?`).get(target.userId).banned).toBeFalsy();
+    await f.addMembership(actor.user.id,target.accountId!,"viewer");
     await expect(removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{})).rejects.toThrow("owner_reassignment_required");
     const incomplete=await f.createUser(email(),password);
     f.master.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt) VALUES(?,?,?,'signup','auth_created',1,1)`).run(crypto.randomUUID(),incomplete.id,incomplete.email);

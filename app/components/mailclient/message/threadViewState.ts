@@ -155,6 +155,40 @@ export function isThreadMessageCollapsed(
   return collapsedMessages[messageId] ?? !defaultExpandedIds.has(messageId);
 }
 
+/** The rendered thread messages whose card is expanded, i.e. whose body the reader shows. */
+export function getExpandedThreadMessages<T extends Pick<Message, "id" | "seen" | "dateValue">>(
+  renderedThread: T[],
+  collapsedMessages: Record<string, boolean>,
+  activeMessageId?: string | null
+) {
+  const defaultExpandedIds = getDefaultExpandedMessageIds(renderedThread, activeMessageId);
+  return renderedThread.filter(
+    (message) => !isThreadMessageCollapsed(message.id, collapsedMessages, defaultExpandedIds)
+  );
+}
+
+/**
+ * Writes the current expanded/collapsed state of every rendered card that has
+ * no explicit entry yet. Default expansion follows the newest unread message;
+ * pinning it before a message is marked read keeps that card open and stops
+ * the next older unread card from opening (and being marked read) in turn.
+ */
+export function pinThreadCollapseState(
+  renderedThread: Pick<Message, "id" | "seen" | "dateValue">[],
+  collapsedMessages: Record<string, boolean>,
+  activeMessageId?: string | null
+) {
+  if (renderedThread.length < 2) return collapsedMessages;
+  const defaultExpandedIds = getDefaultExpandedMessageIds(renderedThread, activeMessageId);
+  let next: Record<string, boolean> | undefined;
+  renderedThread.forEach((message) => {
+    if (message.id in collapsedMessages) return;
+    next ??= { ...collapsedMessages };
+    next[message.id] = !defaultExpandedIds.has(message.id);
+  });
+  return next ?? collapsedMessages;
+}
+
 /**
  * Print what the reader shows: expanded cards whose body has not been read
  * yet are loaded first, so the printout never contains an empty body.

@@ -72,10 +72,11 @@ export default function ShellHeader({ title, toolbar, search, sync, indicators }
       {/* One weight and the font's own tracking for the whole path; only the
           separator steps back. The spaces stay in the text so the heading
           still reads "Mailbox / Folder". Centred like everything else here,
-          the 14px title would sit (14 - 12) * 0.364px below the 12px count
-          and toolbar labels (Inter's (ascender - descender) / 2 is 0.364em);
+          the text-sm title would sit (text-sm - text-xs) * 0.355 below the
+          text-xs count and toolbar labels (SF Pro's (ascender - descender) / 2
+          is 0.355em);
           the lift puts them on one baseline. */}
-      <h1 className="relative top-[calc((var(--text-xs)-var(--text-sm))*0.364)] m-0 min-w-0 truncate text-sm font-medium max-md:flex-1" title={fullTitle}>
+      <h1 className="relative top-[calc((var(--text-xs)-var(--text-sm))*0.355)] m-0 min-w-0 truncate text-sm font-medium max-md:flex-1" title={fullTitle}>
         {segments.map((segment, index) => (
           <Fragment key={index}>
             {index > 0 ? <span className="font-normal text-muted-foreground">{TITLE_SEPARATOR}</span> : null}

@@ -28,8 +28,8 @@ function labelControls(children: ReactNode, labelId: string, hintId?: string): R
   return cloneElement(children, { children: labelled });
 }
 
-/** Native control styling without a width, for controls sized by their content (table cells). 44px tall on phones; disabled controls stay readable but recede. */
-export const nativeControlBaseClass = "min-w-0 rounded-md border bg-background p-2 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground max-md:min-h-11";
+/** Native control styling without a width, for controls sized by their content (table cells). 44px tall on phones; body text size, not the 13.33px UA default; disabled controls stay readable but recede. */
+export const nativeControlBaseClass = "min-w-0 rounded-md border bg-background p-2 text-sm disabled:cursor-not-allowed disabled:bg-muted/60 disabled:text-muted-foreground max-md:min-h-11";
 /** Native select/input/textarea styling shared by the settings forms; fills and never widens its column. */
 export const nativeControlClass = `w-full ${nativeControlBaseClass}`;
 

@@ -2,10 +2,12 @@ import { describe, expect, it } from "bun:test";
 import type { Message } from "@/lib/data";
 import {
   getComposeThreadFocusMessageId,
+  getExpandedThreadMessages,
   getInlineComposePlacement,
   getReaderFolderScope,
   getRenderedThreadMessages,
-  getVisibleThreadMessages
+  getVisibleThreadMessages,
+  pinThreadCollapseState
 } from "./threadViewState";
 
 function makeMessage(overrides?: Partial<Message>): Message {
@@ -216,5 +218,29 @@ describe("getReaderFolderScope", () => {
     expect(getReaderFolderScope({
       activeMessage: { folderId: "acc:Trash" }, activeFolderId: "acc:Trash", threadExcludedFolderIds
     })).toEqual({ folderId: "acc:Trash", excludeFolderIds: [] });
+  });
+});
+
+describe("auto-read thread helpers", () => {
+  const thread = [
+    makeMessage({ id: "active", seen: true, dateValue: 3 }),
+    makeMessage({ id: "unread-newer", seen: false, dateValue: 2 }),
+    makeMessage({ id: "unread-older", seen: false, dateValue: 1 })
+  ];
+
+  it("lists the expanded cards: explicit entries win over the default expansion", () => {
+    expect(getExpandedThreadMessages(thread, {}, "active").map((m) => m.id)).toEqual(["active", "unread-newer"]);
+    expect(getExpandedThreadMessages(thread, { "unread-newer": true, "unread-older": false }, "active").map((m) => m.id))
+      .toEqual(["active", "unread-older"]);
+  });
+
+  it("pins the shown layout so marking the newest unread card read opens no other card", () => {
+    const pinned = pinThreadCollapseState(thread, { active: false }, "active");
+    expect(pinned).toEqual({ active: false, "unread-newer": false, "unread-older": true });
+    const afterRead = thread.map((m) => (m.id === "unread-newer" ? { ...m, seen: true } : m));
+    expect(getExpandedThreadMessages(afterRead, pinned, "active").map((m) => m.id)).toEqual(["active", "unread-newer"]);
+    expect(pinThreadCollapseState(thread, pinned, "active")).toBe(pinned);
+    const single = { active: false };
+    expect(pinThreadCollapseState(thread.slice(0, 1), single, "active")).toBe(single);
   });
 });

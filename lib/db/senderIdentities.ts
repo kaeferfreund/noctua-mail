@@ -3,11 +3,13 @@ import type { AdminAuditAction } from "../data";
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "crypto";
 import type { SenderIdentity } from "../data";
-import { normalizeIdentityEmail, getOwnAddresses } from "../ownAddresses";
+import { normalizeIdentityDisplayName, normalizeIdentityEmail, getOwnAddresses } from "../ownAddresses";
 import { getDb } from "./connection";
 
 type IdentityRow = Omit<SenderIdentity, "enabled" | "isDefault"> & { enabled: number; isDefault: number };
-const mapIdentityRow = (row: IdentityRow): SenderIdentity => ({ ...row, enabled: !!row.enabled, isDefault: !!row.isDefault,
+// Rows written before names were normalized on write read back normalized too.
+const mapIdentityRow = (row: IdentityRow): SenderIdentity => ({ ...row, displayName: normalizeIdentityDisplayName(row.displayName),
+  enabled: !!row.enabled, isDefault: !!row.isDefault,
   replyTo: row.replyTo ?? undefined, signatureId: row.signatureId ?? undefined });
 export function listSenderIdentityRows(db: Database, accountId: string): SenderIdentity[] {
   return (db.query(`SELECT * FROM sender_identities WHERE accountId=?
@@ -39,7 +41,7 @@ export function seedSenderIdentityRow(db: Database, account: { id: string; email
   db.prepare(`INSERT INTO sender_identities
     (id,accountId,email,displayName,isDefault,enabled,createdBy,createdAt,updatedAt)
     VALUES(?,?,?,?,1,1,?,?,?)`).run(randomUUID(), account.id,
-      normalizeIdentityEmail(account.email) ?? account.email.trim().toLowerCase(), account.name, createdBy, now, now);
+      normalizeIdentityEmail(account.email) ?? account.email.trim().toLowerCase(), normalizeIdentityDisplayName(account.name), createdBy, now, now);
 }
 
 export function getIdentitySignatureIds(db: Database, accountId: string): string[] {

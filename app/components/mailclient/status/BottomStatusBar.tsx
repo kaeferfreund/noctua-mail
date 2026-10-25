@@ -20,6 +20,7 @@ import type { UiLocale } from "@/lib/i18n/config";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import type { CalendarReminder } from "../utils/calendarReminders";
 import type { ExceptionEntry, SyncJobProgress } from "../types";
+import type { SpamRescanActivity } from "@/lib/mail/spam/rescanTypes";
 import ProcessStatusPopover from "./ProcessStatusPopover";
 import UpcomingStatusPopover from "./UpcomingStatusPopover";
 import ExceptionStatusPopover from "./ExceptionStatusPopover";
@@ -40,6 +41,8 @@ type BottomStatusBarProps = {
   isRecomputingCategories: boolean;
   syncingFolders: Set<string>;
   syncProgressItems: SyncJobProgress[];
+  spamRescans?: SpamRescanActivity[];
+  onCancelSpamRescan?: (job: SpamRescanActivity) => void;
   accountFolders: Folder[];
   mailCheckMode: "idle" | "polling";
   activeAccountId: string;
@@ -77,7 +80,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
   const isMobile = useIsMobile();
   const indicatorRef = useRef<HTMLButtonElement>(null);
   const { state, attentionCount } = resolveStatusIndicator(props.syncProgressItems, exceptionEntries.length,
-    isSyncing || props.isRecomputingThreads || props.isRecomputingCategories || props.syncingFolders.size > 0);
+    isSyncing || props.isRecomputingThreads || props.isRecomputingCategories || props.syncingFolders.size > 0 || !!props.spamRescans?.length);
   const label = state === "attention" ? t("attention", { count: attentionCount }) : state === "syncing" ? t("syncing") : t("label");
   const changePanel = (panel: BottomStatusPanel) => (open: boolean) => setOpenPanel(current => open ? panel : normalizePanel(current) === panel ? null : current);
   const close = () => setOpenPanel(null);
@@ -114,7 +117,7 @@ export default function BottomStatusBar(props: BottomStatusBarProps) {
   const process = <ProcessStatusPopover embedded={!isMobile} open={openPanel === "process"} onOpenChange={changePanel("process")}
     isSyncing={isSyncing} isRecomputingThreads={props.isRecomputingThreads} isRecomputingCategories={props.isRecomputingCategories}
     syncingFolders={props.syncingFolders} syncProgressItems={props.syncProgressItems} accountFolders={props.accountFolders}
-    accounts={props.accounts} onRetrySync={props.onRetrySync} />;
+    accounts={props.accounts} onRetrySync={props.onRetrySync} spamRescans={props.spamRescans} onCancelSpamRescan={props.onCancelSpamRescan} />;
   const exceptions = <ExceptionStatusPopover embedded={!isMobile} open={openPanel === "exception"} onOpenChange={changePanel("exception")}
     exceptionEntries={exceptionEntries} onClearExceptions={props.onClearExceptions} formatRelativeTime={props.formatRelativeTime} onRelogin={props.onReloginAccount} />;
   const upcoming = <UpcomingStatusPopover embedded={!isMobile} open={openPanel === "reminder"} onOpenChange={changePanel("reminder")}

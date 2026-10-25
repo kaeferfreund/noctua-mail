@@ -84,15 +84,15 @@ describe("message catalogs", () => {
   }
 });
 
-test("admin self-grant copy is explicit in both locales and uses German mailbox roles", () => {
+test("admin mailbox copy names the creator as owner and the membership scope in both locales", () => {
   const t = getTranslator("de");
-  expect(t("Admin.mailboxes.selfGrantTitle")).toBe("Dir selbst Zugriff geben?");
-  expect(t("Admin.mailboxes.noMembers")).toBe("Noch keine Mitglieder – niemand sieht dieses Postfach");
+  expect(t("Admin.mailboxes.help")).toContain("mit dir als Eigentümer");
+  expect(t("Admin.mailboxes.noneVisible")).toContain("in denen du Mitglied bist");
   expect((["manager", "editor", "viewer"] as const).map(role => t(`Admin.roles.${role}`))).toEqual(["Verwalter", "Bearbeiter", "Leser"]);
   for (const locale of ["de", "en"] as const) {
     const translate = getTranslator(locale);
-    for (const key of ["selfGrantTitle", "selfGrantHelp", "grantAccess", "later", "noMembers"] as const) {
-      expect(translate(`Admin.mailboxes.${key}`)).not.toBe(`Admin.mailboxes.${key}`);
+    for (const key of ["Admin.mailboxes.help", "Admin.mailboxes.noneVisible", "Admin.errors.foreignMailboxes"] as const) {
+      expect(translate(key)).not.toBe(key);
     }
   }
 });

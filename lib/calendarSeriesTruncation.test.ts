@@ -19,20 +19,21 @@ function occurrences(input: {
 describe("truncateRecurrenceBeforeOccurrence", () => {
   // The cutoff occurrence and everything after it must vanish from the
   // expanded series, while the occurrence right before it survives — across
-  // positive-offset, negative-offset, and floating zones, since UNTIL is
-  // compared against wall-clock-shifted occurrence starts.
+  // positive-offset, negative-offset, and floating zones. Serialized UTC
+  // bounds must retain the cutoff instant in each zone.
   const cases = [
-    { tz: "Europe/Berlin", start: Date.UTC(2026, 5, 26, 10, 0), cutoff: Date.UTC(2026, 6, 10, 10, 0) },
-    { tz: "America/New_York", start: Date.UTC(2026, 5, 26, 16, 0), cutoff: Date.UTC(2026, 6, 10, 16, 0) },
-    { tz: "", start: Date.UTC(2026, 5, 26, 12, 0), cutoff: Date.UTC(2026, 6, 10, 12, 0) }
+    { tz: "Europe/Berlin", start: Date.UTC(2026, 5, 26, 10, 0), cutoff: Date.UTC(2026, 6, 10, 10, 0), until: "20260710T095959Z" },
+    { tz: "America/New_York", start: Date.UTC(2026, 5, 26, 16, 0), cutoff: Date.UTC(2026, 6, 10, 16, 0), until: "20260710T155959Z" },
+    { tz: "", start: Date.UTC(2026, 5, 26, 12, 0), cutoff: Date.UTC(2026, 6, 10, 12, 0), until: "20260710T115959Z" }
   ];
 
-  for (const { tz, start, cutoff } of cases) {
+  for (const { tz, start, cutoff, until } of cases) {
     test(`drops the cutoff occurrence and all later ones (tz=${tz || "floating"})`, () => {
       const result = truncateRecurrenceBeforeOccurrence(
         { recurrenceRule: "FREQ=WEEKLY;BYDAY=FR", startTimezone: tz },
         cutoff
       );
+      expect(result.recurrenceRule).toContain(`UNTIL=${until}`);
       const remaining = occurrences({
         eventStartAtMs: start,
         recurrenceRule: result.recurrenceRule,

@@ -1216,9 +1216,11 @@ Manager routes (`requireAccountContext(minRole: "manager")`):
 
 Admin routes (`requireAdminSessionOr403`, override for everything above, same audit):
 
-- `GET /api/admin/accounts` → all accounts (manager view, sanitized) with `members`.
+- `GET /api/admin/accounts` → the admin's member mailboxes (manager view, sanitized) with `members`.
+  Since 2026-10-25 every admin mailbox route is limited to member mailboxes (doc/AUTHENTICATION.md,
+  "Administrators: own mailboxes only").
 - `POST /api/admin/accounts` body: `Account` without id. Verifies IMAP, requires
-  `teamFeaturesSupported()`, `ownerUserId = null`. 201 `{ ok, account }`. Not auto-linked.
+  `teamFeaturesSupported()`, `ownerUserId = <creating admin>`. 201 `{ ok, account }`.
 - `PUT/DELETE /api/admin/accounts/[accountId]/members/[userId]` (same limits except self-rules).
 - `DELETE /api/admin/accounts/[accountId]` → deletes the mailbox (audit `account.delete`).
 
@@ -1418,6 +1420,8 @@ Rules:
   to it. No `next/font` (server builds must stay hermetic). `HtmlMessage.tsx` injects the
   same `@font-face` with the absolute `/fonts/...` URL into the srcdoc and uses the family; the
   compose editor uses the family through the token.
+  Superseded in 2026-10: the app uses the platform UI font stack (`-apple-system, BlinkMacSystemFont,
+  "SF Pro Text", …` in `--font-sans` and `lib/ui/fonts.ts`); Inter and `public/fonts` were removed.
 - `<Theme accentColor="iris" grayColor="gray" panelBackground="solid">` stays in the root layout.
   `<html suppressHydrationWarning>`, `ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem`
   (users without a stored value follow the OS theme); the header menu offers light / dark / system. `darkMode` for the kept renderers comes

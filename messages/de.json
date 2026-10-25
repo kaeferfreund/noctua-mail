@@ -55,7 +55,11 @@
         "senderIcons": "Absendersymbole anzeigen",
         "weekStartsOn": "Wochenbeginn",
         "includeAcrossFolders": "Threads ordnerübergreifend anzeigen",
+        "autoMarkRead": "Geöffnete E-Mails als gelesen markieren",
         "newMail": "Benachrichtigungen bei neuen E-Mails"
+      },
+      "fieldHelp": {
+        "autoMarkRead": "Wann eine geöffnete ungelesene E-Mail als gelesen markiert wird. Standard: nach 1 Sekunde. Der Gelesen-Status gilt für alle Mitglieder des Postfachs. Leser können nicht markieren."
       },
       "options": {
         "yes": "Ja",
@@ -66,7 +70,11 @@
         "card": "Karten",
         "table": "Tabelle",
         "compact": "Kompakt",
-        "locale": "Regionales Systemformat"
+        "locale": "Regionales Systemformat",
+        "immediate": "Sofort",
+        "after1s": "Nach 1 Sekunde",
+        "after3s": "Nach 3 Sekunden",
+        "never": "Nie (manuell)"
       }
     },
     "roles": {
@@ -634,7 +642,17 @@
         "repair": "Reparatursynchronisierung"
       },
       "updatedAt": "Zuletzt aktualisiert: {time}",
-      "calendarEvent": "Kalendertermin"
+      "calendarEvent": "Kalendertermin",
+      "spamRescan": {
+        "title": "Spam-Prüfung: {mailbox}",
+        "cancel": "Prüfung abbrechen",
+        "phase": {
+          "server-flag": "Posteingang wird gelesen (alle Mails, auch außerhalb des Zeitraums, für bekannte Absender)",
+          "classifier": "Filter-Prüfung mit Modell",
+          "moving": "Ausgewählte Mails werden verschoben"
+        },
+        "progress": "{processed, number} von {total, number}"
+      }
     },
     "topicPicker": {
       "title": "Themen",
@@ -1048,18 +1066,14 @@
     },
     "mailboxes": {
       "create": "Postfach erstellen",
-      "help": "Erstellt ein Postfach ohne Eigentümer. Füge nach dem Erstellen Mitglieder hinzu.",
+      "help": "Erstellt ein Postfach mit dir als Eigentümer. Füge nach dem Erstellen weitere Mitglieder hinzu.",
       "refresh": "Postfächer aktualisieren",
       "manageMembers": "Mitglieder verwalten",
       "delete": "Postfach löschen",
       "deleteConfirm": "{email} und die lokalen Daten endgültig löschen?",
       "membersTitle": "Mitglieder von {email}",
       "memberCount": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
-      "selfGrantTitle": "Dir selbst Zugriff geben?",
-      "selfGrantHelp": "Das gemeinsame Postfach wurde erstellt. Es hat noch keine Mitglieder. Gib dir ausdrücklich Zugriff oder füge später Mitglieder hinzu.",
-      "grantAccess": "Zugriff geben",
-      "later": "Später",
-      "noMembers": "Noch keine Mitglieder – niemand sieht dieses Postfach"
+      "noneVisible": "Hier erscheinen nur Postfächer, in denen du Mitglied bist. Du bist noch in keinem Postfach Mitglied."
     },
     "users": {
       "refresh": "Benutzer aktualisieren",
@@ -1106,6 +1120,14 @@
       "noExpiry": "Kein Ablaufdatum",
       "issuedBy": "Erstellt von {name}",
       "expires": "Gültig bis {time}",
+      "deletedIssuer": "gelöschter Benutzer",
+      "cleanup": "Verlauf bereinigen",
+      "cleanupConfirm": "Alle eingelösten, abgelaufenen und widerrufenen Einladungen werden aus dem Verlauf gelöscht. Ausgestellte, noch gültige Einladungen bleiben gültig, ebenso Codes, mit denen gerade eine Registrierung läuft.",
+      "cleaned": "{count, plural, =0 {Keine Einträge zum Bereinigen.} one {# Eintrag gelöscht.} other {# Einträge gelöscht.}}",
+      "revoke": "Widerrufen",
+      "revokeFor": "Einladung für {name} widerrufen",
+      "revokeTitle": "Einladung widerrufen",
+      "revokeConfirm": "Der Code für {name} kann danach nicht mehr eingelöst werden.",
       "status": {
         "issued": "ausgestellt",
         "redeemed": "eingelöst",
@@ -1136,6 +1158,11 @@
       "help": "Wird nur einmal angezeigt. Kopiere den Wert jetzt zur persönlichen Übergabe. Beim Schließen wird er verworfen.",
       "copied": "Kopiert.",
       "copyFailed": "Kopieren fehlgeschlagen. Markiere und kopiere den Wert manuell.",
+      "qrLabel": "QR-Code",
+      "qrHelp": {
+        "invite": "Mit dem Handy scannen, um die Registrierung mit diesem Code zu öffnen.",
+        "recovery": "Mit dem Handy scannen, um den Wiederherstellungslink zu öffnen."
+      },
       "copy": "Kopieren",
       "done": "Fertig"
     },
@@ -1151,6 +1178,7 @@
       "selfMutation": "Du kannst dich nicht selbst herabstufen, deaktivieren oder löschen.",
       "reassignOwner": "Wähle einen aktivierten Benutzer als neuen Eigentümer der Postfächer.",
       "invalidOwner": "Wähle einen anderen aktivierten Eigentümer.",
+      "foreignMailboxes": "Diese Person ist Mitglied in Postfächern, in denen du kein Mitglied bist und die du deshalb nicht siehst. Löschen kann sie nur ein Administrator, der in allen ihren Postfächern Mitglied ist.",
       "immutableOwner": "Der Eigentümer des Postfachs kann nicht geändert werden.",
       "selfRole": "Du kannst deine eigene Rolle nicht ändern.",
       "targetDisabled": "Wähle einen aktivierten Benutzer mit abgeschlossener Einrichtung.",
@@ -1167,7 +1195,12 @@
       "verificationRequired": "Bestätige zuerst persönlich die Identität dieser Person.",
       "loggedOut": "Deine Sitzung ist abgelaufen. Melde dich erneut an.",
       "request": "Die Anfrage ist fehlgeschlagen. Versuche es erneut.",
-      "rateLimited": "Zu viele Versuche. Versuche es später erneut."
+      "rateLimited": "Zu viele Versuche. Versuche es später erneut.",
+      "inviteNotIssued": "Die Einladung ist nicht mehr ausgestellt. Der Verlauf wurde inzwischen geändert.",
+      "rescanRunning": "Für dieses Postfach läuft bereits eine Prüfung.",
+      "rescanNotRunning": "Für dieses Postfach läuft keine Prüfung.",
+      "rescanModelUnavailable": "Die Filter-Prüfung ist für dieses Postfach gerade nicht möglich.",
+      "rescanNotMovable": "Diese Prüfung kann nicht mehr verschoben werden. Starte eine neue Prüfung."
     },
     "spam": {
       "heading": "Spam-Erkennung",
@@ -1184,6 +1217,75 @@
       "unavailableReasons": {
         "missing-key": "kein API-Schlüssel (ANTHROPIC_API_KEY)",
         "unsupported-provider": "Anbieter wird nicht unterstützt"
+      },
+      "rescan": {
+        "heading": "Posteingang jetzt prüfen",
+        "help": "Prüft den vorhandenen Posteingang eines Postfachs: zuerst die Mails, die der Mailserver als Spam gekennzeichnet hat (ohne Modell und mit denselben vorsichtigen Ausnahmen wie das Server-Skript), auf Wunsch zusätzlich die noch ungeprüften Mails mit dem Filter. Verschoben wird erst nach deiner Durchsicht.",
+        "open": "Posteingang jetzt prüfen",
+        "openFor": "Posteingang von {email} prüfen",
+        "close": "Schließen",
+        "period": "Zeitraum",
+        "periods": {
+          "30d": "Letzte 30 Tage",
+          "12m": "Letzte 12 Monate",
+          "all": "Alles"
+        },
+        "inboxCount": "{count, plural, one {# Mail} other {# Mails}} im Posteingang in diesem Zeitraum",
+        "withModel": "Auch Filter-Prüfung mit Modell",
+        "modelCount": "Schickt höchstens {count, plural, one {# Mail} other {# Mails}} an das Modell. Bereits geprüfte Mails werden übersprungen; Absender aus der Allowlist und feste Regeln brauchen kein Modell.",
+        "modelCapped": "{unchecked, number} Mails sind ungeprüft, pro Durchlauf gehen höchstens {max, number} an das Modell. Ein weiterer Durchlauf prüft den Rest.",
+        "modelBlocked": {
+          "detection-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist in der Verwaltung ausgeschaltet.",
+          "mailbox-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist für dieses Postfach ausgeschaltet.",
+          "missing-key": "Die Filter-Prüfung ist nicht möglich: kein API-Schlüssel (ANTHROPIC_API_KEY).",
+          "unsupported-provider": "Die Filter-Prüfung ist nicht möglich: Anbieter wird nicht unterstützt."
+        },
+        "noJunk": "Dieses Postfach hat keinen Spam-Ordner. Vom Server markierte Mails bleiben deshalb im Posteingang.",
+        "start": "Prüfung starten",
+        "cancel": "Abbrechen",
+        "phase": {
+          "server-flag": "Posteingang wird gelesen (alle Mails, auch außerhalb des Zeitraums, für bekannte Absender)",
+          "classifier": "Filter-Prüfung mit Modell",
+          "moving": "Ausgewählte Mails werden verschoben"
+        },
+        "progress": "{processed, number} von {total, number}",
+        "state": {
+          "cancelled": "Die Prüfung wurde abgebrochen. Gefundene Treffer kannst du trotzdem verschieben.",
+          "interrupted": "Die Prüfung wurde durch einen Neustart des Dienstes abgebrochen.",
+          "moveInterrupted": "Das Verschieben wurde durch einen Neustart unterbrochen. Die übrigen Mails kannst du erneut verschieben.",
+          "failed": "Die Prüfung ist fehlgeschlagen. Starte eine neue Prüfung."
+        },
+        "summary": "Prüfung vom {time} ({period}): {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
+        "serverLine": "Vom Server markiert: {flagged, number}, davon {kept, number} aus Schutzgründen im Posteingang behalten (z. B. bekannter Absender, beantwortet, markiert, jünger als 3 Tage, „Kein Spam“, bereits geprüft).",
+        "modelLine": "Filter: {checked, number} geprüft, {calls, number} Modellaufrufe, {marked, number} verdächtig.",
+        "modelSkipped": "Filter-Prüfung nicht ausgeführt.",
+        "truncated": "Es gibt mehr Treffer, als die Liste zeigt. Verschiebe diese und starte eine neue Prüfung.",
+        "empty": "Keine Treffer. Es gibt nichts zu verschieben.",
+        "selectAll": "Alle auswählen",
+        "selectNone": "Keine auswählen",
+        "selectItem": "„{subject}“ auswählen",
+        "list": "Treffer",
+        "stage": {
+          "server-flag": "Vom Server markiert",
+          "classifier": "Filter: verdächtig"
+        },
+        "serverScore": "Score {score, number}",
+        "confidence": "Sicherheit {confidence, number, percent}",
+        "moveStatus": {
+          "pending": "Wird verschoben …",
+          "moved": "Verschoben",
+          "gone": "Nicht mehr im Posteingang",
+          "changed": "Geändert, bleibt im Posteingang",
+          "error": "Fehler beim Verschieben"
+        },
+        "move": "Ausgewählte verschieben ({count, number})",
+        "moveHelp": "Verschiebt in den Spam-Ordner wie „Als Spam“. Mit „Kein Spam“ holst du eine Mail zurück.",
+        "moveResult": "{moved, number} verschoben, {gone, number} nicht mehr im Posteingang, {changed, number} geändert und behalten, {errors, number} Fehler.",
+        "again": "Neue Prüfung",
+        "noSubject": "(kein Betreff)",
+        "running": "Prüfung läuft",
+        "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
+        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist."
       }
     },
     "domainIcons": {
@@ -1249,6 +1351,9 @@
     "clearSearch": "Suche löschen",
     "loadingMessages": "Nachrichten werden geladen …",
     "syncingMessages": "Nachrichten werden synchronisiert …",
+    "pullToRefresh": "Zum Aktualisieren ziehen",
+    "releaseToRefresh": "Zum Aktualisieren loslassen",
+    "refreshingMailbox": "Postfach wird abgerufen …",
     "noSearchResults": "Keine Nachrichten entsprechen dieser Suche.",
     "emptyFolder": "Keine Nachrichten in diesem Ordner.",
     "loadingMore": "Weitere werden geladen …",
@@ -1698,7 +1803,8 @@
     "categoryFailed": "Kategorie konnte nicht aktualisiert werden.",
     "todoFailed": "Aufgabenmarkierung konnte nicht aktualisiert werden.",
     "markedNotSuspicious": "Markierung „Verdächtig“ entfernt.",
-    "notSuspiciousFailed": "Die Markierung „Verdächtig“ konnte nicht entfernt werden."
+    "notSuspiciousFailed": "Die Markierung „Verdächtig“ konnte nicht entfernt werden.",
+    "inviteWhileSignedIn": "Du bist bereits angemeldet. Der Einladungscode gilt für eine neue Registrierung."
   },
   "Compose": {
     "sender": {
