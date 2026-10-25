@@ -128,7 +128,8 @@ describe("app/globals.css cascade layers", () => {
         });
       const tokens = layerTokens(root);
       expect(tokens).toEqual({ "--layer-floating": 9990, "--layer-dialog": 9994,
-        "--layer-dialog-overlay": 9995, "--layer-popper": 9998, "--layer-drag-ghost": 9999 });
+        "--layer-dialog-overlay": 9995, "--layer-popper": 9998, "--layer-drag-ghost": 9999,
+        "--layer-status-bar": 10000 });
       // The ladder is strictly ascending, and the JS mirror used for nested
       // dialog arithmetic stays on the same values.
       const order = Object.values(tokens);
@@ -139,6 +140,8 @@ describe("app/globals.css cascade layers", () => {
       expect(zIndexFor(".rt-BaseDialogOverlay")).toEqual([{ layer: "legacy", value: "var(--layer-dialog-overlay)" }]);
       expect(zIndexFor(".rt-PopperContent")).toEqual([{ layer: "legacy", value: "var(--layer-popper)" }]);
       expect(zIndexFor(".drag-ghost")).toEqual([{ layer: "legacy", value: "var(--layer-drag-ghost)" }]);
+      // The band under the iOS status bar covers every other layer.
+      expect(zIndexFor("body::before")).toEqual([{ layer: "legacy", value: "var(--layer-status-bar)" }]);
       // Radix Themes itself is layered below legacy, so the lift wins.
       expect(rulesWithSelector(root, ".rt-BaseDialogOverlay").map(enclosingLayer)).toContain(
         "radix"

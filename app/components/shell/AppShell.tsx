@@ -78,7 +78,7 @@ export default function AppShell({ sidebar, header, panes, statusBar, overlays, 
         data-shell=""
         open={open}
         onOpenChange={setSidebarOpen}
-        className="h-dvh min-h-0 overflow-hidden bg-sidebar text-foreground"
+        className="h-dvh min-h-0 overflow-hidden bg-sidebar pt-(--sat) pr-(--sar) pb-(--sab) pl-(--sal) text-foreground"
         style={{ "--sidebar-width": SIDEBAR_WIDTH, "--header-height": "3rem" } as CSSProperties}
       >
         <ShellSidebar

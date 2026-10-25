@@ -16,7 +16,7 @@ export default function AdminSecretDialog({ secret, onClose }: { secret: AdminSe
   // The sign-up link is built from the origin the admin is using, never from configuration.
   const qrValue = secret.kind === "invite" ? inviteSignupUrl(window.location.origin, secret.value) : isWebUrl(secret.value) ? secret.value : null;
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent aria-describedby={undefined} className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+    <DialogContent aria-describedby={undefined} className="max-h-[calc(100dvh-2rem-var(--sat)-var(--sab))] overflow-y-auto">
       <DialogTitle>{t(`secret.${secret.kind}`)}</DialogTitle>
       <DialogDescription>{t("secret.help")}</DialogDescription>
       <code className="block rounded-md bg-muted px-3 py-2 font-mono text-base break-all text-foreground select-all">{secret.value}</code>
