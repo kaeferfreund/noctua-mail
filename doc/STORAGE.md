@@ -28,7 +28,8 @@ Contains control-plane and identity data:
 - `invite_codes`
 - `domain_icons` (one row per domain with an uploaded icon: byte hash, size, updatedAt, updatedByUserId;
   the PNG itself lives in `domain-icons/`. Back both up together. A row without its file falls
-  back to the favicon; a file without its row is never served.)
+  back to the favicon; a file without its row is never served. The sender-icon route serves an
+  upload only for domains of mailboxes the caller can open.)
 
 Depending on `IMAP_CREDENTIALS_STORAGE`, encrypted IMAP/SMTP passwords may also be stored here:
 - `db`: credentials in DB

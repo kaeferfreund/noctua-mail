@@ -4,6 +4,7 @@ import path from "path";
 import { domainToASCII } from "url";
 import { deleteDomainIconRow, getDomainIconRow, listDomainIconRows, saveDomainIconRow } from "./db";
 import { getDomainIconsDir } from "./runtimePaths";
+import { listAccessibleAccountEmails } from "./accountAccess";
 import { isFreeMailDomain, mailboxGroupDomain } from "./senderIdentity";
 
 /**
@@ -77,17 +78,22 @@ export function senderIconDomains(domain: string | null, rootDomain: string | nu
 
 /**
  * Override for a sender: its exact domain first, then each parent down to the
- * root domain. A free-mail domain (gmail.com, ...) applies only to the
+ * root domain. Only domains of mailboxes the caller can open are considered,
+ * so a member of one mailbox cannot probe another domain's upload through
+ * any `fromEmail`. A free-mail domain (gmail.com, ...) applies only to the
  * mailbox's own address, i.e. the sidebar header of that domain, never to
  * every sender there.
  */
 export async function findSenderDomainIcon(identity: { email: string | null; domain: string | null; rootDomain: string | null },
-  mailboxEmail: string): Promise<DomainIconOverride | null> {
-  const own = identity.email !== null && identity.email === mailboxEmail.trim().toLowerCase();
+  caller: { mailboxEmail: string; userId: string }): Promise<DomainIconOverride | null> {
+  const own = identity.email !== null && identity.email === caller.mailboxEmail.trim().toLowerCase();
+  let memberDomains: Set<string> | null = null;
   for (const domain of senderIconDomains(identity.domain, identity.rootDomain)) {
     if (isFreeMailDomain(domain) && !own) continue;
     const override = await readDomainIconOverride(domain);
-    if (override) return override;
+    if (!override) continue;
+    memberDomains ??= new Set((await listAccessibleAccountEmails(caller.userId)).map(mailboxDomain).filter((value): value is string => value !== null));
+    if (memberDomains.has(domain)) return override;
   }
   return null;
 }

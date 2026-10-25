@@ -47,28 +47,52 @@ describe("sender-icon route with an admin-uploaded domain icon", async () => {
   const domain = `brand-${crypto.randomUUID().slice(0, 8)}.example.test`;
   const png = await normalizeDomainIcon(await sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 0, g: 128, b: 0, alpha: 1 } } }).png().toBuffer());
   const owner = await createAuthenticatedTestSession(undefined, "admin");
+  // A member of mailbox A (owner@example.test) who also reads a mailbox of the
+  // uploaded domain; the requests below all go through A's route.
+  const brandAccountId = `acc-sender-icon-brand-${crypto.randomUUID()}`;
+  await upsertAccount({ ...account, id: brandAccountId, email: `team@${domain}` });
+  const member = await createAuthenticatedTestSession(accountId);
+  await member.addMembership(member.user.id, brandAccountId, "viewer");
+  const memberCookie = member.jar.header();
+  const asMember = (query: string, headers: Record<string, string> = {}) => request(query, { cookie: memberCookie, ...headers });
 
   test("the override wins over the favicon for the domain and its subdomains, with ETag revalidation", async () => {
     await saveDomainIcon(domain, png, owner.user.id);
     try {
       // The sidebar header request: the domain as `from`, the mailbox address as `fromEmail`.
-      const header = await request(`from=${domain}&fromEmail=team%40${domain}&fallback=none&v=1`);
+      const header = await asMember(`from=${domain}&fromEmail=team%40${domain}&fallback=none&v=1`);
       expect(header.status).toBe(200);
       expect(header.headers.get("content-type")).toBe("image/png");
       expect(header.headers.get("cache-control")).toBe("private, no-cache");
       expect(Buffer.from(await header.arrayBuffer()).equals(png)).toBe(true);
       const etag = header.headers.get("etag")!;
-      expect((await request(`from=${domain}&fromEmail=team%40${domain}&fallback=none`, { cookie, "if-none-match": etag })).status).toBe(304);
+      expect((await asMember(`from=${domain}&fromEmail=team%40${domain}&fallback=none`, { "if-none-match": etag })).status).toBe(304);
 
       // A message-list sender at a subdomain gets the root domain's override.
-      const sender = await request(`from=${encodeURIComponent(`Ada <ada@mail.${domain}>`)}`);
+      const sender = await asMember(`from=${encodeURIComponent(`Ada <ada@mail.${domain}>`)}`);
       expect(sender.headers.get("content-type")).toBe("image/png");
       // Other domains keep the resolver (sender icons off here: initials SVG / 404).
-      expect((await request("fromEmail=someone%40other.example.test&fallback=none")).status).toBe(404);
+      expect((await asMember("fromEmail=someone%40other.example.test&fallback=none")).status).toBe(404);
     } finally {
       await resetDomainIcon(domain, owner.user.id);
     }
-    expect((await request(`from=${domain}&fromEmail=team%40${domain}&fallback=none`)).status).toBe(404);
+    expect((await asMember(`from=${domain}&fromEmail=team%40${domain}&fallback=none`)).status).toBe(404);
+  });
+
+  test("a member of another mailbox cannot load a domain's upload through any fromEmail", async () => {
+    await saveDomainIcon(domain, png, owner.user.id);
+    try {
+      // `cookie` belongs to a member of mailbox A only; no mailbox of the uploaded domain.
+      for (const query of [`from=${domain}&fromEmail=team%40${domain}&fallback=none`, `fromEmail=ada%40mail.${domain}&fallback=none`]) {
+        const response = await request(query);
+        expect(response.status).toBe(404);
+        expect(response.headers.get("etag")).toBeNull();
+      }
+      // The same request by a member of a mailbox at that domain gets it.
+      expect((await asMember(`from=${domain}&fromEmail=team%40${domain}&fallback=none`)).headers.get("content-type")).toBe("image/png");
+    } finally {
+      await resetDomainIcon(domain, owner.user.id);
+    }
   });
 
   test("a free-mail domain's override applies only to the mailbox's own address", async () => {

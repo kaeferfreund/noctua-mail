@@ -31,9 +31,10 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
       return NextResponse.json({ ok: false, message: "Account not found" }, { status: 404 });
     }
 
-    // An admin-uploaded domain icon replaces the fetched favicon. It is local
-    // data, so it applies even when the mailbox fetches no sender icons.
-    const override = await findSenderDomainIcon(getSenderIdentity({ from, fromEmail }), account.email);
+    // An admin-uploaded domain icon replaces the fetched favicon for domains
+    // of the caller's own mailboxes. It is local data, so it applies even when
+    // the mailbox fetches no sender icons.
+    const override = await findSenderDomainIcon(getSenderIdentity({ from, fromEmail }), { mailboxEmail: account.email, userId: session.userId });
     if (override) return domainIconOverrideResponse(request, override);
 
     const result = await resolveSenderIcon({
