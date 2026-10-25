@@ -56,6 +56,9 @@ describe("ScheduleSendDialog", () => {
     fireEvent.click(page.getByRole("button", { name: "Planen" }));
     expect(page.getByRole("alert").textContent).toBe("Dieser Zeitpunkt liegt in der Vergangenheit.");
     expect(time.getAttribute("aria-invalid")).toBe("true");
+    expect(date.getAttribute("aria-invalid")).toBe("true");
+    // The browser's own min/required bubbles never pre-empt the inline error.
+    expect((page.getByRole("button", { name: "Planen" }).closest("form") as HTMLFormElement).noValidate).toBe(true);
     expect(planned).toEqual([]);
 
     // The fall-back night offers 02:30 once; it is the first (CEST) instant.

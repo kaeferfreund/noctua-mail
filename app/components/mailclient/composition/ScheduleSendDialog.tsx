@@ -72,6 +72,7 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
   const parsedDate = parseLocalDate(date);
   const timeOptions = parsedDate ? customTimeOptions(parsedDate, clock(), timeZone) : [];
   const customSelected = selection === "custom";
+  const pastDate = Boolean(parsedDate) && date < today;
   const format = (sendAt: number) => formatScheduledSendTime(sendAt, locale, timeZone);
 
   const chooseCustom = (nextDate: string, nextTime: string) => {
@@ -119,7 +120,8 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
   );
 
   return (
-    <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit(); }}>
+    // noValidate: the inline error replaces the browser's min/required bubbles.
+    <form className={styles.form} noValidate onSubmit={event => { event.preventDefault(); void submit(); }}>
       <div className={styles.options} role="radiogroup" aria-label={t("title")}>
         {presets.map(preset => row(preset.kind, t(`presets.${preset.kind}`),
           <span className={styles.optionTime}>{format(preset.sendAt)}</span>))}
@@ -129,7 +131,8 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
         {row("custom", t("custom"), null)}
         <div className={styles.customControls}>
           <input type="date" aria-label={t("dateLabel")} value={date} min={today} required
-            className={`${nativeControlBaseClass} ${styles.control}`} aria-invalid={customSelected && error === "invalid" && !parsedDate ? true : undefined}
+            className={`${nativeControlBaseClass} ${styles.control} ${customSelected && error && (pastDate || !parsedDate) ? styles.controlInvalid : ""}`}
+            aria-invalid={customSelected && error && (pastDate || !parsedDate) ? true : undefined}
             onFocus={() => setSelection("custom")} onChange={event => changeDate(event.target.value)} />
           <select aria-label={t("timeLabel")} value={time} disabled={!timeOptions.length}
             className={`${nativeControlBaseClass} ${styles.control} ${customSelected && error ? styles.controlInvalid : ""}`}
@@ -140,7 +143,7 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
           </select>
         </div>
       </div>
-      {customSelected && !timeOptions.length && parsedDate && !error && <p className={styles.hint}>{t("errors.noTimes")}</p>}
+      {customSelected && !timeOptions.length && parsedDate && !pastDate && !error && <p className={styles.hint}>{t("errors.noTimes")}</p>}
       {error && <p id={errorId} role="alert" className={styles.error}>{t(`errors.${error}`)}</p>}
       <div className={styles.footer}>
         <Button type="button" variant="secondary" className={styles.footerButton} onClick={onCancel} disabled={submitting}>{t("cancel")}</Button>
