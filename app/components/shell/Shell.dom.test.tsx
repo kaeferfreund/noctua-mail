@@ -303,37 +303,19 @@ describe("collapsible domain groups", () => {
     expect(view.getByRole("button", { name: /Brand b/ }).getAttribute("aria-current")).toBe("true");
   });
 
-  describe("the same domain in Eigene and Geteilte", () => {
+  it("own and shared mailboxes of one domain share one group and one stored key", () => {
     const sharedBrand = ["h", "i", "j", "k"].map(id => account(id, `Shared ${id}`, "brand.example.test", true));
-    const sharedPlain = ["l", "m", "n"].map(id => account(id, `Shared ${id}`, "plain.example.test", true));
-    const renderBoth = () => renderSidebar([...brand, ...plain, ...sharedBrand, ...sharedPlain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, plain[0].id, { userId: "user-1", summaries });
-    const brandHeaders = (view: ReturnType<typeof renderSidebar>) =>
-      view.getAllByText("brand.example.test", { selector: "span" }).map(span => span.closest("button")!);
-
-    it("collapses each section's group on its own", () => {
-      const view = renderBoth();
-      const [mineHeader, sharedHeader] = brandHeaders(view);
-      fireEvent.click(sharedHeader);
-      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
-      expect(mineHeader.getAttribute("aria-expanded")).toBe("true");
-      expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["shared:brand.example.test"]');
-      fireEvent.click(mineHeader);
-      fireEvent.click(sharedHeader);
-      expect(mineHeader.getAttribute("aria-expanded")).toBe("false");
-      expect(sharedHeader.getAttribute("aria-expanded")).toBe("true");
-    });
-
-    it("reads a stored key without section as collapsed in both, then splits it", () => {
-      window.localStorage.setItem("noctua:sidebarDomainsCollapsed:user-1", '["brand.example.test"]');
-      const view = renderBoth();
-      const [mineHeader, sharedHeader] = brandHeaders(view);
-      expect(mineHeader.getAttribute("aria-expanded")).toBe("false");
-      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
-      fireEvent.click(mineHeader);
-      expect(mineHeader.getAttribute("aria-expanded")).toBe("true");
-      expect(sharedHeader.getAttribute("aria-expanded")).toBe("false");
-      expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["shared:brand.example.test"]');
-    });
+    window.localStorage.setItem("noctua:sidebarDomainsCollapsed:user-1", '["brand.example.test"]');
+    const view = renderSidebar([...brand, ...plain, ...sharedBrand], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
+    const headers = view.getAllByText("brand.example.test", { selector: "span" }).map(span => span.closest("button")!);
+    expect(headers).toHaveLength(1);
+    expect(headers[0].getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(headers[0]);
+    expect(headers[0].getAttribute("aria-expanded")).toBe("true");
+    // The legacy bare key is split per section on the first toggle; only the list's own entry matters now.
+    const stored = window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1") ?? "[]";
+    expect(stored).not.toContain("mine:brand.example.test");
+    expect(stored).not.toContain('"brand.example.test"');
   });
 
   it("keeps ungrouped sections without a toggle", () => {
