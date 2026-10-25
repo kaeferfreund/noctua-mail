@@ -7,12 +7,15 @@ import { Input } from "@/app/components/ui/input";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { adminActionRow } from "./adminLayout";
+import AdminSpamRescan from "./AdminSpamRescan";
 
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
   effective: { enabled: boolean; provider: string; model: string; threshold: number; modelUnavailable: "missing-key" | "unsupported-provider" | null };
   /** Read-only trusted-sender counters per mailbox. */
   trust?: Array<{ accountId: string; email: string; trustedSkips: number; canaryChecks: number; canaryMismatches: number }>;
+  /** The admin's own mailboxes (member or owner): only these offer „Posteingang jetzt prüfen“. */
+  rescanMailboxes?: Array<{ accountId: string; email: string }>;
 };
 
 function trustTotals(trust: NonNullable<SpamAdminResponse["trust"]>) {
@@ -72,5 +75,6 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
     {data?.trust && <p className="max-w-2xl text-sm text-muted-foreground"
       title={data.trust.map((entry) => `${entry.email}: ${t("spam.trustCounters", { skips: entry.trustedSkips, canaries: entry.canaryChecks, mismatches: entry.canaryMismatches })}`).join("\n")}>
       {t("spam.trustCounters", trustTotals(data.trust))}</p>}
+    {data?.rescanMailboxes && <AdminSpamRescan apiFetch={apiFetch} mailboxes={data.rescanMailboxes} />}
   </section>;
 }

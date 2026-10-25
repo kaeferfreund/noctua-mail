@@ -25,7 +25,8 @@ export type SpamApplyFilters = {
   accountId?: string | null;
 };
 
-export type SpamApplyResult = "moved" | "would-move" | "missing" | "not-in-inbox" | "error";
+/** changed: the lookup reports that the mail changed since it was selected (the rescan's re-check); it stays. */
+export type SpamApplyResult = "moved" | "would-move" | "missing" | "not-in-inbox" | "changed" | "error";
 
 export const isInboxPath = (mailboxPath: string | null | undefined) => (mailboxPath ?? "").toUpperCase() === "INBOX";
 
@@ -54,23 +55,28 @@ export function selectSpamApplyItems(records: SpamEvalRecord[], filters: SpamApp
 /**
  * Sequential on purpose (gentle with IMAP). `lookup` returns the current row
  * (null when it no longer exists); only rows still in the INBOX are moved.
- * A failed move is reported and the loop continues.
+ * A failed move is reported and the loop continues. `onResult` sees every
+ * item's outcome (the rescan stores it); `isCancelled` stops before the next item.
  */
-export async function applySpamItems(items: SpamEvalRecord[], deps: {
+export async function applySpamItems<T extends SpamEvalRecord>(items: T[], deps: {
   dryRun: boolean;
-  lookup: (item: SpamEvalRecord) => Promise<{ mailboxPath: string | null } | null>;
-  move: (item: SpamEvalRecord) => Promise<string | void>;
+  lookup: (item: T) => Promise<{ mailboxPath: string | null; changed?: boolean } | null>;
+  move: (item: T) => Promise<string | void>;
   log?: (line: string) => void;
+  onResult?: (item: T, result: SpamApplyResult) => Promise<void> | void;
+  isCancelled?: () => boolean;
 }) {
-  const counts: Record<SpamApplyResult, number> = { moved: 0, "would-move": 0, missing: 0, "not-in-inbox": 0, error: 0 };
+  const counts: Record<SpamApplyResult, number> = { moved: 0, "would-move": 0, missing: 0, "not-in-inbox": 0, changed: 0, error: 0 };
   const log = deps.log ?? console.log;
   for (const item of items) {
+    if (deps.isCancelled?.()) break;
     let result: SpamApplyResult;
     let detail = "";
     try {
       const row = await deps.lookup(item);
       if (!row) result = "missing";
       else if (!isInboxPath(row.mailboxPath)) { result = "not-in-inbox"; detail = ` (${row.mailboxPath ?? "?"})`; }
+      else if (row.changed) result = "changed";
       else if (deps.dryRun) result = "would-move";
       else { const target = await deps.move(item); result = "moved"; if (target) detail = ` → ${target}`; }
     } catch (error) {
@@ -79,6 +85,7 @@ export async function applySpamItems(items: SpamEvalRecord[], deps: {
     }
     counts[result] += 1;
     log(`${item.subject || "(kein Betreff)"} — ${item.fromEmail ?? "?"} — ${result}${detail}`);
+    await deps.onResult?.(item, result);
   }
   return counts;
 }

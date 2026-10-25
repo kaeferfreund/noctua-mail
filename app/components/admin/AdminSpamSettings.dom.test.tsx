@@ -34,6 +34,20 @@ describe("spam settings", () => {
     expect(JSON.parse(String(put.init?.body))).toEqual({ enabled: true, model: null, threshold: 0.9 });
   });
 
+  it("admin: offers the inbox check only for the admin's own mailboxes", async () => {
+    const trust = [{ accountId: "own", email: "own@example.test", trustedSkips: 0, canaryChecks: 0, canaryMismatches: 0 },
+      { accountId: "foreign", email: "foreign@example.test", trustedSkips: 0, canaryChecks: 0, canaryMismatches: 0 }];
+    const effective = { enabled: true, provider: "anthropic", model: "claude-haiku-5-5", threshold: 0.85, modelUnavailable: null };
+    const page = render(<Theme><AdminSpamSettings apiFetch={async () => response({ ok: true, settings: {}, effective, trust,
+      rescanMailboxes: [{ accountId: "own", email: "own@example.test" }] })} /></Theme>);
+    expect(await page.findByRole("button", { name: "Check the inbox of own@example.test" })).toBeTruthy();
+    expect(page.queryByRole("button", { name: "Check the inbox of foreign@example.test" })).toBeNull();
+    cleanup();
+    const none = render(<Theme><AdminSpamSettings apiFetch={async () => response({ ok: true, settings: {}, effective, trust, rescanMailboxes: [] })} /></Theme>);
+    expect(await none.findByText("You are not a member of any mailbox. Only mailboxes you are a member of can be checked.")).toBeTruthy();
+    expect(none.queryByRole("button", { name: /^Check the inbox of/ })).toBeNull();
+  });
+
   it("mailbox: loads auto-move and saves an empty threshold as the global default", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const apiFetch: AdminFetch = async (input, init) => {

@@ -1,4 +1,5 @@
 import { deleteMcpTokenAccountRows } from "./mcpTokens";
+import { deleteSpamRescanRowsForAccount } from "./spamRescan";
 import { getOwnAddresses } from "../ownAddresses";
 import { listSenderIdentityRows, listSenderIdentityRowsForAccounts } from "./senderIdentities";
 import { recordAdminAuditRow } from "./adminAudit";
@@ -182,6 +183,7 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
       deleteUserAccountPrefRowsForAccount(db, accountId);
       deleteMcpTokenAccountRows(db, accountId);
       db.prepare(`DELETE FROM sender_identities WHERE accountId = ?`).run(accountId);
+      deleteSpamRescanRowsForAccount(db, accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
       if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
     }).immediate();

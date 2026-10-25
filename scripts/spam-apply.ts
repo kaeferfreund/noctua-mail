@@ -39,17 +39,16 @@ import { Database } from "bun:sqlite";
 import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Folder, Message } from "../lib/data";
-import { sentToAddressInDb } from "../lib/db/sentRecipients";
 import { applySpamItems, parseSpamEvalRecords, selectSpamApplyItems, type SpamEvalDecision, type SpamEvalRecord } from "../lib/mail/spam/apply";
 import { assertShardsInsideDataDir, openSpamDataDir } from "../lib/mail/spam/evalData";
 import type { SpamExampleSource } from "../lib/mail/spam/examples";
 import {
+  createCorrespondentCheck,
   parseReviewedServerFlagItems,
   planServerFlagApply,
   scanServerFlaggedInbox,
   SERVER_FLAG_BACKFILL_SOURCE,
   serverFlagApplyRecords,
-  type ScanDb,
   type ServerFlagAccountScan,
   type ServerFlagHousehold
 } from "../lib/mail/spam/serverFlagBackfill";
@@ -75,9 +74,8 @@ type Moved = { accountId: string; previousId: string; messageId: string; rfcMess
  * ("Als Spam") without a user. NOCTUA_DATA_DIR must be set before the call.
  */
 async function appMove(source: SpamExampleSource, options: { datedAtArrival?: boolean; onMoved?: (moved: Moved) => void } = {}) {
-  const { getAccountById, getMessageById } = await import("../lib/serverDb");
-  const { moveMessageToJunk } = await import("../app/api/_helpers/message/junkMove");
-  const { recordSpamDecision } = await import("../lib/mail/spam/examples");
+  const { getMessageById } = await import("../lib/serverDb");
+  const { moveMessageToJunkAsSpam } = await import("../lib/mail/spam/spamMove");
   const current = new Map<string, Message>();
   const lookup: Lookup = async (item) => {
     const message = await getMessageById(item.accountId, item.id);
@@ -87,12 +85,7 @@ async function appMove(source: SpamExampleSource, options: { datedAtArrival?: bo
   };
   const move = async (item: SpamEvalRecord) => {
     const message = current.get(`${item.accountId}\u0000${item.id}`)!;
-    if (typeof message.imapUid !== "number" || !message.mailboxPath) throw new Error("message is missing IMAP metadata");
-    const account = await getAccountById(item.accountId);
-    if (!account) throw new Error("account not found");
-    const moved = await moveMessageToJunk({ account, accountId: item.accountId, message: { ...message, imapUid: message.imapUid, mailboxPath: message.mailboxPath } });
-    await recordSpamDecision({ accountId: item.accountId, message, label: "spam", source, userId: null,
-      createdAt: options.datedAtArrival && Number.isFinite(message.dateValue) ? message.dateValue : undefined });
+    const moved = await moveMessageToJunkAsSpam({ accountId: item.accountId, message, source, userId: null, datedAtArrival: options.datedAtArrival });
     options.onMoved?.({ accountId: item.accountId, previousId: moved.previousMessageId, messageId: moved.messageId,
       rfcMessageId: message.messageId ?? null, junkMailbox: moved.junkMailbox });
     return moved.junkMailbox;
@@ -209,18 +202,6 @@ function printScans(scans: Array<ServerFlagAccountScan & { email: string }>) {
   console.log(`Total: ${Object.entries(total).sort((a, b) => b[1] - a[1]).map(([key, value]) => `${key} ${value}`).join(", ") || "no server-flagged INBOX mail"}`);
 }
 
-const correspondentCheck = (sentShards: Array<{ db: ScanDb; accountId: string; sentFolderId: string }>) => {
-  const cache = new Map<string, boolean>();
-  return (email: string) => {
-    let known = cache.get(email);
-    if (known === undefined) {
-      known = sentShards.some((shard) => sentToAddressInDb(shard.db, shard.accountId, shard.sentFolderId, email));
-      cache.set(email, known);
-    }
-    return known;
-  };
-};
-
 async function applyServerFlagged() {
   const data = arg("data");
   if (!data) throw new Error("Pass --data <data dir> (the environment's NOCTUA_DATA_DIR is never used)");
@@ -242,7 +223,7 @@ async function applyServerFlagged() {
         const sent = findSentFolder(folders, account.id);
         return sent ? [{ db, accountId: account.id, sentFolderId: sent.id }] : [];
       });
-      const household: ServerFlagHousehold = { ...inspect.own, isCorrespondent: correspondentCheck(sentShards), staticRules };
+      const household: ServerFlagHousehold = { ...inspect.own, isCorrespondent: createCorrespondentCheck(sentShards), staticRules };
       const targets = inspect.accounts.filter((account) => !accountFilter || account.id === accountFilter);
       if (!targets.length) throw new Error(accountFilter ? `Account ${accountFilter} not found in ${dataDir}` : `No accounts in ${dataDir}`);
       console.log(`Server-flagged INBOX mail (dry run, read-only, no IMAP): ${dataDir}, ${targets.length} accounts, rules ${existsSync(rulesPath) ? rulesPath : "none"}`);
@@ -289,23 +270,9 @@ async function applyServerFlagged() {
   assertShardsInsideDataDir(targets, dataDir);
   // The app's DB layer reads NOCTUA_DATA_DIR; the explicit --data wins over the environment.
   process.env.NOCTUA_DATA_DIR = dataDir;
-  const { getAccounts, getFolders } = await import("../lib/db");
-  const { getAccountDb } = await import("../lib/db/connection");
-  const { buildOwnIdentitySets } = await import("../lib/mail/spam/allowlist");
+  const { loadAppServerFlagContext } = await import("../lib/mail/spam/serverFlagApp");
   const { getSourcesDir } = await import("../lib/runtimePaths");
-  const accounts = await getAccounts();
-  const shards = new Map<string, { db: ScanDb; folders: Folder[] }>();
-  for (const account of accounts) shards.set(account.id, { db: await getAccountDb(account.id), folders: await getFolders(account.id) });
-  const sentShards = accounts.flatMap((account) => {
-    const shard = shards.get(account.id)!;
-    const sent = findSentFolder(shard.folders, account.id);
-    return sent ? [{ db: shard.db, accountId: account.id, sentFolderId: sent.id }] : [];
-  });
-  const household: ServerFlagHousehold = {
-    ...buildOwnIdentitySets(accounts.flatMap((account) => [account.email, ...(account.ownAddresses ?? [])])),
-    isCorrespondent: correspondentCheck(sentShards),
-    staticRules
-  };
+  const { accounts, shards, household } = await loadAppServerFlagContext(staticRules);
   console.log(`Server-flagged INBOX mail → Junk: ${dataDir}, ${reviewed.length} reviewed items in ${onlyPath}, rules ${existsSync(rulesPath) ? rulesPath : "none"}`);
   const scans: Array<ServerFlagAccountScan & { email: string }> = [];
   for (const account of accounts.filter((candidate) => accountIds.includes(candidate.id))) {

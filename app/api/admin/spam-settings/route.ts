@@ -6,10 +6,11 @@ import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, loadSpamTrustCounters, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
 import { listMemberAccounts } from "@/lib/accountAccess";
 
-/** `trust`: counters of the admin's own mailboxes only. */
+/** `trust` and `rescanMailboxes` („Posteingang jetzt prüfen“): the admin's own mailboxes only. */
 async function body(userId: string) {
+  const own = await listMemberAccounts(userId);
   return NextResponse.json({ ok: true, settings: await loadSpamAdminSettings(), effective: describeSpamConfig(await loadSpamConfig()),
-    trust: await loadSpamTrustCounters(await listMemberAccounts(userId)) });
+    trust: await loadSpamTrustCounters(own), rescanMailboxes: own.map(account => ({ accountId: account.id, email: account.email })) });
 }
 
 export async function GET(request: Request) {

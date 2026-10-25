@@ -1,10 +1,6 @@
 import { RRule, RRuleSet } from "rrule";
 import type { CalendarInviteMutationGroup } from "./calendarInviteProcessing";
-import {
-  fromCalendarTimeZoneWallDate,
-  resolveCalendarTimeZoneId,
-  toCalendarTimeZoneWallDate
-} from "./calendarTimezones";
+import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
 
 export type InviteDeckEventBounds = {
   eventFirstStartAtMs?: number;
@@ -59,28 +55,12 @@ function buildRecurrenceTimeline(params: {
   if (!Number.isFinite(eventStartAtMs) || eventStartAtMs <= 0) return null;
 
   try {
-    const parsed = RRule.fromString(normalizedRule);
-    const parsedTzid =
-      typeof parsed.origOptions.tzid === "string" ? parsed.origOptions.tzid : undefined;
-    const ruleTimeZone =
-      resolveCalendarTimeZoneId(params.startTimezone) ?? resolveCalendarTimeZoneId(parsedTzid);
-    const toRuleDate = (value: number) => {
-      const date = new Date(value);
-      return ruleTimeZone ? toCalendarTimeZoneWallDate(date, ruleTimeZone) : date;
-    };
-    const fromRuleDate = (date: Date) =>
-      ruleTimeZone ? fromCalendarTimeZoneWallDate(date, ruleTimeZone) : date;
-    const originalUntil =
-      parsed.origOptions.until instanceof Date ? parsed.origOptions.until : null;
-    const rule = new RRule({
-      ...parsed.origOptions,
-      dtstart: toRuleDate(eventStartAtMs),
-      until:
-        originalUntil && ruleTimeZone
-          ? toCalendarTimeZoneWallDate(originalUntil, ruleTimeZone)
-          : parsed.origOptions.until,
-      tzid: ruleTimeZone ? undefined : parsed.origOptions.tzid
-    });
+    const { options, toRuleDate, fromRuleDate } = buildCalendarRecurrenceOptions(
+      normalizedRule,
+      eventStartAtMs,
+      params.startTimezone
+    );
+    const rule = new RRule(options);
     const recurrenceDates = normalizeDateList(params.recurrenceDates);
     const excludedDates = normalizeDateList(params.excludedDates);
     const recurrenceSource =
@@ -98,33 +78,22 @@ function buildRecurrenceTimeline(params: {
             return ruleSet;
           })();
     const isBounded =
-      (typeof parsed.origOptions.count === "number" && parsed.origOptions.count > 0) ||
-      parsed.origOptions.until instanceof Date;
-    const untilAtMs = asTimestampMs(
-      parsed.origOptions.until instanceof Date ? parsed.origOptions.until : undefined
-    );
+      (typeof options.count === "number" && options.count > 0) ||
+      options.until instanceof Date;
 
     return {
       firstOnOrAfter(timestampMs: number) {
-        const queryDate = new Date(timestampMs);
-        const next = recurrenceSource.after(
-          ruleTimeZone ? toCalendarTimeZoneWallDate(queryDate, ruleTimeZone) : queryDate,
-          true
-        );
+        const next = recurrenceSource.after(toRuleDate(timestampMs), true);
         return next ? fromRuleDate(next) : null;
       },
       lastOnOrBefore(timestampMs: number) {
-        const queryDate = new Date(timestampMs);
-        const previous = recurrenceSource.before(
-          ruleTimeZone ? toCalendarTimeZoneWallDate(queryDate, ruleTimeZone) : queryDate,
-          true
-        );
+        const previous = recurrenceSource.before(toRuleDate(timestampMs), true);
         return previous ? fromRuleDate(previous) : null;
       },
       lastBoundedOccurrence() {
         if (!isBounded) return null;
-        if (Number.isFinite(untilAtMs)) {
-          const previous = recurrenceSource.before(toRuleDate(untilAtMs), true);
+        if (options.until instanceof Date) {
+          const previous = recurrenceSource.before(options.until, true);
           return previous ? fromRuleDate(previous) : null;
         }
         const occurrences = recurrenceSource.all();

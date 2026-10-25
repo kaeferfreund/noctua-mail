@@ -37,6 +37,27 @@ describe("sender identity service", () => {
       expect(listSenderIdentityRows(db, "a").find(i => i.id === created.id)?.enabled).toBe(false);
     } finally { f.close(); }
   });
+  test("display names are stored trimmed with collapsed whitespace on create, update, seed and read", async () => {
+    const f = await fixture(); const db = f.master;
+    try {
+      const created = await createSenderIdentity("a", { email: "spaced@example.test", displayName: "  Synthetic   Support " }, f.actor, db);
+      expect(created.displayName).toBe("Synthetic Support");
+      const stored = () => (db.prepare("SELECT displayName FROM sender_identities WHERE id=?").get(created.id) as { displayName: string }).displayName;
+      expect(stored()).toBe("Synthetic Support");
+      const audits = () => db.prepare("SELECT count(*) n FROM admin_audit WHERE action LIKE 'identity.%'").get();
+      const before = audits();
+      await updateSenderIdentity("a", created.id, { displayName: "Synthetic Support " }, f.actor, db);
+      expect(audits()).toEqual(before);
+      expect((await updateSenderIdentity("a", created.id, { displayName: "Synthetic  Team\u00a0" }, f.actor, db)).displayName).toBe("Synthetic Team");
+      expect(stored()).toBe("Synthetic Team");
+      expect((await updateSenderIdentity("a", created.id, { displayName: "   " }, f.actor, db)).displayName).toBe("");
+      await expect(updateSenderIdentity("a", created.id, { displayName: "Synthetic\tTeam" }, f.actor, db)).rejects.toMatchObject({ code: "invalid_identity" });
+      persistAccountRow(db, { ...identityTestAccount("c", f.actor.userId), name: " Synthetic  Mailbox " });
+      expect(listSenderIdentityRows(db, "c")[0].displayName).toBe("Synthetic Mailbox");
+      db.prepare("UPDATE sender_identities SET displayName=? WHERE id=?").run(" Legacy  Name ", created.id);
+      expect(listSenderIdentityRows(db, "a").find(i => i.id === created.id)?.displayName).toBe("Legacy Name");
+    } finally { f.close(); }
+  });
   test("default invariants, promotion races across connections, role revocation and atomic audit rollback", async () => {
     const f = await fixture(); const db = f.master; const other = new Database(f.temp.dbPath);
     try {
