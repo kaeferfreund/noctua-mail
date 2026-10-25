@@ -4,10 +4,10 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
-import { getAttachmentData, getMessageSource, saveAttachmentData, statAttachmentData } from "@/lib/storage";
+import { statAttachmentData } from "@/lib/storage";
+import { readStoredAttachmentData } from "@/lib/mail/storedAttachmentData";
 import { getAttachmentMeta } from "@/lib/db";
 import { requireActiveUserSession } from "@/lib/auth";
-import { extractAttachmentBufferFromSource } from "@/lib/mail/attachmentFromSource";
 import { ensureHtmlDocumentTitle, escapeHtml } from "@/lib/html";
 import { formatAttachmentPageTitle } from "@/lib/appBranding";
 import { removeMessageAttachmentEverywhere } from "@/lib/mail/removeMessageAttachment";
@@ -99,31 +99,11 @@ export async function GET(request: Request, { params }: Params) {
       return notModified(currentTag);
     }
 
-    let data = await getAttachmentData(accountId, messageId, attachmentId);
+    const data = await readStoredAttachmentData(accountId, messageId, { ...attachment, id: attachmentId });
     if (!data) {
-      const source = await getMessageSource(accountId, messageId);
-      if (!source) {
-        return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
-      }
-
-      try {
-        const extractedContent = await extractAttachmentBufferFromSource(source, {
-          id: attachmentId,
-          filename: attachment.filename ?? undefined,
-          contentType: attachment.contentType ?? undefined,
-          cid: attachment.cid ?? undefined
-        });
-        if (!extractedContent) {
-          return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
-        }
-        const normalizedContent = Buffer.from(extractedContent);
-        data = normalizedContent;
-        await saveAttachmentData(accountId, messageId, attachmentId, normalizedContent);
-        fileStat = await statAttachmentData(accountId, messageId, attachmentId);
-      } catch {
-        return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
-      }
+      return NextResponse.json({ ok: false, message: "Attachment data not found" }, { status: 404 });
     }
+    fileStat ??= await statAttachmentData(accountId, messageId, attachmentId);
 
     const rawName = attachment.filename ?? "attachment";
     const asciiName = rawName.replace(/[^\x20-\x7E]+/g, "_");
