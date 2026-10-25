@@ -1,6 +1,6 @@
 import { simpleParser } from "mailparser";
 import type { Message, SenderIdentity } from "./data";
-import { normalizeIdentityEmail, parseAddressEmails } from "./ownAddresses";
+import { normalizeIdentityDisplayName, normalizeIdentityEmail, parseAddressEmails } from "./ownAddresses";
 import { configuredReplyTo, IDENTITY_HEADER } from "./sendIdentity";
 import { SenderIdentityError } from "./senderIdentityError";
 
@@ -14,10 +14,12 @@ function unavailable(): never {
 /**
  * The From display name as the header carries it. A name equal to the address (default
  * identities use their address as name) counts as none: the MIME parser drops it from
- * `"a@example.test" <a@example.test>`, so both sides are compared without it.
+ * `"a@example.test" <a@example.test>`, so both sides are compared without it. Whitespace is
+ * normalized on both sides: the parser trims quoted names, legacy rows may carry extra spaces.
  */
 function fromDisplayName(name: string, email: string) {
-  return normalizeIdentityEmail(name) === email ? "" : name;
+  const normalized = normalizeIdentityDisplayName(name);
+  return normalizeIdentityEmail(normalized) === email ? "" : normalized;
 }
 
 /** Inspect outer headers, including duplicates the MIME parser would collapse. */

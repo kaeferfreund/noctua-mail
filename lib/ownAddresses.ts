@@ -21,6 +21,14 @@ function memoizeAddressResult<T>(cache: Map<string, T>, key: string, compute: (k
 const normalizedIdentityEmails = new Map<string, string | null>();
 const parsedAddressEmails = new Map<string, readonly string[]>();
 
+/**
+ * Canonical sender display name: trimmed, inner whitespace runs collapsed to one space.
+ * Header parsers trim quoted names, so a stored trailing space would never match the draft.
+ */
+export function normalizeIdentityDisplayName(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 /** Canonical single addr-spec. Plus tags and dots are significant. */
 export function normalizeIdentityEmail(value: string): string | null {
   return memoizeAddressResult(normalizedIdentityEmails, value, computeIdentityEmail);
