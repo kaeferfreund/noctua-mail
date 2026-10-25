@@ -42,3 +42,33 @@ test("legacy known From resolves without marker, unknown/disabled/foreign identi
   }
   await expect(validateDraftIdentity(legacy.replaceAll("alias@example.test", "unknown@example.test"), { ...draft, senderIdentityId: undefined, from: "unknown@example.test" }, [identity])).rejects.toMatchObject({ code: "identity_unavailable" });
 });
+
+// Default identities use their address as display name; the saved draft then carries
+// `From: "a@…" <a@…>`, which the MIME parser reads without a name.
+test("a display name equal to the address, or none, still matches its identity", async () => {
+  const own: SenderIdentity = { ...identity, id: "own", email: "own@example.test", replyTo: undefined, isDefault: true };
+  const ownDraft = { accountId: "mailbox", from: "own@example.test", senderIdentityId: "own" } as Message;
+  const source = (from: string) => `X-Noctua-Identity-Id: own\r\nFrom: ${from}\r\nMessage-ID: <own@example.test>\r\n\r\nBody`;
+  for (const [displayName, from] of [
+    ["own@example.test", '"own@example.test" <own@example.test>'],
+    ["Own@Example.test", '"Own@Example.test" <own@example.test>'],
+    ["", "own@example.test"],
+    ["", '"own@example.test" <own@example.test>']
+  ] as const) {
+    expect((await validateDraftIdentity(source(from), ownDraft, [{ ...own, displayName }])).id).toBe("own");
+  }
+  for (const [displayName, from] of [
+    ["own@example.test", "Someone Else <own@example.test>"],
+    ["", "Someone Else <own@example.test>"],
+    ["Synthetic Own", '"own@example.test" <own@example.test>'],
+    ["Synthetic Own", "own@example.test"],
+    ["own@example.test", '"other@example.test" <own@example.test>']
+  ] as const) {
+    await expect(validateDraftIdentity(source(from), ownDraft, [{ ...own, displayName }])).rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
+  }
+  // A foreign address or a different Sender stays refused for a default identity too.
+  await expect(validateDraftIdentity(source('"own@example.test" <other@example.test>'), ownDraft, [{ ...own, displayName: own.email }]))
+    .rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
+  await expect(validateDraftIdentity(`Sender: other@example.test\r\n${source('"own@example.test" <own@example.test>')}`, ownDraft, [{ ...own, displayName: own.email }]))
+    .rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
+});

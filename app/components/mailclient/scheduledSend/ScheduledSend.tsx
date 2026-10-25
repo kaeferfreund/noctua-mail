@@ -16,6 +16,8 @@ export type ScheduledSendControls = {
   byDraftId: ReadonlyMap<string, ScheduledSendView>;
   unschedule: (schedule: ScheduledSendView) => Promise<void>;
   sendNow: (message: Message, schedule: ScheduledSendView) => Promise<void>;
+  /** Opens „Senden planen“ for a saved draft; absent for members who may not send. */
+  schedule?: (message: Message) => void;
 };
 
 const ScheduledSendContext = createContext<ScheduledSendControls | null>(null);
@@ -28,6 +30,18 @@ export function ScheduledSendProvider({ value, children }: { value: ScheduledSen
 export function useDraftSchedule(message: Pick<Message, "id" | "draft">) {
   const controls = useContext(ScheduledSendContext);
   return message.draft ? controls?.byDraftId.get(message.id) : undefined;
+}
+
+/**
+ * „Senden planen“ for a saved draft without opening compose (row menu, quick actions,
+ * reader). Null when the member may not send; `busy` while its schedule sends it.
+ */
+export function useDraftScheduleAction(message: Message) {
+  const controls = useContext(ScheduledSendContext);
+  const schedule = useDraftSchedule(message);
+  const open = controls?.schedule;
+  if (!open) return null;
+  return { open: () => open(message), busy: schedule?.status === "sending" };
 }
 
 const KNOWN_REASONS = new Set(["send_failed", "smtp_rejected", "send_uncertain", "interrupted", "draft_invalid"]);

@@ -66,7 +66,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     } catch (error) {
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
-      if (error instanceof DraftSendError) return errorResponse(error.message, error.status);
+      if (error instanceof DraftSendError) {
+        return error.code ? NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status })
+          : errorResponse(error.message, error.status);
+      }
       if (error instanceof ScheduledSendBusyError) return errorResponse("This draft is being sent by its schedule right now.", 409);
       throw error;
     }
