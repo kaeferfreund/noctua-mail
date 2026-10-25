@@ -105,7 +105,11 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     const result: Record<string, unknown> = { scheme, band: statusBand, header: await topOf(page, '[data-slot="shell-header"]'), list, shell };
     expect((result.header as { top: number }).top).toBe(TOP);
     expect(list.top).toBeGreaterThanOrEqual(TOP);
-    expect(list.bottom).toBeLessThanOrEqual(VIEWPORT.height - BOTTOM);
+    // The shell and the list's scroll container reach the bottom edge; the home
+    // indicator is padding inside the list, not an unused band below it.
+    expect(shell.bottom).toBe(VIEWPORT.height);
+    expect(list.bottom).toBe(VIEWPORT.height);
+    expect(await page.locator('[id="list"] aside').evaluate(el => getComputedStyle(el).paddingBottom)).toBe(`${8 + BOTTOM}px`);
     // Floating notices clear the home indicator.
     expect(await page.locator(".inapp-notice-stack").first().evaluate(el => getComputedStyle(el).bottom)).toBe(`${40 + BOTTOM}px`);
     await page.screenshot({ path: path.join(evidence, `safe-area-390-list-${scheme}.png`) });
@@ -116,6 +120,9 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     await expect(back).toBeVisible();
     result.readerBack = await back.evaluate(el => Math.round(el.getBoundingClientRect().top));
     expect(result.readerBack as number).toBeGreaterThanOrEqual(TOP);
+    const reader = page.locator("[data-reader-scroll]").filter({ visible: true }).first();
+    expect(await reader.evaluate(el => ({ bottom: Math.round(el.getBoundingClientRect().bottom), paddingBottom: getComputedStyle(el).paddingBottom })))
+      .toEqual({ bottom: VIEWPORT.height, paddingBottom: `${8 + BOTTOM}px` });
     await page.screenshot({ path: path.join(evidence, `safe-area-390-reader-${scheme}.png`) });
 
     // Phone sidebar sheet.
@@ -124,7 +131,8 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     await openSidebar(page);
     const sidebarSheet = await topOf(page, '[data-slot="sidebar"][data-mobile="true"]');
     expect(sidebarSheet.top).toBe(TOP);
-    expect(sidebarSheet.bottom).toBe(VIEWPORT.height - BOTTOM);
+    expect(sidebarSheet.bottom).toBe(VIEWPORT.height);
+    expect(await page.locator('[data-slot="sidebar"][data-mobile="true"]').evaluate(el => getComputedStyle(el).paddingBottom)).toBe(`${BOTTOM}px`);
     result.sidebarSheet = sidebarSheet;
     await page.screenshot({ path: path.join(evidence, `safe-area-390-sidebar-${scheme}.png`) });
 
@@ -162,4 +170,44 @@ test("iPhone with a 47 px status bar: every top bar and frame starts below it", 
     results.push(result);
   }
   console.log("ios-safe-area", JSON.stringify(results));
+});
+
+test("home-screen app (display-mode: standalone): frames take the whole screen height", async ({ page }) => {
+  await page.setViewportSize(VIEWPORT);
+  await simulateInsets(page);
+  await page.goto("/");
+  // Chromium cannot emulate display-mode, so apply the shipped standalone
+  // rules (WebKit bug 301108 workaround) unconditionally and measure.
+  const standaloneRules = await page.evaluate(() => {
+    const texts: string[] = [];
+    for (const sheet of [...document.styleSheets]) {
+      let rules: CSSRuleList;
+      try { rules = sheet.cssRules; } catch { continue; }
+      const walk = (list: CSSRuleList) => {
+        for (const rule of [...list]) {
+          if (rule instanceof CSSMediaRule && rule.conditionText.includes("display-mode: standalone")) {
+            texts.push(...[...rule.cssRules].map(inner => inner.cssText));
+          } else if ("cssRules" in rule && (rule as CSSGroupingRule).cssRules) walk((rule as CSSGroupingRule).cssRules);
+        }
+      };
+      walk(rules);
+    }
+    const style = document.createElement("style");
+    style.textContent = texts.join("\n");
+    document.head.append(style);
+    return texts;
+  });
+  expect(standaloneRules.join(" ")).toContain("--app-height: 100lvh");
+  expect(standaloneRules.join(" ")).toMatch(/html \{ min-height: min\(100lvh, calc\(100% \+ var\(--sat\)\)\); \}/);
+  const sizes = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.height = "var(--app-height)";
+    document.body.append(probe);
+    const appHeight = probe.getBoundingClientRect().height;
+    probe.remove();
+    return { appHeight, html: document.documentElement.getBoundingClientRect().height, main: document.querySelector("main")!.getBoundingClientRect().height };
+  });
+  expect(sizes).toEqual({ appHeight: VIEWPORT.height, html: VIEWPORT.height, main: VIEWPORT.height });
+  // The page fills the screen without becoming scrollable.
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBe(VIEWPORT.height);
 });
