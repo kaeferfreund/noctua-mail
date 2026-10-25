@@ -35,7 +35,8 @@ export function assertMcpScope(scopes: readonly McpScope[] | undefined, scope: M
 export const MCP_TOOL_SCOPES: Readonly<Record<string, McpScope>> = {
   list_accounts: "read", list_mailbox_summary: "read", list_folders: "read", list_topics: "read",
   list_mailing_list_aliases: "read", check_new_mail: "read", list_messages_by_folder: "read", search_messages: "read",
-  assign_topics: "drafts", unassign_topics: "drafts", create_draft_message: "drafts",
+  list_draft_messages: "read", get_draft_message: "read",
+  assign_topics: "drafts", unassign_topics: "drafts", create_draft_message: "drafts", update_draft_message: "drafts",
   list_sender_identities: "read", create_sender_identity: "manage", update_sender_identity: "manage",
   get_sender_preferences: "read", set_sender_preferences: "manage",
   flag_message: "drafts", unflag_message: "drafts", mark_message_todo: "drafts", mark_message_done: "drafts", clear_message_todo: "drafts",

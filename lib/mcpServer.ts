@@ -44,6 +44,8 @@ import {
   type DraftCreateMode
 } from "@/lib/drafts";
 import { applyFlagMutationsToMessage } from "@/lib/messageFlagMutation";
+import { buildDraftUpdateInput, getStoredDraft, toEditableDraft, type DraftUpdatePatch } from "@/lib/draftEdit";
+import { findDraftsFolder } from "@/lib/specialFolders";
 import {
   addThreadTopic,
   getTopicsForThread,
@@ -58,6 +60,7 @@ import {
   appendMessageFlags,
   hasAiModifiedFlag,
   hasDoneFlag,
+  hasMessageFlag,
   hasTodoFlag
 } from "@/lib/messageFlags";
 
@@ -209,6 +212,39 @@ const CREATE_DRAFT_MESSAGE_SCHEMA = {
     })
   ).optional()
 };
+
+const DRAFT_ID_ARG = {
+  draftId: z.string().trim().min(1).describe("Draft id from create_draft_message, list_draft_messages or search_messages (badge draft).")
+};
+
+const DRAFT_EDIT_HINT =
+  "Drafts are edited in place: never create a second version and ask the user to delete the old one.";
+
+const UPDATE_DRAFT_MESSAGE_SCHEMA = {
+  ...ACCOUNT_ID_ARG,
+  ...DRAFT_ID_ARG,
+  identityId: z.string().min(1).max(256).optional().describe("Enabled sender identity. Omit to keep the draft's sender."),
+  to: z.string().optional().describe("Replaces the whole To list. Omit to keep it; empty string clears it."),
+  cc: z.string().optional().describe("Replaces the whole Cc list. Omit to keep it; empty string clears it."),
+  bcc: z.string().optional().describe("Replaces the whole Bcc list. Omit to keep it; empty string clears it."),
+  subject: z.string().optional().describe("Replaces the subject. Omit to keep it."),
+  text: z.string().optional().describe("Replaces the whole body (with html/markdown, same rules as create_draft_message)."),
+  markdown: z.string().optional().describe("Replaces the whole body as Markdown."),
+  html: z.string().optional().describe("Replaces the whole body as HTML."),
+  composeFormat: z.enum(["text", "html", "markdown"]).optional().describe("Body format; only together with text, html or markdown."),
+  appendBody: z.string().optional().describe(
+    "Plain-text paragraph appended to the existing body, after the authored text and before a quoted original. Keeps the draft's format. Cannot be combined with text/html/markdown."
+  )
+};
+
+const EDITABLE_DRAFT_SCHEMA = z.object({
+  draftId: z.string(), identityId: z.string().nullable(), from: z.string(), to: z.string(), cc: z.string(), bcc: z.string(),
+  subject: z.string(), composeFormat: z.enum(["text", "html", "markdown"]), text: z.string(), html: z.string().nullable(),
+  markdown: z.string().nullable(), inReplyTo: z.string().nullable(), references: z.array(z.string()),
+  forwardedMessageId: z.string().nullable(),
+  attachments: z.array(z.object({ id: z.string(), filename: z.string(), contentType: z.string(), size: z.number(), inline: z.boolean() })),
+  updatedAt: z.number()
+});
 
 const TOPIC_MUTATION_SCHEMA = {
   ...ACCOUNT_ID_ARG,
@@ -864,6 +900,51 @@ async function createDraftMessage(
   };
 }
 
+async function updateDraftMessage(context: McpAccountContext, args: DraftUpdatePatch & { draftId: string }) {
+  const { draftId: requestedDraftId, ...patch } = args;
+  const existing = await getStoredDraft(context.accountId, requestedDraftId);
+  const payload = await buildDraftUpdateInput(context.accountId, existing, patch);
+  const result = await saveDraftForAccount({
+    account: context.account,
+    accountId: context.accountId,
+    clientId: `mcp:${context.tokenRecord.id}`,
+    payload,
+    localFlags: [AI_MODIFIED_FLAG],
+    actor: mcpActor(context),
+    authorization: { tokenId: context.tokenRecord.id }
+  });
+  const message = result.draftId ? await getMessageById(context.accountId, result.draftId) : result.message;
+  if (message) await enrichMessagesWithThreadCollab([message], { accountId: context.accountId });
+  return {
+    ok: true,
+    mode: existing.xForwardedMessageId ? "forward" as const : existing.inReplyTo ? "reply" as const : "new" as const,
+    identityId: result.identityId,
+    draftId: result.draftId,
+    previousDraftId: existing.id,
+    draftIdChanged: result.draftId !== existing.id,
+    message
+  };
+}
+
+async function listDraftMessages(context: McpAccountContext, args: { page?: number; pageSize?: number }) {
+  const draftsFolder = findDraftsFolder(await getFolders(context.accountId), context.accountId);
+  if (!draftsFolder) throw new DraftSaveError(400, "Drafts folder not found");
+  const page = normalizePage(args.page);
+  const pageSize = normalizePageSize(args.pageSize);
+  const data = await listMessages({
+    accountId: context.accountId,
+    viewerUserId: context.tokenRecord.createdByUserId,
+    folderId: draftsFolder.id,
+    page,
+    pageSize,
+    query: null,
+    groupBy: "date"
+  });
+  const drafts = data.items.map(item => ({ draftId: item.id, subject: item.subject, to: item.to ?? "", cc: item.cc ?? "",
+    updatedAt: item.dateValue, editable: hasMessageFlag(item.flags, "\\Draft") }));
+  return { ok: true, folderId: draftsFolder.id, drafts, total: data.total ?? drafts.length, hasMore: data.hasMore ?? false, page, pageSize };
+}
+
 class StatelessJsonResponseTransport implements Transport {
   sessionId = undefined;
   onclose?: () => void;
@@ -1162,7 +1243,7 @@ export async function executeMcpHttpRequest(params: {
   );
 
   server.registerTool("create_draft_message", {
-    description: "Create a draft message. Supports new drafts, replies, and forwards. identityId selects an enabled sender in this mailbox.",
+    description: `Create a draft message. Supports new drafts, replies, and forwards. identityId selects an enabled sender in this mailbox. To change an existing draft use update_draft_message. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(CREATE_DRAFT_MESSAGE_SCHEMA).strict(),
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), referenceMessageId: z.string().nullable(),
       identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable() })
@@ -1171,6 +1252,49 @@ export async function executeMcpHttpRequest(params: {
     return senderToolCall(async () => {
       const result = await createDraftMessage(ctx, args);
       return buildToolResult(`Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`, result);
+    });
+  });
+
+  server.registerTool("list_draft_messages", {
+    description: `List drafts in this mailbox's Drafts folder (newest first). editable=false marks messages without the \\Draft flag. ${DRAFT_EDIT_HINT}`,
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, page: z.number().int().min(1).optional(),
+      pageSize: z.number().int().min(1).max(MCP_MAX_PAGE_SIZE).optional() }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    outputSchema: senderToolOutput({ folderId: z.string(), drafts: z.array(z.object({ draftId: z.string(), subject: z.string(), to: z.string(),
+      cc: z.string(), updatedAt: z.number(), editable: z.boolean() })), total: z.number(), hasMore: z.boolean(), page: z.number(), pageSize: z.number() })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    return senderToolCall(async () => {
+      const result = await listDraftMessages(ctx, args);
+      return buildToolResult(`Returned ${result.drafts.length} drafts (${result.total} total).`, result);
+    });
+  });
+
+  server.registerTool("get_draft_message", {
+    description: `Read an existing draft with everything needed to edit it: sender identity, recipients, subject, body (text and, if stored, html/markdown), reply/forward references and attachment names/sizes. ${DRAFT_EDIT_HINT}`,
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, ...DRAFT_ID_ARG }).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    outputSchema: senderToolOutput({ draft: EDITABLE_DRAFT_SCHEMA })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    return senderToolCall(async () => {
+      const draft = await toEditableDraft(ctx.accountId, await getStoredDraft(ctx.accountId, args.draftId));
+      return buildToolResult(`Draft ${draft.draftId}: ${JSON.stringify(draft.subject)}.`, { ok: true, draft });
+    });
+  });
+
+  server.registerTool("update_draft_message", {
+    description: `Edit an existing draft in place. Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). ${DRAFT_EDIT_HINT}`,
+    inputSchema: z.object(UPDATE_DRAFT_MESSAGE_SCHEMA).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), identityId: z.string(), draftId: z.string().nullable(),
+      previousDraftId: z.string(), draftIdChanged: z.boolean(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable() })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "editor");
+    return senderToolCall(async () => {
+      const { accountId: _accountId, ...input } = args; void _accountId;
+      const result = await updateDraftMessage(ctx, input);
+      return buildToolResult(`Updated draft ${result.previousDraftId}${result.draftIdChanged ? `; its new id is ${result.draftId}` : ""}.`, result);
     });
   });
 
