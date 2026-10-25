@@ -400,7 +400,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
           the kept components below (folder tree, topics, Radix menus). */}
       <Theme asChild>
         <div className="flex h-full min-h-0 flex-col bg-sidebar text-sm">
-          <SidebarHeader className="flex-row items-center gap-2 px-3">
+          <SidebarHeader className="flex-row items-center gap-2 px-3 pt-[calc(--spacing(2)+var(--top-spacer))]">
             {/* eslint-disable-next-line @next/next/no-img-element -- plain SVG, served unoptimized */}
             <img src={versionedIconUrl("/icons/logo.svg")} alt="" width={28} height={28} className="size-7 rounded-md" />
             <div className="flex min-w-0 flex-col leading-tight">

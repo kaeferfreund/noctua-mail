@@ -42,6 +42,21 @@ const band = (page: Page) => page.evaluate(() => {
   return { height: parseFloat(style.height), background: style.backgroundColor, zIndex: Number(style.zIndex) };
 });
 
+/** The rendered colour behind the phone's top bar and the theme-color metas, as hex. */
+const topBarAndThemeColor = (page: Page) => page.evaluate(() => {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d")!;
+  const header = document.querySelector('[data-slot="shell-header"]')!;
+  // The header is transparent; the first painted ancestor gives the bar its colour.
+  let element: Element | null = header;
+  while (element && getComputedStyle(element).backgroundColor === "rgba(0, 0, 0, 0)") element = element.parentElement;
+  context.fillStyle = getComputedStyle(element!).backgroundColor;
+  context.fillRect(0, 0, 1, 1);
+  const bar = "#" + [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)].map(value => value.toString(16).padStart(2, "0")).join("");
+  return { bar, meta: [...new Set([...document.querySelectorAll('meta[name="theme-color"]')].map(meta => meta.getAttribute("content")))] };
+});
+
 async function openSidebar(page: Page) {
   await page.getByRole("button", { name: "Seitenleiste umschalten", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Seitenleiste", exact: true })).toBeVisible();
@@ -67,6 +82,17 @@ test("home-screen meta: opaque status bar, cover viewport, theme colour per sche
   await page.goto("/");
   await expect.poll(() => page.locator('meta[name="theme-color"]').evaluateAll(metas => metas.map(meta => meta.getAttribute("content"))))
     .toEqual(["#0a0a0a", "#0a0a0a"]);
+  // The early iOS detection ships inline in <head> and leaves Chromium unmarked;
+  // its built (minified) source marks an iOS 26 home-screen app.
+  await expect(page.locator("html")).not.toHaveAttribute("data-ios-standalone", "");
+  expect(await page.evaluate(() => {
+    const source = document.getElementById("ios-standalone")?.textContent ?? "";
+    const env: Record<string, unknown> = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+      platform: "iPhone", maxTouchPoints: 5, standalone: true };
+    for (const [key, value] of Object.entries(env)) Object.defineProperty(navigator, key, { configurable: true, value });
+    new Function(source)();
+    return document.documentElement.hasAttribute("data-ios-standalone");
+  })).toBe(true);
   // Without insets (desktop, Android, Safari tab) nothing moves and the band has no height.
   expect((await band(page)).height).toBe(0);
 });
@@ -110,6 +136,12 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
     expect(statusBand.height).toBe(0);
     await expect.poll(() => page.locator('meta[name="theme-color"]').evaluateAll(metas => metas.map(meta => meta.getAttribute("content"))))
       .toEqual(scheme === "light" ? ["#ffffff", "#ffffff"] : ["#0a0a0a", "#0a0a0a"]);
+    // The opaque status bar (theme-color) is exactly the top bar's colour, also
+    // with the list scrolled, so iOS shows no seam above the header.
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
+    await page.locator('[id="list"] aside').evaluate(el => { el.scrollTop = 400; });
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
+    await page.locator('[id="list"] aside').evaluate(el => { el.scrollTop = 0; });
     const list = await topOf(page, '[id="list"] aside');
     const shell = await topOf(page, '[data-slot="sidebar-wrapper"]');
     const result: Record<string, unknown> = { scheme, band: statusBand, header: await topOf(page, '[data-slot="shell-header"]'), list, shell };
@@ -130,6 +162,8 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
     await expect(back).toBeVisible();
     result.readerBack = await back.evaluate(el => Math.round(el.getBoundingClientRect().top));
     expect(result.readerBack as number).toBeGreaterThanOrEqual(TOP);
+    // Opening a mail keeps the same top bar, so the status bar colour does not change.
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
     const reader = page.locator("[data-reader-scroll]").filter({ visible: true }).first();
     expect(await reader.evaluate(el => ({ bottom: Math.round(el.getBoundingClientRect().bottom), paddingBottom: getComputedStyle(el).paddingBottom })))
       .toEqual({ bottom: VIEWPORT.height, paddingBottom: `${8 + BOTTOM}px` });
@@ -180,6 +214,74 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
     results.push(result);
   }
   console.log("ios-safe-area", JSON.stringify(results));
+});
+
+// iOS 26 home-screen app: the early script marks <html data-ios-standalone>
+// (lib/ui/iosStandalone.ts; Chromium is no iPhone, so the test sets it) and
+// every view's top bar gets the quarter-line --top-spacer in its own colour.
+const SPACER = 12;
+test("iOS 26 home-screen app: a quarter-line spacer above each top bar, the list still reaches the bottom", async ({ page, browser }) => {
+  mkdirSync(evidence, { recursive: true });
+  const markIosStandalone = () => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("data-ios-standalone", ""));
+  await page.setViewportSize(VIEWPORT);
+  await simulateInsets(page);
+  await page.addInitScript(markIosStandalone);
+
+  const anonymous = await browser.newContext({ locale: "de-DE", hasTouch: true, isMobile: true, viewport: VIEWPORT });
+  const login = await anonymous.newPage();
+  await simulateInsets(login);
+  await login.addInitScript(markIosStandalone);
+  await login.goto("/");
+  const loginFrame = login.locator("[data-shell]").filter({ has: login.getByRole("button", { name: "Anmelden", exact: true }) }).first();
+  await expect(loginFrame).toBeVisible();
+  await expect.poll(() => loginFrame.evaluate(el => getComputedStyle(el).paddingTop)).toBe(`${16 + SPACER}px`);
+  await anonymous.close();
+
+  await signInQa(page);
+  const rows = page.locator('[data-message-list-row="true"]');
+  await expect.poll(async () => {
+    if (await rows.count()) return true;
+    await page.waitForTimeout(3000); await page.goto("/");
+    return false;
+  }, { timeout: 120000, intervals: [500] }).toBe(true);
+  await page.evaluate(() => { localStorage.setItem("noctua:theme", "dark"); });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-ios-standalone", "");
+  const header = page.locator('[data-slot="shell-header"]');
+  await expect(rows.first()).toBeVisible();
+  const headerBox = await header.evaluate(el => ({ top: Math.round(el.getBoundingClientRect().top), height: Math.round(el.getBoundingClientRect().height), paddingTop: getComputedStyle(el).paddingTop }));
+  // The header starts at the top and carries the spacer itself, so the spacer has the header's colour.
+  expect(headerBox).toEqual({ top: 0, height: 48 + SPACER, paddingTop: `${SPACER}px` });
+  expect((await topBarAndThemeColor(page)).bar).toBe("#0a0a0a");
+  const list = await topOf(page, '[id="list"] aside');
+  expect(list).toEqual({ top: 48 + SPACER, bottom: VIEWPORT.height });
+  await page.screenshot({ path: path.join(evidence, "spacer-390-list-dark.png") });
+
+  // Reader: same top bar, nothing jumps when a mail opens.
+  await rows.first().click();
+  await expect(page.getByRole("button", { name: "Zurück zu den Nachrichten", exact: true })).toBeVisible();
+  expect(await header.evaluate(el => Math.round(el.getBoundingClientRect().height))).toBe(48 + SPACER);
+  await page.screenshot({ path: path.join(evidence, "spacer-390-reader-dark.png") });
+
+  // Sidebar sheet head.
+  await page.goto("/");
+  await openSidebar(page);
+  const sidebarHead = page.locator('[data-slot="sidebar"][data-mobile="true"] [data-slot="sidebar-header"]');
+  expect(await sidebarHead.evaluate(el => getComputedStyle(el).paddingTop)).toBe(`${8 + SPACER}px`);
+  await page.screenshot({ path: path.join(evidence, "spacer-390-sidebar-dark.png") });
+
+  // Fullscreen settings and compose.
+  await page.getByRole("button", { name: "Benutzermenü", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Einstellungen", exact: true }).click();
+  const settings = page.locator(".account-settings-modal");
+  await expect(settings).toBeVisible();
+  expect(await settings.evaluate(el => getComputedStyle(el).paddingTop)).toBe(`${SPACER}px`);
+  await page.goto("/");
+  await openSidebar(page);
+  await page.locator('[data-shell-action="compose"]').click();
+  const compose = page.locator('[role="dialog"][aria-modal="true"]').filter({ has: page.locator("[contenteditable]") }).first();
+  await expect(compose).toBeVisible();
+  expect(await compose.evaluate(el => getComputedStyle(el).paddingTop)).toBe(`${12 + SPACER}px`);
 });
 
 // Chromium cannot emulate display-mode, so apply the shipped standalone rules

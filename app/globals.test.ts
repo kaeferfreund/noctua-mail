@@ -191,7 +191,7 @@ describe("app/globals.css cascade layers", () => {
         }
       });
       // .shimmer comes from shadcn/tailwind.css (reduced-motion override).
-      expect([...unlayered].sort()).toEqual([".dark", ".radix-themes", ".shimmer", ":root"]);
+      expect([...unlayered].sort()).toEqual([".dark", ".radix-themes", ".shimmer", ":root", ":root[data-ios-standalone]"]);
     },
     COMPILE_TIMEOUT_MS
   );

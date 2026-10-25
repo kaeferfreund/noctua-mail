@@ -213,6 +213,12 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
   --status-bar-bg: var(--background);
+  /* Extra room above the top bar of every view (shell header, sidebar head,
+     full-screen frames, login): iOS 26 dims the top edge of a home-screen
+     app's content. Set on <html data-ios-standalone> by an early script
+     (lib/ui/iosStandalone.ts); 0 in browser tabs, on desktop and on Android. */
+  --top-spacer: 0px;
+  --safe-top: calc(var(--sat) + var(--top-spacer));
   /* Height of full-screen frames. */
   --app-height: 100dvh;
 }
@@ -225,6 +231,11 @@
   :root {
     --app-height: min(100lvh, calc(100dvh + var(--sat)));
   }
+}
+
+/* A quarter of the 48px header. */
+:root[data-ios-standalone] {
+  --top-spacer: 12px;
 }
 
 /* z-index ladder for fixed and portalled layers, lowest first. Modules and
