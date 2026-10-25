@@ -30,9 +30,10 @@ describe("identities REST", () => {
   });
   test("manager creates, promotes, disables, edits and reads own effective defaults; audit once per mutation", async () => {
     const f = await fixture(); const p = parameters(f.accountId);
-    const response = await POST(f.request("POST", { email: "Alias@example.test", displayName: "Alias" }), p);
+    const response = await POST(f.request("POST", { email: "Alias@example.test", displayName: " Alias  " }), p);
     expect(response.status).toBe(201);
     const { identity, recomputeJob } = await response.json();
+    expect(identity.displayName).toBe("Alias");
     expect(recomputeJob.accountId).toBe(f.accountId);
     expect(["running", "done", "failed"]).toContain(recomputeJob.status);
     const item = parameters(f.accountId, identity.id);

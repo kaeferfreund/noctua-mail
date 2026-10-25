@@ -72,3 +72,30 @@ test("a display name equal to the address, or none, still matches its identity",
   await expect(validateDraftIdentity(`Sender: other@example.test\r\n${source('"own@example.test" <own@example.test>')}`, ownDraft, [{ ...own, displayName: own.email }]))
     .rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
 });
+
+// Header parsers trim quoted names; legacy identities may carry extra spaces.
+test("display name whitespace differences on either side still match, other names stay refused", async () => {
+  const source = (name: string) => raw.replace("Synthetic Alias <alias@example.test>", `"${name}" <alias@example.test>`);
+  for (const [displayName, header] of [
+    ["Synthetic Alias ", "Synthetic Alias"],
+    [" Synthetic Alias", "Synthetic Alias"],
+    ["Synthetic  Alias", "Synthetic Alias"],
+    ["Synthetic Alias", "Synthetic Alias "],
+    ["Synthetic Alias", " Synthetic Alias"],
+    ["Synthetic Alias", "Synthetic  Alias"],
+    [" Synthetic   Alias ", "Synthetic  Alias  "]
+  ] as const) {
+    expect((await validateDraftIdentity(source(header), draft, [{ ...identity, displayName }])).id).toBe(identity.id);
+  }
+  for (const [displayName, header] of [
+    ["Synthetic Alias ", "SyntheticAlias"],
+    ["Synthetic Alias", "Synthetic Alias2"],
+    ["  ", "Synthetic Alias"],
+    ["Synthetic Alias ", "alias@example.test"]
+  ] as const) {
+    await expect(validateDraftIdentity(source(header), draft, [{ ...identity, displayName }])).rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
+  }
+  const own: SenderIdentity = { ...identity, id: "own", email: "own@example.test", replyTo: undefined, displayName: " own@example.test " };
+  const ownRaw = "X-Noctua-Identity-Id: own\r\nFrom: own@example.test\r\nMessage-ID: <own@example.test>\r\n\r\nBody";
+  expect((await validateDraftIdentity(ownRaw, { accountId: "mailbox", from: "own@example.test", senderIdentityId: "own" } as Message, [own])).id).toBe("own");
+});
