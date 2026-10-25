@@ -201,32 +201,30 @@
   --quote-2: var(--iris-4);
 }
 
-/* Safe-area insets of the iOS home-screen app (black-translucent status bar,
-   viewport-fit=cover, see app/layout.tsx). Layout reads only these tokens, so
-   tests can set them to a notch-sized value. The opaque band under the status
-   bar is --status-bar-bg: iOS always draws the clock and icons white there, so
-   the light theme uses the iris primary (white contrast 5.37:1) and the dark
-   theme its dark header background. */
+/* Safe-area insets (viewport-fit=cover, see app/layout.tsx). Layout reads only
+   these tokens, so tests can set them to device-sized values. The iOS
+   home-screen app has an opaque status bar, so --sat is 0 there and only the
+   home indicator (--sab) pads. Where a browser still draws the page under a
+   system bar (--sat > 0, e.g. an install from before the opaque bar), the
+   body::before band paints the header colour behind it. */
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
-  --status-bar-bg: var(--iris-9);
-  /* Height of full-screen frames. iOS 26 home-screen apps under the
-     translucent bar report 100dvh/100%/innerHeight one status bar short
-     (WebKit bug 301108); 100lvh is the whole screen there. */
+  --status-bar-bg: var(--background);
+  /* Height of full-screen frames. */
   --app-height: 100dvh;
 }
 
+/* Installed app. With the opaque status bar --sat is 0 and this is 100dvh (an
+   opaque bar's 100lvh can be the whole screen, taller than the page). Under a
+   translucent bar iOS 26 reports 100dvh one status bar short (WebKit bug
+   301108); 100dvh + --sat, capped at 100lvh, is the whole screen there. */
 @media (display-mode: standalone) {
   :root {
-    --app-height: 100lvh;
+    --app-height: min(100lvh, calc(100dvh + var(--sat)));
   }
-}
-
-.dark {
-  --status-bar-bg: var(--background);
 }
 
 /* z-index ladder for fixed and portalled layers, lowest first. Modules and
@@ -339,8 +337,9 @@ body {
   overflow: hidden;
 }
 
-/* Opaque band under the iOS status bar, above every layer: no list, dialog,
-   sheet or toast shows through behind the clock. Zero height elsewhere. */
+/* Opaque band under a system status bar the page is drawn beneath (--sat > 0),
+   above every layer: no list, dialog, sheet or toast shows through behind the
+   clock. Zero height with the opaque iOS status bar and on desktop. */
 body::before {
   content: "";
   position: fixed;
@@ -392,9 +391,10 @@ main {
   padding: 0;
 }
 
-/* WebKit bug 301108: a page at least as tall as the screen gets the full
-   viewport, so fixed layers (sheets, dialogs) reach the bottom edge too. The
-   100lvh cap keeps a page that already fills the screen from scrolling. */
+/* WebKit bug 301108 (translucent status bar only, --sat > 0): a page at least
+   as tall as the screen gets the full viewport, so fixed layers (sheets,
+   dialogs) reach the bottom edge too. With the opaque bar --sat is 0 and this
+   is min-height: 100%, a no-op. The 100lvh cap keeps the page from scrolling. */
 @media (display-mode: standalone) {
   html {
     min-height: min(100lvh, calc(100% + var(--sat)));
