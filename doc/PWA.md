@@ -84,13 +84,12 @@ installed apps on iOS 16.4+, Chromium desktop and some Android launchers.
   the same name in `deploy-scripts/container-entrypoint.sh`. Manifest and
   layout are built statically: a rename needs a rebuild.
 - `public/icons/base.svg` is the only icon source (white envelope on the iris
-  gradient around the primary colour `#5b5bd6`, lit like the iOS 26 Mail
-  icon: soft glow at the upper centre, darker bottom corners). Keep its
-  viewBox (`-100 -100 1800 1800`) and the 1600 px rounded background: the
-  sidebar logo route (`app/icons/logo.svg`) draws the environment ribbon in
-  that coordinate system. The ids `iconBackground`, `iconBackgroundLight`
-  (lighting overlays), `envelope`, `envelopeFlapLine` and the mask
-  `envelopeFlapCut` are used for the monochrome badge.
+  gradient around the primary colour `#5b5bd6`). Keep its viewBox
+  (`-100 -100 1800 1800`) and the 1600 px rounded background: the sidebar
+  logo route (`app/icons/logo.svg`) draws the environment ribbon in that
+  coordinate system. The ids `iconBackground`, `envelope`,
+  `envelopeFlapLine` and the mask `envelopeFlapCut` are used for the
+  monochrome badge.
 - Regenerate all raster icons with one command from the repository root
   (needs `rsvg-convert` from librsvg):
 
