@@ -1,10 +1,10 @@
 import { RRule, RRuleSet } from "rrule";
 import {
-  fromCalendarTimeZoneWallDate,
   resolveCalendarTimeZoneId,
   toCalendarTimeZoneWallDate
 } from "./calendarTimezones";
 import { normalizeReminderDateList } from "./reminderDates";
+import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
 
 // Re-exported so existing (server-side) importers keep resolving it from
 // here; the implementation lives in the rrule-free `reminderDates` module.
@@ -47,22 +47,9 @@ function buildRecurrenceQuery(reminder: RecurrenceRuleLike): RecurrenceQuery | n
   const startAtMs = Number(reminder.eventStartAtMs);
   if (!Number.isFinite(startAtMs) || startAtMs <= 0) return null;
   try {
-    const parsed = RRule.fromString(normalizedRule);
-    const parsedTzid =
-      typeof parsed.origOptions.tzid === "string" ? parsed.origOptions.tzid : undefined;
-    const ruleTimeZone = resolveTimeZoneId(reminder.startTimezone) ?? resolveTimeZoneId(parsedTzid);
-    const toRuleDate = (value: number) => {
-      const date = new Date(value);
-      return ruleTimeZone ? toCalendarTimeZoneWallDate(date, ruleTimeZone) : date;
-    };
-    const fromRuleDate = (date: Date) =>
-      ruleTimeZone ? fromCalendarTimeZoneWallDate(date, ruleTimeZone) : date;
-    const rule = new RRule({
-      ...parsed.origOptions,
-      dtstart: toRuleDate(startAtMs),
-      // Expand recurrence in wall-clock space so output is stable across process TZ.
-      tzid: ruleTimeZone ? undefined : parsed.origOptions.tzid
-    });
+    const { options, timeZone: ruleTimeZone, toRuleDate, fromRuleDate } =
+      buildCalendarRecurrenceOptions(normalizedRule, startAtMs, reminder.startTimezone);
+    const rule = new RRule(options);
     const recurrenceDates = normalizeReminderDateList(reminder.recurrenceDates);
     const excludedDates = normalizeReminderDateList(reminder.excludedDates);
     const recurrenceSource: RecurrenceQuery = (() => {

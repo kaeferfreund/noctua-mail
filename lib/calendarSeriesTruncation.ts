@@ -1,5 +1,4 @@
 import { RRule } from "rrule";
-import { resolveCalendarTimeZoneId, toCalendarTimeZoneWallDate } from "./calendarTimezones";
 
 export type SeriesTruncationInput = {
   recurrenceRule?: string;
@@ -37,10 +36,8 @@ function trimBeforeCutoff(values: number[] | undefined, cutoffStartAtMs: number)
  * later occurrence are dropped ("this and all following"). Caps the rule with
  * UNTIL just before the cutoff and removes any RDATE/EXDATE at or after it.
  *
- * UNTIL is stored in wall-clock space to match recurrence expansion, which
- * shifts DTSTART to wall time but leaves UNTIL untouched (see
- * `buildRecurrenceQuery`); a real-instant bound would otherwise mis-truncate in
- * zones with a negative UTC offset.
+ * UNTIL is stored as a UTC instant. The shared recurrence helper converts it
+ * into DTSTART's wall-clock space when expanding the rule.
  */
 export function truncateRecurrenceBeforeOccurrence(
   input: SeriesTruncationInput,
@@ -64,19 +61,12 @@ export function truncateRecurrenceBeforeOccurrence(
   if (normalized) {
     try {
       const parsed = RRule.fromString(normalized);
-      const parsedTzid =
-        typeof parsed.origOptions.tzid === "string" ? parsed.origOptions.tzid : undefined;
-      const tz =
-        resolveCalendarTimeZoneId(input.startTimezone) ?? resolveCalendarTimeZoneId(parsedTzid);
-      const cutoffWallMs = tz
-        ? toCalendarTimeZoneWallDate(new Date(cutoffStartAtMs), tz).getTime()
-        : cutoffStartAtMs;
       // Never raise an existing UNTIL: a later cap would revive base-rule
       // occurrences that the original rule already ended (e.g. when the cutoff
       // occurrence comes only from an RDATE past the rule's own UNTIL).
       const existingUntilMs =
         parsed.origOptions.until instanceof Date ? parsed.origOptions.until.getTime() : null;
-      const cappedUntilMs = cutoffWallMs - TRUNCATION_EPSILON_MS;
+      const cappedUntilMs = cutoffStartAtMs - TRUNCATION_EPSILON_MS;
       const until = new Date(
         existingUntilMs !== null ? Math.min(existingUntilMs, cappedUntilMs) : cappedUntilMs
       );
