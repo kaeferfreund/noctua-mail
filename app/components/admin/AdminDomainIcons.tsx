@@ -6,7 +6,7 @@ import { Button } from "@/app/components/ui/button";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { AdminApiError, adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { notifyDomainIconsChanged } from "@/app/hooks/useDomainIconVersions";
-import { adminActionRow } from "./adminLayout";
+import { adminActionRow, adminSectionTitle } from "./adminLayout";
 
 type DomainIconEntry = { domain: string; mailboxes: number; version: string | null; updatedAt: number | null };
 type Notice = { kind: "uploaded" | "resetDone"; domain: string };
@@ -79,7 +79,7 @@ export default function AdminDomainIcons({ apiFetch = fetch }: { apiFetch?: Admi
   };
 
   return <section className="space-y-4" aria-label={t("tabs.domains")}>
-    <h3 className="font-medium">{t("domainIcons.heading")}</h3>
+    <h3 className={adminSectionTitle}>{t("domainIcons.heading")}</h3>
     <p className="max-w-2xl text-sm text-muted-foreground">{t("domainIcons.help")}</p>
     {Boolean(error) && <p role="alert" className="text-destructive">{errorText(error)}</p>}
     {notice && <p role="status" className="text-sm">{t(`domainIcons.${notice.kind}`, { domain: notice.domain })}</p>}

@@ -1,0 +1,52 @@
+/* Shared look of the Settings and Admin frames: one header, one section
+   navigation style (left-aligned items, a single soft accent for the active
+   one) whether the sections are vertical Radix tabs or admin buttons. */
+.header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Settings: vertical Radix tab list. The phone module keeps its own width. */
+.nav:global(.rt-TabsList) {
+  flex-direction: column;
+  align-items: stretch;
+  flex-shrink: 0;
+  overflow-y: auto;
+  box-shadow: none;
+}
+.navWide:global(.rt-TabsList) {
+  gap: 2px;
+  width: 14rem;
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--border);
+  white-space: normal;
+}
+.navWide :global(.rt-TabsTrigger) { height: auto; min-height: 34px; padding: 0; }
+.nav :global(.rt-TabsTrigger) { justify-content: flex-start; border-radius: var(--radius-2); text-align: start; }
+.nav :global(.rt-TabsTrigger)::before { display: none; }
+.nav :global(.rt-TabsTriggerInner) { position: static; justify-content: flex-start; padding: 6px 10px; }
+.nav :global(.rt-TabsTriggerInnerHidden) { display: none; }
+.nav :global(.rt-TabsTrigger[data-state="active"]),
+.sectionNav button[aria-pressed="true"] {
+  background-color: var(--accent-a3);
+  color: var(--accent-11);
+}
+@media (hover: hover) {
+  .nav :global(.rt-TabsTrigger:hover .rt-TabsTriggerInner) { background-color: transparent; }
+  .nav :global(.rt-TabsTrigger[data-state="inactive"]:hover) { background-color: var(--gray-a3); }
+}
+
+/* Admin: a row of section buttons that wraps on narrow frames. */
+.sectionNav {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 2px var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.sectionNav button { font-weight: 400; color: var(--gray-a11); }
+.sectionNav button[aria-pressed="true"] { font-weight: 500; }

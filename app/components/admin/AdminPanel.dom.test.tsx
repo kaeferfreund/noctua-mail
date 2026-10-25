@@ -26,14 +26,25 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
   const page = render(<Theme><AdminPanel isAdminUser apiFetch={apiFetch} onClose={() => {}} /></Theme>);
   return { page, calls };
 }
+// Rare and sensitive user actions sit in the row's "More actions" menu.
+const menuActions = new Set(["Recovery", "Reset MFA", "Remove passkey", "Delete user"]);
+async function chooseUserAction(page: ReturnType<typeof render>, name: string, email = "user@example.test") {
+  await page.findByText(email);
+  if (!menuActions.has(name)) { fireEvent.click(page.getByRole("button", { name })); return; }
+  fireEvent.pointerDown(page.getByRole("button", { name: `More actions for ${email}` }), { button: 0, ctrlKey: false });
+  fireEvent.click(await page.findByRole("menuitem", { name }));
+}
 // The QR code must encode exactly this value (same path as a fresh encoding).
 function expectQr(dialog: ReturnType<typeof within>, value: string) {
   const qr = dialog.getByRole("img", { name: "QR code" });
   expect(qr.querySelector("path")?.getAttribute("d")).toBe(qrCodePath(value).d);
 }
+// An invite history row reads: address, status badge, then issuer and expiry.
+function inviteRow(page: ReturnType<typeof render>, label: string) {
+  return page.getByText(label, { exact: true }).closest("[data-invite]")!.textContent;
+}
 async function openUserAction(page: ReturnType<typeof render>, name: string, dialog: string) {
-  await page.findByText("user@example.test");
-  fireEvent.click(page.getByRole("button", { name }));
+  await chooseUserAction(page, name);
   return within(await page.findByRole("dialog", { name: dialog }));
 }
 describe("AdminPanel", () => {
@@ -43,17 +54,19 @@ describe("AdminPanel", () => {
     expect(page.getByText(/Password: Yes/)).toBeTruthy();
     expect(page.getByText(/TOTP: Yes/)).toBeTruthy();
     expect(page.getByText(/Passkeys: 2/)).toBeTruthy();
-    expect(page.getByText("Support · editor")).toBeTruthy();
+    const mailbox = page.getByText("support@example.test").closest("li")!;
+    expect(mailbox.textContent).toContain("Support"); expect(within(mailbox).getByText("editor")).toBeTruthy();
   });
   it("uses target ownership from the canonical users DTO", async () => {
     const { page } = harness(url => url === "/api/admin/users" ? response({ ok: true, users: [{ ...user, accounts: [{ id: "owned", name: "Owned", email: "owned@example.test", role: "manager", isOwner: true }] }] }) : undefined);
-    expect(await page.findByText("Owned · manager · Owner")).toBeTruthy();
+    const mailbox = (await page.findByText("owned@example.test")).closest("li")!;
+    expect(within(mailbox).getByText("manager")).toBeTruthy(); expect(within(mailbox).getByText("Owner")).toBeTruthy();
   });
   it("issues an email-bound invite, copies it and shows the code only until dismissed", async () => {
     const { page, calls } = harness((url, init) => url === "/api/admin/users" && init?.method === "POST" ? response({ ok: true, invite: { code: "synthetic-once-code" } }, 201) : undefined);
     await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Invites" }));
     await page.findByText(/Issued by synthetic-issuer/);
-    expect(page.getByText(/invited@example.test · issued/)).toBeTruthy();
+    expect(inviteRow(page, "invited@example.test")).toMatch(/^invited@example\.testissuedIssued by synthetic-issuer/);
     fireEvent.change(page.getByLabelText("Name", { exact: true }), { target: { value: "Synthetic Invitee" } });
     fireEvent.change(page.getByLabelText("Email", { exact: true }), { target: { value: "invited@example.test" } });
     fireEvent.click(page.getByRole("button", { name: "Issue targeted invite" }));
@@ -85,9 +98,10 @@ describe("AdminPanel", () => {
       return url === "/api/admin/invites" ? response({ ok: true, invites: history }) : undefined;
     });
     await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Invites" }));
-    expect(await page.findByText(/issued@example.test · issued · Issued by Synthetic Issuer/)).toBeTruthy();
-    expect(page.getByText(/Legacy invite · redeemed · Issued by Operator · No expiry/)).toBeTruthy();
-    expect(page.getByText(/orphan@example.test · expired · Issued by deleted user/)).toBeTruthy();
+    await page.findByText("issued@example.test", { exact: true });
+    expect(inviteRow(page, "issued@example.test")).toMatch(/^issued@example\.testissuedIssued by Synthetic Issuer/);
+    expect(inviteRow(page, "Legacy invite")).toBe("Legacy inviteredeemedIssued by Operator · No expiry");
+    expect(inviteRow(page, "orphan@example.test")).toMatch(/^orphan@example\.testexpiredIssued by deleted user/);
     expect(page.getAllByRole("button", { name: /^Revoke invite for/ }).map(button => button.getAttribute("aria-label"))).toEqual(["Revoke invite for issued@example.test"]);
 
     fireEvent.click(page.getByRole("button", { name: "Clean up history" }));
@@ -99,13 +113,13 @@ describe("AdminPanel", () => {
     expect(page.getByRole("status").textContent).toBe("2 entries deleted.");
     expect(calls.find(call => call.init?.method === "DELETE")?.url).toBe("/api/admin/invites");
     await waitFor(() => expect(page.queryByText(/Legacy invite/)).toBeNull());
-    expect(page.getByText(/issued@example.test · issued/)).toBeTruthy();
+    expect(inviteRow(page, "issued@example.test")).toMatch(/^issued@example\.testissued/);
 
     fireEvent.click(page.getByRole("button", { name: "Revoke invite for issued@example.test" }));
     const revoke = within(await page.findByRole("dialog", { name: "Revoke invite" }));
     expect(revoke.getByText("The code for issued@example.test can no longer be redeemed afterwards.")).toBeTruthy();
     await act(async () => { fireEvent.click(revoke.getByRole("button", { name: "Confirm" })); });
-    await waitFor(() => expect(page.getByText(/issued@example.test · revoked/)).toBeTruthy());
+    await waitFor(() => expect(inviteRow(page, "issued@example.test")).toMatch(/^issued@example\.testrevoked/));
     expect(calls.find(call => call.url.endsWith("/revoke"))).toMatchObject({ url: "/api/admin/invites/synthetic-issued/revoke", init: { method: "POST" } });
     expect(page.queryByRole("button", { name: /^Revoke invite for/ })).toBeNull();
   });
@@ -159,8 +173,7 @@ describe("AdminPanel", () => {
       { ...user, accounts: [{ id: "owned", name: "Owned", email: "owned@example.test", role: "manager", isOwner: true }] },
       { id: "synthetic-successor", email: "successor@example.test", role: "user", disabled: false, accounts: [] }
     ] }) : undefined);
-    await page.findByText("user@example.test");
-    fireEvent.click(within(page.getByText("user@example.test").closest("tr")!).getByRole("button", { name: "Delete user" }));
+    await chooseUserAction(page, "Delete user");
     const dialog = within(await page.findByRole("dialog", { name: "Delete user" }));
     expect((dialog.getByRole("button", { name: "Confirm" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(dialog.getByLabelText("Reassign owned mailboxes to"), { target: { value: "synthetic-successor" } });
@@ -170,9 +183,7 @@ describe("AdminPanel", () => {
   });
   it("explains inline why a user with memberships in mailboxes the admin cannot see is not deleted", async () => {
     const { page } = harness((url, init) => init?.method === "DELETE" ? response({ ok: false, code: "foreign_mailbox_membership" }, 409) : undefined);
-    await page.findByText("user@example.test");
-    fireEvent.click(page.getByRole("button", { name: "Delete user" }));
-    const dialog = within(await page.findByRole("dialog", { name: "Delete user" }));
+    const dialog = await openUserAction(page, "Delete user", "Delete user");
     fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
     expect((await dialog.findByRole("alert")).textContent).toBe("This user belongs to mailboxes you are not a member of and cannot see. Only an administrator who is a member of all of their mailboxes can delete them.");
   });
@@ -219,10 +230,10 @@ describe("AdminPanel", () => {
     const { page } = harness();
     await page.findByText("user@example.test");
     expect(page.getByLabelText("Role for user@example.test").className).toBe(nativeControlBaseClass);
-    fireEvent.click(within(page.getByText("user@example.test").closest("tr")!).getByRole("button", { name: "Delete user" }));
+    await chooseUserAction(page, "Delete user");
     expect((await page.findByRole("dialog", { name: "Delete user" })).querySelector("select")!.className).toBe(nativeControlClass);
     fireEvent.click(page.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(page.getByRole("button", { name: "Remove passkey" }));
+    await chooseUserAction(page, "Remove passkey");
     expect((await page.findByRole("dialog", { name: "Remove passkey" })).querySelector("select")!.className).toBe(nativeControlClass);
     fireEvent.click(page.getByRole("button", { name: "Cancel" }));
     fireEvent.click(page.getByRole("button", { name: "Invites" }));

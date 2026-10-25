@@ -70,12 +70,13 @@ test("invite history names the issuer and cleans up settled invites after confir
   const dialog = await issueInvite(page, 1281);
   await dialog.getByRole("button", { name: "Done", exact: true }).click();
   const history = page.getByRole("region", { name: "Invites" });
-  const row = history.getByText(/invitee-1281@example.test · issued · Issued by /);
-  await expect(row).toBeVisible();
+  // A history row: address, status badge, then issuer and expiry.
+  const row = history.locator("[data-invite]").filter({ hasText: "invitee-1281@example.test" });
+  await expect(row).toHaveText(/^invitee-1281@example\.testissuedIssued by /);
   expect(await row.textContent()).not.toMatch(/Issued by [0-9a-f]{8}-[0-9a-f]{4}-/);
   await history.getByRole("button", { name: "Revoke invite for invitee-1281@example.test" }).click();
   await page.getByRole("dialog", { name: "Revoke invite" }).getByRole("button", { name: "Confirm" }).click();
-  await expect(history.getByText(/invitee-1281@example.test · revoked/)).toBeVisible();
+  await expect(row).toHaveText(/^invitee-1281@example\.testrevoked/);
   await history.getByRole("button", { name: "Clean up history", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Clean up history" });
   await expect(confirm).toBeVisible(); await page.waitForTimeout(400);

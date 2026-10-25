@@ -15,6 +15,7 @@ import {
   type SpamRescanPreview
 } from "@/lib/mail/spam/rescanTypes";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
+import { adminSectionTitle } from "./adminLayout";
 
 type RescanState = { preview: SpamRescanPreview; job: SpamRescanJob | null; items: SpamRescanItem[] };
 type Mailbox = { accountId: string; email: string };
@@ -30,21 +31,21 @@ const announce = () => window.dispatchEvent(new CustomEvent(SPAM_RESCAN_EVENT));
 export default function AdminSpamRescan({ apiFetch, mailboxes }: { apiFetch: AdminFetch; mailboxes: Mailbox[] }) {
   const t = useTranslations("Admin.spam.rescan");
   const [open, setOpen] = useState<string | null>(null);
-  return <section className="space-y-3" aria-labelledby="spam-rescan-heading">
-    <h3 id="spam-rescan-heading" className="font-medium">{t("heading")}</h3>
-    <p className="max-w-2xl text-sm text-muted-foreground">{t("help")}</p>
-    {mailboxes.length === 0 && <p className="text-sm">{t("noMailboxes")}</p>}
-    <ul className="m-0 list-none space-y-3 p-0">
-      {mailboxes.map((mailbox) => <li key={mailbox.accountId} className="space-y-3 rounded-md border p-3">
+  return <section className="space-y-3 border-t pt-4" aria-labelledby="spam-rescan-heading">
+    <div className="space-y-1"><h3 id="spam-rescan-heading" className={adminSectionTitle}>{t("heading")}</h3>
+      <p className="max-w-2xl text-sm text-muted-foreground">{t("help")}</p></div>
+    {mailboxes.length === 0 && <p className="text-sm text-muted-foreground">{t("noMailboxes")}</p>}
+    {mailboxes.length > 0 && <ul className="m-0 list-none divide-y rounded-md border bg-(--color-panel-solid) p-0">
+      {mailboxes.map((mailbox) => <li key={mailbox.accountId} className="space-y-3 px-3 py-2.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <span className="min-w-0 break-words font-medium">{mailbox.email}</span>
+          <span className="min-w-0 break-words font-medium" data-user-text>{mailbox.email}</span>
           {open === mailbox.accountId
             ? <Button variant="outline" className="max-md:min-h-11" onClick={() => setOpen(null)}>{t("close")}</Button>
             : <Button variant="outline" className="max-md:min-h-11" aria-label={t("openFor", { email: mailbox.email })} onClick={() => setOpen(mailbox.accountId)}>{t("open")}</Button>}
         </div>
         {open === mailbox.accountId && <SpamRescanPanel apiFetch={apiFetch} accountId={mailbox.accountId} />}
       </li>)}
-    </ul>
+    </ul>}
   </section>;
 }
 

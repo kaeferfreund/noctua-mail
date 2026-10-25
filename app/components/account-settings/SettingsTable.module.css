@@ -1,0 +1,50 @@
+/* Tables in Settings and Admin (members, users, audit log) share one card.
+   It scrolls sideways on phones. Edge shadows show that more columns are
+   hidden: the covers scroll with the content and hide the shadow at the
+   start/end, the shadows stay at the visible edges. The table sits on its own
+   panel surface so the covers match it in Settings and Admin alike. */
+.tableScroll {
+  /* Contains the screen-reader-only labels in its cells, which would otherwise
+     widen the surrounding panel past this scroll container. */
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-3);
+  background-color: var(--color-panel-solid);
+  background-image:
+    linear-gradient(to right, var(--color-panel-solid) 30%, transparent),
+    linear-gradient(to left, var(--color-panel-solid) 30%, transparent),
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--foreground) 24%, transparent), transparent),
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--foreground) 24%, transparent), transparent);
+  background-position: left center, right center, left center, right center;
+  background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+.tableScroll table { width: 100%; border-collapse: collapse; text-align: start; font-size: var(--font-size-2); }
+.tableScroll th,
+.tableScroll td { padding: var(--space-2) var(--space-3); text-align: start; vertical-align: middle; }
+.tableScroll th {
+  font-size: var(--font-size-1);
+  font-weight: 500;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.tableScroll tbody tr + tr td { border-top: 1px solid var(--border); }
+/* Rows with stacked content (lists, wrapped actions) align to the top. */
+.tableScroll td[data-align="top"] { vertical-align: top; }
+/* Name and e-mail stacked; the address is secondary. */
+.primary { font-weight: 500; }
+.secondary { color: var(--muted-foreground); font-size: var(--font-size-1); }
+/* On phones the identifying first column stays put while the rest scrolls. */
+@media (max-width: 767px) {
+  .stickyFirst th:first-child,
+  .stickyFirst td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--color-panel-solid);
+    box-shadow: 1px 0 0 var(--border);
+  }
+}

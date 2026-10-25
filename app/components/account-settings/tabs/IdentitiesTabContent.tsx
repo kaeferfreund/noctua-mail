@@ -44,7 +44,7 @@ export default function IdentitiesTabContent({ editingAccount, apiFetch = fetch 
     finally { setBusy(false); }
   };
   return <div className="flex h-full flex-col gap-4 overflow-auto p-2">
-    <p>{senderMessages.identitiesHelp}</p>
+    <p className="text-sm text-muted-foreground">{senderMessages.identitiesHelp}</p>
     {loading && <p role="status">{senderMessages.identitiesLoading}</p>}
     {Boolean(error) && <p role="alert">{senderSettingsError(error, senderMessages)}</p>}
     {saved && <p role="status">{senderMessages.identitySaved}</p>}
@@ -58,7 +58,7 @@ export default function IdentitiesTabContent({ editingAccount, apiFetch = fetch 
         <label><input type="radio" name="mailbox-default-identity" aria-label={senderMessages.identityDefaultFor.replace("{email}", () => identity.email)} checked={identity.isDefault} disabled={busy || !identity.enabled} onChange={() => { if (!identity.isDefault) void mutate(identity.id, { isDefault: true }); }} /> {senderMessages.mailboxDefault}</label>
       </div>}
     </section>)}
-    {manager && <Button variant="outline" disabled={loading || busy} onClick={() => { setEditing("new"); setForm(empty); }}>{senderMessages.addIdentity}</Button>}
+    {manager && <Button variant="outline" className="self-start" disabled={loading || busy} onClick={() => { setEditing("new"); setForm(empty); }}>{senderMessages.addIdentity}</Button>}
     {manager && editing && <form className="grid gap-3" onSubmit={event => {
       event.preventDefault();
       void mutate(editing === "new" ? null : editing, { ...(editing === "new" ? { email: form.email } : {}), displayName: form.displayName,

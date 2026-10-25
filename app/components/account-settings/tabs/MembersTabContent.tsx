@@ -11,7 +11,11 @@ import type { AdminUser, Member, MemberCandidate } from "@/app/components/admin/
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
-import styles from "./MembersTabContent.module.css";
+import tableStyles from "@/app/components/account-settings/SettingsTable.module.css";
+import { Badge } from "@/app/components/ui/badge";
+import StatusBadge from "@/app/components/account-settings/StatusBadge";
+import { adminSectionTitle } from "@/app/components/admin/adminLayout";
+import { Crown, Search } from "lucide-react";
 
 const roles: AccountRole[] = ["viewer", "editor", "manager"];
 export default function MembersTabContent({ accountId, accessRole, apiFetch = fetch, admin = false, initialMembers, users, currentUserId, onChanged }: {
@@ -93,33 +97,42 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
     finally { setBusy(false); }
   };
   return <div className="space-y-4 overflow-auto p-1">
-    <p className="text-sm text-muted-foreground">{t("members.help")}</p>
+    {!admin && <div className="space-y-1"><h3 className={adminSectionTitle}>{t("tabs.members")}</h3><p className="text-sm text-muted-foreground">{t("members.help")}</p></div>}
+    {admin && <p className="text-sm text-muted-foreground">{t("members.help")}</p>}
     {cleanupPending && <p role="status">{t("members.cleanup")}</p>}
     {loading && <p role="status">{t("members.loading")}</p>}
     {Boolean(error) && !pending && <p role="alert" className="text-destructive">{formatAdminError(error, adminT, locale)}</p>}
-    <div data-members-table className={styles.tableScroll}><table className="w-full text-left text-sm"><caption className="sr-only">{t("members.caption")}</caption>
-      <thead><tr><th>{t("members.member")}</th><th>{t("members.role")}</th><th>{t("members.status")}</th><th>{t("members.actions")}</th></tr></thead>
+    <div data-members-table className={tableStyles.tableScroll}><table className="min-w-[34rem]"><caption className="sr-only">{t("members.caption")}</caption>
+      <thead><tr><th>{t("members.member")}</th><th>{t("members.role")}</th><th>{t("members.status")}</th><th><span className="sr-only">{t("members.actions")}</span></th></tr></thead>
       <tbody>{members.map(member => {
         const lastManager = !member.disabled && member.role === "manager" && enabledManagers <= 1;
-        return <tr key={member.userId} className="border-b"><td className="py-3">{member.name || member.email}<div className="text-muted-foreground">{member.email}</div>{member.isOwner && <span>{t("members.owner")}</span>}</td>
+        return <tr key={member.userId}><td><div className="flex items-center gap-1.5"><span className={tableStyles.primary} data-user-text>{member.name || member.email}</span>
+          {member.isOwner && <Badge variant="outline" className="font-normal text-muted-foreground"><Crown aria-hidden="true" className="text-amber-600 dark:text-amber-400" />{t("members.owner")}</Badge>}</div>
+          <div className={tableStyles.secondary} data-user-text>{member.email}</div></td>
           <td><select className={nativeControlBaseClass} aria-label={t("members.roleFor", {email: member.email})} value={member.role} disabled={busy || member.disabled || member.isOwner || (!admin && (!actor || member.userId === actor))}
             onChange={event => { setError(null); setPending({ member, role: event.target.value as AccountRole }); }}>
             {roles.map(role => <option key={role} value={role} disabled={lastManager && role !== "manager"}>{t(`roles.${role}`)}</option>)}
-          </select></td><td>{member.disabled ? t("members.disabled") : t("members.enabled")}</td>
-          <td><Button variant="outline" disabled={busy || member.isOwner || lastManager || !actor} title={member.isOwner ? t("members.ownerCannotRemove") : lastManager ? t("members.lastManager") : undefined}
+          </select></td><td><StatusBadge enabled={!member.disabled}>{member.disabled ? t("members.disabled") : t("members.enabled")}</StatusBadge></td>
+          <td className="text-end"><Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" disabled={busy || member.isOwner || lastManager || !actor} title={member.isOwner ? t("members.ownerCannotRemove") : lastManager ? t("members.lastManager") : undefined}
             onClick={() => { setError(null); setPending({ member, role: null }); }}>{t("members.remove")}</Button></td></tr>;
       })}</tbody></table></div>
-    {!admin && <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
-      <label className="grid gap-1 text-sm">{t("members.find")}<Input value={query} maxLength={128} onChange={event => setQuery(event.target.value)} /></label><Button disabled={directoryLoading}>{t("members.search")}</Button>
-      <p className="text-sm text-muted-foreground">{t("members.searchHelp")}</p>
-    </form>}
-    <form className="flex flex-wrap items-end gap-3" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
-      <label className="grid gap-1 text-sm">{t("members.addEnabled")}<select className={nativeControlClass} aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
-        <option value="">{t("members.choose")}</option>{available.map(user => <option key={user.id} value={user.id}>{user.name || user.email} ({user.email})</option>)}
-      </select></label>
-      <label className="grid gap-1 text-sm">{t("members.newRole")}<select className={nativeControlClass} value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select></label>
-      <Button disabled={busy || !target}>{t("members.add")}</Button>
-    </form>
+    <div className="space-y-2 border-t pt-4">
+      <h4 className="text-sm font-medium">{t("members.add")}</h4>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {!admin && <form role="search" className="flex items-center gap-1 max-md:w-full" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
+          <Input className="md:w-44" aria-label={t("members.find")} placeholder={t("members.find")} value={query} maxLength={128} onChange={event => setQuery(event.target.value)} />
+          <Button variant="outline" size="icon" className="max-md:size-11" disabled={directoryLoading} aria-label={t("members.search")} title={t("members.search")}><Search /></Button>
+        </form>}
+        <form className="flex flex-wrap items-center gap-2 max-md:w-full" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
+          <select className={`${nativeControlClass} md:w-52`} aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
+            <option value="">{t("members.choose")}</option>{available.map(user => <option key={user.id} value={user.id}>{user.name || user.email} ({user.email})</option>)}
+          </select>
+          <select className={`${nativeControlClass} md:w-32`} aria-label={t("members.newRole")} value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select>
+          <Button aria-label={t("members.add")} disabled={busy || !target}>{t("members.addButton")}</Button>
+        </form>
+      </div>
+      {!admin && <p className="text-xs text-muted-foreground">{t("members.searchHelp")}</p>}
+    </div>
 
     {pending && <AdminConfirmDialog title={pending.role ? t("members.changeRole") : t("members.removeTitle")} description={pending.role ? t("members.confirmRole", {email: pending.member.email, role: t(`roles.${pending.role}`)}) : t("members.confirmRemove", {email: pending.member.email})}
       busy={busy} error={error ? formatAdminError(error, adminT, locale) : undefined} onCancel={() => { setPending(null); setError(null); }} onConfirm={() => void mutate(pending.member.userId, pending.role)} />}

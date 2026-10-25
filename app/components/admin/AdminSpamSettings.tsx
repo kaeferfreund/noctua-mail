@@ -6,7 +6,7 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
-import { adminActionRow } from "./adminLayout";
+import { adminActionRow, adminSectionTitle } from "./adminLayout";
 import AdminSpamRescan from "./AdminSpamRescan";
 
 type SpamAdminResponse = {
@@ -60,13 +60,13 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
   };
 
   return <section className="space-y-4" aria-label={t("tabs.spam")}>
-    <h3 className="font-medium">{t("spam.heading")}</h3>
+    <h3 className={adminSectionTitle}>{t("spam.heading")}</h3>
     <p className="max-w-2xl text-sm text-muted-foreground">{t("spam.help")}</p>
     {Boolean(error) && <p role="alert" className="text-destructive">{formatAdminError(error, t, locale)}</p>}
     {data && <form onSubmit={(event) => void save(event)} className="grid max-w-lg gap-3">
       <label className="flex items-center gap-2"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />{t("spam.enabled")}</label>
-      <p className="text-sm text-muted-foreground">{t("spam.provider", { provider: data.effective.provider })}</p>
-      {data.effective.modelUnavailable && <p className="text-sm font-medium" role="status">{t("spam.unavailable", { reason: t(`spam.unavailableReasons.${data.effective.modelUnavailable}`) })}</p>}
+      <p className="m-0 text-sm text-muted-foreground">{t("spam.provider", { provider: data.effective.provider })}</p>
+      {data.effective.modelUnavailable && <p className="m-0 text-sm font-medium" role="status">{t("spam.unavailable", { reason: t(`spam.unavailableReasons.${data.effective.modelUnavailable}`) })}</p>}
       <label className="grid gap-1">{t("spam.model")}<Input value={model} placeholder={data.effective.model} onChange={(event) => setModel(event.target.value)} /></label>
       <label className="grid gap-1">{t("spam.threshold")}<Input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} />
         <span className="text-sm text-muted-foreground">{t("spam.thresholdHelp")}</span></label>
