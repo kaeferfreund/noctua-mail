@@ -49,6 +49,9 @@ import ComposeInlineCard from "./ComposeInlineCard";
 import ComposeMessageField from "./ComposeMessageField";
 import ComposeMinimized from "./ComposeMinimized";
 import ComposeModal from "./ComposeModal";
+import ScheduleSendDialog from "./ScheduleSendDialog";
+import { scheduleDraftSend } from "../scheduledSend/scheduledSendClient";
+import type { ScheduledSendView } from "@/lib/scheduledSendView";
 import { ComposeContextProvider, type ComposeContextValue } from "./ComposeContext";
 import { getDraftChangeState } from "./draftSaveUtils";
 import { normalizeHtmlDerivedText } from "./composeTextNormalization";
@@ -241,6 +244,9 @@ export type ComposeOrchestratorProps = {
   /** Run the compose session inside its own browser/native window. */
   detachedWindow?: boolean;
 
+  /** A send was planned („Senden planen“); compose has closed, the draft stays. */
+  onScheduledSend?: (result: { scheduledSend: ScheduledSendView; subject: string }) => void;
+
   /** Called synchronously before a detached window closes successfully. */
   onDetachedComposeOutcome?: (
     outcome: DetachedComposeOutcome,
@@ -315,6 +321,7 @@ function ComposeOrchestratorImpl(
     onDraftSavedAtChange,
     onComposeMirrorChange,
     detachedWindow = false,
+    onScheduledSend,
     onDetachedComposeOutcome
   }: ComposeOrchestratorProps,
   ref: React.ForwardedRef<ComposeOrchestratorHandle>
@@ -945,6 +952,75 @@ function ComposeOrchestratorImpl(
     setComposeView
   ]);
 
+  /** Shared by „Senden“ and „Senden planen“: sender, attachments, recipients, invite. */
+  const readSendPreconditions = () => {
+    if (senderLoading || sender?.account.id !== activeAccountId || !senderCanCompose || !sender.identities.some(item => item.id === composeIdentityId && item.enabled)) {
+      setSenderError(senderMessages.chooseEnabledSender); return null;
+    }
+    setSenderError(null);
+    if (attachmentLoadState) {
+      reportError(t(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]));
+      return null;
+    }
+    if (!composeTo.trim() && !composeCc.trim() && !composeBcc.trim()) {
+      reportError(t("notices.noRecipient"));
+      return null;
+    }
+    const invitePayload =
+      composeIncludeInvite ? buildComposeInvitePayload(currentComposeInviteDraft) : undefined;
+    if (composeIncludeInvite && !invitePayload) {
+      reportError(t("notices.inviteIncomplete"));
+      return null;
+    }
+    return { invitePayload };
+  };
+
+  const [scheduleSendOpen, setScheduleSendOpen] = useState(false);
+  const openScheduleSend = () => {
+    if (sendingMailRef.current || deliveredRef.current || !readSendPreconditions()) return;
+    // The draft send path relays no calendar invitation, so invitations are never planned.
+    if (composeIncludeInvite) { reportError(t("schedule.inviteUnsupported")); return; }
+    setScheduleSendOpen(true);
+  };
+
+  /** Saves the draft as usual, then plans its send; resolves true once compose has closed. */
+  const handleScheduleSend = async (sendAt: number) => {
+    if (sendingMailRef.current || deliveredRef.current || !activeAccountId || !readSendPreconditions()) return false;
+    sendingMailRef.current = true;
+    setSendingMail(true);
+    const sessionVersion = composeSessionVersionRef.current;
+    try {
+      if (draftSaveTimerRef.current !== null) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      const saved = await saveDraftForHandoff();
+      if (composeSessionVersionRef.current !== sessionVersion) return false;
+      if (!saved.saved || !saved.draftId) {
+        reportError(t("schedule.failed"));
+        return false;
+      }
+      const result = await scheduleDraftSend(apiFetch, activeAccountId, saved.draftId, sendAt);
+      if (!result.ok) {
+        reportError(result.response ? (await readErrorMessage(result.response)) || t("schedule.failed") : t("schedule.failed"));
+        return false;
+      }
+      // Compose closes like after a send; the saved draft stays in Drafts with its schedule.
+      cancelDraftAutoSave();
+      onScheduledSend?.({ scheduledSend: result.value, subject: composeSubject });
+      if (detachedWindow) {
+        onDetachedComposeOutcome?.("scheduled", saved.draftId);
+        window.close();
+      } else {
+        resetAfterSend();
+      }
+      return true;
+    } finally {
+      sendingMailRef.current = false;
+      setSendingMail(false);
+    }
+  };
+
   const handleSendMail = async () => {
     // The draft flush below can take seconds while an auto-save's IMAP APPEND
     // settles. Claim the send here, synchronously, so clicks landing in that
@@ -952,25 +1028,9 @@ function ComposeOrchestratorImpl(
     // button's `disabled` alone is too late, it only applies once React has
     // re-rendered.
     if (sendingMailRef.current || deliveredRef.current) return;
-    if (senderLoading || sender?.account.id !== activeAccountId || !senderCanCompose || !sender.identities.some(item => item.id === composeIdentityId && item.enabled)) {
-      setSenderError(senderMessages.chooseEnabledSender); return;
-    }
-    setSenderError(null);
-    if (attachmentLoadState) {
-      reportError(t(ATTACHMENT_LOAD_BLOCK_MESSAGE[attachmentLoadState]));
-      return;
-    }
-    const composeInviteDraft = currentComposeInviteDraft;
-    if (!composeTo.trim() && !composeCc.trim() && !composeBcc.trim()) {
-      reportError(t("notices.noRecipient"));
-      return;
-    }
-    const invitePayload =
-      composeIncludeInvite ? buildComposeInvitePayload(composeInviteDraft) : undefined;
-    if (composeIncludeInvite && !invitePayload) {
-      reportError(t("notices.inviteIncomplete"));
-      return;
-    }
+    const preconditions = readSendPreconditions();
+    if (!preconditions) return;
+    const { invitePayload } = preconditions;
     sendingMailRef.current = true;
     setSendingMail(true);
     const sendOperation = { accountId: activeAccountId, sessionVersion: composeSessionVersionRef.current };
@@ -1587,6 +1647,7 @@ function ComposeOrchestratorImpl(
     openComposeInNewWindow,
     closeDetachedCompose,
     handleSendMail,
+    handleScheduleSend: openScheduleSend,
     handleSaveDraft,
     handleDiscardDraft: handleDiscardDraftWithCancel,
     markComposeDirty,
@@ -1644,6 +1705,7 @@ function ComposeOrchestratorImpl(
       </div>}
       <ComposeModal isMobile={isMobile} open={isMobile ? composeOpen : showComposeModal} />
       <ComposeMinimized open={!isMobile && showComposeMinimized} />
+      <ScheduleSendDialog open={scheduleSendOpen && composeOpen} onOpenChange={setScheduleSendOpen} onSchedule={handleScheduleSend} />
       {!isMobile && inlineSlotEl &&
         createPortal(
           <ComposeContextProvider value={inlineContextValue}>

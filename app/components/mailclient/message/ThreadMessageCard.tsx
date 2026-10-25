@@ -46,6 +46,7 @@ import { RemoveAttachmentConfirmDialog } from "./AttachmentRemoval";
 import MessageRecipientMetaField from "./MessageRecipientMetaField";
 import CategoryBadge from "../CategoryBadge";
 import SpamBadge, { SpamCorrectionButton } from "../SpamBadge";
+import { ScheduledSendBar } from "../scheduledSend/ScheduledSend";
 import FlagBadge from "./FlagBadge";
 import MessageBadge from "./MessageBadge";
 import SenderIcon from "../SenderIcon";
@@ -903,6 +904,7 @@ function ThreadMessageCard({
                 ) : null;
               })()}
             </div>
+            {isDraftMessage(message) && !isCollapsed && <ScheduledSendBar message={message} />}
             {getUnsubscribeCapability(message) && !isCollapsed && (
               <div className={styles.unsubscribeBanner}>
                 <span className={styles.unsubscribeText}>{t("mailingListMessage")}</span>

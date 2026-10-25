@@ -19,6 +19,9 @@ import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
+import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
+import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
+import { roleAtLeast } from "@/lib/accountRole";
 import { applyMessageCollabUpdate, applyMessagesCollabUpdates, applyThreadCollabCacheUpdates } from "./mailclient/threadCollabUpdates";
 import type { ShellAccount } from "./shell/types";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
@@ -177,6 +180,7 @@ import {
   buildAccountMessageActionPath,
   buildAccountMessagesActionPath,
   buildAccountMessageHtmlPath,
+  buildAccountMessagePath,
   buildAccountMessageSourcePath,
   buildAccountMessagesPath,
   buildAccountTopicSuggestionsPath,
@@ -1971,12 +1975,46 @@ export default function MailClient({
     currentAccount?.settings?.appearance?.dateFormat
   );
 
+  // Assigned after handleSendDraft below; „Jetzt senden“ reuses that manual draft send.
+  const handleSendDraftRef = useRef<(message: Message) => Promise<void>>(async () => {});
+  const loadDraftForCompose = useCallback(async (draftId: string) => {
+    if (!activeAccountId) return null;
+    const res = await apiFetch(buildAccountMessagePath(activeAccountId, draftId), { cache: "no-store" }).catch(() => null);
+    if (!res?.ok) return null;
+    const data = (await res.json().catch(() => null)) as { message?: Message } | null;
+    return data?.message ?? null;
+  }, [activeAccountId, apiFetch]);
+  const scheduledSend = useScheduledSendControls({
+    accountId: activeAccountId || null,
+    enabled: roleAtLeast(currentAccount?.accessRole, "editor"),
+    locale,
+    apiFetch,
+    pushNotice,
+    reportError,
+    loadDraft: loadDraftForCompose,
+    editDraft: (draft) => composeHandleRef.current?.openCompose("edit", draft),
+    sendDraft: (draft) => handleSendDraftRef.current(draft)
+  });
+  const { refresh: refreshScheduledSends, onDetachedScheduled, releaseBeforeEdit: releaseScheduleBeforeEdit } = scheduledSend;
+  const activeFolderIsDrafts = isDraftsFolder(activeFolderId);
+  useEffect(() => {
+    // Another member may have planned a draft since the last read.
+    if (activeFolderIsDrafts) void refreshScheduledSends();
+  }, [activeFolderIsDrafts, refreshScheduledSends]);
+
   const openCompose = (
     mode: ComposeMode,
     message?: Message,
     asNew = false,
     prefill?: ComposeOpenPrefill
   ) => {
+    // „Bearbeiten hebt die Planung auf“: the schedule is cancelled before the draft opens.
+    if (mode === "edit" && !asNew && message && scheduledSend.controls.byDraftId.has(message.id)) {
+      void releaseScheduleBeforeEdit(message.id).then((released) => {
+        if (released) composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
+      });
+      return;
+    }
     composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
   };
 
@@ -3361,6 +3399,8 @@ export default function MailClient({
       locale
     ]
   );
+
+  useEffect(() => { handleSendDraftRef.current = handleSendDraft; }, [handleSendDraft]);
 
   // Phase 4c: the three mutation hooks (move / delete / mutations) now
   // run inside `MessageListOrchestrator`. MailClient reaches them
@@ -5070,12 +5110,13 @@ export default function MailClient({
         setViewMessage(null);
         setActiveMessageId("");
       }
+      if (payload.outcome === "scheduled" && payload.draftId) void onDetachedScheduled(payload.draftId);
       void refreshFolders();
       void refreshMailboxDataRef.current();
     };
     window.addEventListener("storage", handleDetachedComposeEvent);
     return () => window.removeEventListener("storage", handleDetachedComposeEvent);
-  }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice]);
+  }, [activeAccountId, activeMessageId, evictMessageCaches, refreshFolders, viewMessage?.id, pushNotice, onDetachedScheduled]);
   useEmptyFolderRepair({
     accountId: activeAccountId,
     folderId: activeFolderId,
@@ -5218,6 +5259,7 @@ export default function MailClient({
   return (
     <AccountDateFormatProvider value={accountDateFormat}>
     <SpamCorrectionProvider value={spamCorrection}>
+    <ScheduledSendProvider value={scheduledSend.controls}>
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
       {identityDialogs}
       <AppShell
@@ -5847,6 +5889,7 @@ export default function MailClient({
         showComposeModal={showComposeModal}
         showComposeMinimized={showComposeMinimized}
         onComposeMirrorChange={setComposeMirror}
+        onScheduledSend={scheduledSend.onScheduledSend}
       />
 
       <ThreadJsonModal
@@ -5891,6 +5934,7 @@ export default function MailClient({
         onGetRecentFolders={handleGetRecentFolders}
       />
     </CollabRowsContext.Provider>
+    </ScheduledSendProvider>
     </SpamCorrectionProvider>
     </AccountDateFormatProvider>
   );

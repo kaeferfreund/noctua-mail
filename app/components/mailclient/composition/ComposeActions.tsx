@@ -1,7 +1,8 @@
 import { useTranslations } from "next-intl";
 import SendWarnings from "./SendWarnings";
 import DraftSavedLabel from "./DraftSavedLabel";
-import { Button, Text } from "@radix-ui/themes";
+import { Button, DropdownMenu, Text } from "@radix-ui/themes";
+import { ChevronDown, Clock } from "lucide-react";
 import styles from "./Compose.module.css";
 
 type ComposeActionsProps = {
@@ -21,6 +22,8 @@ type ComposeActionsProps = {
   handleSaveDraft: () => void;
   handleCancel: () => void;
   handleSendMail: () => void;
+  /** Opens „Senden planen“; without it the send button has no menu. */
+  handleScheduleSend?: () => void;
   formatRelativeTime: (timestamp: number | null) => string;
 };
 
@@ -41,9 +44,11 @@ export default function ComposeActions({
   handleSaveDraft,
   handleCancel,
   handleSendMail,
+  handleScheduleSend,
   formatRelativeTime
 }: ComposeActionsProps) {
   const t = useTranslations("Compose");
+  const sendBlocked = sendDisabled || busy || sendingMail || Boolean(attachmentLoadState);
   if (deliveredWarnings.length) return <div className={styles.composeFooter}><SendWarnings warnings={deliveredWarnings} /><Button onClick={handleCancel}>{t("actions.close")}</Button></div>;
   return (
     <div className={styles.composeFooter}>
@@ -102,22 +107,39 @@ export default function ComposeActions({
         >
           {t("actions.cancel")}
         </Button>
-        <Button
-          size="2"
-          onClick={handleSendMail}
-          disabled={sendDisabled || busy || sendingMail || Boolean(attachmentLoadState)}
-          title={
-            attachmentLoadState === "error"
-              ? t("actions.attachmentsFailedTitle")
-              : undefined
-          }
-        >
-          {sendingMail
-            ? t("actions.sending")
-            : attachmentLoadState === "loading"
-              ? t("actions.loadingAttachments")
-              : t("actions.send")}
-        </Button>
+        <div className={handleScheduleSend ? styles.sendSplit : styles.sendSingle}>
+          <Button
+            size="2"
+            onClick={handleSendMail}
+            disabled={sendBlocked}
+            title={
+              attachmentLoadState === "error"
+                ? t("actions.attachmentsFailedTitle")
+                : undefined
+            }
+          >
+            {sendingMail
+              ? t("actions.sending")
+              : attachmentLoadState === "loading"
+                ? t("actions.loadingAttachments")
+                : t("actions.send")}
+          </Button>
+          {handleScheduleSend && (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger disabled={sendBlocked}>
+                <Button size="2" aria-label={t("schedule.moreOptions")} title={t("schedule.moreOptions")} data-compose-send-menu="">
+                  <ChevronDown size={16} aria-hidden="true" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end">
+                <DropdownMenu.Item onSelect={handleScheduleSend}>
+                  <Clock size={14} aria-hidden="true" />
+                  {t("schedule.open")}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -426,6 +426,22 @@
   margin-left: auto;
 }
 
+/* „Senden“ plus its menu trigger („Senden planen …“) read as one split button. */
+.sendSingle,
+.sendSplit {
+  display: inline-flex;
+}
+.sendSplit > button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.sendSplit > button:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid color-mix(in oklab, var(--accent-contrast) 35%, transparent);
+  padding-inline: 8px;
+}
+
 .composeResizer {
   position: absolute;
   right: 6px;
@@ -474,7 +490,7 @@
   .composeModal[role="dialog"] { inset: 0; transform: none; }
   .composeFooter { flex-wrap: wrap; flex-shrink: 0; }
   .composeActions { flex-wrap: wrap; justify-content: flex-end; width: 100%; }
-  .composeActions > button { min-width: 44px; min-height: 44px; }
+  .composeActions > button, .composeActions > div > button { min-width: 44px; min-height: 44px; }
   .composeResizer { display: none; }
   .composeHeader { padding: 12px; }
   .composeHeaderActions > button { min-width: 44px; min-height: 44px; margin: 0; }

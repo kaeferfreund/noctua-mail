@@ -47,6 +47,7 @@ export default function ComposeInlineCard() {
     setComposeOpen,
     setComposeView,
     handleSendMail,
+    handleScheduleSend,
     handleDiscardDraft,
     handleSaveDraft,
     applyRecipientSelection,
@@ -162,6 +163,7 @@ export default function ComposeInlineCard() {
             setComposeView("inline");
           }}
           handleSendMail={handleSendMail}
+            handleScheduleSend={handleScheduleSend}
           sendDisabled={sendDisabled}
           formatRelativeTime={formatRelativeTime}
         />

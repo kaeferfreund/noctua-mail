@@ -84,6 +84,8 @@ export type ComposeContextValue = {
 
   // Send / draft / dirty
   handleSendMail: () => void;
+  /** Opens the „Senden planen“ dialog. */
+  handleScheduleSend?: () => void;
   handleSaveDraft: () => void;
   handleDiscardDraft: () => void;
   markComposeDirty: () => void;
