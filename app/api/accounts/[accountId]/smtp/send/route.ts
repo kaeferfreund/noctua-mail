@@ -10,6 +10,8 @@ import { randomUUID } from "crypto";
 import { upsertCalendarEvent } from "@/lib/db";
 import type { ComposeInvitePayload } from "@/lib/composeInvite";
 import { completeSend } from "@/lib/mail/completeSend";
+import { holdScheduleForDraftChange, type DraftScheduleHold } from "@/lib/drafts";
+import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import {
   normalizeCalendarAttachments,
   parseComposeAttachments,
@@ -44,6 +46,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const payload = (await request.json()) as {
       accountId?: string;
       identityId?: string;
+      /** Saved draft this compose session edits: its schedule is held during the send. */
+      draftId?: string;
       from?: never;
       envelopeFrom?: never;
       to?: string;
@@ -157,8 +161,22 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       });
     }
 
+    const draftId = typeof payload.draftId === "string" ? payload.draftId.trim() : "";
+    if (payload.draftId !== undefined && payload.draftId !== null && (typeof payload.draftId !== "string" || draftId.length > 256)) {
+      return NextResponse.json({ ok: false, message: "Invalid draftId" }, { status: 400 });
+    }
     const messageId = buildMessageId(identity.email);
     let result: Awaited<ReturnType<typeof sendSmtpMessage>>;
+    // Compose sends a planned draft: take its schedule from the job first (409 while the job sends
+    // it or after it did), close it after SMTP acceptance, restore it when the send fails.
+    let scheduleHold: DraftScheduleHold | undefined;
+    try {
+      if (draftId) scheduleHold = await holdScheduleForDraftChange(accountId, draftId, "sent_now");
+    } catch (error) {
+      const conflict = scheduledSendConflictResponse(error);
+      if (conflict) return conflict;
+      throw error;
+    }
     try {
       const authorization = await authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
       const beforeSend = await prepareOutboundAssertion(authorization);
@@ -178,6 +196,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         ...(attachments.length > 0 ? { attachments } : {})
       }, identity, beforeSend);
     } catch (error) {
+      await scheduleHold?.abort(error);
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
@@ -188,6 +207,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       throw error;
     }
 
+    await scheduleHold?.complete();
     const sentResult = await completeSend({ account, clientId, raw: result.raw, messageId,
       actor: collabActorFromSession(accountContext.session, accountContext.clientId), inReplyTo: payload.inReplyTo, references: payload.references,
       xForwardedMessageId: payload.xForwardedMessageId });

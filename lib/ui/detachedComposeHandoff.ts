@@ -34,7 +34,7 @@ export type DetachedComposeHandoff =
       message: string;
     });
 
-export type DetachedComposeOutcome = "saved" | "sent" | "discarded";
+export type DetachedComposeOutcome = "saved" | "sent" | "discarded" | "scheduled";
 export type DetachedComposeEventOutcome = DetachedComposeOutcome | "updated";
 
 export type DetachedComposeEvent = {
@@ -222,7 +222,7 @@ export function parseDetachedComposeEvent(rawValue: string | null): DetachedComp
       !parsed.handoffId ||
       typeof parsed.accountId !== "string" ||
       !parsed.accountId ||
-      !["updated", "saved", "sent", "discarded"].includes(String(parsed.outcome)) ||
+      !["updated", "saved", "sent", "discarded", "scheduled"].includes(String(parsed.outcome)) ||
       !isNullableString(parsed.draftId) ||
       !isNullableString(parsed.sourceMessageId) ||
       !isComposeMode(parsed.mode) ||

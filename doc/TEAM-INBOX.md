@@ -40,7 +40,7 @@ Decided: D15 — Tauri/desktop mode is dropped and unsupported; startup rejects 
 
 Decided: D17 — admin issues a short-lived single-use reset link and hands it over personally; SMTP recovery delivery is a non-goal for this stage (user, 2026-10-22).
 
-Decided: canonical HTTPS origin is `https://mail.example.org`, RP ID `mail.example.org`, DNS A `203.0.113.10`, TLS via mailprovider API DNS-01; the preview-host preview stays separate (§8) (user, 2026-10-22).
+Decided: canonical HTTPS origin is `https://mail.example.org`, RP ID `mail.example.org`, DNS A `<tailnet-ip>`, TLS via the DNS provider's API (DNS-01); the preview stays separate (§8) (user, 2026-10-22).
 
 ## 1. Goals and non-goals
 
@@ -74,7 +74,7 @@ Non-goals (for now)
 
 ### 1.1 Go-live criteria (MailPlus replacement)
 
-This release replaces Synology MailPlus for two people, about twelve mailprovider mailboxes including
+This release replaces Synology MailPlus for two people, about twelve mailboxes at the mail provider including
 eight shared ones. “Auth merged” is not “ready to cut over”. Each fit-report §2 item has one
 accountable owner below; §9 gives files/dependencies. Shared `\Seen` is intentional; collaboration
 status tracks work independently. Topics are local, not an IMAP label migration.
@@ -101,7 +101,7 @@ status tracks work independently. Topics are local, not an IMAP label migration.
 | 18 | Consistent application backup + offline keys + independent mail archive restored successfully in isolation | integration/deploy owner / 4, §11 |
 
 The operator confirms UI language (English accepted or translation budgeted), calendar of record,
-and whether Synology Contacts stays in use. External mailprovider limits/capabilities and MailPlus shared
+and whether Synology Contacts stays in use. External mail-provider limits/capabilities and MailPlus shared
 folder layout must be measured; the fit report's estimates are not release evidence.
 
 ## 2. Architecture decisions
@@ -122,7 +122,7 @@ folder layout must be measured; the fit report's estimates are not release evide
 | D12 | Every new route and DB module gets adjacent bun tests. Reuse `lib/testDbHarness.ts` and a shared `lib/testAuthHarness.ts` that creates real auth users, sessions and memberships. Mock wrapper seams only. Concurrency cases run with `bun run test:stress`. | Synthetic data and shared helpers follow AGENTS.md. Cookies are issued by Better Auth rather than reimplementing their signing format. |
 | D13 | TOTP enrollment is mandatory for every user (including admins and passkey users); an app password alone reaches only enrollment. Passkey login is a full login only with `userVerified === true`. Do not offer “trust this device”; reject `trustDevice:true` server-side. | Both people have consistent recovery and a provider-independent fallback. Better Auth has no built-in mandatory-MFA switch; Noctua enforces the gate (§4.1/§4.4). |
 | D14 | Separate `auth_user`, `auth_session`, `auth_account`, `auth_verification`, `auth_two_factor`, `auth_passkey` tables in the master DB; `auth_user.id === users.id`. Mount at `/api/ba`; keep Noctua `/api/auth/me`, `/signup`, `/logout`, `/switch-account` wrappers. | Tests reject direct mapping onto populated `users` and demonstrate ISO-date incompatibility even on an empty table. `/api/auth` already belongs to Noctua routes. |
-| D15 | This fork targets one Linux/systemd Next.js process at `https://mail.example.org`, RP ID `mail.example.org`, reachable inside the tailnet only. Tauri/desktop mode is dropped; startup rejects it. | The deployment uses DNS A `203.0.113.10` and mailprovider API DNS-01 TLS (§8); desktop origin/secret/invite exceptions are removed. |
+| D15 | This fork targets one Linux/systemd Next.js process at `https://mail.example.org`, RP ID `mail.example.org`, reachable inside the tailnet only. Tauri/desktop mode is dropped; startup rejects it. | The deployment uses DNS A `<tailnet-ip>` and DNS-01 TLS via the DNS provider's API (§8); desktop origin/secret/invite exceptions are removed. |
 | D16 | Dedicated Better Auth SQLite connection to the same master file, with zero synchronous busy timeout on both master writers and Noctua async write retries. | Shared-handle rollback and separate-handle retry tests demonstrate why. Keep auth transaction hooks free of network I/O; never retry an entire non-idempotent auth request automatically (§3.1). |
 | D17 | Admin issues a 15-minute single-use password-reset link and hands it over personally; a local operator command uses the same restricted issuance policy. No SMTP recovery delivery or public reset-request issuance in this stage. | Public token redemption remains available; MFA survives password reset (§4.4). |
 
@@ -752,7 +752,7 @@ Granting a second membership disables this optional method for that mailbox; app
 login remains available. A shared address must never be used as a personal user identity.
 Admin/invite validation forbids assigning an existing shared mailbox's address to a new user, and
 migration rejects shared-address user rows until the operator supplies personal identities. A shared mailbox whose address differs from the person's can never satisfy condition 2.
-For this installation, confirm that mailprovider's IMAP username is the full mailbox address; otherwise this
+For this installation, confirm that the mail provider's IMAP username is the full mailbox address; otherwise this
 method stays off until a separately reviewed explicit login-name mapping exists.
 
 Reuse `verifyImapCredentials` and `accountIdFromEmail` for canonical new ids, but locate existing
@@ -1374,7 +1374,7 @@ stayed green). ui-shell Slice 1 uses the generated `radix-nova` style and pins `
 6. Local dev needs `.env.local` with `IMAP_CREDENTIALS_STORAGE=db`, a random `IMAP_SECRET_KEY`,
    a separate random `BETTER_AUTH_SECRET` (each >=32 characters), `BETTER_AUTH_URL=http://localhost:3000`
    (or the actual local port) and `BETTER_AUTH_TELEMETRY=0`. Leave `NOCTUA_IMAP_LOGIN_HOSTS` unset.
-   Production uses `https://mail.example.org`; the preview-host preview is separate (§8).
+   Production uses `https://mail.example.org`; the preview is separate (§8).
 
 `app/globals.css` structure (no preflight):
 
@@ -1640,10 +1640,10 @@ This fork integrates its feature branches locally; it does not target upstream p
 | `BETTER_AUTH_TELEMETRY` | `0`, together with `telemetry:{enabled:false}`; keep `BETTER_AUTH_TELEMETRY_ENDPOINT` unset |
 | `advanced.ipAddress.trustedProxies` | Configure the actual reverse proxy chain; never trust arbitrary forwarded headers |
 
-- Canonical hostname `mail.example.org` has DNS A `203.0.113.10`, the server's Tailscale IP.
+- Canonical hostname `mail.example.org` has DNS A `<tailnet-ip>`, the server's Tailscale IP.
   Service access is inside the tailnet only; a public DNS record does not make it publicly reachable.
   Terminate HTTPS at the reverse proxy with a trusted certificate obtained and renewed via DNS-01
-  using the mailprovider API. DNS-01 requires no public HTTP challenge endpoint. Keep DNS API credentials
+  using the DNS provider's API. DNS-01 requires no public HTTP challenge endpoint. Keep DNS API credentials
   in the deployment secret store, never source control or logs; the deploy owner records actual
   proxy addresses and certificate-renewal configuration before cut-over.
 - `https://preview.example.org:3790` is a separate, non-canonical development preview origin.
@@ -1809,8 +1809,8 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   limiter and no write-back on invalid credentials; changed password revokes old sessions/tokens;
   stored SMTP follows only the §5.3 rule. Use synthetic credentials and injected IMAP verification.
 - Deployment acceptance: canonical BETTER_AUTH_URL/trusted origin and rpID match §8.1; tailnet DNS
-  resolves mail.example.org to 203.0.113.10, the TLS chain/hostname is trusted on both phones, and
-  mailprovider API DNS-01 issuance/renewal succeeds. The separate preview-host preview is not trusted by
+  resolves mail.example.org to <tailnet-ip>, the TLS chain/hostname is trusted on both phones, and
+  DNS-01 issuance/renewal via the DNS provider's API succeeds. The separate preview is not trusted by
   canonical production and cannot reuse canonical passkeys. Localhost harness settings stay isolated.
 - MFA/security: mandatory gate blocks mail/admin/MCP and direct raw BA calls until TOTP verified,
   backup-code one-use, wrong/expired/locked challenges, reject trustDevice=true; passkey registration
@@ -1867,28 +1867,28 @@ use BETTER_AUTH_SECRET, targeted invites, chosen passwords and verified MFA. Ext
 below are templates requiring installed-tool help/capability confirmation on the actual servers.
 Never run an import against household mail as part of implementation-agent tests.
 
-1. Inventory every address: real mailprovider mailbox, alias or forward; map each shared MailPlus mailbox
-   to one mailprovider account and both personal memberships/roles. Resolve sender identities (fit 16),
+1. Inventory every address: real provider mailbox, alias or forward; map each shared MailPlus mailbox
+   to one provider account and both personal memberships/roles. Resolve sender identities (fit 16),
    filter-only folders, duplicate forwards, shared layout, labels/topics and intended Sent/Drafts.
    Confirm mailbox quotas, personal IMAP username rule and English/calendar/contacts decisions.
 2. Before any INBOX import/account creation: final MailPlus POP3 fetch, record keep/delete modes,
    disable all fetch entries and the global POP3 switch. Imported messages have new UIDLs; resumed
-   delete-mode fetch could erase mailprovider copies which Noctua would mirror locally. Keep MailPlus
+   delete-mode fetch could erase provider copies which Noctua would mirror locally. Keep MailPlus
    history intact through day 7. Non-INBOX copies may be prepared earlier.
 3. Probe each mailbox's TLS hostname, CAPABILITY (UIDPLUS), LIST/SPECIAL-USE, one intended Sent and
    Drafts folder, concurrency/login limits and other phone clients. Measure rather than assuming
    published estimates. Configure spam to move into Spam; recreate server rules/autoresponders and
    check ManageSieve availability if needed.
 4. Prepare Linux/systemd + TLS proxy: `BETTER_AUTH_URL=https://mail.example.org`,
-   `PASSKEY_RP_ID=mail.example.org`, canonical trusted origin only, DNS A `203.0.113.10` inside the
-   tailnet and certificate renewal via mailprovider API DNS-01 (§8.1). Keep the preview-host preview separate.
+   `PASSKEY_RP_ID=mail.example.org`, canonical trusted origin only, DNS A `<tailnet-ip>` inside the
+   tailnet and certificate renewal via the DNS provider's API (DNS-01) (§8.1). Keep the preview separate.
    Use DB-only credential storage and independent keys; leave `NOCTUA_IMAP_LOGIN_HOSTS` unset by
    default and enable it only with an explicit reviewed host allowlist for eligible unshared personal
    mailboxes; retain the admin's app-password fallback. Configure the real trusted proxy chain, enough disk (fit estimate >=2.5x mail size must be checked), attachment
    body limit >=40 MB for base64 JSON (verify actual target behavior), watcher flag and worker cap.
    No Docker deployment dependency. Run startup, personal reset-link handover (no SMTP) and canonical
    phone TLS/passkey acceptance.
-5. Import LAN MailPlus→mailprovider with a reviewed imapsync template: folder dry-run first, owner-login
+5. Import LAN MailPlus→provider with a reviewed imapsync template: folder dry-run first, owner-login
    shared copies and shared-prefix exclusion on personal runs; preserve internal dates and map Sent/
    Drafts explicitly, never --delete*. Validate exact installed flags for Message-ID handling,
    --syncinternaldates and folder maps. Second run transfers zero; resolve server duplicates and
@@ -1902,7 +1902,7 @@ Never run an import against household mail as part of implementation-agent tests
    INBOX-full/other-folders-30-days policy):
    `bun scripts/runSyncJob.ts '{"accountId":"synthetic-id","folderId":"synthetic-id:INBOX","mode":"full","fullSync":true}'`
    replacing identifiers from the actual inventory. Cover Sent and every imported folder; checkpoint/
-   timeout handling must finish before comparison. Compare MailPlus, mailprovider/imapsync and local shard
+   timeout handling must finish before comparison. Compare MailPlus, provider/imapsync and local shard
    per-folder counts; a mismatch first requires proving sync finished.
 8. Acceptance: A replies/draft-sends/calendar-replies in shared mail, B sees the Sent copy/answered
    state without an active tab; every mailbox sends into its intended Sent, append failure is visible,
@@ -1919,7 +1919,7 @@ Never run an import against household mail as part of implementation-agent tests
    never authenticate restored test workers to real mail unintentionally. Record restore time/data loss.
 10. Re-run import for stragglers day 1 and day 7, verify no duplicates/count drift, then user signs
     off each §1.1 row before disabling MailPlus permanently. Keep mail archive + key/app backups.
-    Rollback keeps MailPlus history; re-enable POP3 only after removing imported mailprovider INBOX copies
+    Rollback keeps MailPlus history; re-enable POP3 only after removing imported provider INBOX copies
     or deliberate keep-copy mode. Preserve Noctua-only shard state and keys through any rollback.
 
 
@@ -1934,4 +1934,4 @@ Rejected by the user on 2026-10-22; these are historical rationale, not configur
 | Browser-only/cookie mailbox credentials (D2) | Shared inboxes and background workers require server-accessible encrypted DB credentials; the global credential overlay is removed. |
 | Retain Tauri/desktop mode or its invite/secret/origin exemptions (D15) | This is a Linux/systemd web fork; desktop support and its separate security architecture are dropped. |
 | SMTP reset sender and generic public recovery requests (D17) | This stage uses personal admin/operator handover of a 15-minute single-use link; SMTP recovery delivery is a non-goal. |
-| Preview hostname, LAN IP or a separately selected hostname as canonical RP ID | The user fixed `mail.example.org` over tailnet DNS A `203.0.113.10` with mailprovider DNS-01 TLS; the preview-host preview is a separate origin. |
+| Preview hostname, LAN IP or a separately selected hostname as canonical RP ID | The user fixed `mail.example.org` over tailnet DNS A `<tailnet-ip>` with DNS-01 TLS via the DNS provider; the preview is a separate origin. |

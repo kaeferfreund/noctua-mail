@@ -8,6 +8,8 @@ import {
   recordDraftTombstone
 } from "@/lib/db";
 import { deleteImapMessage } from "@/lib/mail/imap";
+import { holdScheduleForDraftChange, type DraftScheduleHold } from "@/lib/drafts";
+import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import { deleteMessageFiles } from "@/lib/storage";
 import {
   getAccountIdFromParams,
@@ -38,39 +40,55 @@ export async function POST(request: Request, { params }: Params) {
     if (!message) {
       return NextResponse.json({ ok: false, message: "Draft not found" }, { status: 404 });
     }
-    // Tombstone first so the draft can't be resurrected by a sync even if the
-    // IMAP delete below fails or races an in-flight APPEND (the original
-    // forward-too-fast bug left the local row deleted but the IMAP copy alive,
-    // which the next sync then re-imported). Best-effort: a tombstone write
-    // failure (DB lock / retry exhaustion) must not abort the discard — the
-    // user still expects the draft gone locally.
+    // Discarding (also the cleanup after a compose send) holds the draft's schedule and closes
+    // it once the draft is gone; 409 while the job sends it.
+    let scheduleHold: DraftScheduleHold;
     try {
-      await recordDraftTombstone(accountId, message.messageId, message.mailboxPath ?? null);
+      scheduleHold = await holdScheduleForDraftChange(accountId, message.id, "discarded");
     } catch (error) {
-      console.warn("[draft-discard] tombstone write failed; proceeding with local delete", {
-        accountId,
-        draftId: message.id,
-        error
-      });
+      const conflict = scheduledSendConflictResponse(error);
+      if (conflict) return conflict;
+      throw error;
     }
-    // Local-first: the IMAP delete is best-effort. If it fails (e.g. an IMAP
-    // outage), still remove the local row and files so the user isn't stuck
-    // with an undeletable draft — the tombstone above makes the next Drafts
-    // sync delete the lingering server copy and refuse to re-import it.
-    if (message.imapUid && message.mailboxPath) {
+    try {
+      // Tombstone first so the draft can't be resurrected by a sync even if the
+      // IMAP delete below fails or races an in-flight APPEND (the original
+      // forward-too-fast bug left the local row deleted but the IMAP copy alive,
+      // which the next sync then re-imported). Best-effort: a tombstone write
+      // failure (DB lock / retry exhaustion) must not abort the discard — the
+      // user still expects the draft gone locally.
       try {
-        await deleteImapMessage(account, message.mailboxPath, message.imapUid, clientId);
+        await recordDraftTombstone(accountId, message.messageId, message.mailboxPath ?? null);
       } catch (error) {
-        console.warn("[draft-discard] IMAP delete failed; relying on tombstone cleanup", {
+        console.warn("[draft-discard] tombstone write failed; proceeding with local delete", {
           accountId,
           draftId: message.id,
           error
         });
       }
+      // Local-first: the IMAP delete is best-effort. If it fails (e.g. an IMAP
+      // outage), still remove the local row and files so the user isn't stuck
+      // with an undeletable draft — the tombstone above makes the next Drafts
+      // sync delete the lingering server copy and refuse to re-import it.
+      if (message.imapUid && message.mailboxPath) {
+        try {
+          await deleteImapMessage(account, message.mailboxPath, message.imapUid, clientId);
+        } catch (error) {
+          console.warn("[draft-discard] IMAP delete failed; relying on tombstone cleanup", {
+            accountId,
+            draftId: message.id,
+            error
+          });
+        }
+      }
+      const attachmentIds = await getAttachmentIds(accountId, message.id);
+      await deleteMessageById(accountId, message.id);
+      await scheduleHold.complete();
+      await deleteMessageFiles(accountId, message.id, attachmentIds);
+    } catch (error) {
+      await scheduleHold.abort(error);
+      throw error;
     }
-    const attachmentIds = await getAttachmentIds(accountId, message.id);
-    await deleteMessageById(accountId, message.id);
-    await deleteMessageFiles(accountId, message.id, attachmentIds);
     return NextResponse.json({ ok: true });
   });
 }

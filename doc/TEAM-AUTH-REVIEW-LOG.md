@@ -13,8 +13,8 @@ own IDs so every original review item has a disposition.
 | Integration/requirements (I) | 11 | 0 | 11 |
 | Total | 29 | 0 | 29 |
 
-Evidence anchors are relative to ROOT:
-`/home/user/.t3/scratch/2026-10-22-https-github-com-paulwellnerbou-noctua-8f78a215`.
+Evidence anchors are relative to ROOT, the review scratch checkout of the upstream repository
+(a local workspace path, not part of this repository).
 
 - **BA** = wt-spike-better-auth/node_modules/better-auth/dist/ (installed 1.7.12).
 - **CORE** = wt-spike-better-auth/node_modules/@better-auth/core/dist/ (1.7.12).
@@ -381,8 +381,8 @@ this promotion does not claim any additional implementation tests passed.
 4. D15: Tauri/desktop mode is dropped and unsupported, including the desktop signup invite exemption.
 5. D17: admin issues a 15-minute single-use link and hands it over personally; SMTP recovery delivery
    is a non-goal. Public token redemption remains available.
-6. Canonical origin https://mail.example.org and RP ID mail.example.org; DNS A 203.0.113.10 inside
-   the tailnet, TLS via mailprovider API DNS-01. The preview-host HTTPS preview is separate. The deployment
+6. Canonical origin https://mail.example.org and RP ID mail.example.org; DNS A <tailnet-ip> inside
+   the tailnet, TLS via the DNS provider's API (DNS-01). The HTTPS preview is separate. The deployment
    owner records actual proxy addresses/trusted hops and certificate renewal configuration (§8.1).
 
 ## Remaining cut-over inputs (unchanged scope)
@@ -391,5 +391,5 @@ this promotion does not claim any additional implementation tests passed.
    dependency. Confirm personal/shared address mappings and intended mailbox roles/ownership.
 8. Accept English UI or budget translation; decide calendar of record and continuing Synology Contacts.
 9. Operator sets backup retention/restore-time/data-loss targets, verifies NAS archive destination,
-   and measures mailprovider capabilities/concurrency/login/body limits. Stage 4 records evidence and user
+   and measures the mail provider's capabilities/concurrency/login/body limits. Stage 4 records evidence and user
    sign-off; source review cannot settle provider/account-specific facts or phone compatibility.

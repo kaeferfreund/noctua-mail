@@ -1,0 +1,148 @@
+.dialog {
+  gap: 0;
+  padding: 0;
+  width: min(560px, calc(100vw - 32px));
+  max-width: min(560px, calc(100vw - 32px)) !important;
+}
+
+.sheet {
+  gap: 0;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.sheet > [data-slot="sheet-close"],
+.dialog > [data-slot="dialog-close"] {
+  top: 10px;
+  right: 10px;
+}
+
+.title {
+  padding: 18px 56px 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 20px 4px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.radio {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.optionLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.optionTime {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.divider {
+  margin: 6px 20px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.customRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 20px 12px;
+}
+
+.customRow > .option {
+  flex: 1;
+  min-width: 0;
+}
+
+.customControls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.control {
+  min-height: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+.controlInvalid {
+  border-color: var(--destructive);
+  background: color-mix(in oklab, var(--destructive) 8%, var(--background));
+}
+
+.error,
+.hint {
+  margin: 0 20px 12px;
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--destructive);
+}
+
+.hint {
+  color: var(--muted-foreground);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.footerButton {
+  min-width: 112px;
+  min-height: 40px;
+  border-radius: 999px;
+}
+
+@media (width < 768px) {
+  .customRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .customControls > .control {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .radio {
+    width: 22px;
+    height: 22px;
+  }
+
+  .footerButton {
+    flex: 1;
+    min-height: 44px;
+  }
+}

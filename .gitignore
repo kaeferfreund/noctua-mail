@@ -35,3 +35,6 @@ pnpm-debug.log*
 
 # generated runtime config
 public/runtime-config.js
+
+# workspace briefs, reports and evidence live outside this public repository
+/briefs/

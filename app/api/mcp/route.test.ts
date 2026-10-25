@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import type { Account, Folder, Message } from "@/lib/data";
+import type { Account, Attachment, Folder, Message } from "@/lib/data";
 import { mintMcpToken, validateMcpToken } from "@/lib/mcpAuth";
 import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { requireActiveUserSession } from "@/lib/auth";
@@ -29,7 +29,7 @@ const buildRawMessage = mock(async (_account: Account, mail: BuiltDraftMail) => 
 });
 const appendImapMessage = mock(async () => 9001);
 const deleteImapMessage = mock(async () => {});
-const syncImapMessage = mock(async (account: Account, mailboxPath: string, uid: number) => {
+const syncImapMessage = mock(async (account: Account, mailboxPath: string, uid: number): Promise<Message> => {
   const mail = lastBuiltDraftMail;
   return {
     id: `${account.id}-draft-${uid}`,
@@ -175,6 +175,20 @@ async function createStoredToken(params: {account:Account;accountId:string;token
 }
 async function postMcp(body:unknown, token?:string) {
   return POST(new Request("http://localhost:3000/api/mcp", { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }));
+}
+
+async function createScopedToken(accountId: string, mode?: "read" | "drafts" | "full") {
+  const fixture = await createAuthenticatedTestSession(accountId);
+  const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: fixture.jar.headers() }));
+  if (session instanceof Response) throw new Error("Fixture session missing");
+  const minted = await mintMcpToken(session, accountId, "Synthetic", 86400, mode ? { mode } : {});
+  return { token: minted.token, userId: fixture.user.id };
+}
+type ToolCallBody = { result: { isError?: boolean; content: Array<{ text: string }>; structuredContent: Record<string, any> } };
+async function callTool(token: string, name: string, args: Record<string, unknown>, id = 1) {
+  const response = await postMcp({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }, token);
+  expect(response.status).toBe(200);
+  return (await response.json()) as ToolCallBody;
 }
 
 async function seedMailbox(accountId: string) {
@@ -349,6 +363,9 @@ describe("/api/mcp", () => {
         "assign_topics",
         "unassign_topics",
         "create_draft_message",
+        "list_draft_messages",
+        "get_draft_message",
+        "update_draft_message",
         "flag_message",
         "unflag_message",
         "mark_message_todo",
@@ -932,6 +949,185 @@ describe("/api/mcp", () => {
     const forwardDraft = await getMessageById(accountId, `${accountId}-draft-9002`);
     expect(forwardDraft?.xForwardedMessageId).toBe(`<${accountId}-msg-2@example.test>`);
     expect(forwardDraft?.flags).toContain(AI_MODIFIED_FLAG);
+  });
+
+  test("get_draft_message returns an editable draft and update_draft_message appends in place", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-edit");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const created = await callTool(token, "create_draft_message", { to: "draft-target@example.test", cc: "copy@example.test",
+      bcc: "hidden@example.test", subject: "Angebot", text: "Guten Tag,\n\nanbei das Angebot." });
+    const createdId = created.result.structuredContent.draftId as string;
+    expect(createdId).toBe(`${accountId}-draft-9001`);
+
+    const read = await callTool(token, "get_draft_message", { draftId: createdId }, 2);
+    expect(read.result.isError).toBeUndefined();
+    expect(read.result.structuredContent.draft).toMatchObject({
+      draftId: createdId, identityId: created.result.structuredContent.identityId, from: "owner@example.test",
+      to: "draft-target@example.test", cc: "copy@example.test", bcc: "hidden@example.test", subject: "Angebot",
+      composeFormat: "text", text: "Guten Tag,\n\nanbei das Angebot.", html: null, markdown: null,
+      inReplyTo: null, references: [], forwardedMessageId: null, attachments: [], updatedAt: Date.UTC(2026, 2, 26, 9, 0, 0)
+    });
+
+    appendImapMessage.mockResolvedValueOnce(9002);
+    const updated = await callTool(token, "update_draft_message", { draftId: createdId, appendBody: "Bitte bis Freitag bestätigen." }, 3);
+    expect(updated.result.isError).toBeUndefined();
+    expect(updated.result.structuredContent).toMatchObject({ ok: true, mode: "new", draftId: `${accountId}-draft-9002`,
+      previousDraftId: createdId, draftIdChanged: true, identityId: created.result.structuredContent.identityId });
+    expect(updated.result.content[0]?.text).toContain(`new id is ${accountId}-draft-9002`);
+    expect(lastBuiltDraftMail).toMatchObject({ to: "draft-target@example.test", cc: "copy@example.test", bcc: "hidden@example.test",
+      subject: "Angebot", text: "Guten Tag,\n\nanbei das Angebot.\n\nBitte bis Freitag bestätigen.", html: undefined });
+    // The old IMAP message is removed and the old row replaced: the old id no longer resolves to a draft.
+    expect(deleteImapMessage).toHaveBeenCalledWith(expect.objectContaining({ id: accountId }), "Drafts", 9001, expect.any(String), expect.any(Function));
+    expect(await getMessageById(accountId, createdId)).toBeNull();
+    expect((await getMessageById(accountId, `${accountId}-draft-9002`))?.flags).toContain(AI_MODIFIED_FLAG);
+    const stale = await callTool(token, "get_draft_message", { draftId: createdId }, 4);
+    expect(stale.result.isError).toBe(true);
+    expect(stale.result.structuredContent).toMatchObject({ ok: false, code: "invalid_draft", message: "Draft not found" });
+    const reread = await callTool(token, "get_draft_message", { draftId: `${accountId}-draft-9002` }, 5);
+    expect(reread.result.structuredContent.draft.text).toBe("Guten Tag,\n\nanbei das Angebot.\n\nBitte bis Freitag bestätigen.");
+
+    const listed = await callTool(token, "list_draft_messages", {}, 6);
+    expect(listed.result.structuredContent).toMatchObject({ ok: true, folderId: `${accountId}:Drafts`, total: 1,
+      drafts: [{ draftId: `${accountId}-draft-9002`, subject: "Angebot", to: "draft-target@example.test", editable: true }] });
+  });
+
+  test("update_draft_message replaces only the passed fields and keeps reply headers, identity and attachments", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-partial");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const attachment = Buffer.from("Synthetic attachment bytes");
+    syncImapMessage.mockImplementationOnce(async (account: Account, mailboxPath: string, uid: number) => ({
+      id: `${account.id}-draft-${uid}`, accountId: account.id, folderId: `${account.id}:Drafts`, threadId: `${account.id}-thread-alpha`,
+      messageId: `<draft-${uid}@example.test>`, inReplyTo: lastBuiltDraftMail?.inReplyTo, references: lastBuiltDraftMail?.references,
+      subject: lastBuiltDraftMail?.subject ?? "", from: account.email, to: lastBuiltDraftMail?.to ?? "", cc: lastBuiltDraftMail?.cc,
+      preview: "", date: new Date(Date.UTC(2026, 2, 26, 9, 0, 0)).toISOString(), dateValue: Date.UTC(2026, 2, 26, 9, 0, 0),
+      body: lastBuiltDraftMail?.text ?? "", htmlBody: lastBuiltDraftMail?.html, mailboxPath, imapUid: uid, flags: ["\\Draft", "\\Seen"], draft: true,
+      attachments: [{ id: "att-synthetic", filename: "angebot.txt", contentType: "text/plain", size: attachment.byteLength, inline: false,
+        content: attachment } as Attachment]
+    }));
+    const created = await callTool(token, "create_draft_message", { mode: "reply", messageId: `${accountId}-msg-1`, cc: "copy@example.test", text: "Danke!" });
+    const draftId = created.result.structuredContent.draftId as string;
+    const read = await callTool(token, "get_draft_message", { draftId }, 2);
+    expect(read.result.structuredContent.draft).toMatchObject({ inReplyTo: `<${accountId}-msg-1@example.test>`,
+      references: [`<${accountId}-msg-1@example.test>`], attachments: [{ id: "att-synthetic", filename: "angebot.txt", size: attachment.byteLength, inline: false }] });
+
+    appendImapMessage.mockResolvedValueOnce(9002);
+    const updated = await callTool(token, "update_draft_message", { draftId, to: "new-target@example.test", subject: "Re: Neuer Betreff" }, 3);
+    expect(updated.result.isError).toBeUndefined();
+    expect(updated.result.structuredContent).toMatchObject({ mode: "reply", identityId: created.result.structuredContent.identityId });
+    expect(lastBuiltDraftMail).toMatchObject({ to: "new-target@example.test", cc: "copy@example.test", subject: "Re: Neuer Betreff",
+      text: "Danke!", inReplyTo: `<${accountId}-msg-1@example.test>`, references: [`<${accountId}-msg-1@example.test>`] });
+    const built = lastBuiltDraftMail as BuiltDraftMail & { attachments?: Array<{ filename: string; content: Buffer }> };
+    expect(built.attachments?.map(item => [item.filename, Buffer.from(item.content).toString()])).toEqual([["angebot.txt", attachment.toString()]]);
+  });
+
+  test("update_draft_message appends to HTML drafts before the quoted original and can replace the body", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-html");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const created = await callTool(token, "create_draft_message", { to: "draft-target@example.test", subject: "HTML",
+      html: '<p>Hallo</p><div id="noctua-quoted-html"><blockquote>Original</blockquote></div>' });
+    expect(lastBuiltDraftMail?.text).toContain("Hallo");
+    const draftId = created.result.structuredContent.draftId as string;
+    appendImapMessage.mockResolvedValueOnce(9002);
+    await callTool(token, "update_draft_message", { draftId, appendBody: "Zweiter <Satz>" }, 2);
+    expect(lastBuiltDraftMail?.html).toBe('<p>Hallo</p><p>Zweiter &lt;Satz&gt;</p><div id="noctua-quoted-html"><blockquote>Original</blockquote></div>');
+    expect(lastBuiltDraftMail?.text).toContain("Zweiter <Satz>");
+
+    appendImapMessage.mockResolvedValueOnce(9003);
+    await callTool(token, "update_draft_message", { draftId: `${accountId}-draft-9002`, markdown: "**Neu**" }, 3);
+    expect(lastBuiltDraftMail).toMatchObject({ to: "draft-target@example.test", subject: "HTML", text: "**Neu**" });
+    expect(lastBuiltDraftMail?.html).toContain("<strong>Neu</strong>");
+    const read = await callTool(token, "get_draft_message", { draftId: `${accountId}-draft-9003` }, 4);
+    expect(read.result.structuredContent.draft).toMatchObject({ composeFormat: "markdown", markdown: "**Neu**" });
+  });
+
+  test("update_draft_message appends to plain-text reply and forward drafts above the quoted original", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-text-quote");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const quote = "Am 25.03.2026, 10:00 schrieb Alice <alice@example.test>:\n> Wann passt es?\n>\n> Grüße";
+    const reply = await callTool(token, "create_draft_message", { mode: "reply", messageId: `${accountId}-msg-1`, text: `Danke!\n\n${quote}` });
+    appendImapMessage.mockResolvedValueOnce(9002);
+    await callTool(token, "update_draft_message", { draftId: reply.result.structuredContent.draftId, appendBody: "Dienstag passt." }, 2);
+    expect(lastBuiltDraftMail?.text).toBe(`Danke!\n\nDienstag passt.\n\n${quote}`);
+
+    const forwarded = "-------- Weitergeleitete Nachricht --------\nVon: Bob <bob@example.test>\nBetreff: Projekt\n\n> Bitte ansehen.";
+    appendImapMessage.mockResolvedValueOnce(9003);
+    const forward = await callTool(token, "create_draft_message", { mode: "forward", messageId: `${accountId}-msg-2`,
+      to: "team@example.test", text: forwarded }, 3);
+    appendImapMessage.mockResolvedValueOnce(9004);
+    await callTool(token, "update_draft_message", { draftId: forward.result.structuredContent.draftId, appendBody: "Zur Info." }, 4);
+    expect(lastBuiltDraftMail?.text).toBe(`Zur Info.\n\n${forwarded}`);
+
+    appendImapMessage.mockResolvedValueOnce(9005);
+    const plain = await callTool(token, "create_draft_message", { to: "draft-target@example.test", text: "Erste Zeile\n> kein Zitat am Ende\nLetzte Zeile" }, 5);
+    appendImapMessage.mockResolvedValueOnce(9006);
+    await callTool(token, "update_draft_message", { draftId: plain.result.structuredContent.draftId, appendBody: "Neu." }, 6);
+    expect(lastBuiltDraftMail?.text).toBe("Erste Zeile\n> kein Zitat am Ende\nLetzte Zeile\n\nNeu.");
+  });
+
+  test("update_draft_message appends to Markdown drafts in their source", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-markdown");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const created = await callTool(token, "create_draft_message", { to: "draft-target@example.test", subject: "MD", markdown: "**Hallo**\n\n- Punkt" });
+    expect(lastBuiltDraftMail?.text).toBe("**Hallo**\n\n- Punkt");
+    appendImapMessage.mockResolvedValueOnce(9002);
+    await callTool(token, "update_draft_message", { draftId: created.result.structuredContent.draftId, appendBody: "Noch ein Satz." }, 2);
+    expect(lastBuiltDraftMail?.text).toBe("**Hallo**\n\n- Punkt\n\nNoch ein Satz.");
+    expect(lastBuiltDraftMail?.html).toContain("<strong>Hallo</strong>");
+    expect(lastBuiltDraftMail?.html).toContain("Noch ein Satz.");
+    const read = await callTool(token, "get_draft_message", { draftId: `${accountId}-draft-9002` }, 3);
+    expect(read.result.structuredContent.draft).toMatchObject({ composeFormat: "markdown", markdown: "**Hallo**\n\n- Punkt\n\nNoch ein Satz." });
+  });
+
+  test("draft edit rejects invalid combinations, unknown ids and non-draft messages", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-errors");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const created = await callTool(token, "create_draft_message", { to: "draft-target@example.test", text: "Body" });
+    const draftId = created.result.structuredContent.draftId as string;
+    const cases: Array<[string, Record<string, unknown>, string]> = [
+      ["update_draft_message", { draftId, text: "Neu", appendBody: "Mehr" }, 'Use either "appendBody"'],
+      ["update_draft_message", { draftId, composeFormat: "html" }, '"composeFormat" can only be changed'],
+      ["update_draft_message", { draftId, appendBody: "   " }, '"appendBody" must not be empty'],
+      ["update_draft_message", { draftId: `${accountId}-missing` }, "Draft not found"],
+      ["get_draft_message", { draftId: `${accountId}-missing` }, "Draft not found"],
+      ["update_draft_message", { draftId: `${accountId}-msg-1`, appendBody: "x" }, "is not a draft"],
+      ["get_draft_message", { draftId: `${accountId}-msg-1` }, "is not a draft"]
+    ];
+    for (const [index, [name, args, message]] of cases.entries()) {
+      const body = await callTool(token, name, args, index + 2);
+      expect(body.result.isError).toBe(true);
+      expect(body.result.structuredContent).toMatchObject({ ok: false, code: "invalid_draft", message: expect.stringContaining(message) });
+    }
+    expect(appendImapMessage).toHaveBeenCalledTimes(1);
+    expect(deleteImapMessage).not.toHaveBeenCalled();
+  });
+
+  test("read tokens and viewers can read drafts but cannot update them", async () => {
+    const accountId = uniqueAccountId("acc-mcp-draft-permissions");
+    await seedMailbox(accountId);
+    const { token: editorToken } = await createScopedToken(accountId);
+    const created = await callTool(editorToken, "create_draft_message", { to: "draft-target@example.test", text: "Body" });
+    const draftId = created.result.structuredContent.draftId as string;
+
+    const { token: readToken } = await createScopedToken(accountId, "read");
+    expect((await callTool(readToken, "get_draft_message", { draftId }, 2)).result.structuredContent.draft.draftId).toBe(draftId);
+    expect((await callTool(readToken, "list_draft_messages", {}, 3)).result.structuredContent.total).toBe(1);
+    const readDenied = await callTool(readToken, "update_draft_message", { draftId, appendBody: "Mehr" }, 4);
+    expect(readDenied.result).toMatchObject({ isError: true, content: [{ text: "Token has no drafts permission" }] });
+
+    const viewer = await createScopedToken(accountId, "drafts");
+    await (await dbModulePromise).setUserAccountRole(viewer.userId, accountId, "viewer", null);
+    expect((await callTool(viewer.token, "get_draft_message", { draftId }, 5)).result.structuredContent.draft.draftId).toBe(draftId);
+    const viewerDenied = await callTool(viewer.token, "update_draft_message", { draftId, appendBody: "Mehr" }, 6);
+    expect(viewerDenied.result.isError).toBe(true);
+    expect(viewerDenied.result.content[0]?.text).toContain("Insufficient mailbox role");
+    expect(appendImapMessage).toHaveBeenCalledTimes(1);
+    expect(deleteImapMessage).not.toHaveBeenCalled();
   });
 
   test("returns a clear error for ambiguous topic selectors", async () => {
