@@ -18,31 +18,46 @@ in `lib/db/spam.ts`.
 1. **Trigger.** Every successful sync job (any mode, including the IMAP IDLE
    watcher's repair sync) calls `scheduleSpamSweep(accountId)` in the server
    process (`lib/syncJobs.ts`). The sweep takes the 50 oldest INBOX rows of the
-   last 3 days with `spamCheckedAt IS NULL` that are not already queued or
-   claimed, and claims only those once per process (24 h memory, so a failed or
-   undecided message is not retried by the next sweep; the rest of a backlog is
-   picked up by the next sweeps). Mailboxes with their own switch off are
+   last 3 days with `spamCheckedAt IS NULL` and fewer than three failed
+   attempts that are not already queued or claimed, and claims only those once
+   per process (24 h memory, so an undecided message is not retried by the next
+   sweep; the rest of a backlog is picked up by the next sweeps). The window
+   uses `dateValue` (the sender's Date header); a back-dated mail outside it is
+   not checked, because the arrival time is not stored on the row. Mailboxes with their own switch off are
    skipped before any data is read.
    Sync never waits: the queue runs in the background with concurrency 2.
 2. **Skip.** Only messages still in the INBOX are checked; anything moved to
    Junk, Trash, Sent or Drafts meanwhile is skipped.
 3. **Input** (`input.ts`): From, Reply-To, To, Subject, Date, List-Id,
-   List-Unsubscribe, the top-most `Authentication-Results` block and the first
-   `X-Spam-*` headers (the receiving server's verdicts), the domains of all
-   links, attachment names/types and the plain text without quoted replies,
-   capped at 4,096 characters. No raw HTML. Without a stored source the message
-   row is used. For the sender profile only (never in the prompt): Cc,
+   List-Unsubscribe, the receiving server's `Authentication-Results` block
+   (authserv-id pinning, see Alignment below) and the first
+   `X-Spam-*` headers (the receiving server's verdicts; values cut at 600
+   characters, `X-Spam-Status` at 4,000 so its whole test list stays), the
+   domains of all links, attachment names/types and the plain text without
+   quoted replies, capped at 4,096 characters. A reply attribution or forward
+   marker cuts the text only after 1,024 characters of own text, so a fake
+   attribution line at the top cannot hide the body; `> ` lines always go. No
+   raw HTML. The stored source is parsed as bytes, so 8-bit bodies are decoded
+   by their MIME charset. Without a stored source the message row is used. For the sender profile only (never in the prompt): Cc,
    Message-ID, Auto-Submitted and links whose text names another domain.
 4. **Hard allowlist** (`allowlist.ts`, never spam): enrolled mailbox and
    identity addresses and the household's own domains (free-mail domains
    excluded) — only when SPF or DKIM passed for that domain, because forged
    own-domain senders exist in the corpus —, addresses the mailbox has written
    to (exact To/Cc/Bcc of its Sent folder), and senders whose latest decision is
-   "Kein Spam" (a later "Als Spam" lifts the correspondent entry).
+   "Kein Spam" by a manager of the mailbox (a later "Als Spam" lifts the
+   correspondent entry; an editor's "Kein Spam" is an example for the model,
+   not an allowlist entry). "Passed" counts only the identity the method
+   authenticated (DKIM `header.d`/`header.i`, SPF `smtp.mailfrom`, inside the
+   domain; never `smtp.helo`, selectors or comments). Correspondents and "Kein
+   Spam" senders also need SPF or DKIM pass for the sender's domain whenever
+   the receiving server wrote Authentication-Results, so a forged From of a
+   known sender goes to the model; without any results they apply as before.
    A sender whose latest decision is "Als Spam" also skips the static allow
    rules below; the model decides with that decision among the examples.
 5. **Static rules** (`staticRules.ts`, file below): allow `address`/`domain`
-   rules short-circuit to ham (`requireAuth` rules only after SPF/DKIM pass);
+   rules short-circuit to ham (`requireAuth` rules only after SPF/DKIM pass,
+   the others unless Authentication-Results exist without a pass for them);
    deny rules short-circuit to spam only with `safe: true`; all other matches,
    `builtin:*` features and the server's `X-Spam-Flag: YES` are passed to the
    model as hints. `name` entries never allow; a known display name from an
@@ -55,8 +70,13 @@ in `lib/db/spam.ts`.
 7. **Model** (`classifySpam.ts`): `generateText` with `Output.object` (the AI
    SDK 7 replacement of `generateObject`) and a Zod schema
    `{ verdict: "spam" | "ham" | "unsure", confidence: 0–1, reasons: string[] (≤ 5, German) }`,
-   Anthropic `effort: "low"`, no SDK retries, 30 s timeout per call (a timeout
-   is a failed attempt). Angle brackets in mail-derived text and examples are
+   Anthropic `effort: "low"` without thinking (`thinking: disabled`; models
+   that always think keep it within the budget), at most 4,096 output tokens,
+   no SDK retries, 30 s timeout per call (a timeout is a failed attempt). The
+   provider drops min/max/length bounds from the schema it sends, so they are
+   applied after parsing: reasons are trimmed, cut to 160 characters and
+   capped at five; a confidence outside 0–1 fails the attempt. An answer cut
+   off at the token limit is a failed attempt (`SpamOutputTruncatedError`). Angle brackets in mail-derived text and examples are
    replaced by ‹ ›, so data cannot close the `<email>`/`<beispiele>` blocks.
    The prompt contains the 16 nearest user decisions (same sender address >
    same root domain > subject similarity > most recent, at least three of each
@@ -70,10 +90,17 @@ in `lib/db/spam.ts`.
 9. **Auto-move** (optional per mailbox): marked messages are moved with the same
    code path as "Als Spam" (`app/api/_helpers/message/junkMove.ts`).
 
-Failures (no key, 429, network, timeout, invalid model output) are retried at
-most twice (after 5 s and 30 s), then dropped; the message stays unmarked. Each account
-logs such failures at most once per 10 minutes. Without `ANTHROPIC_API_KEY` only
-the allowlist and static rules decide; everything else stays unchecked.
+Failures (429, overload, network, timeout, invalid or cut-off model output) are
+retried at most twice (after 5 s and 30 s), then dropped; the message stays
+unmarked. Rejections of the request itself (HTTP 400/401/403/404: bad key,
+unknown model id) are not retried. Failed attempts are stored on the unchecked
+row (`spamReasons = ["failed:<n>"]`, ignored without a verdict), so the limit of
+three attempts also holds after a restart or once the 24 h claim expires; a
+message at the limit is never queued again. Each account logs such failures at
+most once per 10 minutes, with the error's name, code and HTTP status only
+(never its message, which can quote the mail or the model output). Without
+`ANTHROPIC_API_KEY` only the allowlist and static rules decide; everything else
+stays unchecked.
 
 ## Caching
 
@@ -116,8 +143,9 @@ authentication and holds only while a mail matches the sender's pattern.
 per account and sender address): number of mails, first/last mail, last "Als
 Spam", mails in Junk folders, how many passed SPF or DKIM aligned with the From
 domain, DKIM domains, a histogram of To+Cc counts, how often the mailbox was
-addressed directly, Reply-To domains, link root domains (at most 150, then
-"overflow"), masked links, attachment types, German/English by stop words,
+addressed directly, Reply-To domains, link root domains (at most 150: the 100
+most frequent plus the 50 most recently seen, so a flood of one-off domains
+never switches the "new link domain" rule off), masked links, attachment types, German/English by stop words,
 subject prefixes (`[tag]`, text before `:` or the first word, digits as `#`),
 lexicon categories, List-Id/List-Unsubscribe/Auto-Submitted and Message-ID
 domains. Rows of Sent, Drafts and Trash never count; Junk rows only count as
@@ -130,6 +158,21 @@ domain is aligned when it is the organisational domain of the From domain or a
 subdomain of it; `getRootDomain` knows multi-label public suffixes
 (`lib/publicSuffixes.ts`: co.uk, com.au …), so `attacker.co.uk` is not aligned
 with `bank.co.uk`. No Authentication-Results counts as not aligned.
+
+**Receiving server** (`receivingAuthenticationResults` in `input.ts`, shared
+with the allowlist): only `Authentication-Results` blocks above the second
+`Received` line whose authserv-id belongs to the receiving server count. That
+is the exact list in `NOCTUA_SPAM_AUTHSERV_ID`, or else the host after "by" in
+the top-most `Received` line (written by our server, never by the sender): an
+authserv-id matches when it equals that host, its first label, or lies in its
+registrable domain (case-insensitive, trailing dot ignored). The label match
+covers MailProvider, which stamps `by mx1.mail.example.com` but writes
+`Authentication-Results: mx1;`. A block the sender inserted under another id —
+for example when the receiving server adds none — is ignored. A forged block
+under our server's own id still counts when the server writes none; a
+provider whose authserv-id lies outside the Received host's domain needs the
+setting. Mails without any `Received` line (local append) keep the top-most
+block.
 
 **Time**: first and last mail are arrival times — the date of the top-most
 `Received` header, which the receiving server stamps (the sender can only add
@@ -152,10 +195,10 @@ mail to the model):
 
 | Rule | Fires when |
 |---|---|
-| Recipients | To+Cc > max(5, 3 × the sender's 95th percentile); mailbox only in Bcc although ≥ 90 % of the history addressed it directly; ≥ 3 different outside recipient circles from the sender within an hour |
+| Recipients | To+Cc > max(5, 3 × the sender's 95th percentile); mailbox only in Bcc although ≥ 90 % of the history addressed it directly; ≥ 3 different outside recipient circles from the sender arriving within an hour (the 20 rows of the sender stored closest to the mail; arrival = Received stamp, else check time, else `dateValue`) |
 | Reply-To | first Reply-To (other than From) of this sender; a new root domain other than the From domain |
 | Authentication | no aligned SPF/DKIM pass on this mail; SPF fail/softfail; no Authentication-Results; DKIM domain new or missing although ≥ 50 % of the history was signed |
-| Links | IP links (loopback/private excluded); new shortener or file-share domains; any new link root domain (unless the profile overflowed); link text naming another domain when < 20 % of the history does |
+| Links | IP links (loopback/private excluded); new shortener or file-share domains; any link root domain not in the profile's bounded set; link text naming another domain when < 20 % of the history does |
 | Attachments | html/zip/rar/7z/iso/img/lnk/js/vbs/macro Office/svg/executables always; PDF when < 5 % of the history had attachments or with payment words in the subject |
 | Content | credential/payment/urgency words the sender uses in < 20 % of its mail; changed bank details always; language switch against ≥ 90 % of ≥ 10 recognised mails; subject outside the fixed prefixes (top 3 cover ≥ 90 %) |
 | Service marks | List-Id/Auto-Submitted missing although ≥ 95 % had them; Message-ID domain new although one domain covers ≥ 95 % |
@@ -164,7 +207,9 @@ mail to the model):
 The model gets one hint line: `Vertrauter Absender (23 Mails seit 2026-03,
 DKIM github.com); Abweichung: …`, explained in the cached rule catalogue, and
 the stricter threshold 0.9. Static rules keep their precedence: a static allow
-or a safe deny decides before the profile.
+or a safe deny decides before the profile, and a rule hint that is not weak
+("Hinweis", "Starker Hinweis") turns a skip into an anomaly ("passt zu einer
+Spam-Regel").
 
 **Skip**: `spamVerdict = "ham"`, `spamReasons = ["trusted:profile (23 Mails seit
 2026-03, DKIM github.com)"]`. **Canary**: 2 % of the skips (FNV-1a hash of the
@@ -173,11 +218,24 @@ with `trusted:canary (…)`. When the model does not say ham the server logs
 `[spam] canary mismatch` (account, message id, verdict, confidence; no content).
 
 **Learning and revocation**: each saved check with the result ham adds the mail
-to the mailbox's profile (spam and unsure results never do) (once per message, as `spamCheckedAt` is set once). "Als
-Spam" by a user (`POST …/messages/:id/spam`) sets the profile's `lastUserSpamAt`
-(a household-wide revocation through the merge) and resets the sender's INBOX
-rows of the last 7 days in every mailbox that were skipped as trusted; they are
-queued for a new check. Moves by `scripts/spam-apply.ts` do not revoke.
+to the mailbox's profile (spam and unsure results never do). A profile
+remembers short keys of its latest 256 counted mails, so a mail checked again
+(after a revocation) or already folded by the backfill is not counted twice.
+"Als Spam" by a user (`POST …/messages/:id/spam` or a move into Junk) sets the
+profile's `lastUserSpamAt` (a household-wide revocation through the merge),
+counts the mail into the sender's junk share once, and resets the sender's
+INBOX rows in every mailbox that were skipped as trusted and checked in the
+last 7 days (sender matched like the profile key: case, display name, IDN);
+they are queued for a new check. The classifier's auto-move to Junk counts the
+mail into the junk share of a sender that already has a profile. Moves by
+`scripts/spam-apply.ts` do not revoke.
+
+`lastUserSpamAt` is final: "Kein Spam" (button or a move out of Junk) for the
+same sender does not reset it, in no mailbox, and neither does a backfill
+(stored times survive). This is deliberate — one "Als Spam" means the sender's
+mail is never skipped as trusted again; the "Kein Spam" decision itself still
+acts as described under the hard allowlist. Undoing it needs a manual change
+of the `spam_sender_profiles` rows.
 
 **Admin**: Verwaltung → Spam-Erkennung shows one read-only line "Vertraute
 Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
@@ -189,10 +247,13 @@ Absender: n ohne Modell übersprungen, n Stichproben, davon n abweichend"
 each source for the header block and attachment names; about 40 s for 87,000
 rows on the dev data). Stored "Als Spam" decisions (`spam_examples`, label
 spam) become `lastUserSpamAt`, so they revoke trust household-wide like new ones.
-`--data <dir> [--out profiles.json]` is the default dry run: read-only
-(`immutable=1`), it prints the plan per account. `--data <dir> --write` replaces
-each account's profiles over the app's DB layer in one transaction, keeping
-stored "Als Spam" times. The data dir always comes from `--data` (never from
+`--data <dir> [--account <id>] [--out profiles.json]` is the default dry run:
+read-only (`mode=ro`), it prints the plan per account (with `--account`
+only that account is built). `--data <dir> --write` replaces each account's
+profiles over the app's DB layer in one transaction, keeping stored "Als Spam"
+times and junk counted live while it was building. Mail stored while it builds
+is read in a catch-up pass (rows after the last rowid it read) before the
+write, so the profile does not lose mail learned in the meantime. The data dir always comes from `--data` (never from
 `NOCTUA_DATA_DIR`/.env.local), `--help` prints the usage, unknown options are
 errors, and shards without the spam schema are refused (the deployed app
 creates it under the runbook). Run it once with `--write` after the deploy of
@@ -215,7 +276,11 @@ would have on arrival.
 
 Examples live in the shard table `spam_examples` (sender, root domain, subject,
 280-character unquoted snippet, label, source, user, time). The latest decision
-per sender and subject replaces older ones; at most 2,000 per account are kept.
+per sender and subject replaces older ones; at most 2,000 per account are kept,
+plus each sender's latest decision when it is "Kein Spam" (it carries the
+sender's allowlist entry, so the cap never drops it). A "Kein Spam" allowlists
+the sender only when its author is a manager of the mailbox at check time;
+editors' marks (buttons or moves out of Junk) teach the model as examples.
 
 ### Lernen beim Verschieben
 
@@ -252,7 +317,10 @@ Additive, following the `senderKey` pattern (doc/HTML-MAIL-PRIVACY.md):
   the shard v2 key/guard contract are unchanged; the guard inventory grows from
   27 to 29 tables (87 triggers);
 - master table `spam_settings (scope, settings, updatedAt, updatedByUserId)`:
-  scope `global` or an account id.
+  scope `global` or `account:<accountId>` (rows under the bare account id
+  from earlier builds are still read and move to the prefixed key on the next
+  save). Every save writes an admin-log entry `spam_settings.update` with the
+  previous and the new settings (target mailbox for per-mailbox saves).
 
 Existing rows start with NULL and are never backfilled; only mail newer than
 three days at the first sweep is checked.
@@ -273,6 +341,7 @@ afterwards that every shard opens (`shardWriterGuardsInstalled`) and has the
 | `NOCTUA_SPAM_THRESHOLD` | env, admin setting overrides | `0.85` (0.5–1) |
 | `NOCTUA_SPAM_ENABLED` | env, admin setting overrides | off |
 | `NOCTUA_SPAM_RULES_FILE` | env | `<data dir>/spam-static-rules.json` |
+| `NOCTUA_SPAM_AUTHSERV_ID` | env, comma-separated | unset: the top-most `Received` "by" host, its first label or its registrable domain |
 | on/off, auto-move, own threshold | per mailbox (admin) | on / off / global |
 
 Admin UI: Verwaltung → Spam-Erkennung (`GET/PUT /api/admin/spam-settings`).
@@ -287,11 +356,16 @@ example a local OpenAI-compatible server) is one more case in `provider.ts`.
 part of the repository. Copy it to `<data dir>/spam-static-rules.json` (mode
 600) or point `NOCTUA_SPAM_RULES_FILE` at it. It is re-read when its mtime or
 size changes. A missing or invalid file means no static rules; unknown fields
-and unknown `builtin:*` values are ignored.
+and unknown `builtin:*` values are ignored. `header` rules (`"Name: regex"`)
+see only Authentication-Results (the receiving server's block), the first
+X-Spam-* of each name, List-Id, List-Unsubscribe, Reply-To and Message-ID;
+rules on other header names never match.
 
 ## Evaluation
 
-Read-only (SQLite `immutable=1`), never writes to the data dir:
+Read-only (SQLite `mode=ro`), never writes to the data dir. It reads the WAL
+of a live data dir, so it can run while the service writes; a long run only
+delays the service's WAL checkpoints:
 
 ```sh
 bun scripts/spam-eval.ts --data /path/to/noctua-data \
@@ -300,10 +374,9 @@ bun scripts/spam-eval.ts --data /path/to/noctua-data \
 
 With `ANTHROPIC_API_KEY` set it calls the model for every undecided message
 (~1,300 calls for the full sample; `--limit N` and `--concurrency N` help);
-without it only the allowlist and static rules run. `--limit N` alone takes the
-first N sample items, and the sample lists spam first, so a small limit
-evaluates no ham. For a test run use `--limit 100 --stratified` (N/2 spam and
-N/2 ham). The output lists precision, recall, decision sources, false positives
+without it only the allowlist and static rules run. `--limit N` takes a seeded
+random sample of N items, so spam and ham keep their share of the full sample;
+`--limit 100 --stratified` takes N/2 spam and N/2 ham. The output lists precision, recall, decision sources, false positives
 and spam passed by the allowlist by subject and sender only. Ham that the server already flagged (`serverSpamFlag`)
 is reported separately from plain false positives. The static rules were derived
 from the same corpus, so their precision there is optimistic.
@@ -354,3 +427,31 @@ Wrongly moved mail must be moved back in Noctua — with „Kein Spam“ or by m
 it out of Junk (move dialog, drag and drop; see "Lernen beim Verschieben") —
 not with another mail client: only moves made in Noctua store the ham example
 the filter learns from.
+
+### Vom Mailserver markierte Mails (`X-Spam-Flag: YES`)
+
+`scripts/spam-apply.ts --server-flagged` selects the INBOX mails whose source
+carries the receiving server's `X-Spam-Flag: YES` (the top-most header, as the
+classifier reads it; only the first 64 KB of each INBOX source are read) and
+moves them to Junk through the same code path. It is conservative
+(`lib/mail/spam/serverFlagBackfill.ts`): a mail stays in the INBOX when its
+sender is on a household domain, has a „Kein Spam“ example (address or root
+domain) or a static allow rule, or was written to from any household Sent
+folder, or sent at least two unflagged INBOX mails; when it is flagged,
+answered, replied to, `$NotJunk`, has a
+collaboration assignment, status, note or topic; when the classifier already
+judged it or will (last three days); or when the mailbox has no Junk folder.
+
+```sh
+# 1. Dry run on an online .backup copy (refused on a live dir), list with every decision (mode 600)
+bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out /tmp/flagged.json
+# 2. Review /tmp/flagged.json; delete entries that must stay in the INBOX
+# 3. Move only reviewed "move" entries the live data still selects (resumable)
+bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only /tmp/flagged.json --out /tmp/applied.json
+```
+
+The spam examples get the source `server-flag-backfill` and the mail's arrival
+time, so they do not crowd the users' recent decisions out of the prompt; the
+sender's trust is not revoked. „Kein Spam“ undoes a move. `scripts/spam-settings.ts
+--data <dir> --mailbox <email> [--threshold 0.8 --write --actor <admin email>]`
+shows or sets a mailbox's own threshold through the admin UI's helper.

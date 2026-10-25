@@ -8,9 +8,11 @@
   line-height: 1.6;
 }
 
+/* Same 84px label column as the other compose rows; a longer label word
+   ("Weitergeleitete Nachricht:") widens the column and wraps at the space. */
 .composeRow {
   display: grid;
-  grid-template-columns: 84px 1fr;
+  grid-template-columns: minmax(84px, min-content) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
 }
@@ -20,6 +22,9 @@
   font-weight: 600;
   flex: 0 0 auto;
   font-size: 12px;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
 }
 
 .content {

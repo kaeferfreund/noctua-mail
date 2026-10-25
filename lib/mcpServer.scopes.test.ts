@@ -74,6 +74,17 @@ test("read token denies every mutation centrally before schema/handler execution
   expect(JSON.stringify((await call(request("future_send_tool"))).responses)).toContain("no permission classification");
 });
 
+test("a batch with two requests sharing an id is rejected instead of waiting forever", async () => {
+  const ping = (id: number | string) => ({ jsonrpc: "2.0", id, method: "ping" });
+  // Responses are matched to requests by String(id), so 1 and "1" collide as well.
+  for (const ids of [[1, 1], [1, "1"]]) {
+    const result = await Promise.race([call(ids.map(ping)), Bun.sleep(2000).then(() => "timeout" as const)]);
+    expect(result).toEqual({ ok: false, responses: [{ jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid request: duplicate id in batch" } }] });
+  }
+  const distinct = await call([ping(1), ping("2")]);
+  expect(distinct.responses.map(message => "id" in message ? message.id : undefined).sort()).toEqual([1, "2"]);
+});
+
 test("list_accounts exposes only token mailboxes with live roles and trusted creator identity", async () => {
   const response = await call(request("list_accounts"));
   const body = response.responses[0] as unknown as { result: { structuredContent: { accounts: { id: string; accessRole: string }[] } } };

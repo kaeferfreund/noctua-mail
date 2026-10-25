@@ -11,6 +11,11 @@ import { totpFromUri } from "../../helpers/totp";
 test.use({ locale: "en-GB" });
 const rows = (page: Page) => page.locator('[data-message-list-row="true"]');
 const active = (page: Page) => page.locator('[data-message-list-row="true"][data-active="true"]');
+// All QA mailboxes share one fixture INBOX, and the Delete/Archive cases below
+// remove messages from it, so after a repeat the first row can be a collapsed
+// thread whose click opens a different message. Target a single-message row.
+const single = (page: Page) => page.locator('[data-message-list-row="true"]:not([data-thread-child="true"])')
+  .filter({ hasNot: page.getByTitle(/ in thread$/) }).first();
 const search = (page: Page) => {
   const params = new URL(page.url()).searchParams;
   const state = parseDeepLink(params.toString());
@@ -56,7 +61,8 @@ test("URL reader: reload, fresh login, Back to list then previous mailbox, Forwa
   await expect.poll(() => search(page).get("accountId")).toBe("qa-second");
   await expect(rows(page).first()).toBeVisible();
   await expect.poll(() => search(page).get("folderId")).toBe("qa-second:INBOX");
-  const id = await rows(page).first().getAttribute("data-message-id"); await rows(page).first().click();
+  const id = await single(page).getAttribute("data-message-id");
+  await page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`).click();
   await expect.poll(() => search(page).get("openMessageId")).toBe(id);
   expect(switchWrites).toEqual(["qa-second"]);
   await page.evaluate(() => { Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
@@ -146,9 +152,9 @@ test("forbidden and deleted message links fall back without exposing mailbox dat
 
 test("390px reader uses a single URL entry; phone Back, Forward and reload return to the same message", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const id = await rows(page).first().getAttribute("data-message-id");
+  const id = await single(page).getAttribute("data-message-id");
   const historyBefore = await page.evaluate(() => history.length);
-  await rows(page).first().click(); await expect.poll(() => search(page).get("openMessageId")).toBe(id);
+  await page.locator(`[data-message-list-row="true"][data-message-id="${id}"]`).click(); await expect.poll(() => search(page).get("openMessageId")).toBe(id);
   expect(await page.evaluate(() => history.length)).toBe(historyBefore + 1);
   await expect(page.locator("#list")).toBeHidden(); await shot(page, "phone-reader-390");
   await page.getByRole("button", { name: "Back to messages", exact: true }).click();
@@ -161,7 +167,7 @@ test("390px reader uses a single URL entry; phone Back, Forward and reload retur
 
 
 test("cold reader does not wait for a held list; warm SW notification resolves an RFC identity through the same route", async ({ page }) => {
-  const id = await rows(page).first().getAttribute("data-message-id");
+  const id = await single(page).getAttribute("data-message-id");
   const detailResponse = await page.request.get(`/api/accounts/qa-shared/messages/${id}`);
   expect(detailResponse.status()).toBe(200);
   const detail = await detailResponse.json();

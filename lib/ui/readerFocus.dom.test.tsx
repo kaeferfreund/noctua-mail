@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent } from "@testing-library/react";
 import { Theme } from "@radix-ui/themes";
 import { render } from "@/lib/i18n/testRender";
 import ShellPanes from "@/app/components/shell/ShellPanes";
-import ReaderToolbar from "@/app/components/mailclient/message/ReaderToolbar";
+import ReaderToolbar, { ReaderFocusHint } from "@/app/components/mailclient/message/ReaderToolbar";
 import MessageListView from "@/app/components/mailclient/messagelist/MessageListView";
 import { reviewListProps } from "@/tests/helpers/i18nSlice2b";
 import { handleMessageRowKeyDown } from "@/app/components/mailclient/messagelist/listInteractions";
@@ -29,11 +29,12 @@ function FocusHarness({ mobile = false }: { mobile?: boolean }) {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [changeLayout, mobile, readerLayout]);
-  const toolbar = <ReaderToolbar layout={readerLayout} showHint={hintMessageId === "synthetic"} dismissHint={dismissHint}
+  const toolbar = <><ReaderToolbar layout={readerLayout}
     toggleLayout={() => changeLayout(readerLayout === "split" ? "focus" : "split")} back={() => changeLayout("split")}
     archive={() => {}} spam={() => {}} inSpam={false} remove={() => {}} move={() => {}} topics={() => {}} done={() => {}}
     isDone={false} busy={false} renderMenu={() => null} openWindow={() => {}} position={1} total={2} hasMore={false}
-    previous={() => {}} next={() => {}} canPrevious={false} canNext navigating={false} />;
+    previous={() => {}} next={() => {}} canPrevious={false} canNext navigating={false} />
+    {readerLayout === "split" && hintMessageId === "synthetic" && <ReaderFocusHint dismiss={dismissHint} />}</>;
   return <Theme><button onClick={onNavigate}>Synthetic folder</button><ShellPanes readerLayout={readerLayout}
     list={<div ref={scroll} data-testid="scroll"><div role="button" tabIndex={0} data-testid="row" data-selected={selected}
       onClick={() => { setSelected(true); onSelect("synthetic"); }}
@@ -143,18 +144,18 @@ test("every focus entry places focus on Back; exit restores scroll with a virtua
   const view = render(<Harness focused={false} rowPresent />);
   view.rerender(<Harness focused rowPresent />);
   await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
-  expect(document.activeElement).toBe(view.getByText("Back"));
+  expectFocused(view.getByText("Back"));
   view.rerender(<Harness focused={false} rowPresent={false} />);
   await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
-  expect(document.activeElement).toBe(view.getByTestId("focus-list"));
+  expectFocused(view.getByTestId("focus-list"));
   expect(view.getByTestId("focus-list").scrollTop).toBe(211);
   // The same effect also handles a single click re-entering the saved preference.
   view.rerender(<Harness focused rowPresent />);
   await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
-  expect(document.activeElement).toBe(view.getByText("Back"));
+  expectFocused(view.getByText("Back"));
   view.rerender(<Harness focused={false} rowPresent />);
   await act(async () => { await new Promise(resolve => window.requestAnimationFrame(resolve)); });
-  expect(document.activeElement).toBe(view.getByText("Synthetic row"));
+  expectFocused(view.getByText("Synthetic row"));
 });
 
 test("exit focuses the reader's message row, also when the reader closes in the same commit", async () => {
@@ -171,15 +172,15 @@ test("exit focuses the reader's message row, also when the reader closes in the 
   // earlier selection.
   view.rerender(<Harness focused readerId="second" />);
   await frame();
-  expect(document.activeElement).toBe(view.getByText("Back"));
+  expectFocused(view.getByText("Back"));
   view.rerender(<Harness focused={false} readerId="second" />);
   await frame();
-  expect(document.activeElement).toBe(view.getByText("Second row"));
+  expectFocused(view.getByText("Second row"));
   view.rerender(<Harness focused readerId="first" />);
   await frame();
   view.rerender(<Harness focused={false} readerId="" />);
   await frame();
-  expect(document.activeElement).toBe(view.getByText("First row"));
+  expectFocused(view.getByText("First row"));
 });
 
 test("focus dropped by a disabled or removed control returns to Back while focused", async () => {
@@ -200,19 +201,19 @@ test("focus dropped by a disabled or removed control returns to Back while focus
   remove.blur();
   view.rerender(<Harness busy notice />);
   await frame();
-  expect(document.activeElement).toBe(view.getByText("Back"));
+  expectFocused(view.getByText("Back"));
   const undo = view.getByText("Undo");
   undo.focus();
   fireEvent.focusOut(undo);
   view.rerender(<Harness busy={false} notice={false} />);
   await frame();
-  expect(document.activeElement).toBe(view.getByText("Back"));
+  expectFocused(view.getByText("Back"));
   // An ordinary blur of a control that is still usable is left alone.
   view.rerender(<Harness busy={false} notice={false} />);
   remove.focus();
   remove.blur();
   await frame();
-  expect(document.activeElement).toBe(document.body);
+  expectFocused(document.body);
 });
 
 test("a focused control disabled for a short busy phase hands focus to Back without waiting for a blur", async () => {

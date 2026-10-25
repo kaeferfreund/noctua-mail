@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { assessSenderTrust } from "./anomaly";
 import type { SenderMailRecord } from "./profileBuild";
-import { householdProfiles, type AccountProfiles, type ProfileFile } from "./profileFile";
+import { buildProfileFile, householdProfiles, type AccountProfiles, type ProfileFile } from "./profileFile";
 import { DAY, START, ownAddresses, trustedFacts, trustedInput } from "./testProfiles";
 
 const senderKey = "notify@service.example.test";
@@ -43,5 +44,34 @@ describe("eval sender histories", () => {
     const revoked = householdProfiles(file({ a: account(), b: account({ mails: {}, userSpam: { [senderKey]: START } }) }), ownAddresses, "built", at(30));
     expect(revoked.trusted).toBe(0);
     expect(await assessSenderTrust({ ...trustedInput, receivedAt: new Date(at(29)).toISOString() }, revoked.context("a", "m29", at(29)))).toBeNull();
+  });
+
+  test("--account builds only that account: other shards are never opened", async () => {
+    const db = new Database(":memory:");
+    try {
+      db.exec(`CREATE TABLE messages (id TEXT, accountId TEXT, folderId TEXT, dateValue INTEGER, fromAddr TEXT, toAddr TEXT, ccAddr TEXT,
+        replyToAddr TEXT, subject TEXT, messageId TEXT, listId TEXT, listUnsubscribe TEXT, body TEXT, htmlBody TEXT, hasSource INTEGER, deleted INTEGER);
+        INSERT INTO messages VALUES ('m1', 'a', 'inbox', 0, 'Service <notify@service.example.test>', 'anna@example.test', NULL, NULL, 'Hallo',
+          NULL, NULL, NULL, 'Text', NULL, 0, 0)`);
+      const opened: string[] = [];
+      const data = {
+        accounts: [{ id: "a", email: "anna@example.test", dbPath: null }, { id: "b", email: "ben@example.test", dbPath: null }],
+        own: { ownAddresses, ownDomains: new Set<string>() },
+        sourcesDir: "/nonexistent",
+        shard: (accountId: string) => {
+          opened.push(accountId);
+          if (accountId !== "a") throw new Error(`shard ${accountId} opened`);
+          return { db, folders: [{ id: "inbox", accountId: "a", name: "INBOX", count: 0, unreadCount: 0, specialUse: "\\Inbox" }] };
+        }
+      } as unknown as Parameters<typeof buildProfileFile>[0];
+      const built: string[] = [];
+      const only = await buildProfileFile(data, (accountId) => built.push(accountId), "a");
+      expect({ opened, built, accounts: Object.keys(only.accounts) }).toEqual({ opened: ["a"], built: ["a"], accounts: ["a"] });
+      expect(only.accounts.a.rows).toBe(1);
+      await expect(buildProfileFile(data, undefined, "missing")).rejects.toThrow("Account missing not found");
+      await expect(buildProfileFile(data)).rejects.toThrow("shard b opened");
+    } finally {
+      db.close();
+    }
   });
 });

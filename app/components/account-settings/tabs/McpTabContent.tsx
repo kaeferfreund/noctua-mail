@@ -287,8 +287,9 @@ function McpTokenSettings({
                 code: (chunks) => <code>{chunks}</code>
               })}
             </Text>
-            <Flex align="center" gap="2" wrap="wrap">
-              <Text size="2" style={{ fontFamily: "var(--font-mono)" }}>
+            {/* The URL wraps beside its copy button instead of widening the card on phones. */}
+            <Flex align="center" gap="2">
+              <Text size="2" title={serverUrl} style={{ fontFamily: "var(--font-mono)", minWidth: 0, overflowWrap: "anywhere" }}>
                 {serverUrl}
               </Text>
               <TooltipIconButton
@@ -318,10 +319,10 @@ function McpTokenSettings({
               <Text size="2" weight="medium">{t("mcp.mailboxes")}</Text>
               <Text size="1" color="gray">{t("mcp.primaryMailboxHint")}</Text>
               {mailboxes.map(mailbox => (
-                <Text as="label" size="2" key={mailbox.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", overflowWrap: "anywhere" }}>
+                <Text as="label" size="2" key={mailbox.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                   <Checkbox checked={selectedAccountIds.includes(mailbox.id)} disabled={mailbox.id === accountId || creating}
                     onCheckedChange={checked => setSelectedAccountIds(current => checked ? [...new Set([...current, mailbox.id])] : current.filter(id => id !== mailbox.id))} />
-                  {mailbox.name} ({mailbox.email})
+                  <span data-user-text>{mailbox.name} ({mailbox.email})</span>
                 </Text>
               ))}
             </Flex>

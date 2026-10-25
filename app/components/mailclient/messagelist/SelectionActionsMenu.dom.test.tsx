@@ -14,6 +14,7 @@ import {
   type SelectionActionTargets
 } from "./selectionActions";
 import { createSelectionStore, type SelectionStore } from "./selectionStore";
+import { expectFocused } from "@/lib/testDomAssertions";
 
 afterEach(cleanup);
 
@@ -202,7 +203,7 @@ describe("header selection menu", () => {
   it("returns focus to the trigger after an action", async () => {
     const { view } = renderMenu({ selected: ["first", "second"] });
     await choose(view, /Mark as unread/);
-    expect(document.activeElement).toBe(trigger(view));
+    expectFocused(trigger(view));
   });
 
   it("clears and selects all", async () => {

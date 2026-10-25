@@ -11,6 +11,7 @@ import {
   serverVerdictAnomalies,
   serviceAnomalies
 } from "./anomaly";
+import { foldSenderMail } from "./senderProfile";
 import { DAY, ownAddresses, START, trustedFacts, trustedInput, trustedProfile } from "./testProfiles";
 
 const profile = trustedProfile(25, 60);
@@ -64,10 +65,32 @@ describe("anomaly rules: each one positive and one negative case", () => {
     expect(linkAnomalies(profile, { ...mail, linkHosts: ["127.0.0.1", "192.168.1.10"] }).anomalies).toEqual([]);
     expect(linkAnomalies(profile, { ...mail, linkHosts: ["bit.ly"] }).anomalies).toEqual(["neue Link-Domain bit.ly (Kürzer/Freigabe)"]);
     expect(linkAnomalies(profile, { ...mail, linkHosts: ["login.example.invalid"] }).anomalies).toEqual(["neue Link-Domain example.invalid"]);
-    expect(linkAnomalies({ ...profile, linkDomainsOverflow: true }, { ...mail, linkHosts: ["login.example.invalid"] }).anomalies).toEqual([]);
     expect(linkAnomalies(profile, { ...mail, maskedLinkDomains: ["evil.example.invalid"] }).anomalies)
       .toEqual(["Linktext zeigt eine andere Domain als das Ziel (evil.example.invalid)"]);
     expect(linkAnomalies(profile, { ...mail, linkHosts: ["docs.service.example.test"] }).anomalies).toEqual([]);
+  });
+
+  test("links: a flood of one-off link domains never switches the new-domain rule off", () => {
+    let flooded = trustedProfile(25, 60);
+    for (let index = 0; index < 400; index += 1) {
+      flooded = foldSenderMail(flooded, trustedFacts({ date: START + 60 * DAY + index * 60_000, linkHosts: [`www.flood${index}.invalid`] }));
+    }
+    const later = { ...mail, date: START + 62 * DAY };
+    expect(Object.keys(flooded.linkDomains)).toHaveLength(150);
+    // The usual domain stays known, the latest one-off domains too; anything else is new again.
+    expect(linkAnomalies(flooded, { ...later, linkHosts: ["app.service.example.test", "www.flood399.invalid"] }).anomalies).toEqual([]);
+    expect(linkAnomalies(flooded, { ...later, linkHosts: ["login.phish.invalid"] }).anomalies).toEqual(["neue Link-Domain phish.invalid"]);
+    expect(linkAnomalies(flooded, { ...later, linkHosts: ["www.flood0.invalid"] }).anomalies).toEqual(["neue Link-Domain flood0.invalid"]);
+    // A domain that recurs climbs into the frequent part and is not displaced by the next flood.
+    let recurring = flooded;
+    for (let index = 0; index < 3; index += 1) {
+      recurring = foldSenderMail(recurring, trustedFacts({ date: START + 61 * DAY + index * 60_000, linkHosts: ["www.partner.invalid"] }));
+    }
+    for (let index = 0; index < 300; index += 1) {
+      recurring = foldSenderMail(recurring, trustedFacts({ date: START + 62 * DAY + index * 60_000, linkHosts: [`www.wave${index}.invalid`] }));
+    }
+    expect(recurring.linkDomains["partner.invalid"]).toBe(3);
+    expect(Object.keys(recurring.linkDomainsSeenAt).sort()).toEqual(Object.keys(recurring.linkDomains).sort());
   });
 
   test("attachments: risky types always, PDF only when unusual or with a payment subject", () => {

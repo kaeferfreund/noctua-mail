@@ -53,20 +53,11 @@ export type ShellViews = {
   virtual: ShellView[];
 };
 
-/** Splits the accessible mailboxes into the two sidebar sections. */
-export function partitionMailboxes(accounts: readonly ShellAccount[]): {
-  mine: ShellAccount[];
-  shared: ShellAccount[];
-} {
-  const mine: ShellAccount[] = [];
-  const shared: ShellAccount[] = [];
-  for (const account of accounts) {
-    (account.shared ? shared : mine).push(account);
-  }
-  const byName = (a: ShellAccount, b: ShellAccount) =>
+/** The accessible mailboxes in sidebar order: name, then e-mail and id. */
+export function sortMailboxes(accounts: readonly ShellAccount[]): ShellAccount[] {
+  return [...accounts].sort((a, b) =>
     mailboxLabel(a).localeCompare(mailboxLabel(b), "en", { sensitivity: "base" }) ||
-    a.email.localeCompare(b.email) || a.id.localeCompare(b.id);
-  return { mine: mine.sort(byName), shared: shared.sort(byName) };
+    a.email.localeCompare(b.email) || a.id.localeCompare(b.id));
 }
 
 /** Up to two initials for the mailbox avatar, from the name or the e-mail. */

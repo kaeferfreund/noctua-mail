@@ -14,8 +14,12 @@ const projectDir = path.resolve(import.meta.dirname);
 // spelling a client may send out of the request log, not only the issued
 // /reset-password?token= and /api/ba/reset-password/<token> forms: any letter
 // case, any percent-encoded character, wherever "reset-password" appears.
+// The "i" flag covers the hex digits only, so each letter lists the encodings
+// of its lower- and upper-case forms (%72 and %52 for "r").
+const percentEncoded = (char: string) => `%${char.charCodeAt(0).toString(16)}`;
 const RESET_PASSWORD_ANY_SPELLING = new RegExp([..."reset-password"]
-  .map((char) => `(?:${char}|%${char.charCodeAt(0).toString(16)})`).join(""), "i");
+  .map((char) => `(?:${char}|${[...new Set([char.toLowerCase(), char.toUpperCase()])].map(percentEncoded).join("|")})`)
+  .join(""), "i");
 
 const nextConfig: NextConfig = {
   logging: { incomingRequests: { ignore: [RESET_PASSWORD_ANY_SPELLING] } },

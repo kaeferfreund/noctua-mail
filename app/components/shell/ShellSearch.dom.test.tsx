@@ -4,6 +4,7 @@ import { cleanup, fireEvent, within } from "@testing-library/react";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
+import { expectFocused } from "@/lib/testDomAssertions";
 
 afterEach(cleanup);
 
@@ -98,7 +99,7 @@ describe("shell search filters", () => {
     expect(notification.checked).toBe(false);
     const ai = filters.getByRole("checkbox", { name: "AI Modified" }) as HTMLInputElement;
     ai.focus();
-    expect(document.activeElement).toBe(ai);
+    expectFocused(ai);
     fireEvent.click(ai);
     expect(ai.checked).toBe(true);
   });

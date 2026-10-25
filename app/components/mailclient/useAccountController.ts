@@ -134,6 +134,9 @@ export function useAccountController({
   const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  // The selected mailbox whose folders the bootstrap could not read. Its error is shown;
+  // the startup restore stops waiting for those folders, the startup sync does not start.
+  const [foldersUnavailableAccountId, setFoldersUnavailableAccountId] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const instanceAdmin = useRef(false);
   const lastIdentity = useRef<string | null>(null);
@@ -192,6 +195,7 @@ export function useAccountController({
       };
       setInitialDataReady(false);
       setInitialFoldersLoadedAccountId(null);
+      setFoldersUnavailableAccountId(null);
       setBootstrapError(null);
       try {
         const me = await apiFetch("/api/auth/me", { credentials: "include", cache: "no-store" });
@@ -243,7 +247,11 @@ export function useAccountController({
           if (switchOwnsSelection()) { deferToSwitch({ accountId: selected, accounts: nextAccounts }); return; }
           if (foldersRes.ok) {
             setFolders(await foldersRes.json() as Folder[]); setInitialFoldersLoadedAccountId(selected);
-          } else reportError(await readErrorMessage(foldersRes));
+          } else {
+            reportError(await readErrorMessage(foldersRes));
+            if (version !== loadVersion.current) return;
+            setFoldersUnavailableAccountId(selected);
+          }
         } else setInitialFoldersLoadedAccountId("");
         setInitialDataReady(true);
       } catch {
@@ -588,7 +596,7 @@ export function useAccountController({
   }, [loadInitialData]);
 
   return {
-    mailboxState, security, bootstrapError, logout,
+    mailboxState, security, bootstrapError, foldersUnavailableAccountId, logout,
     loadInitialData,
     switchAccount,
     refreshFolders,

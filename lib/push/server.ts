@@ -44,7 +44,9 @@ export function readPushConfig(env: Record<string, string | undefined> = process
  * browser push services are accepted (SSRF guard): Chrome/Edge/Android (FCM),
  * Firefox (Mozilla autopush), Safari/iOS (APNs web push), legacy Edge (WNS).
  */
-const PUSH_SERVICE_HOST_SUFFIXES = [".googleapis.com", ".push.services.mozilla.com", ".push.apple.com", ".notify.windows.com"];
+const PUSH_SERVICE_HOSTS = new Set(["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"]);
+/** WNS uses regional hosts such as wns2-par02p.notify.windows.com. */
+const PUSH_SERVICE_HOST_SUFFIXES = [".notify.windows.com"];
 
 export function isAllowedPushEndpoint(endpoint: string) {
   if (endpoint.length > 2048) return false;
@@ -62,7 +64,7 @@ export function isAllowedPushEndpoint(endpoint: string) {
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(host)) return false;
   const rawAuthority = endpoint.slice("https://".length).split(/[/?#]/, 1)[0];
   if (rawAuthority.toLowerCase() !== host) return false;
-  return PUSH_SERVICE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix) && host.length > suffix.length);
+  return PUSH_SERVICE_HOSTS.has(host) || PUSH_SERVICE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix) && host.length > suffix.length);
 }
 
 export type PushTarget = { endpoint: string; p256dh: string; auth: string };

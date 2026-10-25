@@ -9,6 +9,8 @@ import { I18nTestProvider } from "@/lib/i18n/testRender";
 afterEach(cleanup);
 const noop = () => {};
 const folder = (accountId: string): Folder => ({ id: `${accountId}:INBOX`, accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" });
+const archive = (accountId: string): Folder => ({ id: `${accountId}:Archive`, accountId, name: "Archive", count: 0 });
+let streamFolderStatus = 200;
 
 type JobStatus = { result?: { count: number; newMessages?: readonly unknown[] }; progress?: { mode: string } };
 
@@ -16,9 +18,14 @@ function mount(confirm: UseSyncControllerParams["confirmFullSyncStart"] = async 
   const jobs: { accountId: string; folderId?: string }[] = [];
   const requests: string[] = [];
   const refreshes: Array<{ skipIfCurrent?: boolean } | undefined> = [];
+  const folderSwitches: Array<{ path: string; body: unknown }> = [];
   const apiFetch: UseSyncControllerParams["apiFetch"] = async (input, init) => {
     const path = String(input);
     requests.push(path);
+    if (path.endsWith("/imap/stream/folder")) {
+      folderSwitches.push({ path, body: JSON.parse(String(init?.body)) });
+      return Response.json({ ok: streamFolderStatus === 200 }, { status: streamFolderStatus });
+    }
     if (path.endsWith("/sync")) {
       jobs.push({ ...JSON.parse(String(init?.body)), accountId: path.split("/")[3] });
       return Response.json({ ok: true, jobId: "synthetic-job" });
@@ -29,13 +36,13 @@ function mount(confirm: UseSyncControllerParams["confirmFullSyncStart"] = async 
   };
   const hook = renderHook(({ accountId, folderId }) => useSyncController({
     activeAccountId: accountId, activeFolderId: folderId, activeVirtualFolderId: "", searchScope: "folder", authState,
-    inboxMailboxPath: authState === "ok" ? "INBOX" : "", accountFolders: [folder(accountId)], inboxFolder: folder(accountId), apiFetch,
+    inboxMailboxPath: authState === "ok" ? "INBOX" : "", accountFolders: [folder(accountId), archive(accountId)], inboxFolder: folder(accountId), apiFetch,
     readErrorMessage: async res => `HTTP ${res.status}`, reportError: noop, pushNotice: noop, showNotification: async () => false,
     refreshMailboxData: async options => { refreshes.push(options); return true; }, refreshFolders: async () => [folder(accountId)], refreshPendingCalendarReminders: async () => {},
     setFolders: noop, setMessages: noop, setActiveFolderId: noop, isNotificationSuppressedFolder: () => false,
     updateMessagesWithCurrentResultPrune: noop, confirmFullSyncStart: confirm, currentKeyRef: useRef(accountId)
   }), { initialProps: { accountId: "synthetic-a", folderId: "synthetic-a:INBOX" }, wrapper: I18nTestProvider });
-  return { ...hook, jobs, refreshes, requests };
+  return { ...hook, jobs, refreshes, requests, folderSwitches };
 }
 
 describe("planned SSE reconnect", () => {
@@ -50,7 +57,13 @@ describe("planned SSE reconnect", () => {
   let intervalSpy: ReturnType<typeof spyOn<typeof window, "setInterval">>;
   let timeoutSpy: ReturnType<typeof spyOn<typeof window, "setTimeout">>;
   const visibility = (value: DocumentVisibilityState) => Object.defineProperty(document, "visibilityState", { configurable: true, value });
+  const streamParams = (source: SyntheticEventSource) => new URL(source.url, "http://localhost").searchParams;
+  const withoutKey = (source: SyntheticEventSource) => {
+    const params = streamParams(source); params.delete("streamKey");
+    return `${source.url.split("?")[0]}?${params}`;
+  };
   beforeEach(() => {
+    streamFolderStatus = 200;
     originalEventSource = globalThis.EventSource;
     originalVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
     globalThis.EventSource = SyntheticEventSource as unknown as typeof EventSource;
@@ -76,7 +89,9 @@ describe("planned SSE reconnect", () => {
     expect(sources).toHaveLength(2);
     expect(sources[0].closes).toBe(1);
     expect(sources[1].closes).toBe(0);
-    expect(sources[1].url).toBe(sources[0].url);
+    // Same account and folder; every stream carries its own key.
+    expect(withoutKey(sources[1])).toBe(withoutKey(sources[0]));
+    expect(streamParams(sources[1]).get("streamKey")).not.toBe(streamParams(sources[0]).get("streamKey"));
     expect(h.result.current.streamMode).toBe("stream");
     expect(h.result.current.mailCheckMode).toBe("idle");
     expect(h.requests.some(path => path.includes("/imap/poll"))).toBe(false);
@@ -87,34 +102,81 @@ describe("planned SSE reconnect", () => {
     expect(sources).toHaveLength(2);
   });
 
-  test("reconnect from an old folder/account or after unmount cannot reopen a stream", async () => {
+  test("reconnect from an old account or after unmount cannot reopen a stream", async () => {
     const h = mount(undefined, undefined, "ok");
     await act(async () => {});
     const original = sources[0];
     h.rerender({ accountId: "synthetic-a", folderId: "synthetic-a:Archive" });
-    const folderSource = sources[1];
     h.rerender({ accountId: "synthetic-b", folderId: "synthetic-b:INBOX" });
-    expect(sources).toHaveLength(3);
-    const current = sources[2];
-    act(() => { original.dispatchEvent(new Event("reconnect")); folderSource.dispatchEvent(new Event("reconnect")); });
-    expect(sources).toHaveLength(3);
+    expect(sources).toHaveLength(2);
+    const current = sources[1];
+    act(() => { original.dispatchEvent(new Event("reconnect")); });
+    expect(sources).toHaveLength(2);
     expect(current.closes).toBe(0);
     h.unmount();
     act(() => { current.dispatchEvent(new Event("reconnect")); });
-    expect(sources).toHaveLength(3);
+    expect(sources).toHaveLength(2);
     expect(sources.every(source => source.closes === 1)).toBe(true);
     expect(intervalSpy).not.toHaveBeenCalled();
   });
 
-  test("reconnect while hidden closes the source and waits for visibility before reopening", async () => {
+  test("a folder switch moves the open stream; only an account switch opens a new one", async () => {
     const h = mount(undefined, undefined, "ok");
-    await act(async () => {});
+    await act(async () => { sources[0].dispatchEvent(new Event("open")); });
+    const streamKey = streamParams(sources[0]).get("streamKey");
+    expect(streamKey).toMatch(/^[a-f0-9]{32}$/);
+    expect(streamParams(sources[0]).get("activeFolderId")).toBe("synthetic-a:INBOX");
+    await act(async () => { h.rerender({ accountId: "synthetic-a", folderId: "synthetic-a:Archive" }); });
+    await act(async () => { h.rerender({ accountId: "synthetic-a", folderId: "synthetic-a:INBOX" }); });
+    // Before: every folder switch closed the source and opened a new one (INBOX reconnect on the server).
+    expect(sources).toHaveLength(1);
+    expect(sources[0].closes).toBe(0);
+    expect(h.folderSwitches).toEqual([
+      { path: "/api/accounts/synthetic-a/imap/stream/folder", body: { streamKey, folderId: "synthetic-a:Archive", seq: 1 } },
+      { path: "/api/accounts/synthetic-a/imap/stream/folder", body: { streamKey, folderId: "synthetic-a:INBOX", seq: 2 } }
+    ]);
+    expect(h.result.current.streamMode).toBe("stream");
+    await act(async () => { h.rerender({ accountId: "synthetic-b", folderId: "synthetic-b:INBOX" }); });
+    expect(sources).toHaveLength(2);
+    expect(sources[0].closes).toBe(1);
+    expect(sources[1].url.startsWith("/api/accounts/synthetic-b/imap/stream?")).toBe(true);
+    expect(h.folderSwitches).toHaveLength(2);
+  });
+
+  test("a switch made while the stream opens is sent once it is open", async () => {
+    const h = mount(undefined, undefined, "ok");
+    await act(async () => { h.rerender({ accountId: "synthetic-a", folderId: "synthetic-a:Archive" }); });
+    expect(h.folderSwitches).toHaveLength(0);
+    await act(async () => { sources[0].dispatchEvent(new Event("open")); });
+    expect(h.folderSwitches.map(entry => entry.body)).toEqual([
+      { streamKey: streamParams(sources[0]).get("streamKey"), folderId: "synthetic-a:Archive", seq: 1 }
+    ]);
+    expect(sources).toHaveLength(1);
+  });
+
+  test("a switch the server cannot apply reopens the stream on the current folder", async () => {
+    const h = mount(undefined, undefined, "ok");
+    await act(async () => { sources[0].dispatchEvent(new Event("open")); });
+    streamFolderStatus = 404;
+    await act(async () => { h.rerender({ accountId: "synthetic-a", folderId: "synthetic-a:Archive" }); });
+    expect(sources).toHaveLength(2);
+    expect(sources[0].closes).toBe(1);
+    expect(streamParams(sources[1]).get("activeFolderId")).toBe("synthetic-a:Archive");
+  });
+
+  test("reconnect while hidden closes the source, polls in the background and reopens on visibility", async () => {
+    const h = mount(undefined, undefined, "ok");
+    await act(async () => { sources[0].dispatchEvent(new Event("open")); });
+    expect(h.result.current.streamMode).toBe("stream");
+    // `visibilitychange` was missed: the page is hidden but still in stream mode.
     visibility("hidden");
-    act(() => { sources[0].dispatchEvent(new Event("reconnect")); });
+    await act(async () => { sources[0].dispatchEvent(new Event("reconnect")); });
     expect(sources).toHaveLength(1);
     expect(sources[0].closes).toBe(1);
-    expect(intervalSpy).not.toHaveBeenCalled();
-    expect(h.requests.some(path => path.includes("/imap/poll"))).toBe(false);
+    expect(h.result.current.streamMode).toBe("polling");
+    expect(h.result.current.mailCheckMode).toBe("polling");
+    expect(intervalSpy.mock.calls.filter(([, ms]) => ms === 300000)).toHaveLength(1);
+    expect(h.requests.filter(path => path.includes("/imap/poll"))).toHaveLength(1);
     visibility("visible");
     act(() => { document.dispatchEvent(new Event("visibilitychange")); });
     expect(sources).toHaveLength(2);

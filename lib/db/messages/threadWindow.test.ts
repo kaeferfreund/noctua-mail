@@ -227,4 +227,24 @@ describe("thread window ordering", () => {
     expect(result.window.total).toBe(20);
     expect(result.items.some((item) => item.folderId === `${accountId}-trash`)).toBe(false);
   });
+
+  test("a folder-limited window holds only that folder's rows, also beside folders the account no longer lists", async () => {
+    const accountId = "acc-thread-window-one-folder";
+    const threadId = `${accountId}-thread`;
+    const messages = conversation(accountId, threadId, 30).map((message, index) =>
+      index % 3 === 0
+        ? { ...message, folderId: `${accountId}-trash` }
+        : index % 3 === 1 ? { ...message, folderId: `${accountId}-unlisted` } : message
+    );
+    await seed(accountId, messages);
+    const result = await listThreadMessageWindow({
+      accountId,
+      threadId,
+      anchorMessageId: messages[27].id,
+      folderId: `${accountId}-trash`
+    });
+    expect(result.window.total).toBe(10);
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items.every((item) => item.folderId === `${accountId}-trash`)).toBe(true);
+  });
 });

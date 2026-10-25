@@ -168,3 +168,20 @@ test("fragment links scroll inside the mail document and missing targets never n
   expect(opened).toEqual([]);
   expect(frame.contentDocument).toBe(doc);
 });
+
+test("an image that fails to load shows its alt text instead of the broken-image icon", () => {
+  const view = render(<HtmlMessage darkMode={false} html={'<p>Logo:</p><img alt="Synthetic logo" src="cid:logo"><img src="cid:spacer"><img alt="Photo" src="https://images.example.test/photo">'} />);
+  const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
+  // Remote content stays blocked: the failure handling never adds a remote source.
+  expect(frame.srcdoc).not.toMatch(/\ssrc="https:\/\/images\.example\.test/);
+  const doc = new DOMParser().parseFromString(frame.srcdoc, "text/html");
+  Object.defineProperty(doc, "readyState", { value: "complete" });
+  Object.defineProperty(frame, "contentDocument", { value: doc });
+  fireEvent.load(frame);
+  const [logo, spacer] = Array.from(doc.querySelectorAll<HTMLImageElement>('img[src^="cid:"]'));
+  fireEvent.error(logo!);
+  fireEvent.error(spacer!);
+  expect(doc.querySelectorAll('img[src^="cid:"]')).toHaveLength(0);
+  expect(doc.querySelector(".noctua-image-alt")?.textContent).toBe("Synthetic logo");
+  expect(doc.querySelectorAll(".noctua-image-alt")).toHaveLength(1);
+});

@@ -61,10 +61,22 @@ describe("next.config request logging", () => {
       "/reset%2Dpassword?token=synthetic-token",
       "/reset-password%3Ftoken=synthetic-token",
       "/api/ba//reset-password/synthetic-token",
-      "/api/ba/Reset-Password/synthetic-token"
+      "/api/ba/Reset-Password/synthetic-token",
+      // Percent encodings of the upper-case letters, in both hex-digit cases.
+      "/%52ESET-PASSWORD?token=synthetic-token",
+      "/%52eset-password?token=synthetic-token",
+      "/reset-%50assword?token=synthetic-token",
+      "/%52%45%53%45%54%2D%50%41%53%53%57%4F%52%44?token=synthetic-token",
+      "/%52%45%53%45%54%2d%50%41%53%53%57%4f%52%44?token=synthetic-token",
+      "/%72%65%73%65%74%2d%70%61%73%73%77%6f%72%64?token=synthetic-token",
+      "/api/ba/RESET%2DPASSWOR%44/synthetic-token"
     ]) expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: true });
 
-    for (const url of ["/", "/api/ba/sign-in/email", "/api/ba/request-password-reset", "/settings/password"]) {
+    for (const url of [
+      "/", "/api/ba/sign-in/email", "/api/ba/request-password-reset", "/settings/password",
+      // Encodings of other characters must not match.
+      "/%53eset-password", "/reset-%51assword", "/reset%5Fpassword"
+    ]) {
       expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: false });
     }
   });

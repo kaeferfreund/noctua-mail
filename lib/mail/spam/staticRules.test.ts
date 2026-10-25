@@ -54,6 +54,23 @@ describe("static rules", () => {
     expect(applyStaticRules(rules, input("kontakt@household.example.test", "Hi", { authenticationResults: passed("forged.example") })).decision).toBeNull();
   });
 
+  test("rules without requireAuth do not allow a forged From when the server reports authentication", () => {
+    const forged = { authenticationResults: ["mxe.example.test; spf=pass smtp.mailfrom=x@attacker.example; dkim=pass header.d=attacker.example"] };
+    expect(applyStaticRules(rules, input("partner@example.test", "Hi", forged)).decision).toBeNull();
+    expect(applyStaticRules(rules, input("a@shop.co.example", "Hi", forged)).decision).toBeNull();
+    expect(applyStaticRules(rules, input("partner@example.test", "Hi", { authenticationResults: passed("example.test") })).decision).toBe("allow");
+    expect(applyStaticRules(rules, input("a@mail.shop.co.example", "Hi", { authenticationResults: passed("shop.co.example") })).decision).toBe("allow");
+  });
+
+  test("header rules see the Message-ID", () => {
+    const hint = parseStaticRules({ hints: [{ type: "header", value: "message-id: @ip[\\d-]*\\.ip-\\d+-\\d+-\\d+\\.", spamHits: 19, hamHits: 1, note: "Message-ID host is an IP-derived hostname" }] });
+    const withId = (messageId: string | null) => ({ ...input("x@example.test"), messageId });
+    expect(applyStaticRules(hint, withId("<a1b2@ip198-51-100-7.ip-198-51-100.example>")).hints)
+      .toEqual(["Hinweis: header „message-id: @ip[\\d-]*\\.ip-\\d+-\\d+-\\d+\\.“ (Message-ID host is an IP-derived hostname) – bisher 19× Spam, 1× kein Spam"]);
+    expect(applyStaticRules(hint, withId("<a1b2@mail.example.test>")).hints).toEqual([]);
+    expect(applyStaticRules(hint, withId(null)).hints).toEqual([]);
+  });
+
   test("name entries never allow; an unknown address with a known name is a weak hint", () => {
     expect(applyStaticRules(rules, input("Erika Muster <erika@example.test>")).decision).toBeNull();
     expect(applyStaticRules(rules, input("Erika Muster <erika@example.test>")).hints).toEqual([]);

@@ -106,7 +106,10 @@ refreshes the row and its files.
 
 Lazy sender-key backfill requires an exact final-row-id source matching that
 ownership digest. Legacy files without a digest are never trusted for sender
-permissions, even if their filename exactly matches a row. Authoritative resync
+permissions on open, even if their filename exactly matches a row; only the
+one-time operator tool `scripts/backfill-sender-keys.ts` stamps them, after
+matching byte size, Message-ID and From mailbox against the row
+([HTML mail privacy](HTML-MAIL-PRIVACY.md)). Authoritative resync
 writes both the parsed sender key and the ownership digest. Low-level cache
 rewrites (for example attachment-removal fallback) do not establish provenance;
 if they change the bytes, backfill waits for resync.

@@ -7,11 +7,47 @@ import { buildOwnIdentitySets } from "./allowlist";
 /**
  * Strictly read-only access to a Noctua data dir for the spam scripts
  * (spam-eval, spam-profiles-backfill --dry-run): every database is opened with
- * `immutable=1`, so a live data dir's locks and -wal/-shm files are never touched.
+ * `mode=ro`. Unlike `immutable=1` it reads the WAL, so pages the live service
+ * has not checkpointed yet are seen and a concurrent write cannot make the
+ * file look malformed; it never writes the database or checkpoints the WAL.
  */
 export function openReadOnly(file: string) {
   const flags = (constants as Record<string, number>).SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI;
-  return new Database(`file:${encodeURI(file)}?immutable=1`, flags);
+  return new Database(`file:${encodeURI(file)}?mode=ro`, flags);
+}
+
+/** Deterministic PRNG for the eval samples (mulberry32). */
+export function seededRandom(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A seeded Fisher–Yates shuffle (a new array). */
+export function seededShuffle<T>(items: readonly T[], seed: number) {
+  const next = seededRandom(seed);
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(next() * (index + 1));
+    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+  }
+  return shuffled;
+}
+
+/**
+ * The items of an eval run. `limit` > 0 takes a seeded random sample of that
+ * size, so spam and ham keep their share of the full sample (which lists spam
+ * first); `stratified` takes half spam and half ham instead.
+ */
+export function selectEvalItems<T extends { label: "spam" | "ham" }>(items: readonly T[], limit: number, stratified: boolean, seed = 42) {
+  if (limit <= 0) return [...items];
+  const shuffled = seededShuffle(items, seed);
+  if (!stratified) return shuffled.slice(0, limit);
+  const byLabel = (label: T["label"], count: number) => shuffled.filter((item) => item.label === label).slice(0, count);
+  return [...byLabel("spam", Math.ceil(limit / 2)), ...byLabel("ham", Math.floor(limit / 2))];
 }
 
 export type SpamDataAccount = { id: string; email: string; dbPath: string | null };

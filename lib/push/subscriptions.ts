@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { createHash, randomUUID } from "crypto";
 import { withDbWriteRetry } from "@/lib/dbWriteRetry";
 import { parsePushDeviceSettings } from "./settings";
@@ -143,6 +144,11 @@ export async function deleteOwnPushSubscription(userId: string, selector: { id: 
       : db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ? AND userId = ?`).run(selector.endpoint, userId);
     return result.changes > 0;
   });
+}
+
+/** User deletion: the user's devices go with the account (inside the caller's transaction). */
+export function deletePushSubscriptionRowsForUser(db: Database, userId: string) {
+  db.prepare(`DELETE FROM push_subscriptions WHERE userId = ?`).run(userId);
 }
 
 /** Push service reported the subscription gone (404/410). */
